@@ -35,3 +35,14 @@ src-tauri/target/
 *.njsproj
 *.sln
 *.sw?
+
+# ── Vendored runtime binaries ────────────────────────────────────────────────
+# ripgrep (single binary) and Git for Windows (a full tree providing git + bash
+# + the POSIX toolchain) are fetched at build time by scripts/vendor-sync.mjs
+# from pinned, checksummed upstreams — NOT committed. They're large and fully
+# reproducible, and scripts/tauri-wrapper.mjs runs vendor-sync before every
+# build/dev so packaged apps still ship them offline. The manifest + README stay
+# tracked as the source of truth (pinned versions, checksums, layout).
+/vendor/*
+!/vendor/manifest.json
+!/vendor/README.md

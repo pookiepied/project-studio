@@ -13,6 +13,18 @@
         "linux-x64": "ripgrep/linux-x64/rg",
         "linux-arm64": "ripgrep/linux-arm64/rg"
       }
+    },
+    "git": {
+      "kind": "tree",
+      "source": "git-for-windows/git",
+      "version": "2.55.0.2",
+      "entry": [
+        "cmd/git.exe",
+        "bin/bash.exe"
+      ],
+      "platforms": {
+        "win32-x64": "git/win32-x64"
+      }
     }
   }
 }

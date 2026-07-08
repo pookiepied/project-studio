@@ -20,8 +20,11 @@
 
 import { execSync }                                from "child_process";
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
-import { join }                                    from "path";
+import { join, dirname }                           from "path";
+import { fileURLToPath }                           from "url";
 import { homedir, tmpdir }                         from "os";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ── Credential paths ────────────────────────────────────────────────────────
 
@@ -83,6 +86,22 @@ if (willSign) {
 
 // process.argv: [node, scripts/tauri-wrapper.mjs, ...tauriArgs]
 const args = process.argv.slice(2);
+
+// ── Ensure vendored runtime binaries are present before dev/build ───────────
+// git (for Windows) + ripgrep are fetched at build time by vendor-sync, not
+// committed. This is idempotent — it no-ops in a second or two once the vendor
+// tree is current, and downloads once on a fresh checkout. A packaged app that
+// shipped without these would have broken git/bash/search, so a failure here is
+// fatal rather than silently degrading.
+if (args[0] === "build" || args[0] === "dev") {
+  try {
+    console.log("[tauri-wrapper] Ensuring vendored runtime binaries (git, ripgrep)…");
+    execSync(`node "${join(__dirname, "vendor-sync.mjs")}"`, { stdio: "inherit", env: process.env });
+  } catch (err) {
+    console.error("[tauri-wrapper] vendor-sync failed — cannot build/run without bundled git + ripgrep.");
+    process.exit(typeof err.status === "number" ? err.status : 1);
+  }
+}
 
 let tmpConfigPath = null;
 
