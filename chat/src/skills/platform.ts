@@ -23,7 +23,8 @@ export const PRODUCT_SELF_KNOWLEDGE = `
 
 - **MCP (Model Context Protocol):** Connect local MCP servers (run via Tauri subprocess) or remote MCP servers (HTTP endpoint, called directly from the Worker). Tool manifests are stored in KV and injected into the agent's schema on demand via \`expand_tools\`.
 - **Studio Harness Tools (when desktop app is active):** Full local machine access — read/write/edit files, run bash/PowerShell, use git tools (status, diff, log, commit, branch), SSH into remote servers, search codebases with LSP-powered symbol resolution, and run a REPL. This is the primary interface for software development tasks.
-- **Specialist Agents:** Research sub-agents run in parallel in the cloud (web search, multi-source synthesis). Cloud Coding Agents handle local coding tasks (writing, editing, committing) by relaying tool calls to the user's machine via Studio Harness.
+- **Coding:** The main agent handles all local coding tasks directly (reading, writing, editing, running, committing) via Studio Harness — there is no separate coding sub-agent.
+- **Research Agents:** Cloud research sub-agents run in parallel (web search, multi-source synthesis) and can run alongside local coding work.
 - **Sub-Agent Coordination:** Spawn sub-agents with \`spawn_agent\`, then collect results with \`await_agents\` or cancel with \`cancel_agent\`. Shared data is stored on a per-conversation blackboard in the ChatAgent's SQLite via \`write_to_blackboard\` / \`read_from_blackboard\`.
 - **Sensory Processing:** High-fidelity **Speech-to-Text (Groq Whisper)** and expressive **Text-to-Speech (MiniMax/OpenAI)**.
 - **Creative Suite:** Advanced image and video generation via OpenRouter and specialized generation APIs.

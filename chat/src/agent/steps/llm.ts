@@ -1,5 +1,4 @@
 import { AgentStateType, AgentMessage } from "../state";
-import { STUDIO_HARNESS_BLOCKED } from "../../tools/mcp/blocklist";
 import { createProvider } from "../../server/providers";
 import { getRequestEnv, getRegistryById } from "../../context";
 import { logger } from "../../logger";
@@ -142,10 +141,10 @@ export async function runLlmStep(
   }
 
   if (state.localEngineConnected) {
+    // LSP tools are internal plumbing — never exposed to the model.
+    // The main agent otherwise has full access to every harness tool.
     toolDefinitions = toolDefinitions.filter(
-      (t) =>
-        !STUDIO_HARNESS_BLOCKED.has(t.function.name) &&
-        !t.function.name.startsWith("mcp_studio_harness__lsp_")
+      (t) => !t.function.name.startsWith("mcp_studio_harness__lsp_")
     );
   }
 

@@ -114,8 +114,8 @@ export class ToolRegistry {
         // Context-injected tools (e.g. current_time) are never sent to the LLM
         if (t.contextInjected) return false;
 
-        // Cloud tools that require the local engine (e.g. Cloud Coding Agents that
-        // relay file/shell calls via Harness) — hidden when Harness is offline.
+        // Cloud tools that require the local engine (e.g. tools that relay
+        // file/shell calls via Harness) — hidden when Harness is offline.
         if (t.requiresLocalEngine && !includeLocal) return false;
 
         // Local engine tools

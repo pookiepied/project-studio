@@ -1,6 +1,5 @@
 import { ChatPipelineContext } from "./types";
 import { loadMcpTools, loadBuiltinMcpTools } from "../tools/mcp";
-import { STUDIO_HARNESS_BLOCKED } from "../tools/mcp/blocklist";
 import { ComposioTool } from "../tools/composio/ComposioTool";
 import { createRequestRegistry } from "../tools";
 import { logger } from "../logger";
@@ -171,16 +170,16 @@ export async function preload(ctx: ChatPipelineContext): Promise<void> {
     logger.info("preload: Studio Harness auto-detected from loaded MCP tools — localEngineConnected set to true");
   }
 
+  // LSP tools are internal plumbing — never exposed to the model. Every other
+  // harness tool (write/edit/bash/git/etc.) is available to the main agent.
   const filteredMcpDynamicTools = ctx.localEngineConnected
     ? mcpDynamicTools.filter(
-        (t) =>
-          !STUDIO_HARNESS_BLOCKED.has(t.name) &&
-          !t.name.startsWith("mcp_studio_harness__lsp_")
+        (t) => !t.name.startsWith("mcp_studio_harness__lsp_")
       )
     : mcpDynamicTools;
 
   if (ctx.localEngineConnected && filteredMcpDynamicTools.length !== mcpDynamicTools.length) {
-    logger.info("preload: blocked tools filtered from registry", {
+    logger.info("preload: lsp tools filtered from registry", {
       before: mcpDynamicTools.length,
       after: filteredMcpDynamicTools.length,
       removed: mcpDynamicTools.length - filteredMcpDynamicTools.length,

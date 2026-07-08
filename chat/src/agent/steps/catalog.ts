@@ -26,8 +26,6 @@ export function inferCategory(toolName: string): string {
     return "Shell & Execution";
   if (/^git_/.test(toolPart))
     return "Git";
-  if (/^run_(explorer|planner|coder|tester|debugger|reviewer)_agent/.test(toolPart))
-    return "Cloud Coding Agents";
   if (/^ssh_/.test(toolPart))
     return "Remote Access";
   if (/^(get_desktop_guide|screenshot|click|type_text|key_press|mouse_move|focus_window|get_window)/.test(toolPart))
@@ -62,8 +60,7 @@ export function inferCategory(toolName: string): string {
  */
 export function buildToolDirectory(
   registry: ToolRegistry,
-  includeLocal: boolean,
-  catalogBlocked: Set<string>
+  includeLocal: boolean
 ): string {
   const allDefs = registry.getContextualDefinitions(includeLocal, { coreMode: "all" });
 
@@ -73,7 +70,7 @@ export function buildToolDirectory(
   const cloudMcp = new Map<string, number>();
 
   for (const def of allDefs) {
-    if (catalogBlocked.has(def.function.name)) continue;
+    // LSP tools are internal plumbing — never surfaced in the catalog.
     if (def.function.name.startsWith("mcp_studio_harness__lsp_")) continue;
     const tool = registry.get(def.function.name);
     if (!tool) continue;

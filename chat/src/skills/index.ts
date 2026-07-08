@@ -23,7 +23,7 @@ const SKILLS: Skill[] = [
     category: "Workflows",
     name: "Coding Workflow",
     key: "coding_workflow",
-    description: "Load at the start of ANY coding task — reading code, understanding a codebase, editing files, debugging, running tests, or making commits. Covers the efficient read pattern (grep → outline → targeted section), which Cloud Coding Agent to use for each action, and the full step-by-step workflow for code changes.",
+    description: "Load at the start of ANY coding task — reading code, understanding a codebase, editing files, debugging, running tests, or making commits. Covers the efficient read pattern (grep → outline → targeted section), which tool to use for each write/run action, and the full step-by-step workflow for code changes.",
     content: CODING_WORKFLOW,
   },
   {

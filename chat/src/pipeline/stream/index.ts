@@ -1,5 +1,4 @@
 import { ChatPipelineContext } from "../types";
-import { STUDIO_HARNESS_BLOCKED } from "../../tools/mcp/blocklist";
 import { createProvider } from "../../server/providers";
 import { CapturedUsage } from "@gateway/providers/types";
 import { getRegistryById, clearRequestRegistry, clearRequestContext } from "../../context";
@@ -191,11 +190,8 @@ export function handleStreaming(ctx: ChatPipelineContext): Response {
         }
 
         const canOfferExpand = getExpandCountSinceLastUser(ctx.messages) < 2;
-        // STUDIO write-gate: strip the harness write/exec tools named in
-        // STUDIO_HARNESS_BLOCKED from the main LLM's schema. (Transitional: the
-        // coding specialists that used to own these were removed; the new agent
-        // model will decide who gets write/exec access.)
-        const rawToolDefs = [
+        // The main agent has full access to every harness tool — no write-gate.
+        const toolDefs = [
           ...registry.getContextualDefinitions(ctx.localEngineConnected, {
             message: recentContextText || undefined,
             activeServers: activeServers.size > 0 ? activeServers : undefined,
@@ -203,9 +199,6 @@ export function handleStreaming(ctx: ChatPipelineContext): Response {
           }),
           ...(canOfferExpand ? [EXPAND_TOOLS_DEFINITION] : []),
         ];
-        const toolDefs = ctx.localEngineConnected
-          ? rawToolDefs.filter((t) => !STUDIO_HARNESS_BLOCKED.has(t.function.name))
-          : rawToolDefs;
 
         // ── Phase 1: direct streaming ──────────────────────────────────────
         const phase1 = await runPhase1(ctx, adapter, toolDefs, enqueue);

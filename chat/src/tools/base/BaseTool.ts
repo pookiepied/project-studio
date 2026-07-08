@@ -152,7 +152,7 @@ export abstract class BaseTool {
    * the Harness is offline, preventing the LLM from calling it.
    *
    * Use for cloud tools that ultimately need the local engine to work
-   * (e.g. Cloud Coding Agents that relay file/shell calls via Harness).
+   * (e.g. tools that relay file/shell calls via Harness).
    */
   readonly requiresLocalEngine: boolean = false;
 

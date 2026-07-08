@@ -202,14 +202,14 @@ function harnessSection(connected: boolean): string {
   if (!connected) {
     return `## Studio Harness
 
-Not connected. Local file access, code search, shell execution, and Cloud Coding Agents are unavailable.
+Not connected. Local file access, code search, and shell execution are unavailable.
 
 If the user asks for local machine coding work, acknowledge the request and ask them to enable Studio Harness in Extensions. You can still discuss, plan, or write content — they can apply it manually.`;
   }
 
   return `## Studio Harness
 
-Connected. You have full local coding access via Studio Harness: filesystem reads, code search, git inspection, shell execution, code intelligence (LSP), and Cloud Coding Agents.
+Connected. You have full local coding access via Studio Harness: filesystem read/write/edit, code search, git (including commits), shell execution, and code intelligence (LSP).
 
 Studio Harness tools appear with the prefix \`mcp_studio_harness__*\`. Computer Use (desktop automation, system control, network) is a separate capability — see the Computer Use section below if connected.
 
@@ -217,47 +217,21 @@ Always use the full prefixed tool name.
 
 ---
 
-### Coding — what you can and cannot do directly
+### Coding — you have full, direct access
 
-**Available to you directly (read-only):**
-read_file · grep · glob · outline_file · search_symbol · analyze_file · explore_codebase · index_codebase · git_status · git_log · git_diff · ask_user_question
+You act on the user's machine yourself — there is no separate coding agent to delegate to. Read, search, write, edit, run, and commit directly with the harness tools:
 
-For code/text search, use the Studio Harness \`grep\` tool directly. Do not run PowerShell, bash, \`rg\`, or \`grep\` shell commands for search from the main agent loop; the harness \`grep\` tool is the stable interface and handles ripgrep availability internally.
+- **Read & understand:** read_file · outline_file · search_symbol · analyze_file · explore_codebase · index_codebase · grep · glob
+- **Write & edit:** write_file · edit_file · multi_edit
+- **Run & version:** bash · repl · git_status · git_log · git_diff · git_commit
 
-**NOT available to you — blocked in the main agent loop:**
-write_file · edit_file · bash · repl · git_commit · sleep · all lsp_* tools
+For file content, always author with write_file / edit_file / multi_edit — they are exact, reviewable, and handle any characters safely. Use bash for running commands (installs, builds, tests, scripts), not for writing file bodies.
 
-These tools exist only inside Cloud Coding Agents. If you attempt to call them, you will receive a blocking message telling you the correct alternative. There are no workarounds.
+For code/text search, use the harness \`grep\` tool directly rather than shelling out to \`rg\`, \`grep\`, or PowerShell — it honors .gitignore, paginates, and is stable across platforms.
 
-**Every file write, code edit, shell command, and commit must go through a Cloud Coding Agent. No exceptions.**
+Before working on an existing project, check whether \`.studio/CODEBASE.md\` exists and read it first for orientation.
 
----
-
-### Cloud Coding Agents
-
-Six agents run their own dedicated LLM reasoning loop inside the Cloudflare Worker, relaying local tool calls to the user's machine:
-
-| Agent | When to use |
-|---|---|
-| run_explorer_agent | Understanding an unknown codebase before acting |
-| run_planner_agent | Designing an implementation plan for complex changes |
-| run_coder_agent | Writing files, editing code, creating projects, committing |
-| run_tester_agent | Running builds and tests, reporting pass/fail |
-| run_debugger_agent | Diagnosing failures, applying fixes |
-| run_reviewer_agent | Reviewing a diff, issuing a verdict |
-
-**Routing rules:**
-
-- Any file creation or edit → **run_coder_agent**
-- Any shell command or script → **run_tester_agent** (builds/tests) or **run_debugger_agent** (failures)
-- Unknown existing codebase → **run_explorer_agent** first, then proceed
-- Multi-step implementation → chain agents: explorer → planner → coder → tester/reviewer
-
-Pass each agent's output as context to the next. Any agent can also run independently.
-
-Before working on an existing project, check whether \`.studio/CODEBASE.md\` exists. If it does, read it before delegating. If it does not, run run_explorer_agent first.
-
-Cloud research (spawn_agent) and a Cloud Coding Agent can run in the same turn when both are needed.`;
+(LSP tools are internal plumbing and are not exposed to you. For web research you can still spawn a research agent via spawn_agent.)`;
 }
 
 function computerUseSection(connected: boolean): string | null {

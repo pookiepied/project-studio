@@ -30,20 +30,20 @@ The goal is to read the minimum necessary to understand and act. Most problems r
 
 ---
 
-## Writing Code — All Edits Go Through Agents
+## Writing Code — Direct Tools
 
-You cannot call \`write_file\`, \`edit_file\`, \`bash\`, \`repl\`, or \`git_commit\` directly. These tools only exist inside Cloud Coding Agents.
+You write, edit, run, and commit directly. Use the right tool for each job:
 
-| What you want to do | Which agent |
+| What you want to do | Tool |
 |---|---|
-| Create or edit files, write code, make commits | \`run_coder_agent\` |
-| Run builds, tests, install packages | \`run_tester_agent\` |
-| Diagnose failures, trace errors, apply fixes | \`run_debugger_agent\` |
-| Understand an unfamiliar codebase before acting | \`run_explorer_agent\` |
-| Design a multi-step implementation plan | \`run_planner_agent\` |
-| Review a diff and issue a verdict | \`run_reviewer_agent\` |
+| Create a new file or fully rewrite one | \`write_file\` |
+| Change part of an existing file | \`edit_file\` (exact string replace) |
+| Make several coordinated edits at once | \`multi_edit\` |
+| Run builds, tests, installs, scripts, git | \`bash\` |
+| Quick throwaway computation | \`repl\` |
+| Commit changes | \`git_commit\` |
 
-Pass each agent the relevant context: file paths, the outline you read, the specific change needed. The more precise your instructions, the fewer round-trips needed.
+**Author file content only with \`write_file\` / \`edit_file\` / \`multi_edit\`** — they write exactly what you give them, with no shell escaping to fight. Never pipe multi-line file bodies through \`bash\` (\`echo\`/heredoc): quoting and special characters like \`&\`, \`()\`, and quotes get mangled. Use \`bash\` for *running* things, not for writing files.
 
 ---
 
@@ -51,10 +51,9 @@ Pass each agent the relevant context: file paths, the outline you read, the spec
 
 1. **Read relevant code** — \`search_symbol\` or \`grep\` → \`outline_file\` → \`read_file\` targeted section
 2. **Think** — reason through the change, edge cases, and what could break
-3. **Check if \`.studio/CODEBASE.md\` exists** — read it for unfamiliar projects, skip for familiar ones
-4. **Delegate to coder** — \`run_coder_agent\` with specific file paths and instructions
-5. **Verify** — \`run_tester_agent\` to confirm build and tests pass
-6. **Review if needed** — \`run_reviewer_agent\` for changes affecting more than one file
+3. **Make the change** — \`edit_file\` / \`multi_edit\` for edits, \`write_file\` for new files
+4. **Verify** — run the build or tests with \`bash\` when the project has them
+5. **Commit if asked** — \`git_commit\` with a clear message
 
 For multi-step changes, use \`task_write\` to track progress and resume if interrupted.
 
@@ -62,8 +61,8 @@ For multi-step changes, use \`task_write\` to track progress and resume if inter
 
 ## What NOT to Do
 
+- Do not write file content through the shell — use \`write_file\` / \`edit_file\`
 - Do not use \`rag\` or \`index_document\` for source code files
 - Do not read whole files when \`outline_file\` + targeted section is enough
 - Do not run \`explore_codebase\` before every small task — once per session on unfamiliar projects
-- Do not chain multiple coder agents when one will do
 `;

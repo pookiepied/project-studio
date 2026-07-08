@@ -11,7 +11,6 @@ import {
 } from "../../tools/agentic/expandTools";
 import { retryWithBackoff } from "../../utils/retry";
 import { EXPAND_TOOLS_MAX_PER_TURN } from "../../constants";
-import { STUDIO_HARNESS_BLOCKED } from "../../tools/mcp/blocklist";
 import { buildToolDirectory, buildExpandedCatalog } from "./catalog";
 
 export interface ToolsStepResult {
@@ -108,7 +107,7 @@ export async function runToolsStep(state: AgentStateType): Promise<ToolsStepResu
       // Returns a directory listing of all connected servers and categories.
       // This is a free call — does NOT count toward the per-turn limit.
       if (filter === "index") {
-        const content = buildToolDirectory(registry, state.localEngineConnected, STUDIO_HARNESS_BLOCKED);
+        const content = buildToolDirectory(registry, state.localEngineConnected);
         cloudExecutions.push(
           Promise.resolve({ tool_call_id: tc.id, name: "expand_tools", content })
         );
@@ -144,12 +143,10 @@ export async function runToolsStep(state: AgentStateType): Promise<ToolsStepResu
         filter
       );
 
-      // Apply STUDIO catalog gate — also strip LSP tools (prefix check)
+      // Strip LSP tools (internal plumbing) — everything else is available.
       const catalogDefs = state.localEngineConnected
         ? allDefs.filter(
-            (d) =>
-              !STUDIO_HARNESS_BLOCKED.has(d.function.name) &&
-              !d.function.name.startsWith("mcp_studio_harness__lsp_")
+            (d) => !d.function.name.startsWith("mcp_studio_harness__lsp_")
           )
         : allDefs;
 
