@@ -1,0 +1,154 @@
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckIcon as Check } from "@phosphor-icons/react";
+import type { ChatMessage } from "@/types";
+import { DocumentAttachmentChip } from "./DocumentAttachmentChip";
+import { ImageWithFallback } from "./ImageWithFallback";
+import { MessageActions } from "./MessageActions";
+import { CollapsibleUserText } from "./CollapsibleUserText";
+
+interface UserMessageProps {
+  message:          ChatMessage;
+  isEditing:        boolean;
+  editingContent:   string;
+  editTextareaRef:  React.RefObject<HTMLTextAreaElement | null>;
+  isLoading:        boolean;
+  copiedMessageId:  string | null;
+  ttsPlayingId:     string | null;
+  ttsLoadingId:     string | null;
+  ttsMenuId:        string | null;
+  toolsPopupId:     string | null;
+  toolCalls:        string[] | null;
+  onEditChange:     (v: string) => void;
+  onSaveEdit:       () => void;
+  onCancelEdit:     () => void;
+  onCopy:           (content: string, id: string) => void;
+  onEdit:           (id: string, content: string) => void;
+  onDelete:         (id: string) => void;
+  onSpeak:          (id: string, content: string) => void;
+  onSetTtsMenuId:   (id: string | null) => void;
+  onSetToolsPopupId:(id: string | null) => void;
+  onRegenerate:     () => void;
+  onContinue:       () => void;
+}
+
+export const UserMessage = ({
+  message,
+  isEditing,
+  editingContent,
+  editTextareaRef,
+  isLoading,
+  copiedMessageId,
+  ttsPlayingId,
+  ttsLoadingId,
+  ttsMenuId,
+  toolsPopupId,
+  toolCalls,
+  onEditChange,
+  onSaveEdit,
+  onCancelEdit,
+  onCopy,
+  onEdit,
+  onDelete,
+  onSpeak,
+  onSetTtsMenuId,
+  onSetToolsPopupId,
+  onRegenerate,
+  onContinue,
+}: UserMessageProps) => (
+  <>
+    {/* Edit mode */}
+    <AnimatePresence>
+      {isEditing && (
+        <motion.div
+          key={`edit-${message.id}`}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 4 }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col gap-2 w-full max-w-2xl"
+        >
+          <textarea
+            ref={editTextareaRef}
+            value={editingContent}
+            onChange={(e) => onEditChange(e.target.value)}
+            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-xl resize-none focus:outline-none focus:border-gray-300 dark:focus:border-surface-border text-sm font-normal text-gray-800 dark:text-gray-200 transition-colors duration-200 leading-relaxed scrollbar-thin"
+            rows={3}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSaveEdit();
+              if (e.key === "Escape") onCancelEdit();
+            }}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onSaveEdit}
+              disabled={!editingContent.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40 transition-colors"
+            >
+              <Check size={11} weight="bold" />
+              Save &amp; Send
+            </button>
+            <button
+              onClick={onCancelEdit}
+              className="px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+            >
+              Cancel
+            </button>
+            <span className="text-2xs text-gray-300 dark:text-gray-700 ml-auto">⌘ Enter · Esc to cancel</span>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* Display mode */}
+    {!isEditing && (
+      <div className="flex flex-col items-end gap-1.5 max-w-[88%] sm:max-w-[75%] md:max-w-[70%]">
+        {/* Images — frameless, rounded, clickable for lightbox */}
+        {message.imageUrls && message.imageUrls.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            {message.imageUrls.map((url, idx) => (
+              <ImageWithFallback key={idx} url={url} idx={idx} />
+            ))}
+          </div>
+        )}
+        {/* Document attachment chips */}
+        {message.documentAttachments && message.documentAttachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            {message.documentAttachments.map((doc, idx) => (
+              <DocumentAttachmentChip key={idx} name={doc.name} extension={doc.extension} />
+            ))}
+          </div>
+        )}
+        {/* Text bubble — only if there's text. Long text collapses with a
+            fade + "Show more"/"Show less" toggle. */}
+        {message.content && (
+          <div className="bg-gray-100 dark:bg-surface-raised text-gray-800 dark:text-gray-300 rounded-2xl px-4 py-3 transition-colors duration-300">
+            <CollapsibleUserText content={message.content} />
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Action bar */}
+    {!isEditing && (
+      <MessageActions
+        message={message}
+        isLoading={isLoading}
+        isLastAssistant={false}
+        copiedMessageId={copiedMessageId}
+        ttsPlayingId={ttsPlayingId}
+        ttsLoadingId={ttsLoadingId}
+        ttsMenuId={ttsMenuId}
+        toolsPopupId={toolsPopupId}
+        toolCalls={toolCalls}
+        onCopy={onCopy}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onSpeak={onSpeak}
+        onSetTtsMenuId={onSetTtsMenuId}
+        onSetToolsPopupId={onSetToolsPopupId}
+        onRegenerate={onRegenerate}
+        onContinue={onContinue}
+      />
+    )}
+  </>
+);

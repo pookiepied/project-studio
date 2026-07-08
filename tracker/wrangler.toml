@@ -1,0 +1,41 @@
+# Tracker Worker — Centralized Telemetry & Agent Tracing
+#
+# SETUP INSTRUCTIONS:
+#
+# 1. Create the D1 database:
+#    wrangler d1 create studio-tracker
+#    Copy the database_id output and replace REPLACE_WITH_DATABASE_ID below.
+#
+# 2. Apply the schema (creates all tables in one shot):
+#    wrangler d1 execute studio-tracker --remote --file=./schema.sql
+#
+# 3. Deploy:
+#    npm run deploy
+#
+# 4. Add the TRACKER service binding to every other worker's wrangler.toml:
+#    [[services]]
+#    binding = "TRACKER"
+#    service  = "tracker"
+#
+# 5. Add tail consumers to each source worker's wrangler.toml:
+#    [[tail_consumers]]
+#    service = "tracker"
+#
+# No public domain needed — reachable only via service bindings from other workers.
+
+name = "tracker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "TRACKER_DB"
+database_name = "studio-tracker"
+database_id = "84d438e3-6048-4d66-bd6f-e8cd986b6b66"
+
+[build]
+command = "npm install && npx tsc"

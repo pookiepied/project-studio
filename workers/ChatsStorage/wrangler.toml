@@ -1,0 +1,23 @@
+name = "chats"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+workers_dev = false
+
+[vars]
+ENVIRONMENT = "production"
+
+[[r2_buckets]]
+binding = "CHATS_BUCKET"
+bucket_name = "studio-chats"
+
+# Centralized telemetry — chat storage events go here.
+[[services]]
+binding = "TRACKER"
+service  = "tracker"
+
+# Tail consumer — Cloudflare auto-routes invocation logs to the tracker worker.
+[[tail_consumers]]
+service = "tracker"
+
+[build]
+command = "npm install && npx tsc"

@@ -1,0 +1,2 @@
+export const STARTUP_SPLASH_MIN_MS = 3400;
+export const SPLASH_EXIT_DURATION_SECONDS = 0.72;

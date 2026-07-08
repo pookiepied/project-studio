@@ -1,0 +1,24 @@
+api:
+  base_url: "https://api.pookiepied.dev"
+  chat_endpoint: "/adapters/openai/v1/chat/completions"
+
+model:
+  provider: "alibaba"
+  model_id: "qwen-max"
+  temperature: 0.85
+
+memory:
+  window_size: 50
+  whitelist_only: true
+  auto_fetch: true
+  auto_fetch_limit: 20
+
+queue:
+  max_concurrent: 3
+  timeout_seconds: 60
+  max_queue_size: 50
+
+bot:
+  mention_only: true
+  cooldown_seconds: 5
+  name: "STUDIO"

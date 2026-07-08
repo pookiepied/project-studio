@@ -1,0 +1,118 @@
+name = "studio-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+ALIBABA_API_HOST = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+AZURE_OPENAI_API_VERSION = "2025-01-01-preview"
+# Providers to include in model sync discovery. Must match what has API keys set.
+ENABLED_PROVIDERS = "groq,openrouter,anthropic,openai,google,alibaba,xai,deepseek,mistral,cohere,minimax,fal"
+# Runtime modality overrides — JSON. Uncomment and customise as needed.
+# PROVIDER_MODALITIES_CONFIG = "{\"minimax\":{\"text\":true},\"openrouter\":{\"rerank\":true}}"
+
+# ---------------------------------------------------------------------------
+# KV namespaces
+# ---------------------------------------------------------------------------
+
+# Model catalog — list/filter available provider models.
+[[kv_namespaces]]
+binding = "MODELS_KV"
+id = "95440eeac45742a298ed39edcc7d3944"
+
+# MCP registry + admin config (modes-config, auto-router overrides).
+[[kv_namespaces]]
+binding = "MCP_KV"
+id = "2ad99d3c8750412fa2465f255a5d22a1"
+
+# ---------------------------------------------------------------------------
+# R2 buckets
+# ---------------------------------------------------------------------------
+
+# Generated image storage (7-day TTL via chat cron).
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "studio-images"
+
+# Temporary image storage (24-hour TTL).
+[[r2_buckets]]
+binding = "TEMP_IMAGES_BUCKET"
+bucket_name = "studio-images-temp"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via: wrangler secret put <NAME>
+# ---------------------------------------------------------------------------
+# Core provider API keys:
+#   wrangler secret put GROQ_API_KEY
+#   wrangler secret put OPENROUTER_API_KEY
+#   wrangler secret put ANTHROPIC_API_KEY
+#   wrangler secret put OPENAI_API_KEY
+#   wrangler secret put GOOGLE_AI_API_KEY
+#   wrangler secret put ALIBABA_API_KEY
+#   wrangler secret put XAI_API_KEY
+#   wrangler secret put DEEPSEEK_API_KEY
+#   wrangler secret put MISTRAL_API_KEY
+#   wrangler secret put COHERE_API_KEY
+#   wrangler secret put MINIMAX_API_KEY
+#   wrangler secret put MINIMAX_GROUP_ID
+#   wrangler secret put FAL_API_KEY
+#
+# Azure OpenAI:
+#   wrangler secret put AZURE_RESOURCE_NAME
+#   wrangler secret put AZURE_API_KEY
+#   wrangler secret put AZURE_DEPLOYMENTS        (JSON: {"gpt-4o":"my-deployment"})
+#
+# Amazon Bedrock (choose one auth approach):
+#   wrangler secret put AWS_BEARER_TOKEN_BEDROCK  (preferred — simpler)
+#   — OR —
+#   wrangler secret put AWS_ACCESS_KEY_ID
+#   wrangler secret put AWS_SECRET_ACCESS_KEY
+#   wrangler secret put AWS_REGION               (e.g. us-east-1)
+#
+# Studio infra:
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put MEMORY_AUTH_SECRET
+#   wrangler secret put JINA_API_KEY
+#   wrangler secret put TAVILY_API_KEY
+#
+# Cloudflare AI Gateway (optional — routes supported providers through CF dashboard):
+#   wrangler secret put CF_AI_GATEWAY_ACCOUNT_ID
+#   wrangler secret put CF_AI_GATEWAY_NAME
+#   wrangler secret put CF_AI_GATEWAY_TOKEN
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Service bindings
+# ---------------------------------------------------------------------------
+
+[[kv_namespaces]]
+binding = "REVOKED_KV"
+id = "720a294c0a5844248a4ee8ac6a91fa8f"
+
+[ai]
+binding = "AI"
+
+[[services]]
+binding = "TRACKER"
+service  = "tracker"
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+# ---------------------------------------------------------------------------
+# Durable Objects — atomic rate counter
+# ---------------------------------------------------------------------------
+
+[[durable_objects.bindings]]
+name = "RATE_TRACKER_DO"
+class_name = "RateTrackerDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateTrackerDurableObject"]
+
+[build]
+command = "npm install && npx tsc --noEmit"

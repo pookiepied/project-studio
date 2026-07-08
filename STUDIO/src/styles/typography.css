@@ -1,0 +1,12 @@
+/* Typography system: single source of truth for font families. */
+
+:root {
+  /* Windows Codex-like UI stack: Segoe Variable first, then standard system sans fallbacks. */
+  --font-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Keep headings in the same UI family so the interface stays minimal. */
+  --font-display: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Windows-friendly mono stack that reads closer to Codex on this platform. */
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}

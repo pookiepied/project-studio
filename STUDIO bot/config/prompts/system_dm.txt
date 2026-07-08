@@ -1,0 +1,4 @@
+CONVERSATION TYPE: Direct Message
+
+You are in a private one-on-one conversation with {discord_username}.
+Be conversational and maintain continuity across messages.

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+      html.zen-window,
+      html.zen-window body,
+      html.zen-window #root {
+        background: #ffffff !important;
+      }
+
+      html.dark.zen-window,
+      html.dark.zen-window body,
+      html.dark.zen-window #root {
+        background: #121212 !important;
+      }
+
+    </style>
+
+    <script>
+      (function() {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var isOverlay = params.get('w') === 'overlay';
+          var isSplashPreview = params.get('splashPreview') === '1';
+          var root = document.documentElement;
+
+          if (isOverlay) {
+            root.classList.add('overlay-window');
+          }
+
+          var storedTheme = localStorage.getItem('studio-theme');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (storedTheme === 'dark' || (!storedTheme && prefersDark) || (storedTheme === 'system' && prefersDark)) {
+            root.classList.add('dark');
+          }
+
+          var shellMode = localStorage.getItem('studio-shell-mode');
+          var legacyShellMode = localStorage.getItem('studio-experiment-shell');
+          var workspaceShellEnabled = shellMode
+            ? shellMode !== 'standard'
+            : legacyShellMode !== 'classic';
+          if (!isOverlay && !isSplashPreview && workspaceShellEnabled) {
+            root.classList.add('zen-window');
+            root.style.setProperty('--zen-frame-inset', '0px');
+            root.style.setProperty('--zen-frame-radius', '12px');
+          }
+        } catch(e) {}
+      })();
+    </script>
+
+    <!--
+      Fonts are self-hosted via @fontsource — bundled into the app, no network requests.
+      Imported in main.tsx: Jost Variable, Fraunces Variable, DM Mono.
+    -->
+
+    <!-- Note: CSP is managed by Tauri's tauri.conf.json for desktop app -->
+    <title>STUDIO</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

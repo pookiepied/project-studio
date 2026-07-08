@@ -1,0 +1,86 @@
+name = "studio-mcp-tools"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+# Public origin that serves the gateway's /v1/images/:id route. Replaces chat's
+# request-scoped getRequestBaseUrl(); must match where generated images are
+# publicly reachable. Verify against your deployment's domain.
+PUBLIC_IMAGE_BASE = "https://api.pookiepied.dev"
+
+# ---------------------------------------------------------------------------
+# studio-mcp-tools — STUDIO first-party native tools, exposed as an MCP server.
+#
+# These are the work tools that used to be hardcoded inside the chat worker's
+# ToolRegistry (web_search, web_fetch, rag, image/video gen, http_request, …).
+# They now live here and are surfaced to BOTH the main agent (chat) and
+# sub-agents (agents worker) through the studio-mcp hub's native-service
+# catalog — exactly how studio-mcp-memory is exposed. The hub holds no tool
+# logic; it only lists these schemas and routes execution here.
+# ---------------------------------------------------------------------------
+
+# Durable Object — McpAgent requires one DO class per MCP server.
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "StudioToolsAgent"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StudioToolsAgent"]
+
+# ---------------------------------------------------------------------------
+# Service Bindings — added per tool group as tools are migrated in.
+# GATEWAY is needed once image/video generation lands here (tier 2).
+# ---------------------------------------------------------------------------
+[[services]]
+binding = "GATEWAY"
+service = "studio-gateway"
+
+# Centralized telemetry
+[[services]]
+binding = "TRACKER"
+service = "tracker"
+
+[[tail_consumers]]
+service = "tracker"
+
+# ---------------------------------------------------------------------------
+# Retrieval group (web_fetch, rag) — same studio-rag index + embeddings the
+# chat worker uses, so previously-indexed content stays queryable.
+# Setup: wrangler vectorize create studio-rag --dimensions=768 --metric=cosine
+# ---------------------------------------------------------------------------
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "studio-rag"
+
+# Workers AI — free embedding model used by web_fetch auto-index + rag.
+[ai]
+binding = "AI"
+
+# rag TOC cache — shared namespace with the chat worker's MCP_KV.
+[[kv_namespaces]]
+binding = "MCP_KV"
+id = "2ad99d3c8750412fa2465f255a5d22a1"
+
+# Generated image storage — same bucket the gateway serves from + cleans up.
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "studio-images"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via: wrangler secret put <NAME>
+#
+# TOOLS_AUTH_SECRET    — optional shared secret for service-to-service auth.
+#                        Leave unset for internal-only (service-binding) access;
+#                        the worker is workers_dev=false so it is not publicly
+#                        reachable.
+# TAVILY_API_KEY       — web_search primary provider.
+# BRAVE_SEARCH_API_KEY — web_search fallback provider.
+# ---------------------------------------------------------------------------
+
+[build]
+command = "npm install && npx tsc --noEmit"

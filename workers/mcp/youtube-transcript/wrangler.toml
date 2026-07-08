@@ -1,0 +1,90 @@
+name = "youtube-transcript-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# ---------------------------------------------------------------------------
+# Durable Object — McpAgent requires one DO class per MCP server.
+# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "YouTubeTranscriptAgent"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["YouTubeTranscriptAgent"]
+
+# ---------------------------------------------------------------------------
+# Tracker — Project Studio deployment only.
+# Remove if self-hosting outside the Studio stack.
+# ---------------------------------------------------------------------------
+[[services]]
+binding = "TRACKER"
+service = "tracker"
+
+[[tail_consumers]]
+service = "tracker"
+
+# ---------------------------------------------------------------------------
+# AI worker service binding — Project Studio (bound mode) only.
+#
+# Uncomment to route Layer 3 audio transcription through the AI worker.
+# The AI worker uses its own provider credentials — no STT keys needed here.
+# STT_PROVIDER_NAME must also be set (see secrets below).
+# ---------------------------------------------------------------------------
+# [[services]]
+# binding = "AI"
+# service = "studio-chat"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via: wrangler secret put <NAME>
+#
+# ── Auth ────────────────────────────────────────────────────────────────────
+#
+# MCP_API_KEY
+#   Bearer token clients must present in Authorization: Bearer <key>.
+#   Leave unset to disable auth (development only).
+#   Project Studio: store the same value as config.authToken in D1.
+#   wrangler secret put MCP_API_KEY
+#
+# ── STT: Standalone mode (open-source / self-hosted) ────────────────────────
+#   Use any OpenAI-compatible speech-to-text endpoint.
+#   Both variables required for standalone mode.
+#
+# STT_PROVIDER_URL
+#   Base URL of the STT provider.
+#   Examples:
+#     Groq    — https://api.groq.com/openai/v1
+#     OpenAI  — https://api.openai.com/v1
+#     Local   — http://localhost:8080/v1
+#   wrangler secret put STT_PROVIDER_URL
+#
+# STT_PROVIDER_API_KEY
+#   API key for the STT_PROVIDER_URL endpoint.
+#   wrangler secret put STT_PROVIDER_API_KEY
+#
+# ── STT: Bound mode (Project Studio) ────────────────────────────────────────
+#   Routes transcription through the AI worker service binding above.
+#   The AI worker validates the provider against its model catalog and
+#   uses its own credentials. No STT_PROVIDER_URL or STT_PROVIDER_API_KEY needed.
+#
+# STT_PROVIDER_NAME
+#   Provider name matching the AI worker's ENABLED_PROVIDERS convention.
+#   Examples: groq, openrouter, google, alibaba, minimax
+#   wrangler secret put STT_PROVIDER_NAME
+#
+# ── STT: Shared (both modes) ────────────────────────────────────────────────
+#
+# STT_MODEL
+#   Optional. Whisper model name passed to the STT provider.
+#   Default: whisper-large-v3-turbo
+#   wrangler secret put STT_MODEL
+# ---------------------------------------------------------------------------
+
+[build]
+command = "npm install && npx tsc --noEmit"

@@ -1,0 +1,585 @@
+/* Fonts loaded via <link> tags in index.html — do not use @import here (unreliable in Tauri WebKit) */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens (--surface-*, --text-*, --focus-ring, --syntax-*, …) are the single
+   source of truth and live in src/tokens/tokens.css, imported before this file in
+   main.tsx. This file consumes them; it never redefines colour values. */
+
+/* Ensure html/body background — html is the visible layer at Tauri frameless corners */
+html {
+  background-color: var(--surface-page);
+  /* Match the main div's 300ms transition so corners never flash during theme switch */
+  transition: background-color 300ms ease;
+  overflow-x: hidden;
+  font-size: 14px;
+}
+
+body {
+  @apply bg-white;
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+}
+
+html.overlay-window,
+html.overlay-window body,
+html.overlay-window #root {
+  background: transparent !important;
+  background-color: transparent !important;
+  overflow: hidden;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
+/* Dark mode — apply to <html> so Tauri frameless window corners match the page.
+   Surface/text token values for dark live in src/tokens/tokens.css (html.dark). */
+html.dark,
+html.dark body {
+  background-color: var(--app-bg-dark);
+  color-scheme: dark;
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.2s ease-in-out;
+}
+
+/*
+ * Theme-switch transition
+ * Applied to <html> for ~300 ms during a light↔dark switch.
+ * Forces every element (including those without an explicit transition class)
+ * to animate background-color, color, and border-color at the same rate,
+ * so the switch looks instantaneous rather than staggered.
+ */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition:
+    background-color 280ms ease,
+    color 280ms ease,
+    border-color 280ms ease,
+    fill 280ms ease,
+    stroke 280ms ease !important;
+}
+
+/*
+ * Global keyboard focus ring (DOC §20 / §11.1).
+ * One neutral ring for every keyboard-focused control — never a fill. This is the
+ * baseline so no control is ever focusable without a visible indicator; primitives
+ * may still layer their own ring on top. Pointer focus stays ring-free.
+ */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * Reduced motion — honour the OS setting globally (DOC §20).
+ * Collapses transitions, CSS keyframes, and framer-driven transitions to a single
+ * frame so entrances and infinite loops effectively stop. Components that need
+ * finer control also read useReducedMotion() from framer-motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Display — section headings, page titles, prominent labels */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+
+/* Monospace font class for technical text */
+.font-mono-display {
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  font-weight: 300;
+}
+
+/* .tracking-ultra-wide / .tracking-extra-wide are provided by the Tailwind
+   letterSpacing scale (tailwind.config.js) — the duplicate CSS rules that used to
+   live here (and silently won the cascade) were removed to end the collision. */
+
+/* Prevent 300ms tap delay on all interactive elements */
+a, button, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/*
+ * Prevent auto-zoom on iOS Safari and Android Chrome.
+ * Both browsers zoom the viewport when a focused input has font-size < 16px.
+ * We override to 16px on mobile only — desktop retains the tailwind text-sm (13px).
+ */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="range"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/*
+ * Scrollbars — one tokenized treatment app-wide.
+ * 2px quiet thumb driven by --scrollbar-thumb (auto-switches light/dark).
+ * The named classes (.scrollbar-thin, .scrollbar-auto-hide) are kept as aliases
+ * so existing call-sites keep working; they share the same token now.
+ * .scrollbar-hide opts out entirely.
+ */
+*,
+.scrollbar-thin,
+.scrollbar-auto-hide {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar,
+.scrollbar-thin::-webkit-scrollbar,
+.scrollbar-auto-hide::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+*::-webkit-scrollbar-track,
+.scrollbar-thin::-webkit-scrollbar-track,
+.scrollbar-auto-hide::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb,
+.scrollbar-thin::-webkit-scrollbar-thumb,
+.scrollbar-auto-hide::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover,
+.scrollbar-thin::-webkit-scrollbar-thumb:hover,
+.scrollbar-auto-hide::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Hide scrollbar utility — opt out of the global treatment entirely */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Keep chat follow-scroll stable while content above grows/reflows */
+.chat-scroll-container {
+  overflow-anchor: none;
+}
+
+.chat-scroll-anchor {
+  overflow-anchor: auto;
+  height: 1px;
+}
+
+
+/* Premium Monochromatic Syntax Highlighting Theme */
+/* Light gray theme for code blocks - elegant and minimal */
+
+/* Base code styling */
+pre code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--syntax-text);
+  font-weight: 400;
+}
+
+/* Highlight.js theme — neutral grayscale, auto-switches via --syntax-* tokens */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  color: var(--syntax-text);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+/* Comments */
+.hljs-comment,
+.hljs-quote {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+/* Keywords, tags (semibold) */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-tag,
+.hljs-name {
+  color: var(--syntax-keyword);
+  font-weight: 600;
+}
+
+/* Strings, attributes */
+.hljs-string,
+.hljs-attr,
+.hljs-attribute {
+  color: var(--syntax-string);
+}
+
+/* Numbers, literals */
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--syntax-number);
+}
+
+/* Functions, classes */
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-function {
+  color: var(--syntax-function);
+  font-weight: 500;
+}
+
+/* Types, built-ins */
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name {
+  color: var(--syntax-type);
+}
+
+/* Operators, punctuation */
+.hljs-operator,
+.hljs-punctuation {
+  color: var(--syntax-number);
+}
+
+/* Meta, preprocessor */
+.hljs-meta,
+.hljs-meta-keyword,
+.hljs-meta-string {
+  color: var(--syntax-meta);
+}
+
+/* Sections, headers */
+.hljs-section,
+.hljs-selector-id {
+  color: var(--syntax-keyword);
+  font-weight: 600;
+}
+
+/* Symbols, bullets */
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: var(--syntax-string);
+}
+
+/* Additions (git diff) — neutral fill, no green */
+.hljs-addition {
+  color: var(--syntax-text);
+  background-color: var(--syntax-add-bg);
+}
+
+/* Deletions (git diff) — neutral fill + strike-through, no red */
+.hljs-deletion {
+  color: var(--syntax-comment);
+  background-color: var(--syntax-del-bg);
+  text-decoration: line-through;
+}
+
+/* Emphasis */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* Regex, special */
+.hljs-regexp,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: var(--syntax-string);
+}
+
+/* Template tags */
+.hljs-template-tag {
+  color: var(--syntax-keyword);
+}
+
+/* Params */
+.hljs-params {
+  color: var(--syntax-number);
+}
+
+/* Doctags */
+.hljs-doctag {
+  color: var(--syntax-meta);
+  font-style: italic;
+}
+
+
+/* Custom Prose Theme for Chat Messages */
+/* Optimized spacing, typography, and readability */
+
+.prose-chat {
+  /* Base text styling - proper font family */
+  font-family: var(--font-sans);
+  font-size: 0.875rem; /* 14px - matches text-sm for consistency */
+  line-height: 1.5; /* Match user message line-height */
+  color: var(--text-secondary);
+  min-width: 0;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Paragraphs - generous spacing */
+.prose-chat p {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.75;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.prose-chat p:first-child {
+  margin-top: 0;
+}
+
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings - clear hierarchy with spacing */
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3,
+.prose-chat h4,
+.prose-chat h5,
+.prose-chat h6 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.prose-chat h1:first-child,
+.prose-chat h2:first-child,
+.prose-chat h3:first-child {
+  margin-top: 0;
+}
+
+.prose-chat h1 { font-size: 1.5rem; }
+.prose-chat h2 { font-size: 1.25rem; }
+.prose-chat h3 { font-size: 1.125rem; }
+.prose-chat h4 { font-size: 1rem; }
+
+/* Strong/Bold - proper weight */
+.prose-chat strong {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* Emphasis/Italic */
+.prose-chat em {
+  font-style: italic;
+  font-family: var(--font-sans);
+}
+
+/* Links - subtle styling */
+.prose-chat a {
+  color: var(--text-primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--surface-border);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.2s;
+  font-family: var(--font-sans);
+}
+
+.prose-chat a:hover {
+  text-decoration-color: var(--text-primary);
+}
+
+/* Lists - proper spacing */
+.prose-chat ul,
+.prose-chat ol {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  padding-left: 1.5rem;
+  font-family: var(--font-sans);
+}
+
+.prose-chat li {
+  margin-top: 0.625rem;
+  margin-bottom: 0.625rem;
+  line-height: 1.75;
+  font-family: var(--font-sans);
+}
+
+.prose-chat li > p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Nested lists */
+.prose-chat ul ul,
+.prose-chat ul ol,
+.prose-chat ol ul,
+.prose-chat ol ol {
+  margin-top: 0.625rem;
+  margin-bottom: 0.625rem;
+}
+
+/* Code blocks - generous spacing */
+.prose-chat pre {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  background: transparent;
+  padding: 0;
+  overflow: visible;
+  max-width: 100%;
+}
+
+.prose-chat pre:first-child {
+  margin-top: 0;
+}
+
+.prose-chat pre:last-child {
+  margin-bottom: 0;
+}
+
+/* Inline code - subtle background */
+.prose-chat code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--text-primary);
+  background-color: var(--surface-raised);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 400;
+}
+
+.prose-chat pre code {
+  background-color: transparent;
+  padding: 0;
+  font-size: inherit;
+  font-family: var(--font-mono);
+}
+
+/* Blockquotes - elegant styling */
+.prose-chat blockquote {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  padding-left: 1.25rem;
+  border-left: 3px solid var(--surface-border);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.prose-chat blockquote p {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Horizontal rules - subtle dividers */
+.prose-chat hr {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  border: 0;
+  border-top: 1px solid var(--surface-border);
+}
+
+/* Tables - clean styling */
+.prose-chat table {
+  width: 100%;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.prose-chat thead {
+  border-bottom: 2px solid var(--surface-border);
+}
+
+.prose-chat th {
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prose-chat td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--surface-divider);
+}
+
+.prose-chat tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Images - proper spacing */
+.prose-chat img {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+/* Task lists - checkbox styling */
+.prose-chat input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+/* Single line breaks - add spacing */
+.prose-chat br {
+  display: block;
+  content: "";
+  margin-top: 0.75rem;
+}
+
+
+/* Dark-mode prose & syntax overrides are no longer needed — colours come from the
+   text, surface and syntax tokens, which auto-switch on html.dark. */
+

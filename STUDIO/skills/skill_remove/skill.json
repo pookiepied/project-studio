@@ -1,0 +1,17 @@
+{
+  "key": "skill_remove",
+  "name": "Skill Remove",
+  "description": "Remove a locally installed skill — unregisters it from the Skills catalog and deletes its files from $HOME/.studio/skills/. Load this skill when the user wants to delete, remove, or uninstall a skill.",
+  "category": "Skill Management",
+  "version": "1.0.0",
+  "scope": "local",
+  "allowed_runtime": "local",
+  "entrypoint": "SKILL.md",
+  "when_to_use": [
+    "User asks to delete, remove, or uninstall a skill",
+    "User wants to clean up or remove a skill they no longer need",
+    "User wants to remove a skill and delete its files"
+  ],
+  "required_tools": ["studio-harness", "skill_list", "skill_unregister_local"],
+  "permissions": []
+}

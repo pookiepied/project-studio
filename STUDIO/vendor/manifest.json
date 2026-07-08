@@ -1,0 +1,18 @@
+{
+  "$comment": "Manifest of bundled runtime binaries shipped with STUDIO. Regenerate/refresh with `node scripts/vendor-sync.mjs`. Do not hand-edit binary paths.",
+  "tools": {
+    "ripgrep": {
+      "exe": "rg",
+      "description": "Fast recursive regex file search. Used by the studio-harness grep and outline_file tools. Bundled so search works on machines without ripgrep on PATH (default on Windows).",
+      "source": "@vscode/ripgrep",
+      "version": "15.0.0",
+      "platforms": {
+        "win32-x64": "ripgrep/win32-x64/rg.exe",
+        "darwin-x64": "ripgrep/darwin-x64/rg",
+        "darwin-arm64": "ripgrep/darwin-arm64/rg",
+        "linux-x64": "ripgrep/linux-x64/rg",
+        "linux-arm64": "ripgrep/linux-arm64/rg"
+      }
+    }
+  }
+}

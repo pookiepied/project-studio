@@ -1,0 +1,17 @@
+{
+  "key": "skill_install",
+  "name": "Skill Install",
+  "description": "Install a skill from a GitHub repository URL or local folder path. Validates the skill format, places files in the correct location under $HOME/.studio/skills/, and registers it with the Skills system. Load this skill when the user wants to install, add, or import a skill from GitHub or a local directory.",
+  "category": "Skill Management",
+  "version": "1.0.0",
+  "scope": "local",
+  "allowed_runtime": "local",
+  "entrypoint": "SKILL.md",
+  "when_to_use": [
+    "User provides a GitHub repo URL or local folder path to install a skill",
+    "User asks to add, import, or install a skill",
+    "User wants to bring in a skill from an external source"
+  ],
+  "required_tools": ["studio-harness", "skill_install_plan", "skill_validate", "skill_register_local"],
+  "permissions": []
+}

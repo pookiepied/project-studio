@@ -1,0 +1,100 @@
+name = "studio-mcp-memory"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# Model used to extract facts, entities, and summaries from conversations.
+# Routed through your AI worker — any model in your catalog works here.
+# Verify the exact ID against your KV model catalog before deploying.
+EXTRACT_MODEL = "openrouter:xiaomi/mimo-v2.5"
+
+# Workers AI embedding model. Must match the Vectorize index dimensions below.
+# @cf/baai/bge-base-en-v1.5  → 768 dimensions (default, fast)
+# @cf/baai/bge-large-en-v1.5 → 1024 dimensions (slower, more accurate)
+EMBED_MODEL = "@cf/baai/bge-base-en-v1.5"
+
+# Max tokens to spend on the memory block injected into the system prompt.
+INJECT_TOKEN_BUDGET = "800"
+
+# Number of recent conversation summaries always injected (time-based, no vector).
+INJECT_RECENT_COUNT = "3"
+
+# Number of semantically-matched memories to inject via vector search.
+INJECT_SEMANTIC_COUNT = "5"
+
+# ---------------------------------------------------------------------------
+# Durable Object — McpAgent requires one DO class per MCP server.
+# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "StudioMemoryAgent"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StudioMemoryAgent"]
+
+# ---------------------------------------------------------------------------
+# D1 — STUDIO Memory database
+# Setup:  wrangler d1 create studio-memory
+# Schema: wrangler d1 execute studio-memory --remote --file=./schema.sql
+# ---------------------------------------------------------------------------
+[[d1_databases]]
+binding = "MEMORY_DB"
+database_name = "studio-memory"
+database_id = "171ce9b6-4d75-43c3-9b22-309656635658"
+
+# ---------------------------------------------------------------------------
+# Vectorize — Semantic memory index (separate from studio-rag document index)
+# Setup: wrangler vectorize create studio-memory-vectors --dimensions=768 --metric=cosine
+# ---------------------------------------------------------------------------
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "studio-memory-vectors"
+
+# ---------------------------------------------------------------------------
+# Workers AI — Embedding generation (free tier, bge-base-en-v1.5)
+# ---------------------------------------------------------------------------
+[ai]
+binding = "AI"
+
+# ---------------------------------------------------------------------------
+# KV — Hot-path profile cache (~1ms reads, avoids D1 on every inject call)
+# Setup: wrangler kv namespace create MEMORY_PROFILE_KV
+# ---------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "PROFILE_KV"
+id = "5b0ee001b49d433996bc02388b5dc29a"
+
+# ---------------------------------------------------------------------------
+# AI Worker — routes extraction LLM calls through your own gateway.
+# Gives access to all 500+ models across all your providers.
+# The memory worker never needs its own LLM credentials.
+# ---------------------------------------------------------------------------
+[[services]]
+binding = "AI_WORKER"
+service = "studio-gateway"
+
+# ---------------------------------------------------------------------------
+# Tracker — Project Studio telemetry (remove if self-hosting outside Studio)
+# ---------------------------------------------------------------------------
+[[services]]
+binding = "TRACKER"
+service = "tracker"
+
+[[tail_consumers]]
+service = "tracker"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via: wrangler secret put <NAME>
+#
+# MEMORY_AUTH_SECRET   — shared secret for service-to-service auth.
+#                        Set the same value as MEMORY_AUTH_SECRET in the ai worker.
+# ---------------------------------------------------------------------------
+
+[build]
+command = "npm install && npx tsc --noEmit"

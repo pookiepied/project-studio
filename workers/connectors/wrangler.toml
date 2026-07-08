@@ -1,0 +1,52 @@
+# Studio Connectors Worker - first-party connected app integrations.
+#
+# This worker owns Composio and future native app connector state. It should not
+# own generic MCP registry state; keep that in the MCP worker.
+#
+# SETUP:
+#
+#   1. Create D1:
+#        wrangler d1 create studio-connectors
+#
+#   2. Paste the returned database_id below.
+#
+#   3. Apply schema:
+#        wrangler d1 execute studio-connectors --remote --file=./schema.sql
+#
+#   4. Add secrets:
+#        wrangler secret put COMPOSIO_API_KEY
+#        wrangler secret put CONNECTORS_ENCRYPTION_KEY
+#
+#      CONNECTORS_ENCRYPTION_KEY must be a high-entropy secret. The worker
+#      derives an AES-GCM key from it before encrypting credential payloads.
+#
+#   5. Bind this worker from API/AI when wiring starts:
+#        [[services]]
+#        binding = "CONNECTORS"
+#        service = "connectors"
+
+name = "connectors"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+# Optional. Defaults to https://backend.composio.dev/api.
+# COMPOSIO_API_BASE = "https://backend.composio.dev/api"
+#
+# Curated Composio app catalog auth config mapping. Values come from the
+# Composio dashboard/auth configs. Example:
+# COMPOSIO_AUTH_CONFIGS_JSON = "{\"gmail\":{\"authConfigId\":\"ac_xxx\"},\"github\":{\"authConfigId\":\"ac_yyy\"}}"
+COMPOSIO_AUTH_CONFIGS_JSON = "{}"
+CONNECTORS_TOOL_CACHE_TTL_SECONDS = "21600"
+
+[[d1_databases]]
+binding = "CONNECTORS_DB"
+database_name = "studio-connectors"
+database_id = "TODO_CREATE_WITH_WRANGLER_D1"
+
+[build]
+command = "npm install && npx tsc"

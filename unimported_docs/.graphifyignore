@@ -1,0 +1,30 @@
+# Images - logos only, no semantic value
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.ico
+*.webp
+*.gif
+
+# Docs - outdated/in flux, skip semantic extraction
+docs/
+*.md
+*.mdx
+
+# Build artifacts & deps
+node_modules/
+.wrangler/
+dist/
+build/
+.next/
+out/
+*.lock
+pnpm-lock.yaml
+package-lock.json
+
+# Temp/scratch files
+temp.md
+
+# Graphify own output
+graphify-out/

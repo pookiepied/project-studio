@@ -1,0 +1,99 @@
+/*
+ * Workspace shell styles.
+ * Consumes semantic tokens from src/tokens/tokens.css — no hardcoded hues,
+ * staying inside the monochrome system.
+ */
+
+/* Solid workspace shell ------------------------------------------------------
+ * The native Tauri window stays opaque so Windows owns the real outer shape.
+ * We intentionally avoid app-drawn edge decoration here; the workspace shell
+ * keeps the floating chrome model without trying to fake a different shell. */
+html.zen-window,
+html.zen-window body,
+html.zen-window #root {
+  --zen-shell-bg: var(--surface-page);
+  background: var(--zen-shell-bg) !important;
+}
+
+html.dark.zen-window,
+html.dark.zen-window body,
+html.dark.zen-window #root {
+  --zen-shell-bg: var(--app-bg-dark);
+  background: var(--zen-shell-bg) !important;
+}
+
+/* The app surface is flush with the native window. */
+.zen-surface {
+  position: fixed;
+  inset: var(--zen-frame-inset, 8px);
+  border-radius: var(--zen-frame-radius, 16px);
+  overflow: hidden;
+  box-shadow: none;
+  background: var(--zen-shell-bg);
+  isolation: isolate;
+}
+html.dark .zen-surface {
+  box-shadow: none;
+}
+
+/* ── Hover-reveal window chrome ──────────────────────────────────────────── */
+.zen-hotzone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--zen-hotzone, 8px);
+  z-index: 70;
+  background: transparent;
+  /* Invisible catch area; the drag-region attr makes the very top draggable. */
+}
+
+/* Page chrome alignment ------------------------------------------------------
+ * In workspace-shell mode the top-center dock defines the top-row center line
+ * (23px at the 14px root font: FloatingPanel top-[5.5px] + h-[35px]/2). The
+ * header is centered on that same line so its icons align with the dock and the
+ * WindowTrafficLights (TOP_ROW_CENTER_Y). A 46px header (align-items: center)
+ * puts its content center at 23px. The left padding keeps them clear of the
+ * global WindowTrafficLights capsule.
+ */
+html.zen-window .studio-chat-header {
+  height: 46px;
+  min-height: 46px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 90px;
+  padding-right: 16px;
+  align-items: center;
+}
+
+html.zen-window .studio-chat-left-zone,
+html.zen-window .studio-chat-right-zone,
+html.zen-window .studio-chat-right-actions,
+html.zen-window .studio-chat-title-zone {
+  min-height: 28px;
+  align-items: center;
+}
+
+html.zen-window .studio-chat-title-zone {
+  max-width: clamp(140px, calc(50vw - 90px), 520px);
+}
+
+html.zen-window .studio-chat-inline-title {
+  max-width: 100%;
+  letter-spacing: 0.12em;
+}
+
+html.zen-window .studio-chat-icon-button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  html.zen-window .studio-chat-header {
+    padding-left: 84px;
+    padding-right: 12px;
+  }
+
+  html.zen-window .studio-chat-title-zone {
+    max-width: 38vw;
+  }
+}

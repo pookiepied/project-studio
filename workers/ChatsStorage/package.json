@@ -1,0 +1,19 @@
+{
+  "name": "chats-storage",
+  "version": "1.0.0",
+  "description": "STUDIO Chats Storage Worker - R2-backed chat persistence with gzip compression",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.71.0"
+  }
+}

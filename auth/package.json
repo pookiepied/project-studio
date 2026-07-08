@@ -1,0 +1,21 @@
+{
+  "name": "auth-gate",
+  "version": "1.0.0",
+  "description": "STUDIO Authentication Gate - Google OAuth + JWT issuance",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "whitelist": "node whitelist-manager.js"
+  },
+  "dependencies": {
+    "@studio/jwt": "file:../packages/jwt",
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.71.0"
+  }
+}

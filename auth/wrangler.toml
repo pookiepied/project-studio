@@ -1,0 +1,23 @@
+name = "auth"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "production"
+FRONTEND_URL = "https://studio.pookiepied.dev,http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:1420,http://localhost:8765,http://127.0.0.1:3000,tauri://localhost,https://tauri.localhost"
+
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "720a294c0a5844248a4ee8ac6a91fa8f"
+
+# Centralized telemetry — auth events (login, logout, token refresh) go here.
+[[services]]
+binding = "TRACKER"
+service  = "tracker"
+
+# Tail consumer — Cloudflare auto-routes invocation logs to the tracker worker.
+[[tail_consumers]]
+service = "tracker"
+
+[build]
+command = "npm install && npx tsc"

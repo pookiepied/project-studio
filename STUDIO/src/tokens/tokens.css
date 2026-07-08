@@ -1,0 +1,120 @@
+/*
+ * ───────────────────────────────────────────────────────────────────────────
+ * STUDIO semantic design tokens — SINGLE SOURCE OF TRUTH.
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * Premium neutral monochrome. White-led light mode, graphite-led dark mode.
+ * NO accent colors — hierarchy and state come from surface roles, structure,
+ * and type weight, never from hue. (See frontend-revamp/01-AUDIT.md §11–§12.)
+ *
+ * These CSS variables are bridged into Tailwind in `tailwind.config.js`
+ * (e.g. `bg-surface-base`, `text-primary`, `ring-focus`). Consume the tokens —
+ * never hardcode a hex or write `dark:` colour pairs; the values auto-switch via
+ * the `html.dark` block below.
+ *
+ * Imported FIRST in src/main.tsx (before index.css) so every rule can read them.
+ * We import via JS (Vite), not CSS @import, which is unreliable in Tauri WebKit.
+ *
+ * Interaction-state model (the channel-separation rule, §11.1):
+ *   hover     → quietest fill lift ONLY (transient); never touches text/weight.
+ *   selected  → stronger fill + near-black text + medium weight + optional marker.
+ *   focus     → neutral grey ring (never a fill, never black).
+ *   hover-on-selected → selected stays; do NOT stack a third shade.
+ */
+
+:root {
+  /* ── Surface roles — light (white-led; elevation via hairline border + soft shadow) ── */
+  --surface-page:     #FFFFFF; /* page / root background */
+  --surface-deep:     #FAFAFA; /* sunken panels (terminal, browser) */
+  --surface-base:     #F7F7F7; /* standard card / dropdown */
+  --surface-raised:   #F2F2F2; /* elevated container */
+  --surface-hover:    #EDEDED; /* hover — quietest fill, transient (§11.1) */
+  --surface-selected: #E4E4E4; /* selected/active fill — pair with text-primary + medium weight */
+  --surface-active:   #DCDCDC; /* pressed */
+  --surface-border:   #E6E6E6; /* hairline border — carries light-mode elevation */
+  --surface-divider:  #F0F0F0; /* thin inner divider */
+
+  /* ── Text / ink roles — light (primary is NEAR-BLACK ink, never pure #000) ── */
+  --text-primary:     #1A1A1A; /* primary text — near-black ink (never pure #000) */
+  --text-secondary:   #5A5A5A; /* secondary text */
+  --text-muted:       #6E6E6E; /* muted / placeholder (AA on base & raised surfaces) */
+  --text-disabled:    #B8B8B8; /* disabled text */
+  --text-on-emphasis: #FFFFFF; /* text on a filled near-black/graphite surface */
+
+  /* ── State channels that are NOT fills ── */
+  --focus-ring:       #5A5A5A; /* premium-grey focus ring (= secondary-ink weight) — never a fill, never #000 (§11.1) */
+  --marker:           #1A1A1A; /* structural selected marker (2px edge bar / inset) — near-black ink */
+
+  /* ── Elevation — soft in light, primary separation mechanism (§11.2) ── */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / 0.08);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.10);
+
+  /* ── Misc surfaces ── */
+  --scrim:                  rgb(0 0 0 / 0.45); /* the one modal backdrop */
+  --scrollbar-thumb:        rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover:  rgba(0, 0, 0, 0.20);
+
+  /* ── Syntax highlighting — neutral grayscale ramp only (no colour, §12) ── */
+  --syntax-text:     #262626;
+  --syntax-comment:  #737373;
+  --syntax-keyword:  #171717;
+  --syntax-string:   #404040;
+  --syntax-number:   #525252;
+  --syntax-function: #171717;
+  --syntax-type:     #262626;
+  --syntax-meta:     #737373;
+  /* git-diff: signalled by neutral fill + (deletion) strike-through, never red/green */
+  --syntax-add-bg:   #F0F0F0;
+  --syntax-del-bg:   #EDEDED;
+
+  /* App background mirror — used by html (Tauri frameless corners) + legacy bg-dark-100 */
+  --app-bg-dark:     #121212;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Dark mode — graphite-led, never pure black. Elevation via progressively
+ * lighter graphite fills + minimal shadow (§11.2). Applied on <html.dark>.
+ * ─────────────────────────────────────────────────────────────────────────── */
+html.dark {
+  --surface-page:     #121212;
+  --surface-deep:     #161616;
+  --surface-base:     #1A1A1A;
+  --surface-raised:   #1F1F1F;
+  --surface-hover:    #242424;
+  --surface-selected: #2E2E2E;
+  --surface-active:   #353535;
+  --surface-border:   #2A2A2A;
+  --surface-divider:  #222222;
+
+  --text-primary:     #F2F2F2; /* soft white — never #FFF */
+  --text-secondary:   #A8A8A8;
+  --text-muted:       #8A8A8A; /* AA on page/base/raised graphite */
+  --text-disabled:    #4A4A4A;
+  --text-on-emphasis: #0F0F0F;
+
+  --focus-ring:       #A8A8A8; /* premium-grey ring in dark (= secondary-ink weight) — never #FFF */
+  --marker:           #F2F2F2;
+
+  /* shadows barely read on dark — keep minimal */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / 0.45);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.55);
+
+  --scrim:                 rgb(0 0 0 / 0.55);
+  --scrollbar-thumb:       rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+
+  --syntax-text:     #A8A8A8;
+  --syntax-comment:  #6A6A6A;
+  --syntax-keyword:  #F2F2F2;
+  --syntax-string:   #B5B5B5;
+  --syntax-number:   #8A8A8A;
+  --syntax-function: #F2F2F2;
+  --syntax-type:     #A8A8A8;
+  --syntax-meta:     #6A6A6A;
+  --syntax-add-bg:   #1F1F1F;
+  --syntax-del-bg:   #242424;
+}

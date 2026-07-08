@@ -1,0 +1,16 @@
+{
+  "key": "product-self-knowledge",
+  "name": "Product Self Knowledge",
+  "description": "STUDIO — the autonomous agentic workspace created by pookiepied. Load when reasoning about Studio's own identity, architecture, or capabilities.",
+  "category": "Product",
+  "version": "1.0.0",
+  "scope": "system",
+  "allowed_runtime": "both",
+  "entrypoint": "SKILL.md",
+  "when_to_use": [
+    "Reasoning about Studio's own identity, architecture, or capabilities",
+    "User asks what Studio is, who built it, or what it can do"
+  ],
+  "required_tools": [],
+  "permissions": []
+}

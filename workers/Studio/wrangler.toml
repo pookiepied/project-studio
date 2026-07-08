@@ -1,0 +1,39 @@
+# Studio Worker — User preferences and Studio-specific backend logic
+#
+# SETUP INSTRUCTIONS:
+#
+# 1. Create the D1 database:
+#      wrangler d1 create studio-prefs
+#    Copy the returned database_id and paste it into [[d1_databases]] below.
+#
+# 2. Apply the schema:
+#      wrangler d1 execute studio-prefs --remote --file=./migrations/0001_initial.sql
+#
+# 3. Deploy:
+#      npm run deploy
+#
+# 4. Add the STUDIO service binding to the API worker's wrangler.toml:
+#      [[services]]
+#      binding = "STUDIO"
+#      service = "studio"
+#
+# NOTE: workers_dev and preview_urls are intentionally disabled.
+# This worker is not exposed publicly — it is reachable only via
+# service bindings from the API worker.
+
+name = "studio"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "STUDIO_DB"
+database_name = "studio-prefs"
+database_id = "c80f9e46-9083-4c76-81b9-8abe1d81f019"
+
+[build]
+command = "npm install && npx tsc"

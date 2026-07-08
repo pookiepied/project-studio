@@ -1,0 +1,17 @@
+{
+  "key": "studio-computer-use",
+  "name": "STUDIO Computer Use",
+  "description": "STUDIO desktop computer-use workflow for controlling Windows apps, reading screens with vision/OCR, managing windows, using mouse/keyboard, inspecting UI Automation, diagnosing system/network state, and making local OS changes through the computer-use MCP server.",
+  "category": "Desktop Automation",
+  "version": "1.0.0",
+  "scope": "local",
+  "allowed_runtime": "local",
+  "entrypoint": "SKILL.md",
+  "when_to_use": [
+    "User asks STUDIO to operate local desktop software or native Windows UI",
+    "User asks for screen reading, OCR, clicking, typing, window management, or GUI automation",
+    "User asks to diagnose or change local Windows system, network, audio, display, registry, process, service, startup, task, user, or group state"
+  ],
+  "required_tools": ["computer-use"],
+  "permissions": ["desktop-control", "screen-capture", "keyboard-mouse", "system-settings"]
+}

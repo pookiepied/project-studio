@@ -1,0 +1,35 @@
+{
+  "name": "studio-chat",
+  "version": "1.0.0",
+  "description": "Studio Chat — ChatAgent DO, WebSocket sessions, cron dispatcher",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "@ai-sdk/anthropic": "^3.0.81",
+    "@ai-sdk/deepseek": "^2.0.35",
+    "@ai-sdk/google": "^3.0.80",
+    "@ai-sdk/groq": "^3.0.39",
+    "@ai-sdk/mistral": "^3.0.37",
+    "@ai-sdk/openai": "^3.0.66",
+    "@ai-sdk/openai-compatible": "^2.0.48",
+    "@ai-sdk/xai": "^3.0.92",
+    "@sinclair/typebox": "^0.32.0",
+    "agents": "latest",
+    "ai": "^6.0.193",
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.71.0"
+  },
+  "overrides": {
+    "undici": "^7.24.0"
+  }
+}

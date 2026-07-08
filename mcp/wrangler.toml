@@ -1,0 +1,55 @@
+name = "studio-mcp"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via: wrangler secret put <NAME>
+# ---------------------------------------------------------------------------
+# JWT auth — same secret used by the auth worker for token signing
+#   wrangler secret put JWT_SECRET
+#
+# Legacy static-token fallback (optional)
+#   wrangler secret put MEMORY_AUTH_SECRET
+
+# ---------------------------------------------------------------------------
+# D1 — MCP connections registry (local MCPs, remote MCPs, Composio)
+# ---------------------------------------------------------------------------
+[[d1_databases]]
+binding = "MCP_DB"
+database_name = "studio-mcp"
+database_id = "372d8d03-1d80-4595-9069-1739f7b5bb6f"
+
+# ---------------------------------------------------------------------------
+# Service bindings — native system MCP workers
+# ---------------------------------------------------------------------------
+
+# STUDIO Memory — persistent user memory (facts, profiles, conversation history)
+[[services]]
+binding = "MEMORY"
+service = "studio-mcp-memory"
+
+# STUDIO YouTube Transcript MCP
+[[services]]
+binding = "YOUTUBE_TRANSCRIPT"
+service = "studio-youtube-transcript"
+
+# STUDIO Tools — first-party native work tools (web_search, http_request, gen, …)
+[[services]]
+binding = "TOOLS"
+service = "studio-mcp-tools"
+
+# STUDIO Skills — bundled + local skill catalog (skill_read, skill_list, …).
+# Advertised to BOTH the main chat agent and sub-agents through this hub's
+# native-service catalog, so skills use one tool path everywhere.
+[[services]]
+binding = "SKILLS"
+service = "studio-skills"
+
+[build]
+command = "npm install && npx tsc"

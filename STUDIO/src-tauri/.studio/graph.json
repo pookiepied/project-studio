@@ -1,0 +1,3518 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-10T20:07:39.726Z",
+  "root": "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri",
+  "stats": {
+    "total_files": 500,
+    "changed_files": 500,
+    "scan_duration_ms": 394
+  },
+  "cache": {
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\build.rs": {
+      "hash": "4ae2333b1162",
+      "lines": 4,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 42
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\capabilities\\default.json": {
+      "hash": "b4b6ecb61d68",
+      "lines": 65,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 2044
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\capabilities\\overlay.json": {
+      "hash": "0a46c00e7cda",
+      "lines": 17,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 468
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\Cargo.toml": {
+      "hash": "7194d4d1a9d8",
+      "lines": 44,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1350
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\check_paths.cjs": {
+      "hash": "272570bb8a72",
+      "lines": 17,
+      "imports": [
+        "fs"
+      ],
+      "exports": [],
+      "sizeBytes": 366
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\gen\\schemas\\acl-manifests.json": {
+      "hash": "de8faa9b0ad9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 152132
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\gen\\schemas\\capabilities.json": {
+      "hash": "1eeefea3d824",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 2033
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\gen\\schemas\\desktop-schema.json": {
+      "hash": "50b2b854f862",
+      "lines": 6509,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 428857
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\gen\\schemas\\windows-schema.json": {
+      "hash": "50b2b854f862",
+      "lines": 6509,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 428857
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\mk_dir.cjs": {
+      "hash": "7a4068ba3290",
+      "lines": 9,
+      "imports": [
+        "fs"
+      ],
+      "exports": [],
+      "sizeBytes": 224
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\mk_dir.js": {
+      "hash": "7a4068ba3290",
+      "lines": 9,
+      "imports": [
+        "fs"
+      ],
+      "exports": [],
+      "sizeBytes": 224
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\commands\\oauth_server.rs": {
+      "hash": "0d0298510aaf",
+      "lines": 379,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 15882
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\commands.rs": {
+      "hash": "d442ca5aeaed",
+      "lines": 643,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 22595
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\daemon\\mod.rs": {
+      "hash": "86e6b2e7227d",
+      "lines": 164,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 4995
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\lib.rs": {
+      "hash": "10acd260c799",
+      "lines": 402,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 16704
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\main.rs": {
+      "hash": "96daae6d81cd",
+      "lines": 7,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 187
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\mcp.rs": {
+      "hash": "389fc3551a9d",
+      "lines": 683,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 23483
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\src\\pty.rs": {
+      "hash": "50b00e1116f0",
+      "lines": 195,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 6539
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\.rustc_info.json": {
+      "hash": "251250cf748c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1113
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\adler2-11fcdc20babec40d\\lib-adler2.json": {
+      "hash": "b1ac5d330d7a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 399
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\adler2-708dea00d6a216f0\\lib-adler2.json": {
+      "hash": "f4f61049e875",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 399
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\aho-corasick-043e409c46c5a61c\\lib-aho_corasick.json": {
+      "hash": "1f9c3daa0a16",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\aho-corasick-a823795982057c2a\\lib-aho_corasick.json": {
+      "hash": "fe78c6cb7ff7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\aho-corasick-d4646201266b4461\\lib-aho_corasick.json": {
+      "hash": "9aa269b88c0a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\aho-corasick-ef40d8b8a830289d\\lib-aho_corasick.json": {
+      "hash": "776465cfa371",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-no-stdlib-5654b72975d710ec\\lib-alloc_no_stdlib.json": {
+      "hash": "2d7fd591b823",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 374
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-no-stdlib-8cf46330f114b781\\lib-alloc_no_stdlib.json": {
+      "hash": "42d90ccdf5ae",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 375
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-no-stdlib-9e019d7fe9d17d78\\lib-alloc_no_stdlib.json": {
+      "hash": "260a3ed8378b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 374
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-no-stdlib-f942eb6e35a4ef08\\lib-alloc_no_stdlib.json": {
+      "hash": "d4985649b977",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 375
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-stdlib-30e926fa21b47b7b\\lib-alloc_stdlib.json": {
+      "hash": "1939d7321bfb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 436
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-stdlib-4554e496cb22af62\\lib-alloc_stdlib.json": {
+      "hash": "5bd10189c2cb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 435
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-stdlib-8335f9fd005ac5ec\\lib-alloc_stdlib.json": {
+      "hash": "c9381ee9a6a7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 435
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\alloc-stdlib-f4963da2cb2bf1c8\\lib-alloc_stdlib.json": {
+      "hash": "91d30aef1a21",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 437
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-1072a0094e9e5ec6\\lib-anyhow.json": {
+      "hash": "a064aa52391f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 473
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-2a1584e27acf7ca7\\lib-anyhow.json": {
+      "hash": "5876d631a6ea",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 472
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-415da09ed2399e87\\lib-anyhow.json": {
+      "hash": "a0fd63e556a0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 472
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-7292878aaa05da4c\\run-build-script-build-script-build.json": {
+      "hash": "ef9afdca8cb5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 394
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-854be13ee807ceeb\\build-script-build-script-build.json": {
+      "hash": "7a2e49423bbb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 424
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-c6babb0c09bad520\\lib-anyhow.json": {
+      "hash": "3eb0d263a674",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 473
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-d3b123174dc8a3bc\\build-script-build-script-build.json": {
+      "hash": "1ed4a3474241",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 424
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\anyhow-f60d7d564df056af\\run-build-script-build-script-build.json": {
+      "hash": "674d0c1abffc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 394
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\atomic-waker-51a570a3292c2eef\\lib-atomic_waker.json": {
+      "hash": "c859167e22fb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 380
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\atomic-waker-733411725d00cdd1\\lib-atomic_waker.json": {
+      "hash": "277d9b600335",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 381
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\atomic-waker-a63bfe5478bbd105\\lib-atomic_waker.json": {
+      "hash": "032e7ae4f832",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 381
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\auto-launch-29bcc096baaef98f\\lib-auto_launch.json": {
+      "hash": "50786a859c8c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 474
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\auto-launch-2fd572f7835ef8c5\\lib-auto_launch.json": {
+      "hash": "b945efa58856",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\auto-launch-308676306fe3c641\\lib-auto_launch.json": {
+      "hash": "f2e30beeaba6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\auto-launch-714b9e0e8d3781ec\\lib-auto_launch.json": {
+      "hash": "75f669c5b8fa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 476
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\auto-launch-ffde8ce7806cf74e\\lib-auto_launch.json": {
+      "hash": "8a3e44a06fcf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 476
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\autocfg-d6d09f580b6b9b13\\lib-autocfg.json": {
+      "hash": "41c2bf6296b1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 348
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\autocfg-ff5884693664d457\\lib-autocfg.json": {
+      "hash": "53df11c81479",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 348
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-0b360acb9dc29ba9\\lib-base64.json": {
+      "hash": "680f31bfcfa7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 411
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-11112dfb4e94ae4e\\lib-base64.json": {
+      "hash": "c2b377d138aa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 411
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-42acaaa86c653d4a\\lib-base64.json": {
+      "hash": "58e272ec9365",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 412
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-524f8a75fe643cdd\\lib-base64.json": {
+      "hash": "3a163e0f3159",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 412
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-531f35d68e4e07b5\\lib-base64.json": {
+      "hash": "df95dc9ac217",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 410
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-86bc57838984083e\\lib-base64.json": {
+      "hash": "1396db403c9a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 410
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\base64-ca72789b075579c1\\lib-base64.json": {
+      "hash": "09fc31e5e05f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 411
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-2d4b6ce680170569\\lib-bitflags.json": {
+      "hash": "42e03c4286bb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 453
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-42c0b09bfa163925\\lib-bitflags.json": {
+      "hash": "654c0b6fbcb3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 523
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-505cc21d5fbc6b17\\lib-bitflags.json": {
+      "hash": "1354b4c9f2c2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 454
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-5180e4535a29452d\\lib-bitflags.json": {
+      "hash": "606b8d706c94",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 523
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-ce9d33f5715033bd\\lib-bitflags.json": {
+      "hash": "056275760733",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 522
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-d927a6da6c681fe2\\lib-bitflags.json": {
+      "hash": "ed714841533b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 454
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bitflags-e7afb5616860f76a\\lib-bitflags.json": {
+      "hash": "f532fc2c06e7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 453
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\block-buffer-1215240ae038ffa9\\lib-block_buffer.json": {
+      "hash": "5c91f29d5475",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 424
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\block-buffer-1f5a8c162fe1db28\\lib-block_buffer.json": {
+      "hash": "efefa568f773",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 423
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-33ca700b3f01fe81\\lib-brotli.json": {
+      "hash": "27b9a7d242bc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 917
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-57a5c4dc0a88bf89\\lib-brotli.json": {
+      "hash": "1e34f6c77dca",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 918
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-79dd83a22cf1483b\\lib-brotli.json": {
+      "hash": "03daa55182d2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 916
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-a954e895bab4c520\\lib-brotli.json": {
+      "hash": "9cb554c5faf6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 917
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-decompressor-1021aaecd9925316\\lib-brotli_decompressor.json": {
+      "hash": "83b81508bcd1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 668
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-decompressor-61e2f5d10008b223\\lib-brotli_decompressor.json": {
+      "hash": "4e96651bb1e1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 668
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-decompressor-c5913305fbbfd891\\lib-brotli_decompressor.json": {
+      "hash": "4d0d36f74c21",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 670
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\brotli-decompressor-e210924c3c9c6c01\\lib-brotli_decompressor.json": {
+      "hash": "234672633a7e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 668
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\byteorder-04b068faa2a5ce23\\lib-byteorder.json": {
+      "hash": "f78ec7d7106a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 404
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\byteorder-3e56d726bb0c56b0\\lib-byteorder.json": {
+      "hash": "ef0cfbeb04ee",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 403
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\byteorder-b12c2005ffdddab5\\lib-byteorder.json": {
+      "hash": "81cc293e1c95",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 403
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\byteorder-d249c46501bf1875\\lib-byteorder.json": {
+      "hash": "b64114be7968",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 404
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bytes-2374475d4ec174da\\lib-bytes.json": {
+      "hash": "e72485f3279b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 418
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bytes-7badf37a6efcd7b1\\lib-bytes.json": {
+      "hash": "1541edcdef49",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 418
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bytes-97e5545ef8ab9190\\lib-bytes.json": {
+      "hash": "1deea5e58fae",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 419
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\bytes-d403da2a298e401c\\lib-bytes.json": {
+      "hash": "2cf91bf1bd62",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 418
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\camino-06734163538122ba\\run-build-script-build-script-build.json": {
+      "hash": "7388c96b4182",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 329
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\camino-2a0ca523df3f8bce\\build-script-build-script-build.json": {
+      "hash": "5ca129a454db",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 404
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\camino-541d15d96da2ff80\\lib-camino.json": {
+      "hash": "226276497a8a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 516
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\camino-5c1c8693e6fcbf64\\run-build-script-build-script-build.json": {
+      "hash": "bb7a1b02390b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 330
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\camino-9443787eef558086\\build-script-build-script-build.json": {
+      "hash": "bac7c19638c3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 404
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\camino-ba095afd9eaa7570\\lib-camino.json": {
+      "hash": "91b8290ebdf3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 515
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo-platform-03a75796d38f8942\\lib-cargo_platform.json": {
+      "hash": "9f55a679da8a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 421
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo-platform-56b9310c98587635\\lib-cargo_platform.json": {
+      "hash": "1ec37b4541a5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 421
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo_metadata-1487ba17d7358c31\\lib-cargo_metadata.json": {
+      "hash": "fe9e2708e523",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 795
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo_metadata-2880bbdd1e1a7744\\lib-cargo_metadata.json": {
+      "hash": "59d4181192f6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 797
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo_metadata-532802f5ea9e36cd\\lib-cargo_metadata.json": {
+      "hash": "6dbc27dc4c82",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 796
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo_toml-47ad41febb390ce6\\lib-cargo_toml.json": {
+      "hash": "7419f8dd94f0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 481
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo_toml-4dbf60e7490bd2d7\\lib-cargo_toml.json": {
+      "hash": "b6939cfbc6f6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 481
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cargo_toml-575f4267c45abec0\\lib-cargo_toml.json": {
+      "hash": "c074dbeb22f2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 481
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cc-cd68463d23787897\\lib-cc.json": {
+      "hash": "4a92fc3d1c86",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 490
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cc-e199324d37f1571d\\lib-cc.json": {
+      "hash": "63c151d911e8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 490
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfb-094ef899a3480313\\lib-cfb.json": {
+      "hash": "706943bb905f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 510
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfb-72292e681c39b4f8\\lib-cfb.json": {
+      "hash": "e90ece5b55b6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 507
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfb-7809ac12a3d4b0c6\\lib-cfb.json": {
+      "hash": "f46499500dc5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 511
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfb-ac56cf931fb52896\\lib-cfb.json": {
+      "hash": "27f10be8754e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 510
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfb-c7ce07b0c894b2b7\\lib-cfb.json": {
+      "hash": "c817ed06470a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 510
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfb-ff0dd2eef8c8a08b\\lib-cfb.json": {
+      "hash": "c5953858c92c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 508
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfg-if-492d98eefda77ff2\\lib-cfg_if.json": {
+      "hash": "6402d5411cb8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 378
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfg-if-50da2642d7d10359\\lib-cfg_if.json": {
+      "hash": "e5b4af061ca1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 379
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfg-if-5bd1410b85b8834a\\lib-cfg_if.json": {
+      "hash": "684ae03a1364",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 378
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cfg-if-5d41b71ec4c6f14a\\lib-cfg_if.json": {
+      "hash": "caf7e45feb20",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 379
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\convert_case-a34b2131d4ca3049\\lib-convert_case.json": {
+      "hash": "299a9d53bd58",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 381
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\convert_case-f9fa713d7efa15a0\\lib-convert_case.json": {
+      "hash": "6aea68af9920",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 381
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-4dfc68b656f5af3e\\lib-cookie.json": {
+      "hash": "052277350ffa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 646
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-556f0c69f2194f6b\\lib-cookie.json": {
+      "hash": "0ed443b7f582",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 646
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-6f9bc34b23d67ccd\\run-build-script-build-script-build.json": {
+      "hash": "d9ae88049c9c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 257
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-72e6612ab0930e5f\\run-build-script-build-script-build.json": {
+      "hash": "aafbedf2f562",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 258
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-8261452ec76ed5c2\\lib-cookie.json": {
+      "hash": "202dc7451ba5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 645
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-833370172ffd511f\\build-script-build-script-build.json": {
+      "hash": "58fff8dcb9d9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 606
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cookie-ba0d0f95d27dc253\\build-script-build-script-build.json": {
+      "hash": "ad334377c8b3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 606
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cpufeatures-6de76bf4e4f8eb59\\lib-cpufeatures.json": {
+      "hash": "24261ecfb547",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 357
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cpufeatures-7cfad6cf704d67d6\\lib-cpufeatures.json": {
+      "hash": "93d6c7f3db27",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 357
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-1c041f34d42edac0\\build-script-build-script-build.json": {
+      "hash": "b4bfe0d1c41e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 425
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-839ebbde60ae0ff4\\lib-crc32fast.json": {
+      "hash": "273af39564fc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 534
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-86462daa201d12b1\\lib-crc32fast.json": {
+      "hash": "4d10416b0bbd",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 534
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-99a9de2a1bb3fd7b\\run-build-script-build-script-build.json": {
+      "hash": "238e8c15fe25",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 256
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-9c2aa0df2c773164\\run-build-script-build-script-build.json": {
+      "hash": "d686bbad9921",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 255
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-dd817bf6c5dc27c1\\build-script-build-script-build.json": {
+      "hash": "ea05aeaa977a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 425
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-df3b301534daf44b\\lib-crc32fast.json": {
+      "hash": "ea0bc87cafb6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 535
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crc32fast-fdbca95f3882f6ef\\lib-crc32fast.json": {
+      "hash": "9167d861cc91",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 534
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-channel-1f7a5ad2cc4182ea\\lib-crossbeam_channel.json": {
+      "hash": "814c16604ecc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-channel-2db7acf23903f0e2\\lib-crossbeam_channel.json": {
+      "hash": "91efd508df9f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 474
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-channel-7a7932e886703bf2\\lib-crossbeam_channel.json": {
+      "hash": "18190379ef54",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 476
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-05ff7bf3fa474e2e\\lib-crossbeam_utils.json": {
+      "hash": "dd01be0a9360",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 484
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-5c1bb2b8608fd7d1\\lib-crossbeam_utils.json": {
+      "hash": "5c2afa6f6439",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 483
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-8066693d49c7288a\\build-script-build-script-build.json": {
+      "hash": "1729f7a821bf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 427
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-8ba130f70681044d\\run-build-script-build-script-build.json": {
+      "hash": "a75e88d136ee",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 342
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-c09e493f89b8d7f2\\run-build-script-build-script-build.json": {
+      "hash": "ac0dd6f5d1f1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 342
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-e068025586ae0021\\lib-crossbeam_utils.json": {
+      "hash": "6beea1c6903b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 483
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crossbeam-utils-fa9754cdc3e3a37a\\build-script-build-script-build.json": {
+      "hash": "f77f61550900",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 427
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crypto-common-077f7e6c62b620ad\\lib-crypto_common.json": {
+      "hash": "a1d4770b2b14",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 530
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\crypto-common-4148c4a1ce67004d\\lib-crypto_common.json": {
+      "hash": "577719353cdb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 529
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-2312497c75b8fbc0\\lib-cssparser.json": {
+      "hash": "4b3a39a28b35",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 820
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-456e1b8abcc8c955\\run-build-script-build-script-build.json": {
+      "hash": "66589f24e080",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 340
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-8150c9aa9ad25f7d\\build-script-build-script-build.json": {
+      "hash": "328c6ba6716a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 587
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-ae130d7548cf58c7\\run-build-script-build-script-build.json": {
+      "hash": "80afb78767c2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 341
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-dc3aff4bab215517\\lib-cssparser.json": {
+      "hash": "c2d098387c3e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 817
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-e03f71f6986c2bfd\\build-script-build-script-build.json": {
+      "hash": "8c771e7c27a8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 589
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-f11f83f668524d50\\lib-cssparser.json": {
+      "hash": "9659ac06a222",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 815
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-macros-7f9ff3a66fe42bdb\\lib-cssparser_macros.json": {
+      "hash": "03ae3d0122bf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 478
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\cssparser-macros-a752e4517b914718\\lib-cssparser_macros.json": {
+      "hash": "7ff1297b1aa7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 477
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ctor-83c4641adfc454b2\\lib-ctor.json": {
+      "hash": "00fbe471b7a6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 471
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ctor-bfde378e1605e4c0\\lib-ctor.json": {
+      "hash": "f2a2fc9d19f0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 470
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\darling-0112e529916d66dd\\lib-darling.json": {
+      "hash": "9f141a387447",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 564
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\darling-f8cbe9bafb1f03f8\\lib-darling.json": {
+      "hash": "3b41c3ad3125",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 564
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\darling_core-5f0fa15603a1318c\\lib-darling_core.json": {
+      "hash": "b11f16d49673",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 734
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\darling_core-f07f4024dee280b8\\lib-darling_core.json": {
+      "hash": "96d0f0e3c026",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 736
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\darling_macro-5029253fca6da273\\lib-darling_macro.json": {
+      "hash": "4f2240e2684c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 536
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\darling_macro-fef02188d1e5560d\\lib-darling_macro.json": {
+      "hash": "9bfe85307aa3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 537
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\deranged-7452a43c4aeec30c\\lib-deranged.json": {
+      "hash": "55078784a264",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 641
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\deranged-cc84204674bfc8ac\\lib-deranged.json": {
+      "hash": "49ed40395007",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 641
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\deranged-e7ac4d046d6e47ab\\lib-deranged.json": {
+      "hash": "67f2a770d0e9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 640
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\derive_more-672630d8eb6f6c00\\lib-derive_more.json": {
+      "hash": "4dcddf21c68a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1366
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\derive_more-bec46734a51a09f2\\lib-derive_more.json": {
+      "hash": "ce2640f64df9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1366
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\digest-6f951b4a22d59b96\\lib-digest.json": {
+      "hash": "95211ce143eb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 683
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\digest-81ed8116ea5e9f9a\\lib-digest.json": {
+      "hash": "073b84abb195",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 683
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-1dca65aff1078f9d\\lib-dirs.json": {
+      "hash": "9e85ae20816c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 403
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-1e8f621002ea345c\\lib-dirs.json": {
+      "hash": "7f395d1308b0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 401
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-a803eb5afcbf7a95\\lib-dirs.json": {
+      "hash": "bfb1d4d205b6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 403
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-b1d674762880fbf4\\lib-dirs.json": {
+      "hash": "dfa5df2bb40d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 402
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-eceb5e76e5a814d0\\lib-dirs.json": {
+      "hash": "061b33ee1488",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 402
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-ee3f92f02e11e537\\lib-dirs.json": {
+      "hash": "811a67a653bf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 402
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-sys-310004bdf6581383\\lib-dirs_sys.json": {
+      "hash": "429c353c47df",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-sys-7602d7030222cf88\\lib-dirs_sys.json": {
+      "hash": "912d6c22e825",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-sys-aaf515dfdbde14bd\\lib-dirs_sys.json": {
+      "hash": "df22bf094f59",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-sys-c3b0e29b0350b432\\lib-dirs_sys.json": {
+      "hash": "eb7fb6e94766",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 477
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-sys-ccb70dffeb425ada\\lib-dirs_sys.json": {
+      "hash": "68c689e9368b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 475
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dirs-sys-d145f118bba8d7fa\\lib-dirs_sys.json": {
+      "hash": "900a25cf5cf7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 476
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\displaydoc-099d7fe85334f9fc\\lib-displaydoc.json": {
+      "hash": "c9df8152c5ee",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 549
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\displaydoc-457ca6f969e10d0e\\lib-displaydoc.json": {
+      "hash": "a07d36ff17d6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 550
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\downcast-rs-10296b65e2fab498\\lib-downcast_rs.json": {
+      "hash": "ba41b0d49489",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 398
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\downcast-rs-28ba137ce04ccb9e\\lib-downcast_rs.json": {
+      "hash": "2bcdaf8cdcc4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 397
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\downcast-rs-90ccd020151a9da1\\lib-downcast_rs.json": {
+      "hash": "0b02f4c86f05",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 398
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dpi-02649fd7565d5557\\lib-dpi.json": {
+      "hash": "5dd589aef444",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 471
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dpi-065bd4718b97da88\\lib-dpi.json": {
+      "hash": "58cb3373d952",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 472
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dpi-cda93378276b2559\\lib-dpi.json": {
+      "hash": "26db6042dd90",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 470
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dtoa-957e32faccb96566\\lib-dtoa.json": {
+      "hash": "b71c6c812f6f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 357
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dtoa-9ec691ecd82ae4ac\\lib-dtoa.json": {
+      "hash": "cb12ef0142f5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 357
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dtoa-short-2677d0819641c7b5\\lib-dtoa_short.json": {
+      "hash": "6e5d6494f376",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 413
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dtoa-short-ebe60a01c2ed9226\\lib-dtoa_short.json": {
+      "hash": "ed6d6957d8fc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 412
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dunce-055fb06185da01ec\\lib-dunce.json": {
+      "hash": "c43647ae7caf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 346
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dunce-3643b65bb9ab8189\\lib-dunce.json": {
+      "hash": "b0a9842dbf52",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 345
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dunce-680d14bee3966c98\\lib-dunce.json": {
+      "hash": "31a81fba342b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 346
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dunce-b9e1575e146e7ece\\lib-dunce.json": {
+      "hash": "a5326b861387",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 345
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dyn-clone-4dbbdf89f1abb919\\lib-dyn_clone.json": {
+      "hash": "8ece6d81462b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 355
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\dyn-clone-b44e02aa7499e4bb\\lib-dyn_clone.json": {
+      "hash": "f7e62549292f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 355
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\embed-resource-9dce3ab5a728b9ad\\lib-embed_resource.json": {
+      "hash": "a58be4ebff9c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 657
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\embed-resource-a2a501d88e00d61f\\lib-embed_resource.json": {
+      "hash": "73da0b0df264",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 656
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\embed-resource-baba23c50a2698bc\\lib-embed_resource.json": {
+      "hash": "fc57516b5db2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 655
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\embed-resource-c4678cd67781fb08\\lib-embed_resource.json": {
+      "hash": "22c7d7047353",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 658
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\embed-resource-fc958bc0335c8023\\lib-embed_resource.json": {
+      "hash": "1fa4af2b2997",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 656
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\equivalent-43bf456d570bccb8\\lib-equivalent.json": {
+      "hash": "7821baaa880e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 356
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\equivalent-78c949b3bc5456e0\\lib-equivalent.json": {
+      "hash": "18d780741840",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 355
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\equivalent-b19a42cd8c2442b0\\lib-equivalent.json": {
+      "hash": "47ec229f769c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 356
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\equivalent-ebd39031dcab7414\\lib-equivalent.json": {
+      "hash": "941341fbc04d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 355
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-15beca30643b5e3e\\lib-erased_serde.json": {
+      "hash": "01a4c6af91d5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 610
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-1b1850cb721147e7\\lib-erased_serde.json": {
+      "hash": "a22484cd6a1d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 609
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-213bc07f0b275dae\\lib-erased_serde.json": {
+      "hash": "48c241648ea3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 610
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-34a9c2f65112b32c\\run-build-script-build-script-build.json": {
+      "hash": "aecea012d503",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 334
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-76e63ca1172c0dae\\lib-erased_serde.json": {
+      "hash": "9fb3e4b0774c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 610
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-7caf713cb7db47a9\\run-build-script-build-script-build.json": {
+      "hash": "f5bf9f2866cc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 335
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-8ab499d11fb8c62d\\build-script-build-script-build.json": {
+      "hash": "9e0c863952ce",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 434
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-8bffd7c57ef8d2d0\\lib-erased_serde.json": {
+      "hash": "20c0fb99623e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 611
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-8f5f4ef94a9443e7\\build-script-build-script-build.json": {
+      "hash": "b2db25a98f89",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 434
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\erased-serde-b67874ba68bde310\\lib-erased_serde.json": {
+      "hash": "0097e4cb2e84",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 610
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fastrand-39c7d8dc6e089331\\lib-fastrand.json": {
+      "hash": "69483169bd8e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 438
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fastrand-b0049bbb4869c479\\lib-fastrand.json": {
+      "hash": "414408e2975b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 438
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fastrand-be824bc817d66839\\lib-fastrand.json": {
+      "hash": "871e9e29fabc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 437
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fdeflate-99ea825f3014f4b5\\lib-fdeflate.json": {
+      "hash": "e998739c0c6d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 413
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fdeflate-c114802ce6cc86f6\\lib-fdeflate.json": {
+      "hash": "98811376ccb6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 413
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\filedescriptor-19f3bb8271994063\\lib-filedescriptor.json": {
+      "hash": "52ad3e4b5748",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 538
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\filedescriptor-a5d06e999ba47130\\lib-filedescriptor.json": {
+      "hash": "02c8f348031f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 538
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\filedescriptor-fb0f9a21ac637e5d\\lib-filedescriptor.json": {
+      "hash": "f350b35d8b53",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 536
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\find-msvc-tools-6e714de184a5b4aa\\lib-find_msvc_tools.json": {
+      "hash": "1e82d7b2d1dd",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 367
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\find-msvc-tools-824f9ded730dd358\\lib-find_msvc_tools.json": {
+      "hash": "7237b8a5ae7b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 367
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\flate2-1a761cbad3f1f358\\lib-flate2.json": {
+      "hash": "fd924af8122a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 809
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\flate2-8312364fbc331d02\\lib-flate2.json": {
+      "hash": "cb3ac40d7c90",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 807
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\flate2-8d826a9eb53510c9\\lib-flate2.json": {
+      "hash": "1e19f018dfe4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 808
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fnv-03937741514939f5\\lib-fnv.json": {
+      "hash": "d6e8deeca62c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 384
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fnv-6a2bfe21e1772c80\\lib-fnv.json": {
+      "hash": "763f6b596bd2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 383
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fnv-a847c0352ba4ddbf\\lib-fnv.json": {
+      "hash": "bf6db3d5d315",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 384
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fnv-da722296a25cad98\\lib-fnv.json": {
+      "hash": "a0f487f9a6fe",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 383
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\form_urlencoded-0977931150670c0a\\lib-form_urlencoded.json": {
+      "hash": "988d6fa62213",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 481
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\form_urlencoded-84c075fe0a4b4354\\lib-form_urlencoded.json": {
+      "hash": "a9534e50ac17",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 496
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\form_urlencoded-c08831b2e7325713\\lib-form_urlencoded.json": {
+      "hash": "ba2b18bd13ea",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 482
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\form_urlencoded-c4075ddbaaa7eabd\\lib-form_urlencoded.json": {
+      "hash": "46c9506f54ec",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\form_urlencoded-f56a3cd6753b58f7\\lib-form_urlencoded.json": {
+      "hash": "12515542361b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 496
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futf-226fb9d74391cd13\\lib-futf.json": {
+      "hash": "7e462a722d61",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 469
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futf-32feb1d2abc0dbd6\\lib-futf.json": {
+      "hash": "9c01200685cf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 468
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-channel-0ad3cf9c935b69b6\\lib-futures_channel.json": {
+      "hash": "8212d494aa74",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 561
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-channel-2885b18869ca1fbc\\lib-futures_channel.json": {
+      "hash": "9e2d48e67e88",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 561
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-channel-3e394625f62ffbfb\\lib-futures_channel.json": {
+      "hash": "94519407a1e6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 561
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-core-1baf76ba558868ac\\lib-futures_core.json": {
+      "hash": "efa9e88b840c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 485
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-core-34a9ad38d858a8f3\\lib-futures_core.json": {
+      "hash": "caa58118a856",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 485
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-core-4fcb200a4b6ba7b0\\lib-futures_core.json": {
+      "hash": "d2464a8207f1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 485
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-io-118d68d77e0345ae\\lib-futures_io.json": {
+      "hash": "80df771447ce",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 410
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-io-4d8f4ba64c30f287\\lib-futures_io.json": {
+      "hash": "ddc3ed52f40b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 410
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-io-c5fa4ea61db9b75e\\lib-futures_io.json": {
+      "hash": "162f447abae3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 410
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-lite-25ffeba5078e0213\\lib-futures_lite.json": {
+      "hash": "3f8c25901c17",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 850
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-lite-a63280a9f9085654\\lib-futures_lite.json": {
+      "hash": "cf25cc435f9e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 847
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-lite-e27ea779b0165ff6\\lib-futures_lite.json": {
+      "hash": "bfc6f0aeb1ac",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 849
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-macro-93d00697f73c9b19\\lib-futures_macro.json": {
+      "hash": "fc8b8151e306",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 536
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-macro-ae88135b634acc06\\lib-futures_macro.json": {
+      "hash": "ccd2c4184aa3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 537
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-sink-0e03535744ef2dc8\\lib-futures_sink.json": {
+      "hash": "5fe2edd1b38d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 424
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-sink-3585f6e909057380\\lib-futures_sink.json": {
+      "hash": "5cef50c6c308",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 424
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-sink-f3d33cd6b73d00ff\\lib-futures_sink.json": {
+      "hash": "4a0f380f67ba",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 424
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-task-0343014cc02f8314\\lib-futures_task.json": {
+      "hash": "f75678106f8d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 452
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-task-9a776b0dbfb9362c\\lib-futures_task.json": {
+      "hash": "af8e07d7c5d3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 452
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-task-9c1f78003b86388f\\lib-futures_task.json": {
+      "hash": "6c2dbd50b539",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 452
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-util-135ad54b1f2f9a4b\\lib-futures_util.json": {
+      "hash": "8662f5305f94",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1149
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-util-635bb2bdc2edfca9\\lib-futures_util.json": {
+      "hash": "6d88fa5ee548",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1149
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\futures-util-69de49831d85ef96\\lib-futures_util.json": {
+      "hash": "de0befd8f297",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1149
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fxhash-1357eccb833c1cb3\\lib-fxhash.json": {
+      "hash": "4989fc3f03e1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 409
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fxhash-2f2c2ee3e7c5e20b\\lib-fxhash.json": {
+      "hash": "830ec97d15ac",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 408
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\fxhash-f1039443e3df886e\\lib-fxhash.json": {
+      "hash": "db2699db8dea",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 408
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\generic-array-525c12612aed3778\\lib-generic_array.json": {
+      "hash": "95528e3be7a1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 545
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\generic-array-5ec5ee46430be4f3\\run-build-script-build-script-build.json": {
+      "hash": "77d578495e1c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 258
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\generic-array-8e5b32e26f9f36b6\\build-script-build-script-build.json": {
+      "hash": "a31768147174",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 495
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\generic-array-91b16dd255e0db51\\build-script-build-script-build.json": {
+      "hash": "4c35d2eab011",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 495
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\generic-array-d30b92d1e0cac39b\\lib-generic_array.json": {
+      "hash": "f0360ea5c6a5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 545
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\generic-array-d74cce9424297ba7\\run-build-script-build-script-build.json": {
+      "hash": "fbcc8f2d34b4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 258
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-056e185c68d2e605\\build-script-build-script-build.json": {
+      "hash": "cd5a4864eabf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 536
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-08351592eeb37311\\run-build-script-build-script-build.json": {
+      "hash": "f3dc8a3f0557",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 256
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-14eaca28e4efc2d8\\lib-getrandom.json": {
+      "hash": "a93df394beb2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 645
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-1ce892e632f4ca92\\lib-getrandom.json": {
+      "hash": "c1f5055d604f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 510
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-28f04a6bba61f62d\\run-build-script-build-script-build.json": {
+      "hash": "e32765e5cec2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 331
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-35a45cfa94d08059\\lib-getrandom.json": {
+      "hash": "57f4d6173b7a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 645
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-454030e94a79bbb9\\lib-getrandom.json": {
+      "hash": "1e7b1064623f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 509
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-53ba441fb26d31c8\\lib-getrandom.json": {
+      "hash": "257b95afd5b9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 585
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-57283a07b4ef7be6\\lib-getrandom.json": {
+      "hash": "527e7b146acb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 591
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-5a11fc47e1bdcceb\\lib-getrandom.json": {
+      "hash": "914d65b0bda9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 584
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-5c231dcf118e1d43\\build-script-build-script-build.json": {
+      "hash": "757b6d321d26",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 406
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-740b61614a8d8c5a\\run-build-script-build-script-build.json": {
+      "hash": "6e0d51845bfc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 257
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-75a3e933962d3a1f\\lib-getrandom.json": {
+      "hash": "cfd05143a154",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 514
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-86f7dbd5db73157e\\run-build-script-build-script-build.json": {
+      "hash": "68e6456ecc6b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 333
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-934759ae88c65f2a\\lib-getrandom.json": {
+      "hash": "1c306ac1bb6d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 515
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-942000ae817e51b0\\build-script-build-script-build.json": {
+      "hash": "619e264961f8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 399
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-c47e4f0b1418e627\\run-build-script-build-script-build.json": {
+      "hash": "41b312dbf944",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 332
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-c52c4dcb593455bd\\lib-getrandom.json": {
+      "hash": "08aba91075e6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 585
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-c56e9e122f384263\\lib-getrandom.json": {
+      "hash": "9f9e0da31240",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 591
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-d4eabbce2af4a893\\build-script-build-script-build.json": {
+      "hash": "a76b227dd6c6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 399
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-d55fbc4e47e2a424\\build-script-build-script-build.json": {
+      "hash": "3e2df5cb89ff",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 536
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-da06af381d0b0516\\lib-getrandom.json": {
+      "hash": "0bbcc5458d21",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 515
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-e4393d718bcf9425\\run-build-script-build-script-build.json": {
+      "hash": "929440cab713",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 331
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-e90ead6a93c8863e\\lib-getrandom.json": {
+      "hash": "ae6685342ca9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 515
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-e9faf9724e08c3de\\build-script-build-script-build.json": {
+      "hash": "2250d2dd25da",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 406
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-f0e6de60b03b587f\\lib-getrandom.json": {
+      "hash": "abc62e7c8896",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 591
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-f7c1c0ebc901cc7f\\lib-getrandom.json": {
+      "hash": "c41828a4b050",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 645
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\getrandom-fd0120638a30d7bb\\lib-getrandom.json": {
+      "hash": "7f37d65970a5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 509
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\glob-06affa8167e5c9c0\\lib-glob.json": {
+      "hash": "cd33b82d53e8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 343
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\glob-2e2cf4d75ff2d305\\lib-glob.json": {
+      "hash": "52d2283b02f3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 343
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\glob-dc07bc0fc8a216d0\\lib-glob.json": {
+      "hash": "800a349e2d99",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 342
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\glob-eb75cd2035f2f1b6\\lib-glob.json": {
+      "hash": "36c99300c3b7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 342
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\global-hotkey-35687c4ee43d90e6\\lib-global_hotkey.json": {
+      "hash": "ac911ded8294",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 770
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\global-hotkey-8ed4d0ed2e976868\\lib-global_hotkey.json": {
+      "hash": "be9adae9ea0e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 772
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\global-hotkey-ea8e160c7ef38082\\lib-global_hotkey.json": {
+      "hash": "bd7efd45a2a1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 766
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hashbrown-1b97da0d31029971\\lib-hashbrown.json": {
+      "hash": "c8da4e2a3274",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 556
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hashbrown-32c9fb729af75c96\\lib-hashbrown.json": {
+      "hash": "5bf1c77d9ef9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 574
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hashbrown-3676e64e3082e33b\\lib-hashbrown.json": {
+      "hash": "a6b398f1cc44",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 574
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hashbrown-c4e6cffcaba4a065\\lib-hashbrown.json": {
+      "hash": "79b31913796e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 556
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hashbrown-cbea62664e174456\\lib-hashbrown.json": {
+      "hash": "713859a71e4a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 555
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hashbrown-e5a0e465b556a1f7\\lib-hashbrown.json": {
+      "hash": "9d5ba0814fc5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 555
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\heck-3122194f2c0490ca\\lib-heck.json": {
+      "hash": "2befa5c0ef30",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 345
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\heck-530ae96cd4e922bb\\lib-heck.json": {
+      "hash": "fbbd54bc0ddc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 346
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\heck-6eabf3ca9e635b47\\lib-heck.json": {
+      "hash": "86d20ee95bca",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 345
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\heck-d12e8df05c976497\\lib-heck.json": {
+      "hash": "fa0c41bc0a08",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 346
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\html5ever-5b82800631a59d10\\lib-html5ever.json": {
+      "hash": "67d1ebb830ff",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 610
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\html5ever-89812c16887e5a60\\lib-html5ever.json": {
+      "hash": "90381091a840",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 610
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\html5ever-adf7b2b512b358de\\lib-html5ever.json": {
+      "hash": "dd8dad9a740c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 608
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-2cbb89b7ec951629\\lib-http.json": {
+      "hash": "939062bc0753",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 495
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-4b4f186d60e15529\\lib-http.json": {
+      "hash": "16f9b0433926",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-564a7a08717f4fa6\\lib-http.json": {
+      "hash": "0a2410c111aa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 494
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-body-3708b7bcc4e038c7\\lib-http_body.json": {
+      "hash": "65367deb6c62",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 465
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-body-48c52d0ac863bbc5\\lib-http_body.json": {
+      "hash": "5f2de5319ea4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 466
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-body-4c50cf0d99bee3fe\\lib-http_body.json": {
+      "hash": "59580e41ff63",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 464
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-body-util-87ea9ea903931162\\lib-http_body_util.json": {
+      "hash": "9d4d103910fa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 711
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-body-util-a44950d5137e516d\\lib-http_body_util.json": {
+      "hash": "5245e095224c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 710
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-body-util-ed2bee4aa2096aa5\\lib-http_body_util.json": {
+      "hash": "f7371c661fe5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 710
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\http-c957572742c2e25c\\lib-http.json": {
+      "hash": "5021177fbc63",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 493
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-10e6abab3c189cd2\\build-script-build-script-build.json": {
+      "hash": "db21c0a743e0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 412
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-2c652abd85dc21ee\\run-build-script-build-script-build.json": {
+      "hash": "2e7d469d79d0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 257
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-4dc4630409fa7385\\build-script-build-script-build.json": {
+      "hash": "d183b14a7b3b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 412
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-7ca13416f5fd0f0e\\lib-httparse.json": {
+      "hash": "82911503a9a3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 461
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-7eebae40f3537ccd\\lib-httparse.json": {
+      "hash": "0b349d5b7710",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 461
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-9f9c168bd472a48d\\run-build-script-build-script-build.json": {
+      "hash": "3caf683cc337",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 256
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\httparse-c751802c6b4555c3\\lib-httparse.json": {
+      "hash": "9c2c641f24c6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 461
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-5c11e4d6236efff3\\lib-hyper.json": {
+      "hash": "539ba7de3add",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1267
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-8eca4c544deae787\\lib-hyper.json": {
+      "hash": "98b8d9c4a8fd",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1271
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-b030a22ba3d8a4fc\\lib-hyper.json": {
+      "hash": "74f562f690fa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1273
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-rustls-1e986761aee01f31\\lib-hyper_rustls.json": {
+      "hash": "f8a0c4384468",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1172
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-rustls-4202f91b956d265d\\lib-hyper_rustls.json": {
+      "hash": "c7ed69cbedac",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1177
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-rustls-4f85fd5fc51a16bd\\lib-hyper_rustls.json": {
+      "hash": "0bd0bbbbd949",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1178
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-rustls-4fe16d2f12b029c4\\lib-hyper_rustls.json": {
+      "hash": "ce5d8a4ff4a5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1179
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-rustls-7dc7834f9a92e470\\lib-hyper_rustls.json": {
+      "hash": "856fbfd3c483",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1177
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-util-304e2a4a3fbf100c\\lib-hyper_util.json": {
+      "hash": "34dbcd96443c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1603
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-util-487302c0032db82a\\lib-hyper_util.json": {
+      "hash": "a402ea3f9e83",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1600
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-util-98b8637ea13ec503\\lib-hyper_util.json": {
+      "hash": "61485ba5e2e2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1599
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-util-9ef15265679bf653\\lib-hyper_util.json": {
+      "hash": "9259613869f1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1603
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\hyper-util-a0913d35a91e93bc\\lib-hyper_util.json": {
+      "hash": "1e65832a071e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1599
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ico-83fc3ae53595af8a\\lib-ico.json": {
+      "hash": "db6576308a84",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 466
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ico-84f4bf403fc2224d\\lib-ico.json": {
+      "hash": "b5642199b8e0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 466
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ico-ce6ffd5af6f03609\\lib-ico.json": {
+      "hash": "f346899085fe",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 467
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ico-d8b85b883b00d81d\\lib-ico.json": {
+      "hash": "154b4b3f60ea",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 467
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_collections-0f1b064bb7f3a66e\\lib-icu_collections.json": {
+      "hash": "efa45840b039",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 698
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_collections-3710d5d73204780c\\lib-icu_collections.json": {
+      "hash": "2399f525b213",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 699
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_collections-37368e26fee0bf96\\lib-icu_collections.json": {
+      "hash": "d15f09c4f178",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 698
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_collections-3f0e7905f7962d7d\\lib-icu_collections.json": {
+      "hash": "e49fca63174a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 700
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_collections-5db988f24e21155d\\lib-icu_collections.json": {
+      "hash": "6e772b71b97a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 698
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_collections-9aec34380f3a0476\\lib-icu_collections.json": {
+      "hash": "b3997983c019",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 700
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_locale_core-0992cdd021211936\\lib-icu_locale_core.json": {
+      "hash": "193f0a940b14",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 724
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_locale_core-188a7d1d283f071f\\lib-icu_locale_core.json": {
+      "hash": "01450f30eacd",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 722
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_locale_core-18a7a01d7044afa2\\lib-icu_locale_core.json": {
+      "hash": "f5f5d73da76f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 723
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_locale_core-ca329db53f5a743c\\lib-icu_locale_core.json": {
+      "hash": "ecd6ac20a1b9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 724
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_locale_core-da72d192c21a8c60\\lib-icu_locale_core.json": {
+      "hash": "2eb151f56487",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 725
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_locale_core-ef6cfe6a5d562429\\lib-icu_locale_core.json": {
+      "hash": "c960903c8420",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 725
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer-0a38d09fca10ad99\\lib-icu_normalizer.json": {
+      "hash": "89f857268e68",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 837
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer-343825ac2e2ffa3c\\lib-icu_normalizer.json": {
+      "hash": "9e4de0966333",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 836
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer-540aad5e90591b0c\\lib-icu_normalizer.json": {
+      "hash": "4a41cc868d4f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 834
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer-6ea1896019c6e8ef\\lib-icu_normalizer.json": {
+      "hash": "fcb4c938edd4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 834
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer-7f29aff1ba25992f\\lib-icu_normalizer.json": {
+      "hash": "d4212e1cff56",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 835
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer-a9c4c59f9025e9d6\\lib-icu_normalizer.json": {
+      "hash": "9a23557fb807",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 838
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-8488596ce8c14d84\\run-build-script-build-script-build.json": {
+      "hash": "213ddcaa8813",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 288
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-8ee7f42d56ebb02f\\lib-icu_normalizer_data.json": {
+      "hash": "9ac8fda43eb7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 442
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-a1bbb922a5aaddff\\lib-icu_normalizer_data.json": {
+      "hash": "e9bdf08bfffa",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 444
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-b4c188245447f2a9\\lib-icu_normalizer_data.json": {
+      "hash": "9b07df40cf9f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 443
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-c22509c249439ad5\\run-build-script-build-script-build.json": {
+      "hash": "cbc6234819a1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 287
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-c77926f6d37ac6ed\\build-script-build-script-build.json": {
+      "hash": "0e04794c2211",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 382
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-e5b9eefa86be9780\\lib-icu_normalizer_data.json": {
+      "hash": "93088b74afe8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 443
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_normalizer_data-ea0158a39e734784\\build-script-build-script-build.json": {
+      "hash": "ab5448ce7322",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 382
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties-016460babbf6a660\\lib-icu_properties.json": {
+      "hash": "e9ce641ad819",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 851
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties-1fe17e71d8a1e952\\lib-icu_properties.json": {
+      "hash": "265c889e597d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 850
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties-4e798439a0ab59ef\\lib-icu_properties.json": {
+      "hash": "07a2419d59fc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 850
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties-530556098a6bdf67\\lib-icu_properties.json": {
+      "hash": "a262b90025e8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 850
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties-8418b12910652405\\lib-icu_properties.json": {
+      "hash": "eb88da3b5b19",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 851
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties-ebef18c1063d4434\\lib-icu_properties.json": {
+      "hash": "bf21b79c8557",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 849
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-13e4aeedef6b052c\\lib-icu_properties_data.json": {
+      "hash": "356ac5b7ad77",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 441
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-14c36cd75de7c09e\\build-script-build-script-build.json": {
+      "hash": "b39139760435",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 383
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-2bb32fe2e64eb1d7\\lib-icu_properties_data.json": {
+      "hash": "9a9029adfa34",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 441
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-31d726628250015b\\lib-icu_properties_data.json": {
+      "hash": "0369b5999521",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 440
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-3e7212ac24472c5f\\lib-icu_properties_data.json": {
+      "hash": "b8995e0da2a9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 442
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-44e9eefa4a5346b9\\build-script-build-script-build.json": {
+      "hash": "d898a2c7a09a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 383
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-aa096d7ba3193932\\run-build-script-build-script-build.json": {
+      "hash": "15f903559644",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 288
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_properties_data-faacc8370d0c0a82\\run-build-script-build-script-build.json": {
+      "hash": "b3b57adc2ef5",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 287
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_provider-43d23905b29a2231\\lib-icu_provider.json": {
+      "hash": "fc443c8372d4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 957
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_provider-458fc1338992a66f\\lib-icu_provider.json": {
+      "hash": "fa5491fcc234",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 958
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_provider-4ae96a97130c65b4\\lib-icu_provider.json": {
+      "hash": "16e0c77176e3",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 955
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_provider-7702fa4c218287a6\\lib-icu_provider.json": {
+      "hash": "409dc01e1364",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 955
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_provider-ded06359384ebfb8\\lib-icu_provider.json": {
+      "hash": "d57d266f7759",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 957
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\icu_provider-ded07bd4b28602dd\\lib-icu_provider.json": {
+      "hash": "80f53e019f21",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 957
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ident_case-68eb72f8b9e5c610\\lib-ident_case.json": {
+      "hash": "a78d03c2dd56",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 354
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ident_case-9d205211ae57ff4b\\lib-ident_case.json": {
+      "hash": "4c3a1f448155",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 354
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna-11d0b2e8ba655d81\\lib-idna.json": {
+      "hash": "f5d857fd0610",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 614
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna-557cfe6e3aaa8fab\\lib-idna.json": {
+      "hash": "3bf045bafb73",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 614
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna-b7b697247d8db712\\lib-idna.json": {
+      "hash": "13f799590023",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 614
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna-c0d6d1dea8edb321\\lib-idna.json": {
+      "hash": "0170152a5faf",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 615
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna-d9310a515a632075\\lib-idna.json": {
+      "hash": "1c361f5445b7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 615
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna-dbfa68c788a31633\\lib-idna.json": {
+      "hash": "0c52f0dc79b1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 612
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna_adapter-10a41b9e7dfd7d7f\\lib-idna_adapter.json": {
+      "hash": "a55896e61702",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 527
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna_adapter-2775eb3e0aec7a6d\\lib-idna_adapter.json": {
+      "hash": "76b6c3956a9a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 527
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna_adapter-42a0a4d7ce69616a\\lib-idna_adapter.json": {
+      "hash": "b63578df7504",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 526
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna_adapter-52d512969a635554\\lib-idna_adapter.json": {
+      "hash": "ae6da66fd811",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 527
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna_adapter-5737bd5ba5de0976\\lib-idna_adapter.json": {
+      "hash": "d8ae680b3227",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 528
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\idna_adapter-ddb55c9411b62666\\lib-idna_adapter.json": {
+      "hash": "f34fe4ac1284",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 528
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-0344ac172893f61d\\build-script-build-script-build.json": {
+      "hash": "97e1014bcd67",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 587
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-3b0ec413a1318642\\lib-indexmap.json": {
+      "hash": "25fd479ce08f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 607
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-568022d5881fab01\\lib-indexmap.json": {
+      "hash": "2276b8a8dec4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 696
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-a7136cac7e8410c0\\build-script-build-script-build.json": {
+      "hash": "7b4fa7f203db",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 587
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-b324b98d44f065b4\\lib-indexmap.json": {
+      "hash": "35130c6494b0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 606
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-cf95141d72942207\\run-build-script-build-script-build.json": {
+      "hash": "6b34094c3cd1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 332
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-e58bb364c178d4dc\\lib-indexmap.json": {
+      "hash": "febc58429aea",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 698
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-ee667ad759099f99\\lib-indexmap.json": {
+      "hash": "4f225684456b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 605
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-f8e2c520cbd5f752\\lib-indexmap.json": {
+      "hash": "7d21d45caf14",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 606
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\indexmap-fd5b83996ef50445\\run-build-script-build-script-build.json": {
+      "hash": "f81d7d9d48ef",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 331
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\infer-19b4e3e2e0e3e00d\\lib-infer.json": {
+      "hash": "790a60e23fbb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 481
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\infer-314ee9e63a01d037\\lib-infer.json": {
+      "hash": "2b83acfbd4cb",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 480
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\infer-4d8d3763b0f2bb84\\lib-infer.json": {
+      "hash": "498d495ca88b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 480
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\infer-80037977036b4aaf\\lib-infer.json": {
+      "hash": "39b1983a4ed8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 478
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\infer-edc94c19f66f728b\\lib-infer.json": {
+      "hash": "798f8bca63ee",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 480
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\infer-f5290863b02cfdcf\\lib-infer.json": {
+      "hash": "6ec6eb2736f6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 480
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ipnet-6baec624ee9686e6\\lib-ipnet.json": {
+      "hash": "8111713735ee",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 482
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ipnet-9d89c314429d0c87\\lib-ipnet.json": {
+      "hash": "fd4017493ce8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 481
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\ipnet-dea9cc84ab6ce748\\lib-ipnet.json": {
+      "hash": "4659c3aa4d78",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 482
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\iri-string-0ec0c70a8573aea0\\lib-iri_string.json": {
+      "hash": "86f1517c4415",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 441
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\iri-string-509326e786d3e193\\lib-iri_string.json": {
+      "hash": "ba73345ef653",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 442
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\iri-string-c8773d8120f57ae8\\lib-iri_string.json": {
+      "hash": "7b6ed55a524c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 442
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\itoa-71921e8d6dcd3351\\lib-itoa.json": {
+      "hash": "f373ee48323d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 357
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\itoa-74eb899cfbdae7fb\\lib-itoa.json": {
+      "hash": "44a0e9a24a10",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 358
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\itoa-946a1be2d6564aba\\lib-itoa.json": {
+      "hash": "847734bb8994",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 357
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\itoa-a77b2a4fa1d61808\\lib-itoa.json": {
+      "hash": "9e096f940c57",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 358
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\json-patch-02ae68b7e0492dbf\\lib-json_patch.json": {
+      "hash": "7643f266071a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 647
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\json-patch-2cc5c5cdd4d0a267\\lib-json_patch.json": {
+      "hash": "365fa8d855a7",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 646
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\json-patch-725eff2bd5a4975e\\lib-json_patch.json": {
+      "hash": "ad876912cb57",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 646
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\json-patch-aed40b78d9858ee3\\lib-json_patch.json": {
+      "hash": "d6c20cac7b9e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 648
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\json-patch-f00aa6eac6db07c2\\lib-json_patch.json": {
+      "hash": "0fa6e32a2639",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 646
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\json-patch-fe1d7c2f2a4626ac\\lib-json_patch.json": {
+      "hash": "650752d63ee9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 648
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\jsonptr-1686e1427af47d07\\lib-jsonptr.json": {
+      "hash": "43f65de01c3a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 644
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\jsonptr-3e41a46ad763daf7\\lib-jsonptr.json": {
+      "hash": "1390e47d710b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 642
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\jsonptr-583cb8557358280f\\lib-jsonptr.json": {
+      "hash": "d8663071e183",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 642
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\jsonptr-98109bc9d5bb600f\\lib-jsonptr.json": {
+      "hash": "4a6eede9728d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 644
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\jsonptr-b96e45c22f7eba0a\\lib-jsonptr.json": {
+      "hash": "edd0ed3fe909",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 645
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\jsonptr-c744558f50ec5e24\\lib-jsonptr.json": {
+      "hash": "e55187587b57",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 644
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\keyboard-types-408f0f82df99f4f6\\lib-keyboard_types.json": {
+      "hash": "195d2737ab29",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 673
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\keyboard-types-cc98c02bb96c3054\\lib-keyboard_types.json": {
+      "hash": "fbb2390ebd7c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 675
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\keyboard-types-dba34c0a2b82d553\\lib-keyboard_types.json": {
+      "hash": "98863483264b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 676
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\keyring-5e1299152746f0df\\lib-keyring.json": {
+      "hash": "7446217a291e",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1402
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\keyring-80f0a232ad1a735b\\lib-keyring.json": {
+      "hash": "6ace1e909932",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1400
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\keyring-a31d51c333a6a59a\\lib-keyring.json": {
+      "hash": "a5c90414cdf6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 1400
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\kuchikiki-2d0abe973679d15a\\lib-kuchikiki.json": {
+      "hash": "07002c2b79cc",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 597
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\kuchikiki-4de3b0f65cba6242\\lib-kuchikiki.json": {
+      "hash": "6d1c239806e9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 598
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\kuchikiki-5aad40d3e6ae7b9d\\lib-kuchikiki.json": {
+      "hash": "930cee434b42",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 601
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\kuchikiki-d0d01eff94adb8e3\\lib-kuchikiki.json": {
+      "hash": "1fc0794cca9a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 600
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lazy_static-2a44d546c3d10d6f\\lib-lazy_static.json": {
+      "hash": "db14b15a4539",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 383
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lazy_static-4b97267ccf00dd5f\\lib-lazy_static.json": {
+      "hash": "25518f103fc9",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 384
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lazy_static-efb5120646cb6465\\lib-lazy_static.json": {
+      "hash": "ee65f1279ce8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 384
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-0078d691be65cb3f\\run-build-script-build-script-build.json": {
+      "hash": "3d6e61ddc611",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 718
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-066974f704867ea9\\lib-libc.json": {
+      "hash": "d40239dd2d06",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 568
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-0c50ee38093ea473\\run-build-script-build-script-build.json": {
+      "hash": "acad1203c90b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 718
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-25017762e247b7f7\\lib-libc.json": {
+      "hash": "e256b3859109",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 587
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-25fe2b95394b19b1\\lib-libc.json": {
+      "hash": "20de14473f8c",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 568
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-29432f92c68eda90\\run-build-script-build-script-build.json": {
+      "hash": "98affdf009ee",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 717
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-42389acf0b691b07\\lib-libc.json": {
+      "hash": "8074be59cc17",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 569
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-68f944dd10963ecf\\build-script-build-script-build.json": {
+      "hash": "85154a09d06f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 521
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-700474d734d5ed90\\build-script-build-script-build.json": {
+      "hash": "0e4b83225204",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 539
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-7c7ba05c4e46a384\\lib-libc.json": {
+      "hash": "971da04c4de8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 568
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-a2d503d93b094e37\\lib-libc.json": {
+      "hash": "018787568618",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 587
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-af4c97f889a0d5a5\\run-build-script-build-script-build.json": {
+      "hash": "ca231783bbb8",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 718
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-b4c51a655cca0084\\run-build-script-build-script-build.json": {
+      "hash": "74149fe1bf35",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 719
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-bc5947447a2be48f\\lib-libc.json": {
+      "hash": "d8ced1ce7f8a",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 568
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-eb508d3328143d6a\\lib-libc.json": {
+      "hash": "095095c114d4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 586
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-f2e3d36f1270ebed\\build-script-build-script-build.json": {
+      "hash": "ece0bc00a28d",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 539
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\libc-f8044ede3527f791\\build-script-build-script-build.json": {
+      "hash": "85aed64e9f20",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 521
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\litemap-3fdf950b00e13d32\\lib-litemap.json": {
+      "hash": "1521f64f9c51",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 420
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\litemap-79ad053483413060\\lib-litemap.json": {
+      "hash": "a705e612b202",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 419
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\litemap-cea490a8202bedfb\\lib-litemap.json": {
+      "hash": "06a4212f2dde",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 419
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\litemap-da83b2b2b4471620\\lib-litemap.json": {
+      "hash": "b110dc15e8ac",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 420
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lock_api-2be0f46bc08d21e2\\lib-lock_api.json": {
+      "hash": "4efd4f098ac6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 526
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lock_api-adbb4475e277e311\\lib-lock_api.json": {
+      "hash": "fea3969ca46f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 527
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lock_api-c44f63d9f798bd16\\lib-lock_api.json": {
+      "hash": "8520fde582d0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 526
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\lock_api-eddaf4373452cfa8\\lib-lock_api.json": {
+      "hash": "2abf5ec77ab2",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 525
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\log-3cc17d73fdb8b511\\lib-log.json": {
+      "hash": "52a916d409e4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 837
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\log-6a5e5582317053aa\\lib-log.json": {
+      "hash": "a8ad20e79bf6",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 836
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\log-a347e413189a4eb7\\lib-log.json": {
+      "hash": "42b183d2f642",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 836
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\log-d6799500fb563dbf\\lib-log.json": {
+      "hash": "cf032f78eac1",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 837
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\mac-3d0a991cc68fd766\\lib-mac.json": {
+      "hash": "1dbdfb9f5dd0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 341
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\mac-949b2657b2092d5d\\lib-mac.json": {
+      "hash": "7dc0cb13c84b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 341
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-03526561c81fa019\\run-build-script-build-script-build.json": {
+      "hash": "7d879982366f",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 256
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-041d84596530b523\\run-build-script-build-script-build.json": {
+      "hash": "7dbc9642c19b",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 257
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-0cc96cce08adc442\\lib-markup5ever.json": {
+      "hash": "35233b7550c4",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 659
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-41cbebbd68ec3096\\lib-markup5ever.json": {
+      "hash": "71684869f8f0",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 658
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-65ed5b4cf82741bf\\build-script-build-script-build.json": {
+      "hash": "e72c2d85a533",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 507
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-7177baf99a71bd92\\build-script-build-script-build.json": {
+      "hash": "a51b336d2b35",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 508
+    },
+    "C:\\pookiepied\\Backup\\Project Studio Backup 04\\STUDIO\\src-tauri\\target\\debug\\.fingerprint\\markup5ever-756f73db2b3ccf08\\run-build-script-build-script-build.json": {
+      "hash": "7cc9e5b1fb95",
+      "lines": 1,
+      "imports": [],
+      "exports": [],
+      "sizeBytes": 256
+    }
+  }
+}

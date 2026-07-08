@@ -1,0 +1,80 @@
+name = "studio-skills"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# ---------------------------------------------------------------------------
+# studio-skills — STUDIO Skills worker.
+#
+# Owns the bundled skill catalog, the prompt-ready skill index, skill reading,
+# local skill manifest registration, manifest validation, and install planning.
+#
+# Two interfaces:
+#   1. REST routes under /internal/skills/*   — for direct service-binding
+#      callers (chat preload builds the system-prompt index; the api worker
+#      proxies Studio frontend requests).
+#   2. /mcp Streamable HTTP endpoint          — MCP tools (skill_read,
+#      skill_list, skill_search, skill_validate, skill_register_local,
+#      skill_unregister_local, skill_install_plan) proxied through the
+#      studio-mcp hub's native-service catalog so BOTH the main agent and
+#      sub-agents use the exact same skill tool path.
+#
+# Local skill *content* is never uploaded here — only metadata/manifests.
+# ---------------------------------------------------------------------------
+
+# Import bundled SKILL.md files as raw text (real .md authoring, no fs in Worker).
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
+
+# ---------------------------------------------------------------------------
+# Durable Object — McpAgent requires one DO class per MCP server.
+# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "StudioSkillsAgent"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StudioSkillsAgent"]
+
+# ---------------------------------------------------------------------------
+# D1 — local skill registrations + audit log (metadata only, never content).
+#
+# Setup:
+#   wrangler d1 create studio-skills
+#   → paste the printed database_id below
+#   wrangler d1 execute studio-skills --remote --file=./schema.sql
+# ---------------------------------------------------------------------------
+[[d1_databases]]
+binding = "SKILLS_DB"
+database_name = "studio-skills"
+database_id = "REPLACE_WITH_STUDIO_SKILLS_DB_ID"
+
+# ---------------------------------------------------------------------------
+# Tracker — Project Studio telemetry (remove if self-hosting outside Studio).
+# ---------------------------------------------------------------------------
+[[services]]
+binding = "TRACKER"
+service = "tracker"
+
+[[tail_consumers]]
+service = "tracker"
+
+# ---------------------------------------------------------------------------
+# Secrets — set via: wrangler secret put <NAME>
+#
+# SKILLS_AUTH_SECRET — optional shared secret for service-to-service auth.
+#                      Leave unset for internal-only (service-binding) access;
+#                      the worker is workers_dev=false so it is not publicly
+#                      reachable.
+# ---------------------------------------------------------------------------
+
+[build]
+command = "npm install && npx tsc --noEmit"

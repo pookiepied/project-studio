@@ -1,0 +1,254 @@
+name = "studio-chat"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+# All available providers — add/remove to control which are active.
+# API keys are still required for paid providers (set via: wrangler secret put <KEY_NAME>).
+# cloudflare — gated by the [ai] binding below, not an API key
+# fal         — gated by FAL_API_KEY secret
+ENABLED_PROVIDERS = "groq,openrouter,google,alibaba,minimax,cloudflare,fal"
+
+# R2 API credentials for presigned URL generation
+# Create in Cloudflare Dashboard: Account Settings → R2 → API Tokens → Create API Token
+# Then: wrangler secret put R2_ACCESS_KEY_ID
+#       wrangler secret put R2_SECRET_ACCESS_KEY
+#       wrangler secret put R2_ACCOUNT_ID (account ID: 9daf0e95e03cc8f9463f0d67a6c7c959)
+# R2_ACCESS_KEY_ID = set via: wrangler secret put R2_ACCESS_KEY_ID
+# R2_SECRET_ACCESS_KEY = set via: wrangler secret put R2_SECRET_ACCESS_KEY
+# R2_ACCOUNT_ID = set via: wrangler secret put R2_ACCOUNT_ID
+ALIBABA_API_HOST = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+# Public gateway URL — used to construct image URLs returned to the frontend.
+# Never expose the internal worker URL; always point to the gateway.
+PUBLIC_API_BASE = "https://api.pookiepied.dev/adapters/openai/v1"
+
+# ---------------------------------------------------------------------------
+# Cloudflare AI Gateway (optional)
+# Routes all supported provider calls through the gateway for free logging,
+# caching, analytics, and rate limiting in the Cloudflare dashboard.
+#
+# Setup:
+#   1. Workers & Pages → AI Gateway → Create gateway
+#   2. Note your Account ID (top-right of dashboard) and the gateway name you chose
+#   3. Run:
+#        wrangler secret put CF_AI_GATEWAY_ACCOUNT_ID   # e.g. 9daf0e95e03cc8f9463f0d67a6c7c959
+#        wrangler secret put CF_AI_GATEWAY_NAME          # e.g. studio-gateway
+#
+# Supported providers: anthropic, openai, google, groq, mistral, xai (grok),
+#                      deepseek, openrouter, perplexity
+# Called directly (not in gateway): alibaba, minimax, cerebras, cohere, ollama, lmstudio
+#
+# Docs: https://developers.cloudflare.com/ai-gateway/
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Jina Reader — web_fetch URL-to-Markdown service (free: 1M tokens/month)
+# Without this key, web_fetch falls back to a raw HTML regex stripper
+# (works for static pages; fails on JS-rendered SPAs, PDFs, dynamic sites).
+#
+# Get API key: https://jina.ai/  (sign up, it's free)
+# Docs:        https://jina.ai/reader/
+#
+# wrangler secret put JINA_API_KEY
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# fal.ai — dedicated image and video generation
+# Used by the image_generate and video_generate tools.
+# OpenRouter is filtered to text/multimodal only once this key is set.
+#
+# Get API key: https://fal.ai/dashboard/keys
+# Docs:        https://fal.ai/docs
+#
+# wrangler secret put FAL_API_KEY
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Tavily — AI-native web search
+# Replaces Brave Search. Returns synthesized answers + rich content extracts.
+# Free: 1,000 searches/month (no follow-up web_fetch needed for most queries)
+#
+# Get API key: https://app.tavily.com/
+# Docs:        https://docs.tavily.com/
+#
+# wrangler secret put TAVILY_API_KEY
+# ---------------------------------------------------------------------------
+
+# STUDIO Memory — shared secret for service-to-service auth
+# Must match MEMORY_AUTH_SECRET set in the studio-mcp-memory worker.
+# Set via: wrangler secret put MEMORY_AUTH_SECRET
+
+# MiniMax TTS & Cloning
+# Set via: wrangler secret put MINIMAX_API_KEY
+# Set via: wrangler secret put MINIMAX_GROUP_ID
+# Set via: wrangler secret put MINIMAX_CUSTOM_VOICE_ID
+# Set via: wrangler secret put MINIMAX_CUSTOM_VOICE_NAME
+
+# D1 — persistent knowledge base only (user_documents).
+# Setup:  wrangler d1 create studio-chat
+# Schema: wrangler d1 execute studio-chat --remote --file=./schema.sql
+[[d1_databases]]
+binding = "CHAT_DB"
+database_name = "studio-chat"
+database_id = "REPLACE_WITH_REAL_ID"
+
+[[kv_namespaces]]
+binding = "MODELS_KV"
+id = "95440eeac45742a298ed39edcc7d3944"
+
+# Revoked access tokens — shared namespace with the auth worker (AUTH_KV).
+# Tokens are written here on logout and expire automatically when their JWT exp passes.
+[[kv_namespaces]]
+binding = "REVOKED_KV"
+id = "720a294c0a5844248a4ee8ac6a91fa8f"
+
+# MCP registry and manifests cache.
+[[kv_namespaces]]
+binding = "MCP_KV"
+id = "2ad99d3c8750412fa2465f255a5d22a1"
+
+# Release file storage. Hosts .nsis.zip update packages.
+[[r2_buckets]]
+binding = "RELEASES_BUCKET"
+bucket_name = "studio-releases"
+
+# Credits KV cache — short-lived, avoids hammering provider credit APIs.
+# Setup: wrangler kv:namespace create CREDITS_KV
+# Then replace <CREDITS_KV_ID> with the output id.
+[[kv_namespaces]]
+binding = "CREDITS_KV"
+id = "08979acf4fb84e38b5d0555e8591f8eb"
+
+# Document storage for RAG. Lifecycle rules handle temp (24h) vs permanent docs via key prefix:
+#   temp/{user_id}/{doc_id}      — set object-level expiry or use a cron to clean up
+#   permanent/{user_id}/{doc_id} — no expiry
+# Setup: wrangler r2 bucket create studio-docs
+[[r2_buckets]]
+binding = "DOCS_BUCKET"
+bucket_name = "studio-docs"
+
+# Generated image storage. Images auto-expire after 7 days via daily cron cleanup.
+# Stores keys as: images/{uuid}  (content-type in R2 metadata)
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "studio-images"
+
+# Temporary image storage for source images during editing/generation.
+# Stores keys as: temp-images/{uuid}  Objects deleted after generation completes or expire via TTL.
+[[r2_buckets]]
+binding = "TEMP_IMAGES_BUCKET"
+bucket_name = "studio-images-temp"
+
+# RAG vector index. 768-dim to match @cf/baai/bge-base-en-v1.5 embeddings.
+# Setup: wrangler vectorize create studio-rag --dimensions=768 --metric=cosine
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "studio-rag"
+
+# Workers AI — free embedding model used by the rag tool.
+# No extra cost — billed per neuron-second, free tier is generous.
+[ai]
+binding = "AI"
+
+[triggers]
+crons = ["*/15 * * * *", "0 2 * * *"]
+
+# STUDIO Memory — standalone memory worker (MCP + auto-inject pipeline)
+# CF worker name: studio-mcp-memory. MCP protocol name stays "studio-memory".
+[[services]]
+binding = "MEMORY"
+service  = "studio-mcp-memory"
+
+# STUDIO MCP Hub — central tool server (think, skill_read, web_search, web_fetch,
+# rag, image_generate, video_generate, video_status, http_request)
+# Wired here for future migration; chat/ currently still runs cloud tools locally.
+[[services]]
+binding = "MCP"
+service  = "studio-mcp"
+
+# STUDIO Agents — research sub-agent DOs + shared blackboard (spawn_agent routes here)
+[[services]]
+binding = "AGENTS"
+service  = "studio-agents"
+
+# Centralized telemetry — all track() calls and agent spans go here.
+[[services]]
+binding = "TRACKER"
+service  = "tracker"
+
+# LLM gateway — handles provider routing and API keys.
+# All LLM chat completions from chat/ route through this binding (Phase 8).
+# Provider API keys only need to be set as secrets in studio-gateway, not here.
+[[services]]
+binding = "GATEWAY"
+service  = "studio-gateway"
+
+# STUDIO Skills — bundled + local skill catalog.
+# Used by preload (direct /internal/skills/index fetch for the system prompt)
+# and by the skill_read compatibility shim. Native skill_* tools also reach
+# agents through the studio-mcp hub's native-service catalog.
+[[services]]
+binding = "SKILLS"
+service  = "studio-skills"
+
+# Tail consumer — Cloudflare auto-routes invocation logs to the tracker worker.
+[[tail_consumers]]
+service = "tracker"
+
+[build]
+command = "npm install && npx tsc"
+
+# ---------------------------------------------------------------------------
+# Durable Objects — Cloudflare Agents SDK
+# ---------------------------------------------------------------------------
+
+# ChatAgent: main WebSocket agent. One instance per conversation session.
+# Stores relay state natively — no full history resend on tool relay.
+# Accessed via routeAgentRequest → /agents/chat-agent/{conversationId}
+[[durable_objects.bindings]]
+name = "CHAT_AGENT"
+class_name = "ChatAgent"
+
+# Migrations — add Agent SDK classes as new_sqlite_classes (DO-backed SQLite).
+# Existing legacy migration tags v1–v3 are preserved for backward compat.
+[[migrations]]
+tag = "v1"
+new_classes = ["AgentStateDurableObject", "AgentContextDurableObject"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["SubAgentRunnerDO"]
+
+[[migrations]]
+tag = "v3"
+new_classes = ["RateTrackerDurableObject"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["ChatAgent"]
+
+# v5: Remove legacy Durable Object classes that were replaced by the Agents SDK.
+# AgentStateDurableObject and AgentContextDurableObject (v1) → ChatAgent (v4)
+# SubAgentRunnerDO (v2) → was ResearchSubAgent (v4), now retired entirely (v5+)
+[[migrations]]
+tag = "v5"
+deleted_classes = ["AgentStateDurableObject", "AgentContextDurableObject", "SubAgentRunnerDO"]
+
+# v6: RateTrackerDurableObject moved to studio-gateway worker.
+[[migrations]]
+tag = "v6"
+deleted_classes = ["RateTrackerDurableObject"]
+
+# ---------------------------------------------------------------------------
+# Analytics Engine — structured error and telemetry events
+# ---------------------------------------------------------------------------
+# Create in Cloudflare Dashboard: Workers & Pages → Analytics Engine → Create dataset
+# Dataset name: studio-errors
+# Then set binding = "ANALYTICS" below and deploy.
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "studio-errors"
