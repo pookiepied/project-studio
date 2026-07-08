@@ -3,10 +3,12 @@ export const EXECUTION_DEFINITIONS = [
   {
     name: "bash",
     description:
-      "Execute a shell command. On Windows this runs via cmd.exe; on macOS/Linux via /bin/sh. " +
+      "Execute a shell command. On Windows this runs via Git Bash (falling back to cmd.exe if Git Bash isn't installed); on macOS/Linux via /bin/sh. " +
+      "Use this for running things — installs, builds, tests, git, scripts. " +
+      "Do NOT author file content through the shell (echo/heredoc); use write_file / edit_file, which handle any characters safely. " +
       "Returns stdout, stderr, and exit code. " +
       "Output is capped at 50,000 chars by default — raise max_output_chars (up to 500,000) if you need more. " +
-      "Processes stalled for 45s with no output are killed. Use non-interactive flags (--yes, -y) to prevent prompts.",
+      "Processes stalled with no output are killed. Use non-interactive flags (--yes, -y) to prevent prompts.",
     inputSchema: {
       type: "object",
       properties: {
