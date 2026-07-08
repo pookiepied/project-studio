@@ -2,6 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 
 import { TOOL_TIMEOUTS } from "../tool-contract.js";
+import { resolveGit } from "../shared/vendor.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_OUTPUT_CHARS = 50_000;
@@ -16,7 +17,8 @@ async function runGit(
   timeoutMs: number = GIT_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   try {
-    const result = await execFileAsync("git", gitArgs, {
+    // Vendored Git-for-Windows (bundled under vendor/git) → PATH `git`.
+    const result = await execFileAsync(resolveGit(), gitArgs, {
       cwd,
       maxBuffer: 20 * 1024 * 1024,
       timeout: timeoutMs,
@@ -24,7 +26,7 @@ async function runGit(
     return { stdout: result.stdout as string, stderr: result.stderr as string, exitCode: 0 };
   } catch (e: any) {
     if (e.code === "ENOENT") {
-      return { stdout: "", stderr: "git not found — is git installed and in PATH?", exitCode: 127 };
+      return { stdout: "", stderr: "git not found. STUDIO bundles git under vendor/git — reinstall/repair STUDIO, or run `npm run vendor:sync git` in a dev checkout.", exitCode: 127 };
     }
     if (e.killed || e.signal) {
       return {

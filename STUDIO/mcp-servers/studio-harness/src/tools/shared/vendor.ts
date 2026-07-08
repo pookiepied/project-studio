@@ -120,3 +120,50 @@ export function resolveBinary(tool: string, fallbackCmd: string): string {
 export function resolveRipgrep(): string {
   return resolveBinary("ripgrep", "rg");
 }
+
+// ---------------------------------------------------------------------------
+// Git-for-Windows tree
+//
+// Unlike ripgrep (a single exe), git ships as a directory tree at
+// `vendor/git/<platform>/` (git.exe + bash.exe + their libexec/DLLs/usr-bin).
+// git.exe and bash.exe resolve their own support files relative to their
+// location, so the whole tree must stay intact — we just resolve the two entry
+// points inside it.
+// ---------------------------------------------------------------------------
+
+/** Absolute path to the vendored git tree for this platform, or null. */
+function locateVendoredGitDir(): string | null {
+  const vendorDir = locateVendorDir();
+  if (!vendorDir) return null;
+  const dir = path.join(vendorDir, "git", PLATFORM);
+  return existsSync(dir) ? dir : null;
+}
+
+/**
+ * Resolve the git executable: vendored Git-for-Windows → PATH `git`.
+ * On non-Windows platforms nothing is vendored, so this returns `git` (PATH),
+ * where git is guaranteed by the OS/toolchain.
+ */
+export function resolveGit(): string {
+  const tree = locateVendoredGitDir();
+  if (tree) {
+    const exe = path.join(tree, "cmd", "git.exe");
+    if (existsSync(exe)) return exe;
+  }
+  return "git";
+}
+
+/**
+ * Resolve the vendored Git Bash executable, or null if no vendored tree is
+ * present. Windows only — callers use this as the top priority and fall back to
+ * a PATH-installed Git Bash before erroring. There is deliberately no cmd.exe
+ * fallback: cmd is a divergent shell that mangles quoting/heredocs.
+ */
+export function resolveVendoredGitBash(): string | null {
+  const tree = locateVendoredGitDir();
+  if (tree) {
+    const exe = path.join(tree, "bin", "bash.exe");
+    if (existsSync(exe)) return exe;
+  }
+  return null;
+}
