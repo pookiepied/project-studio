@@ -1,7 +1,11 @@
 import { readFile, editFile, multiEditFile, writeFile, globFiles, grepFiles, listDirectory, deleteFile, moveFile } from "./tools/filesystem/index.js";
 import { outlineFile, indexCodebase, exploreCodebase, searchSymbol, analyzeFile } from "./tools/codeintel/index.js";
 import { executeBash, executePowerShell, runRepl } from "./tools/execution/index.js";
-import { gitStatus, gitDiff, gitLog, gitCommit, gitBranch, gitPush, gitPull, gitFetch, gitShow, gitStash, gitWorktree } from "./tools/git/index.js";
+import {
+  gitStatus, gitDiff, gitLog, gitCommit, gitBranch, gitPush, gitPull, gitFetch, gitShow, gitStash, gitWorktree,
+  gitInit, gitAdd, gitReset, gitRestore, gitRm, gitMv, gitMerge, gitRebase, gitCherryPick, gitRevert,
+  gitTag, gitRemote, gitClone, gitBlame, gitClean, gitReflog, gitConfig,
+} from "./tools/git/index.js";
 import { askUserQuestion } from "./tools/interaction/index.js";
 import { sleep } from "./tools/utils/index.js";
 import { runLsp } from "./tools/lsp/index.js";
@@ -31,7 +35,7 @@ export const TOOL_DEFINITIONS = [
   ...NETWORK_DEFINITIONS,     // ssh_exec, ssh_session (remote command execution)
   ...FILESYSTEM_DEFINITIONS,  // read/edit/write/delete/move, glob, grep, ls
   ...CODEINTEL_DEFINITIONS,   // outline, index_codebase, explore, search_symbol, analyze
-  ...GIT_DEFINITIONS,         // git_status/diff/log/commit/branch/push/pull/fetch/show/stash/worktree
+  ...GIT_DEFINITIONS,         // full git surface: status/diff/log/commit/branch/push/pull/fetch/show/stash/worktree + init/add/reset/restore/rm/mv/merge/rebase/cherry-pick/revert/tag/remote/clone/blame/clean/reflog/config
   ...UTILS_DEFINITIONS,       // sleep
   LSP_TOOL_DEFINITION,        // lsp
   ...INTERACTION_DEFINITIONS, // ask_user_question
@@ -74,6 +78,23 @@ const HANDLERS: Record<string, ToolHandler> = {
   git_show: gitShow,
   git_stash: gitStash,
   git_worktree: gitWorktree,
+  git_init: gitInit,
+  git_add: gitAdd,
+  git_reset: gitReset,
+  git_restore: gitRestore,
+  git_rm: gitRm,
+  git_mv: gitMv,
+  git_merge: gitMerge,
+  git_rebase: gitRebase,
+  git_cherry_pick: gitCherryPick,
+  git_revert: gitRevert,
+  git_tag: gitTag,
+  git_remote: gitRemote,
+  git_clone: gitClone,
+  git_blame: gitBlame,
+  git_clean: gitClean,
+  git_reflog: gitReflog,
+  git_config: gitConfig,
   sleep: sleep,
   ask_user_question: askUserQuestion,
   lsp: runLsp,

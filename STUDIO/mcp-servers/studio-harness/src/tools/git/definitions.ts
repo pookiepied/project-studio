@@ -197,4 +197,276 @@ export const GIT_DEFINITIONS = [
       required: [],
     },
   },
+  {
+    name: "git_init",
+    description:
+      "Initialize a new git repository in a directory. Use initial_branch to name the first branch " +
+      "(e.g. 'main'). The directory must already exist. Safe to call on an existing repo (it re-inits harmlessly).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:            { type: "string",  description: "Directory to initialize (optional, defaults to cwd)" },
+        initial_branch: { type: "string",  description: "Name for the initial branch, e.g. 'main' (optional)" },
+        bare:           { type: "boolean", description: "Create a bare repository (no working tree). Rarely needed. Default false." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_add",
+    description:
+      "Stage files for the next commit. Pass files for specific paths, or all: true to stage every change (git add -A). " +
+      "Prefer git_commit with files/add_all for the common commit workflow; use git_add when you want to stage without committing yet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:   { type: "string",  description: "Repository directory (optional)" },
+        files: { type: "array", items: { type: "string" }, description: "Paths to stage" },
+        all:   { type: "boolean", description: "Stage all changes (git add -A)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_reset",
+    description:
+      "Unstage files or move HEAD. With files: unstages those paths (keeps working-tree changes). " +
+      "Without files: resets HEAD to ref using mode — soft (keep index + working tree), mixed (default; keep working tree, clear index), " +
+      "hard (DISCARD all uncommitted changes to tracked files — irreversible). Use with care.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:   { type: "string",  description: "Repository directory (optional)" },
+        mode:  { type: "string",  enum: ["soft", "mixed", "hard", "keep", "merge"], description: "Reset mode (default: mixed). Ignored when 'files' is given." },
+        ref:   { type: "string",  description: "Commit-ish to reset to, e.g. HEAD, HEAD~1, a hash (optional)" },
+        files: { type: "array", items: { type: "string" }, description: "Specific paths to unstage (mode ignored in this form)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_restore",
+    description:
+      "Discard working-tree changes or restore file contents. By default restores files from the index (discards unstaged edits). " +
+      "Use staged: true to unstage (restore index from HEAD). Use source to restore from a specific commit (e.g. source='HEAD~1').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:    { type: "string",  description: "Repository directory (optional)" },
+        files:  { type: "array", items: { type: "string" }, description: "Paths to restore (required)" },
+        staged: { type: "boolean", description: "Restore the index instead of the working tree (i.e. unstage). Default false." },
+        source: { type: "string",  description: "Restore contents from this commit-ish instead of the index (optional)" },
+      },
+      required: ["files"],
+    },
+  },
+  {
+    name: "git_rm",
+    description:
+      "Remove tracked files from the repository. By default deletes them from disk and stages the removal. " +
+      "Use cached: true to untrack a file while keeping it on disk. Use recursive: true for directories.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:       { type: "string",  description: "Repository directory (optional)" },
+        files:     { type: "array", items: { type: "string" }, description: "Paths to remove (required)" },
+        cached:    { type: "boolean", description: "Untrack but keep the file on disk (--cached). Default false." },
+        recursive: { type: "boolean", description: "Allow recursive removal of directories (-r). Default false." },
+      },
+      required: ["files"],
+    },
+  },
+  {
+    name: "git_mv",
+    description: "Move or rename a tracked file and stage the change in one step (git mv).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:         { type: "string", description: "Repository directory (optional)" },
+        source:      { type: "string", description: "Current path (required)" },
+        destination: { type: "string", description: "New path (required)" },
+      },
+      required: ["source", "destination"],
+    },
+  },
+  {
+    name: "git_merge",
+    description:
+      "Merge a branch into the current branch (non-interactive; auto-generated merge message). " +
+      "Use no_ff: true to always create a merge commit. On conflicts the merge stops — resolve, git_add, git_commit, " +
+      "or call again with abort: true to bail out.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:     { type: "string",  description: "Repository directory (optional)" },
+        branch:  { type: "string",  description: "Branch (or commit-ish) to merge into the current branch. Required unless abort is set." },
+        no_ff:   { type: "boolean", description: "Always create a merge commit even if fast-forward is possible. Default false." },
+        message: { type: "string",  description: "Custom merge commit message (optional)" },
+        abort:   { type: "boolean", description: "Abort an in-progress merge and restore the pre-merge state." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_rebase",
+    description:
+      "Reapply the current branch's commits on top of another base (non-interactive only — interactive rebase is not supported). " +
+      "Pass upstream to rebase onto it. On conflicts the rebase stops — resolve, git_add, then call again with action: 'continue' " +
+      "(or 'abort' / 'skip').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:      { type: "string", description: "Repository directory (optional)" },
+        upstream: { type: "string", description: "Base to rebase onto, e.g. 'main' or a commit hash. Required unless action is set." },
+        onto:     { type: "string", description: "Advanced: rebase onto this ref instead of upstream (--onto). Optional." },
+        action:   { type: "string", enum: ["continue", "abort", "skip"], description: "Continue/abort/skip an in-progress rebase (use instead of upstream)." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_cherry_pick",
+    description:
+      "Apply the changes from one or more existing commits onto the current branch (non-interactive). " +
+      "On conflicts it stops — resolve, git_add, then action: 'continue' (or 'abort' / 'skip').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:     { type: "string", description: "Repository directory (optional)" },
+        commits: { type: "array", items: { type: "string" }, description: "Commit-ishes to apply, in order. Required unless action is set." },
+        action:  { type: "string", enum: ["continue", "abort", "skip"], description: "Continue/abort/skip an in-progress cherry-pick." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_revert",
+    description:
+      "Create new commits that undo the changes of existing commits (safe — history is preserved). " +
+      "Use no_commit: true to stage the reversal without committing. On conflicts: resolve, git_add, then action: 'continue' (or 'abort').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:       { type: "string",  description: "Repository directory (optional)" },
+        commits:   { type: "array", items: { type: "string" }, description: "Commit-ishes to revert. Required unless action is set." },
+        no_commit: { type: "boolean", description: "Stage the reversal but don't commit (--no-commit). Default false." },
+        action:    { type: "string", enum: ["continue", "abort", "skip"], description: "Continue/abort/skip an in-progress revert." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_tag",
+    description:
+      "List, create, or delete tags. Default action 'list'. For create: pass name; add message for an annotated tag, " +
+      "and ref to tag a specific commit (defaults to HEAD).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:     { type: "string", description: "Repository directory (optional)" },
+        action:  { type: "string", enum: ["list", "create", "delete"], description: "Action (default: list)" },
+        name:    { type: "string", description: "Tag name — required for create and delete" },
+        message: { type: "string", description: "Annotation message — makes an annotated tag (create only)" },
+        ref:     { type: "string", description: "Commit-ish to tag (create only, defaults to HEAD)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_remote",
+    description:
+      "Manage remotes. Actions: list (default, with URLs) | add | remove | set-url. " +
+      "add and set-url require name and url; remove requires name.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:    { type: "string", description: "Repository directory (optional)" },
+        action: { type: "string", enum: ["list", "add", "remove", "set-url"], description: "Action (default: list)" },
+        name:   { type: "string", description: "Remote name, e.g. 'origin' — required for add/remove/set-url" },
+        url:    { type: "string", description: "Remote URL — required for add/set-url" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_clone",
+    description:
+      "Clone a remote repository into a directory. Use depth for a shallow clone (faster) and branch to check out a specific branch. " +
+      "Authenticated clones need a token in the HTTPS URL or a configured credential helper.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:       { type: "string", description: "Directory to clone into (the parent; optional, defaults to cwd)" },
+        url:       { type: "string", description: "Repository URL to clone (required)" },
+        directory: { type: "string", description: "Target directory name (optional; defaults to the repo name)" },
+        depth:     { type: "number", description: "Shallow-clone depth, e.g. 1 for latest commit only (optional)" },
+        branch:    { type: "string", description: "Branch to check out (optional)" },
+        timeout:   { type: "number", description: "Timeout in milliseconds (default 60000). Increase for large repos or slow networks." },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "git_blame",
+    description:
+      "Show, for each line of a file, the commit and author that last modified it (read-only). " +
+      "Use start_line and end_line to blame only a range — recommended for large files.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:        { type: "string", description: "Repository directory (optional)" },
+        file:       { type: "string", description: "File to blame (required)" },
+        start_line: { type: "number", description: "First line of the range (use with end_line)" },
+        end_line:   { type: "number", description: "Last line of the range (use with start_line)" },
+      },
+      required: ["file"],
+    },
+  },
+  {
+    name: "git_clean",
+    description:
+      "Remove untracked files from the working tree. DEFAULTS TO DRY-RUN (preview only) for safety — it lists what " +
+      "would be deleted. To actually delete, pass force: true. Use directories: true to also remove untracked directories.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:         { type: "string",  description: "Repository directory (optional)" },
+        dry_run:     { type: "boolean", description: "Preview only, don't delete (default TRUE). Set false (with force) to actually delete." },
+        force:       { type: "boolean", description: "Required to actually delete when dry_run is false." },
+        directories: { type: "boolean", description: "Also remove untracked directories (-d). Default false." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_reflog",
+    description:
+      "Show the reference log — the history of where HEAD and branch tips have pointed. " +
+      "The go-to tool for recovering seemingly-lost commits after a reset, rebase, or bad merge.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:   { type: "string", description: "Repository directory (optional)" },
+        limit: { type: "number", description: "Number of entries to show (default 30)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_config",
+    description:
+      "Get, set, list, or unset git configuration. Use scope 'global' to set machine-wide values (e.g. user.name / user.email — " +
+      "needed before the first commit in a fresh repo), or 'local' (default) for repo-specific settings.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd:    { type: "string", description: "Repository directory (optional; required for scope 'local')" },
+        action: { type: "string", enum: ["get", "set", "list", "unset"], description: "Action (default: get)" },
+        key:    { type: "string", description: "Config key, e.g. 'user.email' — required for get/set/unset" },
+        value:  { type: "string", description: "Value to set — required for set" },
+        scope:  { type: "string", enum: ["local", "global"], description: "Config scope (default: local)" },
+      },
+      required: [],
+    },
+  },
 ] as const;

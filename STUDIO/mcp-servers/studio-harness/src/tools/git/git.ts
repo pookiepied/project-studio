@@ -485,3 +485,486 @@ export async function gitWorktree(
     }),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Shared result shaper for the simple mutating commands below.
+// ---------------------------------------------------------------------------
+
+function gitResult(
+  result: { stdout: string; stderr: string; exitCode: number },
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  const out = maybeTruncate(result.stdout.trim() || result.stderr.trim());
+  return {
+    success: result.exitCode === 0,
+    output: out.text,
+    ...(out.truncated && { truncated: true }),
+    exit_code: result.exitCode,
+    ...extra,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// git_init — initialize a new repository
+// ---------------------------------------------------------------------------
+
+export async function gitInit(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd           = (args.cwd as string) || process.cwd();
+  const initialBranch = args.initial_branch as string | undefined;
+  const bare          = (args.bare as boolean) ?? false;
+
+  const gitArgs = ["init"];
+  if (initialBranch) gitArgs.push("-b", initialBranch);
+  if (bare)          gitArgs.push("--bare");
+
+  return gitResult(await runGit(gitArgs, cwd));
+}
+
+// ---------------------------------------------------------------------------
+// git_add — stage files
+// ---------------------------------------------------------------------------
+
+export async function gitAdd(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd   = (args.cwd as string) || process.cwd();
+  const files = args.files as string[] | undefined;
+  const all   = (args.all as boolean) ?? false;
+
+  if (!all && (!files || files.length === 0)) {
+    return { success: false, error: "Provide 'files' or set all: true", exit_code: 1 };
+  }
+  const gitArgs = all ? ["add", "-A"] : ["add", "--", ...files!];
+  return gitResult(await runGit(gitArgs, cwd));
+}
+
+// ---------------------------------------------------------------------------
+// git_reset — unstage files or move HEAD (soft/mixed/hard)
+// ---------------------------------------------------------------------------
+
+export async function gitReset(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd   = (args.cwd as string) || process.cwd();
+  const mode  = (args.mode as string) ?? "mixed";
+  const ref   = args.ref as string | undefined;
+  const files = args.files as string[] | undefined;
+
+  let gitArgs: string[];
+  if (files && files.length > 0) {
+    // Unstage specific paths — mode is ignored in this form.
+    gitArgs = ["reset", ...(ref ? [ref] : []), "--", ...files];
+  } else {
+    const flag =
+      ({ soft: "--soft", mixed: "--mixed", hard: "--hard", keep: "--keep", merge: "--merge" } as Record<string, string>)[mode];
+    if (!flag) return { error: `Unknown mode '${mode}'. Use: soft | mixed | hard | keep | merge`, exit_code: 1 };
+    gitArgs = ["reset", flag, ...(ref ? [ref] : [])];
+  }
+  return gitResult(await runGit(gitArgs, cwd), {
+    ...(mode === "hard" && { warning: "--hard discards all uncommitted changes to tracked files irreversibly." }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// git_restore — discard working-tree changes or restore from a source
+// ---------------------------------------------------------------------------
+
+export async function gitRestore(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd    = (args.cwd as string) || process.cwd();
+  const files  = args.files as string[] | undefined;
+  const staged = (args.staged as boolean) ?? false;
+  const source = args.source as string | undefined;
+
+  if (!files || files.length === 0) return { error: "'files' is required", exit_code: 1 };
+
+  const gitArgs = ["restore"];
+  if (staged)  gitArgs.push("--staged");
+  if (source)  gitArgs.push("--source", source);
+  gitArgs.push("--", ...files);
+
+  return gitResult(await runGit(gitArgs, cwd));
+}
+
+// ---------------------------------------------------------------------------
+// git_rm — remove tracked files
+// ---------------------------------------------------------------------------
+
+export async function gitRm(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd       = (args.cwd as string) || process.cwd();
+  const files     = args.files as string[] | undefined;
+  const cached    = (args.cached as boolean) ?? false;
+  const recursive = (args.recursive as boolean) ?? false;
+
+  if (!files || files.length === 0) return { error: "'files' is required", exit_code: 1 };
+
+  const gitArgs = ["rm"];
+  if (cached)    gitArgs.push("--cached");     // untrack but keep on disk
+  if (recursive) gitArgs.push("-r");
+  gitArgs.push("--", ...files);
+
+  return gitResult(await runGit(gitArgs, cwd));
+}
+
+// ---------------------------------------------------------------------------
+// git_mv — move/rename a tracked file
+// ---------------------------------------------------------------------------
+
+export async function gitMv(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd         = (args.cwd as string) || process.cwd();
+  const source      = args.source as string | undefined;
+  const destination = args.destination as string | undefined;
+
+  if (!source || !destination) return { error: "'source' and 'destination' are required", exit_code: 1 };
+  return gitResult(await runGit(["mv", "--", source, destination], cwd));
+}
+
+// ---------------------------------------------------------------------------
+// git_merge — merge a branch into the current branch (non-interactive)
+// ---------------------------------------------------------------------------
+
+export async function gitMerge(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd     = (args.cwd as string) || process.cwd();
+  const branch  = args.branch as string | undefined;
+  const noFf    = (args.no_ff as boolean) ?? false;
+  const abort   = (args.abort as boolean) ?? false;
+  const message = args.message as string | undefined;
+
+  let gitArgs: string[];
+  if (abort) {
+    gitArgs = ["merge", "--abort"];
+  } else {
+    if (!branch) return { error: "'branch' is required (or set abort: true)", exit_code: 1 };
+    gitArgs = ["merge", "--no-edit"];
+    if (noFf)    gitArgs.push("--no-ff");
+    if (message) gitArgs.push("-m", message);
+    gitArgs.push(branch);
+  }
+
+  const result = await runGit(gitArgs, cwd);
+  return gitResult(result, {
+    ...(result.exitCode !== 0 && !abort && {
+      hint: "Merge failed — likely conflicts. Inspect with git_status/git_diff, resolve and git_add the files, then git_commit; or call again with abort: true to bail out.",
+    }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// git_rebase — rebase the current branch (non-interactive)
+// ---------------------------------------------------------------------------
+
+export async function gitRebase(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd      = (args.cwd as string) || process.cwd();
+  const upstream = args.upstream as string | undefined;
+  const onto     = args.onto as string | undefined;
+  const action   = args.action as string | undefined; // continue | abort | skip
+
+  // Force a no-op editor so an in-progress rebase never blocks on a prompt.
+  const noEditor = ["-c", "core.editor=true", "-c", "sequence.editor=true"];
+
+  let gitArgs: string[];
+  if (action) {
+    if (!["continue", "abort", "skip"].includes(action))
+      return { error: "action must be one of: continue | abort | skip", exit_code: 1 };
+    gitArgs = [...noEditor, "rebase", `--${action}`];
+  } else {
+    if (!upstream) return { error: "'upstream' is required (or action: continue | abort | skip)", exit_code: 1 };
+    gitArgs = [...noEditor, "rebase"];
+    if (onto) gitArgs.push("--onto", onto);
+    gitArgs.push(upstream);
+  }
+
+  const result = await runGit(gitArgs, cwd);
+  return gitResult(result, {
+    ...(result.exitCode !== 0 && action !== "abort" && {
+      hint: "Rebase stopped — likely conflicts. Resolve and git_add the files, then call again with action: continue; or action: abort to bail out.",
+    }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// git_cherry_pick — apply existing commits onto the current branch
+// ---------------------------------------------------------------------------
+
+export async function gitCherryPick(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd     = (args.cwd as string) || process.cwd();
+  const commits = args.commits as string[] | undefined;
+  const action  = args.action as string | undefined; // continue | abort | skip
+
+  let gitArgs: string[];
+  if (action) {
+    if (!["continue", "abort", "skip"].includes(action))
+      return { error: "action must be one of: continue | abort | skip", exit_code: 1 };
+    gitArgs = ["-c", "core.editor=true", "cherry-pick", `--${action}`];
+  } else {
+    if (!commits || commits.length === 0)
+      return { error: "'commits' is required (or action: continue | abort | skip)", exit_code: 1 };
+    gitArgs = ["cherry-pick", "--no-edit", ...commits];
+  }
+
+  const result = await runGit(gitArgs, cwd);
+  return gitResult(result, {
+    ...(result.exitCode !== 0 && action !== "abort" && {
+      hint: "Cherry-pick stopped — likely conflicts. Resolve and git_add, then action: continue; or action: abort.",
+    }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// git_revert — create commits that undo existing commits
+// ---------------------------------------------------------------------------
+
+export async function gitRevert(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd      = (args.cwd as string) || process.cwd();
+  const commits  = args.commits as string[] | undefined;
+  const action   = args.action as string | undefined; // continue | abort | skip
+  const noCommit = (args.no_commit as boolean) ?? false;
+
+  let gitArgs: string[];
+  if (action) {
+    if (!["continue", "abort", "skip"].includes(action))
+      return { error: "action must be one of: continue | abort | skip", exit_code: 1 };
+    gitArgs = ["-c", "core.editor=true", "revert", `--${action}`];
+  } else {
+    if (!commits || commits.length === 0)
+      return { error: "'commits' is required (or action: continue | abort | skip)", exit_code: 1 };
+    gitArgs = ["revert", "--no-edit"];
+    if (noCommit) gitArgs.push("--no-commit");
+    gitArgs.push(...commits);
+  }
+
+  return gitResult(await runGit(gitArgs, cwd));
+}
+
+// ---------------------------------------------------------------------------
+// git_tag — list / create / delete tags
+// ---------------------------------------------------------------------------
+
+export async function gitTag(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd     = (args.cwd as string) || process.cwd();
+  const action  = (args.action as string) ?? "list";
+  const name    = args.name as string | undefined;
+  const message = args.message as string | undefined;
+  const ref     = args.ref as string | undefined;
+
+  let gitArgs: string[];
+  switch (action) {
+    case "list":
+      gitArgs = ["tag", "--list"];
+      break;
+    case "create":
+      if (!name) return { error: "'name' is required for create", exit_code: 1 };
+      gitArgs = ["tag"];
+      if (message) gitArgs.push("-a", name, "-m", message); // annotated
+      else         gitArgs.push(name);                       // lightweight
+      if (ref) gitArgs.push(ref);
+      break;
+    case "delete":
+      if (!name) return { error: "'name' is required for delete", exit_code: 1 };
+      gitArgs = ["tag", "-d", name];
+      break;
+    default:
+      return { error: `Unknown action '${action}'. Use: list | create | delete`, exit_code: 1 };
+  }
+  return gitResult(await runGit(gitArgs, cwd), { action });
+}
+
+// ---------------------------------------------------------------------------
+// git_remote — list / add / remove / set-url remotes
+// ---------------------------------------------------------------------------
+
+export async function gitRemote(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd    = (args.cwd as string) || process.cwd();
+  const action = (args.action as string) ?? "list";
+  const name   = args.name as string | undefined;
+  const url    = args.url as string | undefined;
+
+  let gitArgs: string[];
+  switch (action) {
+    case "list":
+      gitArgs = ["remote", "-v"];
+      break;
+    case "add":
+      if (!name || !url) return { error: "'name' and 'url' are required for add", exit_code: 1 };
+      gitArgs = ["remote", "add", name, url];
+      break;
+    case "remove":
+      if (!name) return { error: "'name' is required for remove", exit_code: 1 };
+      gitArgs = ["remote", "remove", name];
+      break;
+    case "set-url":
+      if (!name || !url) return { error: "'name' and 'url' are required for set-url", exit_code: 1 };
+      gitArgs = ["remote", "set-url", name, url];
+      break;
+    default:
+      return { error: `Unknown action '${action}'. Use: list | add | remove | set-url`, exit_code: 1 };
+  }
+  return gitResult(await runGit(gitArgs, cwd), { action });
+}
+
+// ---------------------------------------------------------------------------
+// git_clone — clone a remote repository
+// ---------------------------------------------------------------------------
+
+export async function gitClone(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd       = (args.cwd as string) || process.cwd();
+  const url       = args.url as string | undefined;
+  const directory = args.directory as string | undefined;
+  const depth     = args.depth as number | undefined;
+  const branch    = args.branch as string | undefined;
+  const timeout   = (args.timeout as number) ?? GIT_NETWORK_TIMEOUT_MS;
+
+  if (!url) return { error: "'url' is required", exit_code: 1 };
+
+  const gitArgs = ["clone", "--no-progress"];
+  if (depth)  gitArgs.push("--depth", String(depth));
+  if (branch) gitArgs.push("--branch", branch);
+  gitArgs.push(url);
+  if (directory) gitArgs.push(directory);
+
+  const result = await runGit(gitArgs, cwd, timeout);
+  return gitResult(result, {
+    ...(result.exitCode !== 0 && {
+      hint: "Clone failed. Common causes: (1) auth required — clone over HTTPS with a token in the URL or a configured credential helper; (2) destination directory already exists and is non-empty.",
+    }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// git_blame — show last-modifying commit per line (read-only)
+// ---------------------------------------------------------------------------
+
+export async function gitBlame(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd   = (args.cwd as string) || process.cwd();
+  const file  = args.file as string | undefined;
+  const start = args.start_line as number | undefined;
+  const end   = args.end_line as number | undefined;
+
+  if (!file) return { error: "'file' is required", exit_code: 1 };
+
+  const gitArgs = ["blame"];
+  if (start && end) gitArgs.push("-L", `${start},${end}`);
+  gitArgs.push("--", file);
+
+  const result = await runGit(gitArgs, cwd);
+  const out = maybeTruncate(result.stdout);
+  return {
+    success: result.exitCode === 0,
+    file,
+    output: out.text,
+    ...(out.truncated && { truncated: true }),
+    exit_code: result.exitCode,
+    ...(result.exitCode !== 0 && result.stderr && { stderr: result.stderr }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// git_clean — remove untracked files (dry-run by default for safety)
+// ---------------------------------------------------------------------------
+
+export async function gitClean(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd         = (args.cwd as string) || process.cwd();
+  const directories = (args.directories as boolean) ?? false;
+  const dryRun      = (args.dry_run as boolean) ?? true;  // SAFE default: preview only
+  const force       = (args.force as boolean) ?? false;
+
+  const gitArgs = ["clean"];
+  if (dryRun) {
+    gitArgs.push("-n");
+  } else {
+    if (!force)
+      return {
+        error:
+          "Refusing to delete: git clean permanently removes untracked files. " +
+          "Preview with dry_run: true first, then pass force: true to actually delete.",
+        exit_code: 1,
+      };
+    gitArgs.push("-f");
+  }
+  if (directories) gitArgs.push("-d");
+
+  return gitResult(await runGit(gitArgs, cwd), { dry_run: dryRun });
+}
+
+// ---------------------------------------------------------------------------
+// git_reflog — show the reference log (recover lost commits)
+// ---------------------------------------------------------------------------
+
+export async function gitReflog(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd   = (args.cwd as string) || process.cwd();
+  const limit = (args.limit as number) ?? 30;
+
+  const result = await runGit(["reflog", `-${limit}`], cwd);
+  const out = maybeTruncate(result.stdout);
+  return {
+    success: result.exitCode === 0,
+    output: out.text,
+    ...(out.truncated && { truncated: true }),
+    exit_code: result.exitCode,
+    ...(result.exitCode !== 0 && result.stderr && { stderr: result.stderr }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// git_config — get / set / list / unset configuration
+// ---------------------------------------------------------------------------
+
+export async function gitConfig(
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const cwd    = (args.cwd as string) || process.cwd();
+  const action = (args.action as string) ?? "get";
+  const key    = args.key as string | undefined;
+  const value  = args.value as string | undefined;
+  const scope  = (args.scope as string) ?? "local"; // local | global
+  const scopeFlag = scope === "global" ? "--global" : "--local";
+
+  let gitArgs: string[];
+  switch (action) {
+    case "get":
+      if (!key) return { error: "'key' is required for get", exit_code: 1 };
+      gitArgs = ["config", scopeFlag, "--get", key];
+      break;
+    case "set":
+      if (!key || value === undefined) return { error: "'key' and 'value' are required for set", exit_code: 1 };
+      gitArgs = ["config", scopeFlag, key, String(value)];
+      break;
+    case "list":
+      gitArgs = ["config", scopeFlag, "--list"];
+      break;
+    case "unset":
+      if (!key) return { error: "'key' is required for unset", exit_code: 1 };
+      gitArgs = ["config", scopeFlag, "--unset", key];
+      break;
+    default:
+      return { error: `Unknown action '${action}'. Use: get | set | list | unset`, exit_code: 1 };
+  }
+  return gitResult(await runGit(gitArgs, cwd), { action, scope });
+}
