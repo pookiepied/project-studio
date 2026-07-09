@@ -2,15 +2,15 @@ import { ReactNode, useState, useEffect, useLayoutEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { TitleBar } from "./TitleBar";
 import { NavPopup } from "./NavPopup";
-import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { OfflineIndicator } from "@/app/globals/OfflineIndicator";
 import { UpdateBanner } from "../feedback/UpdateBanner";
 import { CommandPalette } from "../overlays/CommandPalette";
-import { CommandPaletteProvider } from "../../contexts/CommandPaletteContext";
-import { useSettings } from "../../contexts/SettingsContext";
+import { CommandPaletteProvider } from "@/app/contexts/CommandPaletteContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import type { View } from "@/types/navigation";
-import { resolveTheme } from "../../utils/theme";
-import { isWorkspaceShell, WORKSPACE_SHELL } from "../../shell/shellConfig";
-import { WorkspaceShellChrome } from "../../shell/WorkspaceShellChrome";
+import { resolveTheme } from "@/lib/theme";
+import { isWorkspaceShell, WORKSPACE_SHELL } from "@/app/shell/shellConfig";
+import { WorkspaceShellChrome } from "@/app/shell/WorkspaceShellChrome";
 
 interface MainLayoutProps {
   children: ReactNode;

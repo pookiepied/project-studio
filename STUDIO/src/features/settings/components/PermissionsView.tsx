@@ -15,7 +15,7 @@ import {
   listWorkspaceToolGrants,
   revokeToolGrant,
   clearAllPermissions,
-} from "@/permissions";
+} from "@/core/permissions";
 import { SectionLabel } from "./SectionLabel";
 
 /**
@@ -28,7 +28,7 @@ import { SectionLabel } from "./SectionLabel";
  *
  * It only reads / revokes; grants are *created* in-chat through the trust modal,
  * global-access modal, and per-action approval prompts. Reading straight from
- * the same `perm:` store (via `@/permissions`) keeps this view and the engine
+ * the same `perm:` store (via `@/core/permissions`) keeps this view and the engine
  * from ever drifting. MCP server *enablement* lives in Local AI > System
  * Integration and is intentionally not duplicated here.
  */

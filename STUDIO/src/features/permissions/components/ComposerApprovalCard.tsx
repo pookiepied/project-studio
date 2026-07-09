@@ -2,8 +2,8 @@ import { useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LockSimpleIcon as LockSimple } from "@phosphor-icons/react";
 import { toolLabel, getToolIcon } from "@/runtime";
-import { RISK_CLASS_META, extractTargetPaths } from "../../../permissions";
-import type { GrantScope } from "../../../permissions";
+import { RISK_CLASS_META, extractTargetPaths } from "@/core/permissions";
+import type { GrantScope } from "@/core/permissions";
 import type { ActiveToolCall } from "@/features/chat/context/types";
 import type { ToolApprovalDecision } from "@/features/chat/context/types";
 

@@ -19,7 +19,7 @@ import {
   MODEL_FILTERS,
   type ModelFilter,
 } from "@/features/models/services/modelFilter";
-import { isVisionModel } from "@/utils/modelUtils";
+import { isVisionModel } from "@/lib/modelUtils";
 import { ProviderIcon, getProviderDisplayName } from "./ProviderIcon";
 import { AI_MODES } from "@/core/config/autoMode";
 

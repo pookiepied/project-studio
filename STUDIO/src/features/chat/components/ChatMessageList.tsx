@@ -5,7 +5,7 @@ import { ErrorDisplay } from "@/ui/feedback/ErrorDisplay";
 import { ToolPermissionCard } from "@/runtime";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";
-import { getTurnAnchorIndices } from "@/utils/turnAnchors";
+import { getTurnAnchorIndices } from "@/lib/turnAnchors";
 import { TurnStatus } from "./idle/TurnStatus";
 import type { ChatMessage, MessageSegment } from "@/types";
 import type { ActiveToolCall } from "@/features/chat/context/types";

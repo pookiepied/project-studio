@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getTurnAnchorIndices } from "@/utils/turnAnchors";
+import { getTurnAnchorIndices } from "@/lib/turnAnchors";
 import type { ChatMessage } from "@/types";
 
 interface Props {

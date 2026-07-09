@@ -7,11 +7,11 @@ import {
   ChatCircleIcon as Chat,
   ArrowRightIcon as ArrowRight,
 } from "@phosphor-icons/react";
-import { useCommandPalette } from "../../contexts/CommandPaletteContext";
-import { useNavigation } from "../../contexts/NavigationContext";
+import { useCommandPalette } from "@/app/contexts/CommandPaletteContext";
+import { useNavigation } from "@/app/contexts/NavigationContext";
 import { useChat } from "@/features/chat/context";
-import { getAllConversations } from "../../core/storage/chatHistoryService";
-import type { ConversationMetadata } from "../../hooks/useConversationsList";
+import { getAllConversations } from "@/core/storage/chatHistoryService";
+import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import {
   searchMessages,
   invalidateSearchCache,

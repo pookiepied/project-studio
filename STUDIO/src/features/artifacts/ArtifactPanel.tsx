@@ -4,7 +4,7 @@ import {
   CodeIcon as Code,
   FileTextIcon as FileText,
 } from "@phosphor-icons/react";
-import type { ArtifactTab } from "@/hooks/useArtifactPanel";
+import type { ArtifactTab } from "@/app/hooks/useArtifactPanel";
 import { CodeView }     from "./artifact/CodeView";
 import { DocumentView } from "./artifact/DocumentView";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";

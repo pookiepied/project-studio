@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { APIChatMessage } from "@/types/chat";
 import type { ChatRequestBody } from "../protocol";
 import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
-import { filterMcpServersForConversationScope } from "@/permissions/scope";
+import { filterMcpServersForConversationScope } from "@/core/permissions/scope";
 
 export interface ChatBodyParams {
   messages: APIChatMessage[];

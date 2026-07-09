@@ -5,8 +5,8 @@ import {
 } from "@phosphor-icons/react";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
 import { Toggle } from "@/ui/primitives/Toggle";
-import { ConditionalAutostart, ConditionalSystemTray } from "@/components/ConditionalFeatures";
-import { useSettings } from "@/contexts/SettingsContext";
+import { ConditionalAutostart, ConditionalSystemTray } from "@/app/globals/ConditionalFeatures";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import type { AppSettings, ThemePreference } from "@/types";
 import { SettingsRow } from "./SettingsRow";
 

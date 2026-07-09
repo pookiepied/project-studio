@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useDebouncedValue } from "@/hooks/useDebounce";
+import { useDebouncedValue } from "@/lib/hooks/useDebounce";
 
 const KEY_PREFIX = "studio_draft_";
 const DEBOUNCE_MS = 800;

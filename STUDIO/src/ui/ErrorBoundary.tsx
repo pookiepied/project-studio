@@ -7,7 +7,7 @@ import {
   CheckIcon as Check,
 } from "@phosphor-icons/react";
 import { reportError } from "../core/errors/errorReporting";
-import { logger } from "../core/logging/logger";
+import { logger } from "@/core/logging/logger";
 
 interface Props {
   children: ReactNode;

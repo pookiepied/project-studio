@@ -6,7 +6,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { apiClient } from "@/utils/api";
+import { apiClient } from "@/lib/api";
 import { APIResponse } from "@/types";
 import * as fasterWhisperService from "@/features/transcription/services/fasterWhisper";
 import { TranscribeResponse } from "./types";

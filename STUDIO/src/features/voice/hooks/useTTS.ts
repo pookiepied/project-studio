@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { apiClient } from "@/utils/api";
+import { apiClient } from "@/lib/api";
 
 interface TTSState {
   /** Message ID currently being played, or null */

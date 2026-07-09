@@ -12,8 +12,8 @@ import {
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { mkdir } from "@tauri-apps/plugin-fs";
 import { documentDir } from "@tauri-apps/api/path";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { setWorkspaceTrust } from "@/permissions";
+import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
+import { setWorkspaceTrust } from "@/core/permissions";
 import { StudioMark } from "@/ui/brand";
 
 type AccessMode = "review" | "autonomous";

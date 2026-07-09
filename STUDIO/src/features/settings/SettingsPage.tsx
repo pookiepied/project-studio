@@ -25,17 +25,17 @@ import {
   setLocalMcpPermission,
   type LocalMcpServerDef,
 } from "@/runtime";
-import { useNavigation } from "@/contexts/NavigationContext";
+import { useNavigation } from "@/app/contexts/NavigationContext";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { useSettings } from "@/contexts/SettingsContext";
-import { useFeatures } from "@/hooks/useFeatures";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { useFeatures } from "@/app/hooks/useFeatures";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useModelsContext as useModels } from "@/features/models/context";
 import { AuthControls } from "@/features/auth/components/AuthControls";
 import { AppSettings, ThemePreference } from "@/types";
 import { logger } from "@/core/logging/logger";
 import { AutostartService } from "@/core/platform/autostartService";
-import { resolveTheme } from "@/utils/theme";
+import { resolveTheme } from "@/lib/theme";
 
 import {
   NavTile,

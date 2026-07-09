@@ -1,5 +1,5 @@
 import { apiManager } from './apiManager';
-import { createHeaders } from '@/utils/api';
+import { createHeaders } from '@/lib/api';
 
 interface UserProfile {
   name: string;

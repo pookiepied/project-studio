@@ -2,9 +2,9 @@ import { useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneLight, atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { CopyIcon as Copy, CheckIcon as Check } from "@phosphor-icons/react";
-import { FONT_MONO } from "@/styles/fonts";
-import { useSettings } from "@/contexts/SettingsContext";
-import { isResolvedDark } from "@/utils/theme";
+import { FONT_MONO } from "@/design/fonts";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { isResolvedDark } from "@/lib/theme";
 
 interface CodeViewProps {
   content:  string;

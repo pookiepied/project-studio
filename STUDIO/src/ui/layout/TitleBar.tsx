@@ -1,8 +1,8 @@
 import { MagnifyingGlassIcon as Search } from "@phosphor-icons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useCommandPalette } from "../../contexts/CommandPaletteContext";
-import { logger } from "../../core/logging/logger";
-import { environmentService } from "../../core/platform/environmentService";
+import { useCommandPalette } from "@/app/contexts/CommandPaletteContext";
+import { logger } from "@/core/logging/logger";
+import { environmentService } from "@/core/platform/environmentService";
 import { NavToggleIcon } from "../icons/WorkspaceIcons";
 import { NotificationBell } from "../notifications/NotificationBell";
 

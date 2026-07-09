@@ -184,7 +184,7 @@ export async function fetchModels(
       logger.debug('Models', `Fetching from: ${endpoints.models}`);
       
       // Use full endpoint URL directly
-      const token = await (await import("@/utils/tokenManager")).tokenManager.getAccessToken();
+      const token = await (await import("@/lib/tokenManager")).tokenManager.getAccessToken();
       const headers: HeadersInit = {
         'Content-Type': 'application/json'
       };

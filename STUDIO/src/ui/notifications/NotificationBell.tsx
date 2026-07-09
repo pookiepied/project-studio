@@ -11,15 +11,15 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BellIcon as Bell } from "@phosphor-icons/react";
-import { useNotifications } from "../../hooks/useNotifications";
+import { useNotifications } from "@/app/hooks/useNotifications";
 import {
   broadcastPanelOpen,
   useExclusivePanel,
-} from "../../hooks/useExclusivePanel";
+} from "@/lib/hooks/useExclusivePanel";
 import type {
   AppNotification,
   AgentNotificationStatus,
-} from "../../core/notifications/notificationStore";
+} from "@/core/notifications/notificationStore";
 
 function relativeTime(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);

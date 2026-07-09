@@ -1,18 +1,18 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import { isWorkspaceShell, WORKSPACE_SHELL } from "./shell/shellConfig";
-import { isThemePreference, resolveTheme } from "./utils/theme";
+import App from "./app/App";
+import { isWorkspaceShell, WORKSPACE_SHELL } from "./app/shell/shellConfig";
+import { isThemePreference, resolveTheme } from "./lib/theme";
 
 // Typography variables must load before the rest of the app styles.
 // We intentionally use system font stacks for a compact Codex-like feel.
-import "./styles/typography.css";
+import "./design/typography.css";
 // Semantic design tokens (single source of truth) load before index.css so
 // every global rule can read the CSS variables they define.
-import "./tokens/tokens.css";
+import "./design/tokens.css";
 import "./index.css";
 // Workspace-shell styles (scoped to .zen-* classes; inert unless used).
-import "./shell/workspaceShell.css";
+import "./app/shell/workspaceShell.css";
 import { logger } from "./core/logging/logger";
 
 logger.info("Main", "Starting STUDIO");

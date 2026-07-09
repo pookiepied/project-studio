@@ -1,5 +1,5 @@
 import { apiManager } from "@/core/network/apiManager";
-import { createHeaders } from "@/utils/api";
+import { createHeaders } from "@/lib/api";
 
 export type AgentType    = "omni" | "coding";
 export type TriggerType  = "manual" | "cron";

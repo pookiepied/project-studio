@@ -11,9 +11,9 @@ import {
   CloudCheckIcon as CloudCheck,
   DesktopTowerIcon as DesktopTower,
 } from "@phosphor-icons/react";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { formatDate } from "@/utils/formatters";
-import type { ConversationMetadata } from "@/hooks/useConversationsList";
+import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
+import { formatDate } from "@/lib/formatters";
+import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
 import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
 import { ClaudeCodeIcon } from "@/ui/primitives/ClaudeCodeIcon";

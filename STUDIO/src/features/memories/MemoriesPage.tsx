@@ -14,10 +14,10 @@ import { Textarea } from "@/ui/primitives/Textarea";
 import { Spinner } from "@/ui/primitives/Spinner";
 import { EmptyState } from "@/ui/primitives/EmptyState";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
-import { createHeaders } from "@/utils/api";
+import { createHeaders } from "@/lib/api";
 import { apiManager } from "@/core/network/apiManager";
 import { logger } from "@/core/logging/logger";
-import { formatLabel } from "@/utils/formatters";
+import { formatLabel } from "@/lib/formatters";
 import { MemoriesGraph } from "./components";
 import type { Memory } from "./types";
 

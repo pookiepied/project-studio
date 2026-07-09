@@ -8,11 +8,11 @@ import { Spinner } from "@/ui/primitives/Spinner";
 import { RecordingState } from "@/types";
 import { useRecording } from "@/features/voice/context/RecordingContext";
 import { useChat } from "@/features/chat/context";
-import { useNavigation } from "@/contexts/NavigationContext";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useNavigation } from "@/app/contexts/NavigationContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { NotificationService } from "@/core/notifications";
 import { TrayService } from "@/core/platform/trayService";
-import { formatShortcutKeys } from "@/utils/shortcutFormatter";
+import { formatShortcutKeys } from "@/lib/shortcutFormatter";
 import { logger } from "@/core/logging/logger";
 
 /** Split text into natural lines for sequential reveal. */

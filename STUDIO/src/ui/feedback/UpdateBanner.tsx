@@ -12,8 +12,8 @@ import {
   CheckCircleIcon as CheckCircle,
   XIcon as X,
 } from "@phosphor-icons/react";
-import { useAppUpdater } from "../../hooks/useAppUpdater";
-import { environmentService } from "../../core/platform/environmentService";
+import { useAppUpdater } from "@/app/hooks/useAppUpdater";
+import { environmentService } from "@/core/platform/environmentService";
 
 export const UpdateBanner = () => {
   const isTauri = environmentService.isTauri();

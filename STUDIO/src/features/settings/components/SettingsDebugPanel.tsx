@@ -10,11 +10,11 @@ import {
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Button } from "@/ui/primitives/Button";
 import { Icon, Refresh, Warning, Close } from "@/ui/icons";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { configService } from "@/core/storage/configService";
 import { comprehensiveDiagnostics, type DiagnosticTest, type DiagnosticReport } from "@/core/errors/comprehensiveDiagnostics";
 import { getSaltInfo } from "@/core/storage/secureStorage";
-import { tokenManager } from "@/utils/tokenManager";
+import { tokenManager } from "@/lib/tokenManager";
 import { logger } from "@/core/logging/logger";
 import { environmentService } from "@/core/platform/environmentService";
 

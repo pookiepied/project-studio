@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { CodeBlock } from "./CodeBlock";
 import ExternalLink from "@/ui/primitives/ExternalLink";
-import { tokenManager } from "@/utils/tokenManager";
+import { tokenManager } from "@/lib/tokenManager";
 import { TAURI_CONFIG } from "@/core/config/tauriConfig";
 
 // ---------------------------------------------------------------------------

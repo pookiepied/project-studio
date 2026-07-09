@@ -5,11 +5,11 @@ import {
 } from "recharts";
 import { Icon, Refresh, Warning } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
-import { createHeaders } from "@/utils/api";
+import { createHeaders } from "@/lib/api";
 import { apiManager } from "@/core/network/apiManager";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { useSettings } from "@/contexts/SettingsContext";
-import { isResolvedDark } from "@/utils/theme";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { isResolvedDark } from "@/lib/theme";
 import { logger } from "@/core/logging/logger";
 import { prefetchProfiles } from "@/core/network/userProfileCache";
 

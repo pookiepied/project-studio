@@ -14,7 +14,7 @@
  * to CORS) and only fall back to `fallback` if that image itself errors.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import { useCachedIcon } from "../../hooks/useCachedIcon";
+import { useCachedIcon } from "@/lib/hooks/useCachedIcon";
 
 export type AppLogoSize = "xs" | "sm" | "md" | "lg" | "xl";
 

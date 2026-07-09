@@ -10,7 +10,7 @@
  * It never blocks sending a message.
  */
 
-import { countMessageTokensAsync } from "@/utils/tokenEstimator";
+import { countMessageTokensAsync } from "@/lib/tokenEstimator";
 import { logger } from "@/core/logging/logger";
 import {
   loadConversation,

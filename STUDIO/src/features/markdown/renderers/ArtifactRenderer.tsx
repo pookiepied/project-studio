@@ -9,7 +9,7 @@ import type {
   ArtifactStat,
   ArtifactTimelineItem,
 } from "@/types/artifacts";
-import { parseArtifact } from "@/utils/artifact";
+import { parseArtifact } from "@/lib/artifact";
 import { JsonRenderer } from "./JsonRenderer";
 import { WebSearchArtifact } from "./artifacts";
 

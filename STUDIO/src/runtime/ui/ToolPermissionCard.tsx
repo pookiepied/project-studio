@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { formatLabel } from "@/utils/formatters";
+import { formatLabel } from "@/lib/formatters";
 
 interface ToolPermissionCardProps {
   tool: string;

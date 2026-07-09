@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect, useState } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 // @ts-expect-error - Keeping THREE imported for future use as requested
 import * as THREE from "three";
-import { formatLabel } from "@/utils/formatters";
+import { formatLabel } from "@/lib/formatters";
 import type { Memory } from "../types";
 
 interface MemoriesGraphProps {

@@ -12,9 +12,9 @@ import {
   WarningCircleIcon as WarningCircle,
 } from "@phosphor-icons/react";
 import { ArtifactRenderer } from "@/features/markdown";
-import { ARTIFACT_EXAMPLES } from "@/artifacts/examples";
+import { ARTIFACT_EXAMPLES } from "@/features/artifacts/examples";
 import type { Artifact, ArtifactSurface } from "@/types/artifacts";
-import { artifactToMarkdown, parseArtifact } from "@/utils/artifact";
+import { artifactToMarkdown, parseArtifact } from "@/lib/artifact";
 
 type ArtifactLabCanvasItem = {
   id: string;

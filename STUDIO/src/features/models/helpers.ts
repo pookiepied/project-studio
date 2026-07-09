@@ -1,6 +1,6 @@
 import { getProviderDisplayName } from "@/features/models/components/ProviderIcon";
-import { formatPrice } from "@/utils/formatters";
-import { isVisionModel } from "@/utils/modelUtils";
+import { formatPrice } from "@/lib/formatters";
+import { isVisionModel } from "@/lib/modelUtils";
 import type { Model } from "@/features/models/services/modelService";
 
 export const CHAT_SELECTABLE_TYPES = new Set<Model["type"]>(["chat", "multimodal"]);

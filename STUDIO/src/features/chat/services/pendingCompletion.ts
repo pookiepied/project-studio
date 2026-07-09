@@ -12,7 +12,7 @@
  */
 
 import { TAURI_CONFIG } from "@/core/config/tauriConfig";
-import { tokenManager } from "@/utils/tokenManager";
+import { tokenManager } from "@/lib/tokenManager";
 
 const AGENT_BASE = `${TAURI_CONFIG.API_BASE_URL}/agents/chat-agent`;
 

@@ -1,6 +1,6 @@
 // Settings types — moved from src/types/index.ts per T5.5 (D-527 shim pattern).
 
-import { RephraseTone } from "@/utils/prompts";
+import { RephraseTone } from "@/lib/prompts";
 
 export type ThemePreference = "system" | "light" | "dark";
 

@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { WifiSlashIcon as WifiSlash, ArrowsClockwiseIcon as ArrowsClockwise } from "@phosphor-icons/react";
-import { useOffline } from "../../contexts/OfflineContext";
+import { useOffline } from "@/app/contexts/OfflineContext";
 
 const Tear = ({ x, delay }: { x: number; delay: number }) => (
   <motion.div

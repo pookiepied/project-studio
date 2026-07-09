@@ -1,6 +1,6 @@
 import { MicrophoneIcon as Microphone } from "@phosphor-icons/react";
 import { useAudioRecorder } from "@/features/voice/hooks/useAudioRecorder";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { AudioWaveform } from "./AudioWaveform";
 import { composerRoundIconButton, cx } from "@/features/chat/components/composerControlStyles";
 

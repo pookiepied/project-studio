@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from "react";
-import { tokenManager } from "@/utils/tokenManager";
+import { tokenManager } from "@/lib/tokenManager";
 import { unifiedStorage } from "@/core/storage/unifiedStorageService";
 
 interface DecodedToken {

@@ -3,9 +3,9 @@ import {
   CircleDashedIcon as CircleDashed,
 } from "@phosphor-icons/react";
 import { Toggle } from "@/ui/primitives/Toggle";
-import { ConditionalGlobalShortcuts } from "@/components/ConditionalFeatures";
-import { useSettings } from "@/contexts/SettingsContext";
-import { FONT_SANS } from "@/styles/fonts";
+import { ConditionalGlobalShortcuts } from "@/app/globals/ConditionalFeatures";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { FONT_SANS } from "@/design/fonts";
 import type { AppSettings } from "@/types";
 import { SettingsRow } from "./SettingsRow";
 import { ShortcutRecorder } from "./ShortcutRecorder";

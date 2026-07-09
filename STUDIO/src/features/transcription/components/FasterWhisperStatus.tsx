@@ -12,7 +12,7 @@ import { IconButton } from '@/ui/primitives/IconButton';
 import { Spinner } from '@/ui/primitives/Spinner';
 import { Success, Refresh, Delete, Warning, Icon } from '@/ui/icons';
 import { useFasterWhisper } from '@/features/transcription/hooks/useFasterWhisper';
-import { useFeatures } from '@/hooks/useFeatures';
+import { useFeatures } from '@/app/hooks/useFeatures';
 import {
   installFasterWhisper,
   downloadModel,

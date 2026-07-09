@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
-import { useNavigation } from "@/contexts/NavigationContext";
+import { useAutoResizeTextarea } from "@/lib/hooks/useAutoResizeTextarea";
+import { useNavigation } from "@/app/contexts/NavigationContext";
 import {
   PlusIcon as Plus,
   FilesIcon as Files,
@@ -15,7 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { FEATURED_APPS } from "@/features/extensions/components/ComposioCards";
 import { AppLogo } from "@/ui/brand";
-import { useComposioLogos } from "@/hooks/useComposioLogos";
+import { useComposioLogos } from "@/features/extensions/hooks/useComposioLogos";
 import { TierSelector } from "@/features/models/components/TierSelector";
 import { VoiceInput } from "@/features/voice/components/VoiceInput";
 import { AttachmentInput } from "@/features/chat/components/AttachmentInput";
@@ -30,10 +30,10 @@ import {
   cx,
 } from "./composerControlStyles";
 import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
-import type { RecentFileEntry } from "@/hooks/useRecentFiles";
+import type { RecentFileEntry } from "@/app/hooks/useRecentFiles";
 import type { AppSettings } from "@/types";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import type { PermissionModeId } from "@/permissions";
+import type { PermissionModeId } from "@/core/permissions";
 
 interface ChatComposerProps {
   inputMessage: string;

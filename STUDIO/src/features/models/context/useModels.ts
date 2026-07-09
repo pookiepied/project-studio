@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchModels, Model, ModelsResponse, ProviderInfo } from "@/features/models/services/modelService";
 import { errorService } from "@/core/errors/errorService";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { useDaemon } from "@/core/daemon/useDaemon";
 import { createDaemonClient } from "@/core/daemon/daemonClient";
 import { logger } from "@/core/logging/logger";

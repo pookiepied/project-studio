@@ -1,5 +1,5 @@
 import { apiManager } from "@/core/network/apiManager";
-import { tokenManager } from "@/utils/tokenManager";
+import { tokenManager } from "@/lib/tokenManager";
 
 async function getComposioBase(): Promise<string> {
   const endpoints = await apiManager.getEndpoints();

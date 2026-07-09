@@ -1,4 +1,4 @@
-import { createHeaders } from "@/utils/api";
+import { createHeaders } from "@/lib/api";
 import { API_ENDPOINTS } from "@/core/config/tauriConfig";
 
 export interface UploadedDocument {

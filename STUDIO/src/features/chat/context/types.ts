@@ -19,7 +19,7 @@ import type {
   PermissionModeId,
   GrantScope,
   ToolRiskClass,
-} from "@/permissions";
+} from "@/core/permissions";
 
 /** User decision on a per-action approval prompt: a grant scope, or deny. */
 export type ToolApprovalDecision = GrantScope | "deny";

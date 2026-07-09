@@ -30,14 +30,14 @@ import type { FileAttachment }                         from "@/features/chat/att
 import type { APIChatMessage, ToolResultItem, AutoRoutedInfo } from "@/types/chat";
 import { extractMessageText }                          from "@/types/chat";
 import { aiService }                                   from "@/features/chat/services/aiService";
-import { tokenManager }                                from "@/utils/tokenManager";
+import { tokenManager }                                from "@/lib/tokenManager";
 import { memorySystem }                                from "@/core/storage/memorySystem";
 import { errorService }                                from "@/core/errors/errorService";
 import { logger }                                      from "@/core/logging/logger";
 import { safeIsVisionModel, safeGetContextWindow, handleNetworkFailure } from "@/core/network/fallbackService";
-import { useSettings }                                 from "@/contexts/SettingsContext";
+import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
-import { parseChatResponse, isValidChatResponse }     from "@/utils/chatParser";
+import { parseChatResponse, isValidChatResponse }     from "@/lib/chatParser";
 import { TAURI_CONFIG }                               from "@/core/config/tauriConfig";
 import {
   createConversation, saveConversation, loadConversation, addMessage,
@@ -64,8 +64,8 @@ import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
 import { DEFAULT_MAX_CONTEXT_TOKENS, MESSAGES_PER_PAGE, MAX_CONTEXT_MESSAGES } from "./constants";
 import { classifyToolDisplay, extractGeneratedImageIds, deleteRemoteImages } from "@/runtime";
-import { buildHarnessEvent } from "@/utils/harnessEventUtils";
-import { hasDSML, parseDSML, stripDSMLForStreaming } from "@/utils/dsmlParser";
+import { buildHarnessEvent } from "@/lib/harnessEventUtils";
+import { hasDSML, parseDSML, stripDSMLForStreaming } from "@/lib/dsmlParser";
 import { executeLocalTools }                           from "@/runtime";
 import {
   buildApiMessages, pruneContextByTokens, applyAllSystemMessages,
@@ -77,7 +77,7 @@ import { chat } from "@/features/chat/services/chatService";
 import { claudeBridgeService } from "@/features/chat/services/claudeBridgeService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
 import { effortToThinkingBudget, getClaudeContextWindowTokens } from "@/cliBridges";
-import type { PermissionModeId, PermissionDecision, ActionMode } from "@/permissions";
+import type { PermissionModeId, PermissionDecision, ActionMode } from "@/core/permissions";
 import {
   evaluateToolCall,
   chatModeFromStorageScope,
@@ -88,7 +88,7 @@ import {
   buildGrantLookupForConversation,
   clearSessionGrants,
   recordGrant as recordToolGrant,
-} from "@/permissions";
+} from "@/core/permissions";
 import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
 import { GlobalAccessModal } from "@/ui/overlays/GlobalAccessModal";
 import type { ToolApprovalDecision } from "./types";
@@ -1878,7 +1878,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         : conv.messages.slice(-50);
       const objs = raw.map((m) => ({ content: m.content }));
       if (conv.contextSummary) objs.unshift({ content: conv.contextSummary });
-      import("@/utils/tokenEstimator").then(({ countMessageTokensAsync: c }) =>
+      import("@/lib/tokenEstimator").then(({ countMessageTokensAsync: c }) =>
         c(objs).then(setContextTokens).catch(() => {})
       );
     } else {

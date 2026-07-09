@@ -8,7 +8,7 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FONT_SANS } from "../../styles/fonts";
+import { FONT_SANS } from "@/design/fonts";
 import {
   ArrowSquareOutIcon as ArrowsOut,
   XIcon as X,
@@ -18,8 +18,8 @@ import {
   ChatsCircleIcon as ChatsCircle,
 } from "@phosphor-icons/react";
 
-import type { OverlayPayload, OverlayActionType } from "../../core/platform/overlayService";
-import { deriveIslandViewState, getIslandVisualSize } from "../../core/platform/islandViewState";
+import type { OverlayPayload, OverlayActionType } from "@/core/platform/overlayService";
+import { deriveIslandViewState, getIslandVisualSize } from "@/core/platform/islandViewState";
 import { RecordingState } from "@/types";
 
 import {

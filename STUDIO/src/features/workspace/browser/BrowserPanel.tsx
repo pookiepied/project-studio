@@ -13,8 +13,8 @@ import {
   TerminalIcon as Terminal,
   XIcon as X,
 } from "@phosphor-icons/react";
-import { FONT_SANS } from "@/styles/fonts";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import { FONT_SANS } from "@/design/fonts";
+import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "../rightWorkspace/types";
 import { NativeBrowserHost } from "./NativeBrowserHost";

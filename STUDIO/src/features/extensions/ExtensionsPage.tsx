@@ -3,7 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { PlusIcon as Plus } from "@phosphor-icons/react";
 import { Warning, Close, Search, Manage, Refresh, Expand, Icon } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
-import { useNavigation } from "@/contexts/NavigationContext";
+import { useNavigation } from "@/app/contexts/NavigationContext";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useChat } from "@/features/chat/context";
 import { environmentService } from "@/core/platform/environmentService";

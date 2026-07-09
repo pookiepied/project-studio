@@ -11,7 +11,7 @@ import {
   ChatCircleIcon as ChatCircle,
 } from "@phosphor-icons/react";
 import { RecordingState } from "@/types";
-import type { IslandMode } from "../../core/platform/overlayService";
+import type { IslandMode } from "@/core/platform/overlayService";
 
 // ─── Shared animation spring ──────────────────────────────────────────────────
 // Matches Studio's panel / NavPopup spring exactly.

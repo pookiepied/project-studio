@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Manage, Collapse, Icon } from "@/ui/icons";
 import { Badge } from "@/ui/primitives/Badge";
 import { EmptyState } from "@/ui/primitives/EmptyState";
-import { createHeaders } from "@/utils/api";
+import { createHeaders } from "@/lib/api";
 import { apiManager } from "@/core/network/apiManager";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { logger } from "@/core/logging/logger";

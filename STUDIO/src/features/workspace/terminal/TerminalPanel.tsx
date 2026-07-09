@@ -34,7 +34,7 @@ import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
-import { FONT_MONO } from "@/styles/fonts";
+import { FONT_MONO } from "@/design/fonts";
 
 // ─── Xterm themes (matched to tailwind.config.js palette) ────────────────────
 // xterm ITHEME ANSI palette — data-viz carve-out: terminal ANSI 16-color palette

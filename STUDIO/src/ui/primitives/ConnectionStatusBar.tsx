@@ -13,7 +13,7 @@
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useConnectionManager } from "../../hooks/useConnectionManager";
+import { useConnectionManager } from "@/app/hooks/useConnectionManager";
 
 interface Props {
   convId?: string;

@@ -1,5 +1,5 @@
 import { AppSettings } from "@/types";
-import { RephraseTone } from "@/utils/prompts";
+import { RephraseTone } from "@/lib/prompts";
 import {
   loadSettingsFromFile,
   saveSettingsToFile,
@@ -10,7 +10,7 @@ import {
   getConfigLocation,
   DEFAULT_SETTINGS,
 } from "./fileConfigService";
-import { isThemePreference } from "../../utils/theme";
+import { isThemePreference } from "@/lib/theme";
 
 /**
  * Load settings (uses unified storage)

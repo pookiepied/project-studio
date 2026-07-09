@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CaretDownIcon as CaretDown } from "@phosphor-icons/react";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { useSettings } from "@/contexts/SettingsContext";
-import { resolveTheme } from "@/utils/theme";
+import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { resolveTheme } from "@/lib/theme";
 import { PROJECT_APPS } from "./projectApps";
 import { psArray, psString, runPowerShell } from "./projectAppsShell";
 import {

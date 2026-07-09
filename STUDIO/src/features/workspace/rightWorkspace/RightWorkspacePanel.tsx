@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { setRightPanelWidth } from "@/shell/workspaceLayoutStore";
+import { setRightPanelWidth } from "@/app/shell/workspaceLayoutStore";
 import { ArtifactPanel } from "@/features/artifacts";
 import { BrowserPanel } from "../browser/BrowserPanel";
 import type { BrowserTab } from "../browser/BrowserPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
-import type { ArtifactTab } from "@/hooks/useArtifactPanel";
+import type { ArtifactTab } from "@/app/hooks/useArtifactPanel";
 import { WorkspaceHomePanel } from "./WorkspaceHomePanel";
 import { WorkspacePlaceholderPanel } from "./WorkspacePlaceholderPanel";
 import { SideChatPanel } from "./SideChatPanel";

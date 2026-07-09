@@ -9,8 +9,8 @@ import {
   CheckIcon as Check,
 } from "@phosphor-icons/react";
 import { composerPillButton, composerPillLabel, cx } from "./composerControlStyles";
-import { getPermissionModesForEngine } from "@/permissions";
-import type { PermissionIconKey, PermissionModeId } from "@/permissions";
+import { getPermissionModesForEngine } from "@/core/permissions";
+import type { PermissionIconKey, PermissionModeId } from "@/core/permissions";
 import type { ChatEngine } from "@/cliBridges/types";
 
 function PermIcon({ icon, size = 13 }: { icon: PermissionIconKey; size?: number }) {

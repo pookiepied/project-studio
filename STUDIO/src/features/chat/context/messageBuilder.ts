@@ -16,7 +16,7 @@
 import {
   estimateTokens,
   countMessageTokensAsync,
-} from "@/utils/tokenEstimator";
+} from "@/lib/tokenEstimator";
 import { logger } from "@/core/logging/logger";
 import type { APIChatMessage } from "@/types/chat";
 import type { ChatConversation } from "@/types";
@@ -25,7 +25,7 @@ import {
   PROJECT_CONTEXT_MARKER,
   buildProjectContextSystemPrompt,
   buildProjectContextUserBlock,
-} from "@/utils/projectContextUtils";
+} from "@/lib/projectContextUtils";
 import { MAX_CONTEXT_MESSAGES } from "./constants";
 
 // ---------------------------------------------------------------------------

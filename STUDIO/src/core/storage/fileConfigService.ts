@@ -4,11 +4,11 @@
  */
 
 import { AppSettings, ThemePreference } from "@/types";
-import { RephraseTone } from "@/utils/prompts";
+import { RephraseTone } from "@/lib/prompts";
 import { unifiedStorage } from "./unifiedStorageService";
 import { migrateModelId } from "@/features/models/services/modelService";
 import { logger } from "../logging/logger";
-import { isThemePreference } from "../../utils/theme";
+import { isThemePreference } from "@/lib/theme";
 
 const CONFIG_PATH = "STUDIO.conf";
 

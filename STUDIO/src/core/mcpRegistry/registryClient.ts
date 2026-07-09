@@ -1,5 +1,5 @@
 import { apiManager } from "@/core/network/apiManager";
-import { tokenManager } from "@/utils/tokenManager";
+import { tokenManager } from "@/lib/tokenManager";
 import { logger } from "@/core/logging/logger";
 
 /**

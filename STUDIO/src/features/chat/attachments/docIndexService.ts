@@ -1,5 +1,5 @@
 import { apiManager } from "@/core/network/apiManager";
-import { createHeaders } from "@/utils/api";
+import { createHeaders } from "@/lib/api";
 import { logger } from "@/core/logging/logger";
 
 /** Characters of extracted text above which we RAG-index instead of inlining. */

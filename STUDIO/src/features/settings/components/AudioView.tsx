@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Select } from "@/ui/primitives/Select";
 import { Toggle } from "@/ui/primitives/Toggle";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { logger } from "@/core/logging/logger";
-import { getAvailableTones, type RephraseTone } from "@/utils/prompts";
+import { getAvailableTones, type RephraseTone } from "@/lib/prompts";
 import type { AppSettings } from "@/types";
 import { SettingsRow } from "./SettingsRow";
 

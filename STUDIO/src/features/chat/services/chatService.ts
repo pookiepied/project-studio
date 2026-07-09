@@ -8,10 +8,10 @@
  * aiService.chatStream (SSE).  This module is transport-independent.
  */
 
-import { apiClient } from "@/utils/api";
+import { apiClient } from "@/lib/api";
 import { APIResponse } from "@/types";
-import { getRephrasePrompt, RephraseTone } from "@/utils/prompts";
-import { cleanAIResponse, isValidResponse } from "@/utils/responseParser";
+import { getRephrasePrompt, RephraseTone } from "@/lib/prompts";
+import { cleanAIResponse, isValidResponse } from "@/lib/responseParser";
 import { errorService } from "@/core/errors/errorService";
 import { logger } from "@/core/logging/logger";
 import { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";

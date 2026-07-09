@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, Component, ReactNode } from "react";
-import { FONT_SANS } from "@/styles/fonts";
+import { FONT_SANS } from "@/design/fonts";
 import mermaid from "mermaid";
-import { useSettings } from "@/contexts/SettingsContext";
-import { isResolvedDark } from "@/utils/theme";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { isResolvedDark } from "@/lib/theme";
 
 interface MermaidDiagramProps {
   code: string;

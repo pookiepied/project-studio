@@ -14,7 +14,7 @@
  *  - Direct, non-streaming, single-turn call so it resolves quickly.
  */
 
-import { apiClient } from "@/utils/api";
+import { apiClient } from "@/lib/api";
 import { logger } from "@/core/logging/logger";
 import { ChatMessage } from "@/types";
 

@@ -15,9 +15,9 @@ import {
   BrainIcon as Brain,
   TerminalIcon as Terminal,
 } from "@phosphor-icons/react";
-import { FONT_SANS } from "../../styles/fonts";
+import { FONT_SANS } from "@/design/fonts";
 import type { PulseCard, PulseCardType } from "@/types/pulse";
-import type { OverlayActionType } from "../../core/platform/overlayService";
+import type { OverlayActionType } from "@/core/platform/overlayService";
 import { ActionBtn } from "./IslandAtoms";
 
 // ─── Card icon ────────────────────────────────────────────────────────────────

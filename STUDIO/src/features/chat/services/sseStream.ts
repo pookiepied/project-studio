@@ -7,7 +7,7 @@
  * @deprecated Prefer useAgentChat for all new streaming use-cases.
  */
 
-import { apiClient }                              from "@/utils/api";
+import { apiClient }                              from "@/lib/api";
 import type { APIChatMessage, AutoRoutedInfo, LocalToolCall } from "./types";
 import { decodeChunk }                            from "./daemonService";
 

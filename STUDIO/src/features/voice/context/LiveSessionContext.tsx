@@ -13,11 +13,11 @@
 
 import { createContext, useContext, useEffect, ReactNode, type RefObject } from "react";
 import { useLiveSession, SessionState, type VoiceCaptionState } from "@/features/voice/hooks/useLiveSession";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { pulseCoordinator } from "@/core/platform/pulseCoordinator";
 import { environmentService } from "@/core/platform/environmentService";
 import { RecordingState } from "@/types";
-import { sampleAudioLevels } from "@/utils/audioLevels";
+import { sampleAudioLevels } from "@/lib/audioLevels";
 
 // ─── Public shape ─────────────────────────────────────────────────────────────
 

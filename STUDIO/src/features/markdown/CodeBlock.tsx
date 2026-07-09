@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { FONT_MONO } from "@/styles/fonts";
+import { FONT_MONO } from "@/design/fonts";
 import { CopyIcon as Copy, CheckIcon as Check, CaretDownIcon as CaretDown, CaretUpIcon as CaretUp, TextAlignLeftIcon as TextAlignLeft, EyeIcon as Eye } from "@phosphor-icons/react";
-import { useBrowserPanel } from "@/contexts/BrowserPanelContext";
+import { useBrowserPanel } from "@/app/contexts/BrowserPanelContext";
 import { motion, AnimatePresence } from "framer-motion";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneLight, atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { errorService } from "@/core/errors/errorService";
 import { toast } from "sonner";
-import { useSettings } from "@/contexts/SettingsContext";
-import { isResolvedDark } from "@/utils/theme";
+import { useSettings } from "@/app/contexts/SettingsContext";
+import { isResolvedDark } from "@/lib/theme";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { LatexRenderer } from "./renderers/LatexRenderer";
 import { SvgRenderer } from "./renderers/SvgRenderer";

@@ -1,5 +1,5 @@
 import { useChat } from "@/features/chat/context";
-import { useSettings } from "../../contexts/SettingsContext";
+import { useSettings } from "@/app/contexts/SettingsContext";
 import { usePermissionNotifications } from "./hooks/usePermissionNotifications";
 
 /**

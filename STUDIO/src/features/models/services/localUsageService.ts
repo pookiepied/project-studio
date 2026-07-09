@@ -13,7 +13,7 @@
  * Fire-and-forget: never throws, never blocks the chat response.
  */
 
-import { apiClient } from "@/utils/api";
+import { apiClient } from "@/lib/api";
 import { logger } from "@/core/logging/logger";
 import { extractLocalModelName } from "@/features/chat/services/daemonService";
 
