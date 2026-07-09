@@ -23,24 +23,18 @@ import {
   useRef,
 } from "react";
 import { buildChatBody, getMcpServers } from "@/runtime";
-import { buildSendContext } from "./buildSendContext";
 
 import type { ChatConversation, ChatMessage }          from "@/types";
-import type { FileAttachment }                         from "@/features/chat/attachments/fileAttachmentService";
-import type { APIChatMessage, AutoRoutedInfo } from "@/types/chat";
-import { extractMessageText }                          from "@/types/chat";
-import { aiService }                                   from "@/features/chat/services/aiService";
-import { tokenManager }                                from "@/lib/tokenManager";
+import type { AutoRoutedInfo } from "@/types/chat";
 import { memorySystem }                                from "@/core/storage/memorySystem";
 import { errorService }                                from "@/core/errors/errorService";
-import { safeIsVisionModel, safeGetContextWindow, handleNetworkFailure } from "@/core/network/fallbackService";
+import { safeIsVisionModel, safeGetContextWindow } from "@/core/network/fallbackService";
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
-import { parseChatResponse, isValidChatResponse }     from "@/lib/chatParser";
 import { TAURI_CONFIG }                               from "@/core/config/tauriConfig";
 import {
   createConversation, saveConversation, loadConversation, addMessage,
-  getContextMessages, getConversationMessages, updateConversationTitle,
+  getConversationMessages, updateConversationTitle,
   updateMessage, deleteMessage, getAllConversations, truncateMessagesAfter,
   forkConversationToStudio as forkConversationToStudioStorage,
 } from "@/core/storage/chatHistoryService";
@@ -60,7 +54,7 @@ import { usePermittedTools }                           from "@/features/chat/hoo
 
 import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
-import { DEFAULT_MAX_CONTEXT_TOKENS, MESSAGES_PER_PAGE, MAX_CONTEXT_MESSAGES } from "./constants";
+import { DEFAULT_MAX_CONTEXT_TOKENS, MESSAGES_PER_PAGE } from "./constants";
 import { extractGeneratedImageIds, deleteRemoteImages } from "@/runtime";
 import {
   buildApiMessages, pruneContextByTokens, applyAllSystemMessages,
@@ -88,6 +82,7 @@ import { GlobalAccessModal } from "@/ui/overlays/GlobalAccessModal";
 import type { ToolApprovalDecision } from "./types";
 import { runClaudeTurn as runClaudeTurnDriver } from "./runClaudeTurn";
 import { useStreamHandlers } from "./useStreamHandlers";
+import { useSendPipeline } from "./useSendPipeline";
 
 import {
   getConvProjectCtx,
@@ -486,19 +481,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setThinkingContent("");
   }, []);
 
-  // ── Drain pending message queue when streaming ends ─────────────────────
-  const prevIsStreamingRef = useRef(false);
-  useEffect(() => {
-    const wasStreaming = prevIsStreamingRef.current;
-    prevIsStreamingRef.current = isStreaming;
-    if (wasStreaming && !isStreaming && pendingMessages.length > 0) {
-      const [first, ...rest] = pendingMessages;
-      setPendingMessages(rest);
-      // Defer one tick so streaming state fully settles before re-entering sendMessage
-      setTimeout(() => sendMessageRef.current?.(first.content, true, first.attachments), 0);
-    }
-  }, [isStreaming, pendingMessages]);
-
   // ── Sync default model ──────────────────────────────────────────────────
   useEffect(() => {
     if (!conversation && settings.defaultChatModel) setCurrentModel(settings.defaultChatModel);
@@ -816,378 +798,50 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     failStreamingTurn,
   ]);
 
-  // ── sendMessage ─────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (
-    content:       string,
-    useStreaming:   boolean = true,
-    attachments:   FileAttachment[] = []
-  ) => {
-    const hasPDFImages  = attachments.some((a) => a.isPDF && a.pdfPageImages?.length);
-    const hasImages     = attachments.some((a) => a.isImage || a.type.startsWith("image/")) || hasPDFImages;
-    const hasDocuments  = attachments.some((a) => !a.isImage);
-    if ((!content.trim() && !hasImages && !hasDocuments) || isLoading) return;
-
-    // Queue the message if the AI is currently streaming — it auto-sends when done
-    if (isStreaming) {
-      setPendingMessages((prev) => [...prev, { content, attachments }]);
-      return;
-    }
-
-    const userDisplayContent = content.trim();
-    const silentPrompt    = !userDisplayContent && hasImages;
-    const silentDocPrompt = !userDisplayContent && hasDocuments && !hasImages;
-    const apiContent      = userDisplayContent
-      || (hasImages ? "Describe this image in detail." : "Please analyze this document.");
-
-    setError(null);
-    setIsLoading(true);
-
-    // ── Optimistic UI ────────────────────────────────────────────────────
-    const imageUrls = hasImages
-      ? attachments.filter((a) => a.isImage && a.file).map((a) => URL.createObjectURL(a.file!))
-      : [];
-    const docAttachments = attachments
-      .filter((a) => !a.isImage)
-      .map((a) => ({ name: a.name, extension: a.extension }));
-
-    const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticAsst = `ai-optimistic-${Date.now()}`;
-    appendToDisplayedMessages({
-      id: optimisticId, role: "user", content: userDisplayContent,
-      timestamp: Date.now(),
-      ...(imageUrls.length > 0 ? { imageUrls } : {}),
-      ...(docAttachments.length > 0 ? { documentAttachments: docAttachments } : {}),
-    });
-    appendToDisplayedMessages({ id: optimisticAsst, role: "assistant", content: "", timestamp: Date.now() + 1 });
-    setStreamingMessageId(optimisticAsst);
-
-    if (hasImages && !currentModelSupportsVision) {
-      setError("Selected model doesn't support images. Please choose a vision model.");
-      setIsLoading(false);
-      setDisplayedMessages((prev) => prev.filter((m) => m.id !== optimisticId && m.id !== optimisticAsst));
-      setStreamingMessageId(null);
-      return;
-    }
-
-    // ── Create/get conversation ──────────────────────────────────────────
-    let activeConversation: ChatConversation;
-    try {
-      activeConversation = await getOrCreateConversation(
-        userDisplayContent || (hasImages ? "Image" : attachments[0]?.name || "Document"),
-        chatEngine === "claude" ? claudeModel : currentModel
-      );
-    } catch (err) {
-      const nf = handleNetworkFailure(err);
-      setError(nf.userMessage);
-      setIsLoading(false);
-      setDisplayedMessages((prev) => prev.filter((m) => m.id !== optimisticId && m.id !== optimisticAsst));
-      setStreamingMessageId(null);
-      return;
-    }
-
-    // ── Save user message ────────────────────────────────────────────────
-    const activeIsClaudeOwned = isClaudeOwnedConversation(activeConversation);
-    if (activeIsClaudeOwned && chatEngine !== "claude") {
-      setError("This is a Claude Code native conversation. Continue with Claude, or fork it into Studio first.");
-      setIsLoading(false);
-      setDisplayedMessages((prev) => prev.filter((m) => m.id !== optimisticId && m.id !== optimisticAsst));
-      setStreamingMessageId(null);
-      return;
-    }
-
-    if (!activeIsClaudeOwned) try {
-      await addMessage(activeConversation.id, {
-        id: optimisticId, timestamp: Date.now(), role: "user" as const, content: userDisplayContent,
-        ...(imageUrls.length > 0 ? { imageUrls } : {}),
-        ...(docAttachments.length > 0 ? { documentAttachments: docAttachments } : {}),
-      });
-      const updated = await loadConversation(activeConversation.id);
-      if (updated) {
-        setConversation(updated);
-        const last = updated.messages[updated.messages.length - 1];
-        if (last) setDisplayedMessages((prev) => prev.map((m) => m.id === optimisticId ? last : m));
-      }
-    } catch (err) {
-      const nf = handleNetworkFailure(err);
-      setError(`Failed to save message: ${nf.userMessage}`);
-      setIsLoading(false);
-      setDisplayedMessages((prev) => prev.filter((m) => m.id !== optimisticId && m.id !== optimisticAsst));
-      setStreamingMessageId(null);
-      return;
-    }
-
-    if (chatEngine === "claude") {
-      const savedConversation = await loadConversation(activeConversation.id);
-      const latestConversation = savedConversation ?? activeConversation;
-      const prompt = apiContent;
-
-      await persistConversationMetadata(
-        latestConversation,
-        "claude",
-        {
-          ...(claudeSession ?? {}),
-          model: claudeModel,
-          permissionMode: settings.autopilotMode ? "bypassPermissions" : claudePermissionMode,
-          effortLevel: claudeEffortLevel,
-          cwd: projectContext?.path,
-          lastTurnAt: Date.now(),
-        }
-      );
-
-      await runClaudeTurn(latestConversation, prompt, optimisticAsst);
-      return;
-    }
-
-    const {
-      prunedMessages: initialPruned,
-      runningMcpServers,
-      freshConv,
-    } = await buildSendContext({
-      convId:         activeConversation.id,
-      userContent:    content,
-      attachments,
-      model:          currentModel,
-      isMemoryEnabled,
-      projectContext,
-      storageScope: conversationStorageScope,
-      imageModel:     settings.imageModel,
-      videoModel:     settings.videoModel,
-      silentPrompt,
-      silentDocPrompt,
-      apiContent,
-      getContextLimit,
-      setContextTokens,
-      setContextLimit,
-    });
-    let prunedMessages = initialPruned;
-
-    // Image augmentation
-    if (hasImages && currentModelSupportsVision && !currentModel.startsWith("local:")) {
-      prunedMessages = await aiService.augmentMessagesWithImages(prunedMessages, attachments);
-    }
-    if (hasPDFImages && currentModelSupportsVision && !currentModel.startsWith("local:")) {
-      prunedMessages = await aiService.augmentMessagesWithPDFImages(prunedMessages, attachments);
-    }
-
-    // Local Ollama vision — non-streaming path
-    if (hasImages && currentModelSupportsVision && currentModel.startsWith("local:")) {
-      const resp = await aiService.chatWithImages(prunedMessages, currentModel, attachments);
-      if (resp.success && resp.data) {
-        const parsed = parseChatResponse(extractMessageText(resp.data.choices[0]?.message?.content));
-        if (!isValidChatResponse(parsed)) { setError("AI response invalid."); return; }
-        await addMessage(activeConversation.id, { id: optimisticAsst, timestamp: Date.now(), role: "assistant" as const, content: parsed });
-        const fc = await loadConversation(activeConversation.id);
-        if (fc) {
-          setConversation(fc);
-          const last = fc.messages[fc.messages.length - 1];
-          if (last?.role === "assistant") appendToDisplayedMessages(last);
-        }
-        setIsLoading(false);
-        setStreamingMessageId(null);
-        if (isMemoryEnabled) memorySystem.processConversation(activeConversation).catch(() => {});
-      } else {
-        setError(errorService.getUserMessage(resp.error));
-      }
-      return;
-    }
-
-    // Background compaction
-    if (freshConv) maybeCompact(freshConv, currentModel, getContextLimit, isSummarizingRef, setIsSummarizing, setConversation).catch(() => {});
-
-    // ── Stream via WebSocket ─────────────────────────────────────────────
-    if (useStreaming) {
-      activeConversationIdRef.current    = activeConversation.id;
-      optimisticAssistantIdRef.current   = optimisticAsst;
-      resetStreamingState(optimisticAsst);
-
-      const userId = await tokenManager.getUserId();
-      const body = buildChatBody({
-        messages: prunedMessages,
-        model: currentModel,
-        runningMcpServers,
-        storageScope: conversationStorageScope,
-        reasoningBudget,
-        userId: userId ?? undefined,
-      });
-
-      try {
-        // Pass activeConversation.id explicitly — the agentChat closure captured
-        // in this callback may still hold conversationId = null (the value from
-        // before React re-rendered after getOrCreateConversation). The explicit ID
-        // bypasses the stale closure so the socket is set up for the right DO instance.
-        agentChat.startTurn(body, activeConversation.id);
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-        setError(errorService.getUserMessage(err));
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    // ── Non-streaming (rare) ─────────────────────────────────────────────
-    abortControllerRef.current = new AbortController();
-    const resp = await aiService.chat(prunedMessages, currentModel, {
-      localEngineConnected: runningMcpServers.includes("studio-harness"),
-      signal: abortControllerRef.current.signal,
-    });
-
-    if (resp.success && resp.data) {
-      const parsed = parseChatResponse(resp.data);
-      if (!isValidChatResponse(parsed)) { setError("AI response invalid."); setIsLoading(false); return; }
-      const asst: any = { id: optimisticAsst, timestamp: Date.now(), role: "assistant", content: parsed };
-      await addMessage(activeConversation.id, asst);
-      const fc = await loadConversation(activeConversation.id);
-      if (fc) {
-        setConversation(fc);
-        const last = fc.messages[fc.messages.length - 1];
-        if (last?.role === "assistant") appendToDisplayedMessages(last);
-      }
-    } else {
-      setError(errorService.getUserMessage(resp.error));
-    }
-    setIsLoading(false);
-    setStreamingMessageId(null);
-  }, [
-    claudeSession, claudeModel, currentModel, isLoading, isStreaming, currentModelSupportsVision,
-    isMemoryEnabled, getContextLimit, appendToDisplayedMessages, resetStreamingState,
-    persistConversationMetadata, projectContext, chatEngine, runClaudeTurn, settings, reasoningBudget, agentChat, getOrCreateConversation,
-    claudePermissionMode, claudeEffortLevel, conversationStorageScope,
-  ]);
-
-  // Keep ref in sync so the pending-queue drain effect can call sendMessage without
-  // capturing a stale closure.
-  useEffect(() => {
-    sendMessageRef.current = sendMessage;
-  }, [sendMessage]);
-
-  const cancelPendingMessage = useCallback((index: number) => {
-    setPendingMessages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  // ── streamAndSaveResponse (regenerate / continue) ───────────────────────
-  const streamAndSaveResponse = useCallback(async (
-    conversationId:      string,
-    messagesToSend:      APIChatMessage[],
-    appendToMessageId?:  string,
-    overwriteMessageId?: string
-  ) => {
-    let existingContent = "";
-    if (appendToMessageId) {
-      const c = await loadConversation(conversationId);
-      existingContent = c?.messages.find((m) => m.id === appendToMessageId)?.content ?? "";
-    }
-
-    // overwriteMessageId: the message whose content is replaced in-place (regenerate)
-    // appendToMessageId:  the message to append new content to (continue)
-    const optId = overwriteMessageId ?? appendToMessageId ?? `ai-regen-${Date.now()}`;
-    activeConversationIdRef.current  = conversationId;
-    optimisticAssistantIdRef.current = optId;
-    resetStreamingState(optId, existingContent ? existingContent + "\n\n" : "");
-    abortControllerRef.current = new AbortController();
-
-    const runningMcpServers = await getMcpServers(conversationStorageScope);
-    const body = buildChatBody({
-      messages: messagesToSend,
-      model: currentModel,
-      runningMcpServers,
-      storageScope: conversationStorageScope,
-      reasoningBudget,
-    });
-
-    try {
-      agentChat.startTurn(body);
-    } catch (err: any) {
-      if (err?.name !== "AbortError") setError(errorService.getUserMessage(err));
-    }
-  }, [currentModel, reasoningBudget, agentChat, resetStreamingState, conversationStorageScope]);
-
-  // ── regenerateResponse ──────────────────────────────────────────────────
-  const regenerateResponse = useCallback(async () => {
-    if (!conversation || isLoading) return;
-    if (chatEngine === "claude") {
-      setError("Regenerate is not wired for Cloud mode yet. Send a quick follow-up instead.");
-      return;
-    }
-    const lastAsst = [...conversation.messages].reverse().find((m) => m.role === "assistant");
-    if (!lastAsst) return;
-
-    setIsLoading(true);
-    setError(null);
-    setDisplayedMessages((prev) => prev.map((m) => m.id === lastAsst.id ? { ...m, content: "" } : m));
-
-    try {
-      const running = await getMcpServers(conversationStorageScope);
-
-      const fresh = await loadConversation(conversation.id);
-      let base: APIChatMessage[] = fresh
-        ? await buildApiMessages(fresh, currentModel, getContextLimit, setContextTokens, setContextLimit)
-        : (await getContextMessages(conversation.id, MAX_CONTEXT_MESSAGES)).map((m) => ({ role: m.role, content: m.content }));
-
-      base = base.slice(0, -1); // Remove last assistant message
-      const enhanced = applyAllSystemMessages(base, running, settings.imageModel, settings.videoModel, projectContext);
-      const pruned   = pruneContextByTokens(enhanced, getContextLimit(currentModel));
-
-      await streamAndSaveResponse(conversation.id, pruned, undefined, lastAsst.id);
-    } catch (err: any) {
-      if (err?.name !== "AbortError") setError(errorService.getUserMessage(err));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [conversation, currentModel, isLoading, getContextLimit, settings, projectContext, chatEngine, streamAndSaveResponse, conversationStorageScope]);
-
-  // ── continueResponse ────────────────────────────────────────────────────
-  const continueResponse = useCallback(async () => {
-    if (!conversation || isLoading) return;
-    const lastAsst = [...conversation.messages].reverse().find((m) => m.role === "assistant");
-    if (!lastAsst) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    if (chatEngine === "claude") {
-      const optimisticId = `ai-continue-${Date.now()}`;
-      appendToDisplayedMessages({
-        id: optimisticId,
-        role: "assistant",
-        content: "",
-        timestamp: Date.now(),
-      });
-      try {
-        await runClaudeTurn(
-          conversation,
-          "Please continue your previous response from exactly where you left off. Do not repeat anything already written.",
-          optimisticId
-        );
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    try {
-      const running = await getMcpServers(conversationStorageScope);
-
-      const fresh = await loadConversation(conversation.id);
-      const base: APIChatMessage[] = fresh
-        ? await buildApiMessages(fresh, currentModel, getContextLimit, setContextTokens, setContextLimit)
-        : (await getContextMessages(conversation.id, MAX_CONTEXT_MESSAGES)).map((m) => ({ role: m.role, content: m.content }));
-
-      base.push({
-        role: "user",
-        content: "Please continue your previous response from exactly where you left off. Do not repeat anything already written. Do not add any preamble or acknowledgement — simply continue the text.",
-      });
-
-      const enhanced = applyAllSystemMessages(base, running, settings.imageModel, settings.videoModel, projectContext);
-      const pruned   = pruneContextByTokens(enhanced, getContextLimit(currentModel));
-
-      await streamAndSaveResponse(conversation.id, pruned, lastAsst.id);
-    } catch (err: any) {
-      if (err?.name !== "AbortError") setError(errorService.getUserMessage(err));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [appendToDisplayedMessages, conversation, currentModel, getContextLimit, isLoading, projectContext, chatEngine, runClaudeTurn, settings, streamAndSaveResponse, conversationStorageScope]);
+  const {
+    sendMessage,
+    cancelPendingMessage,
+    regenerateResponse,
+    continueResponse,
+  } = useSendPipeline({
+    conversation,
+    conversationStorageScope,
+    projectContext,
+    currentModel,
+    currentModelSupportsVision,
+    chatEngine,
+    claudeModel,
+    claudeSession,
+    claudePermissionMode,
+    claudeEffortLevel,
+    isLoading,
+    isStreaming,
+    isMemoryEnabled,
+    reasoningBudget,
+    pendingMessages,
+    settings,
+    activeConversationIdRef,
+    optimisticAssistantIdRef,
+    abortControllerRef,
+    isSummarizingRef,
+    sendMessageRef,
+    setConversation,
+    setDisplayedMessages,
+    setPendingMessages,
+    setStreamingMessageId,
+    setContextTokens,
+    setContextLimit,
+    setIsSummarizing,
+    setIsLoading,
+    setError,
+    agentChat,
+    appendToDisplayedMessages,
+    getOrCreateConversation,
+    resetStreamingState,
+    persistConversationMetadata,
+    runClaudeTurn,
+    getContextLimit,
+  });
 
   // ── Voice input ─────────────────────────────────────────────────────────
   // Mirror sendMessage into a ref so the stable onTranscribed callback below
