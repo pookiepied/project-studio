@@ -1,7 +1,9 @@
 # Local Runtime & Frontend Reorg — Task Index
 
-> **Status:** PLANNING. Nothing has been moved yet. This folder is the single,
-> self-contained plan for two linked pieces of work on the `STUDIO/` desktop app:
+> **Status:** IN PROGRESS. Phases 0–4 are complete and verified; Phase 6 and 7
+> are complete; **Phase 5 is partially complete** (see doc 05). Resume at
+> Phase 5. This folder is the single, self-contained plan for two linked pieces
+> of work on the `STUDIO/` desktop app:
 >
 > 1. **Name and centralize the Local Runtime** — the currently-nameless subsystem
 >    that lets the cloud agent execute tools on the user's own machine.

@@ -136,8 +136,8 @@ infra, not vice-versa.
 
 **VERIFY.** Build passes.
 
-**Done when.** ☐ All §B moved. ☐ `infrastructure/` gone. ☐ `core/daemon/` holds the
-daemon client + hook. ☐ Build passes.
+**Done when.** ☑ All §B moved. ☑ `infrastructure/` gone. ☑ `core/daemon/` holds the
+daemon client + hook. ☑ Build passes.
 
 ---
 
@@ -160,8 +160,8 @@ feature code → its feature (doc 04 §C).
 **VERIFY.** Build passes. Smoke: open Models, Voice, Extensions, Settings pages;
 confirm they render.
 
-**Done when.** ☐ `ui/` holds only shared primitives. ☐ No feature code left in a
-shared bucket. ☐ `features/auth/` exists. ☐ Build + smoke pass.
+**Done when.** ☑ `ui/` holds only shared primitives. ☑ No feature code left in a
+shared bucket. ☑ `features/auth/` exists. ☑ Build + smoke pass.
 
 ---
 
@@ -186,8 +186,8 @@ home (doc 04 §C permissions row).
 
 **VERIFY.** Build passes. Smoke: full app boot to Home; auth gate; open a chat.
 
-**Done when.** ☐ Top level matches doc 03 §1. ☐ `App.tsx` is thin. ☐ Permissions has
-one home. ☐ Build + smoke pass.
+**Done when.** ☑ Top level matches doc 03 §1. ☑ `App.tsx` is thin. ☑ Permissions has
+one home. ☑ Build + smoke pass.
 
 ---
 
@@ -210,8 +210,35 @@ so what's left is genuinely chat-state orchestration — the cleanest possible s
 permission prompt; confirm streaming, tool cards, task list, and persistence all work
 exactly as before.
 
+### Progress — part 1 landed (2079 → 1879 lines)
+
+Done:
+- `context/runClaudeTurn.ts` — the Claude CLI-bridge turn driver, moved out verbatim
+  as a plain async fn over a deps bundle (+ the pure `mapClaudeToolName`). The
+  provider keeps a thin wrapper so call sites are unchanged.
+- `context/toolExecutionCallbacks.ts` — `buildToolExecutionCallbacks()`. The
+  `executeLocalTools` callback bundle had been built identically in two places
+  (WS `onLocalToolsPending` and the DSML interception in `handleStreamDone`).
+- `finishStreamingTurn()` — the 11-line end-of-turn teardown, previously duplicated
+  verbatim across `handleStreamDone`'s two completion branches.
+- `failStreamingTurn(message)` — the two Claude bailout paths.
+
+Remaining (this is what "thin composition" still needs):
+- `useSendPipeline` ← `sendMessage`, `streamAndSaveResponse`, `regenerateResponse`,
+  `continueResponse` (~350 lines).
+- `useStreamHandlers` ← the `useAgentChat` handler object + `handleStreamDone`
+  (incl. DSML interception) (~300 lines).
+- `useConversationState` ← `displayedMessages` pagination, `loadInitialMessages`,
+  `loadMoreMessages`, conversation CRUD (~250 lines).
+- `usePersistence` ← `persistConversationMetadata`, project-context persistence.
+
+> **Do not** fold the `agentChat.onError` handler or `handleStreamDone`'s
+> empty-response early return into `finishStreamingTurn` / `failStreamingTurn`.
+> They reset overlapping but strictly *smaller* subsets of state; unifying them
+> would clear `thinking`/segments where today's code deliberately does not.
+
 **Done when.** ☐ `ChatProvider.tsx` is a thin composition. ☐ Extracted hooks own their
-slices. ☐ Build + smoke pass.
+slices. ☑ Build + tsc pass (part 1). ☐ Smoke pass.
 
 ---
 
@@ -222,16 +249,34 @@ slices. ☐ Build + smoke pass.
 **Steps.**
 1. For each candidate, grep `src/` + `index.html` + router for every import path and
    exported symbol. Paste the evidence into the commit body.
-2. Delete only those with no external references:
-   `pages/TemporaryPage.tsx`, `pages/SplashPreviewPage.tsx` (+ its `App.tsx` branch,
-   if removing), the emptied `components/rightWorkspace/`, redundant empty barrels.
+2. Delete only those with no external references.
 3. Do **not** touch `features/workspace/rightWorkspace/`, `cliBridges/`, `daemon/`,
    `mcp-servers/`, `vendor/`.
 
+### Outcome (VERIFY-FIRST corrected two candidates from the original draft)
+
+Deleted — proven unreferenced:
+- `core/platform/crossPlatformService.ts` — 135 lines of a disabled canvas feature.
+  Zero importers at HEAD **and** at pre-reorg `9d3c262`, so it was already dead
+  before this task rather than orphaned by it.
+- 11 `export {};` placeholder barrels left by the Phase 0 skeleton: `app/`, `core/`,
+  `design/`, `lib/`, `ui/`, and `runtime/{servers,transport,ui,capabilities,execution,invoke}/`.
+
+**Kept — the original draft was wrong.** Both files this doc proposed deleting are
+live; grep proved it:
+- `app/routes/TemporaryPage.tsx` — routed from `HomePage.tsx` (`case "temporary"`).
+- `app/routes/SplashPreviewPage.tsx` — mounted by `app/App.tsx` behind the
+  `IS_SPLASH_PREVIEW` build flag.
+
+Also fixed here (stale config the reorg left behind, not dead code):
+- `eslint.config.js` now ignores `vendor/` (it was linting vendored git terminfo
+  `.js` files → 2 parse errors) and its design-system rule message no longer points
+  at the deleted `@/components/ui` path.
+
 **VERIFY.** Build passes. Full smoke.
 
-**Done when.** ☐ Only proven-dead files removed, with grep evidence. ☐ Build + smoke
-pass.
+**Done when.** ☑ Only proven-dead files removed, with grep evidence. ☑ Build + tsc
+pass. ☐ Full smoke pass.
 
 ---
 
@@ -245,7 +290,12 @@ pass.
 2. Confirm the one-line `protocol.ts` cross-reference comment landed in
    `chat/src/agent/ChatAgent.ts` (from Phase 1 step 8).
 
-**Done when.** ☐ Optional rename done or consciously skipped. ☐ Cross-ref comment
+**Outcome.** The `mcp.rs` → `runtime.rs` rename was **consciously skipped**: it is
+cosmetic, and touching the Tauri `mod` + command registration risks the desktop build
+for zero functional gain. The cross-reference comment is present at
+`chat/src/agent/ChatAgent.ts:97`.
+
+**Done when.** ☑ Optional rename done or consciously skipped. ☑ Cross-ref comment
 present.
 
 ---
