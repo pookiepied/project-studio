@@ -21,14 +21,18 @@ import {
   extractMcpImages,
   truncateMcpOutput,
   formatMcpError,
-} from "@/services/mcp/mcpInvoker";
+} from "../invoke/invokeMcpTool";
 import { logger } from "@/services/logging/logger";
 import { connectionManager } from "@/services/connection";
-import type { APIChatMessage, LocalToolCall, ToolResultItem } from "@/services/ai/types";
-import type { TaskItem, ActiveToolCall, ToolApprovalDecision } from "./types";
+import type { APIChatMessage, LocalToolCall, ToolResultItem } from "@/types/chat";
+import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "@/features/chat/context/types";
 import { isLocalMcpServer } from "@/permissions";
 import type { PermissionDecision, GrantScope } from "@/permissions";
+import { applyWorkspaceDefaults } from "./workspaceDefaults";
+import { executeBuiltinTool } from "./builtinTools";
 import { notifyPermissionRequired } from "./notifications";
+
+// TODO(reorg): chat-state type coupling (ActiveToolCall) resolved in Phase 5.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -153,137 +157,10 @@ async function executeSingleTool(
   toolName:   string,
   cb:         ToolExecutionCallbacks
 ): Promise<unknown> {
-  // -- task_write - handled entirely in-process -------------------------
-  if (toolName === "task_write") {
-    const rawTasks = (tc.args.todos ?? []) as TaskItem[];
-    const nextTasks = rawTasks.every((t) => t.status === "completed")
-      ? []
-      : rawTasks;
-    cb.setSessionTasks(nextTasks);
-    cb.setActiveToolCalls((prev) =>
-      prev.map((t) =>
-        t.callId === tc.callId
-          ? { ...t, status: "complete", result: nextTasks }
-          : t
-      )
-    );
-    return "Tasks have been updated successfully.";
-  }
-
-  // -- spawn_agent - should never reach the client -----------------------
-  if (toolName === "spawn_agent") {
-    logger.warn("toolExecutor", "spawn_agent reached client - handled server-side");
-    cb.setActiveToolCalls((prev) =>
-      prev.map((t) =>
-        t.callId === tc.callId ? { ...t, status: "error" } : t
-      )
-    );
-    return { error: "spawn_agent must be handled by the AI Worker." };
-  }
-
-  // -- get_location - browser geolocation API ---------------------------
-  if (toolName === "get_location") {
-    if (!navigator.geolocation) {
-      const result = { error: "Geolocation is not supported by this browser.", source: "unavailable" };
-      cb.setActiveToolCalls((prev) =>
-        prev.map((t) => t.callId === tc.callId ? { ...t, status: "error", result } : t)
-      );
-      return result;
-    }
-
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000,
-        });
-      });
-
-      const { latitude, longitude, accuracy } = position.coords;
-
-      let city: string | undefined;
-      let country: string | undefined;
-      let address: string | undefined;
-      try {
-        const geoRes = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
-          { headers: { "User-Agent": "Studio-AI/1.0" } }
-        );
-        if (geoRes.ok) {
-          const geoData = await geoRes.json() as Record<string, any>;
-          const addr = geoData.address as Record<string, string> | undefined;
-          city    = addr?.city ?? addr?.town ?? addr?.village;
-          country = addr?.country;
-          address = geoData.display_name as string | undefined;
-        }
-      } catch {
-        // reverse geocode failed - coordinates still returned
-      }
-
-      const result = {
-        latitude,
-        longitude,
-        accuracy: Math.round(accuracy),
-        source: "browser",
-        ...(city    ? { city }    : {}),
-        ...(country ? { country } : {}),
-        ...(address ? { address } : {}),
-      };
-
-      cb.setActiveToolCalls((prev) =>
-        prev.map((t) => t.callId === tc.callId ? { ...t, status: "complete", result } : t)
-      );
-      return result;
-    } catch (err: unknown) {
-      const geoErr = err as GeolocationPositionError;
-      const denied = geoErr?.code === 1; // PERMISSION_DENIED
-      const result = {
-        error: denied
-          ? "Location access denied by user."
-          : `Geolocation failed: ${geoErr?.message ?? "Unknown error"}`,
-        source: denied ? "denied" : "error",
-      };
-      cb.setActiveToolCalls((prev) =>
-        prev.map((t) => t.callId === tc.callId ? { ...t, status: "error", result } : t)
-      );
-      return result;
-    }
-  }
-
-  // -- ask_user_question - interactive prompt ----------------------------
-  if (tc.server === "studio-harness" && toolName === "ask_user_question") {
-    await notifyPermissionRequired(
-      typeof tc.args?.question === "string"
-        ? `AI has a question: ${(tc.args.question as string).slice(0, 80)}`
-        : "AI has a question for you"
-    );
-    cb.setActiveToolCalls((prev) =>
-      prev.map((t) =>
-        t.callId === tc.callId ? { ...t, status: "pending_question" } : t
-      )
-    );
-    // 5-minute timeout - if user doesn't answer, return a safe fallback so
-    // the AI can explain the situation rather than hanging forever.
-    const ANSWER_TIMEOUT_MS = 5 * 60 * 1000;
-    const answer = await Promise.race([
-      cb.waitForAnswer(typeof tc.args?.question === "string" ? tc.args.question : "AI has a question for you"),
-      new Promise<string>((resolve) =>
-        setTimeout(() => {
-          connectionManager.emit({ type: "tool:answer_timeout", timestamp: Date.now(), convId: cb.convId, toolName: tc.tool });
-          resolve("[No response after 5 minutes. Let the user know you're waiting for their answer, or ask them to continue the conversation.]");
-        }, ANSWER_TIMEOUT_MS)
-      ),
-    ]);
-    cb.setActiveToolCalls((prev) =>
-      prev.map((t) =>
-        t.callId === tc.callId
-          ? { ...t, status: "complete", result: answer }
-          : t
-      )
-    );
-    return answer;
-  }
+  // -- Builtin tools (task_write / spawn_agent / get_location / ask_user_question)
+  // handled in-process; returns undefined if not a builtin.
+  const builtinResult = await executeBuiltinTool(tc, toolName, cb);
+  if (builtinResult !== undefined) return builtinResult;
 
   // -- MCP tools ---------------------------------------------------------
   if (tc.server) {
@@ -305,55 +182,6 @@ async function executeSingleTool(
 // ---------------------------------------------------------------------------
 // MCP tool execution with permission gates
 // ---------------------------------------------------------------------------
-
-function applyWorkspaceDefaults(
-  server: string,
-  toolName: string,
-  args: Record<string, unknown>,
-  workspaceRoot: string | null
-): Record<string, unknown> {
-  if (server !== "studio-harness" || !workspaceRoot) return args;
-
-  const next = { ...args };
-  const setIfMissing = (key: string) => {
-    if (typeof next[key] !== "string" || (next[key] as string).trim().length === 0) {
-      next[key] = workspaceRoot;
-    }
-  };
-
-  switch (toolName) {
-    case "bash":
-    case "powershell":
-    case "git_status":
-    case "git_diff":
-    case "git_log":
-    case "git_commit":
-    case "git_push":
-    case "git_pull":
-    case "git_fetch":
-    case "git_show":
-    case "git_branch":
-    case "git_stash":
-    case "git_worktree":
-      setIfMissing("cwd");
-      break;
-    case "ls":
-    case "grep":
-    case "glob":
-      setIfMissing("path");
-      break;
-    case "index_codebase":
-    case "explore_codebase":
-    case "search_symbol":
-      setIfMissing("root_dir");
-      break;
-    case "outline_file":
-      setIfMissing("workspace_root");
-      break;
-  }
-
-  return next;
-}
 
 async function executeMcpTool(
   tc:       LocalToolCall,

@@ -7,7 +7,7 @@
 
 export { ChatProvider, useChatContext, useChatContext as useChat } from "./ChatProvider";
 export type { ChatContextType, TaskItem, TodoItem, ActiveToolCall, ToolDisplayClass } from "./types";
-export { classifyToolDisplay }                                               from "./toolClassifier";
+export { classifyToolDisplay }                                               from "@/runtime";
 export {
   pruneContextByTokens,
   buildApiMessages,

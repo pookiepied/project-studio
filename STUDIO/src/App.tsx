@@ -23,7 +23,7 @@ import { apiManager } from "./services/network/apiManager";
 import { logger } from "./services/logging/logger";
 import { environmentService } from "./services/platform/environmentService";
 import { invoke } from "@tauri-apps/api/core";
-import { useHarnessInit } from "./hooks/useHarnessInit";
+import { useRuntimeInit } from "@/runtime";
 import { HarnessPermissionModal } from "./components/ui/HarnessPermissionModal";
 import { deployBundledLocalSkills } from "./services/skills/skillDeployer";
 import { STARTUP_SPLASH_MIN_MS } from "./constants/splashTiming";
@@ -219,7 +219,7 @@ function AppRouter({ onReady }: { onReady: () => void }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [checkingAPI, setCheckingAPI] = useState(true);
   const isWeb = environmentService.isWeb();
-  const { showModal: showHarnessModal, handleAllow: allowHarness, handleDeny: denyHarness } = useHarnessInit();
+  const { showModal: showHarnessModal, handleAllow: allowHarness, handleDeny: denyHarness } = useRuntimeInit();
   const isCallbackRoute = window.location.pathname === '/oauth/callback';
 
   // Toast when a background conversation finishes while viewing a different one.

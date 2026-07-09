@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StudioMark } from "../brand";
-import type { LocalPermissionGrants } from "../../hooks/useHarnessInit";
+import type { LocalPermissionGrants } from "@/runtime";
 
 interface HarnessPermissionModalProps {
   open: boolean;

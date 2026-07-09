@@ -14,7 +14,7 @@ import { AppLogo } from "@/components/brand";
 import { Toggle } from "@/components/ui/Toggle";
 import { IconButton } from "@/components/ui/IconButton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import type { McpServer } from "@/services/ai/mcpService";
+import type { McpServer } from "@/core/mcpRegistry/registryClient";
 import type { ComposioApp, ComposioConnection } from "@/services/ai/composioService";
 import {
   StatusDot, DotState,

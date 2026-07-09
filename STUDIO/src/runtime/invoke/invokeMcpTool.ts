@@ -13,7 +13,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { logger } from "../logging/logger";
+import { logger } from "@/services/logging/logger";
 
 // ---------------------------------------------------------------------------
 // Contract constants

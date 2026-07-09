@@ -110,9 +110,9 @@ bigger reshuffles.
 (e.g. `ls`) and one permission-prompted tool; confirm cards render and results
 return. This is the behavioral proof the carve-out preserved the data path.
 
-**Done when.** ☐ All §A files in `runtime/`. ☐ `protocol.ts` + `index.ts` exist.
-☐ No file outside `runtime/` imports a runtime internal path (all via `@/runtime`).
-☐ Build + smoke pass.
+**Done when.** ☑ All §A files in `runtime/`. ☑ `protocol.ts` + `index.ts` exist.
+☑ No file outside `runtime/` imports a runtime internal path (all via `@/runtime`).
+☑ Build + smoke pass.
 
 ---
 

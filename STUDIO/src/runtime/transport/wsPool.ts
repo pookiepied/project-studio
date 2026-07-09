@@ -16,12 +16,12 @@
  *   Tool results sent back via still-open WebSocket
  */
 
-import { TAURI_CONFIG } from "../../config/tauriConfig";
-import type { AgentChatHandlers, ChatRequestBody } from "../../hooks/useAgentChat";
-import type { LocalToolCall, ToolResultItem } from "../ai/types";
+import { TAURI_CONFIG } from "@/config/tauriConfig";
+import type { AgentChatHandlers, ChatRequestBody } from "../protocol";
+import type { LocalToolCall, ToolResultItem } from "@/types/chat";
 import { parsePoolMessage } from "./wsMessages";
-import { logger } from "../logging/logger";
-import { connectionManager } from "../connection";
+import { logger } from "@/services/logging/logger";
+import { connectionManager } from "@/services/connection";
 
 // ---------------------------------------------------------------------------
 // Types

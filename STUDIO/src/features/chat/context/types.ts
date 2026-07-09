@@ -5,7 +5,7 @@
  * React/hook imports so it can also be used in utility functions.
  */
 
-import type { AutoRoutedInfo } from "@/services/ai/types";
+import type { AutoRoutedInfo } from "@/types/chat";
 import type {
   ChatConversation,
   ChatMessage,

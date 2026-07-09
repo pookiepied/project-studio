@@ -18,9 +18,9 @@ import {
   countMessageTokensAsync,
 } from "@/utils/tokenEstimator";
 import { logger } from "@/services/logging/logger";
-import type { APIChatMessage } from "@/services/ai/types";
+import type { APIChatMessage } from "@/types/chat";
 import type { ChatConversation } from "@/types";
-import { extractMessageText } from "@/services/ai/types";
+import { extractMessageText } from "@/types/chat";
 import {
   PROJECT_CONTEXT_MARKER,
   buildProjectContextSystemPrompt,

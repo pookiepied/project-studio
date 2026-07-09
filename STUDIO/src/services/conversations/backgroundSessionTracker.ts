@@ -15,7 +15,7 @@
  * Statuses are cleared when the user navigates back (acknowledge()).
  */
 
-import { wsPool } from "./wsPool";
+import { wsPool } from "@/runtime";
 import type { NotificationService as NS } from "../notifications/notificationService";
 
 export type ConversationSessionStatus =

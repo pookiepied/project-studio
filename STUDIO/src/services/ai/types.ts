@@ -1,52 +1,32 @@
 /**
  * AI service shared types.
  *
- * Single source of truth for message shapes, request/response formats, and
- * the tool-relay contract between the frontend and the AI worker backend.
- * Import from here instead of directly from aiService.ts.
+ * Runtime / tool-relay types (APIChatMessage, extractMessageText, LocalToolCall,
+ * ToolResultItem, AutoRoutedInfo) now live in `@/types/chat` — the neutral leaf
+ * both `runtime/` and `features/chat/` import downward (D-9). They are
+ * re-exported below for back-compat; importers should switch to `@/types/chat`.
+ *
+ * The HTTP chat shapes (ChatRequest / ChatResponse / TranscribeResponse /
+ * VisionChatMessage) stay here until Phase 3 moves them to
+ * `features/chat/services/types.ts`.
  */
 
-// ---------------------------------------------------------------------------
-// Messages
-// ---------------------------------------------------------------------------
+export { extractMessageText } from "@/types/chat";
+export type {
+  APIChatMessage,
+  LocalToolCall,
+  ToolResultItem,
+  AutoRoutedInfo,
+} from "@/types/chat";
 
-/** Wire format used by the AI worker for every LLM message role. */
-export interface APIChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content:
-    | string
-    | Array<{
-        type: "text" | "image_url";
-        text?: string;
-        image_url?: { url: string; detail?: "low" | "high" | "auto" };
-      }>;
-  tool_call_id?: string;
-  name?: string;
-  tool_calls?: Array<{
-    id: string;
-    type: "function";
-    function: { name: string; arguments: string };
-  }>;
-}
-
-/** Vision message variant used by Ollama's OpenAI-compatible endpoint. */
-export type VisionChatMessage = APIChatMessage;
-
-/** Extracts plain text from either a string or a vision content-block array. */
-export function extractMessageText(
-  content: APIChatMessage["content"] | undefined
-): string {
-  if (!content) return "";
-  if (typeof content === "string") return content;
-  const textPart = content.find(
-    (p): p is { type: "text"; text: string } => p.type === "text"
-  );
-  return textPart?.text ?? "";
-}
+import type { APIChatMessage } from "@/types/chat";
 
 // ---------------------------------------------------------------------------
 // Request / Response
 // ---------------------------------------------------------------------------
+
+/** Vision message variant used by Ollama's OpenAI-compatible endpoint. */
+export type VisionChatMessage = APIChatMessage;
 
 export interface ChatRequest {
   model: string;
@@ -91,41 +71,4 @@ export interface ChatResponse {
 export interface TranscribeResponse {
   text: string;
   language?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Tool relay
-// ---------------------------------------------------------------------------
-
-/**
- * A local tool call the server is asking the client to execute.
- * MCP tools additionally carry `server` and `mcpTool` so the client can
- * route to the correct subprocess without re-parsing the prefixed tool name.
- */
-export interface LocalToolCall {
-  callId: string;
-  tool: string;
-  args: Record<string, unknown>;
-  /** Present for MCP tools: the server name (e.g. "github"). */
-  server?: string;
-  /** Present for MCP tools: the bare tool name (e.g. "search_repos"). */
-  mcpTool?: string;
-}
-
-/** A resolved tool result sent back to the agent. */
-export interface ToolResultItem {
-  call_id: string;
-  content: string;
-  name?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Auto-routing
-// ---------------------------------------------------------------------------
-
-export interface AutoRoutedInfo {
-  tier: string;
-  model: string;
-  usedFallback: boolean;
-  usedEmergency: boolean;
 }

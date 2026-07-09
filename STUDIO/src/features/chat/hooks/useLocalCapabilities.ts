@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   checkLocalCapabilities,
   type LocalCapabilitiesSnapshot,
-} from "@/services/localCapabilities";
+} from "@/runtime";
 
 export function useLocalCapabilities() {
   const [snapshot, setSnapshot] = useState<LocalCapabilitiesSnapshot | null>(null);

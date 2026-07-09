@@ -1,47 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { environmentService } from "../services/platform/environmentService";
-import { logger } from "../services/logging/logger";
-import { connectionManager } from "../services/connection";
+import { environmentService } from "@/services/platform/environmentService";
+import { logger } from "@/services/logging/logger";
+import { connectionManager } from "@/services/connection";
+import { getLocalMcpServer, readLocalMcpPermission, setLocalMcpPermission } from "./catalog";
 import {
-  LOCAL_MCP_SERVERS,
-  getLocalMcpServer,
-  readLocalMcpPermission,
-  setLocalMcpPermission,
-  startLocalMcp,
-  resolveLocalMcpPath,
-  type LocalMcpServerDef,
-} from "../services/local/localMcpControl";
+  grantedServers,
+  registerAndStartLocalServers,
+  restartServer,
+  HEALTH_CHECK_INTERVAL_MS,
+  type LocalPermissionGrants,
+} from "./lifecycle";
 
-// Re-export the legacy permission key for backwards-compatible imports.
-export const HARNESS_PERMISSION_KEY = LOCAL_MCP_SERVERS[0].permissionKey;
-export const COMPUTER_USE_PERMISSION_KEY = LOCAL_MCP_SERVERS[1].permissionKey;
-
-export interface LocalPermissionGrants {
-  studioHarness: boolean;
-  computerUse: boolean;
-}
-
-/** Servers that should run given the persisted grants. */
-function grantedServers(grants: LocalPermissionGrants): LocalMcpServerDef[] {
-  return LOCAL_MCP_SERVERS.filter((srv) => {
-    if (srv.name === "studio-harness") return grants.studioHarness;
-    if (srv.name === "computer-use") return grants.computerUse;
-    return false;
-  });
-}
-
-async function registerAndStartLocalServers(servers: LocalMcpServerDef[]): Promise<void> {
-  // register + start (each handles its own backend registration + manifest sync).
-  for (const srv of servers) {
-    try {
-      await startLocalMcp(srv);
-    } catch (e) {
-      logger.warn("HarnessInit", `Failed to start ${srv.name}`, e);
-    }
-  }
-}
+// Back-compat re-exports (canonical home is ./lifecycle.ts).
+export { HARNESS_PERMISSION_KEY, COMPUTER_USE_PERMISSION_KEY } from "./lifecycle";
+export type { LocalPermissionGrants } from "./lifecycle";
 
 export interface HarnessInitState {
   /** Whether the one-time permission modal should be shown */
@@ -52,44 +26,20 @@ export interface HarnessInitState {
   handleDeny: () => void;
 }
 
-// How often to check if all granted servers are still alive (ms).
-const HEALTH_CHECK_INTERVAL_MS = 30_000;
-
-async function restartServer(srv: LocalMcpServerDef): Promise<boolean> {
-  connectionManager.emit({ type: "mcp:restarting", timestamp: Date.now(), serverName: srv.name });
-  try {
-    const serverPath = await resolveLocalMcpPath(srv);
-    await invoke("mcp_start_server", {
-      name: srv.name,
-      command: "node",
-      args: [serverPath],
-      envVars: {
-        STUDIO_API_URL: "https://api.pookiepied.dev",
-        STUDIO_API_PREFIX: "/adapters/openai/v1",
-      },
-    });
-    logger.warn("HarnessInit", `Auto-restarted ${srv.name} after crash`);
-    connectionManager.emit({ type: "mcp:restored", timestamp: Date.now(), serverName: srv.name });
-    return true;
-  } catch (e) {
-    logger.warn("HarnessInit", `Auto-restart failed for ${srv.name}`, e);
-    connectionManager.emit({ type: "mcp:restart_failed", timestamp: Date.now(), serverName: srv.name, error: e instanceof Error ? e.message : String(e) });
-    return false;
-  }
-}
-
 /**
- * Manages local-MCP auto-initialization (Studio Harness + Computer Use).
+ * useRuntimeInit — React wrapper over the Local Runtime lifecycle.
+ *
+ * Manages local-MCP auto-initialization (Studio Harness + Computer Use):
  * - On first run: shows a permission modal listing both MCPs independently
  * - After permission granted: starts the granted servers on every launch
  * - After permission denied: does nothing (user can enable in Settings)
  *
- * `studio-harness` is always treated as the primary connectivity indicator —
- * when it is running, the cloud worker enables Studio main-chat mode
- * (localEngineConnected). Computer Use is an independent, separately-granted
- * capability.
+ * The pure start/stop/health/restart primitives live in ./lifecycle.ts; this
+ * hook composes them with mount-once effects + the first-run modal state.
+ *
+ * Renamed from useHarnessInit. App.tsx imports it via the @/runtime barrel.
  */
-export function useHarnessInit(): HarnessInitState {
+export function useRuntimeInit(): HarnessInitState {
   const [showModal, setShowModal] = useState(false);
   const resolveRef = useRef<((grants: LocalPermissionGrants) => void) | null>(null);
   const didInit = useRef(false);

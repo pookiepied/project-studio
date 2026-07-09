@@ -22,13 +22,13 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { buildChatBody, getMcpServers } from "./buildChatRequest";
+import { buildChatBody, getMcpServers } from "@/runtime";
 import { buildSendContext } from "./buildSendContext";
 
 import type { ChatConversation, ChatMessage }          from "@/types";
 import type { FileAttachment }                         from "@/services/files/fileAttachmentService";
-import type { APIChatMessage, ToolResultItem, AutoRoutedInfo } from "@/services/ai/types";
-import { extractMessageText }                          from "@/services/ai/types";
+import type { APIChatMessage, ToolResultItem, AutoRoutedInfo } from "@/types/chat";
+import { extractMessageText }                          from "@/types/chat";
 import { aiService }                                   from "@/services/ai/aiService";
 import { tokenManager }                                from "@/utils/tokenManager";
 import { memorySystem }                                from "@/services/storage/memorySystem";
@@ -56,17 +56,17 @@ import {
   savePreferredChatEngine,
 } from "@/services/conversations/preferences/chatEnginePreference";
 
-import { useAgentChat }                                from "@/hooks/useAgentChat";
+import { useAgentChat }                                from "@/runtime";
 import { useVoiceInput }                               from "@/hooks/useVoiceInput";
 import { usePermittedTools }                           from "@/features/chat/hooks/usePermittedTools";
 
 import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
 import { DEFAULT_MAX_CONTEXT_TOKENS, MESSAGES_PER_PAGE, MAX_CONTEXT_MESSAGES } from "./constants";
-import { classifyToolDisplay, extractGeneratedImageIds, deleteRemoteImages } from "./toolClassifier";
+import { classifyToolDisplay, extractGeneratedImageIds, deleteRemoteImages } from "@/runtime";
 import { buildHarnessEvent } from "@/utils/harnessEventUtils";
 import { hasDSML, parseDSML, stripDSMLForStreaming } from "@/utils/dsmlParser";
-import { executeLocalTools }                           from "./toolExecutor";
+import { executeLocalTools }                           from "@/runtime";
 import {
   buildApiMessages, pruneContextByTokens, applyAllSystemMessages,
 } from "./messageBuilder";
@@ -89,7 +89,7 @@ import {
   clearSessionGrants,
   recordGrant as recordToolGrant,
 } from "@/permissions";
-import { readLocalMcpPermission, getLocalMcpServer } from "@/services/local/localMcpControl";
+import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
 import { GlobalAccessModal } from "@/components/overlays/GlobalAccessModal";
 import type { ToolApprovalDecision } from "./types";
 

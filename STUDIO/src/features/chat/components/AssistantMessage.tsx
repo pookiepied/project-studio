@@ -3,8 +3,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/features/markdown";
 import { StreamingText } from "@/components/ui/StreamingText";
-import { HarnessStepCard } from "../tools/HarnessStepCard";
-import { InlineToolSteps } from "../tools/InlineToolSteps";
+import { RuntimeStepCard } from "@/runtime";
+import { InlineToolSteps } from "@/runtime";
 import { InlinePermissionRequest } from "@/components/InlinePermissionRequest";
 import { ScreenshotThumbnail } from "./ScreenshotThumbnail";
 import { MessageActions } from "./MessageActions";
@@ -159,7 +159,7 @@ export const AssistantMessage = ({
                         <MemoizedMarkdown content={seg.content} />
                       </div>
                     ) : seg.type === "harness_event" ? (
-                      <HarnessStepCard key={seg.event.callId} event={seg.event} />
+                      <RuntimeStepCard key={seg.event.callId} event={seg.event} />
                     ) : (
                       <InlineQuestionAnswer
                         key={seg.id}
@@ -184,7 +184,7 @@ export const AssistantMessage = ({
                         <MemoizedMarkdown content={seg.content} />
                       </div>
                     ) : seg.type === "harness_event" ? (
-                      <HarnessStepCard key={seg.event.callId} event={seg.event} />
+                      <RuntimeStepCard key={seg.event.callId} event={seg.event} />
                     ) : (
                       <InlineQuestionAnswer
                         key={seg.id}

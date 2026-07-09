@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CaretRightIcon as CaretRight } from "@phosphor-icons/react";
 import type { HarnessEvent } from "@/types";
-import { getToolIcon } from "@/features/chat/tools/toolCardUtils";
+import { getToolIcon } from "./toolCardUtils";
 
 interface HarnessStepCardProps {
   event: HarnessEvent;
@@ -88,7 +88,7 @@ function StatusDot({ status }: { status: HarnessEvent["status"] }) {
 
 // ── Main card ────────────────────────────────────────────────────────────────
 
-export function HarnessStepCard({ event }: HarnessStepCardProps) {
+export function RuntimeStepCard({ event }: HarnessStepCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const isRunning  = event.status === "running";

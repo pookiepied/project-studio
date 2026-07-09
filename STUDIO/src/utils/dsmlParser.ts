@@ -22,7 +22,7 @@
  * Both ASCII `||` and fullwidth `｜｜` (U+FF5C) delimiters are matched.
  */
 
-import type { LocalToolCall } from "../services/ai/types";
+import type { LocalToolCall } from "@/types/chat";
 
 // ── Regex building blocks ──────────────────────────────────────────────────
 

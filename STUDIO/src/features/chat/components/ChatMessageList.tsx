@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StreamingText } from "@/components/ui/StreamingText";
 import { ErrorDisplay } from "@/components/feedback/ErrorDisplay";
-import { ToolPermissionCard } from "../tools/ToolPermissionCard";
+import { ToolPermissionCard } from "@/runtime";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";
 import { getTurnAnchorIndices } from "@/utils/turnAnchors";

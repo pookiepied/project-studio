@@ -19,7 +19,7 @@ import {
   FileTextIcon as FileText,
 } from "@phosphor-icons/react";
 import { formatLabel } from "@/utils/formatters";
-import { resolveMcpService, getMcpActionLabel } from "./mcpRegistry";
+import { resolveMcpService, getMcpActionLabel } from "./toolCardRegistry";
 
 const TOOL_LABELS: Record<string, string> = {
   claude_code: "Local Agent",

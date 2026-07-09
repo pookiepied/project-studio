@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ActiveToolCall, ToolApprovalDecision } from "@/features/chat/context/types";
-import { toolLabel } from "@/features/chat/tools/toolCardUtils";
+import { toolLabel } from "@/runtime";
 import { RISK_CLASS_META, extractTargetPaths } from "../../../permissions";
 
 const ACTION_TYPE_ID = "studio-permission-request";

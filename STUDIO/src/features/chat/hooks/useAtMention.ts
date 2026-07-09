@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { mcpService } from "@/services/ai/mcpService";
+import { mcpService } from "@/core/mcpRegistry/registryClient";
 import { listConnections, listComposioApps } from "@/services/ai/composioService";
 import type { AppMention } from "@/features/chat/components/ContextAutocomplete";
 

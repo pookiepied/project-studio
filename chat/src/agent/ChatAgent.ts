@@ -93,6 +93,9 @@ export interface ChatAgentState {
 
 // ---------------------------------------------------------------------------
 // WebSocket message shapes (client → agent)
+// NOTE: The canonical source of truth for this protocol is mirrored in
+// STUDIO/src/runtime/protocol.ts (the Local Runtime's public contract).
+// Keep both sides in sync when adding/changing a message shape.
 // ---------------------------------------------------------------------------
 
 interface ChatRequestBody {

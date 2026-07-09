@@ -9,7 +9,7 @@
 import { PlayIcon as Play, StopIcon as Stop } from "@phosphor-icons/react";
 import { Icon } from "@/components/icons";
 import { Toggle } from "@/components/ui/Toggle";
-import type { McpServer } from "@/services/ai/mcpService";
+import type { McpServer } from "@/core/mcpRegistry/registryClient";
 import {
   DotState, StatusDot,
   Context7Icon,

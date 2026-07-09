@@ -19,14 +19,12 @@ import { environmentService } from "@/services/platform/environmentService";
 import {
   HARNESS_PERMISSION_KEY,
   COMPUTER_USE_PERMISSION_KEY,
-} from "@/hooks/useHarnessInit";
-import {
   LOCAL_MCP_SERVERS,
   startLocalMcp,
   stopLocalMcp,
   setLocalMcpPermission,
   type LocalMcpServerDef,
-} from "@/services/local/localMcpControl";
+} from "@/runtime";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
