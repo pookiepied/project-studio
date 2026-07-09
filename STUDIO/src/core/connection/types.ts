@@ -31,10 +31,13 @@ export const CONNECTION_TIMEOUTS = {
   // Frontend — Tool gates
   TOOL_APPROVAL_TIMEOUT_MS: 300_000,  // 5 min: waitForApproval auto-deny
   TOOL_ANSWER_TIMEOUT_MS:   300_000,  // 5 min: waitForAnswer auto-reply
+  TOOL_GLOBAL_ACCESS_TIMEOUT_MS: 300_000,  // 5 min: requestGlobalAccess auto-deny
 
   // Frontend — MCP servers
   MCP_HEALTH_CHECK_INTERVAL_MS: 30_000,  // how often to poll for crashes
   MCP_MAX_AUTO_RESTARTS:             5,  // give up after N crashes in a session
+  MCP_MANIFEST_SYNC_MAX_ATTEMPTS:    5,  // manifest push retries before deferring
+  MCP_MANIFEST_SYNC_BASE_DELAY_MS: 1_000,  // exponential backoff base (jittered)
 
   // Cloud (documented here for reference — enforced in workers)
   CLOUD_LLM_FETCH_TIMEOUT_MS:   20_000,  // agents Worker AbortSignal for LLM calls

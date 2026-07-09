@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { logger } from "@/core/logging/logger";
 import { HARNESS_ENV, type LocalMcpServerDef } from "./catalog";
-import { ensureLocalMcpRegistered, pushServerManifest } from "./manifestSync";
+import { ensureLocalMcpRegistered, pushServerManifest, type ManifestTool } from "./manifestSync";
 
 /**
  * Local MCP process lifecycle (Tauri): resolve path, start / stop subprocess,
@@ -48,11 +48,14 @@ export async function stopLocalMcp(name: string): Promise<void> {
 /**
  * Fetch the server's live tool manifest (via Tauri `mcp_get_tools`) and push it
  * to the cloud registry so the AI worker can discover and call these tools at
- * request time. Delegates the registry push to ./manifestSync.ts.
+ * request time.
+ *
+ * The push itself — retries, de-duplication, and the deferred-retry queue that
+ * survives a failed sync (audit B5) — lives in ./manifestSync.ts.
  */
 export async function syncLocalMcpManifest(server: LocalMcpServerDef): Promise<void> {
   try {
-    const manifest = await invoke<{ tools?: { name: string; description: string; inputSchema?: unknown }[] }>(
+    const manifest = await invoke<{ tools?: ManifestTool[] }>(
       "mcp_get_tools",
       { server: server.name }
     );

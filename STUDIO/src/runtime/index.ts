@@ -32,7 +32,14 @@ export {
   resolveLocalMcpPath,
   syncLocalMcpManifest,
 } from "./servers/manifest";
-export { ensureLocalMcpRegistered, pushServerManifest } from "./servers/manifestSync";
+export {
+  ensureLocalMcpRegistered,
+  pushServerManifest,
+  resyncPendingManifests,
+  resetManifestSyncState,
+  startManifestResyncOnReconnect,
+  type ManifestTool,
+} from "./servers/manifestSync";
 export {
   HARNESS_PERMISSION_KEY,
   COMPUTER_USE_PERMISSION_KEY,

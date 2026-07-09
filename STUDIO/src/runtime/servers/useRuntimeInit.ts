@@ -12,6 +12,7 @@ import {
   HEALTH_CHECK_INTERVAL_MS,
   type LocalPermissionGrants,
 } from "./lifecycle";
+import { startManifestResyncOnReconnect } from "./manifestSync";
 
 // Back-compat re-exports (canonical home is ./lifecycle.ts).
 export { HARNESS_PERMISSION_KEY, COMPUTER_USE_PERMISSION_KEY } from "./lifecycle";
@@ -45,12 +46,18 @@ export function useRuntimeInit(): HarnessInitState {
   const didInit = useRef(false);
   const healthCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
+  const stopResyncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
 
     if (!environmentService.isTauri()) return;
+
+    // A manifest push can fail (offline, auth not ready, cold worker). When it
+    // does, the cloud holds a stale tool list, so re-push on every reconnect
+    // rather than waiting for the next launch (audit B5).
+    stopResyncRef.current = startManifestResyncOnReconnect();
 
     const harnessServer = getLocalMcpServer("studio-harness")!;
     const computerUseServer = getLocalMcpServer("computer-use")!;
@@ -137,6 +144,8 @@ export function useRuntimeInit(): HarnessInitState {
       }
       unlistenRef.current?.();
       unlistenRef.current = null;
+      stopResyncRef.current?.();
+      stopResyncRef.current = null;
     };
   }, []);
 
