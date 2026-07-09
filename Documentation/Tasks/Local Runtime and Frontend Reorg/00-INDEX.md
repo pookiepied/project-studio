@@ -1,9 +1,17 @@
 # Local Runtime & Frontend Reorg — Task Index
 
-> **Status:** IN PROGRESS. Phases 0–4 are complete and verified; Phase 6 and 7
-> are complete; **Phase 5 is partially complete** (see doc 05). Resume at
-> Phase 5. This folder is the single, self-contained plan for two linked pieces
-> of work on the `STUDIO/` desktop app:
+> **Status:** STRUCTURAL WORK COMPLETE. Phases 0–7 are all done and verified by
+> `tsc --noEmit` + `vite build`. All 11 audit findings in doc 06 are resolved
+> (B4 and B5 were fixed on request after the structural phases; B11 is a
+> documented edge, no change).
+>
+> **The only thing outstanding is the behavioral smoke test** that every phase's
+> "Done when" box calls for — start the app, open a chat, run a local tool,
+> confirm the card renders and results return. That needs a desktop session and
+> has not been run.
+>
+> This folder is the single, self-contained plan for two linked pieces of work on
+> the `STUDIO/` desktop app:
 >
 > 1. **Name and centralize the Local Runtime** — the currently-nameless subsystem
 >    that lets the cloud agent execute tools on the user's own machine.

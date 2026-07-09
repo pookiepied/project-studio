@@ -120,19 +120,23 @@ Severity: 🔴 correctness risk · 🟠 structural/maintainability · 🟡 minor
 | B1 | 🔴 | **WS protocol is hand-duplicated in 3 places** (`chat/…/ChatAgent.ts`, `wsPool.ts`, `useAgentChat.ts`) with no shared type. A live symptom already exists: `wsPool` swallows `"Unknown message type"` errors from older backends that don't recognise the keepalive `ping`. | `wsPool.ts` ~L472 comment + guard | ✅ **DONE** — `runtime/protocol.ts` is the single source; cross-ref comment in `ChatAgent.ts:97`. **Post-Phase-1 follow-up:** the Phase 1 pass left `PoolConnectionStatus` declared *twice* (protocol.ts + wsPool.ts, byte-identical — `tsc` cannot catch a structurally identical duplicate). Now imported from `../protocol`. |
 | B2 | 🟠 | **Latent cross-layer cycle**: `wsPool` imports `ChatRequestBody`/`AgentChatHandlers` from `hooks/useAgentChat`. Naive reorg makes `runtime → features`. | grep confirmed 3 importers | *resolved-by-reorg*: D-9 moves those types to `runtime/protocol.ts` + `src/types/`. |
 | B3 | 🟠 | **`mcpService` is dual-purpose** (local manifest sync **and** Extensions marketplace) but sits under `services/ai/`, coupling two subsystems through an accidental location. | grep: 5 distinct importers | *resolved-by-reorg*: → `core/mcpRegistry/` (D-9). |
-| B4 | 🟡 | **Local-model streaming can't call tools**: daemon streaming branch is explicitly `tool calls not supported in streaming mode yet`. So a local model in stream mode silently loses tool use. | `daemon/src/routes/chat.ts` L46 | Flag for a **separate daemon task**. Out of scope here. |
-| B5 | 🟠 | **Manifest sync is best-effort/racy**: `syncLocalMcpManifest` retries once after 4s then gives up with "KV manifest may be stale until next launch." Cloud can hold a stale local-tool list → the agent may call a tool the manifest no longer matches. | `localMcpControl.ts` L137-161 | Flag. Consider a sync-on-reconnect or version stamp — **separate task**. |
+| B4 | 🟡 | **Local-model streaming can't call tools**: daemon streaming branch is explicitly `tool calls not supported in streaming mode yet`. So a local model in stream mode silently loses tool use. | `daemon/src/routes/chat.ts` L46 | ✅ **FIXED** — streaming now runs the same tool loop (assembles `delta.tool_calls`, executes, continues on the same response stream). Also fixed an unbuffered SSE split that dropped frames straddling a chunk boundary. Regression test: `daemon/test/chat.stream.test.cjs` (`npm test`). |
+| B5 | 🟠 | **Manifest sync is best-effort/racy**: `syncLocalMcpManifest` retries once after 4s then gives up with "KV manifest may be stale until next launch." Cloud can hold a stale local-tool list → the agent may call a tool the manifest no longer matches. | `localMcpControl.ts` L137-161 | ✅ **FIXED** in `runtime/servers/manifestSync.ts`: bounded exponential backoff w/ jitter, a deferred queue drained on `ws:reconnected`, in-flight de-duplication, and an order-insensitive content version stamp that skips redundant pushes. |
 | B6 | 🟠 | **Permission engine split across two trees** (`permissions/` + `features/permissions/`), consumed by 12 files. | grep (see §2) | *resolved-by-reorg*: unify engine in `core/permissions/`. |
 | B7 | 🟡 | **Platform logic split** across `services/platform/` and `infrastructure/platform/` (same concern, two folders). | file tree | *resolved-by-reorg*: merge into `core/platform/`. |
 | B8 | 🟡 | **Duplicate `rightWorkspace/` location** (`components/rightWorkspace/ResizeHandle` vs the real `features/workspace/rightWorkspace/`). Functionality is NOT dead (D-6). | file tree | *resolved-by-reorg*: consolidate into the feature. |
-| B9 | 🔴→🟠 | **`ChatProvider.tsx` (2079 lines)** owns the send pipeline, streaming handlers, tool orchestration, conversation state, and persistence at once. High blast-radius for any change; the tool-orchestration part is entangled with the runtime. | line count + reads | *partly resolved*: runtime parts leave in Phase 1; the rest is split in Phase 5. |
+| B9 | 🔴→🟠 | **`ChatProvider.tsx` (2079 lines)** owns the send pipeline, streaming handlers, tool orchestration, conversation state, and persistence at once. High blast-radius for any change; the tool-orchestration part is entangled with the runtime. | line count + reads | ✅ **DONE** — runtime parts left in Phase 1; Phase 5 split the rest into `runClaudeTurn` / `useStreamHandlers` / `useSendPipeline` / `useConversationActions`. Now 967 lines of state + composition. |
 | B10 | 🟡 | **Repeated hard-coded 5-min timeouts** (approval, question, global-access) copy-pasted in `toolExecutor`. | `toolExecutor.ts` L268/405/470 | ✅ **DONE** — centralized in `runtime/execution/constants.ts`. |
 | B11 | 🟡 | **Reconnect relies on CF fiber resume**: `wsPool` clears `lastSentBody` on done/error and does not auto-resend on reconnect, trusting the Durable Object fiber to still be running. If the DO evicted, a mid-turn reconnect yields no resume. | `wsPool.ts` onopen/onclose | Flag as a known runtime edge; document in `runtime/transport/`. No change now. |
 
-**Note on scope:** B4 and B5 are genuine product bugs but live in the daemon and
-manifest-sync flows respectively; fixing them is **not** part of the structure-only
-reorg. They are recorded here so they are not lost. Everything marked
-*resolved-by-reorg* is handled by executing docs 04–05 as written.
+**Note on scope:** B4 and B5 were originally deferred as out-of-scope for the
+structure-only reorg. They have since been fixed on request, in their own commits,
+*after* the structural phases landed — see their rows above. B11 remains a known,
+documented edge. Everything marked *resolved-by-reorg* is handled by executing
+docs 04–05 as written.
+
+**Audit status:** B1 ✅ · B2 ✅ · B3 ✅ · B4 ✅ · B5 ✅ · B6 ✅ · B7 ✅ · B8 ✅ ·
+B9 ✅ · B10 ✅ · B11 documented (no change).
 
 ---
 

@@ -210,35 +210,44 @@ so what's left is genuinely chat-state orchestration — the cleanest possible s
 permission prompt; confirm streaming, tool cards, task list, and persistence all work
 exactly as before.
 
-### Progress — part 1 landed (2079 → 1879 lines)
+### Outcome — ChatProvider.tsx 2079 → 967 lines (−53%)
 
-Done:
-- `context/runClaudeTurn.ts` — the Claude CLI-bridge turn driver, moved out verbatim
-  as a plain async fn over a deps bundle (+ the pure `mapClaudeToolName`). The
-  provider keeps a thin wrapper so call sites are unchanged.
-- `context/toolExecutionCallbacks.ts` — `buildToolExecutionCallbacks()`. The
-  `executeLocalTools` callback bundle had been built identically in two places
-  (WS `onLocalToolsPending` and the DSML interception in `handleStreamDone`).
-- `finishStreamingTurn()` — the 11-line end-of-turn teardown, previously duplicated
-  verbatim across `handleStreamDone`'s two completion branches.
-- `failStreamingTurn(message)` — the two Claude bailout paths.
+The provider is now state + turn-scoped refs + small derived setters + four hook
+calls + the context value. Everything below was moved **verbatim**; deps are
+destructured at the top of each hook so every `useCallback` dependency array is
+unchanged and the staleness profile of each closure is identical to the original.
 
-Remaining (this is what "thin composition" still needs):
-- `useSendPipeline` ← `sendMessage`, `streamAndSaveResponse`, `regenerateResponse`,
-  `continueResponse` (~350 lines).
-- `useStreamHandlers` ← the `useAgentChat` handler object + `handleStreamDone`
-  (incl. DSML interception) (~300 lines).
-- `useConversationState` ← `displayedMessages` pagination, `loadInitialMessages`,
-  `loadMoreMessages`, conversation CRUD (~250 lines).
-- `usePersistence` ← `persistConversationMetadata`, project-context persistence.
+| Module | Owns |
+|---|---|
+| `context/runClaudeTurn.ts` | Claude Code (CLI bridge) turn driver + `mapClaudeToolName` |
+| `context/useStreamHandlers.ts` | `useAgentChat` handlers, `handleStreamDone` (incl. DSML interception), question segments, the local-tool segment bridge |
+| `context/useSendPipeline.ts` | `sendMessage`, pending-queue + drain, `streamAndSaveResponse`, `regenerate`, `continue` |
+| `context/useConversationActions.ts` | create / load / fork / retitle / edit / delete / abort / memory toggle |
+| `context/toolExecutionCallbacks.ts` | the `executeLocalTools` callback bundle |
+
+Duplication removed along the way (each had been copy-pasted 2–4×):
+`buildToolExecutionCallbacks`, `finishStreamingTurn` (end-of-turn teardown),
+`failStreamingTurn` (Claude bailouts), `abortOptimisticSend` (sendMessage's four
+early exits).
 
 > **Do not** fold the `agentChat.onError` handler or `handleStreamDone`'s
 > empty-response early return into `finishStreamingTurn` / `failStreamingTurn`.
 > They reset overlapping but strictly *smaller* subsets of state; unifying them
 > would clear `thinking`/segments where today's code deliberately does not.
 
-**Done when.** ☐ `ChatProvider.tsx` is a thin composition. ☐ Extracted hooks own their
-slices. ☑ Build + tsc pass (part 1). ☐ Smoke pass.
+> One new ESLint suppression, in `useSendPipeline`: once refs and setState fns
+> arrive through a deps bundle rather than `useRef`/`useState` in scope,
+> `exhaustive-deps` can no longer prove they are stable and demands them. The dep
+> arrays are the originals verbatim; do not "fix" the warning by adding them.
+
+Still inline (cohesive, low-value to move): message pagination
+(`loadInitialMessages` / `loadMoreMessages`), `getOrCreateConversation`,
+`persistConversationMetadata`. The doc's proposed `useConversationState` /
+`usePersistence` split would separate these from the state they read; folded into
+the provider they read as one coherent block.
+
+**Done when.** ☑ `ChatProvider.tsx` is a thin composition. ☑ Extracted hooks own their
+slices. ☑ Build + tsc pass. ☐ Smoke pass.
 
 ---
 
