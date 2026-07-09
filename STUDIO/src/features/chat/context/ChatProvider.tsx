@@ -76,7 +76,7 @@ import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/
 import { chat } from "@/features/chat/services/chatService";
 import { claudeBridgeService } from "@/features/chat/services/claudeBridgeService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import { effortToThinkingBudget, getClaudeContextWindowTokens } from "@/cliBridges";
+import { getClaudeContextWindowTokens } from "@/cliBridges";
 import type { PermissionModeId, PermissionDecision, ActionMode } from "@/core/permissions";
 import {
   evaluateToolCall,
@@ -87,11 +87,12 @@ import {
   setGlobalGrant,
   buildGrantLookupForConversation,
   clearSessionGrants,
-  recordGrant as recordToolGrant,
 } from "@/core/permissions";
 import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
 import { GlobalAccessModal } from "@/ui/overlays/GlobalAccessModal";
 import type { ToolApprovalDecision } from "./types";
+import { buildToolExecutionCallbacks } from "./toolExecutionCallbacks";
+import { runClaudeTurn as runClaudeTurnDriver } from "./runClaudeTurn";
 
 import {
   getConvProjectCtx,
@@ -455,6 +456,41 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       window.cancelAnimationFrame(pendingStreamingFrameRef.current);
   }, []);
 
+  // ── End-of-turn teardown ────────────────────────────────────────────────
+  // Returns the provider to idle once a turn has been fully persisted. Both
+  // completion paths in handleStreamDone (Claude-owned and Studio-owned) end
+  // here, so the reset can never drift between them.
+  const finishStreamingTurn = useCallback(() => {
+    setIsStreaming(false);
+    setStreamingContent("");
+    latestStreamingContentRef.current = "";
+    setStreamingMessageId(null);
+    setActiveToolCalls([]);
+    screenshotUrlsRef.current = [];
+    harnessSegmentsRef.current = [];
+    pendingSegmentTextRef.current = "";
+    setHarnessSegments([]);
+    // Clear live thinking — it has already been captured onto the saved message
+    // (message.thinkingContent). Leaving the live state set made the "thinking"
+    // indicator linger after the turn was done.
+    thinkingContentRef.current = "";
+    setThinkingContent("");
+  }, []);
+
+  // Tears the turn down to idle and surfaces the failure. Used by both Claude
+  // bailout paths (bridge threw / non-zero exit with no content).
+  const failStreamingTurn = useCallback((message: string) => {
+    setError(message);
+    setIsLoading(false);
+    setIsStreaming(false);
+    setStreamingContent("");
+    latestStreamingContentRef.current = "";
+    setStreamingMessageId(null);
+    setActiveToolCalls([]);
+    thinkingContentRef.current = "";
+    setThinkingContent("");
+  }, []);
+
   // ── Drain pending message queue when streaming ends ─────────────────────
   const prevIsStreamingRef = useRef(false);
   useEffect(() => {
@@ -727,18 +763,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
 
     async onLocalToolsPending(toolCalls, pendingSpecialist): Promise<ToolResultItem[]> {
-      const { toolResultItems } = await executeLocalTools(toolCalls, {
-        setActiveToolCalls,
-        setSessionTasks,
-        waitForAnswer:   waitForQuestionAnswer,
-        evaluatePermission,
-        requestApproval: () => new Promise<ToolApprovalDecision>((resolve) => { pendingApprovalResolveRef.current = resolve; }),
-        requestGlobalAccess,
-        recordGrant:     (tool, scope) => recordToolGrant(tool, scope, projectContext?.path ?? null, conversation?.id ?? null),
-        workspaceRoot:   projectContext?.path ?? null,
-        screenshotUrls:   screenshotUrlsRef.current,
-        convId:           conversation?.id,
-      });
+      const { toolResultItems } = await executeLocalTools(
+        toolCalls,
+        buildToolExecutionCallbacks({
+          setActiveToolCalls,
+          setSessionTasks,
+          waitForAnswer: waitForQuestionAnswer,
+          evaluatePermission,
+          requestGlobalAccess,
+          pendingApprovalResolveRef,
+          screenshotUrls: screenshotUrlsRef.current,
+          workspaceRoot: projectContext?.path ?? null,
+          convId: conversation?.id,
+        })
+      );
       void pendingSpecialist; // echoed back by the hook automatically
       return toolResultItems;
     },
@@ -853,18 +891,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setHarnessSegments([...harnessSegmentsRef.current]);
 
         // 3. Execute the tools via the standard local pipeline
-        const { toolResultItems } = await executeLocalTools(toolCalls, {
-          setActiveToolCalls,
-          setSessionTasks,
-          waitForAnswer:   waitForQuestionAnswer,
-          evaluatePermission,
-          requestApproval: () => new Promise<ToolApprovalDecision>((resolve) => { pendingApprovalResolveRef.current = resolve; }),
-          requestGlobalAccess,
-          recordGrant:     (tool, scope) => recordToolGrant(tool, scope, projectContext?.path ?? null, conversation?.id ?? null),
-          workspaceRoot:   projectContext?.path ?? null,
-          screenshotUrls:   screenshotUrlsRef.current,
-          convId:           conversation?.id,
-        });
+        const { toolResultItems } = await executeLocalTools(
+          toolCalls,
+          buildToolExecutionCallbacks({
+            setActiveToolCalls,
+            setSessionTasks,
+            waitForAnswer: waitForQuestionAnswer,
+            evaluatePermission,
+            requestGlobalAccess,
+            pendingApprovalResolveRef,
+            screenshotUrls: screenshotUrlsRef.current,
+            workspaceRoot: projectContext?.path ?? null,
+            convId: conversation?.id,
+          })
+        );
 
         // 4. Update the harness cards to "complete"
         harnessSegmentsRef.current = harnessSegmentsRef.current.map((seg) => {
@@ -978,17 +1018,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessageOffset(MESSAGES_PER_PAGE);
       }
 
-      setIsStreaming(false);
-      setStreamingContent("");
-      latestStreamingContentRef.current = "";
-      setStreamingMessageId(null);
-      setActiveToolCalls([]);
-      screenshotUrlsRef.current = [];
-      harnessSegmentsRef.current = [];
-      pendingSegmentTextRef.current = "";
-      setHarnessSegments([]);
-      thinkingContentRef.current = "";
-      setThinkingContent("");
+      finishStreamingTurn();
       return;
     }
 
@@ -1011,22 +1041,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Reset streaming state
-    setIsStreaming(false);
-    setStreamingContent("");
-    latestStreamingContentRef.current = "";
-    setStreamingMessageId(null);
-    setActiveToolCalls([]);
-    screenshotUrlsRef.current = [];
-    harnessSegmentsRef.current = [];
-    pendingSegmentTextRef.current = "";
-    setHarnessSegments([]);
-    // Clear live thinking — it has already been captured onto the saved message
-    // (message.thinkingContent). Leaving the live state set made the "thinking"
-    // indicator linger after the turn was done.
-    thinkingContentRef.current = "";
-    setThinkingContent("");
-  }, [flushStreamingContentUpdate, isMemoryEnabled, appendToDisplayedMessages, conversationStorageScope]); // eslint-disable-line
+    finishStreamingTurn();
+  }, [flushStreamingContentUpdate, isMemoryEnabled, appendToDisplayedMessages, conversationStorageScope, finishStreamingTurn]); // eslint-disable-line
 
   useEffect(() => {
     handleStreamDoneRef.current = handleStreamDone;
@@ -1121,268 +1137,52 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setHarnessSegments([]);
   }, []);
 
-  const mapClaudeToolName = useCallback((tool: string) => {
-    const lowered = tool.toLowerCase();
-    if (lowered === "bash") return "bash";
-    if (lowered === "powershell") return "powershell";
-    if (lowered === "read") return "read_file";
-    if (lowered === "edit") return "edit_file";
-    if (lowered === "write") return "write_file";
-    if (lowered === "glob") return "glob";
-    if (lowered === "grep") return "grep";
-    return lowered;
-  }, []);
-
   const runClaudeTurn = useCallback(async (
     activeConversation: ChatConversation,
     prompt: string,
     optimisticAssistantId: string
   ) => {
-    const bridgeSessionId = `claude-turn-${Date.now()}`;
-    const permissionMode: PermissionModeId = settings.autopilotMode
-      ? "bypassPermissions"
-      : claudePermissionMode;
-    const cwd = projectContext?.path || claudeSession?.cwd || undefined;
-    const resume = claudeSession?.sessionId || undefined;
-    const seenTextDeltas = { current: false };
-    let finalExitCode = 0;
-
-    activeConversationIdRef.current = activeConversation.id;
-    optimisticAssistantIdRef.current = optimisticAssistantId;
-    resetStreamingState(optimisticAssistantId);
-
-    const completeClaudeTool = (toolUseId: string, rawResult: unknown) => {
-      setActiveToolCalls((prev) =>
-        prev.map((tc) =>
-          tc.callId === toolUseId
-            ? { ...tc, status: "complete", result: rawResult }
-            : tc
-        )
-      );
-    };
-
-    try {
-      await claudeBridgeService.runTurn({
-        sessionId: bridgeSessionId,
-        prompt,
-        cwd,
-        resume,
-        model: resume ? undefined : claudeModel,
-        permissionMode,
-        thinkingBudget: effortToThinkingBudget(claudeEffortLevel),
-        onLine: async (line, stream) => {
-          if (stream === "stderr") {
-            logger.warn("ClaudeBridge", "stderr", line);
-            return;
-          }
-
-          let event: any;
-          try {
-            event = JSON.parse(line);
-          } catch {
-            logger.warn("ClaudeBridge", "Failed to parse Claude stream line", line);
-            return;
-          }
-
-          if (event.type === "stream_event") {
-            const delta = event.event?.delta;
-            if (delta?.type === "text_delta" && typeof delta.text === "string") {
-              seenTextDeltas.current = true;
-              fullContentRef.current += delta.text;
-              pendingSegmentTextRef.current += delta.text;
-              scheduleStreamingContentUpdate(pendingSegmentTextRef.current);
-            }
-            return;
-          }
-
-          if (event.type === "system" && event.subtype === "init") {
-            const nextClaude: ClaudeSessionMetadata = {
-              ...(claudeSession ?? {}),
-              sessionId: event.session_id,
-              model: event.model ?? claudeModel,
-              permissionMode: event.permissionMode ?? permissionMode,
-              effortLevel: claudeEffortLevel,
-              cwd: event.cwd ?? cwd,
-              lastTurnAt: Date.now(),
-            };
-            setClaudeSession(nextClaude);
-            setClaudeModelState(nextClaude.model ?? claudeModel);
-            await persistConversationMetadata(activeConversation, "claude", nextClaude);
-            return;
-          }
-
-          if (event.type === "rate_limit_event") {
-            setClaudeSession((prev) => {
-              const next = {
-                ...(prev ?? {}),
-                rateLimit: event.rate_limit_info,
-                lastTurnAt: Date.now(),
-              };
-              persistConversationMetadata(activeConversation, "claude", next).catch(() => {});
-              return next;
-            });
-            return;
-          }
-
-          if (event.type === "system" && event.subtype === "thinking_tokens") {
-            // Token-count pings carry no real reasoning text. Showing a fake
-            // "Thinking… N" placeholder is misleading and lingered after the
-            // turn finished. We only surface genuine `thinking` content blocks
-            // (handled below), so ignore this signal entirely.
-            return;
-          }
-
-          if (event.type === "assistant" && Array.isArray(event.message?.content)) {
-            const block = event.message.content[0];
-            if (block?.type === "thinking" && typeof block.thinking === "string") {
-              thinkingContentRef.current = block.thinking;
-              setThinkingContent(block.thinking);
-              return;
-            }
-
-            if (block?.type === "tool_use") {
-              const toolName = mapClaudeToolName(block.name ?? "tool");
-              const args = (block.input ?? {}) as Record<string, unknown>;
-              const displayClass = classifyToolDisplay(toolName);
-              setActiveToolCalls((prev) => [
-                ...prev.filter((item) => item.callId !== block.id),
-                {
-                  callId: block.id,
-                  tool: toolName,
-                  args,
-                  status: "running",
-                  displayClass,
-                },
-              ]);
-
-              if (displayClass === "stream") {
-                const pendingText = pendingSegmentTextRef.current;
-                if (pendingText) {
-                  harnessSegmentsRef.current = [
-                    ...harnessSegmentsRef.current,
-                    { type: "text", content: pendingText },
-                  ];
-                  pendingSegmentTextRef.current = "";
-                  setStreamingContent("");
-                  latestStreamingContentRef.current = "";
-                }
-                harnessSegmentsRef.current = [
-                  ...harnessSegmentsRef.current,
-                  { type: "harness_event", event: buildHarnessEvent(block.id, toolName, args, "running") },
-                ];
-                setHarnessSegments([...harnessSegmentsRef.current]);
-              }
-              return;
-            }
-
-            if (!seenTextDeltas.current) {
-              const textBlock = event.message.content.find((item: any) => item.type === "text");
-              if (typeof textBlock?.text === "string" && textBlock.text) {
-                fullContentRef.current = textBlock.text;
-                pendingSegmentTextRef.current = textBlock.text;
-                scheduleStreamingContentUpdate(textBlock.text);
-              }
-            }
-            return;
-          }
-
-          if (event.type === "user" && Array.isArray(event.message?.content)) {
-            const block = event.message.content[0];
-            if (block?.type === "tool_result" && block.tool_use_id) {
-              completeClaudeTool(block.tool_use_id, event.tool_use_result ?? block.content);
-              harnessSegmentsRef.current = harnessSegmentsRef.current.map((segment) => {
-                if (segment.type !== "harness_event" || segment.event.callId !== block.tool_use_id) return segment;
-                return {
-                  type: "harness_event" as const,
-                  event: buildHarnessEvent(
-                    block.tool_use_id,
-                    segment.event.tool,
-                    segment.event.args,
-                    "complete",
-                    event.tool_use_result ?? block.content
-                  ),
-                };
-              });
-              setHarnessSegments([...harnessSegmentsRef.current]);
-            }
-            return;
-          }
-
-          if (event.type === "result") {
-            const turnCost = typeof event.total_cost_usd === "number" ? event.total_cost_usd : undefined;
-            // Real usage from the model's own accounting — the ground truth that
-            // includes the system prompt, skills, tools, and every file-read
-            // result the estimate can't see.
-            const usage = (event.usage ?? {}) as Record<string, unknown>;
-            const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-            const nextClaude: ClaudeSessionMetadata = {
-              ...(claudeSession ?? {}),
-              sessionId: event.session_id ?? claudeSession?.sessionId,
-              model: claudeModel,
-              permissionMode,
-              cwd,
-              lastCostUsd: turnCost ?? claudeSession?.lastCostUsd,
-              lastDurationMs: typeof event.duration_ms === "number" ? event.duration_ms : claudeSession?.lastDurationMs,
-              lastInputTokens: num(usage.input_tokens) ?? claudeSession?.lastInputTokens,
-              lastOutputTokens: num(usage.output_tokens) ?? claudeSession?.lastOutputTokens,
-              lastCacheReadTokens: num(usage.cache_read_input_tokens) ?? claudeSession?.lastCacheReadTokens,
-              lastCacheCreationTokens: num(usage.cache_creation_input_tokens) ?? claudeSession?.lastCacheCreationTokens,
-              // Cumulative per-conversation spend — what the composer shows.
-              totalCostUsd: (claudeSession?.totalCostUsd ?? 0) + (turnCost ?? 0),
-              lastTurnAt: Date.now(),
-              rateLimit: claudeSession?.rateLimit,
-            };
-            setClaudeSession(nextClaude);
-            await persistConversationMetadata(activeConversation, "claude", nextClaude);
-          }
-        },
-        onExit: (code) => {
-          finalExitCode = code;
-        },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setError(message);
-      setIsLoading(false);
-      setIsStreaming(false);
-      setStreamingContent("");
-      latestStreamingContentRef.current = "";
-      setStreamingMessageId(null);
-      setActiveToolCalls([]);
-      thinkingContentRef.current = "";
-      setThinkingContent("");
-      return;
-    }
-
-    if (finalExitCode !== 0 && !fullContentRef.current.trim()) {
-      setError("Claude stopped before returning a response.");
-      thinkingContentRef.current = "";
-      setThinkingContent("");
-      setIsLoading(false);
-      setIsStreaming(false);
-      setStreamingContent("");
-      latestStreamingContentRef.current = "";
-      setStreamingMessageId(null);
-      setActiveToolCalls([]);
-      return;
-    }
-
-    await handleStreamDoneRef.current?.();
-    // Claude turns own their own loading lifecycle (no agentChat onLoadingChange
-    // callback). Without this, isLoading stayed true after a successful turn and
-    // the "Thinking…" dot bubble reappeared once streaming flags cleared.
-    setIsLoading(false);
+    await runClaudeTurnDriver({
+      activeConversation,
+      prompt,
+      optimisticAssistantId,
+      autopilotMode: !!settings.autopilotMode,
+      claudePermissionMode,
+      claudeEffortLevel,
+      claudeModel,
+      claudeSession,
+      projectContextPath: projectContext?.path ?? null,
+      activeConversationIdRef,
+      optimisticAssistantIdRef,
+      fullContentRef,
+      pendingSegmentTextRef,
+      latestStreamingContentRef,
+      thinkingContentRef,
+      harnessSegmentsRef,
+      handleStreamDoneRef,
+      resetStreamingState,
+      scheduleStreamingContentUpdate,
+      setActiveToolCalls,
+      setHarnessSegments,
+      setStreamingContent,
+      setThinkingContent,
+      setClaudeSession,
+      setClaudeModelState,
+      setIsLoading,
+      persistConversationMetadata,
+      failStreamingTurn,
+    });
   }, [
     claudeSession,
     claudePermissionMode,
     claudeEffortLevel,
     claudeModel,
-    mapClaudeToolName,
     persistConversationMetadata,
     projectContext,
     resetStreamingState,
     scheduleStreamingContentUpdate,
     settings.autopilotMode,
+    failStreamingTurn,
   ]);
 
   // ── sendMessage ─────────────────────────────────────────────────────────
