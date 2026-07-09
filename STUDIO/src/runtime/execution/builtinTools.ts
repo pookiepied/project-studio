@@ -24,6 +24,7 @@ import type { LocalToolCall } from "@/types/chat";
 import type { TaskItem } from "@/features/chat/context/types";
 import { notifyPermissionRequired } from "./notifications";
 import type { ToolExecutionCallbacks } from "./executeLocalTools";
+import { ANSWER_TIMEOUT_MS } from "./constants";
 
 /**
  * Returns the builtin tool result, or `undefined` if the call is not a builtin
@@ -144,9 +145,6 @@ export async function executeBuiltinTool(
         t.callId === tc.callId ? { ...t, status: "pending_question" } : t
       )
     );
-    // 5-minute timeout - if user doesn't answer, return a safe fallback so
-    // the AI can explain the situation rather than hanging forever.
-    const ANSWER_TIMEOUT_MS = 5 * 60 * 1000;
     const answer = await Promise.race([
       cb.waitForAnswer(typeof tc.args?.question === "string" ? tc.args.question : "AI has a question for you"),
       new Promise<string>((resolve) =>

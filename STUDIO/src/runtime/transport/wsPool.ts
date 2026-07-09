@@ -17,7 +17,11 @@
  */
 
 import { TAURI_CONFIG } from "@/core/config/tauriConfig";
-import type { AgentChatHandlers, ChatRequestBody } from "../protocol";
+import type {
+  AgentChatHandlers,
+  ChatRequestBody,
+  PoolConnectionStatus,
+} from "../protocol";
 import type { LocalToolCall, ToolResultItem } from "@/types/chat";
 import { parsePoolMessage } from "./wsMessages";
 import { logger } from "@/core/logging/logger";
@@ -26,15 +30,6 @@ import { connectionManager } from "@/core/connection";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type PoolConnectionStatus =
-  | "connecting"
-  | "idle"
-  | "streaming"
-  | "permission_needed"
-  | "done_unread"
-  | "error"
-  | "closed";
 
 interface PendingToolRequest {
   toolCalls: LocalToolCall[];

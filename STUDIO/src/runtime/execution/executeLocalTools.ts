@@ -8,7 +8,7 @@
  *   - MCP tools         - routed to Tauri subprocess via invokeMcpTool
  *
  * Local MCP calls pass through the centralized permission engine
- * (src/permissions/evaluateToolCall) before execution - allow, prompt for
+ * (@/core/permissions evaluateToolCall) before execution - allow, prompt for
  * approval, or deny. The result is serialised to the wire format expected by
  * both the HTTP relay and the new WebSocket path.
  *
@@ -31,6 +31,7 @@ import type { PermissionDecision, GrantScope } from "@/core/permissions";
 import { applyWorkspaceDefaults } from "./workspaceDefaults";
 import { executeBuiltinTool } from "./builtinTools";
 import { notifyPermissionRequired } from "./notifications";
+import { APPROVAL_TIMEOUT_MS, GLOBAL_ACCESS_TIMEOUT_MS } from "./constants";
 
 // TODO(reorg): chat-state type coupling (ActiveToolCall) resolved in Phase 5.
 
@@ -230,7 +231,6 @@ async function executeMcpTool(
       );
       await notifyPermissionRequired(`AI wants machine-wide access for: ${toolName}`);
 
-      const GLOBAL_ACCESS_TIMEOUT_MS = 5 * 60 * 1000;
       let globalTimedOut = false;
       const granted = await Promise.race([
         cb.requestGlobalAccess(toolName),
@@ -294,8 +294,6 @@ async function executeMcpTool(
       );
       await notifyPermissionRequired(`AI wants to run: ${toolName}`);
 
-      // 5-minute timeout - auto-deny if unanswered so the turn doesn't hang.
-      const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
       let approvalTimedOut = false;
       const choice = await Promise.race([
         cb.requestApproval(),

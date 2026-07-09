@@ -20,6 +20,7 @@ export default tseslint.config(
       "mcp-servers",
       "scripts",
       "public",
+      "vendor",
       "**/*.config.js",
       "**/*.config.ts",
     ],
@@ -53,7 +54,7 @@ export default tseslint.config(
         {
           selector: "JSXOpeningElement[name.name='button']",
           message:
-            "DS: use <Button>/<IconButton> from @/components/ui instead of a raw <button>.",
+            "DS: use <Button>/<IconButton> from @/ui/primitives instead of a raw <button>.",
         },
         {
           selector: "Literal[value=/text-\\[/]",
