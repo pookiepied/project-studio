@@ -1,7 +1,7 @@
 import { Model } from "../ai/modelService";
 import { FileAttachment, estimateAttachmentTokens } from "./fileAttachmentService";
-import { safeGetContextWindow, createFallbackAttachmentLimits, FALLBACK_VALUES } from "../network/fallbackService";
-import { logger } from "../logging/logger";
+import { safeGetContextWindow, createFallbackAttachmentLimits, FALLBACK_VALUES } from "@/core/network/fallbackService";
+import { logger } from "@/core/logging/logger";
 
 export interface AttachmentLimits {
   maxAttachments: number;

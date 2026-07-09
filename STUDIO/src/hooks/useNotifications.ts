@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { notificationStore, type AppNotification } from "../services/notifications/notificationStore";
+import { notificationStore, type AppNotification } from "../core/notifications/notificationStore";
 
 /**
  * Subscribe a component to the in-app notification store.

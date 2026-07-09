@@ -8,8 +8,8 @@
 
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from "react";
 import { AppSettings } from "../types";
-import { configService } from "../services/storage/configService";
-import { logger } from "../services/logging/logger";
+import { configService } from "../core/storage/configService";
+import { logger } from "../core/logging/logger";
 import { isThemePreference } from "../utils/theme";
 
 interface SettingsContextType {

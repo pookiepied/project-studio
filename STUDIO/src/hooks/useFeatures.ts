@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from 'react';
-import { featureManager, isFeatureEnabled, type FeatureFlags } from '../services/platform/featureManager';
+import { featureManager, isFeatureEnabled, type FeatureFlags } from '../core/platform/featureManager';
 
 export interface UseFeatureResult {
   isEnabled: (feature: keyof FeatureFlags) => boolean;

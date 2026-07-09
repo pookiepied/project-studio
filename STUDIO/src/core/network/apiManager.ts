@@ -5,7 +5,7 @@
 
 import { environmentService } from '../platform/environmentService';
 import { logger } from '../logging/logger';
-import { TAURI_CONFIG, API_ENDPOINTS } from '../../config/tauriConfig';
+import { TAURI_CONFIG, API_ENDPOINTS } from '../config/tauriConfig';
 
 interface APIEndpoints {
   auth: string;

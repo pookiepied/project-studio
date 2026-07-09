@@ -1,4 +1,4 @@
-import { webStorageService } from '../../web/webStorage';
+import { webStorageService } from './webStorage';
 import { logger } from '../../logging/logger';
 import type { StorageBackend, SystemLocation } from './types';
 

@@ -1,4 +1,4 @@
-import { apiManager } from "../network/apiManager";
+import { apiManager } from "@/core/network/apiManager";
 import { createHeaders } from "../../utils/api";
 
 export interface KbDocument {

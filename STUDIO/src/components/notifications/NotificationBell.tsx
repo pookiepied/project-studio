@@ -19,7 +19,7 @@ import {
 import type {
   AppNotification,
   AgentNotificationStatus,
-} from "../../services/notifications/notificationStore";
+} from "../../core/notifications/notificationStore";
 
 function relativeTime(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);

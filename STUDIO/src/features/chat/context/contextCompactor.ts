@@ -11,11 +11,11 @@
  */
 
 import { countMessageTokensAsync } from "@/utils/tokenEstimator";
-import { logger } from "@/services/logging/logger";
+import { logger } from "@/core/logging/logger";
 import {
   loadConversation,
   updateConversationSummary,
-} from "@/services/storage/chatHistoryService";
+} from "@/core/storage/chatHistoryService";
 import { summarizeMessages } from "@/services/ai/summarizationService";
 import type { ChatConversation } from "@/types";
 

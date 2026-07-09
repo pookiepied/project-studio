@@ -1,8 +1,8 @@
 import { APIResponse } from "../types";
-import { errorService } from "../services/errors/errorService";
+import { errorService } from "../core/errors/errorService";
 import { tokenManager } from "./tokenManager";
-import { apiManager } from "../services/network/apiManager";
-import { logger } from "../services/logging/logger";
+import { apiManager } from "../core/network/apiManager";
+import { logger } from "../core/logging/logger";
 
 
 /**

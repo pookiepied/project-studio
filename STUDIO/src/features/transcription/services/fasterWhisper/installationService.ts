@@ -5,8 +5,8 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { APIResponse } from '@/types';
-import { errorService } from '@/services/errors/errorService';
-import { logger } from '@/services/logging/logger';
+import { errorService } from '@/core/errors/errorService';
+import { logger } from '@/core/logging/logger';
 import { 
   getVenvDir, 
   getVenvPythonPath,

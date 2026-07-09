@@ -7,8 +7,8 @@
  */
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { environmentService } from "../services/platform/environmentService";
-import { logger } from "../services/logging/logger";
+import { environmentService } from "../core/platform/environmentService";
+import { logger } from "../core/logging/logger";
 
 const DOT_SIZE = 10;
 // Shared top-row center line (px). Must match the FloatingPanel dock center and

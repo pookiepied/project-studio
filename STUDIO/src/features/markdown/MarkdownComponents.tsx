@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CodeBlock } from "./CodeBlock";
 import ExternalLink from "@/components/ui/ExternalLink";
 import { tokenManager } from "@/utils/tokenManager";
-import { TAURI_CONFIG } from "@/config/tauriConfig";
+import { TAURI_CONFIG } from "@/core/config/tauriConfig";
 
 // ---------------------------------------------------------------------------
 // Image lightbox — renders via portal so it overlays everything

@@ -10,7 +10,7 @@
  */
 
 import { mcpService } from "@/core/mcpRegistry/registryClient";
-import { logger } from "@/services/logging/logger";
+import { logger } from "@/core/logging/logger";
 import type { LocalMcpServerDef } from "./catalog";
 
 /**

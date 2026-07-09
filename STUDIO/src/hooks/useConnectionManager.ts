@@ -12,13 +12,13 @@
  */
 
 import { useCallback, useEffect, useReducer } from "react";
-import { connectionManager } from "../services/connection/ConnectionManager";
+import { connectionManager } from "../core/connection/ConnectionManager";
 import type {
   ConnectionEvent,
   ConversationConnectionState,
   McpServerState,
   WsConnectionStatus,
-} from "../services/connection/types";
+} from "../core/connection/types";
 
 // ---------------------------------------------------------------------------
 // State shape

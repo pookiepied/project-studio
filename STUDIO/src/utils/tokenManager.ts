@@ -11,10 +11,10 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { logger } from "../services/logging/logger";
-import { encryptData, decryptData } from "../services/storage/secureStorage";
-import { isFeatureEnabled } from "../services/platform/featureManager";
-import { STORAGE_KEYS, TOKEN_LIMITS } from "@/constants";
+import { logger } from "../core/logging/logger";
+import { encryptData, decryptData } from "../core/storage/secureStorage";
+import { isFeatureEnabled } from "../core/platform/featureManager";
+import { STORAGE_KEYS, TOKEN_LIMITS } from "@/core/config/constants";
 import type { AccessTokenPayload, RefreshTokenPayload } from "../types";
 
 const ACCESS_TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;
@@ -249,7 +249,7 @@ async function refreshAccessToken(): Promise<string | null> {
   }
   
   try {
-    const { apiManager } = await import("../services/network/apiManager");
+    const { apiManager } = await import("../core/network/apiManager");
     const endpoints = await apiManager.getEndpoints();
     
     if (!endpoints.auth) {

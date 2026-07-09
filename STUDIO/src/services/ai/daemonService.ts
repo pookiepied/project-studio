@@ -6,7 +6,7 @@
  * run the actual LLM inference against a local Ollama / LM Studio daemon.
  */
 
-import { logger } from "../logging/logger";
+import { logger } from "@/core/logging/logger";
 import { reportLocalUsage, type LocalUsage } from "./localUsageService";
 
 // ---------------------------------------------------------------------------

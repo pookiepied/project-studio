@@ -10,7 +10,7 @@ import {
 import { useCommandPalette } from "../../contexts/CommandPaletteContext";
 import { useNavigation } from "../../contexts/NavigationContext";
 import { useChat } from "@/features/chat/context";
-import { getAllConversations } from "../../services/storage/chatHistoryService";
+import { getAllConversations } from "../../core/storage/chatHistoryService";
 import type { ConversationMetadata } from "../../hooks/useConversationsList";
 import {
   searchMessages,

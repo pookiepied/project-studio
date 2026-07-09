@@ -5,7 +5,7 @@
  * this folder — the barrel controls the public API.
  *
  * Quick start for a new subsystem:
- *   import { connectionManager, CONNECTION_TIMEOUTS } from "@/services/connection";
+ *   import { connectionManager, CONNECTION_TIMEOUTS } from "@/core/connection";
  *   connectionManager.emit({ type: "ws:reconnecting", timestamp: Date.now(), convId });
  */
 

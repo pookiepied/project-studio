@@ -31,21 +31,21 @@ import type { APIChatMessage, ToolResultItem, AutoRoutedInfo } from "@/types/cha
 import { extractMessageText }                          from "@/types/chat";
 import { aiService }                                   from "@/services/ai/aiService";
 import { tokenManager }                                from "@/utils/tokenManager";
-import { memorySystem }                                from "@/services/storage/memorySystem";
-import { errorService }                                from "@/services/errors/errorService";
-import { logger }                                      from "@/services/logging/logger";
-import { safeIsVisionModel, safeGetContextWindow, handleNetworkFailure } from "@/services/network/fallbackService";
+import { memorySystem }                                from "@/core/storage/memorySystem";
+import { errorService }                                from "@/core/errors/errorService";
+import { logger }                                      from "@/core/logging/logger";
+import { safeIsVisionModel, safeGetContextWindow, handleNetworkFailure } from "@/core/network/fallbackService";
 import { useSettings }                                 from "@/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
 import { parseChatResponse, isValidChatResponse }     from "@/utils/chatParser";
-import { TAURI_CONFIG }                               from "@/config/tauriConfig";
+import { TAURI_CONFIG }                               from "@/core/config/tauriConfig";
 import {
   createConversation, saveConversation, loadConversation, addMessage,
   getContextMessages, getConversationMessages, updateConversationTitle,
   updateMessage, deleteMessage, getAllConversations, truncateMessagesAfter,
   forkConversationToStudio as forkConversationToStudioStorage,
-} from "@/services/storage/chatHistoryService";
-import type { ConversationStorageScope } from "@/services/storage/chatHistoryService";
+} from "@/core/storage/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
 import {
   canContinueWithEngine,
   isClaudeOwnedConversation,
@@ -99,10 +99,10 @@ import {
   type ProjectCtx,
 } from "./projectContextStorage";
 import { backgroundSessionTracker } from "@/services/conversations/backgroundSessionTracker";
-import { NotificationService, recordAgentToolResult } from "@/services/notifications";
+import { NotificationService, recordAgentToolResult } from "@/core/notifications";
 import type { PendingMessage } from "./types";
 import type { ClaudeSessionMetadata } from "@/types";
-import { getAIMode } from "@/config/autoMode";
+import { getAIMode } from "@/core/config/autoMode";
 
 // ---------------------------------------------------------------------------
 // Context

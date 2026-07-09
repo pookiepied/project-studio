@@ -6,12 +6,12 @@ import {
 import { Icon, Refresh, Warning } from "@/components/icons";
 import { IconButton } from "@/components/ui/IconButton";
 import { createHeaders } from "@/utils/api";
-import { apiManager } from "@/services/network/apiManager";
+import { apiManager } from "@/core/network/apiManager";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { isResolvedDark } from "@/utils/theme";
-import { logger } from "@/services/logging/logger";
-import { prefetchProfiles } from "@/services/network/userProfileCache";
+import { logger } from "@/core/logging/logger";
+import { prefetchProfiles } from "@/core/network/userProfileCache";
 
 import type {
   SystemStatus, AuthHealth, SummaryData, UsageRow, LogEntry,

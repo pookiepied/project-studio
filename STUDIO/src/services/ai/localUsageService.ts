@@ -14,7 +14,7 @@
  */
 
 import { apiClient } from "../../utils/api";
-import { logger } from "../logging/logger";
+import { logger } from "@/core/logging/logger";
 import { extractLocalModelName } from "./daemonService";
 
 export type LocalEngine = "lmstudio" | "ollama" | "local";

@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Icon, Back, Manage } from "@/components/icons";
-import { environmentService } from "@/services/platform/environmentService";
+import { environmentService } from "@/core/platform/environmentService";
 import {
   HARNESS_PERMISSION_KEY,
   COMPUTER_USE_PERMISSION_KEY,
@@ -33,8 +33,8 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useModelsContext as useModels } from "@/features/models/context";
 import { AuthControls } from "@/components/AuthControls";
 import { AppSettings, ThemePreference } from "@/types";
-import { logger } from "@/services/logging/logger";
-import { AutostartService } from "@/services/platform/autostartService";
+import { logger } from "@/core/logging/logger";
+import { AutostartService } from "@/core/platform/autostartService";
 import { resolveTheme } from "@/utils/theme";
 
 import {

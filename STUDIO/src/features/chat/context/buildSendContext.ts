@@ -1,10 +1,10 @@
 import type { APIChatMessage } from "@/types/chat";
 import type { FileAttachment } from "@/services/files/fileAttachmentService";
 import type { ChatConversation } from "@/types";
-import type { ConversationStorageScope } from "@/services/storage/chatHistoryService";
-import { memorySystem } from "@/services/storage/memorySystem";
+import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
+import { memorySystem } from "@/core/storage/memorySystem";
 import { indexDocumentForRAG, buildRAGAnnotation, DOC_RAG_THRESHOLD } from "@/services/files/docIndexService";
-import { getContextMessages, loadConversation } from "@/services/storage/chatHistoryService";
+import { getContextMessages, loadConversation } from "@/core/storage/chatHistoryService";
 import { buildApiMessages, pruneContextByTokens, applyAllSystemMessages, prependProjectContextToLastUser } from "./messageBuilder";
 import { getMcpServers } from "@/runtime";
 import { MAX_CONTEXT_MESSAGES } from "./constants";

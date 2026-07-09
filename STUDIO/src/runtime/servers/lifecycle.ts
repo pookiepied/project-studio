@@ -7,8 +7,8 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { logger } from "@/services/logging/logger";
-import { connectionManager } from "@/services/connection";
+import { logger } from "@/core/logging/logger";
+import { connectionManager } from "@/core/connection";
 import { LOCAL_MCP_SERVERS, HARNESS_ENV, type LocalMcpServerDef } from "./catalog";
 import { startLocalMcp, resolveLocalMcpPath } from "./manifest";
 

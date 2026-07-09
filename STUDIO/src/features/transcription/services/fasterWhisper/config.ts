@@ -5,7 +5,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir } from '@tauri-apps/api/path';
-import { logger } from '@/services/logging/logger';
+import { logger } from '@/core/logging/logger';
 
 export interface FasterWhisperConfig {
   installed: boolean;

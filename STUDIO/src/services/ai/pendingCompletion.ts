@@ -11,7 +11,7 @@
  *   DELETE /agents/chat-agent/{id}/completed → { ok: true }
  */
 
-import { TAURI_CONFIG } from "../../config/tauriConfig";
+import { TAURI_CONFIG } from "../../core/config/tauriConfig";
 import { tokenManager } from "../../utils/tokenManager";
 
 const AGENT_BASE = `${TAURI_CONFIG.API_BASE_URL}/agents/chat-agent`;

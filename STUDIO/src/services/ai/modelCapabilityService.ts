@@ -4,7 +4,7 @@
  */
 
 import { Model } from "./modelService";
-import { FALLBACK_VALUES } from "../network/fallbackService";
+import { FALLBACK_VALUES } from "@/core/network/fallbackService";
 
 export interface ModelCapabilities {
   supportsVision: boolean;

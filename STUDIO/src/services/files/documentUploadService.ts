@@ -1,5 +1,5 @@
 import { createHeaders } from "../../utils/api";
-import { API_ENDPOINTS } from "../../config/tauriConfig";
+import { API_ENDPOINTS } from "../../core/config/tauriConfig";
 
 export interface UploadedDocument {
   docId:     string;

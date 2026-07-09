@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { environmentService } from "@/services/platform/environmentService";
+import { environmentService } from "@/core/platform/environmentService";
 
 export interface NativeBrowserBounds {
   x: number;

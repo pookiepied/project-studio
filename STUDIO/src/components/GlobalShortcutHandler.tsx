@@ -21,10 +21,10 @@ import {
   unregisterGlobalShortcut,
   registerVoiceShortcut,
   unregisterVoiceShortcut,
-} from "../services/platform/globalShortcutService";
-import { environmentService } from "../services/platform/environmentService";
-import { pulseCoordinator } from "../services/platform/pulseCoordinator";
-import { logger } from "../services/logging/logger";
+} from "../core/platform/globalShortcutService";
+import { environmentService } from "../core/platform/environmentService";
+import { pulseCoordinator } from "../core/platform/pulseCoordinator";
+import { logger } from "../core/logging/logger";
 import { RecordingState } from "../types";
 import type { View } from "../types/navigation";
 import { isResolvedDark } from "../utils/theme";

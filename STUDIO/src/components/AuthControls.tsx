@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
-import { logger } from "../services/logging/logger";
+import { logger } from "../core/logging/logger";
 
 let tauriOAuth: typeof import("../services/auth/tauriOAuth") | null = null;
 

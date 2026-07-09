@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { aiService } from "../services/ai/aiService";
-import { errorService } from "../services/errors/errorService";
+import { errorService } from "../core/errors/errorService";
 
 interface UseVoiceInputOptions {
   transcriptionModel: string;

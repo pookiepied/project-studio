@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Select } from "@/components/ui/Select";
 import { Toggle } from "@/components/ui/Toggle";
 import { useSettings } from "@/contexts/SettingsContext";
-import { logger } from "@/services/logging/logger";
+import { logger } from "@/core/logging/logger";
 import { getAvailableTones, type RephraseTone } from "@/utils/prompts";
 import type { AppSettings } from "@/types";
 import { SettingsRow } from "./SettingsRow";

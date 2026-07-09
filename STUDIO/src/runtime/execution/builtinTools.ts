@@ -18,8 +18,8 @@
  * (ChatProvider split). Type-only import — no runtime cycle.
  */
 
-import { logger } from "@/services/logging/logger";
-import { connectionManager } from "@/services/connection";
+import { logger } from "@/core/logging/logger";
+import { connectionManager } from "@/core/connection";
 import type { LocalToolCall } from "@/types/chat";
 import type { TaskItem } from "@/features/chat/context/types";
 import { notifyPermissionRequired } from "./notifications";

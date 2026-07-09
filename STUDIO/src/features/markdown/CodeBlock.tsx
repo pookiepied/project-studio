@@ -5,7 +5,7 @@ import { useBrowserPanel } from "@/contexts/BrowserPanelContext";
 import { motion, AnimatePresence } from "framer-motion";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneLight, atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { errorService } from "@/services/errors/errorService";
+import { errorService } from "@/core/errors/errorService";
 import { toast } from "sonner";
 import { useSettings } from "@/contexts/SettingsContext";
 import { isResolvedDark } from "@/utils/theme";

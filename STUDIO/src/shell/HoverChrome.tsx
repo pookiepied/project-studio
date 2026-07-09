@@ -7,7 +7,7 @@
  * app window.
  */
 
-import { environmentService } from "../services/platform/environmentService";
+import { environmentService } from "../core/platform/environmentService";
 import { WORKSPACE_SHELL } from "./shellConfig";
 
 export function HoverChrome() {

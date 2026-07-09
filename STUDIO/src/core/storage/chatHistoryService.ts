@@ -1,11 +1,11 @@
-import { ChatConversation, ChatMessage } from "../../types";
+import { ChatConversation, ChatMessage } from "@/types";
 import { unifiedStorage } from "./unifiedStorageService";
 import { logger } from "../logging/logger";
-import { localConversationStore } from "../conversations/storage/localConversationStore";
-import type { ConversationIndex } from "../conversations/storage/types";
-import { claudeConversationAdapter } from "../conversations/claude/claudeConversationAdapter";
-import { parseClaudeNativeConversationId } from "../conversations/claude/claudeConversationPaths";
-import { isClaudeOwnedConversation } from "../conversations/ownership/conversationOwnership";
+import { localConversationStore } from "@/services/conversations/storage/localConversationStore";
+import type { ConversationIndex } from "@/services/conversations/storage/types";
+import { claudeConversationAdapter } from "@/services/conversations/claude/claudeConversationAdapter";
+import { parseClaudeNativeConversationId } from "@/services/conversations/claude/claudeConversationPaths";
+import { isClaudeOwnedConversation } from "@/services/conversations/ownership/conversationOwnership";
 
 const CHAT_INDEX_PATH = "chats/chat-index.json";
 

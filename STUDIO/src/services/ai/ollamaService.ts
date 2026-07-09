@@ -7,8 +7,8 @@
  */
 
 import { APIResponse } from '../../types';
-import { logger } from '../logging/logger';
-import { errorService } from '../errors/errorService';
+import { logger } from '@/core/logging/logger';
+import { errorService } from '@/core/errors/errorService';
 
 function getOllamaBaseUrl(baseUrl?: string): string {
   return baseUrl || 'http://localhost:11434';

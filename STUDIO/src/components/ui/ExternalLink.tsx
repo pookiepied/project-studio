@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowSquareOutIcon as ArrowSquareOut, GlobeIcon as Globe, ArrowUpRightIcon as ArrowUpRight } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api/core";
-import { environmentService } from "../../services/platform/environmentService";
+import { environmentService } from "../../core/platform/environmentService";
 
 interface ExternalLinkProps {
   href?: string;

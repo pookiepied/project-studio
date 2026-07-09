@@ -17,7 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { FONT_SANS } from "../../styles/fonts";
 import type { PulseCard, PulseCardType } from "../../types/pulse";
-import type { OverlayActionType } from "../../services/platform/overlayService";
+import type { OverlayActionType } from "../../core/platform/overlayService";
 import { ActionBtn } from "./IslandAtoms";
 
 // ─── Card icon ────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { checkOllamaStatus, OllamaStatus, getOllamaModels } from '../services/ai/ollamaService';
 import { useSettings } from '../contexts/SettingsContext';
-import { logger } from '../services/logging/logger';
+import { logger } from '../core/logging/logger';
 
 export interface UseOllamaResult {
   status: OllamaStatus;

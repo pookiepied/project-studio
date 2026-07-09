@@ -16,7 +16,7 @@ import {
   BrainIcon as Brain,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getAIMode, type AIMode } from "../config/autoMode";
+import { getAIMode, type AIMode } from "../core/config/autoMode";
 import { useModes } from "../hooks/useModes";
 import { composerPillButton, composerPillLabel, cx } from "@/features/chat/components/composerControlStyles";
 

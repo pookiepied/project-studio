@@ -13,7 +13,7 @@ import "./tokens/tokens.css";
 import "./index.css";
 // Workspace-shell styles (scoped to .zen-* classes; inert unless used).
 import "./shell/workspaceShell.css";
-import { logger } from "./services/logging/logger";
+import { logger } from "./core/logging/logger";
 
 logger.info("Main", "Starting STUDIO");
 

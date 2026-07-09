@@ -12,8 +12,8 @@ import { apiClient } from "../../utils/api";
 import { APIResponse } from "../../types";
 import { getRephrasePrompt, RephraseTone } from "../../utils/prompts";
 import { cleanAIResponse, isValidResponse } from "../../utils/responseParser";
-import { errorService } from "../errors/errorService";
-import { logger } from "../logging/logger";
+import { errorService } from "@/core/errors/errorService";
+import { logger } from "@/core/logging/logger";
 import { FileAttachment } from "../files/fileAttachmentService";
 import {
   APIChatMessage,

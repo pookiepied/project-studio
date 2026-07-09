@@ -17,7 +17,7 @@ import {
   estimateTokens,
   countMessageTokensAsync,
 } from "@/utils/tokenEstimator";
-import { logger } from "@/services/logging/logger";
+import { logger } from "@/core/logging/logger";
 import type { APIChatMessage } from "@/types/chat";
 import type { ChatConversation } from "@/types";
 import { extractMessageText } from "@/types/chat";

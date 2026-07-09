@@ -13,7 +13,7 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react";
 import { useAppUpdater } from "../../hooks/useAppUpdater";
-import { environmentService } from "../../services/platform/environmentService";
+import { environmentService } from "../../core/platform/environmentService";
 
 export const UpdateBanner = () => {
   const isTauri = environmentService.isTauri();

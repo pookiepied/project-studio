@@ -10,10 +10,10 @@ import { useRecording } from "@/contexts/RecordingContext";
 import { useChat } from "@/features/chat/context";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { NotificationService } from "@/services/notifications";
-import { TrayService } from "@/services/platform/trayService";
+import { NotificationService } from "@/core/notifications";
+import { TrayService } from "@/core/platform/trayService";
 import { formatShortcutKeys } from "@/utils/shortcutFormatter";
-import { logger } from "@/services/logging/logger";
+import { logger } from "@/core/logging/logger";
 
 /** Split text into natural lines for sequential reveal. */
 function toLines(text: string): string[] {

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { StudioMark } from "../brand";
-import { SPLASH_EXIT_DURATION_SECONDS } from "../../constants/splashTiming";
+import { SPLASH_EXIT_DURATION_SECONDS } from "../../core/config/constants/splashTiming";
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 const EASE_STANDARD = [0.4, 0, 0.2, 1] as const;

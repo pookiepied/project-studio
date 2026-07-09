@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { environmentService } from "@/services/platform/environmentService";
-import { logger } from "@/services/logging/logger";
-import { connectionManager } from "@/services/connection";
+import { environmentService } from "@/core/platform/environmentService";
+import { logger } from "@/core/logging/logger";
+import { connectionManager } from "@/core/connection";
 import { getLocalMcpServer, readLocalMcpPermission, setLocalMcpPermission } from "./catalog";
 import {
   grantedServers,

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatConversation } from "../../../types";
-import { logger } from "../../logging/logger";
+import { logger } from "@/core/logging/logger";
 import type { ConversationIndex, ConversationIndexEntry, ConversationStore } from "./types";
 import {
   getLocalConversationDir,

@@ -18,8 +18,8 @@ import { listen, emit } from "@tauri-apps/api/event";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { FloatingIsland } from "../components/overlays/FloatingIsland";
 import { RecordingState } from "../types";
-import type { OverlayPayload, OverlayActionType } from "../services/platform/overlayService";
-import { deriveIslandViewState, getIslandWindowSize } from "../services/platform/islandViewState";
+import type { OverlayPayload, OverlayActionType } from "../core/platform/overlayService";
+import { deriveIslandViewState, getIslandWindowSize } from "../core/platform/islandViewState";
 
 export function OverlayPage() {
   const [payload, setPayload] = useState<OverlayPayload>({

@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Update } from "@tauri-apps/plugin-updater";
-import { environmentService } from "../services/platform/environmentService";
+import { environmentService } from "../core/platform/environmentService";
 
 export type UpdaterState =
   | { status: "idle" }

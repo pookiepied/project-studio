@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { connectionManager } from "./services/connection";
+import { connectionManager } from "./core/connection";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
@@ -17,16 +17,16 @@ import { SplashScreen } from "./components/feedback/SplashScreen";
 import { OfflineModal } from "./components/feedback/OfflineModal";
 import { UpdateBanner } from "./components/feedback/UpdateBanner";
 import { ContextMenu } from "./components/layout/ContextMenu";
-import { unifiedStorage } from "./services/storage/unifiedStorageService";
-import { globalErrorHandler } from "./services/errors/globalErrorHandler";
-import { apiManager } from "./services/network/apiManager";
-import { logger } from "./services/logging/logger";
-import { environmentService } from "./services/platform/environmentService";
+import { unifiedStorage } from "./core/storage/unifiedStorageService";
+import { globalErrorHandler } from "./core/errors/globalErrorHandler";
+import { apiManager } from "./core/network/apiManager";
+import { logger } from "./core/logging/logger";
+import { environmentService } from "./core/platform/environmentService";
 import { invoke } from "@tauri-apps/api/core";
 import { useRuntimeInit } from "@/runtime";
 import { HarnessPermissionModal } from "./components/ui/HarnessPermissionModal";
-import { deployBundledLocalSkills } from "./services/skills/skillDeployer";
-import { STARTUP_SPLASH_MIN_MS } from "./constants/splashTiming";
+import { deployBundledLocalSkills } from "./core/skills/skillDeployer";
+import { STARTUP_SPLASH_MIN_MS } from "./core/config/constants/splashTiming";
 import { resolveTheme } from "./utils/theme";
 
 function AppToaster() {
@@ -237,7 +237,7 @@ function AppRouter({ onReady }: { onReady: () => void }) {
       try {
         await apiManager.isConfigured();
       } catch (error) {
-        logger.error('App', 'Failed to check API config', error);
+        logger.error('App', 'Failed to check API core/config', error);
       } finally {
         setCheckingAPI(false);
       }

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from "react";
 import { apiClient } from "../utils/api";
 import { aiService, APIChatMessage } from "../services/ai/aiService";
-import { logger } from "../services/logging/logger";
+import { logger } from "../core/logging/logger";
 
 export type SessionState =
   | "idle"

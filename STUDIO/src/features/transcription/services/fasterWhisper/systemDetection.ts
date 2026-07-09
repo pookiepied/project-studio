@@ -4,7 +4,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { logger } from '@/services/logging/logger';
+import { logger } from '@/core/logging/logger';
 
 export interface SystemInfo {
   hasPython: boolean;

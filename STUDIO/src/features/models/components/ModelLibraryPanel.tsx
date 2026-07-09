@@ -14,7 +14,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useModelsContext as useModels } from "@/features/models/context";
 import { sortModels, sortProvidersByFree, groupModelsByProvider } from "@/services/ai/modelService";
-import { AUTO_DISPLAY_MODEL } from "@/config/autoMode";
+import { AUTO_DISPLAY_MODEL } from "@/core/config/autoMode";
 import {
   CHAT_SELECTABLE_TYPES, LONG_CONTEXT_TOKENS,
   isFreeModel, isVisionModel, hasTools, modelMatchesSearch,

@@ -6,7 +6,7 @@
 import { AppSettings, ThemePreference } from "../../types";
 import { RephraseTone } from "../../utils/prompts";
 import { unifiedStorage } from "./unifiedStorageService";
-import { migrateModelId } from "../ai/modelService";
+import { migrateModelId } from "@/services/ai/modelService";
 import { logger } from "../logging/logger";
 import { isThemePreference } from "../../utils/theme";
 

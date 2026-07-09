@@ -1,10 +1,10 @@
 /**
  * Constants barrel — the single import surface for ALL app-wide static values.
  *
- * Per the §2 placement rule, app-wide constants live in `src/constants/`.
+ * Per the §2 placement rule, app-wide constants live in `src/core/config/constants/`.
  * This barrel re-exports every categorized group so consumers can do:
  *
- *   import { TOKEN_LIMITS, ERROR_MESSAGES } from "@/constants";
+ *   import { TOKEN_LIMITS, ERROR_MESSAGES } from "@/core/config/constants";
  *
  * — regardless of which sibling file actually defines them. New app constants
  * go into one of: app.ts / network.ts / ui.ts / models.ts / splashTiming.ts.

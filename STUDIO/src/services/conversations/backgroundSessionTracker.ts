@@ -16,7 +16,7 @@
  */
 
 import { wsPool } from "@/runtime";
-import type { NotificationService as NS } from "../notifications/notificationService";
+import type { NotificationService as NS } from "@/core/notifications/notificationService";
 
 export type ConversationSessionStatus =
   | "streaming"

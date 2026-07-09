@@ -6,8 +6,8 @@ import {
   CopyIcon as Copy,
   CheckIcon as Check,
 } from "@phosphor-icons/react";
-import { reportError } from "../services/errors/errorReporting";
-import { logger } from "../services/logging/logger";
+import { reportError } from "../core/errors/errorReporting";
+import { logger } from "../core/logging/logger";
 
 interface Props {
   children: ReactNode;

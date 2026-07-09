@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mcpService, type McpServer } from "@/core/mcpRegistry/registryClient";
-import { environmentService } from "@/services/platform/environmentService";
+import { environmentService } from "@/core/platform/environmentService";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AddFormState } from "../types";
 

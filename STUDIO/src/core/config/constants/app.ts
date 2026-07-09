@@ -2,9 +2,9 @@
  * App-wide tuning constants — token/context limits, caches, memory, validation, feature flags.
  *
  * Split out of the historical config/constants.ts monolith during Phase 5 (T5.1)
- * per the §2 placement rule (app-wide static values live in `constants/`).
+ * per the §2 placement rule (app-wide static values live in `core/config/constants/`).
  * Co-located siblings: network.ts, ui.ts, models.ts, splashTiming.ts — all
- * re-exported by `constants/index.ts` for ergonomic imports.
+ * re-exported by `core/config/constants/index.ts` for ergonomic imports.
  */
 
 // Token and Context Management

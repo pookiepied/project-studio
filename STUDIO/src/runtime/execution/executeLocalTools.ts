@@ -22,8 +22,8 @@ import {
   truncateMcpOutput,
   formatMcpError,
 } from "../invoke/invokeMcpTool";
-import { logger } from "@/services/logging/logger";
-import { connectionManager } from "@/services/connection";
+import { logger } from "@/core/logging/logger";
+import { connectionManager } from "@/core/connection";
 import type { APIChatMessage, LocalToolCall, ToolResultItem } from "@/types/chat";
 import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "@/features/chat/context/types";
 import { isLocalMcpServer } from "@/permissions";

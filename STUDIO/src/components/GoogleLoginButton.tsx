@@ -10,11 +10,11 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { WarningCircleIcon as WarningCircle } from "@phosphor-icons/react";
-import { apiManager } from "../services/network/apiManager";
-import { environmentService } from "../services/platform/environmentService";
+import { apiManager } from "../core/network/apiManager";
+import { environmentService } from "../core/platform/environmentService";
 import { googleSDK } from "../services/auth/googleSDK";
-import { isFeatureEnabled } from "../services/platform/featureManager";
-import { logger } from "../services/logging/logger";
+import { isFeatureEnabled } from "../core/platform/featureManager";
+import { logger } from "../core/logging/logger";
 
 let tauriOAuth: typeof import("../services/auth/tauriOAuth") | null = null;
 
@@ -43,7 +43,7 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
         setHasAPIConfigured(hasAPI);
         
       } catch (error) {
-        logger.error('GoogleLoginButton', 'Failed to check API config', error);
+        logger.error('GoogleLoginButton', 'Failed to check API core/config', error);
         setHasAPIConfigured(false);
       } finally {
         setCheckingAPI(false);

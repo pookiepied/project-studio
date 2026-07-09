@@ -6,8 +6,8 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { apiManager } from "../network/apiManager";
-import { logger } from "../logging/logger";
+import { apiManager } from "@/core/network/apiManager";
+import { logger } from "@/core/logging/logger";
 
 /**
  * Get the Google Client ID from API manager

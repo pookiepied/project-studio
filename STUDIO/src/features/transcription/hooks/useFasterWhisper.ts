@@ -8,7 +8,7 @@ import {
   loadConfig,
   type FasterWhisperConfig,
 } from '@/features/transcription/services/fasterWhisper';
-import { logger } from '@/services/logging/logger';
+import { logger } from '@/core/logging/logger';
 
 export interface UseFasterWhisperResult {
   config: FasterWhisperConfig | null;
@@ -32,7 +32,7 @@ export function useFasterWhisper(): UseFasterWhisperResult {
       const loadedConfig = await loadConfig();
       setConfig(loadedConfig);
     } catch (error) {
-      logger.error('useFasterWhisper', 'Failed to load config', error);
+      logger.error('useFasterWhisper', 'Failed to load core/config', error);
     } finally {
       setIsLoading(false);
     }

@@ -25,7 +25,7 @@ import {
   type ModelDownloadProgress,
   type InstalledModelInfo,
 } from '@/features/transcription/services/fasterWhisper';
-import { logger } from '@/services/logging/logger';
+import { logger } from '@/core/logging/logger';
 
 export const FasterWhisperStatus = () => {
   const { isEnabled } = useFeatures();

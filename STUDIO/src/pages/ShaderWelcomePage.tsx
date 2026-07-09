@@ -1,10 +1,10 @@
 import { GoogleLoginButton } from "../components/GoogleLoginButton";
 import { toast } from "sonner";
-import { apiManager } from "../services/network/apiManager";
-import { logger } from "../services/logging/logger";
+import { apiManager } from "../core/network/apiManager";
+import { logger } from "../core/logging/logger";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { environmentService } from "../services/platform/environmentService";
+import { environmentService } from "../core/platform/environmentService";
 import {
   XIcon      as X,
   MinusIcon  as Minus,

@@ -15,7 +15,7 @@
  */
 
 import { apiClient } from "../../utils/api";
-import { logger } from "../logging/logger";
+import { logger } from "@/core/logging/logger";
 import { ChatMessage } from "../../types";
 
 // ---------------------------------------------------------------------------

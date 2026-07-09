@@ -3,7 +3,7 @@
  *
  * Split out of the historical config/constants.ts monolith during Phase 5 (T5.1)
  * per the §2 placement rule. Co-located siblings: app.ts, network.ts, models.ts,
- * splashTiming.ts — all re-exported by `constants/index.ts`.
+ * splashTiming.ts — all re-exported by `core/config/constants/index.ts`.
  */
 
 // UI Configuration

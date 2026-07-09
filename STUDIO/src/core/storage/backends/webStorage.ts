@@ -3,7 +3,7 @@
  * Replaces Tauri file system with browser localStorage/indexedDB
  */
 
-import { logger } from '../logging/logger';
+import { logger } from '@/core/logging/logger';
 
 // Simple localStorage wrapper for web version
 export const webStorageService = {

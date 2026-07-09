@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatConversation } from "../../../types";
 import type { ConversationIndex } from "../storage/types";
-import { logger } from "../../logging/logger";
+import { logger } from "@/core/logging/logger";
 import {
   getClaudeProjectDir,
   getClaudeProjectKeyFromPath,

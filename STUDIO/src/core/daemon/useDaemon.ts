@@ -6,9 +6,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useFeatures } from './useFeatures';
-import { useSettings } from '../contexts/SettingsContext';
-import { logger } from '../services/logging/logger';
+import { useFeatures } from '@/hooks/useFeatures';
+import { useSettings } from '@/contexts/SettingsContext';
+import { logger } from '../logging/logger';
 
 export interface DaemonStatus {
   running: boolean;

@@ -1,7 +1,7 @@
 import { createContext, useContext, ReactNode, type RefObject } from "react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useSettings } from "./SettingsContext";
-import { NotificationService } from "../services/notifications";
+import { NotificationService } from "../core/notifications";
 import { RecordingState } from "../types";
 
 interface RecordingContextType {

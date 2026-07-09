@@ -1,7 +1,7 @@
 import {
   getStudioConversationHome,
   joinStudioPath,
-} from "@/infrastructure/platform/studioPaths";
+} from "@/core/platform/studioPaths";
 
 export async function getStudioConversationRoot(): Promise<string> {
   return getStudioConversationHome();

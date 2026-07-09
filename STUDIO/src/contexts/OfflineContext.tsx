@@ -4,7 +4,7 @@
  */
 
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from "react";
-import { networkService, NetworkStatus } from "../services/network/networkService";
+import { networkService, NetworkStatus } from "../core/network/networkService";
 
 interface OfflineContextType {
   isOffline: boolean;

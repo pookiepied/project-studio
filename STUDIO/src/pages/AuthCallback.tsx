@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { googleSDK } from "../services/auth/googleSDK";
-import { logger } from "../services/logging/logger";
+import { logger } from "../core/logging/logger";
 import { SplashScreen } from "../components/feedback/SplashScreen";
 
 export const AuthCallback = () => {

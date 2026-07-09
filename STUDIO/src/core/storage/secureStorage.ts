@@ -292,23 +292,23 @@ export async function storeAPIConfig(config: {
     if (environmentService.isTauri()) {
       try {
         await invoke('store_secure', { 
-          key: 'api_config', 
+          key: 'api_core/config', 
           value: configString 
         });
         logger.debug('SecureStorage', 'API config stored in Tauri secure storage');
       } catch (error) {
         logger.warn('SecureStorage', 'Tauri secure storage failed, falling back to localStorage', error);
-        localStorage.setItem('studio_api_config', configString);
+        localStorage.setItem('studio_api_core/config', configString);
         logger.debug('SecureStorage', 'API config stored in localStorage fallback');
       }
     } else {
-      localStorage.setItem('studio_api_config', configString);
+      localStorage.setItem('studio_api_core/config', configString);
       logger.debug('SecureStorage', 'API config stored in localStorage');
     }
 
     logger.info('SecureStorage', 'API config stored successfully');
   } catch (error) {
-    logger.error('SecureStorage', 'Failed to store API config', error);
+    logger.error('SecureStorage', 'Failed to store API core/config', error);
     throw error;
   }
 }
@@ -326,17 +326,17 @@ export async function getAPIConfig(): Promise<{
 
     if (environmentService.isTauri()) {
       try {
-        storedData = await invoke('get_secure', { key: 'api_config' }) as string;
+        storedData = await invoke('get_secure', { key: 'api_core/config' }) as string;
         logger.debug('SecureStorage', 'Retrieved config from Tauri secure storage');
       } catch (error) {
         logger.warn('SecureStorage', 'Tauri secure storage failed, trying localStorage fallback', error);
-        storedData = localStorage.getItem('studio_api_config');
+        storedData = localStorage.getItem('studio_api_core/config');
         if (storedData) {
           logger.debug('SecureStorage', 'Retrieved config from localStorage fallback');
         }
       }
     } else {
-      storedData = localStorage.getItem('studio_api_config');
+      storedData = localStorage.getItem('studio_api_core/config');
       if (storedData) {
         logger.debug('SecureStorage', 'Retrieved config from localStorage');
       }
@@ -351,14 +351,14 @@ export async function getAPIConfig(): Promise<{
     
     // Handle both encrypted and unencrypted data (for migration)
     if (storedConfig.encrypted) {
-      logger.debug('SecureStorage', 'Decrypting stored config');
+      logger.debug('SecureStorage', 'Decrypting stored core/config');
       const config = {
         endpoint: storedConfig.endpoint,
         jwtSecret: await decryptData(storedConfig.jwtSecret),
         customClientId: storedConfig.customClientId ? 
           await decryptData(storedConfig.customClientId) : undefined
       };
-      logger.info('SecureStorage', 'Successfully decrypted API config');
+      logger.info('SecureStorage', 'Successfully decrypted API core/config');
       return config;
     } else {
       logger.debug('SecureStorage', 'Using unencrypted stored config (legacy)');
@@ -370,7 +370,7 @@ export async function getAPIConfig(): Promise<{
       };
     }
   } catch (error) {
-    logger.error('SecureStorage', 'Failed to retrieve API config', error);
+    logger.error('SecureStorage', 'Failed to retrieve API core/config', error);
     return null;
   }
 }
@@ -381,13 +381,13 @@ export async function getAPIConfig(): Promise<{
 export async function clearAPIConfig(): Promise<void> {
   try {
     if (environmentService.isTauri()) {
-      await invoke('remove_secure', { key: 'api_config' });
+      await invoke('remove_secure', { key: 'api_core/config' });
     } else {
-      localStorage.removeItem('studio_api_config');
+      localStorage.removeItem('studio_api_core/config');
     }
     logger.info('SecureStorage', 'API config cleared');
   } catch (error) {
-    logger.error('SecureStorage', 'Failed to clear API config', error);
+    logger.error('SecureStorage', 'Failed to clear API core/config', error);
   }
 }
 

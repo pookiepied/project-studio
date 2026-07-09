@@ -8,7 +8,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { getVenvDir } from './config';
-import { logger } from '@/services/logging/logger';
+import { logger } from '@/core/logging/logger';
 
 interface CUDAPathsResult {
   success: boolean;

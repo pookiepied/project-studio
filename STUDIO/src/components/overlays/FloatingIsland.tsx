@@ -18,8 +18,8 @@ import {
   ChatsCircleIcon as ChatsCircle,
 } from "@phosphor-icons/react";
 
-import type { OverlayPayload, OverlayActionType } from "../../services/platform/overlayService";
-import { deriveIslandViewState, getIslandVisualSize } from "../../services/platform/islandViewState";
+import type { OverlayPayload, OverlayActionType } from "../../core/platform/overlayService";
+import { deriveIslandViewState, getIslandVisualSize } from "../../core/platform/islandViewState";
 import { RecordingState } from "../../types";
 
 import {

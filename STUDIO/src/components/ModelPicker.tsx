@@ -21,7 +21,7 @@ import {
 } from "../services/ai/modelFilter";
 import { isVisionModel } from "../utils/modelUtils";
 import { ProviderIcon, getProviderDisplayName } from "./ProviderIcon";
-import { AI_MODES } from "../config/autoMode";
+import { AI_MODES } from "../core/config/autoMode";
 
 export interface ModelPickerProps {
   models: Model[];

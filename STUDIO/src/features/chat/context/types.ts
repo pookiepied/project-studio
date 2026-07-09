@@ -12,7 +12,7 @@ import type {
   ClaudeSessionMetadata,
   MessageSegment,
 } from "@/types";
-import type { ConversationStorageScope } from "@/services/storage/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
 import type { FileAttachment } from "@/services/files/fileAttachmentService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
 import type {

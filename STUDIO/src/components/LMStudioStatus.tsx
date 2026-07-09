@@ -10,8 +10,8 @@ import {
   CaretDownIcon as CaretDown,
 } from '@phosphor-icons/react';
 import { Toggle } from './ui/Toggle';
-import { useDaemon } from '../hooks/useDaemon';
-import { createDaemonClient, LocalModel } from '../services/local/daemonClient';
+import { useDaemon } from '../core/daemon/useDaemon';
+import { createDaemonClient, LocalModel } from '../core/daemon/daemonClient';
 
 interface LMStudioStatusProps {
   enabled: boolean;

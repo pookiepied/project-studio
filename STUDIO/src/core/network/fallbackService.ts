@@ -3,10 +3,10 @@
  * Provides fallback mechanisms for various system failures
  */
 
-import { Model } from "../ai/modelService";
-import { AttachmentLimits } from "../files/attachmentLimits";
+import { Model } from "@/services/ai/modelService";
+import { AttachmentLimits } from "@/services/files/attachmentLimits";
 import { errorService } from "../errors/errorService";
-import { detectVisionSupport, detectContextWindow } from "../ai/modelCapabilityService";
+import { detectVisionSupport, detectContextWindow } from "@/services/ai/modelCapabilityService";
 import { logger } from "../logging/logger";
 
 /**

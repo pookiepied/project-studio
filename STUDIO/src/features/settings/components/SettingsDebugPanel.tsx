@@ -11,12 +11,12 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
 import { Icon, Refresh, Warning, Close } from "@/components/icons";
 import { useSettings } from "@/contexts/SettingsContext";
-import { configService } from "@/services/storage/configService";
-import { comprehensiveDiagnostics, type DiagnosticTest, type DiagnosticReport } from "@/services/errors/comprehensiveDiagnostics";
-import { getSaltInfo } from "@/services/storage/secureStorage";
+import { configService } from "@/core/storage/configService";
+import { comprehensiveDiagnostics, type DiagnosticTest, type DiagnosticReport } from "@/core/errors/comprehensiveDiagnostics";
+import { getSaltInfo } from "@/core/storage/secureStorage";
 import { tokenManager } from "@/utils/tokenManager";
-import { logger } from "@/services/logging/logger";
-import { environmentService } from "@/services/platform/environmentService";
+import { logger } from "@/core/logging/logger";
+import { environmentService } from "@/core/platform/environmentService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ export const SettingsDebugPanel = () => {
 
   const detectStorageBackend = async () => {
     try {
-      const { unifiedStorage } = await import("@/services/storage/unifiedStorageService");
+      const { unifiedStorage } = await import("@/core/storage/unifiedStorageService");
       await unifiedStorage.initialize();
       setStorageBackend((await unifiedStorage.isUsingTauriFS()) ? "Tauri FS" : "Web Storage");
     } catch {
@@ -511,7 +511,7 @@ export const SettingsDebugPanel = () => {
         <IconButton
           variant="outline"
           size="sm"
-          aria-label="Export config"
+          aria-label="Export core/config"
           onClick={handleExportSettings}
         >
           <Icon icon={FileArrowDown as unknown as PhosphorIcon} size="sm" weight="regular" />

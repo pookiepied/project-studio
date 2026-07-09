@@ -6,7 +6,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/features/chat/context";
-import { environmentService } from "@/services/platform/environmentService";
+import { environmentService } from "@/core/platform/environmentService";
 import { useMcpServers, useComposio } from "./hooks";
 import {
   HeroBanner,

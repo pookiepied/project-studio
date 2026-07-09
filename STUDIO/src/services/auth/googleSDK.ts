@@ -4,8 +4,8 @@
  * Supports both One Tap (desktop) and redirect flow (mobile)
  */
 
-import { logger } from '../logging/logger';
-import { isFeatureEnabled } from '../platform/featureManager';
+import { logger } from '@/core/logging/logger';
+import { isFeatureEnabled } from '@/core/platform/featureManager';
 
 class GoogleSDKManager {
   private isInitialized = false;

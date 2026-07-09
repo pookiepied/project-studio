@@ -1,11 +1,11 @@
 import { APIResponse } from "../../types";
 import { convertOllamaToModel } from "./localModelDetection";
-import { safeGetContextWindow, handleNetworkFailure } from "../network/fallbackService";
+import { safeGetContextWindow, handleNetworkFailure } from "@/core/network/fallbackService";
 import * as ollamaService from "./ollamaService";
 import * as fasterWhisperService from "@/features/transcription/services/fasterWhisper";
-import { logger } from "../logging/logger";
-import { isFeatureEnabled } from "../platform/featureManager";
-import { CACHE_CONFIG, STORAGE_KEYS } from "@/constants";
+import { logger } from "@/core/logging/logger";
+import { isFeatureEnabled } from "@/core/platform/featureManager";
+import { CACHE_CONFIG, STORAGE_KEYS } from "@/core/config/constants";
 
 export interface Model {
   id: string;
@@ -159,7 +159,7 @@ export async function fetchModels(
 
   logger.debug('Models', 'Fetching fresh data...');
   
-  const { apiManager } = await import("../network/apiManager");
+  const { apiManager } = await import("@/core/network/apiManager");
   const config = await apiManager.getConfig();
   
   let cloudResponse: APIResponse<ModelsResponse>;

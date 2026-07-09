@@ -1,4 +1,4 @@
-import { apiManager } from "../network/apiManager";
+import { apiManager } from "@/core/network/apiManager";
 import { tokenManager } from "../../utils/tokenManager";
 
 async function getComposioBase(): Promise<string> {

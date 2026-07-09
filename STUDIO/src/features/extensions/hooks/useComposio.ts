@@ -13,7 +13,7 @@ import {
   type ComposioApp,
   type ComposioConnection,
 } from "@/services/ai/composioService";
-import { environmentService } from "@/services/platform/environmentService";
+import { environmentService } from "@/core/platform/environmentService";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface UseComposioReturn {

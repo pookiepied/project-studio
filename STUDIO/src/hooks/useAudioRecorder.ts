@@ -2,10 +2,10 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { RecordingState } from "../types";
 import { aiService } from "../services";
 import { processTranscriptionChunks, TranscriptionChunk } from "../utils/textMerger";
-import { reportError } from "../services/errors/errorReporting";
-import { errorService } from "../services/errors/errorService";
-import { NotificationService } from "../services/notifications";
-import { logger } from "../services/logging/logger";
+import { reportError } from "../core/errors/errorReporting";
+import { errorService } from "../core/errors/errorService";
+import { NotificationService } from "../core/notifications";
+import { logger } from "../core/logging/logger";
 
 interface AudioRecorderOptions {
   chunkDuration?: number; // seconds

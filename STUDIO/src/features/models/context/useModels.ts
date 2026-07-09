@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { fetchModels, Model, ModelsResponse, ProviderInfo } from "@/services/ai/modelService";
-import { errorService } from "@/services/errors/errorService";
+import { errorService } from "@/core/errors/errorService";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useDaemon } from "@/hooks/useDaemon";
-import { createDaemonClient } from "@/services/local/daemonClient";
-import { logger } from "@/services/logging/logger";
+import { useDaemon } from "@/core/daemon/useDaemon";
+import { createDaemonClient } from "@/core/daemon/daemonClient";
+import { logger } from "@/core/logging/logger";
 
 export interface UseModelsResult {
   models: Model[];

@@ -6,8 +6,8 @@ import {
   updateConversationTitle,
   type ConversationStorageScope,
   type ConversationListOptions,
-} from "../services/storage/chatHistoryService";
-import { TAURI_CONFIG } from "../config/tauriConfig";
+} from "../core/storage/chatHistoryService";
+import { TAURI_CONFIG } from "../core/config/tauriConfig";
 
 export interface ConversationMetadata {
   id:           string;

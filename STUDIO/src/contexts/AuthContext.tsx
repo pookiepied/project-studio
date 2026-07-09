@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from "react";
 import { tokenManager } from "../utils/tokenManager";
-import { unifiedStorage } from "../services/storage/unifiedStorageService";
+import { unifiedStorage } from "../core/storage/unifiedStorageService";
 
 interface DecodedToken {
   sub: string;
@@ -21,8 +21,8 @@ function decodeTokenPayload(token: string | null): DecodedToken | null {
     return null;
   }
 }
-import { apiManager } from "../services/network/apiManager";
-import { logger } from "../services/logging/logger";
+import { apiManager } from "../core/network/apiManager";
+import { logger } from "../core/logging/logger";
 
 interface User {
   id: string;

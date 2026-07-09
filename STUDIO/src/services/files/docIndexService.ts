@@ -1,6 +1,6 @@
-import { apiManager } from "../network/apiManager";
+import { apiManager } from "@/core/network/apiManager";
 import { createHeaders } from "../../utils/api";
-import { logger } from "../logging/logger";
+import { logger } from "@/core/logging/logger";
 
 /** Characters of extracted text above which we RAG-index instead of inlining. */
 export const DOC_RAG_THRESHOLD = 100_000; // ~25K tokens

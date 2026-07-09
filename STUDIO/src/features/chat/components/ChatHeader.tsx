@@ -12,7 +12,7 @@ import { OverviewIcon } from "@/components/icons/WorkspaceIcons";
 import { ConversationsDropdown } from "./ConversationsDropdown";
 import type { ConversationMetadata } from "@/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/services/conversations/backgroundSessionTracker";
-import type { ConversationStorageScope } from "@/services/storage/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
 
 interface ChatHeaderProps {
   // Title

@@ -10,8 +10,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { apiManager } from "../services/network/apiManager";
-import { AI_MODES, type AIMode } from "../config/autoMode";
+import { apiManager } from "../core/network/apiManager";
+import { AI_MODES, type AIMode } from "../core/config/autoMode";
 
 interface UsemodesResult {
   modes: AIMode[];

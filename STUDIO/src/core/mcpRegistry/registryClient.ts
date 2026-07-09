@@ -1,6 +1,6 @@
-import { apiManager } from "@/services/network/apiManager";
+import { apiManager } from "@/core/network/apiManager";
 import { tokenManager } from "@/utils/tokenManager";
-import { logger } from "@/services/logging/logger";
+import { logger } from "@/core/logging/logger";
 
 /**
  * A single installed MCP server as returned by the backend.

@@ -5,7 +5,7 @@ import { ArtifactPanelContext }                      from "@/contexts/ArtifactPa
 import { ModelLibraryPanel }                         from "@/features/models";
 import { SummaryPanel }                              from "@/features/artifacts";
 import { ContextAutocomplete }                       from "@/features/chat/components/ContextAutocomplete";
-import { environmentService }                        from "@/services/platform/environmentService";
+import { environmentService }                        from "@/core/platform/environmentService";
 import { useChat }                                   from "@/features/chat/context";
 import { useModelsContext as useModels }              from "@/features/models/context";
 import { useDraftPersistence }                       from "@/features/chat/hooks/useDraftPersistence";
@@ -27,7 +27,7 @@ import { usePermissionPrompt }                       from "@/features/chat/hooks
 import { useExclusivePanel, broadcastPanelOpen }     from "@/hooks/useExclusivePanel";
 import { useLocalCapabilities }                      from "@/features/chat/hooks/useLocalCapabilities";
 import { useClaudeAccountStatus }                    from "@/features/chat/hooks/useClaudeAccountStatus";
-import type { ConversationStorageScope }             from "@/services/storage/chatHistoryService";
+import type { ConversationStorageScope }             from "@/core/storage/chatHistoryService";
 
 import { ChatHeader }           from "@/features/chat/components/ChatHeader";
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
