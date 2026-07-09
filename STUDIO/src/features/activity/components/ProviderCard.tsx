@@ -1,5 +1,5 @@
-import { Warning } from "@/components/icons";
-import { ProviderIcon, getProviderDisplayName } from "@/components/ProviderIcon";
+import { Warning } from "@/ui/icons";
+import { ProviderIcon, getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import { fmtTokens, fmtCost } from "../formatters";
 import type { UsageRow, CreditEntry } from "../types";
 

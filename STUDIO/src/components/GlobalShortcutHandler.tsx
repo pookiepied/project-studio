@@ -14,8 +14,8 @@
 
 import { useEffect, useRef } from "react";
 import { useSettings } from "../contexts/SettingsContext";
-import { useRecording } from "../contexts/RecordingContext";
-import { useLiveSessionContext } from "../contexts/LiveSessionContext";
+import { useRecording } from "@/features/voice/context/RecordingContext";
+import { useLiveSessionContext } from "@/features/voice/context/LiveSessionContext";
 import {
   registerGlobalShortcut,
   unregisterGlobalShortcut,

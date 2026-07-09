@@ -1,4 +1,4 @@
-import { GoogleLoginButton } from "../components/GoogleLoginButton";
+import { GoogleLoginButton } from "@/features/auth/components/GoogleLoginButton";
 import { toast } from "sonner";
 import { apiManager } from "../core/network/apiManager";
 import { logger } from "../core/logging/logger";

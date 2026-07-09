@@ -4,9 +4,9 @@
  * Note: Canvas integration disabled - feature coming soon
  */
 
-// import { ChatConversation } from '../../types'; // Not used - commented out to avoid lint error
-// import { CanvasData } from '../../types/canvas'; // Disabled - canvas removed
-import { UnifiedConversation } from '../../types/conversation';
+// import { ChatConversation } from '@/types'; // Not used - commented out to avoid lint error
+// import { CanvasData } from '@/types/canvas'; // Disabled - canvas removed
+import { UnifiedConversation } from '@/types/conversation';
 import * as chatHistoryService from '../storage/chatHistoryService';
 // import * as canvasService from '../canvas/canvasService'; // Disabled - canvas removed
 import { errorService } from '../errors/errorService';

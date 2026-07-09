@@ -11,10 +11,10 @@ import {
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
-import { SearchInput } from "@/components/ui/SearchInput";
-import { Icon, Back, Manage } from "@/components/icons";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { SearchInput } from "@/ui/primitives/SearchInput";
+import { Icon, Back, Manage } from "@/ui/icons";
 import { environmentService } from "@/core/platform/environmentService";
 import {
   HARNESS_PERMISSION_KEY,
@@ -26,12 +26,12 @@ import {
   type LocalMcpServerDef,
 } from "@/runtime";
 import { useNavigation } from "@/contexts/NavigationContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useFeatures } from "@/hooks/useFeatures";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useModelsContext as useModels } from "@/features/models/context";
-import { AuthControls } from "@/components/AuthControls";
+import { AuthControls } from "@/features/auth/components/AuthControls";
 import { AppSettings, ThemePreference } from "@/types";
 import { logger } from "@/core/logging/logger";
 import { AutostartService } from "@/core/platform/autostartService";

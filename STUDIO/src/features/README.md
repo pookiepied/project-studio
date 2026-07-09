@@ -33,7 +33,7 @@ features/<feature>/
   `src/contexts/`. Feature-scoped state lives in `features/<feature>/context/`.
 - **Cross-cutting infra** (network, storage, errors, logging, platform, notifications, auth) stays
   in `src/services/`. Feature business logic lives in `features/<feature>/services/`.
-- Use the `@/` path alias for imports (e.g. `@/components/ui/Button`).
+- Use the `@/` path alias for imports (e.g. `@/ui/primitives/Button`).
 
 ## Planned features (created on migration — Phase 4)
 

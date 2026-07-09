@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Collapse } from "@/components/icons";
+import { Collapse } from "@/ui/icons";
 
 /**
  * Navigation tile (a section entry on the settings landing menu). Tokenized

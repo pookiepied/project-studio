@@ -1,5 +1,5 @@
-import { AppSettings } from "../../types";
-import { RephraseTone } from "../../utils/prompts";
+import { AppSettings } from "@/types";
+import { RephraseTone } from "@/utils/prompts";
 import {
   loadSettingsFromFile,
   saveSettingsToFile,

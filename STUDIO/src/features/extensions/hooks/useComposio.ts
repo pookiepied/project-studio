@@ -12,9 +12,9 @@ import {
   refreshComposioAppsCache,
   type ComposioApp,
   type ComposioConnection,
-} from "@/services/ai/composioService";
+} from "@/features/extensions/services/composioService";
 import { environmentService } from "@/core/platform/environmentService";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 export interface UseComposioReturn {
   // State

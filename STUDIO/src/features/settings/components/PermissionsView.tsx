@@ -5,7 +5,7 @@ import {
   WrenchIcon as Wrench,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
-import { Icon } from "@/components/icons";
+import { Icon } from "@/ui/icons";
 import {
   listGlobalMachineGrants,
   revokeGlobalMachineGrant,

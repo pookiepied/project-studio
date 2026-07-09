@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContextReference } from '@/features/chat/services/contextRetrievalService';
 import { ChatCircleDotsIcon as ChatCircleDots, PlugIcon as Plug, CloudIcon as Cloud } from '@phosphor-icons/react';
-import { AppLogo } from '@/components/brand';
+import { AppLogo } from '@/ui/brand';
 
 export interface AppMention {
   id: string;

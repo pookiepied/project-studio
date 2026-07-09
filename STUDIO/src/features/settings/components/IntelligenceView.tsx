@@ -5,10 +5,10 @@ import {
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { IconButton } from "@/components/ui/IconButton";
-import { Spinner } from "@/components/ui/Spinner";
-import { Icon, Manage, Refresh } from "@/components/icons";
-import { ModelPicker } from "@/components/ModelPicker";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Spinner } from "@/ui/primitives/Spinner";
+import { Icon, Manage, Refresh } from "@/ui/icons";
+import { ModelPicker } from "@/features/models/components/ModelPicker";
 import { useModelsContext as useModels } from "@/features/models/context";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatDate } from "@/utils/formatters";

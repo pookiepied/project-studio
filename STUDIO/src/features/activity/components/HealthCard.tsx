@@ -1,4 +1,4 @@
-import { Warning } from "@/components/icons";
+import { Warning } from "@/ui/icons";
 
 // ---------------------------------------------------------------------------
 // Status indicator — strict-neutral (D-401): no hue. State reads on the

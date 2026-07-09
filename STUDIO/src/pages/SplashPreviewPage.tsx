@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { SplashScreen } from "../components/feedback/SplashScreen";
+import { SplashScreen } from "../ui/feedback/SplashScreen";
 
 export function SplashPreviewPage() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));

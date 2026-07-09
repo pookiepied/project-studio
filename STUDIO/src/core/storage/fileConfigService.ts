@@ -3,10 +3,10 @@
  * Uses unified storage abstraction (Tauri FS primary, localStorage fallback)
  */
 
-import { AppSettings, ThemePreference } from "../../types";
-import { RephraseTone } from "../../utils/prompts";
+import { AppSettings, ThemePreference } from "@/types";
+import { RephraseTone } from "@/utils/prompts";
 import { unifiedStorage } from "./unifiedStorageService";
-import { migrateModelId } from "@/services/ai/modelService";
+import { migrateModelId } from "@/features/models/services/modelService";
 import { logger } from "../logging/logger";
 import { isThemePreference } from "../../utils/theme";
 

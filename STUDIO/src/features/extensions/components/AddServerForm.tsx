@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Warning } from "@/components/icons";
-import { Button } from "@/components/ui/Button";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Warning } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
+import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
 import { inputCls, labelCls } from "./ExtensionIcons";
 import type { AddFormState } from "../types";
 

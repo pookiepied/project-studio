@@ -9,8 +9,8 @@
  */
 
 import type { ChatEngine } from "@/cliBridges/types";
-import { StudioMark } from "@/components/brand/StudioMark";
-import { ClaudeCodeIcon } from "@/components/ui/ClaudeCodeIcon";
+import { StudioMark } from "@/ui/brand/StudioMark";
+import { ClaudeCodeIcon } from "@/ui/primitives/ClaudeCodeIcon";
 
 export type GlyphState = "idle" | "busy";
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Select } from "@/components/ui/Select";
-import { Toggle } from "@/components/ui/Toggle";
+import { Select } from "@/ui/primitives/Select";
+import { Toggle } from "@/ui/primitives/Toggle";
 import { useSettings } from "@/contexts/SettingsContext";
 import { logger } from "@/core/logging/logger";
 import { getAvailableTones, type RephraseTone } from "@/utils/prompts";

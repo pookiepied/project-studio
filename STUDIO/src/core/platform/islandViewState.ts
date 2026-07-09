@@ -1,4 +1,4 @@
-import { RecordingState } from "../../types";
+import { RecordingState } from "@/types";
 import type { IslandMode, OverlayPayload } from "./overlayService";
 
 export type IslandViewKind =

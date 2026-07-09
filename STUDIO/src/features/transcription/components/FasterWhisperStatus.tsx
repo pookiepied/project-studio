@@ -7,10 +7,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CpuIcon as Cpu, DownloadSimpleIcon as DownloadSimple, InfoIcon as Info } from '@phosphor-icons/react';
-import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/IconButton';
-import { Spinner } from '@/components/ui/Spinner';
-import { Success, Refresh, Delete, Warning, Icon } from '@/components/icons';
+import { Button } from '@/ui/primitives/Button';
+import { IconButton } from '@/ui/primitives/IconButton';
+import { Spinner } from '@/ui/primitives/Spinner';
+import { Success, Refresh, Delete, Warning, Icon } from '@/ui/icons';
 import { useFasterWhisper } from '@/features/transcription/hooks/useFasterWhisper';
 import { useFeatures } from '@/hooks/useFeatures';
 import {

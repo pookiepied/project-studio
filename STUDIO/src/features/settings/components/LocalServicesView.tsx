@@ -5,14 +5,14 @@ import {
   TerminalIcon as Terminal,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
-import { Icon } from "@/components/icons";
-import { Input } from "@/components/ui/Input";
-import { Toggle } from "@/components/ui/Toggle";
+import { Icon } from "@/ui/icons";
+import { Input } from "@/ui/primitives/Input";
+import { Toggle } from "@/ui/primitives/Toggle";
 import { useFeatures } from "@/hooks/useFeatures";
-import { OllamaStatus } from "@/components/OllamaStatus";
-import { LMStudioStatus } from "@/components/LMStudioStatus";
+import { OllamaStatus } from "@/features/models/components/OllamaStatus";
+import { LMStudioStatus } from "@/features/models/components/LMStudioStatus";
 import { FasterWhisperStatus } from "@/features/transcription";
-import { LocalProviderStatus } from "@/components/LocalProviderStatus";
+import { LocalProviderStatus } from "@/features/models/components/LocalProviderStatus";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { AppSettings } from "@/types";
 import { SectionLabel } from "./SectionLabel";

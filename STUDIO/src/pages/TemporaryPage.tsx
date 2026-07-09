@@ -11,7 +11,7 @@ import { UserMessage } from "@/features/chat/components/UserMessage";
 import { ArtifactRenderer } from "@/features/markdown";
 import { useSettings } from "../contexts/SettingsContext";
 import type { ChatMessage } from "../types";
-import type { FileAttachment } from "../services/files/fileAttachmentService";
+import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
 
 const SEARCH_ARTIFACT = {
   type: "artifact",

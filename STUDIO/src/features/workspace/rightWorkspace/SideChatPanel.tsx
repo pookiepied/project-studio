@@ -5,7 +5,7 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react";
 import { ChatProvider, useChat } from "@/features/chat/context";
-import { ResizeHandle } from "@/components/rightWorkspace/ResizeHandle";
+import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 
 interface SideChatPanelProps {
   width: number;

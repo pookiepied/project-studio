@@ -10,7 +10,7 @@ import { useChat }                                   from "@/features/chat/conte
 import { useModelsContext as useModels }              from "@/features/models/context";
 import { useDraftPersistence }                       from "@/features/chat/hooks/useDraftPersistence";
 import { useSettings }                               from "@/contexts/SettingsContext";
-import { useTTS }                                    from "@/hooks/useTTS";
+import { useTTS }                                    from "@/features/voice/hooks/useTTS";
 import { useChatScroll }                             from "@/features/chat/hooks/useChatScroll";
 import { useAtMention }                              from "@/features/chat/hooks/useAtMention";
 import { useConversationsList }                      from "@/hooks/useConversationsList";
@@ -37,11 +37,11 @@ import { RenameModal }          from "@/features/chat/components/RenameModal";
 import { ProjectContextPicker } from "@/features/chat/components/ProjectContextPicker";
 import { ContextWindowButton }  from "@/features/chat/components/ContextWindowButton";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
-import { ConnectionStatusBar }  from "@/components/ui/ConnectionStatusBar";
+import { ConnectionStatusBar }  from "@/ui/primitives/ConnectionStatusBar";
 import { ComposerApprovalCard } from "@/features/permissions";
-import { AskUserQuestionCard }  from "@/components/ui/AskUserQuestionCard";
+import { AskUserQuestionCard }  from "@/ui/primitives/AskUserQuestionCard";
 import { DocumentStorageModal } from "@/features/artifacts";
-import { ClaudeCodeIcon }       from "@/components/ui/ClaudeCodeIcon";
+import { ClaudeCodeIcon }       from "@/ui/primitives/ClaudeCodeIcon";
 import { ClaudeUsageBadge }     from "@/features/chat/components/ClaudeUsageBadge";
 import {
   RightWorkspaceControls,

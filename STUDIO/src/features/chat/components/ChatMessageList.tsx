@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { StreamingText } from "@/components/ui/StreamingText";
-import { ErrorDisplay } from "@/components/feedback/ErrorDisplay";
+import { StreamingText } from "@/ui/primitives/StreamingText";
+import { ErrorDisplay } from "@/ui/feedback/ErrorDisplay";
 import { ToolPermissionCard } from "@/runtime";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCachedIcon } from "../services/extensions/appIconCache";
+import { getCachedIcon } from "@/features/extensions/services/appIconCache";
 
 /** Resolves `url` through the local icon cache and returns a data-URL once ready. */
 export function useCachedIcon(url: string | undefined): string | undefined {

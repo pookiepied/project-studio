@@ -8,10 +8,10 @@ import {
   WrenchIcon as Wrench,
 } from "@phosphor-icons/react";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { OverviewIcon } from "@/components/icons/WorkspaceIcons";
+import { OverviewIcon } from "@/ui/icons/WorkspaceIcons";
 import { ConversationsDropdown } from "./ConversationsDropdown";
 import type { ConversationMetadata } from "@/hooks/useConversationsList";
-import type { ConversationSessionStatus } from "@/services/conversations/backgroundSessionTracker";
+import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
 import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
 
 interface ChatHeaderProps {

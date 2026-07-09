@@ -6,11 +6,11 @@
  * strict-neutral (D-401).
  */
 import { PlusIcon as Plus } from "@phosphor-icons/react";
-import { Success, Icon } from "@/components/icons";
-import { AppLogo } from "@/components/brand";
-import { Toggle } from "@/components/ui/Toggle";
-import { Badge } from "@/components/ui/Badge";
-import type { ComposioApp, ComposioConnection } from "@/services/ai/composioService";
+import { Success, Icon } from "@/ui/icons";
+import { AppLogo } from "@/ui/brand";
+import { Toggle } from "@/ui/primitives/Toggle";
+import { Badge } from "@/ui/primitives/Badge";
+import type { ComposioApp, ComposioConnection } from "@/features/extensions/services/composioService";
 import { StatusDot, GithubLetterIcon } from "./ExtensionIcons";
 
 // ─── Composio app browse card ─────────────────────────────────────────────────

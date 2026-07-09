@@ -31,8 +31,8 @@ import {
   MoonIcon as Moon,
   CaretDownIcon as CaretDown,
 } from "@phosphor-icons/react";
-import { StudioMark } from "../components/brand/StudioMark";
-import { NotificationBell } from "../components/notifications/NotificationBell";
+import { StudioMark } from "../ui/brand/StudioMark";
+import { NotificationBell } from "../ui/notifications/NotificationBell";
 import { useSettings } from "../contexts/SettingsContext";
 import { resolveTheme } from "../utils/theme";
 import { useRightPanelWidth } from "./workspaceLayoutStore";

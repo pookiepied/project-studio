@@ -16,7 +16,7 @@ import { CsvTable } from "./renderers/CsvTable";
 import { JsonRenderer } from "./renderers/JsonRenderer";
 import { ArtifactRenderer } from "./renderers/ArtifactRenderer";
 import { TextBlock } from "./renderers/TextBlock";
-import { VideoPlayer } from "@/components/ui/VideoPlayer";
+import { VideoPlayer } from "@/ui/primitives/VideoPlayer";
 
 interface CodeBlockProps {
   children?: React.ReactNode;

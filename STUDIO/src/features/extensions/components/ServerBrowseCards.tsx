@@ -7,8 +7,8 @@
  * server marks are monochrome (no brand colour).
  */
 import { PlayIcon as Play, StopIcon as Stop } from "@phosphor-icons/react";
-import { Icon } from "@/components/icons";
-import { Toggle } from "@/components/ui/Toggle";
+import { Icon } from "@/ui/icons";
+import { Toggle } from "@/ui/primitives/Toggle";
 import type { McpServer } from "@/core/mcpRegistry/registryClient";
 import {
   DotState, StatusDot,

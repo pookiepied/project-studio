@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, type ChangeEvent } from "react";
-import { processFile } from "@/services/files/fileAttachmentService";
-import { validateAttachments } from "@/services/files/attachmentLimits";
-import type { FileAttachment } from "@/services/files/fileAttachmentService";
+import { processFile } from "@/features/chat/attachments/fileAttachmentService";
+import { validateAttachments } from "@/features/chat/attachments/attachmentLimits";
+import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
 import { useRecentFiles, recentEntryToAttachment } from "@/hooks/useRecentFiles";
 import type { RecentFileEntry } from "@/hooks/useRecentFiles";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { getCachedFile, dataUrlToFile } from "@/services/files/imageCacheService";
-import { uploadDocument } from "@/services/files/documentUploadService";
+import { getCachedFile, dataUrlToFile } from "@/features/chat/attachments/imageCacheService";
+import { uploadDocument } from "@/features/chat/attachments/documentUploadService";
 
 type ModelsParam = Parameters<typeof validateAttachments>[1];
 

@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import { PlusIcon as Plus } from "@phosphor-icons/react";
-import { Warning, Close, Search, Manage, Refresh, Expand, Icon } from "@/components/icons";
-import { IconButton } from "@/components/ui/IconButton";
+import { Warning, Close, Search, Manage, Refresh, Expand, Icon } from "@/ui/icons";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { useNavigation } from "@/contexts/NavigationContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { useChat } from "@/features/chat/context";
 import { environmentService } from "@/core/platform/environmentService";
 import { useMcpServers, useComposio } from "./hooks";

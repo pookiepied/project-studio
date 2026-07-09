@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { mcpService } from "@/core/mcpRegistry/registryClient";
-import { listConnections, listComposioApps } from "@/services/ai/composioService";
+import { listConnections, listComposioApps } from "@/features/extensions/services/composioService";
 import type { AppMention } from "@/features/chat/components/ContextAutocomplete";
 
 interface AtMentionState {

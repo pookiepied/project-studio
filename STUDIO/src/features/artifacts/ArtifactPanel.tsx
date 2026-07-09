@@ -7,7 +7,7 @@ import {
 import type { ArtifactTab } from "@/hooks/useArtifactPanel";
 import { CodeView }     from "./artifact/CodeView";
 import { DocumentView } from "./artifact/DocumentView";
-import { ResizeHandle } from "@/components/rightWorkspace/ResizeHandle";
+import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 
 // ---------------------------------------------------------------------------
 

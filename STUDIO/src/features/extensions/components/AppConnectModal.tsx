@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { PlusIcon as Plus } from "@phosphor-icons/react";
-import { Close, Icon } from "@/components/icons";
-import { AppLogo } from "@/components/brand";
-import { Toggle } from "@/components/ui/Toggle";
+import { Close, Icon } from "@/ui/icons";
+import { AppLogo } from "@/ui/brand";
+import { Toggle } from "@/ui/primitives/Toggle";
 import { StudioMarkIcon } from "./ExtensionIcons";
 
 export interface AppConnectModalConfig {

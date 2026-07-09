@@ -4,7 +4,7 @@
  */
 
 import { unifiedStorage } from "./unifiedStorageService";
-import { ChatMessage, ChatConversation } from "../../types";
+import { ChatMessage, ChatConversation } from "@/types";
 import { logger } from "../logging/logger";
 
 // Memory Types

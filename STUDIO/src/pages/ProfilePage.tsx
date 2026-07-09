@@ -6,7 +6,7 @@ import {
   UserIcon as User,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { useNavigation } from "../contexts/NavigationContext";
 import type { View } from "../types/navigation";
 

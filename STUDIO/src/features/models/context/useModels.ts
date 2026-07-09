@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchModels, Model, ModelsResponse, ProviderInfo } from "@/services/ai/modelService";
+import { fetchModels, Model, ModelsResponse, ProviderInfo } from "@/features/models/services/modelService";
 import { errorService } from "@/core/errors/errorService";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useDaemon } from "@/core/daemon/useDaemon";

@@ -14,7 +14,7 @@ import { mkdir } from "@tauri-apps/plugin-fs";
 import { documentDir } from "@tauri-apps/api/path";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { setWorkspaceTrust } from "@/permissions";
-import { StudioMark } from "@/components/brand";
+import { StudioMark } from "@/ui/brand";
 
 type AccessMode = "review" | "autonomous";
 type ProjectCtx  = { path: string; name: string; accessMode?: AccessMode };

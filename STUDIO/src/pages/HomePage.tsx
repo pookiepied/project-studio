@@ -14,7 +14,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
-import { MainLayout }    from "../components/layout/MainLayout";
+import { MainLayout }    from "../ui/layout/MainLayout";
 import { TranscribePage } from "@/features/transcription";
 import { SettingsPage }   from "@/features/settings";
 import { ChatPage }       from "@/features/chat";
@@ -30,9 +30,9 @@ import { ComputerUsePage } from "@/features/computerUse";
 import { TemporaryPage } from "./TemporaryPage";
 
 import { NavigationProvider }   from "../contexts/NavigationContext";
-import { RecordingProvider }    from "../contexts/RecordingContext";
+import { RecordingProvider }    from "@/features/voice/context/RecordingContext";
 import { ChatProvider }         from "@/features/chat/context";
-import { LiveSessionProvider }  from "../contexts/LiveSessionContext";
+import { LiveSessionProvider }  from "@/features/voice/context/LiveSessionContext";
 
 import { GlobalShortcutHandler } from "../components/GlobalShortcutHandler";
 import { GlobalContextEvents }   from "../components/GlobalContextEvents";

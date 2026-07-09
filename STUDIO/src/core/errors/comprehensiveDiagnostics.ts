@@ -342,7 +342,7 @@ class ComprehensiveDiagnostics {
 
   private async testModelLoading(test: DiagnosticTest) {
     try {
-      const { fetchModels } = await import('@/services/ai/modelService');
+      const { fetchModels } = await import('@/features/models/services/modelService');
       const result = await fetchModels(false, false, false); // Quick check without local models
       
       if (!result.success) {

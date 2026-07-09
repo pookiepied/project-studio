@@ -21,10 +21,10 @@ import {
   SpeakerHighIcon,
   SpeakerSlashIcon,
 } from "@phosphor-icons/react";
-import { SessionState } from "@/hooks/useLiveSession";
-import { useLiveSessionContext } from "@/contexts/LiveSessionContext";
-import { IconButton } from "@/components/ui/IconButton";
-import { Icon, Settings, Warning } from "@/components/icons";
+import { SessionState } from "@/features/voice/hooks/useLiveSession";
+import { useLiveSessionContext } from "@/features/voice/context/LiveSessionContext";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Icon, Settings, Warning } from "@/ui/icons";
 import { liveSessionSounds } from "./utils/liveSessionSounds";
 
 const STATE_LABELS: Record<SessionState, string> = {

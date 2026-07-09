@@ -9,13 +9,13 @@ import {
   TerminalIcon as Terminal,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
-import { Back, Delete, Icon } from "@/components/icons";
-import { AppLogo } from "@/components/brand";
-import { Toggle } from "@/components/ui/Toggle";
-import { IconButton } from "@/components/ui/IconButton";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Back, Delete, Icon } from "@/ui/icons";
+import { AppLogo } from "@/ui/brand";
+import { Toggle } from "@/ui/primitives/Toggle";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { EmptyState } from "@/ui/primitives/EmptyState";
 import type { McpServer } from "@/core/mcpRegistry/registryClient";
-import type { ComposioApp, ComposioConnection } from "@/services/ai/composioService";
+import type { ComposioApp, ComposioConnection } from "@/features/extensions/services/composioService";
 import {
   StatusDot, DotState,
   Context7Icon,

@@ -15,7 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { FONT_SANS } from "@/styles/fonts";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { ResizeHandle } from "@/components/rightWorkspace/ResizeHandle";
+import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "../rightWorkspace/types";
 import { NativeBrowserHost } from "./NativeBrowserHost";
 import { nativeBrowserService } from "./nativeBrowserService";

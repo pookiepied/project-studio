@@ -2,7 +2,7 @@ import {
   SpeakerHighIcon as SpeakerHigh,
   CircleDashedIcon as CircleDashed,
 } from "@phosphor-icons/react";
-import { Toggle } from "@/components/ui/Toggle";
+import { Toggle } from "@/ui/primitives/Toggle";
 import { ConditionalGlobalShortcuts } from "@/components/ConditionalFeatures";
 import { useSettings } from "@/contexts/SettingsContext";
 import { FONT_SANS } from "@/styles/fonts";

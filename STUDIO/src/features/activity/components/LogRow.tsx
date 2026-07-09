@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Expand, Collapse } from "@/components/icons";
-import { getProviderDisplayName } from "@/components/ProviderIcon";
+import { Expand, Collapse } from "@/ui/icons";
+import { getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import { getCachedProfile } from "@/core/network/userProfileCache";
 import { fmtTokens, fmtCost, fmtLatency, fmtRelative } from "../formatters";
 import type { LogEntry } from "../types";

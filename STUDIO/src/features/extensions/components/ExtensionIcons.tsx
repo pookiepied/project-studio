@@ -1,6 +1,6 @@
 import { CloudIcon as Cloud } from "@phosphor-icons/react";
-import { Icon } from "@/components/icons";
-import { Badge } from "@/components/ui/Badge";
+import { Icon } from "@/ui/icons";
+import { Badge } from "@/ui/primitives/Badge";
 
 // ─── Status dot ───────────────────────────────────────────────────────────────
 // Strict-neutral (D-401): state reads on shade, not hue. Running = strong dot,

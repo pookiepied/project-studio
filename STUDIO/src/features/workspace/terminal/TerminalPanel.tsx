@@ -33,7 +33,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ResizeHandle } from "@/components/rightWorkspace/ResizeHandle";
+import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import { FONT_MONO } from "@/styles/fonts";
 
 // ─── Xterm themes (matched to tailwind.config.js palette) ────────────────────

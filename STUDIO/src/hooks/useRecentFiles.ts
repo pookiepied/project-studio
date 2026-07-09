@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import type { FileAttachment } from "../services/files/fileAttachmentService";
-import { cacheImageFile, cachePDFPages } from "../services/files/imageCacheService";
+import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
+import { cacheImageFile, cachePDFPages } from "@/features/chat/attachments/imageCacheService";
 
 const STORAGE_KEY    = "studio_recent_files";
 const MAX_FILES      = 5;

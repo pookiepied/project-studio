@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   backgroundSessionTracker,
   type ConversationSessionStatus,
-} from "@/services/conversations/backgroundSessionTracker";
+} from "@/features/chat/conversations/backgroundSessionTracker";
 
 /**
  * Returns a live map of conversation IDs → their background status.

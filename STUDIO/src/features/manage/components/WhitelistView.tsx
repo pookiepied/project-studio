@@ -3,13 +3,13 @@ import {
   UserCircleIcon as UserCircle,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Back, Refresh, Delete, Success, Warning, Icon } from "@/components/icons";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { IconButton } from "@/components/ui/IconButton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Spinner } from "@/components/ui/Spinner";
+import { Back, Refresh, Delete, Success, Warning, Icon } from "@/ui/icons";
+import { Input } from "@/ui/primitives/Input";
+import { Button } from "@/ui/primitives/Button";
+import { Badge } from "@/ui/primitives/Badge";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { EmptyState } from "@/ui/primitives/EmptyState";
+import { Spinner } from "@/ui/primitives/Spinner";
 import type { WhitelistedUser, FetchState, ActionState } from "../types";
 import { Avatar } from "./Avatar";
 import { fmtRelative } from "../helpers";

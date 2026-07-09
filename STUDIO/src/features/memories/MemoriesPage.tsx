@@ -6,14 +6,14 @@ import {
   ShareNetworkIcon as ShareNetwork,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Edit, Delete, Close, Success, Warning, Search, Icon } from "@/components/icons";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
-import { Badge } from "@/components/ui/Badge";
-import { Textarea } from "@/components/ui/Textarea";
-import { Spinner } from "@/components/ui/Spinner";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Edit, Delete, Close, Success, Warning, Search, Icon } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Badge } from "@/ui/primitives/Badge";
+import { Textarea } from "@/ui/primitives/Textarea";
+import { Spinner } from "@/ui/primitives/Spinner";
+import { EmptyState } from "@/ui/primitives/EmptyState";
+import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
 import { createHeaders } from "@/utils/api";
 import { apiManager } from "@/core/network/apiManager";
 import { logger } from "@/core/logging/logger";

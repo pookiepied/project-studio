@@ -1,15 +1,15 @@
 import type { Dispatch, SetStateAction } from "react";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Back, Refresh, Success, Warning, Icon } from "@/components/icons";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
-import { Badge } from "@/components/ui/Badge";
-import { Spinner } from "@/components/ui/Spinner";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { ModelPicker } from "@/components/ModelPicker";
-import { MODEL_FILTERS } from "@/services/ai/modelFilter";
-import type { Model } from "@/services/ai/modelService";
+import { Back, Refresh, Success, Warning, Icon } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Badge } from "@/ui/primitives/Badge";
+import { Spinner } from "@/ui/primitives/Spinner";
+import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
+import { ModelPicker } from "@/features/models/components/ModelPicker";
+import { MODEL_FILTERS } from "@/features/models/services/modelFilter";
+import type { Model } from "@/features/models/services/modelService";
 import type { AdminMode, FetchState, ActionState } from "../types";
 import { ModeIcon } from "./ModeIcon";
 

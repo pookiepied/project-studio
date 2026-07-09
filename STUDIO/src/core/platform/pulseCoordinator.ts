@@ -1,5 +1,5 @@
-import { RecordingState } from "../../types";
-import type { PulseCard } from "../../types/pulse";
+import { RecordingState } from "@/types";
+import type { PulseCard } from "@/types/pulse";
 import { overlayService, type IslandMode, type OverlayPayload } from "./overlayService";
 
 type ActiveActivity = IslandMode;

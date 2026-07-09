@@ -13,7 +13,7 @@ import type {
   MessageSegment,
 } from "@/types";
 import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
-import type { FileAttachment } from "@/services/files/fileAttachmentService";
+import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
 import type {
   PermissionModeId,

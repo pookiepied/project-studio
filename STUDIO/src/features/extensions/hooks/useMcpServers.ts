@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mcpService, type McpServer } from "@/core/mcpRegistry/registryClient";
 import { environmentService } from "@/core/platform/environmentService";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import type { AddFormState } from "../types";
 
 // Server names from the old hand-built integration system (pre-Composio).

@@ -3,8 +3,8 @@ import {
   SunIcon as Sun,
   MoonIcon as Moon,
 } from "@phosphor-icons/react";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { Toggle } from "@/components/ui/Toggle";
+import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
+import { Toggle } from "@/ui/primitives/Toggle";
 import { ConditionalAutostart, ConditionalSystemTray } from "@/components/ConditionalFeatures";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { AppSettings, ThemePreference } from "@/types";

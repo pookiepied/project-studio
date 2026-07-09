@@ -6,10 +6,10 @@
  */
 
 import { useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { googleSDK } from "../services/auth/googleSDK";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { googleSDK } from "@/features/auth/services/googleSDK";
 import { logger } from "../core/logging/logger";
-import { SplashScreen } from "../components/feedback/SplashScreen";
+import { SplashScreen } from "../ui/feedback/SplashScreen";
 
 export const AuthCallback = () => {
   const { login } = useAuth();

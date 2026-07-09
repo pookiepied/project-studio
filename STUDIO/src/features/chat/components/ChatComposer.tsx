@@ -14,11 +14,11 @@ import {
   ArrowUpIcon as ArrowUp,
 } from "@phosphor-icons/react";
 import { FEATURED_APPS } from "@/features/extensions/components/ComposioCards";
-import { AppLogo } from "@/components/brand";
+import { AppLogo } from "@/ui/brand";
 import { useComposioLogos } from "@/hooks/useComposioLogos";
-import { TierSelector } from "@/components/TierSelector";
-import { VoiceInput } from "@/components/VoiceInput";
-import { AttachmentInput } from "@/components/AttachmentInput";
+import { TierSelector } from "@/features/models/components/TierSelector";
+import { VoiceInput } from "@/features/voice/components/VoiceInput";
+import { AttachmentInput } from "@/features/chat/components/AttachmentInput";
 import { EngineSelector } from "./EngineSelector";
 import { PermissionModeSelector } from "./PermissionModeSelector";
 import { ClaudeModelSelector } from "./ClaudeModelSelector";
@@ -29,7 +29,7 @@ import {
   composerToolbarGroup,
   cx,
 } from "./composerControlStyles";
-import type { FileAttachment } from "@/services/files/fileAttachmentService";
+import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
 import type { RecentFileEntry } from "@/hooks/useRecentFiles";
 import type { AppSettings } from "@/types";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";

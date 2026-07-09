@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { CodeBlock } from "./CodeBlock";
-import ExternalLink from "@/components/ui/ExternalLink";
+import ExternalLink from "@/ui/primitives/ExternalLink";
 import { tokenManager } from "@/utils/tokenManager";
 import { TAURI_CONFIG } from "@/core/config/tauriConfig";
 

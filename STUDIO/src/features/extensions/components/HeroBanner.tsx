@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ChatCircleIcon as ChatCircle } from "@phosphor-icons/react";
-import { AppLogo } from "@/components/brand";
-import type { ComposioApp } from "@/services/ai/composioService";
+import { AppLogo } from "@/ui/brand";
+import type { ComposioApp } from "@/features/extensions/services/composioService";
 import { GithubLetterIcon } from "./ExtensionIcons";
 
 // NOTE: The hero gradient + the rotating brand-coloured prompt card are an

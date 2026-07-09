@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { MicrophoneIcon as Microphone } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AudioWaveform } from "@/components/AudioWaveform";
-import { Send, Copy, Success, Refresh, Icon } from "@/components/icons";
-import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
+import { AudioWaveform } from "@/features/voice/components/AudioWaveform";
+import { Send, Copy, Success, Refresh, Icon } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
+import { Spinner } from "@/ui/primitives/Spinner";
 import { RecordingState } from "@/types";
-import { useRecording } from "@/contexts/RecordingContext";
+import { useRecording } from "@/features/voice/context/RecordingContext";
 import { useChat } from "@/features/chat/context";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useSettings } from "@/contexts/SettingsContext";

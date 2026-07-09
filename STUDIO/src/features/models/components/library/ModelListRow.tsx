@@ -4,9 +4,9 @@ import {
   HardDrivesIcon as HardDrives,
   LeafIcon as Leaf,
 } from "@phosphor-icons/react";
-import { Success, Icon } from "@/components/icons";
-import { ProviderIcon } from "@/components/ProviderIcon";
-import type { Model } from "@/services/ai/modelService";
+import { Success, Icon } from "@/ui/icons";
+import { ProviderIcon } from "@/features/models/components/ProviderIcon";
+import type { Model } from "@/features/models/services/modelService";
 import {
   isFreeModel, isVisionModel, hasTools, hasReasoning,
   formatCtx, formatModelPrice, getModelSubtitle,

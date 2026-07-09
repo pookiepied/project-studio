@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listComposioApps } from "../services/ai/composioService";
+import { listComposioApps } from "@/features/extensions/services/composioService";
 
 // Module-level so every consumer (app picker, featured cards, browse grid)
 // shares one in-flight request instead of each mount re-fetching the catalogue.

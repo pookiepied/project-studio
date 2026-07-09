@@ -1,7 +1,7 @@
-import { getProviderDisplayName } from "@/components/ProviderIcon";
+import { getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import { formatPrice } from "@/utils/formatters";
 import { isVisionModel } from "@/utils/modelUtils";
-import type { Model } from "@/services/ai/modelService";
+import type { Model } from "@/features/models/services/modelService";
 
 export const CHAT_SELECTABLE_TYPES = new Set<Model["type"]>(["chat", "multimodal"]);
 export const LONG_CONTEXT_TOKENS = 128_000;

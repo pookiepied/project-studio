@@ -7,9 +7,9 @@ import {
   WifiHighIcon as WifiHigh,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
-import { IconButton } from "@/components/ui/IconButton";
-import { Button } from "@/components/ui/Button";
-import { Icon, Refresh, Warning, Close } from "@/components/icons";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Button } from "@/ui/primitives/Button";
+import { Icon, Refresh, Warning, Close } from "@/ui/icons";
 import { useSettings } from "@/contexts/SettingsContext";
 import { configService } from "@/core/storage/configService";
 import { comprehensiveDiagnostics, type DiagnosticTest, type DiagnosticReport } from "@/core/errors/comprehensiveDiagnostics";

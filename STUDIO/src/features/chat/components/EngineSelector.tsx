@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CaretDownIcon as CaretDown, CheckIcon as Check } from "@phosphor-icons/react";
-import { ClaudeCodeIcon } from "@/components/ui/ClaudeCodeIcon";
-import { StudioIcon } from "@/components/ui/StudioIcon";
+import { ClaudeCodeIcon } from "@/ui/primitives/ClaudeCodeIcon";
+import { StudioIcon } from "@/ui/primitives/StudioIcon";
 import { composerPillButton, composerPillLabel, cx } from "./composerControlStyles";
 import type { ChatEngine } from "@/cliBridges/types";
 

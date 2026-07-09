@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { KeyboardIcon as Keyboard } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface ShortcutRecorderProps {
   value: string[];

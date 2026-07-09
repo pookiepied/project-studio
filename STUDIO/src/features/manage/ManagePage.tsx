@@ -5,15 +5,15 @@ import {
   CpuIcon as Cpu,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Manage, Collapse, Icon } from "@/components/icons";
-import { Badge } from "@/components/ui/Badge";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Manage, Collapse, Icon } from "@/ui/icons";
+import { Badge } from "@/ui/primitives/Badge";
+import { EmptyState } from "@/ui/primitives/EmptyState";
 import { createHeaders } from "@/utils/api";
 import { apiManager } from "@/core/network/apiManager";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { logger } from "@/core/logging/logger";
-import { fetchModels } from "@/services/ai/modelService";
-import type { Model } from "@/services/ai/modelService";
+import { fetchModels } from "@/features/models/services/modelService";
+import type { Model } from "@/features/models/services/modelService";
 import type { WhitelistedUser, AdminMode, SubView, FetchState } from "./types";
 import { isValidEmail } from "./helpers";
 import { WhitelistView, AiModelsView } from "./components";

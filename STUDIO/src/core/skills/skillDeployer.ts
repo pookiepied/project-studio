@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { logger } from "../logging/logger";
-import { tokenManager } from "../../utils/tokenManager";
+import { tokenManager } from "@/utils/tokenManager";
 import { apiManager } from "../network/apiManager";
 
 /**

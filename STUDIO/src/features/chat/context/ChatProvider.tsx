@@ -26,10 +26,10 @@ import { buildChatBody, getMcpServers } from "@/runtime";
 import { buildSendContext } from "./buildSendContext";
 
 import type { ChatConversation, ChatMessage }          from "@/types";
-import type { FileAttachment }                         from "@/services/files/fileAttachmentService";
+import type { FileAttachment }                         from "@/features/chat/attachments/fileAttachmentService";
 import type { APIChatMessage, ToolResultItem, AutoRoutedInfo } from "@/types/chat";
 import { extractMessageText }                          from "@/types/chat";
-import { aiService }                                   from "@/services/ai/aiService";
+import { aiService }                                   from "@/features/chat/services/aiService";
 import { tokenManager }                                from "@/utils/tokenManager";
 import { memorySystem }                                from "@/core/storage/memorySystem";
 import { errorService }                                from "@/core/errors/errorService";
@@ -50,14 +50,14 @@ import {
   canContinueWithEngine,
   isClaudeOwnedConversation,
   normalizeEngineForConversationOwner,
-} from "@/services/conversations/ownership/conversationOwnership";
+} from "@/features/chat/conversations/ownership/conversationOwnership";
 import {
   getPreferredChatEngine,
   savePreferredChatEngine,
-} from "@/services/conversations/preferences/chatEnginePreference";
+} from "@/features/chat/conversations/preferences/chatEnginePreference";
 
 import { useAgentChat }                                from "@/runtime";
-import { useVoiceInput }                               from "@/hooks/useVoiceInput";
+import { useVoiceInput }                               from "@/features/voice/hooks/useVoiceInput";
 import { usePermittedTools }                           from "@/features/chat/hooks/usePermittedTools";
 
 import type { MessageSegment } from "@/types";
@@ -72,9 +72,9 @@ import {
 } from "./messageBuilder";
 import { maybeCompact }                                from "./contextCompactor";
 import { applyCatchUp }                               from "./catchUp";
-import { fetchPendingCompletion, clearPendingCompletion } from "@/services/ai/pendingCompletion";
-import { chat } from "@/services/ai/chatService";
-import { claudeBridgeService } from "@/services/ai/claudeBridgeService";
+import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/services/pendingCompletion";
+import { chat } from "@/features/chat/services/chatService";
+import { claudeBridgeService } from "@/features/chat/services/claudeBridgeService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
 import { effortToThinkingBudget, getClaudeContextWindowTokens } from "@/cliBridges";
 import type { PermissionModeId, PermissionDecision, ActionMode } from "@/permissions";
@@ -90,7 +90,7 @@ import {
   recordGrant as recordToolGrant,
 } from "@/permissions";
 import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
-import { GlobalAccessModal } from "@/components/overlays/GlobalAccessModal";
+import { GlobalAccessModal } from "@/ui/overlays/GlobalAccessModal";
 import type { ToolApprovalDecision } from "./types";
 
 import {
@@ -98,7 +98,7 @@ import {
   saveConvProjectCtx,
   type ProjectCtx,
 } from "./projectContextStorage";
-import { backgroundSessionTracker } from "@/services/conversations/backgroundSessionTracker";
+import { backgroundSessionTracker } from "@/features/chat/conversations/backgroundSessionTracker";
 import { NotificationService, recordAgentToolResult } from "@/core/notifications";
 import type { PendingMessage } from "./types";
 import type { ClaudeSessionMetadata } from "@/types";
@@ -165,7 +165,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // ── Pending message queue ───────────────────────────────────────────────
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
-  const sendMessageRef = useRef<((content: string, useStreaming?: boolean, attachments?: import("@/services/files/fileAttachmentService").FileAttachment[]) => Promise<void>) | null>(null);
+  const sendMessageRef = useRef<((content: string, useStreaming?: boolean, attachments?: import("@/features/chat/attachments/fileAttachmentService").FileAttachment[]) => Promise<void>) | null>(null);
   const [streamingContent,   setStreamingContent]   = useState("");
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   // isRecordingVoice + voice send/transcribe come from useVoiceInput (below sendMessage)

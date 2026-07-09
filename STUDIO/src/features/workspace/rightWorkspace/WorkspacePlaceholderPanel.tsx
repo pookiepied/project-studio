@@ -4,7 +4,7 @@ import {
   FilesIcon as Files,
   XIcon as X,
 } from "@phosphor-icons/react";
-import { ResizeHandle } from "@/components/rightWorkspace/ResizeHandle";
+import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "./types";
 
 interface WorkspacePlaceholderPanelProps {

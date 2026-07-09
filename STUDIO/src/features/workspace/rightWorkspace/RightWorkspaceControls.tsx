@@ -1,4 +1,4 @@
-import { OverviewIcon, NavToggleIcon } from "@/components/icons/WorkspaceIcons";
+import { OverviewIcon, NavToggleIcon } from "@/ui/icons/WorkspaceIcons";
 import { ProjectLauncher } from "./ProjectLauncher";
 import type { ProjectContextLike } from "./types";
 

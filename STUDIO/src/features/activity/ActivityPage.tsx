@@ -3,11 +3,11 @@ import { ChartLineUp, TerminalWindow, Robot } from "@phosphor-icons/react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Icon, Refresh, Warning } from "@/components/icons";
-import { IconButton } from "@/components/ui/IconButton";
+import { Icon, Refresh, Warning } from "@/ui/icons";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { createHeaders } from "@/utils/api";
 import { apiManager } from "@/core/network/apiManager";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { isResolvedDark } from "@/utils/theme";
 import { logger } from "@/core/logging/logger";

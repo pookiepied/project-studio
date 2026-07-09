@@ -4,7 +4,7 @@ import {
   StarIcon as Star,
   SparkleIcon as Sparkle,
 } from "@phosphor-icons/react";
-import { Icon, type IconSize } from "@/components/icons";
+import { Icon, type IconSize } from "@/ui/icons";
 
 /**
  * AI-tier glyph (leaf / lightning / star / sparkle). These are feature-specific

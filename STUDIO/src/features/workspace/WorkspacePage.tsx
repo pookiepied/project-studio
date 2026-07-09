@@ -26,8 +26,8 @@ import {
   WarningCircleIcon as WarningCircle,
   XCircleIcon as XCircle,
 } from "@phosphor-icons/react";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { useAuth } from "@/contexts/AuthContext";
+import { EmptyState } from "@/ui/primitives/EmptyState";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   deleteKbDoc,
   deleteMemoryFact,
@@ -36,7 +36,7 @@ import {
   listMemoryFacts,
   type KbDocument,
   type MemoryFact,
-} from "@/services/files/kbService";
+} from "@/features/chat/attachments/kbService";
 import {
   createAgent,
   deleteAgent,

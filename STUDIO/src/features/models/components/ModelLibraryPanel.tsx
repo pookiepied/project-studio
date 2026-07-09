@@ -9,11 +9,11 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Refresh, Close, Search } from "@/components/icons";
-import { IconButton } from "@/components/ui/IconButton";
-import { Spinner } from "@/components/ui/Spinner";
+import { Refresh, Close, Search } from "@/ui/icons";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Spinner } from "@/ui/primitives/Spinner";
 import { useModelsContext as useModels } from "@/features/models/context";
-import { sortModels, sortProvidersByFree, groupModelsByProvider } from "@/services/ai/modelService";
+import { sortModels, sortProvidersByFree, groupModelsByProvider } from "@/features/models/services/modelService";
 import { AUTO_DISPLAY_MODEL } from "@/core/config/autoMode";
 import {
   CHAT_SELECTABLE_TYPES, LONG_CONTEXT_TOKENS,

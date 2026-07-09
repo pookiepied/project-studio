@@ -17,7 +17,7 @@ import {
   ListChecks,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
-import { Icon } from "@/components/icons";
+import { Icon } from "@/ui/icons";
 
 // ── Entrance variants (subtle stagger; reduced-motion → opacity-only via MotionConfig) ──
 const HERO_VARIANTS = {

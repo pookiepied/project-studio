@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { TokenRing } from "@/components/ui/TokenRing";
+import { TokenRing } from "@/ui/primitives/TokenRing";
 import { composerRoundIconButton, cx } from "./composerControlStyles";
 
 interface ContextWindowButtonProps {

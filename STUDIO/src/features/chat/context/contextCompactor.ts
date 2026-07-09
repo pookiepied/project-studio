@@ -16,7 +16,7 @@ import {
   loadConversation,
   updateConversationSummary,
 } from "@/core/storage/chatHistoryService";
-import { summarizeMessages } from "@/services/ai/summarizationService";
+import { summarizeMessages } from "@/features/chat/services/summarizationService";
 import type { ChatConversation } from "@/types";
 
 /** Minimum raw-turn count before compaction is considered. */
