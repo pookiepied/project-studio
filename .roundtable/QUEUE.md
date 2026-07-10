@@ -181,8 +181,9 @@ typechecker is silent exactly where you are relying on it to speak.**
 | 5 | `features/chat/attachments/fileAttachmentService.ts`, `lib/modelUtils.ts` | 14 deleted, 1 privatized — `05ee015` |
 | 6 | `features/chat/services/aiService.ts` facade (+`useLiveSession.ts` import) | 9 re-exports dropped — `214647e` |
 | 7 | cascade: `daemonService.ts`, `services/types.ts` | `daemonStream` + 2 dead types; **RT-005 cycle dissolved** — `9137d06` |
+| 8 | `core/models/` barrel, then `modelCapabilityService.ts` + `claudeBridgeService.ts` | 6 deleted, 4 privatized; 302→119 lines — `86fb9fb`, `1f818a7` |
 
-knip: 399 unused symbols at the start of RT-020, **336** now. Zero unused files. Cycles 2 → 1.
+knip: 399 unused symbols at the start of RT-020, **318** now. Zero unused files. Cycles 2 → 1.
 
 **Trim the barrel first — every single time.** Batches 1, 6 and 7 all found the same thing: a
 dead re-export makes a sibling-only symbol look alive to the detector. `daemonStream` had been
@@ -209,7 +210,13 @@ than quietly following the instruction. Both halves of that are the protocol wor
 
 **Watch for duplicated implementations.** The dead copy is often the *second* one:
 `calculateMaxAttachmentTokens`/`getModelContextWindow` duplicated `attachmentLimits.ts`;
-`formatFileSize` existed three times; `MAX_ATTACHMENTS: 10` still sits in `constants/ui.ts`.
+`formatFileSize` existed three times; `MAX_ATTACHMENTS: 10` still sits in `constants/ui.ts`;
+`detectToolSupport` duplicated the inline check at `features/models/helpers.ts:39`.
+
+**Dead *data* is invisible to every tool we have.** `CAPABILITY_PATTERNS.tools` and
+`.longContext` — two arrays of regexes — survived only because a deleted function read them.
+Neither tsc nor knip flags an unread object property. After deleting a function, read what its
+module-level constants were for.
 
 ---
 
