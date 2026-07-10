@@ -55,7 +55,7 @@ for exactly this per decision D-9 in the Local Runtime task doc.
 
 ---
 
-## RT-003 — Break the `runtime/execution` self-cycle · `todo`
+## RT-003 — Break the `runtime/execution` self-cycle · `done` (2026-07-10)
 
 **Cycle (1 of 11):**
 ```
@@ -156,6 +156,28 @@ follow-up items, per category (a) only, with evidence in the ledger.
 
 `npm run deadcode` reports exactly one unused devDependency and it has not been
 identified. Name it, prove it, then propose removal as a separate item.
+
+---
+
+## RT-011 — `runtime/execution/types.ts` depends on `features/` · `todo`
+
+Surfaced during RT-003 review, not introduced by it — the coupling moved with the type.
+`runtime/execution/types.ts:15` imports `ActiveToolCall`, `TaskItem`, `ToolApprovalDecision`
+from `@/features/chat/context/types`. `runtime/` should not depend on `features/`; this is
+the same inversion as RT-001, now sitting in a file whose name makes it look harmless.
+
+Madge does not flag it because it is not a *cycle*. The gate cannot see layering
+violations that don't close a loop — worth remembering before trusting a green gate.
+
+**Preconditions:** RT-001 `done`, so the inversion is fixed once with one pattern.
+
+---
+
+## RT-012 — Stale comment in `builtinTools.ts` · `todo` · trivial
+
+Reported by the RT-003 implementer, correctly left untouched as out of scope. The header
+comment (~lines 16-18) still says the type-only import comes from `./executeLocalTools`.
+It now comes from `./types`. Fold into any future item that touches this file.
 
 ---
 

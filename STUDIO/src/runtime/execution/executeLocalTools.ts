@@ -25,65 +25,19 @@ import {
 import { logger } from "@/core/logging/logger";
 import { connectionManager } from "@/core/connection";
 import type { APIChatMessage, LocalToolCall, ToolResultItem } from "@/types/chat";
-import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "@/features/chat/context/types";
+import type { ToolApprovalDecision } from "@/features/chat/context/types";
 import { isLocalMcpServer } from "@/core/permissions";
-import type { PermissionDecision, GrantScope } from "@/core/permissions";
 import { applyWorkspaceDefaults } from "./workspaceDefaults";
 import { executeBuiltinTool } from "./builtinTools";
 import { notifyPermissionRequired } from "./notifications";
 import { APPROVAL_TIMEOUT_MS, GLOBAL_ACCESS_TIMEOUT_MS } from "./constants";
+import type { ToolExecutionCallbacks, ToolExecutionResult } from "./types";
 
-// TODO(reorg): chat-state type coupling (ActiveToolCall) resolved in Phase 5.
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface ToolExecutionCallbacks {
-  /** React state setter for active tool cards. */
-  setActiveToolCalls: React.Dispatch<React.SetStateAction<ActiveToolCall[]>>;
-  setSessionTasks:    React.Dispatch<React.SetStateAction<TaskItem[]>>;
-  /**
-   * Returns a Promise that resolves when the user submits an answer to an
-   * ask_user_question prompt.
-   */
-  waitForAnswer: (question: string) => Promise<string>;
-  /**
-   * Evaluate a local MCP tool call against trusted permission state.
-   * Returns the engine's decision (allow / prompt / deny).
-   */
-  evaluatePermission: (
-    server: string,
-    toolName: string,
-    args: Record<string, unknown>
-  ) => PermissionDecision;
-  /**
-   * Prompt the user for approval on a `prompt` decision. Resolves with the
-   * chosen grant scope, or "deny". The card metadata is already on-screen.
-   */
-  requestApproval: () => Promise<ToolApprovalDecision>;
-  /**
-   * Prompt for machine-wide file access when a global (no-project) chat needs
-   * to reach outside any workspace root. Resolves `true` if the user grants it
-   * (the caller persists the global grant), `false` if declined.
-   */
-  requestGlobalAccess: (toolName: string) => Promise<boolean>;
-  /** Persist an approval at the chosen scope so later calls don't re-prompt. */
-  recordGrant: (toolName: string, scope: GrantScope) => void;
-  /** Open project root for defaulting pathless Studio Harness calls. */
-  workspaceRoot?: string | null;
-  /** Screenshot URLs collected during execution (mutated in-place). */
-  screenshotUrls: string[];
-  /** Active conversation ID - used to emit tool timeout events to ConnectionManager. */
-  convId?: string;
-}
-
-export interface ToolExecutionResult {
-  /** Tool result messages in OpenAI format (for HTTP relay). */
-  toolMessages: APIChatMessage[];
-  /** Tool results in the wire format for WebSocket tool_results messages. */
-  toolResultItems: ToolResultItem[];
-}
+// Re-exported so `@/runtime` and other consumers can keep importing these
+// execution types from this module; the definitions live in the leaf
+// `./types` module to keep executeLocalTools and builtinTools off each
+// other's import path.
+export type { ToolExecutionCallbacks, ToolExecutionResult } from "./types";
 
 // ---------------------------------------------------------------------------
 // Main executor

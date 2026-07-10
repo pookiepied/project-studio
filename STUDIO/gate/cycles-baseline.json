@@ -8,6 +8,5 @@
   "features/models/services/modelService.ts > core/network/fallbackService.ts > features/chat/attachments/attachmentLimits.ts": 1,
   "features/models/services/modelService.ts > core/network/fallbackService.ts > features/models/services/modelCapabilityService.ts": 1,
   "features/models/services/modelService.ts > features/models/services/localModelDetection.ts": 1,
-  "features/workspace/browser/BrowserPanel.tsx > features/workspace/browser/NativeBrowserHost.tsx": 1,
-  "runtime/execution/executeLocalTools.ts > runtime/execution/builtinTools.ts": 1
+  "features/workspace/browser/BrowserPanel.tsx > features/workspace/browser/NativeBrowserHost.tsx": 1
 }

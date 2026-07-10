@@ -23,7 +23,7 @@ import { connectionManager } from "@/core/connection";
 import type { LocalToolCall } from "@/types/chat";
 import type { TaskItem } from "@/features/chat/context/types";
 import { notifyPermissionRequired } from "./notifications";
-import type { ToolExecutionCallbacks } from "./executeLocalTools";
+import type { ToolExecutionCallbacks } from "./types";
 import { ANSWER_TIMEOUT_MS } from "./constants";
 
 /**

@@ -64,4 +64,44 @@ burn-down (RT-007), then triage items.
 **Human decisions recorded:** smoke testing stays manual, by choice; new libraries
 permitted; ratchets strict.
 
-**Not committed at time of writing.** Doc deletions staged; gate files unstaged.
+**Committed** on branch `roundtable/bootstrap` as three commits: doc purge, gate, round table.
+
+---
+
+## 2026-07-10 — RT-003 · Break the `runtime/execution` self-cycle · ACCEPTED
+
+First loop iteration. Chosen as calibration: two files, so a flaw in the protocol
+surfaces cheaply.
+
+**Cause.** `executeLocalTools.ts` imported the value `executeBuiltinTool` from
+`builtinTools.ts`; `builtinTools.ts` imported the type `ToolExecutionCallbacks` back.
+The edge being type-only does not stop madge from seeing the loop.
+
+**Fix.** `ToolExecutionCallbacks` and `ToolExecutionResult` moved to a new leaf module
+`runtime/execution/types.ts`. `executeLocalTools.ts` re-exports them, so `runtime/index.ts`
+and `features/chat/context/toolExecutionCallbacks.ts` needed no change and the public
+`@/runtime` surface is identical.
+
+**Gate.** before: 11 cycles · after: 10 · typecheck clean · lint 232, unchanged.
+Baseline diff removes exactly one line, the target cycle. Verified by the lead, not
+taken on report.
+
+**Cold review.** PASS. Independently confirmed the re-export chain resolves and that
+`types.ts` imports no sibling — the cycle is broken, not relocated.
+
+**Lead verification.** Re-ran the gate, read the baseline diff, and checked `types.ts`
+import list directly. Both agents' central claims held.
+
+**Findings raised to queue.** `types.ts` imports `@/features/chat/context/types`, so
+`runtime/` now visibly depends on `features/` → RT-011. Not introduced by this change;
+the coupling travelled with the type. **Madge does not flag it because it is not a
+cycle.** The gate is blind to layering violations that do not close a loop. Stale
+comment in `builtinTools.ts` → RT-012.
+
+**Protocol deviation.** Implementer ran in the main working tree, not an isolated
+worktree as SKILL.md prescribes: a fresh worktree has no `node_modules`, so the agent
+could not have run the gate without a full reinstall. Tree was clean and committed, so
+git was the undo. Unresolved — either the skill should stop promising worktrees, or
+bootstrap must handle dependency install.
+
+**Awaiting human smoke test before merge.**
