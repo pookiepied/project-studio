@@ -218,6 +218,17 @@ than quietly following the instruction. Both halves of that are the protocol wor
 Neither tsc nor knip flags an unread object property. After deleting a function, read what its
 module-level constants were for.
 
+**Never script these edits — the rule covers deletions, not just rewrites.** Two failures, both
+the lead's, both in RT-029:
+1. A regex-based un-export script printed `MISS` for all six targets, changed one unintended
+   line, and reported success. Caught by reading its output.
+2. Two `node -e` line-slice truncations *worked* — and left a double blank line that tsc,
+   eslint and the gate all passed over in silence (fixed in `3495243`).
+
+The first failure is loud. **The second is the dangerous one:** a script can leave a
+correct-compiling file with a fingerprint no tool will ever report. Hand-edit with Edit, and
+read the resulting file end to end. "It typechecks" is not "it is right."
+
 ---
 
 ### RT-026 — `lib/modelUtils.ts` is now a one-line delegate · `todo` · small
