@@ -78,11 +78,10 @@ export function detectVisionSupport(model: Model): boolean {
   }
   
   // 5. Pattern-based detection (fallback)
-  return CAPABILITY_PATTERNS.vision.some(pattern => 
+  return CAPABILITY_PATTERNS.vision.some(pattern =>
     pattern.test(model.id) || pattern.test(model.name)
   );
 }
-
 
 /**
  * Detect context window with multiple fallback methods
