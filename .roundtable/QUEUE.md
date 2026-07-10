@@ -64,7 +64,7 @@ buttons). Do **not** fix the buttons here — that is RT-007b. One item, one con
 
 ---
 
-### RT-017 — Five barrels orphaned by the reorg · `todo` · small
+### RT-017 — Five barrels orphaned by the reorg · `done` (c0e556e)
 
 `npm run deadcode` reports these as unused files, newly:
 
@@ -83,7 +83,7 @@ mark it deliberate public API.
 
 ---
 
-### RT-009 — Answered: the unused devDependency is `madge` · `todo` · config fix
+### RT-009 — the unused devDependency is `madge` (false positive) · `done` (c0e556e)
 
 It is a **false positive.** `scripts/ratchet.mjs` invokes `node_modules/madge/bin/cli.js`
 directly, and `knip.json` lists `scripts/**` under `ignore`, so the gate's own tool is invisible
@@ -95,7 +95,38 @@ deserves to be analyzed. Verify `npm run gate` still passes afterward.
 
 ---
 
-### RT-008 — Triage unused exports · `needs-confirmation`
+### RT-019 — `@chat` mentions: half-wired feature · `needs-confirmation`
+
+`features/chat/services/contextRetrievalService.ts` exports four functions with **zero callers**:
+`parseMentions`, `getAvailableContexts`, `retrieveContexts`, `formatContextsForLLM`. Yet
+`ContextAutocomplete.tsx` — rendered by `ChatPage` — imports `ContextReference` from it.
+
+The UI shell exists; the retrieval pipeline behind it was never connected. **This is a product
+question, not a cleanup:** is `@chat` mention-based context retrieval a feature you intend to
+ship, or an abandoned experiment? Delete the service and simplify the component, or wire it up.
+Do not decide this mechanically.
+
+---
+
+### RT-020 — Triage 340 unused exports / 130 unused types · `needs-confirmation`
+
+178 of them sit in 19 `index.ts` barrels — that is deliberate public surface, not dead code.
+The remaining ~292 live in 106 non-barrel files.
+
+**Do not bulk-delete.** Two traps, both already hit during Phase 1:
+1. **Namespace imports** (`import * as`) defeat per-export analysis. Five exist internally:
+   `chatHistoryService`, `fasterWhisper` (×2), `ollamaService`. `fasterWhisper` presents as a
+   dead subsystem — 40 unused exports in one barrel — and is fully live.
+2. **knip cannot see non-import usage.** It called `madge` an unused dependency while the gate
+   was running it.
+
+Suggested method: for each candidate, remove the `export` keyword rather than the symbol.
+`tsc --noUnusedLocals` then either passes (the symbol was used locally; keep it private) or
+fails (the symbol is genuinely dead; delete it). The typechecker adjudicates, not the detector.
+
+---
+
+### RT-008 — superseded by RT-020 · `done`
 
 `npm run deadcode` reports 340 unused exports and ~126 unused types. This is **not** a delete
 list. Many are deliberate public barrels (`runtime/index.ts`, `cliBridges/index.ts`) and knip
@@ -107,14 +138,14 @@ category (a) only, with evidence in the ledger.
 
 ---
 
-### RT-012 — Stale comment in `builtinTools.ts` · `todo` · trivial
+### RT-012 — Stale comment in `builtinTools.ts` · `done` (6efd186)
 
 The header comment (~lines 16-18) still says the type-only import comes from
 `./executeLocalTools`. It now comes from `./types`. Fold into any future item touching the file.
 
 ---
 
-### RT-010 — Fix the dangling doc reference in `eslint.config.js` · `todo` · trivial
+### RT-010 — Dangling doc reference in `eslint.config.js` · `done` (verified; both docs exist)
 
 [eslint.config.js:13](../STUDIO/eslint.config.js:13) cites
 `Documentation/frontend-loop-engineer-master-prompt.md § 6`. Confirm that path still resolves

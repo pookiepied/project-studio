@@ -302,3 +302,63 @@ component. Cycles were the symptom; direction of dependency was the disease.
 
 **Human smoke test now mandatory and overdue.** Three unverified changes (RT-003, RT-015f, and
 this) have touched the tool-execution path and every page-level import in the app.
+
+---
+
+## 2026-07-10 — Phase 1 (removal), batches 1–2, plus one live bug
+
+### f60e66b — `fix(skills)`: built-in skills were never shipping
+
+Found while reference-checking assets, not by any detector. `skillDeployer.ts` calls
+`import.meta.glob("../../skills/**")`, which resolves from `src/core/skills/` to
+`src/skills/` — a directory that has never existed in this repo's history. **Vite returns an
+empty object for a glob that matches nothing rather than erroring**, so `SKILL_FILES` was `{}`
+in every build ever made. `App.tsx` calls `deployBundledLocalSkills()` on startup; it was
+iterating an empty map. All four built-in skills were absent at runtime.
+
+Typecheck passed. Build passed. Lint passed. The gate is blind to this entire class of bug.
+
+Proven, not assumed: grepped the production bundle for `skill_create`, `skill_install`,
+`skill_remove`, `studio-computer-use` before and after — zero of four, then four of four.
+
+### c0e556e — five orphaned barrels, one orphaned asset, one lying detector
+
+Barrels verified dead three ways (no `@/` import, no relative import, no dynamic import) and
+read to confirm pure re-export with no side effects. `core/daemon/index.ts` also advertised a
+hook deleted in `73fcc4d`.
+
+`src/assets/mcp/obsidian-icon.png` — left behind when the Obsidian MCP server was removed. The
+only `import.meta.glob` in the tree targets `skills/`, not `assets/`, so nothing could reach it
+dynamically. `src/assets/` was left empty and removed.
+
+**The detector was fixed before it was trusted.** knip reported `madge` as an unused
+devDependency while `scripts/ratchet.mjs` was actively invoking it. It is called by filesystem
+path, not by `import`, so no entry/project configuration can find it — it needed an explicit
+exemption. A dead-code phase run on a detector that cannot see the gate's own tooling would
+have been worse than no phase at all.
+
+### 6efd186 — commented-out code and comments that lie
+
+`errorReporting.ts` carried 28 lines of Sentry setup for a package never installed.
+`contextRetrievalService.ts` carried a deleted Canvas feature: two commented-out imports (one
+pointing at `@/types/canvas`, which does not exist), three commented-out functions, and a dead
+`'canvas'` arm in `retrieveContexts`' union that `parseMentions` cannot produce.
+
+Closes RT-012 — both `TODO(reorg)` comments claimed a coupling that `5347457` had already
+removed. RT-010 verified already closed.
+
+### Deferred, deliberately — `needs-confirmation`
+
+**`contextRetrievalService`'s four exported functions have zero callers**: `parseMentions`,
+`getAvailableContexts`, `retrieveContexts`, `formatContextsForLLM`. But `ContextAutocomplete`
+— which *is* rendered by `ChatPage` — imports the `ContextReference` type from it. So this is a
+half-wired feature (`@chat` mentions), not dead code. **Deleting it is a product decision, not a
+mechanical one.** Not touched. Queued as RT-019.
+
+### Method note for the deletion phases
+
+`import * as` namespace imports defeat per-export dead-code analysis. Five exist internally
+(`chatHistoryService`, `fasterWhisper` ×2, `ollamaService`). Any bulk deletion of knip's 340
+"unused exports" must exclude the modules behind them. `fasterWhisper` looked like a dead
+subsystem — 40 unused exports in one barrel — and is in fact live, reached through exactly such
+an import. **Checked before deleting; would have removed a working feature.**
