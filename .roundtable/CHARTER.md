@@ -30,12 +30,17 @@ Detectors that inform the queue but do not gate: `npm run deadcode` (knip).
 
 ## Scope lock
 
-**In scope:** `STUDIO/src/`, `STUDIO/gate/`, `STUDIO/scripts/ratchet.mjs`,
+**In scope:** all of `STUDIO/src/`, `STUDIO/gate/`, `STUDIO/scripts/ratchet.mjs`,
 `STUDIO/eslint.config.js`, `STUDIO/knip.json`.
+
+`STUDIO/src/cliBridges/` is **in scope and auditable.** It is a live, load-bearing
+subsystem (Claude CLI today; Codex / OpenCode / KiloCode planned) that has previously been
+misidentified as dead code. Nothing in it is to be removed. "Do not delete this" is not
+the same instruction as "do not look at this" — an earlier version of this charter
+conflated the two.
 
 **Out of scope — do not modify:**
 
-- `STUDIO/src/cliBridges/` — shipping feature, deliberately excluded
 - `STUDIO/daemon/`, `STUDIO/src-tauri/`, `STUDIO/mcp-servers/`, `STUDIO/vendor/`
 - `chat/`, `api/`, `auth/`, `gateway/`, `gateway-v2/`, `ai/`, `skills/` — backend
 - Anything outside `STUDIO/`
