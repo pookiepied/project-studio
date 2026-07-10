@@ -22,6 +22,7 @@
  */
 
 import path from "path";
+import { existsSync, statSync } from "fs";
 import { lspManager, EXT_TO_LANG, pathToUri } from "./manager.js";
 import {
   formatLocations,
@@ -223,7 +224,7 @@ function findWorkspaceRoot(startPath: string): string {
     for (const marker of markers) {
       try {
         // sync check — we want this fast and it's a small lookup
-        require("fs").statSync(path.join(dir, marker));
+        statSync(path.join(dir, marker));
         return dir;
       } catch {
         // not here
@@ -240,11 +241,10 @@ function detectWorkspaceLanguage(workspaceRoot: string): string | null {
   // For workspaceSymbol calls where we don't have a target file,
   // try to detect from package.json or pyproject.toml presence.
   try {
-    const fs = require("fs");
-    if (fs.existsSync(path.join(workspaceRoot, "package.json"))) return "typescript";
-    if (fs.existsSync(path.join(workspaceRoot, "pyproject.toml"))) return "python";
-    if (fs.existsSync(path.join(workspaceRoot, "Cargo.toml"))) return "rust";
-    if (fs.existsSync(path.join(workspaceRoot, "go.mod"))) return "go";
+    if (existsSync(path.join(workspaceRoot, "package.json"))) return "typescript";
+    if (existsSync(path.join(workspaceRoot, "pyproject.toml"))) return "python";
+    if (existsSync(path.join(workspaceRoot, "Cargo.toml"))) return "rust";
+    if (existsSync(path.join(workspaceRoot, "go.mod"))) return "go";
   } catch { /* ignore */ }
   return null;
 }
