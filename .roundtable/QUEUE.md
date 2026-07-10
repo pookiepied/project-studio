@@ -184,6 +184,12 @@ typechecker is silent exactly where you are relying on it to speak.**
 | 8 | `core/models/` barrel, then `modelCapabilityService.ts` + `claudeBridgeService.ts` | 6 deleted, 4 privatized; 302→119 lines — `86fb9fb`, `1f818a7` |
 | 9 | `types/artifacts.ts`, `ui/icons/index.tsx` | 2 deleted, 8 privatized, 1 dead re-export dropped — `c7371f0` |
 | 10 | `lib/harnessEventUtils.ts`, `lib/textMerger.ts`, `chat/context/messageBuilder.ts` | 1 deleted, 14 privatized — `91338b2` |
+| 11 | `runtime/index.ts` barrel (D-1 boundary; 0 deep imports) | 34 dead re-exports dropped, 92→48 lines — `5876f06` |
+
+**No more multi-file batches.** From batch 11 on, one folder per commit. A barrel is not a leaf:
+trimming it changes what knip reports about every sibling, so grouping folders means acting on a
+per-file view the trim already invalidated. Batches 9 and 10 only worked because those files were
+independent leaves.
 
 knip: 399 unused symbols at the start of RT-020, **291** now. Zero unused files. Cycles 2 → 1.
 
@@ -201,8 +207,27 @@ dead re-export makes a sibling-only symbol look alive to the detector. `daemonSt
 invisible for the whole of RT-020 because `aiService` re-exported it into nothing. The per-file
 view is only truthful once the barrel is honest.
 
-**The non-barrel list is now exhausted.** What remains — ~180 symbols across ~20 barrels — must
-be taken one folder at a time, trimming the barrel before trusting the per-file view.
+**Correction.** An earlier note here said the non-barrel list was exhausted. It is not: at 291
+symbols the split was 134 in barrels, **157 non-barrel** across ~90 files at 1–5 each. What is
+exhausted is the *large* non-barrel files. Take the barrels one folder at a time, trimming the
+barrel before trusting the per-file view.
+
+**A source file can be invisible to grep, and nothing warns you.**
+`runtime/servers/manifestSync.ts` emitted U+0000 and U+0001 as **raw bytes** into a template
+literal (legitimate hash delimiters, wrongly encoded). It was the only file in `src/` with
+control bytes. Both searchers treat it as binary:
+- `grep -rn` prints `Binary file ... matches` and withholds the line;
+- **ripgrep — the Grep tool — returns "No matches found", silently.**
+
+RT-020's entire method is grep-based. A symbol whose only importer lived in that file would have
+read as dead and been deleted. It imports `mcpService`, `connectionManager`,
+`CONNECTION_TIMEOUTS`, `logger`, `LocalMcpServerDef` — all live elsewhere — so no batch was
+corrupted. **That was luck, not method.** Fixed in `510b783` by writing the code points as
+escapes; verified by un-escaping the new file back to the old blob byte for byte. A tree-wide
+scan confirms no other file carries control bytes; re-run that scan if this ever recurs.
+
+Note knip was never fooled — it reads the TS AST, not bytes. The blind tool was the one used to
+*confirm* knip. Two detectors, one shared assumption, and the assumption was in the reader.
 
 **Name collisions are THE recurring hazard — eight so far.**
 - `supportsTranslation` — a function *and* a boolean property on 14 models.
