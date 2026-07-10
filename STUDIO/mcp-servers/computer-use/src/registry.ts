@@ -54,6 +54,7 @@ import { DESKTOP_AUTOMATION_DEFINITIONS } from "./tools/desktop/automation/defin
 import { DESKTOP_NETWORK_DEFINITIONS }    from "./tools/desktop/network/definitions.js";
 import { DESKTOP_SECURITY_DEFINITIONS }   from "./tools/desktop/security/definitions.js";
 import { DESKTOP_SYSTEM_UI_DEFINITIONS }  from "./tools/desktop/system-ui/definitions.js";
+import { finalizeToolDefinitions } from "./tool-schema.js";
 
 // ---------------------------------------------------------------------------
 // Tool definitions (schema sent to the AI via tools/list)
@@ -63,7 +64,7 @@ import { DESKTOP_SYSTEM_UI_DEFINITIONS }  from "./tools/desktop/system-ui/defini
 // definitions.ts in its folder, not here.
 // ---------------------------------------------------------------------------
 
-export const TOOL_DEFINITIONS = [
+export const TOOL_DEFINITIONS = finalizeToolDefinitions([
   ...DESKTOP_MONITORING_DEFINITIONS, // hardware & OS stats (read-only)
   ...DESKTOP_CONTROL_DEFINITIONS,    // processes, services, elevation
   ...DESKTOP_SETTINGS_DEFINITIONS,   // registry, display, audio, power, firewall, env, apps, scheduler
@@ -73,7 +74,7 @@ export const TOOL_DEFINITIONS = [
   ...DESKTOP_SECURITY_DEFINITIONS,   // local users & groups
   ...DESKTOP_SYSTEM_UI_DEFINITIONS,  // clipboard, notifications, dialog
   ...SKILL_DEFINITIONS,              // local STUDIO skill file reads
-];
+]);
 
 // ---------------------------------------------------------------------------
 // Dispatch — maps tool name → handler function
@@ -81,7 +82,7 @@ export const TOOL_DEFINITIONS = [
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
-const HANDLERS: Record<string, ToolHandler> = {
+export const HANDLERS: Record<string, ToolHandler> = {
   // ── monitoring (13) ─────────────────────────────────────────────────────────
   get_system_stats:          getSystemStats,
   get_cpu_details:           getCpuDetails,
@@ -208,6 +209,13 @@ const HANDLERS: Record<string, ToolHandler> = {
   show_dialog:               showDialog,
   skill_read_local:          readLocalSkill,
 };
+
+for (const definition of TOOL_DEFINITIONS) {
+  if (!HANDLERS[definition.name]) throw new Error(`Tool definition has no handler: ${definition.name}`);
+}
+for (const name of Object.keys(HANDLERS)) {
+  if (!TOOL_DEFINITIONS.some(definition => definition.name === name)) throw new Error(`Tool handler has no definition: ${name}`);
+}
 
 export async function dispatch(
   name: string,

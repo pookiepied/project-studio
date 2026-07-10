@@ -120,6 +120,14 @@ export async function createMcpServer(
         return { content: result as any[] };
       }
 
+      if (typeof result === "object" && result !== null && !Array.isArray(result)) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+          isError: typeof (result as Record<string, unknown>).error === "string",
+        };
+      }
+
       // Any other value is serialized as text for the LLM.
       return {
         content: [
