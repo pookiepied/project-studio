@@ -16,7 +16,11 @@ import { apiManager } from "../network/apiManager";
  */
 
 // ── Bundled skill files (imported as raw strings at build time) ──────────────
-const SKILL_FILES = import.meta.glob("../../skills/**/*.{md,json}", {
+// Path is relative to this file: src/core/skills/ -> ../../../ is STUDIO/, where
+// the `skills/` source directory lives. Two levels up resolves to src/skills/,
+// which does not exist; Vite resolves that to an empty object without erroring,
+// so a wrong depth here ships zero skills and fails silently at runtime.
+const SKILL_FILES = import.meta.glob("../../../skills/**/*.{md,json}", {
   query: "?raw",
   import: "default",
   eager: true,
