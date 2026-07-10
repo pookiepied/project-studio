@@ -12,10 +12,6 @@
  * `executeBuiltinTool` returns the tool result when one of these handles the
  * call, or `undefined` when the call is not a builtin (the caller then falls
  * through to the MCP execution path).
- *
- * TODO(reorg): the ToolExecutionCallbacks type references chat-state types
- * (ActiveToolCall / TaskItem); that coupling is resolved in Phase 5
- * (ChatProvider split). Type-only import — no runtime cycle.
  */
 
 import { logger } from "@/core/logging/logger";

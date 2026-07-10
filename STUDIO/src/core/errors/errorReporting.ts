@@ -205,32 +205,3 @@ export function initErrorReporting(): void {
 
   logger.info('ErrorReporting', 'Error reporting initialized');
 }
-
-/**
- * Example: Sentry initialization (commented out)
- * 
- * To use Sentry:
- * 1. Install: npm install @sentry/react
- * 2. Uncomment and configure below
- * 3. Replace reportError calls with Sentry.captureException
- */
-
-/*
-import * as Sentry from "@sentry/react";
-
-export function initSentry(): void {
-  if (import.meta.env.PROD) {
-    Sentry.init({
-      dsn: import.meta.env.VITE_SENTRY_DSN,
-      environment: import.meta.env.MODE,
-      tracesSampleRate: 1.0,
-      integrations: [
-        new Sentry.BrowserTracing(),
-        new Sentry.Replay(),
-      ],
-      replaysSessionSampleRate: 0.1,
-      replaysOnErrorSampleRate: 1.0,
-    });
-  }
-}
-*/
