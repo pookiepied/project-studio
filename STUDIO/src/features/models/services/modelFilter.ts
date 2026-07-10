@@ -31,7 +31,7 @@
  *   3. TypeScript will surface any call sites that need updating.
  */
 
-import type { Model } from "./modelService";
+import type { Model } from "@/core/models";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ModelFilter — composable filter specification

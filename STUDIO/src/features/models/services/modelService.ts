@@ -1,13 +1,11 @@
 import { APIResponse } from "@/types";
 import { convertOllamaToModel } from "./localModelDetection";
-import { safeGetContextWindow, handleNetworkFailure } from "@/core/network/fallbackService";
+import { handleNetworkFailure } from "@/core/network/fallbackService";
 import * as ollamaService from "./ollamaService";
 import * as fasterWhisperService from "@/features/transcription/services/fasterWhisper";
 import { logger } from "@/core/logging/logger";
 import { isFeatureEnabled } from "@/core/platform/featureManager";
 import { CACHE_CONFIG, STORAGE_KEYS } from "@/core/config/constants";
-import { migrateModelId } from "@/core/models/modelIdMigration";
-export type { Model, ModelsResponse, ProviderInfo } from "@/core/models/types";
 import type { Model, ModelsResponse, ProviderInfo } from "@/core/models/types";
 
 // Cache for models
@@ -326,55 +324,6 @@ export async function fetchModels(
 }
 
 /**
- * Get models by type
- */
-export function getModelsByType(models: Model[], type: Model["type"]): Model[] {
-  return models.filter((model) => model.type === type);
-}
-
-/**
- * Get chat models (includes both chat and multimodal models)
- */
-export function getChatModels(models: Model[]): Model[] {
-  return models.filter((model) => model.type === "chat" || model.type === "multimodal");
-}
-
-/**
- * Get audio/transcription models
- */
-export function getAudioModels(models: Model[]): Model[] {
-  return getModelsByType(models, "audio");
-}
-
-/**
- * Get image generation models
- */
-export function getImageModels(models: Model[]): Model[] {
-  return getModelsByType(models, "image");
-}
-
-/**
- * Get video generation models
- */
-export function getVideoModels(models: Model[]): Model[] {
-  return getModelsByType(models, "video");
-}
-
-/**
- * Get free models
- */
-export function getFreeModels(models: Model[]): Model[] {
-  return models.filter((model) => model.free === true);
-}
-
-/**
- * Get models by provider
- */
-export function getModelsByProvider(models: Model[], provider: string): Model[] {
-  return models.filter((model) => model.provider === provider);
-}
-
-/**
  * Group models by provider
  */
 export function groupModelsByProvider(models: Model[]): Record<string, Model[]> {
@@ -430,63 +379,3 @@ export function sortProvidersByFree(
   );
 }
 
-/**
- * Get model by ID from models array
- */
-export function getModelById(models: Model[], id: string): Model | undefined {
-  return models.find((model) => model.id === id);
-}
-
-/**
- * Get context window size for a model
- * Returns the context window in tokens, or a default value if not available
- */
-export function getModelContextWindow(models: Model[], modelId: string): number {
-  return safeGetContextWindow(models, modelId);
-}
-
-/**
- * Calculate maximum tokens allowed for attachments
- * Reserves space for conversation history and AI response
- * 
- * @param contextWindow - Total context window size in tokens
- * @param reserveForConversation - Percentage to reserve for conversation (0-1)
- * @param reserveForResponse - Percentage to reserve for AI response (0-1)
- * @returns Maximum tokens allowed for attachments
- */
-export function calculateMaxAttachmentTokens(
-  contextWindow: number,
-  reserveForConversation: number = 0.3,
-  reserveForResponse: number = 0.2
-): number {
-  // Reserve space for conversation history and response
-  const availableForAttachments = 1 - reserveForConversation - reserveForResponse;
-  const maxTokens = Math.floor(contextWindow * availableForAttachments);
-  
-  // Ensure we have at least 1000 tokens for attachments
-  return Math.max(maxTokens, 1000);
-}
-
-/**
- * Clear models cache (useful for testing or forcing refresh)
- */
-export function clearModelsCache(): void {
-  modelsCache = null;
-  cacheTimestamp = 0;
-  try {
-    localStorage.removeItem(CACHE_STORAGE_KEY);
-    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
-    logger.debug('Models', 'Cleared models cache');
-  } catch (error) {
-    logger.warn('Models', 'Failed to clear cache from localStorage', error);
-  }
-}
-
-/**
- * Check if models cache is valid
- */
-export function isCacheValid(): boolean {
-  return modelsCache !== null && Date.now() - cacheTimestamp < CACHE_DURATION;
-}
-
-export { migrateModelId };
