@@ -185,6 +185,22 @@ typechecker is silent exactly where you are relying on it to speak.**
 | 9 | `types/artifacts.ts`, `ui/icons/index.tsx` | 2 deleted, 8 privatized, 1 dead re-export dropped — `c7371f0` |
 | 10 | `lib/harnessEventUtils.ts`, `lib/textMerger.ts`, `chat/context/messageBuilder.ts` | 1 deleted, 14 privatized — `91338b2` |
 | 11 | `runtime/index.ts` barrel (D-1 boundary; 0 deep imports) | 34 dead re-exports dropped, 92→48 lines — `5876f06` |
+| 12 | `core/permissions/` barrel then internals | 30 barrel re-exports + 15 internals; `80deff1`, `908054f` |
+| 13 | `core/config/constants/` barrel + siblings | 2 files deleted, CONSTANTS aggregate + 11 constants removed — `f76423e` |
+
+**The parallel Codex session shares this `main` and rebases onto it.** Mid-sweep, `main`
+showed HEAD at the session-start commit and `git log -12` didn't reach my work — it looked like a
+reset. It was not: verified `908054f` is an ancestor of `main` (`main..rt020-work == 0`), with the
+Codex session's 12 commits (SSH removal, harness tool surface, composer selectors `ec7393f`)
+layered on top. Nothing lost. A `rt020-work` branch is parked at my tip as insurance. If HEAD ever
+looks wrong again: check `git merge-base --is-ancestor <mytip> main` before concluding anything.
+
+**Lint baseline moved 256 → 266 (`53fa1d5`), human-authorized.** Not a rule break: `ec7393f`
+(parallel session) committed 10 raw `<button>`s across six selector/shell files — RT-007 backlog,
+not a dead-code regression. The never-re-baseline rule guards against hiding *your own* red; this
+records another session's committed reality with explicit approval. The +10 stays on the RT-007
+list. The update also ratcheted three files down and dropped deleted `TemporaryPage.tsx` (a
+ratchet-down can never hide a regression).
 
 **No more multi-file batches.** From batch 11 on, one folder per commit. A barrel is not a leaf:
 trimming it changes what knip reports about every sibling, so grouping folders means acting on a
