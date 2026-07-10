@@ -4,6 +4,7 @@ import { spawn } from "child_process";
 import { TOOL_TIMEOUTS } from "../tool-contract.js";
 import { runLsp } from "../lsp/index.js";
 import { resolveRipgrep } from "../shared/vendor.js";
+import { syntaxDefinitions } from "../syntax/tools.js";
 
 // Regex patterns for structural declarations per language family.
 // Each pattern matches at the start of a line and captures a meaningful declaration.
@@ -30,16 +31,28 @@ const DECLARATION_PATTERNS: Record<string, string> = {
 
 // Map file extension → language key
 const EXT_TO_PATTERN: Record<string, string> = {
-  ".ts": "ts", ".tsx": "ts", ".js": "ts", ".jsx": "ts", ".mjs": "ts", ".cjs": "ts",
+  ".ts": "ts",
+  ".tsx": "ts",
+  ".js": "ts",
+  ".jsx": "ts",
+  ".mjs": "ts",
+  ".cjs": "ts",
   ".py": "py",
   ".go": "go",
   ".rs": "rs",
-  ".java": "java", ".kt": "java",
+  ".java": "java",
+  ".kt": "java",
   ".rb": "rb",
-  ".c": "c", ".cpp": "c", ".cc": "c", ".h": "c", ".hpp": "c",
+  ".c": "c",
+  ".cpp": "c",
+  ".cc": "c",
+  ".h": "c",
+  ".hpp": "c",
 };
 
-async function regexOutline(filePath: string): Promise<Record<string, unknown>> {
+async function regexOutline(
+  filePath: string,
+): Promise<Record<string, unknown>> {
   const ext = path.extname(filePath).toLowerCase();
   const langKey = EXT_TO_PATTERN[ext];
   const pattern = langKey ? DECLARATION_PATTERNS[langKey] : null;
@@ -66,7 +79,9 @@ async function regexOutline(filePath: string): Promise<Record<string, unknown>> 
   return new Promise((resolve) => {
     let stdout = "";
     let settled = false;
-    const proc = spawn(resolveRipgrep(), ["-n", "-e", pattern, filePath], { stdio: "pipe" });
+    const proc = spawn(resolveRipgrep(), ["-n", "-e", pattern, filePath], {
+      stdio: "pipe",
+    });
 
     function finish(result: Record<string, unknown>) {
       if (settled) return;
@@ -84,7 +99,9 @@ async function regexOutline(filePath: string): Promise<Record<string, unknown>> 
       });
     }, OUTLINE_TIMEOUT_MS);
 
-    proc.stdout?.on("data", (d: Buffer) => { stdout += d.toString(); });
+    proc.stdout?.on("data", (d: Buffer) => {
+      stdout += d.toString();
+    });
     proc.on("close", () => {
       const declarations = stdout
         .trim()
@@ -92,8 +109,10 @@ async function regexOutline(filePath: string): Promise<Record<string, unknown>> 
         .filter(Boolean)
         .map((line) => {
           const colonIdx = line.indexOf(":");
-          const lineNum = colonIdx > -1 ? parseInt(line.slice(0, colonIdx), 10) : null;
-          const text = colonIdx > -1 ? line.slice(colonIdx + 1).trim() : line.trim();
+          const lineNum =
+            colonIdx > -1 ? parseInt(line.slice(0, colonIdx), 10) : null;
+          const text =
+            colonIdx > -1 ? line.slice(colonIdx + 1).trim() : line.trim();
           return lineNum ? `L${lineNum}\t${text}` : text;
         });
 
@@ -126,7 +145,7 @@ async function regexOutline(filePath: string): Promise<Record<string, unknown>> 
 }
 
 export async function outlineFile(
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const filePath = args.file_path as string;
   const workspaceRoot = args.workspace_root as string | undefined;
@@ -134,11 +153,11 @@ export async function outlineFile(
   if (!filePath) return { error: "file_path is required" };
 
   // Attempt LSP documentSymbol first — richest output with type info and nesting
-  const lspResult = await runLsp({
+  const lspResult = (await runLsp({
     operation: "documentSymbol",
     filePath,
     ...(workspaceRoot ? { workspaceRoot } : {}),
-  }) as Record<string, unknown>;
+  })) as Record<string, unknown>;
 
   // LSP succeeded if there's no top-level error key
   if (!lspResult.error) {
@@ -150,5 +169,9 @@ export async function outlineFile(
   }
 
   // LSP unavailable or unsupported file type — fall back to regex
-  return regexOutline(filePath);
+  try {
+    return await syntaxDefinitions(filePath);
+  } catch {
+    return regexOutline(filePath);
+  }
 }

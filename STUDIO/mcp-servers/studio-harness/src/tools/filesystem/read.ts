@@ -1,132 +1,118 @@
-import { promises as fs } from "fs";
+import { createReadStream, promises as fs } from "fs";
+import { createHash } from "crypto";
+import { createInterface } from "readline";
+import { resolve } from "path";
+import { classifyBuffer, GENERATED, inferLanguage } from "./inspect.js";
+import { getFileRevision } from "./revision.js";
 
-// Per-session dedup cache. Key = "path::offset::limit" → last seen mtime + total line count.
-// Saves a full re-read when the LLM requests the same range of an unchanged file.
-const readCache = new Map<string, { mtime: number; totalLines: number }>();
+const DEFAULT_MAX_BYTES = 256 * 1024;
+const HARD_MAX_BYTES = 5 * 1024 * 1024;
 
-// Threshold above which an unbounded read shows a warning instead of silently
-// burning tokens. ~80 KB ≈ 20,000 tokens at 4 chars/token.
-const TOKEN_GATE_CHARS = 80_000;
-
-// Hard ceiling applied even when allow_large: true. Prevents 50MB binaries or
-// generated files from flooding the context window. 5 MB ≈ 1.25M tokens.
-const ABSOLUTE_MAX_CHARS = 5 * 1024 * 1024;
-
-function addLineNumbers(lines: string[], startLine: number): string {
-  return lines.map((l, i) => `${startLine + i}\t${l}`).join("\n");
+function numbered(lines: string[], start: number): string {
+  return lines.map((line, index) => `${start + index}\t${line}`).join("\n");
 }
 
-export async function readFile(
-  args: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  const filePath = args.path as string;
-  // offset is 0-indexed line position; limit is max lines to return
-  const offset = (args.offset as number) ?? 0;
-  const limit = args.limit as number | undefined;
-  // allow_large: true bypasses the token-gate error and reads the whole file.
-  // A size warning is still included in the response. Hard 5 MB ceiling still applies.
-  const allowLarge = (args.allow_large as boolean) ?? false;
-
-  if (!filePath) return { error: "path is required" };
-
-  // Stat first (cheap) — gives us mtime for dedup and size for early rejection
-  let stat: Awaited<ReturnType<typeof fs.stat>>;
+async function readBytes(path: string, offset: number, requested: number) {
+  const length = Math.min(requested, HARD_MAX_BYTES);
+  const handle = await fs.open(path, "r");
   try {
-    stat = await fs.stat(filePath);
-  } catch {
-    return { error: `File not found: ${filePath}` };
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, offset);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
   }
-  const mtime = Math.floor(stat.mtimeMs);
+}
 
-  // Absolute ceiling — check the on-disk size BEFORE loading the file into
-  // memory. Without this, a 50 MB file would be fully read into a string and
-  // only then rejected, defeating the purpose of the guard. stat.size is in
-  // bytes (>= char count for UTF-8), so this can only ever reject earlier, not
-  // let something through that the post-read check would have caught.
-  if (stat.size > ABSOLUTE_MAX_CHARS) {
-    return {
-      error:
-        `File exceeds the absolute size limit (${(stat.size / 1024 / 1024).toFixed(1)} MB). ` +
-        `Use offset and limit to read specific sections, or outline_file to see structure first.`,
-      total_lines: undefined,
-      size_bytes: stat.size,
-    };
-  }
+export async function readFile(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const path = args.path as string;
+  if (!path) return { error: "path is required" };
 
-  // Dedup: if same path+range and mtime unchanged, skip the read entirely
-  const cacheKey = `${filePath}::${offset}::${limit ?? "all"}`;
-  const cached = readCache.get(cacheKey);
-  if (cached && cached.mtime === mtime) {
-    return {
-      unchanged: true,
-      note: "File not modified since last read. Content from that read is still in your context window.",
-      total_lines: cached.totalLines,
-      start_line: offset + 1,
-    };
-  }
+  const stat = await fs.stat(path);
+  if (!stat.isFile()) return { error: `${path} is not a regular file` };
 
-  let raw: string;
-  try {
-    raw = await fs.readFile(filePath, "utf-8");
-  } catch {
-    return { error: `Cannot read file: ${filePath}` };
-  }
-
-  const lines = raw.split("\n");
-  const total = lines.length;
-  const end = limit !== undefined ? offset + limit : total;
-  const selected = lines.slice(offset, end);
-
-  // Absolute ceiling — enforced even with allow_large: true.
-  // Prevents binaries or generated files from flooding the context window.
-  if (raw.length > ABSOLUTE_MAX_CHARS) {
-    return {
-      error:
-        `File exceeds the absolute size limit (${(raw.length / 1024 / 1024).toFixed(1)} MB). ` +
-        `Use offset and limit to read specific sections, or outline_file to see structure first.`,
-      total_lines: total,
-      size_bytes: raw.length,
-    };
-  }
-
-  // Token gate — fires when no explicit limit AND file is large AND allow_large not set.
-  // If the caller set limit, they're already scoping — let it through unconditionally.
-  // If the caller set allow_large: true, they explicitly want the full file — let it through with a warning.
-  let sizeWarning: string | undefined;
-  if (limit === undefined && raw.length > TOKEN_GATE_CHARS) {
-    if (!allowLarge) {
-      const estimatedTokens = Math.round(raw.length / 4);
-      return {
-        error:
-          `File too large for an unbounded read (est. ${estimatedTokens.toLocaleString()} tokens, ${total} lines). ` +
-          `Options:\n` +
-          `  1. Use offset + limit to read a specific section (recommended):\n` +
-          `       offset=0, limit=100          → first 100 lines\n` +
-          `       offset=${Math.max(0, total - 100)}, limit=100  → last 100 lines\n` +
-          `  2. Run outline_file first → identify the section you need → read with offset+limit.\n` +
-          `  3. Pass allow_large: true to read the entire file anyway (use sparingly).`,
-        total_lines: total,
-        estimated_tokens: estimatedTokens,
-      };
+  const byteOffset = args.byte_offset as number | undefined;
+  const byteLength = args.byte_length as number | undefined;
+  if (byteOffset !== undefined || byteLength !== undefined) {
+    if (byteOffset === undefined || byteLength === undefined || byteOffset < 0 || byteLength < 1) {
+      return { error: "byte_offset and byte_length must be supplied together and be non-negative/positive integers" };
     }
-    // allow_large: true path — include a warning but proceed
-    sizeWarning =
-      `Large file read (${total} lines, est. ${Math.round(raw.length / 4).toLocaleString()} tokens). ` +
-      `Consider outline_file + targeted reads for future sessions to save context.`;
+    const data = await readBytes(path, byteOffset, byteLength);
+    const revision = await getFileRevision(path);
+    return {
+      path: resolve(path),
+      content: data.toString((args.encoding as BufferEncoding) || "utf8"),
+      byte_offset: byteOffset,
+      bytes_returned: data.length,
+      size_bytes: stat.size,
+      truncated: byteOffset + data.length < stat.size,
+      capped: byteLength > HARD_MAX_BYTES,
+      modified_ms: Math.floor(stat.mtimeMs),
+      revision,
+      content_hash: revision.hash,
+      language: inferLanguage(path),
+      generated: GENERATED.test(path),
+    };
   }
 
-  readCache.set(cacheKey, { mtime, totalLines: total });
+  const probe = await readBytes(path, 0, Math.min(stat.size, 8192));
+  if (classifyBuffer(probe).binary) {
+    return { error: "binary_file: read_file only returns text. Use file_metadata to classify the file and route it to the appropriate specialized capability.", size_bytes: stat.size };
+  }
 
-  // 1-based start line for display (matches editor line numbers)
-  const startLine = offset + 1;
-  const content = addLineNumbers(selected, startLine);
+  const legacyOffset = args.offset as number | undefined;
+  const legacyLimit = args.limit as number | undefined;
+  const startLine = (args.start_line as number | undefined) ?? (legacyOffset !== undefined ? legacyOffset + 1 : 1);
+  const endLine = args.end_line as number | undefined;
+  const maxLines = endLine !== undefined ? endLine - startLine + 1 : legacyLimit;
+  const maxBytes = Math.min((args.max_bytes as number | undefined) ?? DEFAULT_MAX_BYTES, HARD_MAX_BYTES);
+  if (startLine < 1 || (maxLines !== undefined && maxLines < 1) || maxBytes < 1) {
+    return { error: "start_line must be >= 1; end_line/limit and max_bytes must select a positive range" };
+  }
 
+  const includeLineNumbers = (args.include_line_numbers as boolean | undefined) ?? true;
+  const lines: string[] = [];
+  let lineNumber = 0;
+  let returnedBytes = 0;
+  let outputLimited = false;
+  const input = createReadStream(path, { encoding: (args.encoding as BufferEncoding) || "utf8" });
+  const hasher = createHash("sha256");
+  let streamedBytes = 0;
+  input.on("data", chunk => { const data = Buffer.from(chunk as string, (args.encoding as BufferEncoding) || "utf8"); streamedBytes += data.length; hasher.update(data); });
+  const reader = createInterface({ input, crlfDelay: Infinity });
+  for await (const line of reader) {
+    lineNumber++;
+    if (lineNumber < startLine) continue;
+    if (maxLines !== undefined && lines.length >= maxLines) continue;
+    const bytes = Buffer.byteLength(line, "utf8") + 1;
+    if (returnedBytes + bytes > maxBytes) {
+      outputLimited = true;
+      continue;
+    }
+    lines.push(line);
+    returnedBytes += bytes;
+  }
+
+  const requestedEnd = maxLines === undefined ? lineNumber : startLine + maxLines - 1;
+  const after = await fs.stat(path);
+  if (after.size !== stat.size || Math.floor(after.mtimeMs) !== Math.floor(stat.mtimeMs)) return { error: "file_changed_during_read", message: "The file changed while it was being read. Retry the read to obtain a consistent revision." };
+  const revision = { algorithm: "sha256", hash: hasher.digest("hex"), size_bytes: streamedBytes, modified_ms: Math.floor(stat.mtimeMs) };
   return {
-    content,
-    total_lines: total,
+    path: resolve(path),
+    content: includeLineNumbers ? numbered(lines, startLine) : lines.join("\n"),
+    total_lines: lineNumber,
     start_line: startLine,
-    lines_returned: selected.length,
-    truncated: end < total,
-    ...(sizeWarning && { size_warning: sizeWarning }),
+    end_line: lines.length ? startLine + lines.length - 1 : startLine - 1,
+    lines_returned: lines.length,
+    bytes_returned: returnedBytes,
+    size_bytes: stat.size,
+    modified_ms: Math.floor(stat.mtimeMs),
+    truncated: outputLimited || requestedEnd < lineNumber,
+    limit_reason: outputLimited ? "max_bytes" : undefined,
+    line_numbers_included: includeLineNumbers,
+    revision,
+    content_hash: revision.hash,
+    language: inferLanguage(path),
+    generated: GENERATED.test(path),
   };
 }

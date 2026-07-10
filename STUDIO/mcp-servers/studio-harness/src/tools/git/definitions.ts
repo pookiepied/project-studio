@@ -1,6 +1,15 @@
 /** Tool schema definitions for git version control tools. */
 export const GIT_DEFINITIONS = [
   {
+    name: "search_git_history",
+    description: "Bounded native Git history search across commit messages, exact changed strings (-S), diff regexes (-G), or historical contents of a specific file.",
+    inputSchema: { type: "object", properties: {
+      query: { type: "string", description: "Commit-message text, exact changed string, diff regular expression, or historical file text." }, mode: { type: "string", enum: ["commit_message","changed_string","diff_regex","historical_content"], description: "History search strategy (default commit_message). historical_content requires file." },
+      cwd: { type: "string", description: "Repository directory (default cwd)." }, file: { type: "string", description: "Limit history to this path." }, all_refs: { type: "boolean", description: "Search all refs instead of current history." }, author: { type: "string", description: "Limit commits by author pattern." },
+      since: { type: "string", description: "Git-compatible lower date bound." }, until: { type: "string", description: "Git-compatible upper date bound." }, max_commits: { type: "number", description: "Maximum commits considered (default 50, maximum 1000)." }, max_output_bytes: { type: "number", description: "Maximum returned bytes (default 500000, maximum 5000000)." },
+    }, required: ["query"] },
+  },
+  {
     name: "git_status",
     description:
       "Show the working tree status of a git repository. Returns current branch, " +

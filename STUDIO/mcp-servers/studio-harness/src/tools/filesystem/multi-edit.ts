@@ -1,9 +1,11 @@
 import { promises as fs } from "fs";
+import { getFileRevision, revisionFromBuffer, staleResult } from "./revision.js";
 
 interface MultiEditItem {
   path: string;
   old_string: string;
   new_string: string;
+  expected_revision?: unknown;
 }
 
 function countOccurrences(content: string, needle: string): number {
@@ -34,7 +36,7 @@ function parseEdit(value: unknown, index: number): MultiEditItem | { error: stri
     return { error: `edits[${index}].new_string is required` };
   }
 
-  return { path: filePath, old_string: oldString, new_string: newString };
+  return { path: filePath, old_string: oldString, new_string: newString, expected_revision: item.expected_revision ?? item.expected_hash };
 }
 
 export async function multiEditFile(
@@ -54,6 +56,13 @@ export async function multiEditFile(
 
   const originals = new Map<string, string>();
   const staged = new Map<string, string>();
+  const expectedByPath = new Map<string, unknown>();
+  for (const edit of edits) {
+    if (edit.expected_revision === undefined) continue;
+    const prior = expectedByPath.get(edit.path) as any;
+    if (prior && prior.hash !== (edit.expected_revision as any)?.hash) return { error: `Conflicting expected revisions supplied for ${edit.path}` };
+    expectedByPath.set(edit.path, edit.expected_revision);
+  }
 
   for (let i = 0; i < edits.length; i += 1) {
     const edit = edits[i];
@@ -61,7 +70,10 @@ export async function multiEditFile(
     let content = staged.get(edit.path);
     if (content === undefined) {
       try {
-        content = await fs.readFile(edit.path, "utf-8");
+        const [data, stat] = await Promise.all([fs.readFile(edit.path), fs.stat(edit.path)]);
+        content = data.toString("utf-8");
+        const stale = staleResult(expectedByPath.get(edit.path), revisionFromBuffer(data, stat.mtimeMs));
+        if (stale) return { ...stale, edit_index: i, path: edit.path };
       } catch {
         return {
           error: `edits[${i}]: file not found: ${edit.path}. Verify the path with ls or glob before editing.`,
@@ -116,5 +128,6 @@ export async function multiEditFile(
     success: true,
     edits_applied: edits.length,
     files_changed: changedFiles,
+    revisions: Object.fromEntries(await Promise.all(changedFiles.map(async path => [path, await getFileRevision(path)]))),
   };
 }

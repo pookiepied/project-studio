@@ -1,54 +1,34 @@
 import { promises as fs } from "fs";
-import { join } from "path";
+import { join, relative } from "path";
 
-interface Entry {
-  name: string;
-  type: "file" | "directory";
-  size?: number;
-  children?: Entry[];
-}
+interface Entry { path: string; name: string; type: "file" | "directory" | "symlink" | "other"; size?: number; depth: number }
+const DEFAULT_IGNORES = new Set([".git", "node_modules", "dist", "build", "coverage", ".next", ".cache"]);
 
-async function listDir(dirPath: string, recursive: boolean): Promise<Entry[]> {
-  const dirents = await fs.readdir(dirPath, { withFileTypes: true });
-  const result: Entry[] = [];
-
-  for (const dirent of dirents) {
-    if (dirent.name.startsWith(".")) continue;
-    const fullPath = join(dirPath, dirent.name);
-
-    if (dirent.isDirectory()) {
-      const entry: Entry = { name: dirent.name, type: "directory" };
-      if (recursive) {
-        entry.children = await listDir(fullPath, true);
-      }
-      result.push(entry);
-    } else if (dirent.isFile()) {
-      const stat = await fs.stat(fullPath);
-      result.push({ name: dirent.name, type: "file", size: stat.size });
-    }
-  }
-
-  return result;
-}
-
-export async function listDirectory(
-  args: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  const dirPath = (args.path as string) || process.cwd();
+export async function listDirectory(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const root = (args.path as string) || process.cwd();
   const recursive = (args.recursive as boolean) || false;
+  const maxDepth = Math.max(0, Math.min((args.depth as number | undefined) ?? (recursive ? 3 : 1), 20));
+  const maxEntries = Math.max(1, Math.min((args.max_entries as number) || 500, 10_000));
+  const includeHidden = (args.include_hidden as boolean) || false;
+  const ignores = new Set([...DEFAULT_IGNORES, ...((args.ignore as string[]) || [])]);
+  const entries: Entry[] = [];
+  let skipped = 0;
 
-  let entries: Entry[];
-  try {
-    entries = await listDir(dirPath, recursive);
-  } catch (e: any) {
-    if (e.code === "ENOENT") {
-      return { error: `Directory not found: ${dirPath}. Verify the path exists.` };
+  async function walk(directory: string, depth: number): Promise<void> {
+    if (depth > maxDepth || entries.length >= maxEntries) return;
+    const dirents = await fs.readdir(directory, { withFileTypes: true });
+    dirents.sort((a, b) => a.name.localeCompare(b.name));
+    for (const item of dirents) {
+      if (entries.length >= maxEntries) { skipped++; continue; }
+      if ((!includeHidden && item.name.startsWith(".")) || ignores.has(item.name)) { skipped++; continue; }
+      const full = join(directory, item.name);
+      const type = item.isDirectory() ? "directory" : item.isFile() ? "file" : item.isSymbolicLink() ? "symlink" : "other";
+      const stat = type === "file" ? await fs.stat(full) : undefined;
+      entries.push({ path: relative(root, full) || item.name, name: item.name, type, size: stat?.size, depth });
+      if (type === "directory" && depth < maxDepth) await walk(full, depth + 1);
     }
-    if (e.code === "ENOTDIR") {
-      return { error: `${dirPath} is a file, not a directory. Use read_file to read its contents.` };
-    }
-    return { error: `Failed to list directory: ${e.message}` };
   }
 
-  return { path: dirPath, entries, count: entries.length };
+  await walk(root, 1);
+  return { path: root, entries, count: entries.length, max_depth: maxDepth, ignored_or_skipped: skipped, truncated: entries.length >= maxEntries };
 }

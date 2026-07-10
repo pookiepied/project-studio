@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import { dirname } from "path";
+import { getFileRevision, staleResult } from "./revision.js";
 
 export async function writeFile(
   args: Record<string, unknown>
@@ -9,6 +10,14 @@ export async function writeFile(
 
   if (!filePath) return { error: "path is required" };
   if (content === undefined) return { error: "content is required" };
+
+  try {
+    const stale = staleResult(args.expected_revision ?? args.expected_hash, await getFileRevision(filePath));
+    if (stale) return stale;
+  } catch (e: any) {
+    if (e?.code !== "ENOENT") throw e;
+    if (args.expected_revision || args.expected_hash) return { error: "stale_file", message: "Expected an existing file revision, but the target does not exist." };
+  }
 
   try {
     await fs.mkdir(dirname(filePath), { recursive: true });
@@ -30,5 +39,6 @@ export async function writeFile(
     success: true,
     path: filePath,
     bytes_written: Buffer.byteLength(content, "utf-8"),
+    revision: await getFileRevision(filePath),
   };
 }

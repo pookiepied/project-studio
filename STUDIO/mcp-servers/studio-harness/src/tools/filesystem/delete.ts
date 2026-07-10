@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import { formatCaughtError } from "../tool-contract.js";
+import { getFileRevision, staleResult } from "./revision.js";
 
 export async function deleteFile(
   args: Record<string, unknown>
@@ -30,6 +31,9 @@ export async function deleteFile(
       return formatCaughtError("delete_file", e);
     }
   }
+
+  const stale = staleResult(args.expected_revision ?? args.expected_hash, await getFileRevision(filePath));
+  if (stale) return stale;
 
   try {
     await fs.unlink(filePath);

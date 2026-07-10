@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import { getFileRevision, revisionFromBuffer, staleResult } from "./revision.js";
 
 export async function editFile(
   args: Record<string, unknown>
@@ -12,13 +13,18 @@ export async function editFile(
   if (newString === undefined) return { error: "new_string is required" };
 
   let content: string;
+  let currentRevision;
   try {
-    content = await fs.readFile(filePath, "utf-8");
+    const [data, stat] = await Promise.all([fs.readFile(filePath), fs.stat(filePath)]);
+    content = data.toString("utf-8");
+    currentRevision = revisionFromBuffer(data, stat.mtimeMs);
   } catch {
     return {
       error: `File not found: ${filePath}. Verify the path with ls or glob before editing.`,
     };
   }
+  const stale = staleResult(args.expected_revision ?? args.expected_hash, currentRevision);
+  if (stale) return stale;
 
   if (!content.includes(oldString)) {
     return {
@@ -50,5 +56,6 @@ export async function editFile(
     success: true,
     path: filePath,
     note: "Edit applied. Use read_file to verify the result if needed.",
+    revision: await getFileRevision(filePath),
   };
 }

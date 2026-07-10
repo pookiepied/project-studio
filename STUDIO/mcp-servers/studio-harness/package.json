@@ -4,19 +4,21 @@
   "description": "Studio Harness MCP server: local coding/project harness (filesystem, code search & intelligence, git, shell/PowerShell, REPL, LSP)",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --target=node18 --external:node-ssh --external:ssh2 --external:cpu-features --outfile=dist/index.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node18 --external:node-ssh --external:ssh2 --external:cpu-features --outfile=dist/index.js",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "glob": "^11.0.0",
-    "node-ssh": "^13.1.0"
+    "node-ssh": "^13.1.0",
+    "tree-sitter-wasms": "^0.1.13",
+    "web-tree-sitter": "^0.20.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "esbuild": "^0.24.0",
-    "typescript": "^5.6.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }

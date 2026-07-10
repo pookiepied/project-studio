@@ -53,7 +53,7 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-interface LspServer {
+export interface LspServer {
   process: ChildProcess;
   nextId: number;
   pending: Map<number, PendingRequest>;
@@ -61,6 +61,8 @@ interface LspServer {
   openedFiles: Set<string>;
   workspaceUri: string;
   language: string;
+  capabilities: Record<string, any>;
+  diagnostics: Map<string, any[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +84,8 @@ const LANG_SERVERS: Record<string, { bins: string[]; installHint: string }> = {
   },
   rust: {
     bins: ["rust-analyzer"],
-    installHint: "Install rust-analyzer via rustup or from https://rust-analyzer.github.io",
+    installHint:
+      "Install rust-analyzer via rustup or from https://rust-analyzer.github.io",
   },
   go: {
     bins: ["gopls"],
@@ -106,12 +109,32 @@ export const EXT_TO_LANG: Record<string, string> = {
 
 // SymbolKind number → human-readable label
 export const SYMBOL_KIND_NAMES: Record<number, string> = {
-  1: "File", 2: "Module", 3: "Namespace", 4: "Package", 5: "Class",
-  6: "Method", 7: "Property", 8: "Field", 9: "Constructor", 10: "Enum",
-  11: "Interface", 12: "Function", 13: "Variable", 14: "Constant",
-  15: "String", 16: "Number", 17: "Boolean", 18: "Array", 19: "Object",
-  20: "Key", 21: "Null", 22: "EnumMember", 23: "Struct", 24: "Event",
-  25: "Operator", 26: "TypeParameter",
+  1: "File",
+  2: "Module",
+  3: "Namespace",
+  4: "Package",
+  5: "Class",
+  6: "Method",
+  7: "Property",
+  8: "Field",
+  9: "Constructor",
+  10: "Enum",
+  11: "Interface",
+  12: "Function",
+  13: "Variable",
+  14: "Constant",
+  15: "String",
+  16: "Number",
+  17: "Boolean",
+  18: "Array",
+  19: "Object",
+  20: "Key",
+  21: "Null",
+  22: "EnumMember",
+  23: "Struct",
+  24: "Event",
+  25: "Operator",
+  26: "TypeParameter",
 };
 
 // ---------------------------------------------------------------------------
@@ -137,21 +160,31 @@ class LspManager {
       const candidates = isWindows ? [bin + ".cmd", bin + ".ps1", bin] : [bin];
       for (const candidate of candidates) {
         try {
-          execSync(isWindows ? `where ${candidate}` : `which ${candidate}`, { stdio: "ignore" });
+          execSync(isWindows ? `where ${candidate}` : `which ${candidate}`, {
+            stdio: "ignore",
+          });
           return candidate;
-        } catch { /* not on PATH, try next */ }
+        } catch {
+          /* not on PATH, try next */
+        }
       }
     }
     return null;
   }
 
   getInstallHint(language: string): string {
-    return LANG_SERVERS[language]?.installHint ?? `No LSP server known for '${language}'`;
+    return (
+      LANG_SERVERS[language]?.installHint ??
+      `No LSP server known for '${language}'`
+    );
   }
 
   // ── Server lifecycle ──────────────────────────────────────────────────────
 
-  async getOrCreate(language: string, workspaceRoot: string): Promise<LspServer> {
+  async getOrCreate(
+    language: string,
+    workspaceRoot: string,
+  ): Promise<LspServer> {
     const key = `${language}:${workspaceRoot}`;
     const existing = this.servers.get(key);
     if (existing && !existing.process.killed) return existing;
@@ -159,13 +192,15 @@ class LspManager {
     if (!LANG_SERVERS[language]) {
       throw new Error(
         `Language '${language}' is not supported. ` +
-        `Supported: ${Object.keys(LANG_SERVERS).join(", ")}`
+          `Supported: ${Object.keys(LANG_SERVERS).join(", ")}`,
       );
     }
 
     const bin = this.findBinary(language);
     if (!bin) {
-      throw new Error(`No server binary for '${language}'. ${this.getInstallHint(language)}`);
+      throw new Error(
+        `No server binary for '${language}'. ${this.getInstallHint(language)}`,
+      );
     }
 
     const server = await this.spawnServer(bin, language, workspaceRoot);
@@ -176,13 +211,14 @@ class LspManager {
   private spawnServer(
     bin: string,
     language: string,
-    workspaceRoot: string
+    workspaceRoot: string,
   ): Promise<LspServer> {
     return new Promise((resolve, reject) => {
       const isWindows = process.platform === "win32";
-      const args = language === "typescript" || language === "javascript"
-        ? ["--stdio"]
-        : [];
+      const args =
+        language === "typescript" || language === "javascript"
+          ? ["--stdio"]
+          : [];
 
       const proc = spawn(bin, args, {
         cwd: workspaceRoot,
@@ -198,6 +234,8 @@ class LspManager {
         openedFiles: new Set(),
         workspaceUri: pathToUri(workspaceRoot),
         language,
+        capabilities: {},
+        diagnostics: new Map(),
       };
 
       proc.stdout!.on("data", (chunk: Buffer) => {
@@ -205,7 +243,9 @@ class LspManager {
         this.drainBuffer(server);
       });
 
-      proc.stderr!.on("data", () => { /* suppress LSP server debug output */ });
+      proc.stderr!.on("data", () => {
+        /* suppress LSP server debug output */
+      });
 
       proc.on("error", (err) => {
         const hint = this.getInstallHint(language);
@@ -215,13 +255,19 @@ class LspManager {
       });
 
       proc.on("exit", (code) => {
-        this.rejectAll(server, new Error(`LSP server exited with code ${code}`));
+        this.rejectAll(
+          server,
+          new Error(`LSP server exited with code ${code}`),
+        );
       });
 
       // Initialize
       this.sendInitialize(server, workspaceRoot)
         .then(() => resolve(server))
-        .catch((e) => { proc.kill(); reject(e); });
+        .catch((e) => {
+          proc.kill();
+          reject(e);
+        });
     });
   }
 
@@ -267,6 +313,11 @@ class LspManager {
           } else {
             resolve(msg.result);
           }
+        } else if (msg.method === "textDocument/publishDiagnostics") {
+          server.diagnostics.set(
+            msg.params?.uri,
+            msg.params?.diagnostics ?? [],
+          );
         }
         // Notifications (no id) — ignored
       } catch {
@@ -281,12 +332,19 @@ class LspManager {
     server.process.stdin!.write(header + body);
   }
 
-  request<T = unknown>(server: LspServer, method: string, params: unknown, timeoutMs = 20_000): Promise<T> {
+  request<T = unknown>(
+    server: LspServer,
+    method: string,
+    params: unknown,
+    timeoutMs = 20_000,
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const id = server.nextId++;
       const timer = setTimeout(() => {
         server.pending.delete(id);
-        reject(new Error(`LSP '${method}' timed out after ${timeoutMs / 1000}s`));
+        reject(
+          new Error(`LSP '${method}' timed out after ${timeoutMs / 1000}s`),
+        );
       }, timeoutMs);
 
       server.pending.set(id, {
@@ -305,28 +363,80 @@ class LspManager {
 
   // ── LSP handshake ─────────────────────────────────────────────────────────
 
-  private async sendInitialize(server: LspServer, workspaceRoot: string): Promise<void> {
-    await this.request(server, "initialize", {
-      processId: process.pid,
-      clientInfo: { name: "studio-harness", version: "1.0.0" },
-      rootUri: server.workspaceUri,
-      capabilities: {
-        textDocument: {
-          synchronization: { dynamicRegistration: false, willSave: false, willSaveWaitUntil: false, didSave: false },
-          definition: { linkSupport: false },
-          references: { dynamicRegistration: false },
-          hover: { dynamicRegistration: false, contentFormat: ["plaintext", "markdown"] },
-          documentSymbol: { dynamicRegistration: false, hierarchicalDocumentSymbolSupport: true },
-          implementation: { dynamicRegistration: false, linkSupport: false },
-          callHierarchy: { dynamicRegistration: false },
+  private async sendInitialize(
+    server: LspServer,
+    workspaceRoot: string,
+  ): Promise<void> {
+    const initialized: any = await this.request(
+      server,
+      "initialize",
+      {
+        processId: process.pid,
+        clientInfo: { name: "studio-harness", version: "1.0.0" },
+        rootUri: server.workspaceUri,
+        capabilities: {
+          textDocument: {
+            synchronization: {
+              dynamicRegistration: false,
+              willSave: false,
+              willSaveWaitUntil: false,
+              didSave: false,
+            },
+            definition: { linkSupport: false },
+            references: { dynamicRegistration: false },
+            hover: {
+              dynamicRegistration: false,
+              contentFormat: ["plaintext", "markdown"],
+            },
+            documentSymbol: {
+              dynamicRegistration: false,
+              hierarchicalDocumentSymbolSupport: true,
+            },
+            implementation: { dynamicRegistration: false, linkSupport: false },
+            declaration: { dynamicRegistration: false, linkSupport: false },
+            typeDefinition: { dynamicRegistration: false, linkSupport: false },
+            callHierarchy: { dynamicRegistration: false },
+            signatureHelp: { dynamicRegistration: false },
+            rename: { dynamicRegistration: false, prepareSupport: true },
+            codeAction: {
+              dynamicRegistration: false,
+              resolveSupport: { properties: ["edit"] },
+            },
+            formatting: { dynamicRegistration: false },
+            rangeFormatting: { dynamicRegistration: false },
+            semanticTokens: {
+              dynamicRegistration: false,
+              requests: { range: true, full: false },
+              tokenTypes: [],
+              tokenModifiers: [],
+              formats: ["relative"],
+            },
+            inlayHint: {
+              dynamicRegistration: false,
+              resolveSupport: {
+                properties: [
+                  "tooltip",
+                  "textEdits",
+                  "label.tooltip",
+                  "label.location",
+                  "label.command",
+                ],
+              },
+            },
+          },
+          workspace: {
+            symbol: { dynamicRegistration: false },
+            workspaceFolders: true,
+          },
         },
-        workspace: {
-          symbol: { dynamicRegistration: false },
-          workspaceFolders: true,
-        },
+        workspaceFolders: [
+          { uri: server.workspaceUri, name: path.basename(workspaceRoot) },
+        ],
       },
-      workspaceFolders: [{ uri: server.workspaceUri, name: path.basename(workspaceRoot) }],
-    }, 30_000);
+      30_000,
+    );
+
+    server.capabilities = initialized?.capabilities ?? {};
 
     this.notify(server, "initialized", {});
   }
@@ -340,7 +450,8 @@ class LspManager {
       this.notify(server, "textDocument/didOpen", {
         textDocument: {
           uri,
-          languageId: server.language === "typescript" ? "typescript" : server.language,
+          languageId:
+            server.language === "typescript" ? "typescript" : server.language,
           version: 1,
           text,
         },
@@ -352,13 +463,30 @@ class LspManager {
     return uri;
   }
 
+  async syncFile(server: LspServer, filePath: string): Promise<void> {
+    const uri = pathToUri(filePath);
+    const text = await readFile(filePath, "utf8");
+    if (!server.openedFiles.has(uri)) {
+      await this.ensureFileOpen(server, filePath);
+      return;
+    }
+    this.notify(server, "textDocument/didChange", {
+      textDocument: { uri, version: Date.now() },
+      contentChanges: [{ text }],
+    });
+  }
+
   // ── Utility ───────────────────────────────────────────────────────────────
 
   terminate(language: string, workspaceRoot: string): void {
     const key = `${language}:${workspaceRoot}`;
     const server = this.servers.get(key);
     if (server) {
-      try { server.process.kill(); } catch { /* ignore */ }
+      try {
+        server.process.kill();
+      } catch {
+        /* ignore */
+      }
       this.servers.delete(key);
     }
   }
@@ -370,7 +498,9 @@ class LspManager {
 
 export function pathToUri(filePath: string): string {
   const normalized = filePath.replace(/\\/g, "/");
-  return normalized.startsWith("/") ? `file://${normalized}` : `file:///${normalized}`;
+  return normalized.startsWith("/")
+    ? `file://${normalized}`
+    : `file:///${normalized}`;
 }
 
 export function uriToPath(uri: string): string {

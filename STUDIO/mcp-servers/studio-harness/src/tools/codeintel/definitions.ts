@@ -6,13 +6,20 @@ export const CODEINTEL_DEFINITIONS = [
       "Get the structural outline of a file — functions, classes, interfaces, exports — with line numbers, " +
       "WITHOUT reading the file content. Use this before read_file on any file over ~100 lines. " +
       "Tells you exactly which line range to pass to read_file for the relevant section. " +
-      "Uses LSP (Language Server Protocol) for rich output when available, falls back to regex otherwise. " +
+      "Uses LSP for rich output when available, Tree-sitter as the broad structural fallback, then regex for unsupported grammars. " +
       "Supported: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Ruby, C/C++.",
     inputSchema: {
       type: "object",
       properties: {
-        file_path:      { type: "string", description: "Absolute or relative path to the file to outline" },
-        workspace_root: { type: "string", description: "Project root directory for LSP context (optional — auto-detected from file path)" },
+        file_path: {
+          type: "string",
+          description: "Absolute or relative path to the file to outline",
+        },
+        workspace_root: {
+          type: "string",
+          description:
+            "Project root directory for LSP context (optional — auto-detected from file path)",
+        },
       },
       required: ["file_path"],
     },
@@ -31,10 +38,26 @@ export const CODEINTEL_DEFINITIONS = [
     inputSchema: {
       type: "object",
       properties: {
-        root_dir:  { type: "string",  description: "Root directory to index (optional, defaults to current working directory)" },
-        force:     { type: "boolean", description: "Force full re-scan even for unchanged files (default false)" },
-        max_files: { type: "number",  description: "Maximum number of files to index (default 500). Increase for larger codebases." },
-        timeout:   { type: "number",  description: "Timeout in milliseconds (default 120000). Increase to 300000 for large monorepos." },
+        root_dir: {
+          type: "string",
+          description:
+            "Root directory to index (optional, defaults to current working directory)",
+        },
+        force: {
+          type: "boolean",
+          description:
+            "Force full re-scan even for unchanged files (default false)",
+        },
+        max_files: {
+          type: "number",
+          description:
+            "Maximum number of files to index (default 500). Increase for larger codebases.",
+        },
+        timeout: {
+          type: "number",
+          description:
+            "Timeout in milliseconds (default 120000). Increase to 300000 for large monorepos.",
+        },
       },
       required: [],
     },
@@ -50,8 +73,15 @@ export const CODEINTEL_DEFINITIONS = [
     inputSchema: {
       type: "object",
       properties: {
-        root_dir:         { type: "string",  description: "Project root directory (optional, defaults to cwd)" },
-        include_outlines: { type: "boolean", description: "Include structural outlines of entry-point files (default true)" },
+        root_dir: {
+          type: "string",
+          description: "Project root directory (optional, defaults to cwd)",
+        },
+        include_outlines: {
+          type: "boolean",
+          description:
+            "Include structural outlines of entry-point files (default true)",
+        },
       },
       required: [],
     },
@@ -66,10 +96,24 @@ export const CODEINTEL_DEFINITIONS = [
     inputSchema: {
       type: "object",
       properties: {
-        symbol:      { type: "string", description: "Name of the symbol to find (function, class, type, variable, etc.)" },
-        root_dir:    { type: "string", description: "Project root to search in (optional, defaults to cwd)" },
-        type:        { type: "string", description: "File type to restrict search (e.g. 'ts', 'py', 'go', 'rust')" },
-        max_results: { type: "number", description: "Maximum number of matches to return (default 5)" },
+        symbol: {
+          type: "string",
+          description:
+            "Name of the symbol to find (function, class, type, variable, etc.)",
+        },
+        root_dir: {
+          type: "string",
+          description: "Project root to search in (optional, defaults to cwd)",
+        },
+        type: {
+          type: "string",
+          description:
+            "File type to restrict search (e.g. 'ts', 'py', 'go', 'rust')",
+        },
+        max_results: {
+          type: "number",
+          description: "Maximum number of matches to return (default 5)",
+        },
       },
       required: ["symbol"],
     },
@@ -85,8 +129,15 @@ export const CODEINTEL_DEFINITIONS = [
     inputSchema: {
       type: "object",
       properties: {
-        file_path: { type: "string", description: "Path to the file to analyze (absolute or relative)" },
-        root_dir:  { type: "string", description: "Project root for reverse dependency lookup (optional, auto-detected)" },
+        file_path: {
+          type: "string",
+          description: "Path to the file to analyze (absolute or relative)",
+        },
+        root_dir: {
+          type: "string",
+          description:
+            "Project root for reverse dependency lookup (optional, auto-detected)",
+        },
       },
       required: ["file_path"],
     },

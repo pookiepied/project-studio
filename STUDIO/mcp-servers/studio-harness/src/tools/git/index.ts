@@ -5,3 +5,4 @@ export {
   gitCherryPick, gitRevert, gitTag, gitRemote, gitClone, gitBlame, gitClean,
   gitReflog, gitConfig,
 } from "./git.js";
+export { searchGitHistory } from "./search.js";

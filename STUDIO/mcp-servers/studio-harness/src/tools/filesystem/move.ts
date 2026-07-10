@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import { dirname } from "path";
 import { formatCaughtError } from "../tool-contract.js";
+import { getFileRevision, staleResult } from "./revision.js";
 
 export async function moveFile(
   args: Record<string, unknown>
@@ -11,7 +12,11 @@ export async function moveFile(
   if (!destination) return { error: "destination is required" };
 
   try {
-    await fs.stat(source);
+    const stat = await fs.stat(source);
+    if (stat.isFile()) {
+      const stale = staleResult(args.expected_revision ?? args.expected_hash, await getFileRevision(source));
+      if (stale) return stale;
+    }
   } catch {
     return { error: `Source not found: ${source}` };
   }

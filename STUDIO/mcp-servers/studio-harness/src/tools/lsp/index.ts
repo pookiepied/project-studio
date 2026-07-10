@@ -30,6 +30,7 @@ import {
   formatWorkspaceSymbols,
   formatCallHierarchyItems,
 } from "./formatters.js";
+export { navigateSymbol, findSymbolRelationships, inspectSymbol, diagnostics, renameSymbol, codeActions, formatCode } from "./ide.js";
 
 type LspOperation =
   | "goToDefinition"

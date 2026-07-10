@@ -3,23 +3,34 @@ export const FILESYSTEM_DEFINITIONS = [
   {
     name: "read_file",
     description:
-      "Read the contents of a file with line numbers. Supports offset/limit to read specific ranges — " +
-      "always use these for files over ~500 lines. Returns line-numbered content, total line count, " +
-      "and start line so you can reference exact positions in follow-up calls. " +
-      "For large files without offset/limit, you will get an instructive error explaining your options — " +
-      "including allow_large: true to read the full file when you genuinely need it. " +
-      "Use outline_file first on large files to find the exact section you need.",
+      "Read text using bounded line or byte ranges without loading the complete file into memory. " +
+      "Prefer 1-based start_line/end_line; legacy offset/limit remains supported. Responses have a byte budget, " +
+      "line numbers, total lines, and truncation metadata. Binary content is refused and routed through file_metadata.",
     inputSchema: {
       type: "object",
       properties: {
         path:        { type: "string",  description: "Absolute or relative path to the file" },
         offset:      { type: "number",  description: "0-indexed line position to start reading from (default 0 = beginning). Use with limit to read specific sections." },
         limit:       { type: "number",  description: "Maximum number of lines to return. Omit only for small files. For large files, always provide this." },
-        allow_large: { type: "boolean", description: "Set to true to bypass the large-file token gate and read the entire file. Use only when you genuinely need the full content — prefer offset+limit or outline_file for efficiency. A 5 MB hard ceiling still applies regardless." },
+        start_line:  { type: "number", description: "1-based first line; preferred over legacy offset" },
+        end_line:    { type: "number", description: "1-based inclusive final line" },
+        max_bytes:   { type: "number", description: "Maximum response bytes (default 262144, hard max 5 MB)" },
+        byte_offset: { type: "number", description: "Raw byte start; requires byte_length" },
+        byte_length: { type: "number", description: "Raw bytes requested; requires byte_offset" },
+        encoding:    { type: "string", description: "Text encoding (default utf8)" },
+        include_line_numbers: { type: "boolean", description: "Prefix returned text lines with source line numbers (default true)." },
       },
       required: ["path"],
     },
   },
+  {
+    name: "read_many_files", description: "Read explicit bounded ranges from multiple files with aggregate file and byte budgets.",
+    inputSchema: { type: "object", properties: { requests: { type: "array", description: "Explicit file requests; each entry requires path and may provide a bounded line range and byte budget.", items: { type: "object", properties: { path: { type: "string", description: "File to read." }, start_line: { type: "number", description: "1-based first line." }, end_line: { type: "number", description: "1-based inclusive final line." }, max_bytes: { type: "number", description: "Per-file response-byte ceiling." } }, required: ["path"] } }, max_files: { type: "number", description: "Maximum requests processed (default 20, hard maximum 100)." }, max_total_bytes: { type: "number", description: "Aggregate returned-content budget (default 524288 bytes, hard maximum 5242880)." } }, required: ["requests"] },
+  },
+  { name: "file_metadata", description: "Inspect file type, size, timestamps, binary/encoding classification, and generated/minified heuristics.", inputSchema: { type: "object", properties: { path: { type: "string", description: "File or directory to inspect." } }, required: ["path"] } },
+  { name: "detect_binary", description: "Classify a file as text or binary from a bounded sample.", inputSchema: { type: "object", properties: { path: { type: "string", description: "File to classify." }, sample_bytes: { type: "number", description: "Leading bytes sampled (default 8192, maximum 1048576)." } }, required: ["path"] } },
+  { name: "content_hash", description: "Compute a stable hash for a file or selected byte range.", inputSchema: { type: "object", properties: { path: { type: "string", description: "File to hash." }, algorithm: { type: "string", enum: ["sha256", "sha512", "sha1", "md5"], description: "Hash algorithm (default sha256)." }, byte_offset: { type: "number", description: "Zero-based byte offset (default 0)." }, byte_length: { type: "number", description: "Number of bytes to hash; omit to hash through end-of-file." } }, required: ["path"] } },
+  { name: "watch_files", description: "Track changes using snapshots. Actions: snapshot, changes, drop.", inputSchema: { type: "object", properties: { action: { type: "string", enum: ["snapshot", "changes", "drop"], description: "Lifecycle operation (default snapshot)." }, path: { type: "string", description: "Root directory for snapshot; defaults to cwd." }, snapshot_id: { type: "string", description: "Required for changes and drop operations." }, max_files: { type: "number", description: "Maximum scanned files (default 10000, hard maximum 100000)." } }, required: [] } },
   {
     name: "edit_file",
     description:
@@ -31,6 +42,7 @@ export const FILESYSTEM_DEFINITIONS = [
         path:       { type: "string", description: "Path to the file to edit" },
         old_string: { type: "string", description: "Exact string to find (must be unique in the file)" },
         new_string: { type: "string", description: "String to replace it with" },
+        expected_revision: { type: "object", description: "Optional revision returned by read_file; rejects the edit with stale_file when its hash no longer matches.", properties: { algorithm: { type: "string", description: "Hash algorithm; currently sha256." }, hash: { type: "string", description: "Expected whole-file hash." }, size_bytes: { type: "number", description: "File size observed during the read." }, modified_ms: { type: "number", description: "Modification time observed during the read." } }, required: ["hash"] },
       },
       required: ["path", "old_string", "new_string"],
     },
@@ -53,6 +65,7 @@ export const FILESYSTEM_DEFINITIONS = [
               path:       { type: "string", description: "Path to the file to edit" },
               old_string: { type: "string", description: "Exact string to find (must be unique when this edit is applied)" },
               new_string: { type: "string", description: "String to replace it with" },
+              expected_revision: { type: "object", description: "Optional revision returned by read_file for this file.", properties: { hash: { type: "string", description: "Expected whole-file SHA-256 hash." } }, required: ["hash"] },
             },
             required: ["path", "old_string", "new_string"],
           },
@@ -71,6 +84,7 @@ export const FILESYSTEM_DEFINITIONS = [
       properties: {
         path:    { type: "string", description: "Path to the file to write" },
         content: { type: "string", description: "Full content to write to the file" },
+        expected_revision: { type: "object", description: "Optional revision required to overwrite an existing file; a mismatch rejects the write.", properties: { hash: { type: "string", description: "Expected whole-file SHA-256 hash." } }, required: ["hash"] },
       },
       required: ["path", "content"],
     },
@@ -86,6 +100,7 @@ export const FILESYSTEM_DEFINITIONS = [
       properties: {
         path:      { type: "string",  description: "Absolute or relative path to the file or directory to delete" },
         recursive: { type: "boolean", description: "Required when deleting a directory — removes it and all contents (default: false)" },
+        expected_revision: { type: "object", description: "Optional revision required before deleting a regular file; not applicable to directories.", properties: { hash: { type: "string", description: "Expected whole-file SHA-256 hash." } }, required: ["hash"] },
       },
       required: ["path"],
     },
@@ -100,6 +115,7 @@ export const FILESYSTEM_DEFINITIONS = [
       properties: {
         source:      { type: "string", description: "Current path of the file or directory" },
         destination: { type: "string", description: "New path (including new name if renaming)" },
+        expected_revision: { type: "object", description: "Optional revision required before moving a regular file; not applicable to directories.", properties: { hash: { type: "string", description: "Expected whole-file SHA-256 hash." } }, required: ["hash"] },
       },
       required: ["source", "destination"],
     },
@@ -156,6 +172,10 @@ export const FILESYSTEM_DEFINITIONS = [
       properties: {
         path:      { type: "string",  description: "Directory to list (optional, defaults to cwd)" },
         recursive: { type: "boolean", description: "List recursively (default false)" },
+        depth: { type: "number", description: "Maximum tree depth" },
+        max_entries: { type: "number", description: "Maximum returned entries (default 500)" },
+        include_hidden: { type: "boolean", description: "Include dotfiles" },
+        ignore: { type: "array", items: { type: "string" }, description: "Additional exact names to ignore" },
       },
       required: [],
     },

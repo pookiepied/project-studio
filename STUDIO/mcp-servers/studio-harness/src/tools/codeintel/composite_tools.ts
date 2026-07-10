@@ -54,7 +54,7 @@ async function ensureCodebaseIndex(rootDir: string): Promise<{
  * Use at the start of any coding session on an unfamiliar project.
  */
 export async function exploreCodebase(
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const rootDir = path.resolve((args.root_dir as string) || process.cwd());
   const includeOutlines = (args.include_outlines as boolean) ?? true;
@@ -63,7 +63,10 @@ export async function exploreCodebase(
 
   const reportContent = await readTextFile(reportPath);
   if (!reportContent) {
-    return { error: "Failed to build or read codebase index. Check directory permissions." };
+    return {
+      error:
+        "Failed to build or read codebase index. Check directory permissions.",
+    };
   }
 
   const result: Record<string, unknown> = {
@@ -75,7 +78,8 @@ export async function exploreCodebase(
 
   // Extract entry point files from the report and outline them
   if (includeOutlines) {
-    const entrySection = reportContent.match(/## Entry Points\n([\s\S]*?)(?=\n##|$)/)?.[1] ?? "";
+    const entrySection =
+      reportContent.match(/## Entry Points\n([\s\S]*?)(?=\n##|$)/)?.[1] ?? "";
     const entryFiles = entrySection
       .split("\n")
       .map((l) => l.replace(/^- /, "").trim())
@@ -88,12 +92,15 @@ export async function exploreCodebase(
         const abs = path.join(rootDir, rel);
         try {
           await fs.stat(abs);
-          const outline = await outlineFile({ file_path: abs }) as Record<string, unknown>;
+          const outline = (await outlineFile({ file_path: abs })) as Record<
+            string,
+            unknown
+          >;
           outlines[rel] = outline;
         } catch {
           // file not found — skip
         }
-      })
+      }),
     );
 
     if (Object.keys(outlines).length > 0) {
@@ -123,7 +130,7 @@ export async function exploreCodebase(
  * the file's structural outline so the LLM knows context without reading more.
  */
 export async function searchSymbol(
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const symbol = args.symbol as string;
   const rootDir = path.resolve((args.root_dir as string) || process.cwd());
@@ -132,29 +139,59 @@ export async function searchSymbol(
 
   if (!symbol) return { error: "symbol is required" };
 
-  type Match = { file: string; line: number | null; snippet: string; outline?: unknown };
+  type Match = {
+    file: string;
+    line: number | null;
+    snippet: string;
+    outline?: unknown;
+  };
   const matches: Match[] = [];
 
   // ── Strategy 1: LSP workspaceSymbol ──────────────────────────────────────
-  const lspResult = await runLsp({
+  const lspResult = (await runLsp({
     operation: "workspaceSymbol",
     query: symbol,
     workspaceRoot: rootDir,
-  }) as Record<string, unknown>;
+  })) as Record<string, unknown>;
 
   if (!lspResult.error && lspResult) {
-    const lspText = typeof lspResult === "string" ? lspResult : JSON.stringify(lspResult);
+    for (const item of ((lspResult.symbols as any[]) ?? []).slice(
+      0,
+      maxResults,
+    )) {
+      const filePath = item.path as string;
+      const lineNum = item.start_line as number;
+      const snippet = (await readFile({
+        path: filePath,
+        start_line: Math.max(1, lineNum - 2),
+        end_line: lineNum + 5,
+      })) as Record<string, unknown>;
+      matches.push({
+        file: path.relative(rootDir, filePath),
+        line: lineNum,
+        snippet: (snippet.content as string) ?? "",
+      });
+    }
+    const lspText =
+      typeof lspResult === "string" ? lspResult : JSON.stringify(lspResult);
     // LSP found something — parse file:line pairs from the formatted output
     const locPattern = /([^\s:]+\.[a-z]+):(\d+)/g;
     let m: RegExpExecArray | null;
     const seen = new Set<string>();
-    while ((m = locPattern.exec(lspText)) !== null && matches.length < maxResults) {
+    while (
+      (m = locPattern.exec(lspText)) !== null &&
+      matches.length < maxResults
+    ) {
       const key = `${m[1]}:${m[2]}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const filePath = path.isAbsolute(m[1]) ? m[1] : path.join(rootDir, m[1]);
       const lineNum = parseInt(m[2], 10);
-      const snippet = await readFile({ path: filePath, offset: Math.max(0, lineNum - 3), limit: 8 }) as Record<string, unknown>;
+      const snippet = (await readFile({
+        path: filePath,
+        offset: Math.max(0, lineNum - 3),
+        limit: 8,
+      })) as Record<string, unknown>;
       matches.push({
         file: path.relative(rootDir, filePath),
         line: lineNum,
@@ -170,14 +207,14 @@ export async function searchSymbol(
   // ── Strategy 2: grep for declarations ────────────────────────────────────
   if (matches.length === 0) {
     const declPattern = `(export\\s+)?(async\\s+)?(function|class|interface|type|enum|def|fn)\\s+${symbol}\\b`;
-    const grepResult = await grepFiles({
+    const grepResult = (await grepFiles({
       pattern: declPattern,
       path: rootDir,
       output_mode: "content",
       ...(fileType ? { type: fileType } : {}),
       "-A": 3,
       head_limit: maxResults,
-    }) as Record<string, unknown>;
+    })) as Record<string, unknown>;
 
     const grepText = (grepResult.matches as string) ?? "";
     if (grepText) {
@@ -201,13 +238,13 @@ export async function searchSymbol(
 
   // ── Strategy 3: broad grep fallback ──────────────────────────────────────
   if (matches.length === 0) {
-    const grepResult = await grepFiles({
+    const grepResult = (await grepFiles({
       pattern: `\\b${symbol}\\b`,
       path: rootDir,
       output_mode: "files_with_matches",
       ...(fileType ? { type: fileType } : {}),
       head_limit: maxResults,
-    }) as Record<string, unknown>;
+    })) as Record<string, unknown>;
 
     const files = ((grepResult.matches as string) ?? "")
       .split("\n")
@@ -238,7 +275,9 @@ export async function searchSymbol(
     try {
       const outline = await outlineFile({ file_path: absPath });
       firstMatch.outline = outline;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return {
@@ -269,10 +308,12 @@ export async function searchSymbol(
  * what it depends on, and who depends on it — without reading the whole thing.
  */
 export async function analyzeFile(
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const filePath = path.resolve(args.file_path as string);
-  const rootDir = path.resolve((args.root_dir as string) || path.dirname(filePath));
+  const rootDir = path.resolve(
+    (args.root_dir as string) || path.dirname(filePath),
+  );
 
   if (!args.file_path) return { error: "file_path is required" };
 
@@ -284,10 +325,10 @@ export async function analyzeFile(
   }
 
   // Run outline + header read in parallel
-  const [outlineResult, headerResult] = await Promise.all([
+  const [outlineResult, headerResult] = (await Promise.all([
     outlineFile({ file_path: filePath, workspace_root: rootDir }),
     readFile({ path: filePath, offset: 0, limit: 40 }),
-  ]) as [Record<string, unknown>, Record<string, unknown>];
+  ])) as [Record<string, unknown>, Record<string, unknown>];
 
   // Find who imports this file
   const relPath = path.relative(rootDir, filePath);
@@ -295,12 +336,12 @@ export async function analyzeFile(
   // Search for the file's relative path in import statements
   const importPattern = `['"].*${baseNoExt.replace(/\\/g, "/")}['"]`;
 
-  const grepResult = await grepFiles({
+  const grepResult = (await grepFiles({
     pattern: importPattern,
     path: rootDir,
     output_mode: "files_with_matches",
     head_limit: 20,
-  }) as Record<string, unknown>;
+  })) as Record<string, unknown>;
 
   const importedBy = ((grepResult.matches as string) ?? "")
     .split("\n")
