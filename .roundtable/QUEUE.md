@@ -182,26 +182,40 @@ typechecker is silent exactly where you are relying on it to speak.**
 | 6 | `features/chat/services/aiService.ts` facade (+`useLiveSession.ts` import) | 9 re-exports dropped — `214647e` |
 | 7 | cascade: `daemonService.ts`, `services/types.ts` | `daemonStream` + 2 dead types; **RT-005 cycle dissolved** — `9137d06` |
 | 8 | `core/models/` barrel, then `modelCapabilityService.ts` + `claudeBridgeService.ts` | 6 deleted, 4 privatized; 302→119 lines — `86fb9fb`, `1f818a7` |
+| 9 | `types/artifacts.ts`, `ui/icons/index.tsx` | 2 deleted, 8 privatized, 1 dead re-export dropped — `c7371f0` |
+| 10 | `lib/harnessEventUtils.ts`, `lib/textMerger.ts`, `chat/context/messageBuilder.ts` | 1 deleted, 14 privatized — `91338b2` |
 
-knip: 399 unused symbols at the start of RT-020, **318** now. Zero unused files. Cycles 2 → 1.
+knip: 399 unused symbols at the start of RT-020, **291** now. Zero unused files. Cycles 2 → 1.
+
+**Most flagged exports are private helpers, not corpses.** Batch 10 is the clean statement of
+this: in all three files knip flagged *N−1 of N* exports, and the one it left alone was the
+module's entry point — `buildHarnessEvent`, `processTranscriptionChunks`,
+`applyAllSystemMessages`. Each entry point calls the helpers below it. Nothing was dead; the
+`export` keyword was just scattered across a file's whole call graph rather than its surface.
+When knip flags nearly everything in a file, **look for the survivor and read what it calls**
+before reaching for a delete. 14 of the 15 were privatized; only `mergeTranscriptionChunks`
+(which nothing called, not even its own module) was actually removed.
 
 **Trim the barrel first — every single time.** Batches 1, 6 and 7 all found the same thing: a
 dead re-export makes a sibling-only symbol look alive to the detector. `daemonStream` had been
 invisible for the whole of RT-020 because `aiService` re-exported it into nothing. The per-file
 view is only truthful once the barrel is honest.
 
-Remaining non-barrel candidates, largest first:
-`core/models/modelCapabilityService.ts` (7, newly orphaned by batch 5), `ui/icons/index.tsx` (6),
-`types/artifacts.ts` (6), `features/chat/context/messageBuilder.ts` (5), `lib/textMerger.ts` (5),
-`features/chat/services/claudeBridgeService.ts` (4, newly visible after batch 6).
-~180 more sit in ~20 barrels — trim per the fasterWhisper pattern, do not blind-delete.
+**The non-barrel list is now exhausted.** What remains — ~180 symbols across ~20 barrels — must
+be taken one folder at a time, trimming the barrel before trusting the per-file view.
 
-**Name collisions are THE recurring hazard — four batches, four collisions.**
+**Name collisions are THE recurring hazard — eight so far.**
 - `supportsTranslation` — a function *and* a boolean property on 14 models.
 - `updateSetting` — three declarations, one live.
 - `getModelById` — three declarations, two live; one reached via a namespace import.
 - `formatFileSize` / `formatTokenCount` / `MAX_ATTACHMENTS` — declared in two to three places
   each, none of them the one being deleted.
+- `ArtifactTable` — an interface in `types/artifacts.ts` *and* a local component at
+  `ArtifactRenderer.tsx:138`. The renderer never imports the interface.
+- `iconSize` — a const in the icon barrel, a prop in `SearchInput.tsx`, a parameter in
+  `toolCardUtils.tsx`. Only the const was dead. Note the exported *type* `IconSize`, one
+  character apart, has two real consumers and had to stay.
+- `IconProps` — the icon barrel's, and a separate already-private one in `WorkspaceIcons.tsx`.
 
 **Disambiguate by import source, never by bare name.** The last of these was *the lead's* error:
 I counted bare-name greps, marked three dead exports as "externally consumed", and wrote that
@@ -228,6 +242,25 @@ the lead's, both in RT-029:
 The first failure is loud. **The second is the dangerous one:** a script can leave a
 correct-compiling file with a fingerprint no tool will ever report. Hand-edit with Edit, and
 read the resulting file end to end. "It typechecks" is not "it is right."
+
+---
+
+### RT-030 — Three consumers bypass the icon barrel · `todo` · organize-phase
+
+`ui/icons/index.tsx` opens by declaring itself "the SINGLE import surface for UI glyphs."
+It is not. `RightWorkspaceControls.tsx`, `TitleBar.tsx` and `ChatHeader.tsx` all import
+`NavToggleIcon` / `OverviewIcon` straight from `@/ui/icons/WorkspaceIcons`, and the barrel's
+re-export of those two had **zero** importers — which is why batch 9 removed it as dead.
+
+Removing the dead line was correct (no importer, no evidence of use) but it does leave the
+header comment overstating the barrel's reach. Two further inaccuracies in that header, both
+pre-existing: it claims Phosphor is "imported ONLY here", while `WorkspacePage.tsx` and
+`ArtifactRenderer.tsx` import glyphs directly.
+
+Fix in the organize phase, not here: point the three consumers at `@/ui/icons`, restore the
+`WorkspaceIcons` re-export as *live* surface, and either enforce the Phosphor rule with a lint
+restriction or soften the comment to match reality. **Do not do this as part of a removal
+commit** — it deletes nothing and changes import graph shape.
 
 ---
 
