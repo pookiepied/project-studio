@@ -14,9 +14,9 @@
  *     Multi-color brand logos are a separate category — see `components/brand`.
  *
  * Canonical concept → glyph mapping (retire all duplicates as features migrate):
- *   Close=X · Back=ArrowLeft · Send=ArrowUp · Refresh=ArrowsClockwise · Loading=SpinnerGap
+ *   Close=X · Back=ArrowLeft · Send=ArrowUp · Refresh=ArrowsClockwise
  *   Settings=Gear · Manage=SlidersHorizontal · Delete=Trash · Copy=Copy
- *   Success=CheckCircle · ErrorIcon=XCircle · Warning=Warning
+ *   Success=CheckCircle · Warning=Warning
  *   Expand=CaretDown · Collapse=CaretRight · Edit=PencilSimple · Search=MagnifyingGlass
  *
  * Adding a concept: import its glyph below and add a `makeIcon` line — do NOT
@@ -34,22 +34,20 @@ import {
   MagnifyingGlass,
   PencilSimple,
   SlidersHorizontal,
-  SpinnerGap,
   Trash,
   Warning as WarningGlyph,
   ArrowUp,
   X,
-  XCircle,
   type Icon as PhosphorIcon,
   type IconProps as PhosphorIconProps,
   type IconWeight,
 } from "@phosphor-icons/react";
 
 /** The only sanctioned icon sizes (px). No raw numbers in consumers. */
-export const iconSize = { xs: 12, sm: 14, md: 16, lg: 20, xl: 24 } as const;
+const iconSize = { xs: 12, sm: 14, md: 16, lg: 20, xl: 24 } as const;
 export type IconSize = keyof typeof iconSize;
 
-export interface IconProps extends Omit<PhosphorIconProps, "size" | "weight"> {
+interface IconProps extends Omit<PhosphorIconProps, "size" | "weight"> {
   /** A keyword from the icon size scale. Defaults to `md` (16px). */
   size?: IconSize;
   /** Resting weight is `regular`; pass `fill` only for active/selected state. */
@@ -86,19 +84,13 @@ export const Close = makeIcon(X, "Close");
 export const Back = makeIcon(ArrowLeft, "Back");
 export const Send = makeIcon(ArrowUp, "Send");
 export const Refresh = makeIcon(ArrowsClockwise, "Refresh");
-/** Static loading glyph. For an animated indeterminate spinner use the `Spinner` primitive. */
-export const Loading = makeIcon(SpinnerGap, "Loading");
 export const Settings = makeIcon(Gear, "Settings");
 export const Manage = makeIcon(SlidersHorizontal, "Manage");
 export const Delete = makeIcon(Trash, "Delete");
 export const Copy = makeIcon(CopyGlyph, "Copy");
 export const Success = makeIcon(CheckCircle, "Success");
-export const ErrorIcon = makeIcon(XCircle, "ErrorIcon");
 export const Warning = makeIcon(WarningGlyph, "Warning");
 export const Expand = makeIcon(CaretDown, "Expand");
 export const Collapse = makeIcon(CaretRight, "Collapse");
 export const Edit = makeIcon(PencilSimple, "Edit");
 export const Search = makeIcon(MagnifyingGlass, "Search");
-
-// ── Custom monochrome marks (live here per §17 step 5) ───────────────────────
-export { NavToggleIcon, OverviewIcon } from "./WorkspaceIcons";

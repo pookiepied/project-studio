@@ -1,12 +1,12 @@
-export type ArtifactCategory = "general" | "coding";
+type ArtifactCategory = "general" | "coding";
 
 export type ArtifactSurface = "chat" | "overview" | "panel";
 
-export type ArtifactStatus = "success" | "partial" | "pending" | "error";
+type ArtifactStatus = "success" | "partial" | "pending" | "error";
 
-export type ArtifactDensity = "line" | "card" | "expanded";
+type ArtifactDensity = "line" | "card" | "expanded";
 
-export interface ArtifactPresentation {
+interface ArtifactPresentation {
   surface?: ArtifactSurface;
   density?: ArtifactDensity;
   defaultCollapsed?: boolean;
@@ -14,7 +14,7 @@ export interface ArtifactPresentation {
   priority?: number;
 }
 
-export interface ArtifactSource {
+interface ArtifactSource {
   provider?: string;
   server?: string;
   tool?: string;
@@ -48,7 +48,7 @@ export interface ArtifactListItem {
   status?: ArtifactStatus;
 }
 
-export interface ArtifactTable {
+interface ArtifactTable {
   columns: string[];
   rows: Array<Array<string | number | boolean | null>>;
 }
