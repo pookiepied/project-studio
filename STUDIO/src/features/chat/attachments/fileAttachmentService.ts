@@ -1,7 +1,7 @@
 import { fileValidationService } from "./fileValidationService";
 import { processPDF } from "./pdfAttachmentService";
 
-export interface FileAttachmentServerDoc {
+interface FileAttachmentServerDoc {
   docId:     string;
   permanent: boolean;
   expiresAt?: number; // unix ms — only present for temporary uploads
@@ -28,8 +28,7 @@ export interface FileAttachment {
 const MAX_IMAGE_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_DOCUMENT_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_PDF_FILE_SIZE = 25 * 1024 * 1024;      // 25MB
-export const MAX_ATTACHMENTS = 10;
-const IMAGE_TYPES = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+const IMAGE_TYPES =['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 const DOCUMENT_TYPES = [
   '.txt', '.md', '.markdown', '.csv', '.log',
   '.json', '.xml', '.yaml', '.yml', '.toml',
@@ -170,21 +169,6 @@ export async function processFile(file: File): Promise<FileAttachment> {
   };
 }
 
-export function formatAttachmentsForLLM(attachments: FileAttachment[]): string {
-  if (attachments.length === 0) return '';
-
-  const textAttachments = attachments.filter(a => !a.isImage && a.content);
-  if (textAttachments.length === 0) return '';
-
-  return textAttachments.map((attachment) => {
-    if (attachment.isPDF) {
-      // PDF text is prose — don't wrap in a code block
-      return `${attachment.contextPrompt}\n\n${attachment.content}`;
-    }
-    return `${attachment.contextPrompt}\n\`\`\`${attachment.extension.slice(1)}\n${attachment.content}\n\`\`\``;
-  }).join('\n\n');
-}
-
 export function estimateAttachmentTokens(attachment: FileAttachment): number {
   if (attachment.isImage) {
     return 0;
@@ -199,38 +183,3 @@ export function estimateAttachmentTokens(attachment: FileAttachment): number {
   return bufferedTokens;
 }
 
-export function estimateTotalAttachmentTokens(attachments: FileAttachment[]): number {
-  if (attachments.length === 0) return 0;
-  
-  const totalTokens = attachments.reduce((sum, attachment) => {
-    return sum + estimateAttachmentTokens(attachment);
-  }, 0);
-  
-  const spacingTokens = (attachments.length - 1) * 2;
-  
-  return totalTokens + spacingTokens;
-}
-
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-export function formatTokenCount(tokens: number): string {
-  if (tokens < 1000) return `${tokens}`;
-  if (tokens < 1000000) return `${(tokens / 1000).toFixed(1)}K`;
-  return `${(tokens / 1000000).toFixed(1)}M`;
-}
-
-export function getSupportedExtensions(includeImages: boolean = true): string[] {
-  const extensions = new Set<string>();
-  DOCUMENT_TYPES.forEach(ext => extensions.add(ext));
-  PDF_TYPES.forEach(ext => extensions.add(ext));
-  if (includeImages) {
-    IMAGE_TYPES.forEach(ext => extensions.add(ext));
-  }
-  return Array.from(extensions).sort();
-}
-
-export { DOCUMENT_TYPES, IMAGE_TYPES, PDF_TYPES };
