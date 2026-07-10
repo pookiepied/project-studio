@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { logger } from "@/core/logging/logger";
 
-export type ClaudePermissionMode =
+type ClaudePermissionMode =
   | "default"
   | "acceptEdits"
   | "auto"
@@ -10,18 +10,18 @@ export type ClaudePermissionMode =
   | "dontAsk"
   | "plan";
 
-export interface ClaudeBridgeStreamEvent {
+interface ClaudeBridgeStreamEvent {
   sessionId: string;
   text: string;
   stream: "stdout" | "stderr";
 }
 
-export interface ClaudeBridgeExitEvent {
+interface ClaudeBridgeExitEvent {
   sessionId: string;
   code: number;
 }
 
-export interface ClaudeBridgeTurnOptions {
+interface ClaudeBridgeTurnOptions {
   sessionId: string;
   prompt: string;
   cwd?: string;
