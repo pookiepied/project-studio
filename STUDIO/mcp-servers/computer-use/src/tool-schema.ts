@@ -1,7 +1,7 @@
 type Definition = { name: string; description: string; inputSchema: { type: "object"; properties?: Record<string, any>; required?: readonly string[] }; outputSchema?: Record<string, unknown>; annotations?: Record<string, unknown> };
 const READ_ONLY = /^(get_|list_|read_|screenshot_and_analyze|ocr_(file|url)|analyze_image|ping_host|check_port|dns_lookup|traceroute|skill_read_local)/;
 const DESTRUCTIVE = /^(kill_|suspend_|run_elevated|close_window|click_|mouse_|double_click|drag_|type_text|press_hotkey|key_|set_|delete_|create_user|manage_|connect_wifi|disconnect_wifi|enable_adapter|disable_adapter|system_power_action|add_firewall_rule|remove_firewall_rule)/;
-const OPEN_WORLD = /^(launch_app|run_elevated|ping_host|check_port|dns_lookup|traceroute|connect_wifi|ocr_url|screenshot_and_analyze|ssh_)/;
+const OPEN_WORLD = /^(launch_app|run_elevated|ping_host|check_port|dns_lookup|traceroute|connect_wifi|ocr_url|screenshot_and_analyze)/;
 const title = (name: string) => name.split("_").map(x => x.charAt(0).toUpperCase() + x.slice(1)).join(" ");
 export function finalizeToolDefinitions<const T extends readonly Definition[]>(definitions: T): T {
   const names = new Set<string>();
