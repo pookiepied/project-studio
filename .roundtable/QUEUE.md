@@ -143,9 +143,18 @@ namespace import; knip flagged neither, while correctly flagging `saveConfig` an
    yet its consumer component was rendered on every chat page (see RT-019). File-level
    reasoning would have deleted a working feature.
 
-Suggested method: for each candidate, remove the `export` keyword rather than the symbol.
+Method: for each candidate, remove the `export` keyword rather than the symbol.
 `tsc --noUnusedLocals` then either passes (the symbol was used locally; keep it private) or
-fails (the symbol is genuinely dead; delete it). The typechecker adjudicates, not the detector.
+fails with `TS6133` (the symbol is genuinely dead; delete it). The typechecker adjudicates, not
+the detector.
+
+**The un-export step is not optional, and RT-024 proved why.** `noUnusedLocals` never flags an
+*exported* symbol — it cannot, since an export is by definition reachable from outside the file.
+My RT-024 spec told the implementer to delete `getModelsByType`'s callers and let `TS6133`
+adjudicate what remained. tsc came back clean and said nothing, because `getModelsByType` was
+still exported. The implementer noticed, fell back to grep, got the right answer, and reported
+that my instruction was unsound. **Drop the `export` first, then run tsc. Otherwise the
+typechecker is silent exactly where you are relying on it to speak.**
 
 **Two fixed points, not one.** Established across batches 1–2:
 - *Within a file*, deleting a function can orphan its callees. Iterate `tsc` until it converges.
@@ -161,11 +170,22 @@ fails (the symbol is genuinely dead; delete it). The typechecker adjudicates, no
 | 1 | `fasterWhisper/` (7 files + barrel) | 21 deleted, 4 privatized — `52a14d7`, `bafb003` |
 | 2 | `core/platform/studioPaths.ts`, `core/storage/configService.ts` | 21 deleted, 7 privatized — `2c67ba2` |
 | 3 | cascade: `core/storage/fileConfigService.ts` | `updateSetting` deleted; `importSettings` → RT-022 |
+| 4 | `features/models/services/modelService.ts` (+1 import line in `modelFilter.ts`) | 12 deleted, 2 re-exports dropped — `01a5212` |
 
-Remaining non-barrel candidates, largest first: `features/models/services/modelService.ts` (14),
+Remaining non-barrel candidates, largest first:
 `features/chat/attachments/fileAttachmentService.ts` (10), `features/chat/services/aiService.ts` (9),
 `lib/modelUtils.ts` (8). ~180 more sit in ~20 barrels — trim per the fasterWhisper pattern
 (a barrel is for outsiders), do not blind-delete.
+
+**Name collisions are the recurring hazard.** Every batch so far has contained at least one
+symbol whose name is also declared elsewhere and live: `supportsTranslation` (function vs. model
+property), `updateSetting` (three declarations, one live), `getModelById` (three declarations,
+two live). **Disambiguate by import source, never by bare name.**
+
+**Watch for duplicated implementations.** RT-024 deleted `calculateMaxAttachmentTokens` and
+`getModelContextWindow` from `modelService` while `features/chat/attachments/attachmentLimits.ts`
+computes the same things from `core/network/fallbackService`. The dead copy was the *second*
+implementation, not the first. Expect more of this in the attachments batch.
 
 ---
 
