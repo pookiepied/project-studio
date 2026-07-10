@@ -151,3 +151,24 @@ elements exist across 13 files, all uncounted. An agent working RT-007 could sat
 gate by converting a raw `<button>` into a `<motion.button>`. Closing the hole raises the
 baseline ~28. Charter forbids raising a baseline without human sign-off. **Awaiting decision;
 RT-007 is blocked until then.**
+
+---
+
+## 2026-07-10 — RT-013 · Close the `<motion.button>` bypass · ACCEPTED
+
+Human approved the baseline raise. Added a second selector matching any
+`JSXMemberExpression` whose `property.name` is `button`, so `<motion.button>` — and any
+other `X.button` — is caught. The original selector only matched `name.name='button'`,
+which a member expression does not have.
+
+**Baseline 229 → 257.** This is a raise, and the charter forbids raising a baseline to make
+a red gate green. It is permitted here for the opposite reason: the gate was *falsely*
+green. 28 raw buttons existed and were never counted. We did not add debt; we stopped
+lying about it.
+
+Verified the ratchet still exits 1 on a real regression (an earlier reading of exit 0 was a
+shell artifact — `$?` after a pipe reports `tail`, not the script).
+
+RT-007 unblocked. Before this, an agent could have satisfied the burn-down by rewriting a
+`<button>` as a `<motion.button>`: a counted violation traded for an invisible one, scored
+by the gate as progress.

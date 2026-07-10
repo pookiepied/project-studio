@@ -114,7 +114,7 @@ features/workspace/browser/BrowserPanel.tsx > features/workspace/browser/NativeB
 
 ---
 
-## RT-013 — Close the `<motion.button>` guardrail bypass · `blocked` · needs human decision
+## RT-013 — Close the `<motion.button>` guardrail bypass · `done` (2026-07-10)
 
 The rule selector is `JSXOpeningElement[name.name='button']`. A `<motion.button>` is a
 JSXMemberExpression, so **it does not match.** 29 of them exist across 13 files, entirely
@@ -124,9 +124,9 @@ Not cosmetic: until it is closed, an agent working RT-007 can satisfy the gate b
 `<button>` as `<motion.button>`, trading a counted violation for an invisible one.
 **Close this before dispatching RT-007.**
 
-Closing it raises the lint baseline by roughly 28. Per the charter a baseline raise is an
-escalation to the human, not a silent act. The reason to accept it: the debt already exists
-and the number was always wrong. Awaiting decision.
+Closed with a second selector matching `JSXMemberExpression` with `property.name='button'`,
+so any `X.button` is caught, not just `motion.button`. Human approved the baseline raise:
+229 → 257. The debt was not added, it was finally counted.
 
 ---
 
@@ -142,10 +142,10 @@ real debt; they stay counted. Baseline 232 → 229.
 
 ## RT-007 — Raw `<button>` burn-down · `todo` · batched
 
-**Preconditions:** RT-013 resolved, or the gate cannot score this item honestly.
+**Unblocked.** RT-013 closed the bypass, so the gate now scores this item honestly.
 
-229 violations across ~90 files (was 232; three control primitives carved out in RT-014).
-Plus ~28 more invisible until RT-013 lands. All the same rule: use `<Button>`/`<IconButton>` from
+257 violations across ~100 files: 229 raw `<button>` plus 28 `<motion.button>`. All the
+same rule: use `<Button>`/`<IconButton>` from
 `@/ui/primitives`. Mechanical, high-volume, low-risk — which makes it the right work
 to run *after* the loop has earned trust on the cycle items, not before.
 

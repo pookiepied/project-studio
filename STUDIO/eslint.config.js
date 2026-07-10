@@ -57,10 +57,25 @@ const TOKEN_GUARDRAILS = [
   },
 ];
 
-const NO_RAW_BUTTON = {
-  selector: "JSXOpeningElement[name.name='button']",
-  message: "DS: use <Button>/<IconButton> from @/ui/primitives instead of a raw <button>.",
-};
+/**
+ * Both forms of native button. The member-expression selector catches `<motion.button>`
+ * (and any other `X.button`), which the plain-identifier selector cannot see: a
+ * JSXMemberExpression has no `name.name`. Without it the guardrail is trivially bypassed
+ * by wrapping the element in framer-motion, which is how 29 uncounted raw buttons ended
+ * up in the tree.
+ */
+const NO_RAW_BUTTON = [
+  {
+    selector: "JSXOpeningElement[name.name='button']",
+    message: "DS: use <Button>/<IconButton> from @/ui/primitives instead of a raw <button>.",
+  },
+  {
+    selector: "JSXOpeningElement[name.type='JSXMemberExpression'][name.property.name='button']",
+    message:
+      "DS: use <Button>/<IconButton> from @/ui/primitives instead of a raw <motion.button>. " +
+      "Button already wraps motion.button; pass the motion props through it.",
+  },
+];
 
 /**
  * The only files allowed to render a native <button>: the control primitives themselves.
@@ -115,7 +130,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
 
-      "no-restricted-syntax": ["error", NO_RAW_BUTTON, ...TOKEN_GUARDRAILS],
+      "no-restricted-syntax": ["error", ...NO_RAW_BUTTON, ...TOKEN_GUARDRAILS],
     },
   },
   {
