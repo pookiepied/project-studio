@@ -9,12 +9,7 @@
  */
 
 // protocol — the runtime's public wire contract (D-9, audit B1)
-export type {
-  ChatRequestBody,
-  AgentChatHandlers,
-  PoolConnectionStatus,
-  PoolServerMessage,
-} from "./protocol";
+export type { ChatRequestBody } from "./protocol";
 
 // servers — catalogue + lifecycle + manifest
 export {
@@ -22,69 +17,30 @@ export {
   getLocalMcpServer,
   readLocalMcpPermission,
   setLocalMcpPermission,
-  HARNESS_ENV,
   type LocalMcpServerDef,
-  type LocalMcpPermission,
 } from "./servers/catalog";
-export {
-  startLocalMcp,
-  stopLocalMcp,
-  resolveLocalMcpPath,
-  syncLocalMcpManifest,
-} from "./servers/manifest";
-export {
-  ensureLocalMcpRegistered,
-  pushServerManifest,
-  resyncPendingManifests,
-  resetManifestSyncState,
-  startManifestResyncOnReconnect,
-  type ManifestTool,
-} from "./servers/manifestSync";
+export { startLocalMcp, stopLocalMcp } from "./servers/manifest";
 export {
   HARNESS_PERMISSION_KEY,
   COMPUTER_USE_PERMISSION_KEY,
-  grantedServers,
-  registerAndStartLocalServers,
-  restartServer,
-  HEALTH_CHECK_INTERVAL_MS,
   type LocalPermissionGrants,
 } from "./servers/lifecycle";
-export { useRuntimeInit, type HarnessInitState } from "./servers/useRuntimeInit";
+export { useRuntimeInit } from "./servers/useRuntimeInit";
 
 // transport — WebSocket pool + React driver
 export { wsPool } from "./transport/wsPool";
-export { parsePoolMessage } from "./transport/wsMessages";
-export { useAgentChat, type UseAgentChatReturn } from "./transport/useAgentChat";
-
-// invoke — Tauri invoke contract
-export {
-  invokeMcpTool,
-  formatMcpError,
-  truncateMcpOutput,
-  extractMcpImages,
-  MCP_INVOKE_TIMEOUT_MS,
-  MAX_MCP_OUTPUT_CHARS,
-} from "./invoke/invokeMcpTool";
+export { useAgentChat } from "./transport/useAgentChat";
 
 // execution — local tool executor + permission gate
-export {
-  executeLocalTools,
-  type ToolExecutionCallbacks,
-  type ToolExecutionResult,
-} from "./execution/executeLocalTools";
+export { executeLocalTools, type ToolExecutionCallbacks } from "./execution/executeLocalTools";
 
 // capabilities — what's running + turn body builder
 export { checkLocalCapabilities } from "./capabilities/capabilityService";
-export type {
-  LocalCapabilitiesSnapshot,
-  LocalCapabilityId,
-  LocalCapabilityStatus,
-} from "./capabilities/types";
-export { buildChatBody, getMcpServers, type ChatBodyParams } from "./capabilities/buildChatBody";
+export type { LocalCapabilitiesSnapshot } from "./capabilities/types";
+export { buildChatBody, getMcpServers } from "./capabilities/buildChatBody";
 
 // ui — tool-card display
-export { toolLabel, getToolIcon, argsPreview } from "./ui/toolCardUtils";
-export { resolveMcpService, getMcpActionLabel, type McpServiceInfo } from "./ui/toolCardRegistry";
+export { toolLabel, getToolIcon } from "./ui/toolCardUtils";
 export { classifyToolDisplay, extractGeneratedImageIds, deleteRemoteImages } from "./ui/classifyToolDisplay";
 export { ToolPermissionCard } from "./ui/ToolPermissionCard";
 export { RuntimeStepCard } from "./ui/RuntimeStepCard";
