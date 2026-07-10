@@ -29,7 +29,7 @@ const NS = "perm:";
  * separator-normalised so the same folder maps to one identity across sessions
  * and platforms.
  */
-export function workspaceId(root: string): string {
+function workspaceId(root: string): string {
   return root.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
@@ -194,10 +194,6 @@ export function recordGrant(
  * Build the flattened {@link GrantLookup} the engine consumes: a tool counts as
  * granted if it was approved for the session, for this workspace, or globally.
  */
-export function buildGrantLookup(root: string | null): GrantLookup {
-  return buildGrantLookupForConversation(root, null);
-}
-
 export function buildGrantLookupForConversation(
   root: string | null,
   conversationId: string | null | undefined

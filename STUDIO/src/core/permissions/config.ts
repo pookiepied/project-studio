@@ -1,5 +1,5 @@
 import type { ChatEngine } from "@/cliBridges/types";
-import type { PermissionModeDef, PermissionModeId } from "./types";
+import type { PermissionModeDef } from "./types";
 
 /**
  * Centralized permission-mode catalog.
@@ -8,7 +8,7 @@ import type { PermissionModeDef, PermissionModeId } from "./types";
  * and any future CLI bridge all speak the same language. Add a new engine to a
  * mode's `engines` array to expose it there - no per-engine duplication.
  */
-export const PERMISSION_MODES: PermissionModeDef[] = [
+const PERMISSION_MODES: PermissionModeDef[] = [
   {
     id: "default",
     label: "Ask",
@@ -41,18 +41,4 @@ export const PERMISSION_MODES: PermissionModeDef[] = [
 
 export function getPermissionModesForEngine(engine: ChatEngine): PermissionModeDef[] {
   return PERMISSION_MODES.filter((m) => m.engines.includes(engine));
-}
-
-export function getPermissionMode(id: PermissionModeId): PermissionModeDef | undefined {
-  return PERMISSION_MODES.find((m) => m.id === id);
-}
-
-/**
- * Map Studio AI's legacy `autopilotMode` boolean onto the shared vocabulary, so
- * both engines describe permissions with the same ids.
- *   autopilot off -> "default" (ask / review)
- *   autopilot on  -> "bypassPermissions" (autonomous)
- */
-export function studioModeFromAutopilot(autopilot: boolean): PermissionModeId {
-  return autopilot ? "bypassPermissions" : "default";
 }

@@ -24,7 +24,7 @@ export type ToolRiskClass =
   | "high-risk";         // system mutation: processes, services, registry,
                          // power, firewall, users, network, elevation, ssh
 
-export type ToolRiskCategory =
+type ToolRiskCategory =
   | "filesystem"
   | "shell"
   | "git"
@@ -64,7 +64,7 @@ export const RISK_CLASS_META: Record<ToolRiskClass, RiskClassMeta> = {
  *
  * Studio Harness: 33 tools. Computer Use: 116 tools.
  */
-export const TOOL_RISK: Record<string, ToolRiskClass> = {
+const TOOL_RISK: Record<string, ToolRiskClass> = {
   // =========================== Studio Harness (33) ===========================
   // -- read-only (12) --
   read_file: "read-only",
@@ -234,13 +234,4 @@ export const TOOL_RISK: Record<string, ToolRiskClass> = {
  */
 export function getToolRisk(toolName: string): ToolRiskClass {
   return TOOL_RISK[toolName] ?? "high-risk";
-}
-
-export function getRiskMeta(toolName: string): RiskClassMeta {
-  return RISK_CLASS_META[getToolRisk(toolName)];
-}
-
-/** True if the tool only observes/reads and never mutates state. */
-export function isReadOnlyTool(toolName: string): boolean {
-  return !getRiskMeta(toolName).mutating;
 }

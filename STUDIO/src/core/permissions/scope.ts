@@ -23,7 +23,7 @@ import type { ChatMode, LocalContext } from "./model";
  * key, display name) live in `services/local/localMcpControl.ts`; those `name`
  * fields must stay in step with this set.
  */
-export const LOCAL_MCP_SERVER_NAMES: ReadonlySet<string> = new Set([
+const LOCAL_MCP_SERVER_NAMES: ReadonlySet<string> = new Set([
   "studio-harness",
   "computer-use",
 ]);
@@ -39,7 +39,7 @@ export function chatModeFromStorageScope(scope: ConversationStorageScope): ChatM
 }
 
 /** Whether local machine capabilities are permitted in this conversation. */
-export function allowsLocalCapabilities(scope: ConversationStorageScope): boolean {
+function allowsLocalCapabilities(scope: ConversationStorageScope): boolean {
   return chatModeFromStorageScope(scope) === "local";
 }
 

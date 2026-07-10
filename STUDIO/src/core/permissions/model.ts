@@ -51,7 +51,7 @@ export type GrantScope = "once" | "session" | "workspace" | "global";
 // Decision result
 // ---------------------------------------------------------------------------
 
-export type PermissionOutcome = "allow" | "prompt" | "deny";
+type PermissionOutcome = "allow" | "prompt" | "deny";
 
 /** Machine-readable reason a call was blocked outright. */
 export type PermissionDenyCode =
@@ -66,7 +66,7 @@ export type PermissionPromptCode =
   | "autonomous_floor"       // high-risk action that even autonomy must confirm
   | "global_access_required"; // global (no-project) chat needs machine-wide file access
 
-export type PermissionReasonCode =
+type PermissionReasonCode =
   | "ok"
   | PermissionDenyCode
   | PermissionPromptCode;

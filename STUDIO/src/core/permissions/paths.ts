@@ -65,7 +65,7 @@ export function extractTargetPaths(
 // ---------------------------------------------------------------------------
 
 /** True for an absolute path on either platform (drive, UNC, or POSIX root). */
-export function isAbsolutePath(p: string): boolean {
+function isAbsolutePath(p: string): boolean {
   return (
     /^[a-zA-Z]:[\\/]/.test(p) || // C:\ or C:/
     /^[\\/]{2}/.test(p) ||       // \\server\share (UNC)
@@ -82,7 +82,7 @@ export function isAbsolutePath(p: string): boolean {
  *
  * Does not touch the disk - pure string math.
  */
-export function normalizePath(p: string): string {
+function normalizePath(p: string): string {
   let s = p.replace(/\\/g, "/").trim();
 
   // Preserve a leading UNC or root marker while we split.
