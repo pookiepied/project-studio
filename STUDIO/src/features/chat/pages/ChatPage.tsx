@@ -34,7 +34,6 @@ import { ChatMessageList }      from "@/features/chat/components/ChatMessageList
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
 import { RenameModal }          from "@/features/chat/components/RenameModal";
-import { ComposerContextBar } from "@/features/chat/components/ComposerContextBar";
 import { ContextWindowButton }  from "@/features/chat/components/ContextWindowButton";
 import { BranchSelector }       from "@/features/chat/components/BranchSelector";
 import { EnvironmentSelector }  from "@/features/chat/components/EnvironmentSelector";
@@ -482,17 +481,7 @@ export const ChatPage = () => {
   }, [activeProjectPath, activeProjectName, conversationStorageScope, refreshProjects]);
 
   const composerBlock = (inputRef: React.RefObject<HTMLTextAreaElement | null>) => (
-    <div className="relative flex flex-col">
-      {conversationStorageScope === "local" && (
-        <ComposerContextBar
-          projectContext={projectContext}
-          setProjectContext={setProjectContext}
-        />
-      )}
-      <div className={conversationStorageScope === "local" ? "relative z-10 -mt-2" : undefined}>
-        <ChatComposer {...composerProps} inputRef={inputRef} />
-      </div>
-    </div>
+    <ChatComposer {...composerProps} inputRef={inputRef} />
   );
 
   // -- Render ------------------------------------------------------------------
