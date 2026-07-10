@@ -171,21 +171,41 @@ typechecker is silent exactly where you are relying on it to speak.**
 | 2 | `core/platform/studioPaths.ts`, `core/storage/configService.ts` | 21 deleted, 7 privatized — `2c67ba2` |
 | 3 | cascade: `core/storage/fileConfigService.ts` | `updateSetting` deleted; `importSettings` → RT-022 |
 | 4 | `features/models/services/modelService.ts` (+1 import line in `modelFilter.ts`) | 12 deleted, 2 re-exports dropped — `01a5212` |
+| 5 | `features/chat/attachments/fileAttachmentService.ts`, `lib/modelUtils.ts` | 14 deleted, 1 privatized — `05ee015` |
 
-Remaining non-barrel candidates, largest first:
-`features/chat/attachments/fileAttachmentService.ts` (10), `features/chat/services/aiService.ts` (9),
-`lib/modelUtils.ts` (8). ~180 more sit in ~20 barrels — trim per the fasterWhisper pattern
-(a barrel is for outsiders), do not blind-delete.
+knip: 399 unused symbols at the start of RT-020, **348** now. Zero unused files.
 
-**Name collisions are the recurring hazard.** Every batch so far has contained at least one
-symbol whose name is also declared elsewhere and live: `supportsTranslation` (function vs. model
-property), `updateSetting` (three declarations, one live), `getModelById` (three declarations,
-two live). **Disambiguate by import source, never by bare name.**
+Remaining non-barrel candidates, largest first: `features/chat/services/aiService.ts` (9),
+`core/models/modelCapabilityService.ts` (7, newly orphaned by batch 5), `ui/icons/index.tsx` (6),
+`types/artifacts.ts` (6), `features/chat/context/messageBuilder.ts` (5), `lib/textMerger.ts` (5).
+~180 more sit in ~20 barrels — trim per the fasterWhisper pattern (a barrel is for outsiders),
+do not blind-delete.
 
-**Watch for duplicated implementations.** RT-024 deleted `calculateMaxAttachmentTokens` and
-`getModelContextWindow` from `modelService` while `features/chat/attachments/attachmentLimits.ts`
-computes the same things from `core/network/fallbackService`. The dead copy was the *second*
-implementation, not the first. Expect more of this in the attachments batch.
+**Name collisions are THE recurring hazard — four batches, four collisions.**
+- `supportsTranslation` — a function *and* a boolean property on 14 models.
+- `updateSetting` — three declarations, one live.
+- `getModelById` — three declarations, two live; one reached via a namespace import.
+- `formatFileSize` / `formatTokenCount` / `MAX_ATTACHMENTS` — declared in two to three places
+  each, none of them the one being deleted.
+
+**Disambiguate by import source, never by bare name.** The last of these was *the lead's* error:
+I counted bare-name greps, marked three dead exports as "externally consumed", and wrote that
+into the spec. The implementer checked, found no importer, and reported the contradiction rather
+than quietly following the instruction. Both halves of that are the protocol working.
+
+**Watch for duplicated implementations.** The dead copy is often the *second* one:
+`calculateMaxAttachmentTokens`/`getModelContextWindow` duplicated `attachmentLimits.ts`;
+`formatFileSize` existed three times; `MAX_ATTACHMENTS: 10` still sits in `constants/ui.ts`.
+
+---
+
+### RT-026 — `lib/modelUtils.ts` is now a one-line delegate · `todo` · small
+
+After RT-025 the file is 14 lines: `isVisionModel(model)` returning `detectVisionSupport(model)`.
+Its two consumers (`ModelPicker.tsx:22`, `features/models/helpers.ts:3`) could import
+`detectVisionSupport` from `@/core/models` directly and the file would disappear.
+
+Not done in RT-025 to keep that item's scope honest. Belongs to the rename/organize phase.
 
 ---
 
