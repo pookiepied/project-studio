@@ -330,11 +330,15 @@ export async function saveSettingsToFile(settings: AppSettings): Promise<void> {
 }
 
 /**
- * Get config file location for display
+ * Get config file location for display.
+ *
+ * Asks the storage layer where CONFIG_PATH actually resolves rather than
+ * restating it. The two must not be able to disagree: on macOS/Linux the app
+ * data directory is not %APPDATA%, and under the web backend there is no file
+ * at all.
  */
 export async function getConfigLocation(): Promise<string> {
-  // Using Tauri's default app directory
-  return `%APPDATA%\\com.pookiepied.studio\\${CONFIG_PATH}`;
+  return unifiedStorage.describePath(CONFIG_PATH);
 }
 
 /**
@@ -342,18 +346,6 @@ export async function getConfigLocation(): Promise<string> {
  */
 export async function resetSettings(): Promise<void> {
   await saveSettingsToFile(DEFAULT_SETTINGS);
-}
-
-/**
- * Update specific setting
- */
-export async function updateSetting<K extends keyof AppSettings>(
-  key: K,
-  value: AppSettings[K]
-): Promise<void> {
-  const settings = await loadSettingsFromFile();
-  settings[key] = value;
-  await saveSettingsToFile(settings);
 }
 
 /**
@@ -365,7 +357,11 @@ export async function exportSettings(): Promise<string> {
 }
 
 /**
- * Import settings from text
+ * Import settings from text.
+ *
+ * Currently has no caller: settings can be exported from the debug panel but
+ * never imported back, so this is the unwired half of a round-trip. Kept
+ * deliberately pending a product decision (RT-022), not because it is reachable.
  */
 export async function importSettings(content: string): Promise<boolean> {
   try {
