@@ -2,6 +2,7 @@ import { readFile, readManyFiles, fileMetadata, detectBinary, contentHash, watch
 import { readNotebook } from "./tools/notebook/index.js";
 import { readArchiveManifest } from "./tools/archive/index.js";
 import { outlineFile, indexCodebase, exploreCodebase, searchSymbol, analyzeFile, findRelatedFiles } from "./tools/codeintel/index.js";
+import { buildCodeGraph, codeGraphStatus, graphNeighborsTool, graphPathTool, graphImpactTool } from "./tools/graph/index.js";
 import {
   executeBash, executePowerShell, runRepl,
   startProcess, readProcessOutput, writeProcessInput, stopProcess, listProcesses, commandExists,
@@ -36,6 +37,7 @@ import { ARCHIVE_DEFINITIONS }     from "./tools/archive/definitions.js";
 import { SEARCH_DEFINITIONS }      from "./tools/search/definitions.js";
 import { CONTEXT_DEFINITIONS }     from "./tools/context/definitions.js";
 import { SYNTAX_DEFINITIONS }      from "./tools/syntax/definitions.js";
+import { GRAPH_DEFINITIONS }       from "./tools/graph/definitions.js";
 
 // ---------------------------------------------------------------------------
 // Tool definitions (schema sent to the AI via tools/list)
@@ -54,7 +56,8 @@ export const TOOL_DEFINITIONS = finalizeToolDefinitions([
   ...SEARCH_DEFINITIONS,      // bounded lexical, file, identifier, import, config, marker search
   ...CONTEXT_DEFINITIONS,     // semantic, graph-enriched context retrieval and index control
   ...SYNTAX_DEFINITIONS,      // Tree-sitter parsing, structural analysis, and safe rewriting
-  ...CODEINTEL_DEFINITIONS,   // outline, index_codebase, explore, search_symbol, analyze
+  ...CODEINTEL_DEFINITIONS,   // outline, index_codebase, explore, search_symbol, analyze, find_related
+  ...GRAPH_DEFINITIONS,       // portable code-relationship graph: build, status, neighbors, path, impact
   ...GIT_DEFINITIONS,         // full git surface: status/diff/log/commit/branch/push/pull/fetch/show/stash/worktree + init/add/reset/restore/rm/mv/merge/rebase/cherry-pick/revert/tag/remote/clone/blame/clean/reflog/config
   ...UTILS_DEFINITIONS,       // sleep
   LSP_TOOL_DEFINITION,        // lsp
@@ -102,6 +105,11 @@ export const HANDLERS: Record<string, ToolHandler> = {
   search_symbol: searchSymbol,
   analyze_file: analyzeFile,
   find_related_files: findRelatedFiles,
+  graph_build: buildCodeGraph,
+  graph_status: codeGraphStatus,
+  graph_neighbors: graphNeighborsTool,
+  graph_path: graphPathTool,
+  graph_impact: graphImpactTool,
   git_status: gitStatus,
   git_diff: gitDiff,
   git_log: gitLog,
