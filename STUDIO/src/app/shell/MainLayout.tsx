@@ -88,7 +88,11 @@ export const MainLayout = ({ children, currentView, onViewChange }: MainLayoutPr
       {workspaceShell ? (
         /* ── Workspace shell chrome: hover controls +
               global floating panel (replaces TitleBar + NavPopup) ── */
-        <WorkspaceShellChrome currentView={currentView} onNavigate={onViewChange} />
+        <WorkspaceShellChrome
+          currentView={currentView}
+          onNavigate={onViewChange}
+          showDock={currentView !== "chat"}
+        />
       ) : (
         <>
           {/* Title bar */}

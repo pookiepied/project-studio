@@ -22,9 +22,13 @@ type ProjectCtx  = { path: string; name: string; accessMode?: AccessMode };
 interface Props {
   projectContext: ProjectCtx | null;
   setProjectContext: (ctx: ProjectCtx | null) => void;
+  /** "bar" renders as a borderless, ghost-hover trigger meant to sit inline
+   *  inside a shared pill (e.g. ComposerContextBar). Defaults to the
+   *  original standalone bordered chip. */
+  variant?: "standalone" | "bar";
 }
 
-export function ProjectContextPicker({ projectContext, setProjectContext }: Props) {
+export function ProjectContextPicker({ projectContext, setProjectContext, variant = "standalone" }: Props) {
   const [showMenu, setShowMenu] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formName, setFormName] = useState("");
@@ -105,9 +109,11 @@ export function ProjectContextPicker({ projectContext, setProjectContext }: Prop
     resetFlow();
   }, [pendingPath, pendingName, mode, setProjectContext, resetFlow]);
 
+  const isBar = variant === "bar";
+
   return (
     <>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className={isBar ? "flex items-center gap-1" : "mt-2 flex items-center gap-1.5"}>
         {showForm ? (
           <>
             <input
@@ -143,11 +149,19 @@ export function ProjectContextPicker({ projectContext, setProjectContext }: Prop
             <button
               type="button"
               onClick={openMenu}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 border ${
-                projectContext
-                  ? "border-gray-200 dark:border-surface-border bg-gray-50 dark:bg-surface-raised text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-selected"
-                  : "border-dashed border-gray-200 dark:border-surface-border text-gray-400 dark:text-gray-600 hover:border-gray-300 dark:hover:border-surface-border hover:text-gray-600 dark:hover:text-gray-400"
-              }`}
+              className={
+                isBar
+                  ? `flex items-center gap-1.5 px-2 h-6 rounded-md text-xs font-medium transition-colors duration-150 ${
+                      projectContext
+                        ? "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-selected"
+                        : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-selected"
+                    }`
+                  : `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 border ${
+                      projectContext
+                        ? "border-gray-200 dark:border-surface-border bg-gray-50 dark:bg-surface-raised text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-selected"
+                        : "border-dashed border-gray-200 dark:border-surface-border text-gray-400 dark:text-gray-600 hover:border-gray-300 dark:hover:border-surface-border hover:text-gray-600 dark:hover:text-gray-400"
+                    }`
+              }
             >
               <FolderOpen size={12} weight={projectContext ? "duotone" : "regular"} />
               <span>{projectContext ? projectContext.name : "Work in a project"}</span>
@@ -195,7 +209,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext }: Prop
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 4 }}
                   transition={{ duration: 0.1 }}
-                  className="w-48 bg-white dark:bg-surface-raised border border-gray-200 dark:border-surface-border rounded-xl shadow-lg overflow-hidden"
+                  className="w-48 bg-surface-base border border-surface-border rounded-xl shadow-lg overflow-hidden"
                 >
                   <button
                     type="button"

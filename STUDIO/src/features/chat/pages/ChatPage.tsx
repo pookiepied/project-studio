@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence }                   from "framer-motion";
 import { BrowserPanelContext }                       from "@/app/contexts/BrowserPanelContext";
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
@@ -34,8 +34,16 @@ import { ChatMessageList }      from "@/features/chat/components/ChatMessageList
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
 import { RenameModal }          from "@/features/chat/components/RenameModal";
-import { ProjectContextPicker } from "@/features/chat/components/ProjectContextPicker";
+import { ComposerContextBar } from "@/features/chat/components/ComposerContextBar";
 import { ContextWindowButton }  from "@/features/chat/components/ContextWindowButton";
+import { BranchSelector }       from "@/features/chat/components/BranchSelector";
+import { EnvironmentSelector }  from "@/features/chat/components/EnvironmentSelector";
+import { HeaderNavButton }      from "@/app/shell/HeaderNavButton";
+import { NotificationBell }     from "@/app/shell/NotificationBell";
+import { ThemeToggle }          from "@/app/shell/ThemeToggle";
+import { useProjects }          from "@/features/chat/hooks/useProjects";
+import { projectRegistry, type ProjectEntry } from "@/core/projects";
+import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import { ComposerApprovalCard } from "@/features/permissions";
@@ -378,6 +386,23 @@ export const ChatPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectContext?.path, projectContext?.accessMode]);
 
+  // Shared by the header's ConversationsDropdown and the composer's
+  // EnvironmentSelector — both let the user flip local/cloud scope.
+  const handleStorageScopeChange = useCallback(async (scope: ConversationStorageScope) => {
+    setConversationListScope(scope);
+
+    if (scope === conversationStorageScope) return;
+
+    if (!hasStartedConversation) {
+      setConversationStorageScope(scope);
+      return;
+    }
+
+    createNewConversation(scope, {
+      preserveProject: scope === "local" && !!projectContext,
+    });
+  }, [conversationStorageScope, hasStartedConversation, setConversationStorageScope, createNewConversation, projectContext]);
+
   // Shared props for both ChatComposer instances (empty state + conversation dock)
   const composerProps = {
     inputMessage, attachments, attachMenuRef, showAttachMenu,
@@ -423,34 +448,49 @@ export const ChatPage = () => {
     onClaudeEffortLevelChange: setClaudeEffortLevel,
   };
 
-  const composerMetaRow = (showContextIndicator: boolean) => (
-    <div className="flex min-h-[28px] items-start justify-between gap-3">
-      <div
-        className={`min-w-0 transition-opacity duration-200 ${
-          conversationStorageScope === "local"
-            ? "opacity-100"
-            : "opacity-0 pointer-events-none select-none"
-        }`}
-        aria-hidden={conversationStorageScope !== "local"}
-      >
-        <div className={conversationStorageScope === "local" ? "" : "invisible"}>
-          <ProjectContextPicker
-            projectContext={projectContext}
-            setProjectContext={setProjectContext}
-          />
-        </div>
-      </div>
+  // Project registry — the canonical list behind the projects/conversations
+  // switcher. Opening a folder registers it; selecting one makes it this
+  // conversation's context.
+  const { projects, refresh: refreshProjects, removeProject, deleteProject } = useProjects();
 
-      <div className="flex h-7 shrink-0 items-center justify-end">
-        {showContextIndicator && (
-          <ContextWindowButton
-            usedTokens={usageContextTokens > 0 ? usageContextTokens : contextTokens}
-            maxTokens={contextLimit}
-            isSummarizing={isSummarizing}
-            hasContextSummary={!!conversation?.contextSummary}
-            variant="meta"
-          />
-        )}
+  const handleSelectProject = useCallback(async (project: ProjectEntry) => {
+    setProjectContext({ path: project.path, name: project.name, accessMode: project.accessMode });
+    await projectRegistry.touch(project.id);
+    await refreshProjects();
+    setShowConversations(false);
+  }, [setProjectContext, refreshProjects]);
+
+  const handleOpenProjectFolder = useCallback(async () => {
+    const selected = await openDialog({ directory: true, multiple: false });
+    if (typeof selected !== "string") return;
+    const entry = await projectRegistry.add(selected);
+    setProjectContext({ path: entry.path, name: entry.name, accessMode: entry.accessMode });
+    await refreshProjects();
+    setShowConversations(false);
+  }, [setProjectContext, refreshProjects]);
+
+  // Any project that becomes the active context gets registered, whichever way
+  // it was chosen (switcher, composer picker, or restored with a conversation).
+  const activeProjectPath = projectContext?.path;
+  const activeProjectName = projectContext?.name;
+  useEffect(() => {
+    if (!activeProjectPath || conversationStorageScope !== "local") return;
+    projectRegistry
+      .add(activeProjectPath, { name: activeProjectName })
+      .then(() => refreshProjects())
+      .catch(() => {});
+  }, [activeProjectPath, activeProjectName, conversationStorageScope, refreshProjects]);
+
+  const composerBlock = (inputRef: React.RefObject<HTMLTextAreaElement | null>) => (
+    <div className="relative flex flex-col">
+      {conversationStorageScope === "local" && (
+        <ComposerContextBar
+          projectContext={projectContext}
+          setProjectContext={setProjectContext}
+        />
+      )}
+      <div className={conversationStorageScope === "local" ? "relative z-10 -mt-2" : undefined}>
+        <ChatComposer {...composerProps} inputRef={inputRef} />
       </div>
     </div>
   );
@@ -562,28 +602,19 @@ export const ChatPage = () => {
             onRenameChat={() => setIsEditingTitle(true)}
             onNewChat={() => { createNewConversation(); setShowConversations(false); }}
             conversations={conversations}
-            storageScope={conversationListScope}
             currentConvId={conversation?.id}
             showConversations={showConversations}
             editingConvId={editingConvId}
             editingConvTitle={editingConvTitle}
             hoveredConvId={hoveredConvId}
             onToggleConversations={() => setShowConversations(v => !v)}
-            onStorageScopeChange={async (scope) => {
-              setConversationListScope(scope);
-
-              if (scope === conversationStorageScope) return;
-
-              if (!hasStartedConversation) {
-                setConversationStorageScope(scope);
-                return;
-              }
-
-              createNewConversation(scope, {
-                preserveProject: scope === "local" && !!projectContext,
-              });
-            }}
             onCloseConversations={() => setShowConversations(false)}
+            projects={projects}
+            currentProjectPath={projectContext?.path}
+            onSelectProject={handleSelectProject}
+            onOpenProjectFolder={handleOpenProjectFolder}
+            onRemoveProject={(id) => { void removeProject(id); }}
+            onDeleteProject={(id) => { void deleteProject(id); }}
             onSelectConversation={async (id) => { await loadConversationById(id); setShowConversations(false); }}
             onNewConversation={() => {
               createNewConversation(conversationListScope, {
@@ -605,6 +636,30 @@ export const ChatPage = () => {
             onEditTitleChange={setEditingConvTitle}
             onHoverConv={setHoveredConvId}
             conversationStatuses={conversationStatuses}
+            navTrigger={
+              <HeaderNavButton onNewChat={() => { createNewConversation(); setShowConversations(false); }} />
+            }
+            contextControls={
+              <>
+                {projectContext && conversationStorageScope === "local" && (
+                  <BranchSelector
+                    projectContext={projectContext}
+                    setProjectContext={setProjectContext}
+                    placement="down"
+                  />
+                )}
+                {!isEmptyConversation && (
+                  <ContextWindowButton
+                    usedTokens={usageContextTokens > 0 ? usageContextTokens : contextTokens}
+                    maxTokens={contextLimit}
+                    isSummarizing={isSummarizing}
+                    hasContextSummary={!!conversation?.contextSummary}
+                    variant="header"
+                    placement="down"
+                  />
+                )}
+              </>
+            }
             accountControl={
               conversationStorageScope === "local" && chatEngine === "claude" ? (
                 <ClaudeUsageBadge
@@ -617,21 +672,30 @@ export const ChatPage = () => {
               ) : null
             }
             rightControls={
-              <RightWorkspaceControls
-                isTauri={isTauri}
-                projectContext={projectContext}
-                open={rightWorkspace.open}
-                summaryPanelOpen={summaryPanelOpen}
-                onToggleSummaryPanel={() => {
-                  const next = !summaryPanelOpen;
-                  setSummaryPanelOpen(next);
-                  if (next) broadcastPanelOpen("overview");
-                }}
-                onToggleOpen={() => {
-                  if (!rightWorkspace.open) broadcastPanelOpen("tools");
-                  rightWorkspace.toggleOpen();
-                }}
-              />
+              <>
+                <EnvironmentSelector
+                  scope={conversationStorageScope}
+                  onScopeChange={handleStorageScopeChange}
+                  placement="down"
+                />
+                <NotificationBell align="right" />
+                <ThemeToggle />
+                <RightWorkspaceControls
+                  isTauri={isTauri}
+                  projectContext={projectContext}
+                  open={rightWorkspace.open}
+                  summaryPanelOpen={summaryPanelOpen}
+                  onToggleSummaryPanel={() => {
+                    const next = !summaryPanelOpen;
+                    setSummaryPanelOpen(next);
+                    if (next) broadcastPanelOpen("overview");
+                  }}
+                  onToggleOpen={() => {
+                    if (!rightWorkspace.open) broadcastPanelOpen("tools");
+                    rightWorkspace.toggleOpen();
+                  }}
+                />
+              </>
             }
           />
 
@@ -681,16 +745,8 @@ export const ChatPage = () => {
                       ) : null;
                     })()}
                   </div>
-                  <ChatComposer {...composerProps} inputRef={emptyInputRef} />
+                  {composerBlock(emptyInputRef)}
                 </div>
-
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.3, duration: 0.4 } }}
-                  className="w-full max-w-2xl min-h-[42px]"
-                >
-                  {composerMetaRow(false)}
-                </motion.div>
               </motion.div>
 
             ) : (
@@ -775,7 +831,7 @@ export const ChatPage = () => {
                       it's shown) instead of hard-clipping. Mirrors the top fade. */}
                   <div className="pointer-events-none absolute inset-x-0 bottom-full h-4 bg-gradient-to-t from-white to-transparent dark:from-surface-page" />
                   <div className="pointer-events-none absolute inset-0 bg-surface-page" />
-                  <div className="relative px-5 pt-3 pb-7">
+                  <div className="relative px-5 pt-3 pb-5">
                     <div className="max-w-2xl mx-auto relative pointer-events-auto">
                       {isClaudeOwnedConversation && (
                         <div className={CLAUDE_TRANSCRIPT_BANNER}>
@@ -836,13 +892,7 @@ export const ChatPage = () => {
                         })()}
                       </div>
 
-                      <div>
-                        <ChatComposer {...composerProps} inputRef={conversationInputRef} />
-                      </div>
-
-                      <div className="min-h-[42px]">
-                        {composerMetaRow(true)}
-                      </div>
+                      {composerBlock(conversationInputRef)}
                     </div>
                   </div>
                 </div>

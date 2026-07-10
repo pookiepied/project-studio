@@ -74,10 +74,6 @@ html.zen-window .studio-chat-title-zone {
   align-items: center;
 }
 
-html.zen-window .studio-chat-title-zone {
-  max-width: clamp(140px, calc(50vw - 90px), 520px);
-}
-
 html.zen-window .studio-chat-inline-title {
   max-width: 100%;
   letter-spacing: 0.12em;
@@ -91,9 +87,5 @@ html.zen-window .studio-chat-icon-button {
   html.zen-window .studio-chat-header {
     padding-left: 84px;
     padding-right: 12px;
-  }
-
-  html.zen-window .studio-chat-title-zone {
-    max-width: 38vw;
   }
 }

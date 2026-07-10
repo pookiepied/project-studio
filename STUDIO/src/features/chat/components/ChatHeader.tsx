@@ -12,7 +12,7 @@ import { OverviewIcon } from "@/ui/icons/WorkspaceIcons";
 import { ConversationsDropdown } from "./ConversationsDropdown";
 import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
-import type { ConversationStorageScope } from "@/core/conversations";
+import type { ProjectEntry } from "@/core/projects";
 
 interface ChatHeaderProps {
   // Title
@@ -35,14 +35,12 @@ interface ChatHeaderProps {
   onNewChat:         () => void;
   // Conversations dropdown (all props forwarded)
   conversations:       ConversationMetadata[];
-  storageScope:        ConversationStorageScope;
   currentConvId:       string | undefined;
   showConversations:   boolean;
   editingConvId:       string | null;
   editingConvTitle:    string;
   hoveredConvId:       string | null;
   onToggleConversations: () => void;
-  onStorageScopeChange?: (scope: ConversationStorageScope) => void;
   onCloseConversations:  () => void;
   onSelectConversation:(id: string) => void;
   onNewConversation:   () => void;
@@ -53,6 +51,17 @@ interface ChatHeaderProps {
   onEditTitleChange:   (v: string) => void;
   onHoverConv:           (id: string | null) => void;
   conversationStatuses?: Map<string, ConversationSessionStatus>;
+  // Projects (forwarded to the projects/conversations switcher)
+  projects:            ProjectEntry[];
+  currentProjectPath?: string;
+  onSelectProject:     (project: ProjectEntry) => void;
+  onOpenProjectFolder: () => void;
+  onRemoveProject:     (id: string) => void;
+  onDeleteProject:     (id: string) => void;
+  /** Navigation trigger rendered at the head of the left zone (replaces the dock). */
+  navTrigger?: ReactNode;
+  /** Branch / worktree / context-window — project state, so it sits beside the title. */
+  contextControls?: ReactNode;
   accountControl?: ReactNode;
   rightControls?: ReactNode;
 }
@@ -168,14 +177,12 @@ export const ChatHeader = ({
   onRenameChat,
   onNewChat,
   conversations,
-  storageScope,
   currentConvId,
   showConversations,
   editingConvId,
   editingConvTitle,
   hoveredConvId,
   onToggleConversations,
-  onStorageScopeChange,
   onCloseConversations,
   onSelectConversation,
   onNewConversation,
@@ -186,6 +193,14 @@ export const ChatHeader = ({
   onEditTitleChange,
   onHoverConv,
   conversationStatuses,
+  projects,
+  currentProjectPath,
+  onSelectProject,
+  onOpenProjectFolder,
+  onRemoveProject,
+  onDeleteProject,
+  navTrigger,
+  contextControls,
   accountControl,
   rightControls,
 }: ChatHeaderProps) => {
@@ -193,18 +208,24 @@ export const ChatHeader = ({
   useOnClickOutside(convMenuRef, onCloseConvMenu, showConvMenu);
 
   return (
-    <div className="studio-chat-header flex-shrink-0 px-[3px] py-3 flex items-center justify-between min-w-0">
+    <div className="studio-chat-header flex-shrink-0 px-[3px] py-3 flex items-center justify-between min-w-0 gap-2">
       <div className="studio-chat-left-zone flex items-center gap-1 min-w-0 flex-1">
+        {navTrigger}
+
         <ConversationsDropdown
           conversations={conversations}
-          storageScope={storageScope}
           currentConvId={currentConvId}
           showConversations={showConversations}
           editingConvId={editingConvId}
           editingConvTitle={editingConvTitle}
           hoveredConvId={hoveredConvId}
+          projects={projects}
+          currentProjectPath={currentProjectPath}
+          onSelectProject={onSelectProject}
+          onOpenProjectFolder={onOpenProjectFolder}
+          onRemoveProject={onRemoveProject}
+          onDeleteProject={onDeleteProject}
           onToggle={onToggleConversations}
-          onStorageScopeChange={onStorageScopeChange}
           onClose={onCloseConversations}
           onSelectConversation={onSelectConversation}
           onNewConversation={onNewConversation}
@@ -220,9 +241,7 @@ export const ChatHeader = ({
         {/* Title + ⋯ options */}
         <div className="studio-chat-title-zone flex items-center gap-0.5 min-w-0 flex-1 group/header">
           {/* min-w-0 + inner truncating span — the h2 is a flex row (for h-7
-              centering), so text-overflow only works on the inner span. This keeps
-              a long "PROJECT / TITLE" clipped with an ellipsis instead of running
-              under the center dock. */}
+              centering), so text-overflow only works on the inner span. */}
           <h2 className="studio-chat-inline-title flex h-7 min-w-0 items-center rounded-lg px-1.5 text-xs font-semibold text-gray-400 dark:text-gray-600 tracking-extra-wide font-sans transition-colors duration-300">
             <span className="min-w-0 truncate">
               {projectName && (
@@ -284,9 +303,18 @@ export const ChatHeader = ({
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Project state — branch, worktree, context window. Sits with the title
+            because it describes what this conversation is working on. */}
+        {contextControls && (
+          <div className="flex flex-shrink-0 items-center gap-1 pl-1">
+            <span className="mr-0.5 h-4 w-px bg-surface-divider" />
+            {contextControls}
+          </div>
+        )}
       </div>
 
-      {/* Right: Summary panel toggle + Tools */}
+      {/* Right: system controls — environment, notifications, theme, panels. */}
       <div className="studio-chat-right-zone flex items-center gap-1.5 flex-shrink-0">
         {accountControl}
         {rightControls ?? (

@@ -3,7 +3,6 @@
  * Used by HomePage, MainLayout, GlobalShortcutHandler, GlobalContextEvents.
  */
 export type View =
-  | "temporary"
   | "transcribe"
   | "chat"
   | "voice"

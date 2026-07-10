@@ -22,3 +22,18 @@ async function getStudioHome(): Promise<string> {
 export async function getStudioConversationHome(): Promise<string> {
   return joinStudioPath(await getStudioHome(), "data", "conversations");
 }
+
+/** Root for per-project Studio data (never the user's source folder). */
+export async function getStudioProjectsHome(): Promise<string> {
+  return joinStudioPath(await getStudioHome(), "data", "projects");
+}
+
+/** The project registry file — the canonical list of known projects. */
+export async function getStudioProjectRegistryPath(): Promise<string> {
+  return joinStudioPath(await getStudioHome(), "data", "projects.json");
+}
+
+/** Studio's own data folder for one project, e.g. …/data/projects/<id>/ */
+export async function getStudioProjectDir(projectId: string): Promise<string> {
+  return joinStudioPath(await getStudioProjectsHome(), projectId);
+}

@@ -27,7 +27,6 @@ import { ActivityPage }   from "@/features/activity";
 import { ManagePage }     from "@/features/manage";
 import { WorkspacePage }   from "@/features/workspace";
 import { ComputerUsePage } from "@/features/computerUse";
-import { TemporaryPage } from "./TemporaryPage";
 
 import { NavigationProvider }   from "../contexts/NavigationContext";
 import { RecordingProvider }    from "@/features/voice/context/RecordingContext";
@@ -84,7 +83,6 @@ export const HomePage = () => {
     );
 
     switch (currentView) {
-      case "temporary":   return wrap("temporary",   <TemporaryPage />);
       case "transcribe":  return wrap("transcribe",  <TranscribePage />);
       case "settings":    return wrap("settings",    <SettingsPage />);
       case "chat":        return wrap("chat",         <ChatPage />);

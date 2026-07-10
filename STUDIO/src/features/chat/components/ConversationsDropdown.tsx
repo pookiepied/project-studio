@@ -1,26 +1,27 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChatCircleIcon as ChatCircle,
   PencilSimpleIcon as PencilSimple,
   TrashIcon as Trash,
   CheckIcon as Check,
   XIcon as X,
   CheckCircleIcon as CheckCircle,
   WarningCircleIcon as WarningCircle,
-  CloudCheckIcon as CloudCheck,
-  DesktopTowerIcon as DesktopTower,
+  StackIcon as Stack,
+  FolderOpenIcon as FolderOpen,
+  MinusCircleIcon as MinusCircle,
 } from "@phosphor-icons/react";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { formatDate } from "@/lib/formatters";
 import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
-import type { ConversationStorageScope } from "@/core/conversations";
+import type { ProjectEntry } from "@/core/projects";
 import { ClaudeCodeIcon } from "@/ui/brand";
+
+type Tab = "projects" | "conversations";
 
 interface ConversationsDropdownProps {
   conversations:         ConversationMetadata[];
-  storageScope:          ConversationStorageScope;
   currentConvId:         string | undefined;
   showConversations:     boolean;
   editingConvId:         string | null;
@@ -28,7 +29,6 @@ interface ConversationsDropdownProps {
   hoveredConvId:         string | null;
   conversationStatuses?: Map<string, ConversationSessionStatus>;
   onToggle:              () => void;
-  onStorageScopeChange?: (scope: ConversationStorageScope) => void;
   onClose:               () => void;
   onSelectConversation:  (id: string) => void;
   onNewConversation:     () => void;
@@ -38,11 +38,17 @@ interface ConversationsDropdownProps {
   onCancelConvEdit:      () => void;
   onEditTitleChange:     (v: string) => void;
   onHoverConv:           (id: string | null) => void;
+  // Projects
+  projects:              ProjectEntry[];
+  currentProjectPath?:   string;
+  onSelectProject:       (project: ProjectEntry) => void;
+  onOpenProjectFolder:   () => void;
+  onRemoveProject:       (id: string) => void;
+  onDeleteProject:       (id: string) => void;
 }
 
 export const ConversationsDropdown = ({
   conversations,
-  storageScope,
   currentConvId,
   showConversations,
   editingConvId,
@@ -50,7 +56,6 @@ export const ConversationsDropdown = ({
   hoveredConvId,
   conversationStatuses,
   onToggle,
-  onStorageScopeChange,
   onClose,
   onSelectConversation,
   onNewConversation,
@@ -60,13 +65,19 @@ export const ConversationsDropdown = ({
   onCancelConvEdit,
   onEditTitleChange,
   onHoverConv,
+  projects,
+  currentProjectPath,
+  onSelectProject,
+  onOpenProjectFolder,
+  onRemoveProject,
+  onDeleteProject,
 }: ConversationsDropdownProps) => {
   const ref = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<Tab>("conversations");
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
   useOnClickOutside(ref, onClose, showConversations);
 
   const hasActivity = conversationStatuses && conversationStatuses.size > 0;
-  const handleStorageScopeChange =
-    typeof onStorageScopeChange === "function" ? onStorageScopeChange : () => {};
 
   return (
     <div ref={ref} className="relative flex-shrink-0">
@@ -75,9 +86,9 @@ export const ConversationsDropdown = ({
         aria-expanded={showConversations}
         aria-haspopup="dialog"
         className="studio-chat-icon-button relative flex h-7 w-7 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
-        title="Conversations"
+        title="Projects and conversations"
       >
-        <ChatCircle size={14} weight="bold" className="text-gray-500 dark:text-gray-500 transition-colors duration-300" />
+        <Stack size={14} weight="bold" className="text-gray-500 dark:text-gray-500 transition-colors duration-300" />
         {/* Activity dot — shows when any background conversation has a status */}
         {hasActivity && (
           <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary dark:bg-primary" />
@@ -95,57 +106,110 @@ export const ConversationsDropdown = ({
             aria-label="Conversations"
             className="absolute left-0 top-12 w-80 bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col transition-colors duration-300"
           >
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-surface-border transition-colors duration-300">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-600 tracking-extra-wide font-sans transition-colors duration-300">
-                  CONVERSATIONS
-                </h3>
-                <div
-                  className="relative grid grid-cols-2 gap-0.5 rounded-full border border-gray-200 dark:border-surface-border bg-gray-50 dark:bg-surface-selected p-0.5"
-                  aria-label="Conversation storage"
-                >
-                  {(["cloud", "local"] as const).map((scope) => {
-                    const active = storageScope === scope;
-                    const Icon = scope === "cloud" ? CloudCheck : DesktopTower;
-                    return (
-                      <button
-                        key={scope}
-                        type="button"
-                        title={scope === "cloud" ? "Cloud conversations" : "Local conversations"}
-                        aria-pressed={active}
-                        onClick={() => {
-                          if (!active) handleStorageScopeChange(scope);
-                        }}
-                        className={`relative z-10 h-7 w-9 rounded-full flex items-center justify-center transition-colors ${
-                          active
-                            ? "text-gray-900 dark:text-gray-100"
-                            : "text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                        }`}
-                      >
-                        {active && (
-                          <motion.span
-                            layoutId="conversation-storage-switch"
-                            className="absolute inset-0 rounded-full bg-white dark:bg-surface-base shadow-sm"
-                            transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          />
-                        )}
-                        <Icon size={14} weight={active ? "fill" : "regular"} className="relative z-10" />
-                      </button>
-                    );
-                  })}
-                </div>
+            <div className="px-2 pt-2 border-b border-gray-200 dark:border-surface-border transition-colors duration-300">
+              <div className="relative flex items-center gap-1" role="tablist">
+                {(["projects", "conversations"] as const).map((key) => {
+                  const active = tab === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setTab(key)}
+                      className={`relative px-3 py-2 text-xs font-semibold tracking-extra-wide font-sans transition-colors ${
+                        active
+                          ? "text-gray-900 dark:text-gray-200"
+                          : "text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400"
+                      }`}
+                    >
+                      {key === "projects" ? "PROJECTS" : "CONVERSATIONS"}
+                      {active && (
+                        <motion.span
+                          layoutId="workspace-dropdown-tab"
+                          className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-gray-900 dark:bg-gray-200"
+                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="px-2 py-2">
               <button
-                onClick={onNewConversation}
+                onClick={tab === "projects" ? onOpenProjectFolder : onNewConversation}
                 className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-surface-raised rounded-lg transition-smooth text-gray-900 dark:text-gray-300"
               >
-                + New Chat
+                {tab === "projects" ? "+ Open project folder" : "+ New Chat"}
               </button>
             </div>
 
+            {tab === "projects" && (
+              <div className="flex-1 overflow-y-auto scrollbar-auto-hide px-2 pb-2">
+                {projects.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-gray-400 transition-colors duration-300">
+                    No projects yet
+                  </div>
+                ) : (
+                  projects.map((project) => {
+                    const isCurrent = project.path === currentProjectPath;
+                    return (
+                      <div
+                        key={project.id}
+                        onMouseEnter={() => setHoveredProjectId(project.id)}
+                        onMouseLeave={() => setHoveredProjectId(null)}
+                        className={`relative mb-1 rounded-lg ${isCurrent ? "bg-gray-100 dark:bg-surface-raised" : ""}`}
+                      >
+                        <button
+                          onClick={() => onSelectProject(project)}
+                          className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-surface-raised rounded-lg transition-smooth"
+                        >
+                          <div className="flex items-center gap-2 pr-16">
+                            <FolderOpen size={13} weight={isCurrent ? "fill" : "regular"} className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
+                            <p className="text-gray-900 dark:text-gray-300 truncate flex-1 transition-colors duration-300">
+                              {project.name}
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-400 dark:text-gray-600 mt-0.5 truncate transition-colors duration-300">
+                            {project.path}
+                          </p>
+                        </button>
+
+                        <AnimatePresence>
+                          {hoveredProjectId === project.id && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute right-2 top-2 flex gap-1 z-10"
+                            >
+                              <button
+                                title="Remove from list (keeps all files)"
+                                onClick={(e) => { e.stopPropagation(); onRemoveProject(project.id); }}
+                                className="p-1 hover:bg-gray-200 dark:hover:bg-surface-border rounded transition-smooth bg-white dark:bg-surface-base"
+                              >
+                                <MinusCircle size={12} weight="bold" className="text-gray-600 dark:text-gray-500" />
+                              </button>
+                              <button
+                                title="Delete Studio's data for this project (your folder is untouched)"
+                                onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
+                                className="p-1 hover:bg-gray-200 dark:hover:bg-surface-border rounded transition-smooth bg-white dark:bg-surface-base"
+                              >
+                                <Trash size={12} weight="bold" className="text-gray-600 dark:text-gray-500" />
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {tab === "conversations" && (
             <div className="flex-1 overflow-y-auto scrollbar-auto-hide px-2 pb-2">
               {conversations.length === 0 ? (
                 <div className="text-center py-8 text-sm text-gray-400 transition-colors duration-300">
@@ -264,6 +328,7 @@ export const ConversationsDropdown = ({
                 })
               )}
             </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

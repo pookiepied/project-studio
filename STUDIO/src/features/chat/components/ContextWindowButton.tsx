@@ -8,7 +8,9 @@ interface ContextWindowButtonProps {
   maxTokens: number;
   isSummarizing: boolean;
   hasContextSummary: boolean;
-  variant?: "toolbar" | "meta";
+  variant?: "toolbar" | "meta" | "header";
+  /** "up" anchors the panel above the ring (composer); "down" below it (header). */
+  placement?: "up" | "down";
 }
 
 function formatTokenCount(value: number): string {
@@ -23,6 +25,7 @@ export function ContextWindowButton({
   isSummarizing,
   hasContextSummary,
   variant = "toolbar",
+  placement = "up",
 }: ContextWindowButtonProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +47,8 @@ export function ContextWindowButton({
     <div
       className={cx(
         "relative flex h-7 shrink-0 items-center justify-center",
-        variant === "meta" ? "mt-2" : "w-7",
+        variant === "meta" && "mt-2",
+        variant === "toolbar" && "w-7",
       )}
       ref={containerRef}
     >
@@ -55,6 +59,9 @@ export function ContextWindowButton({
         className={cx(
           variant === "meta"
             ? "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full box-border leading-none text-gray-400 transition-colors dark:text-gray-600 [&>svg]:block"
+            : variant === "header"
+            // Ring alone was unreadable at this size — pair it with the number.
+            ? "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium leading-none text-gray-400 transition-colors dark:text-gray-600"
             : composerRoundIconButton,
           variant === "toolbar" && "relative justify-end pr-0.5 text-gray-400",
           "hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400",
@@ -63,20 +70,24 @@ export function ContextWindowButton({
         <TokenRing
           usedTokens={usedTokens}
           maxTokens={maxTokens}
-          size={10}
+          size={variant === "header" ? 12 : 10}
           stroke={1.25}
           active={usedTokens > 0}
         />
+        {variant === "header" && <span>{Math.round(percentage * 100)}%</span>}
       </button>
 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 6 }}
+            initial={{ opacity: 0, scale: 0.96, y: placement === "down" ? -6 : 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 6 }}
+            exit={{ opacity: 0, scale: 0.96, y: placement === "down" ? -6 : 6 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute right-0 bottom-full mb-1.5 w-56 z-50 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-surface-border dark:bg-surface-base"
+            className={cx(
+              "absolute right-0 w-56 z-50 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-surface-border dark:bg-surface-base",
+              placement === "down" ? "top-full mt-1.5" : "bottom-full mb-1.5",
+            )}
           >
             <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
               Context window
