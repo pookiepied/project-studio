@@ -362,3 +362,39 @@ mechanical one.** Not touched. Queued as RT-019.
 "unused exports" must exclude the modules behind them. `fasterWhisper` looked like a dead
 subsystem — 40 unused exports in one barrel — and is in fact live, reached through exactly such
 an import. **Checked before deleting; would have removed a working feature.**
+
+---
+
+## 2026-07-10 — RT-019 removed; and a lead claim retracted
+
+### 39dd7f2 — `@chat` mentions cut, `@app` mentions preserved
+
+Human decision: remove the feature. Scoping it first was load-bearing.
+`ContextAutocomplete` renders **two** mention features from one component. Only the `@chat` half
+was dead — `ChatPage` passed `contexts={[]}` and `onSelect={() => {}}` as stubs. The `@app` half
+(MCP connections + Composio apps via `useAtMention`) is live on every chat page. Taking the
+instruction "remove the UI" literally would have deleted working app mentions.
+
+Deleted: `contextRetrievalService.ts` (whole file), the `contexts`/`onSelect` props,
+`filteredContexts`, the Chats section, the chat branch of keyboard nav, an unreachable
+"No results" branch, and `useContextAutocomplete` (exported, unreferenced).
+
+Lint 257 → 256: the deleted Chats section held one raw `<button>`. Baseline lowered in commit.
+
+### Retraction — the lead was wrong about knip
+
+The previous ledger entry and RT-020 both asserted that `import * as` namespace imports defeat
+knip's per-export analysis, and cited `fasterWhisper` as evidence. **This was false and is now
+tested.** `modelService.ts` reaches `loadConfig` and `getModelById` through a namespace import;
+knip flagged neither, while correctly flagging `saveConfig`, `getAllModelNames` and seven others
+that nothing calls. knip resolves namespace member access.
+
+The claim was plausible, stated confidently, and wrong. It was caught only because the next step
+required checking it against the actual data instead of quoting the earlier conclusion. **This is
+the same failure the charter attributes to implementer agents, committed by the lead**, and it is
+the argument for the rule holding regardless of who wrote the sentence: verify from the artifact,
+not from the report — including your own.
+
+What survives: the 286 non-barrel unused exports are a **more** trustworthy list than claimed.
+The real hazards are string-based usage (invisible to knip, as `madge` proved), re-export chains,
+and symbols that are dead inside files that are alive.

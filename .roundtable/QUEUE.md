@@ -95,7 +95,7 @@ deserves to be analyzed. Verify `npm run gate` still passes afterward.
 
 ---
 
-### RT-019 — `@chat` mentions: half-wired feature · `needs-confirmation`
+### RT-019 — `@chat` mentions removed · `done` (39dd7f2)
 
 `features/chat/services/contextRetrievalService.ts` exports four functions with **zero callers**:
 `parseMentions`, `getAvailableContexts`, `retrieveContexts`, `formatContextsForLLM`. Yet
@@ -113,12 +113,22 @@ Do not decide this mechanically.
 178 of them sit in 19 `index.ts` barrels — that is deliberate public surface, not dead code.
 The remaining ~292 live in 106 non-barrel files.
 
-**Do not bulk-delete.** Two traps, both already hit during Phase 1:
-1. **Namespace imports** (`import * as`) defeat per-export analysis. Five exist internally:
-   `chatHistoryService`, `fasterWhisper` (×2), `ollamaService`. `fasterWhisper` presents as a
-   dead subsystem — 40 unused exports in one barrel — and is fully live.
-2. **knip cannot see non-import usage.** It called `madge` an unused dependency while the gate
-   was running it.
+**Correction (2026-07-10).** An earlier version of this item claimed namespace imports
+(`import * as`) defeat knip's per-export analysis. **That was wrong, and it was tested.**
+`modelService.ts` calls `fasterWhisperService.loadConfig()` and `.getModelById()` through a
+namespace import; knip flagged neither, while correctly flagging `saveConfig` and
+`getAllModelNames`, which nothing calls. knip resolves namespace member access.
+
+**Still do not bulk-delete.** The real traps:
+1. **knip cannot see non-import usage.** It called `madge` an unused dependency while the gate
+   was running it, because `ratchet.mjs` invokes it by filesystem path. Anything reached by
+   string name — Tauri commands, route conventions — is invisible the same way.
+2. **Re-export chains.** Most flagged symbols in `fasterWhisper/` have exactly one reference
+   outside their own file: the barrel that re-exports them into nothing. Deleting the symbol
+   means deleting the barrel line too, or the build breaks.
+3. **A symbol can be dead while its file is alive.** `contextRetrievalService` was 100% dead
+   yet its consumer component was rendered on every chat page (see RT-019). File-level
+   reasoning would have deleted a working feature.
 
 Suggested method: for each candidate, remove the `export` keyword rather than the symbol.
 `tsc --noUnusedLocals` then either passes (the symbol was used locally; keep it private) or
