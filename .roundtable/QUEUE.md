@@ -7,8 +7,9 @@ Items are ordered: architectural damage first, cosmetic backlog after. Each item
 names its files, its definition of done, and what would make it fail. An item that
 cannot state how it fails is not ready to dispatch.
 
-**Gate as of 2026-07-10:** typecheck clean · build passes · lint **257** · cycles **2**.
-All 257 lint errors are raw buttons (RT-007). Layering violations: **zero**.
+**Gate as of 2026-07-10:** typecheck clean · build passes · lint **256** · cycles **1**.
+All 256 lint errors are raw buttons (RT-007). Layering violations: **zero**.
+knip: 336 unused exports (from 399), zero unused files.
 
 ---
 
@@ -40,16 +41,22 @@ map cleanly. **Human smoke test mandatory before merge.**
 
 ---
 
-### RT-005 — Break the surviving intra-feature cycle · `todo` · small
+### RT-005 — Break the surviving intra-feature cycle · `done` (9137d06)
 
 ```
 features/chat/services/daemonService.ts > features/models/services/localUsageService.ts
 ```
 
-One of only two cycles left. No layering violation — a service-to-service tangle. The other
-half of this item (`modelService > localModelDetection`) closed in the reorg.
+**Closed by deletion, not restructuring.** The cycle existed for one reason: `daemonStream`
+called `reportLocalUsage` on its last line. `daemonStream` had no callers. It was a cycle held
+open entirely by dead code, and no amount of dependency-inversion cleverness was the right fix.
 
-**Done when:** cycle gone, baseline lowered, typecheck clean, no behavior change.
+It stayed hidden because `aiService`'s `export * from "./daemonService"` re-exported it into
+nothing, so the detector counted it as used — the same barrel pollution as fasterWhisper.
+Trimming that barrel (RT-027) made it visible; deleting it dissolved the cycle for free.
+
+**Third time this pattern has held.** The reorg dissolved 7 of 9 cycles without targeting one.
+This closed the 8th by deleting dead code. *Cycles are a symptom. Look for the disease.*
 
 ---
 
@@ -172,14 +179,21 @@ typechecker is silent exactly where you are relying on it to speak.**
 | 3 | cascade: `core/storage/fileConfigService.ts` | `updateSetting` deleted; `importSettings` → RT-022 |
 | 4 | `features/models/services/modelService.ts` (+1 import line in `modelFilter.ts`) | 12 deleted, 2 re-exports dropped — `01a5212` |
 | 5 | `features/chat/attachments/fileAttachmentService.ts`, `lib/modelUtils.ts` | 14 deleted, 1 privatized — `05ee015` |
+| 6 | `features/chat/services/aiService.ts` facade (+`useLiveSession.ts` import) | 9 re-exports dropped — `214647e` |
+| 7 | cascade: `daemonService.ts`, `services/types.ts` | `daemonStream` + 2 dead types; **RT-005 cycle dissolved** — `9137d06` |
 
-knip: 399 unused symbols at the start of RT-020, **348** now. Zero unused files.
+knip: 399 unused symbols at the start of RT-020, **336** now. Zero unused files. Cycles 2 → 1.
 
-Remaining non-barrel candidates, largest first: `features/chat/services/aiService.ts` (9),
+**Trim the barrel first — every single time.** Batches 1, 6 and 7 all found the same thing: a
+dead re-export makes a sibling-only symbol look alive to the detector. `daemonStream` had been
+invisible for the whole of RT-020 because `aiService` re-exported it into nothing. The per-file
+view is only truthful once the barrel is honest.
+
+Remaining non-barrel candidates, largest first:
 `core/models/modelCapabilityService.ts` (7, newly orphaned by batch 5), `ui/icons/index.tsx` (6),
-`types/artifacts.ts` (6), `features/chat/context/messageBuilder.ts` (5), `lib/textMerger.ts` (5).
-~180 more sit in ~20 barrels — trim per the fasterWhisper pattern (a barrel is for outsiders),
-do not blind-delete.
+`types/artifacts.ts` (6), `features/chat/context/messageBuilder.ts` (5), `lib/textMerger.ts` (5),
+`features/chat/services/claudeBridgeService.ts` (4, newly visible after batch 6).
+~180 more sit in ~20 barrels — trim per the fasterWhisper pattern, do not blind-delete.
 
 **Name collisions are THE recurring hazard — four batches, four collisions.**
 - `supportsTranslation` — a function *and* a boolean property on 14 models.
