@@ -21,7 +21,7 @@
 import { logger } from "@/core/logging/logger";
 import { connectionManager } from "@/core/connection";
 import type { LocalToolCall } from "@/types/chat";
-import type { TaskItem } from "@/features/chat/context/types";
+import type { TaskItem } from "@/types/tools";
 import { notifyPermissionRequired } from "./notifications";
 import type { ToolExecutionCallbacks } from "./types";
 import { ANSWER_TIMEOUT_MS } from "./constants";

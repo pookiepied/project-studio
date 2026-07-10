@@ -25,7 +25,7 @@ import {
 import { logger } from "@/core/logging/logger";
 import { connectionManager } from "@/core/connection";
 import type { APIChatMessage, LocalToolCall, ToolResultItem } from "@/types/chat";
-import type { ToolApprovalDecision } from "@/features/chat/context/types";
+import type { ToolApprovalDecision } from "@/types/tools";
 import { isLocalMcpServer } from "@/core/permissions";
 import { applyWorkspaceDefaults } from "./workspaceDefaults";
 import { executeBuiltinTool } from "./builtinTools";

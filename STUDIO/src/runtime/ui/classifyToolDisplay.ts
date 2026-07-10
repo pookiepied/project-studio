@@ -4,7 +4,7 @@
  * Pure functions — no React dependencies. Importable anywhere.
  */
 
-import type { ToolDisplayClass } from "@/features/chat/context/types";
+import type { ToolDisplayClass } from "@/types/tools";
 
 const SILENT_TOOLS = new Set([
   "think",

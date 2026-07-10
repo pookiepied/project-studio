@@ -12,7 +12,7 @@
  */
 
 import type { APIChatMessage, ToolResultItem } from "@/types/chat";
-import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "@/features/chat/context/types";
+import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "@/types/tools";
 import type { PermissionDecision, GrantScope } from "@/core/permissions";
 
 // TODO(reorg): chat-state type coupling (ActiveToolCall) resolved in Phase 5.

@@ -69,7 +69,7 @@ good calibration run for the loop. Both files are in scope.
 
 ---
 
-## RT-004 — Break the `features/chat/context` ↔ `runtime` barrel cycle · `todo`
+## RT-004 — Break the `features/chat/context` ↔ `runtime` barrel cycle · `done` (2026-07-10, via RT-015f)
 
 **Cycle (1 of 11):**
 ```
@@ -188,7 +188,7 @@ identified. Name it, prove it, then propose removal as a separate item.
 
 ---
 
-## RT-011 — `runtime/execution/types.ts` depends on `features/` · `todo`
+## RT-011 — `runtime/execution/types.ts` depends on `features/` · `done` (2026-07-10, superseded by RT-015f)
 
 Surfaced during RT-003 review, not introduced by it — the coupling moved with the type.
 `runtime/execution/types.ts:15` imports `ActiveToolCall`, `TaskItem`, `ToolApprovalDecision`
@@ -234,7 +234,7 @@ Type-only imports count. `import type` still couples the layers.
 | 015c | `core/network/fallbackService.ts:6-9` | 3 | Same file as RT-001. Do them together. |
 | 015d | `core/daemon/useDaemon.ts:9-10` | 2 | Imports `@/app` context + hooks. A hook in `core/` is itself the smell. |
 | 015e | `core/storage/fileConfigService.ts:9` | 1 | Wants `migrateModelId`. Hoist the migration util to a leaf. |
-| 015f | `runtime/execution/{types,builtinTools,executeLocalTools}.ts` + `runtime/ui/{classifyToolDisplay,InlineToolSteps}` | 5 | All want `features/chat/context/types`. One hoist fixes all five. Supersedes RT-011. |
+| ~~015f~~ | `runtime/**` | ~~5~~ **done** | Hoisted 4 types to `src/types/tools.ts`. Also dissolved RT-004's cycle. |
 | 015g | `lib/{modelUtils,hooks/useCachedIcon}.ts` | 3 | |
 | 015h | `ui/{layout/AccountMenu,overlays/CommandPalette,overlays/FloatingIsland,primitives/StreamingText,primitives/TodoWriteCard}` | 7 | Presentational components reaching into features. Props, not imports. |
 

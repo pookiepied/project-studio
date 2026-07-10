@@ -15,14 +15,25 @@ import type {
 import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
 import type { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import type {
-  PermissionModeId,
-  GrantScope,
-  ToolRiskClass,
-} from "@/core/permissions";
+import type { PermissionModeId } from "@/core/permissions";
 
-/** User decision on a per-action approval prompt: a grant scope, or deny. */
-export type ToolApprovalDecision = GrantScope | "deny";
+// Tool-execution domain types now live in the neutral leaf module `@/types/tools`
+// so the desktop-backend `runtime/` layer can depend on them without importing
+// upward from `features/`. Re-exported here so existing `@/features/chat/context`
+// consumers keep working unchanged.
+export type {
+  ActiveToolCall,
+  TaskItem,
+  TodoItem,
+  ToolApprovalDecision,
+  ToolDisplayClass,
+} from "@/types/tools";
+
+import type {
+  ActiveToolCall,
+  TaskItem,
+  ToolApprovalDecision,
+} from "@/types/tools";
 
 // ---------------------------------------------------------------------------
 // Pending message queue
@@ -31,54 +42,6 @@ export type ToolApprovalDecision = GrantScope | "deny";
 export interface PendingMessage {
   content: string;
   attachments: FileAttachment[];
-}
-
-// ---------------------------------------------------------------------------
-// Task list
-// ---------------------------------------------------------------------------
-
-export interface TaskItem {
-  content: string;
-  activeForm: string;
-  status: "pending" | "in_progress" | "completed";
-}
-
-/** @deprecated Use TaskItem */
-export type TodoItem = TaskItem;
-
-// ---------------------------------------------------------------------------
-// Tool call cards
-// ---------------------------------------------------------------------------
-
-export type ToolDisplayClass = "capsule" | "stream" | "silent";
-
-export interface ActiveToolCall {
-  callId: string;
-  tool: string;
-  args: Record<string, unknown>;
-  status:
-    | "running"
-    | "complete"
-    | "error"
-    | "pending_question"
-    | "pending_approval";
-  result?: unknown;
-  displayClass?: ToolDisplayClass;
-  // -- Permission approval metadata (set when status = "pending_approval") --
-  /** Risk class of the tool awaiting approval. */
-  riskClass?: ToolRiskClass;
-  /** Human-readable reason the approval is required. */
-  approvalReason?: string;
-  /** Grant scopes the user may choose from in the approval prompt. */
-  offeredScopes?: GrantScope[];
-  /** Which resolver owns this pending approval card. */
-  approvalKind?: "tool" | "global_access";
-  /** True when this card represents a delegated sub-agent. */
-  type?: "sub_agent";
-  /** callId of the spawn_agent that created this sub-agent. */
-  parentCallId?: string;
-  /** Live text content streamed by the sub-agent. */
-  subAgentContent?: string;
 }
 
 // ---------------------------------------------------------------------------

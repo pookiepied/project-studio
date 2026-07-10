@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckIcon as Check, XIcon as X, CaretDownIcon as CaretDown } from "@phosphor-icons/react";
-import type { ActiveToolCall } from "@/features/chat/context";
+import type { ActiveToolCall } from "@/types/tools";
 import { getToolIcon, toolLabel, argsPreview } from "./toolCardUtils";
 
 interface InlineToolStepsProps {

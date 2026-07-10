@@ -203,3 +203,39 @@ imports, 19 dependents. The healthiest module in the tree — and the one we wer
 to touch, because it had once been misfiled as dead code. Doc 13's proposal to move
 `claudeBridgeService.ts` into it turns out to be sound; I held it for the right reason
 (unread) and was wrong about the conclusion.
+
+---
+
+## 2026-07-10 — RT-015f · Remove `runtime/` → `features/` upward imports · ACCEPTED
+
+First item scored by the new layering gate. `ActiveToolCall`, `TaskItem`,
+`ToolApprovalDecision`, `ToolDisplayClass` (and the `TodoItem` alias) hoisted from
+`features/chat/context/types.ts` to a neutral leaf, `src/types/tools.ts`, which imports only
+`@/core/permissions` — downward. Chat re-exports them, so all ~21 importers were untouched.
+
+**Gate.** lint 284 → 279 · cycles 10 → **9** · typecheck clean. Both baselines lowered in the
+same commit.
+
+**The cycle fell out for free.** RT-004's cycle —
+`chat/context/index.ts > ChatProvider > runClaudeTurn > runtime/index.ts > InlineToolSteps.tsx`
+— disappeared without being targeted. It was a symptom; the upward import was the disease.
+This is the argument for fixing layering before chasing individual cycles, and it retires
+RT-004 and RT-011 outright.
+
+**Cold review.** PASS. Byte-compared each moved type against `HEAD` (unchanged), confirmed
+the barrel still re-exports everything, confirmed `types/tools.ts` has no upward import,
+grepped the diff for `eslint-disable` (none), and verified the baseline diff removes exactly
+the five named entries — with `InlineToolSteps.tsx` going 2 → 1 rather than to 0, because its
+second violation is a raw `<button>` from a different rule.
+
+**Lead verification.** Ran the gate, read the baseline diff, checked `types/tools.ts`'s import
+list, grepped for `eslint-disable`. All independent of both agents' reports.
+
+**Implementer behaved correctly under an incomplete instruction.** The item authorized
+lowering the lint baseline only. It found the cycles baseline was also beatable, did **not**
+touch it, and said so. That is the right instinct — an agent that quietly re-baselines what it
+was not asked to is the failure mode this whole system exists to prevent. The lead lowered
+cycles 10 → 9 afterward, since the charter requires locking in an improvement or it is
+reversible.
+
+**Awaiting human smoke test before further items.**
