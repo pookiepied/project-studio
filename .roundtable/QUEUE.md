@@ -108,7 +108,20 @@ Do not decide this mechanically.
 
 ---
 
-### RT-020 — Triage 340 unused exports / 130 unused types · `needs-confirmation`
+### RT-021 — Dead exports in `core/platform` + `core/storage` · `done` (2c67ba2)
+
+`studioPaths.ts` defined a 14-branch path hierarchy of which one branch was ever used.
+`getStudioSkillsHome()` was worse than unused: it resolved to `%APPDATA%/Studio/skills`, while
+bundled skills are written to and read from `$HOME/.studio/skills`
+([skillDeployer.ts:140](../STUDIO/src/core/skills/skillDeployer.ts:140), and `mcp-servers/computer-use`
+reads `os.homedir()/.studio/skills`). **It pointed at a directory nothing reads.**
+
+`configService.ts`'s real public surface is the `configService` object literal, not its named
+function exports. Five object members had no callers.
+
+---
+
+### RT-020 — Triage 340 unused exports / 130 unused types · `in-progress`
 
 178 of them sit in 19 `index.ts` barrels — that is deliberate public surface, not dead code.
 The remaining ~292 live in 106 non-barrel files.
@@ -133,6 +146,46 @@ namespace import; knip flagged neither, while correctly flagging `saveConfig` an
 Suggested method: for each candidate, remove the `export` keyword rather than the symbol.
 `tsc --noUnusedLocals` then either passes (the symbol was used locally; keep it private) or
 fails (the symbol is genuinely dead; delete it). The typechecker adjudicates, not the detector.
+
+**Two fixed points, not one.** Established across batches 1–2:
+- *Within a file*, deleting a function can orphan its callees. Iterate `tsc` until it converges.
+- *Across files*, deleting a consumer can orphan an exporter. **`tsc` cannot see this** —
+  `noUnusedLocals` reasons only within a file. Re-run `knip` after each batch. Batch 2 deleted
+  `configService.updateSetting`, which silently orphaned `fileConfigService.updateSetting`.
+- `noUnusedLocals` never flags unused `interface`/`type`. Check those by hand.
+
+**Batch log:**
+
+| Batch | Files | Result |
+|---|---|---|
+| 1 | `fasterWhisper/` (7 files + barrel) | 21 deleted, 4 privatized — `52a14d7`, `bafb003` |
+| 2 | `core/platform/studioPaths.ts`, `core/storage/configService.ts` | 21 deleted, 7 privatized — `2c67ba2` |
+| 3 | cascade: `core/storage/fileConfigService.ts` | `updateSetting` deleted; `importSettings` → RT-022 |
+
+Remaining non-barrel candidates, largest first: `features/models/services/modelService.ts` (14),
+`features/chat/attachments/fileAttachmentService.ts` (10), `features/chat/services/aiService.ts` (9),
+`lib/modelUtils.ts` (8). ~180 more sit in ~20 barrels — trim per the fasterWhisper pattern
+(a barrel is for outsiders), do not blind-delete.
+
+---
+
+### RT-022 — `importSettings` is the unwired half of a round-trip · `needs-confirmation`
+
+[fileConfigService.ts:359](../STUDIO/src/core/storage/fileConfigService.ts:359) exports
+`importSettings`, which parses a `.conf` blob back into `AppSettings` and saves it. **It has zero
+callers.** `SettingsDebugPanel` can *export* settings and reveal the config file location, but
+nothing anywhere imports them back.
+
+This is the same shape as RT-019 (`@chat`): a working backend behind a UI that was never built.
+It is dead by every static measure, so a mechanical sweep would delete it — but deleting it
+removes a capability, not cruft. **That is a product decision, not a cleanup.**
+
+Options: (a) delete it and accept export-only, (b) wire an "Import settings" control into
+`SettingsDebugPanel` next to the existing export. A comment at the declaration marks it as a
+deliberate hold so a later sweep does not quietly take it.
+
+Its two helpers (`confToSettings`, `settingsToConf`) are used by the live load/save paths and
+survive either way.
 
 ---
 
