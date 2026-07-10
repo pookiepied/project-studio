@@ -3,5 +3,6 @@
   "entry": ["src/main.tsx", "web/web-main.tsx"],
   "project": ["src/**/*.{ts,tsx}", "web/**/*.{ts,tsx}"],
   "ignore": ["src-tauri/**", "daemon/**", "mcp-servers/**", "scripts/**", "vendor/**"],
-  "ignoreBinaries": ["tauri"]
+  "ignoreBinaries": ["tauri", "powershell"],
+  "ignoreDependencies": ["madge"]
 }
