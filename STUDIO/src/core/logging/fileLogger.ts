@@ -1,8 +1,9 @@
 /**
  * File-based Logger for Production
- * 
- * Writes logs to: %APPDATA%\STUDIO\logs\app.log
- * Automatically rotates logs when they get too large
+ *
+ * Writes to the logical path `logs/app.log`, which unifiedStorage resolves
+ * against the platform's app data directory (or browser storage on web).
+ * Automatically rotates logs when they get too large.
  */
 
 import { unifiedStorage } from "../storage/unifiedStorageService";

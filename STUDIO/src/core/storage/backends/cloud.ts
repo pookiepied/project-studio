@@ -97,4 +97,7 @@ export class CloudStorageBackend implements StorageBackend {
   async resolveSystemPath(location: string): Promise<string> {
     return location;
   }
+  async describePath(path: string): Promise<string> {
+    return `Cloud storage — ${path}`;
+  }
 }

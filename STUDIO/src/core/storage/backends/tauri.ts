@@ -101,6 +101,11 @@ export class TauriStorageBackend implements StorageBackend {
     return join(appDataDir, path.replace(/\//g, "\\"));
   }
 
+  async describePath(path: string): Promise<string> {
+    if (!(await this.isAvailable())) return path;
+    return this.resolveAppDataPath(path);
+  }
+
   async createFileSystem(path: string, content = ''): Promise<string> {
     if (!(await this.isAvailable())) throw new Error("Tauri FS not available");
     try {

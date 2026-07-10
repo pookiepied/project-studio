@@ -79,6 +79,15 @@ class UnifiedStorageManager {
     return (await this.getBackendForPath(path)).mkdir(path);
   }
 
+  /**
+   * Where a logical path actually lives, for display. Routes through the same
+   * backend selection as readText/writeText so the answer cannot drift from
+   * where the data really is.
+   */
+  async describePath(path: string): Promise<string> {
+    return (await this.getBackendForPath(path)).describePath(path);
+  }
+
   async readJSON<T>(path: string): Promise<T | null> {
     const content = await this.readText(path);
     if (!content) return null;

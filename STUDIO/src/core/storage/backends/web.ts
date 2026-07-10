@@ -71,4 +71,8 @@ export class WebStorageBackend implements StorageBackend {
   async resolveSystemPath(location: string): Promise<string> {
     return location;
   }
+  async describePath(path: string): Promise<string> {
+    // webStorageService keys localStorage by the logical path verbatim.
+    return `Browser local storage — key "${path}"`;
+  }
 }
