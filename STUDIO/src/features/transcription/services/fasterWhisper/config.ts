@@ -32,7 +32,7 @@ let configCache: FasterWhisperConfig | null = null;
  * Get Faster Whisper base directory
  * Should be: AppData/Roaming/com.pookiepied.studio/addons/faster-whisper/
  */
-export async function getFasterWhisperDir(): Promise<string> {
+async function getFasterWhisperDir(): Promise<string> {
   const appData = await appDataDir();
   logger.debug('Config', 'App data directory', { appData });
   
@@ -169,7 +169,7 @@ export async function loadConfig(): Promise<FasterWhisperConfig> {
 /**
  * Save configuration to disk
  */
-export async function saveConfig(config: Partial<FasterWhisperConfig>): Promise<void> {
+async function saveConfig(config: Partial<FasterWhisperConfig>): Promise<void> {
   try {
     // Ensure directory structure exists
     await ensureDirectoryStructure();
@@ -198,14 +198,6 @@ export async function saveConfig(config: Partial<FasterWhisperConfig>): Promise<
     logger.error('Config', 'Failed to save Faster Whisper configuration', error);
     throw error;
   }
-}
-
-/**
- * Update specific config fields
- */
-export async function updateConfig(updates: Partial<FasterWhisperConfig>): Promise<FasterWhisperConfig> {
-  await saveConfig(updates);
-  return await loadConfig();
 }
 
 /**
@@ -263,54 +255,9 @@ export async function setSelectedModel(modelName: string): Promise<void> {
 }
 
 /**
- * Set device type
- */
-export async function setDevice(device: 'cuda' | 'cpu'): Promise<void> {
-  await saveConfig({ device });
-}
-
-/**
- * Set quantization type
- */
-export async function setQuantization(quantization: string): Promise<void> {
-  await saveConfig({ quantization });
-}
-
-/**
- * Check if Faster Whisper is installed
- */
-export async function isInstalled(): Promise<boolean> {
-  const config = await loadConfig();
-  return config.installed;
-}
-
-/**
  * Get installed models
  */
 export async function getInstalledModels(): Promise<string[]> {
   const config = await loadConfig();
   return config.installedModels;
-}
-
-/**
- * Get selected model
- */
-export async function getSelectedModel(): Promise<string | undefined> {
-  const config = await loadConfig();
-  return config.selectedModel;
-}
-
-/**
- * Reset configuration (for uninstall)
- */
-export async function resetConfig(): Promise<void> {
-  configCache = null;
-  await saveConfig(DEFAULT_CONFIG);
-}
-
-/**
- * Clear config cache (force reload from disk)
- */
-export function clearCache(): void {
-  configCache = null;
 }

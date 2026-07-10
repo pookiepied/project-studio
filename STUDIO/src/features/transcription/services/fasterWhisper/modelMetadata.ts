@@ -18,7 +18,7 @@ export interface FasterWhisperModel {
   recommended?: boolean;
 }
 
-export const FASTER_WHISPER_MODELS: FasterWhisperModel[] = [
+const FASTER_WHISPER_MODELS: FasterWhisperModel[] = [
   {
     id: 'tiny',
     name: 'tiny',
@@ -165,58 +165,8 @@ export function getModelById(id: string): FasterWhisperModel | undefined {
 }
 
 /**
- * Get all model names
- */
-export function getAllModelNames(): string[] {
-  return FASTER_WHISPER_MODELS.map(m => m.name);
-}
-
-/**
- * Check if model supports translation
- */
-export function supportsTranslation(modelName: string): boolean {
-  const model = FASTER_WHISPER_MODELS.find(m => m.name === modelName);
-  return model?.supportsTranslation ?? false;
-}
-
-/**
- * Get quantization options for a model and device
- */
-export function getQuantizationOptions(
-  modelName: string,
-  device: 'cuda' | 'cpu',
-  supportedQuantizations: { cpu: string[]; cuda: string[] }
-): string[] {
-  const model = FASTER_WHISPER_MODELS.find(m => m.name === modelName);
-  const hwSupported = new Set(supportedQuantizations[device] || []);
-  
-  let options: string[];
-  
-  if (model?.quantizationOverrides) {
-    options = model.quantizationOverrides[device] || supportedQuantizations[device] || [];
-    options = options.filter(opt => hwSupported.has(opt));
-  } else {
-    options = supportedQuantizations[device] || [];
-  }
-  
-  // CPU doesn't support float16/bfloat16
-  if (device === 'cpu') {
-    options = options.filter(opt => !['float16', 'bfloat16'].includes(opt));
-  }
-  
-  return options;
-}
-
-/**
  * Get recommended models for quick selection
  */
 export function getRecommendedModels(): FasterWhisperModel[] {
   return FASTER_WHISPER_MODELS.filter(m => m.recommended);
-}
-
-/**
- * Get models by size category
- */
-export function getModelsBySize(size: 'tiny' | 'small' | 'medium' | 'large'): FasterWhisperModel[] {
-  return FASTER_WHISPER_MODELS.filter(m => m.size === size);
 }

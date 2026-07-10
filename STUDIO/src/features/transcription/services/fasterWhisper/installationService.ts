@@ -30,18 +30,6 @@ export interface InstallationResult {
 }
 
 /**
- * Check if virtual environment exists
- */
-export async function checkVenvExists(): Promise<boolean> {
-  try {
-    const pythonPath = await getVenvPythonPath();
-    return await invoke<boolean>('file_exists', { path: pythonPath });
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Create virtual environment
  */
 async function createVirtualEnvironment(
@@ -400,45 +388,6 @@ export async function installFasterWhisper(
     };
   } catch (error) {
     logger.error('Installation', 'Installation failed', error);
-    const categorized = errorService.categorize(error);
-    return {
-      success: false,
-      error: categorized.userMessage,
-      errorDetails: categorized,
-    };
-  }
-}
-
-/**
- * Verify installation integrity
- */
-export async function verifyInstallation(): Promise<APIResponse<boolean>> {
-  try {
-    // Check if venv exists
-    const venvExists = await checkVenvExists();
-    if (!venvExists) {
-      return {
-        success: false,
-        error: 'Virtual environment not found',
-      };
-    }
-    
-    // Try to import faster_whisper
-    const pythonPath = await getVenvPythonPath();
-    const result = await invoke<string>('execute_shell_command', {
-      command: pythonPath,
-      args: ['-c', 'import faster_whisper; print("OK")'],
-    });
-    
-    if (result.includes('OK')) {
-      return { success: true, data: true };
-    }
-    
-    return {
-      success: false,
-      error: 'Faster Whisper not properly installed',
-    };
-  } catch (error) {
     const categorized = errorService.categorize(error);
     return {
       success: false,

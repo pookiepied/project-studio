@@ -17,7 +17,7 @@ export interface SystemInfo {
   architecture: string;
 }
 
-export interface GPUInfo {
+interface GPUInfo {
   vendor: 'nvidia' | 'amd' | 'none';
   name?: string;
   available: boolean;
@@ -174,14 +174,6 @@ async function getPlatform(): Promise<{ os: 'windows' | 'macos' | 'linux'; arch:
       arch: 'x64',
     };
   }
-}
-
-/**
- * Check if Python version is supported (3.11, 3.12, or 3.13)
- */
-export function isPythonVersionSupported(version: string): boolean {
-  const [major, minor] = version.split('.').map(Number);
-  return major === 3 && (minor === 11 || minor === 12 || minor === 13);
 }
 
 /**
