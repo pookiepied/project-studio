@@ -133,7 +133,7 @@ const STUDIO_HARNESS_SYSTEM_MARKER = "[studio-harness:";
 const STUDIO_HARNESS_SYSTEM_PROMPT = "[studio-harness: local machine access enabled]";
 
 /** Inject the task_write task-management context. */
-export function addCoreSystemMessages(
+function addCoreSystemMessages(
   messages: APIChatMessage[]
 ): APIChatMessage[] {
   if (alreadyInjected(messages, CORE_SYSTEM_MARKER)) return messages;
@@ -162,7 +162,7 @@ Skip task_write for: single trivial tasks, purely conversational replies, tasks 
 }
 
 /** Inject configured image/video generation model names. */
-export function addGenerationModelsSystemMessage(
+function addGenerationModelsSystemMessage(
   messages:   APIChatMessage[],
   imageModel?: string,
   videoModel?: string
@@ -182,7 +182,7 @@ export function addGenerationModelsSystemMessage(
 }
 
 /** Inject Studio Harness system prompt when the local engine is connected. */
-export function addStudioHarnessSystemMessages(
+function addStudioHarnessSystemMessages(
   messages:       APIChatMessage[],
   runningServers: string[]
 ): APIChatMessage[] {
@@ -195,7 +195,7 @@ export function addStudioHarnessSystemMessages(
 }
 
 /** Inject text-block formatting guidance. */
-export function addFormattingSystemMessage(
+function addFormattingSystemMessage(
   messages: APIChatMessage[]
 ): APIChatMessage[] {
   if (alreadyInjected(messages, FORMATTING_MARKER)) return messages;
@@ -237,7 +237,7 @@ Use artifact blocks for search results, link bundles, weather/location snapshots
 }
 
 /** Inject project context (opened folder) as a system message. */
-export function addProjectContextSystemMessage(
+function addProjectContextSystemMessage(
   messages:       APIChatMessage[],
   projectContext: { path: string; name: string } | null
 ): APIChatMessage[] {

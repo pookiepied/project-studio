@@ -114,7 +114,7 @@ function findOverlap(chunk1: string, chunk2: string, threshold: number = 0.8): n
 /**
  * Merge two text chunks by removing overlapping sentences
  */
-export function mergeChunks(chunk1: string, chunk2: string, threshold: number = 0.8): string {
+function mergeChunks(chunk1: string, chunk2: string, threshold: number = 0.8): string {
   if (!chunk1) return chunk2;
   if (!chunk2) return chunk1;
   
@@ -136,7 +136,7 @@ export function mergeChunks(chunk1: string, chunk2: string, threshold: number = 
 /**
  * Merge multiple transcription chunks in order
  */
-export function mergeTranscriptions(chunks: string[], threshold: number = 0.8): string {
+function mergeTranscriptions(chunks: string[], threshold: number = 0.8): string {
   if (chunks.length === 0) return "";
   if (chunks.length === 1) return chunks[0];
   
@@ -152,7 +152,7 @@ export function mergeTranscriptions(chunks: string[], threshold: number = 0.8): 
 /**
  * Remove duplicate sentences from text
  */
-export function removeDuplicates(text: string, threshold: number = 0.9): string {
+function removeDuplicates(text: string, threshold: number = 0.9): string {
   const sentences = splitSentences(text);
   const unique: string[] = [];
   
@@ -176,7 +176,7 @@ export function removeDuplicates(text: string, threshold: number = 0.9): string 
 /**
  * Clean and organize transcribed text
  */
-export function cleanTranscription(text: string): string {
+function cleanTranscription(text: string): string {
   if (!text) return "";
   
   // Remove filler words
@@ -222,18 +222,4 @@ export interface TranscriptionChunk {
   startTime: number;
   endTime: number;
   confidence?: number;
-}
-
-/**
- * Merge transcription chunks with metadata
- */
-export function mergeTranscriptionChunks(chunks: TranscriptionChunk[]): string {
-  // Sort by start time
-  const sorted = [...chunks].sort((a, b) => a.startTime - b.startTime);
-  
-  // Extract text
-  const texts = sorted.map((chunk) => chunk.text);
-  
-  // Process and merge
-  return processTranscriptionChunks(texts);
 }

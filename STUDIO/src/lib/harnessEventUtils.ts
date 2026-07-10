@@ -27,7 +27,7 @@ const LABEL_MAP: Record<string, [running: string, complete: string]> = {
   mkdir:        ["Creating",  "Created"],
 };
 
-export function getHarnessLabel(
+function getHarnessLabel(
   tool: string,
   status: "running" | "complete" | "error"
 ): string {
@@ -45,7 +45,7 @@ function basename(p: string): string {
   return p.replace(/\\/g, "/").split("/").pop() ?? p;
 }
 
-export function getHarnessTarget(
+function getHarnessTarget(
   tool: string,
   args: Record<string, unknown>
 ): string {
@@ -84,7 +84,7 @@ function countDiffLines(diff: string): { added: number; removed: number } {
   return { added, removed };
 }
 
-export function extractDiffStats(
+function extractDiffStats(
   tool: string,
   args: Record<string, unknown>,
   result: unknown
@@ -130,7 +130,7 @@ export function extractDiffStats(
 // Preview (expanded pane content)
 // ---------------------------------------------------------------------------
 
-export function extractHarnessPreview(
+function extractHarnessPreview(
   tool: string,
   args: Record<string, unknown>,
   result: unknown
@@ -186,7 +186,7 @@ export function extractHarnessPreview(
 // Line range (for read_file)
 // ---------------------------------------------------------------------------
 
-export function extractLineRange(
+function extractLineRange(
   tool: string,
   args: Record<string, unknown>
 ): string | undefined {
