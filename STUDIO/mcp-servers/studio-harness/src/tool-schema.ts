@@ -6,9 +6,9 @@ type Definition = {
   annotations?: Record<string, unknown>;
 };
 
-const READ_ONLY = /^(read_|search_|semantic_|find_|retrieve_|explain_|navigate_|inspect_|parse_|query_|extract_|calculate_|detect_|diagnostics$|index_status|file_metadata|content_hash|glob|grep|ls|outline_|analyze_file|git_(status|diff|log|show|blame|reflog)|lsp$)/;
-const DESTRUCTIVE = /^(write_file|edit_file|multi_edit|delete_file|move_file|structural_replace|rename_symbol|code_actions|format_code|git_(commit|branch|push|pull|reset|restore|rm|mv|merge|rebase|cherry_pick|revert|clean|init|add|stash|worktree|tag|remote|clone|config)|bash|powershell|repl|ssh_)/;
-const OPEN_WORLD = /^(bash|powershell|repl|ssh_|git_(push|pull|fetch|clone)|ask_user_question)/;
+const READ_ONLY = /^(read_|search_|semantic_|find_|retrieve_|explain_|navigate_|inspect_|parse_|query_|extract_|calculate_|detect_|diagnostics$|index_status|file_metadata|content_hash|glob|grep|ls|outline_|analyze_file|list_processes|command_exists|git_(status|diff|log|show|blame|reflog)|lsp$)/;
+const DESTRUCTIVE = /^(write_file|edit_file|multi_edit|delete_file|move_file|structural_replace|rename_symbol|code_actions|format_code|start_process|stop_process|write_process_input|git_(commit|branch|push|pull|reset|restore|rm|mv|merge|rebase|cherry_pick|revert|clean|init|add|stash|worktree|tag|remote|clone|config)|bash|powershell|repl|ssh_)/;
+const OPEN_WORLD = /^(bash|powershell|repl|ssh_|start_process|git_(push|pull|fetch|clone)|ask_user_question)/;
 
 function title(name: string): string {
   return name.split("_").map(x => x.charAt(0).toUpperCase() + x.slice(1)).join(" ");

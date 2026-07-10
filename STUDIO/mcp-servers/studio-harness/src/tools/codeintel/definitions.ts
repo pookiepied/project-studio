@@ -142,4 +142,24 @@ export const CODEINTEL_DEFINITIONS = [
       required: ["file_path"],
     },
   },
+  {
+    name: "find_related_files",
+    description:
+      "Given one file, list the files conventionally related to it: co-located tests (.test/.spec, _test, __tests__/), " +
+      "styles (.css/.scss), type declarations (.d.ts), stories (.stories), snapshots (.snap), the directory barrel (index), " +
+      "and the nearest project-config files (package.json, tsconfig.json, Cargo.toml, …). " +
+      "Given a test or story, it also points back at the likely source. " +
+      "This is deterministic naming/location convention — cheap and always fresh, no index required. " +
+      "Use it to jump from a file to its tests or from a test to its source; for 'what implements feature X' use find_feature_implementation instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_path: {
+          type: "string",
+          description: "Path to the file whose related files you want (absolute or relative).",
+        },
+      },
+      required: ["file_path"],
+    },
+  },
 ] as const;

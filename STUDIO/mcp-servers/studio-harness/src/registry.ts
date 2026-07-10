@@ -1,8 +1,11 @@
 import { readFile, readManyFiles, fileMetadata, detectBinary, contentHash, watchFiles, editFile, multiEditFile, writeFile, globFiles, grepFiles, listDirectory, deleteFile, moveFile } from "./tools/filesystem/index.js";
 import { readNotebook } from "./tools/notebook/index.js";
 import { readArchiveManifest } from "./tools/archive/index.js";
-import { outlineFile, indexCodebase, exploreCodebase, searchSymbol, analyzeFile } from "./tools/codeintel/index.js";
-import { executeBash, executePowerShell, runRepl } from "./tools/execution/index.js";
+import { outlineFile, indexCodebase, exploreCodebase, searchSymbol, analyzeFile, findRelatedFiles } from "./tools/codeintel/index.js";
+import {
+  executeBash, executePowerShell, runRepl,
+  startProcess, readProcessOutput, writeProcessInput, stopProcess, listProcesses, commandExists,
+} from "./tools/execution/index.js";
 import {
   gitStatus, gitDiff, gitLog, gitCommit, gitBranch, gitPush, gitPull, gitFetch, gitShow, gitStash, gitWorktree,
   gitInit, gitAdd, gitReset, gitRestore, gitRm, gitMv, gitMerge, gitRebase, gitCherryPick, gitRevert,
@@ -69,6 +72,12 @@ export const HANDLERS: Record<string, ToolHandler> = {
   bash: executeBash,
   powershell: executePowerShell,
   repl: runRepl,
+  start_process: startProcess,
+  read_process_output: readProcessOutput,
+  write_process_input: writeProcessInput,
+  stop_process: stopProcess,
+  list_processes: listProcesses,
+  command_exists: commandExists,
   ssh_exec: executeSshCommand,
   ssh_session: manageSshSession,
   read_file: readFile,
@@ -92,6 +101,7 @@ export const HANDLERS: Record<string, ToolHandler> = {
   explore_codebase: exploreCodebase,
   search_symbol: searchSymbol,
   analyze_file: analyzeFile,
+  find_related_files: findRelatedFiles,
   git_status: gitStatus,
   git_diff: gitDiff,
   git_log: gitLog,
