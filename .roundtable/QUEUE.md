@@ -216,3 +216,43 @@ It now comes from `./types`. Fold into any future item that touches this file.
 citing `frontend-revamp/02-PLAN.md` § T6.3 and decision D-604. That file does not exist
 anywhere in the repo and predates the 2026-07-10 doc purge. Either point the comment at
 a real doc or restate the rationale inline. Do not weaken the rules.
+
+---
+
+## RT-015 — Layering guardrail enabled; burn down the 27 upward imports · `todo` · batched
+
+`no-restricted-imports` now enforces that `core/`, `lib/`, `runtime/` never import from
+`features/` or `app/`, and `ui/` never imports from `features/`. Existing violations are
+held at baseline. Each batch below removes some and lowers the baseline.
+
+Type-only imports count. `import type` still couples the layers.
+
+| Batch | File | Upward imports | Note |
+|---|---|---|---|
+| 015a | `core/platform/overlayService.ts:24` | 1 | **Worst.** A core platform service imports `useLiveSession`, a React hook, from `features/voice`. Found by neither madge nor the external audit. |
+| 015b | `core/storage/chatHistoryService.ts:4-8` | 5 | Same file as RT-002. Do them together. |
+| 015c | `core/network/fallbackService.ts:6-9` | 3 | Same file as RT-001. Do them together. |
+| 015d | `core/daemon/useDaemon.ts:9-10` | 2 | Imports `@/app` context + hooks. A hook in `core/` is itself the smell. |
+| 015e | `core/storage/fileConfigService.ts:9` | 1 | Wants `migrateModelId`. Hoist the migration util to a leaf. |
+| 015f | `runtime/execution/{types,builtinTools,executeLocalTools}.ts` + `runtime/ui/{classifyToolDisplay,InlineToolSteps}` | 5 | All want `features/chat/context/types`. One hoist fixes all five. Supersedes RT-011. |
+| 015g | `lib/{modelUtils,hooks/useCachedIcon}.ts` | 3 | |
+| 015h | `ui/{layout/AccountMenu,overlays/CommandPalette,overlays/FloatingIsland,primitives/StreamingText,primitives/TodoWriteCard}` | 7 | Presentational components reaching into features. Props, not imports. |
+
+**Done when:** the batch's files reach 0 upward imports, baseline lowered in the same
+commit, typecheck clean, no behavior change.
+
+**Fails if:** the import is silenced with an eslint-disable comment, or the coupling is
+moved rather than removed (e.g. re-exporting the feature type from `core/`).
+
+---
+
+## RT-016 — `cliBridges/` audit result: healthy · `done` (2026-07-10)
+
+Audited because doc 13 proposed moving code into it having never read it. Result:
+**185 lines across 5 files, importing only `@tauri-apps/api/core` and itself.** A true
+leaf, zero upward imports, 19 dependents (17 in `features/`, 2 in `core/`). It is the
+most architecturally correct module in `src/`.
+
+Doc 13's proposal to move `features/chat/services/claudeBridgeService.ts` (89 lines,
+imports only Tauri and `core/logging`) into `cliBridges/claude/` is **sound** and would
+keep it a leaf. Queued as a real option, not rejected. Nothing here is dead.

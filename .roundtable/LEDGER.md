@@ -172,3 +172,34 @@ shell artifact — `$?` after a pipe reports `tail`, not the script).
 RT-007 unblocked. Before this, an agent could have satisfied the burn-down by rewriting a
 `<button>` as a `<motion.button>`: a counted violation traded for an invisible one, scored
 by the gate as progress.
+
+---
+
+## 2026-07-10 — Layering made machine-checkable · cliBridges audited
+
+**Upward-import sweep.** 27 imports violate the intended layering: 12 from `core/`, 5 from
+`runtime/`, 3 from `lib/`, 7 from `ui/`. **madge saw 8 of them** — only the ones that close
+a cycle. The other 19 were invisible to every tool in the repo.
+
+Worst offender, found by neither madge nor the external audit:
+`core/platform/overlayService.ts:24` imports `useLiveSession`, a React hook, from
+`features/voice/`. A core platform service depending on a feature's React hook.
+
+**Fix: `no-restricted-imports`,** built into ESLint, no new dependency. `core/`, `lib/`,
+`runtime/` may not import `@/features` or `@/app`; `ui/` may not import `@/features`.
+Type-only imports count — `import type` still couples the layers.
+
+Baseline 257 → 284. A raise, and the correct kind: 27 violations existed and were never
+counted. The rule and the independent grep sweep agree on the number exactly, which is the
+cross-check that makes the count trustworthy.
+
+Verified by probe: a new upward import into `core/` produces a regression and exit 1.
+
+**This is the most important change so far.** RT-001, RT-002, RT-011 and RT-015 were each a
+one-off repair of a violation nothing prevented from recurring. Layering is now a gate.
+
+**cliBridges audited.** 185 lines, 5 files, imports only Tauri and itself. Zero upward
+imports, 19 dependents. The healthiest module in the tree — and the one we were most afraid
+to touch, because it had once been misfiled as dead code. Doc 13's proposal to move
+`claudeBridgeService.ts` into it turns out to be sound; I held it for the right reason
+(unread) and was wrong about the conclusion.

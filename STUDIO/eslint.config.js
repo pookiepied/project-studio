@@ -139,4 +139,66 @@ export default tseslint.config(
       "no-restricted-syntax": ["error", ...TOKEN_GUARDRAILS],
     },
   },
+
+  // ── Layering guardrails ──
+  // Dependencies point downward: features -> runtime/ui -> core/lib -> types.
+  // Nothing below may import upward.
+  //
+  // madge only reports an upward import if it closes a *cycle*. Most do not: a sweep on
+  // 2026-07-10 found 27 upward imports, of which madge saw 8. Without these rules the
+  // architecture is unenforceable and every fix is one careless import from being undone.
+  //
+  // Type-only imports are restricted too. `import type` still couples the layers, still
+  // means the lower layer cannot be understood or moved without the upper one.
+  {
+    files: ["src/core/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/features/*", "@/features/**", "@/app/*", "@/app/**"],
+              message:
+                "Layering: core/ and lib/ must not import from features/ or app/. Invert the dependency, or hoist the shared thing into core/, types/, or a leaf both can depend on.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/runtime/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/features/*", "@/features/**", "@/app/*", "@/app/**"],
+              message:
+                "Layering: runtime/ must not import from features/ or app/. Runtime is the desktop-backend layer; features depend on it, not the reverse.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/ui/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/features/*", "@/features/**"],
+              message:
+                "Layering: ui/ is presentational and must not import from features/. If a component needs feature data, it should receive it as props.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
