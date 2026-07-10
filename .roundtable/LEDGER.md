@@ -105,3 +105,49 @@ git was the undo. Unresolved — either the skill should stop promising worktree
 bootstrap must handle dependency install.
 
 **Awaiting human smoke test before merge.**
+
+---
+
+## 2026-07-10 — External audit received · branch merged to main · RT-014
+
+**Process failure, recorded.** The audit task, the gate, and the charter were committed to
+`roundtable/bootstrap`. The external agent ran against `main` and saw none of it, so it
+executed the original master prompt instead of the seven-slice brief. Output landed in
+`Documentation/frontend-loop-engineer/` — twelve docs plus a thirteenth structural audit.
+
+Lesson: any agent or tool pointed at this repo sees `main`. Work hidden on a branch is
+work hidden from the loop. **All queue work now happens on `main`,** one commit per item,
+gate green at every commit, `git revert` as the undo. Branching was never the safety net;
+the commits are.
+
+Merged `roundtable/bootstrap` into `main` as a fast-forward — main was a strict ancestor,
+zero divergence, no conflict possible. Committed the audit verbatim and unedited so the
+agent's claims stay separable from our conclusions about them.
+
+**Audit assessment: strong observations, unsafe prescriptions.**
+
+Verified independently and holding: 232/23 lint counts; 12 `alert()` and 24 `console.*` in
+`src/`; `core/storage/fileConfigService.ts:9` importing `migrateModelId` from
+`features/models`; `core/daemon/useDaemon.ts:9-10` importing from `@/app`;
+`tsconfig.node.json` including only `vite.config.ts`. It under-reported Tauri imports in
+`app/`+`ui/` (named 5, there are 8) — wrong in the safe direction.
+
+Those last two inversions matter: **neither closes a cycle, so madge cannot see them.**
+Confirms the gate's blind spot, and confirms that reading beats tooling for layering.
+
+Rejected pending audit: doc 13 proposes moving `claudeBridgeService.ts` into `cliBridges/`,
+a subsystem it never opened. Its "Target Top-Level Shape" omits `cliBridges/` and six live
+feature folders (`activity`, `computerUse`, `manage`, `memories`, `models`, `settings`).
+As a sketch, harmless. Handed to an implementer as a spec, it deletes live code.
+
+**RT-014 accepted.** Carved `Button`, `IconButton`, `SegmentedControl`, `Toggle` out of the
+raw-button rule — narrower than the audit's proposed blanket `ui/primitives/*` exemption,
+which would have forgiven 8 real violations in composite components. Ratchet reported
+exactly 3 improvements; baseline 232 → 229. Gate exits 0.
+
+**New finding, escalated as RT-013.** `Button.tsx` never appeared in the baseline because it
+renders `<motion.button>`, and the selector matches only `name.name='button'`. 29 such
+elements exist across 13 files, all uncounted. An agent working RT-007 could satisfy the
+gate by converting a raw `<button>` into a `<motion.button>`. Closing the hole raises the
+baseline ~28. Charter forbids raising a baseline without human sign-off. **Awaiting decision;
+RT-007 is blocked until then.**

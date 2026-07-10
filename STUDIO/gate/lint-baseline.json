@@ -88,8 +88,5 @@
   "src/ui/primitives/ConnectionStatusBar.tsx": 1,
   "src/ui/primitives/ExternalLink.tsx": 1,
   "src/ui/primitives/HarnessPermissionModal.tsx": 3,
-  "src/ui/primitives/IconButton.tsx": 1,
-  "src/ui/primitives/SegmentedControl.tsx": 1,
-  "src/ui/primitives/Toggle.tsx": 1,
   "src/ui/primitives/VideoPlayer.tsx": 1
 }

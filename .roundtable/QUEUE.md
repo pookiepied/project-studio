@@ -114,9 +114,38 @@ features/workspace/browser/BrowserPanel.tsx > features/workspace/browser/NativeB
 
 ---
 
+## RT-013 — Close the `<motion.button>` guardrail bypass · `blocked` · needs human decision
+
+The rule selector is `JSXOpeningElement[name.name='button']`. A `<motion.button>` is a
+JSXMemberExpression, so **it does not match.** 29 of them exist across 13 files, entirely
+uncounted. `ui/primitives/Button.tsx` is one, which is why it never appeared in the baseline.
+
+Not cosmetic: until it is closed, an agent working RT-007 can satisfy the gate by rewriting
+`<button>` as `<motion.button>`, trading a counted violation for an invisible one.
+**Close this before dispatching RT-007.**
+
+Closing it raises the lint baseline by roughly 28. Per the charter a baseline raise is an
+escalation to the human, not a silent act. The reason to accept it: the debt already exists
+and the number was always wrong. Awaiting decision.
+
+---
+
+## RT-014 — Carve control primitives out of the raw-button rule · `done` (2026-07-10)
+
+Found by the Codex audit, verified here. `IconButton`, `SegmentedControl`, and `Toggle`
+tripped the rule they exist to satisfy. Exempted those three plus `Button.tsx` — and only
+those. The other primitives (`AskUserQuestionCard`, `HarnessPermissionModal`,
+`ConnectionStatusBar`, `ExternalLink`, `VideoPlayer`) are composites whose raw buttons are
+real debt; they stay counted. Baseline 232 → 229.
+
+---
+
 ## RT-007 — Raw `<button>` burn-down · `todo` · batched
 
-232 violations across 93 files, all the same rule: use `<Button>`/`<IconButton>` from
+**Preconditions:** RT-013 resolved, or the gate cannot score this item honestly.
+
+229 violations across ~90 files (was 232; three control primitives carved out in RT-014).
+Plus ~28 more invisible until RT-013 lands. All the same rule: use `<Button>`/`<IconButton>` from
 `@/ui/primitives`. Mechanical, high-volume, low-risk — which makes it the right work
 to run *after* the loop has earned trust on the cycle items, not before.
 
