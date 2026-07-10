@@ -34,7 +34,7 @@
   "src/features/chat/components/ClaudeUsageBadge.tsx": 2,
   "src/features/chat/components/CollapsibleUserText.tsx": 1,
   "src/features/chat/components/ConnectionStatusBar.tsx": 1,
-  "src/features/chat/components/ContextAutocomplete.tsx": 2,
+  "src/features/chat/components/ContextAutocomplete.tsx": 1,
   "src/features/chat/components/ContextWindowButton.tsx": 1,
   "src/features/chat/components/ConversationsDropdown.tsx": 8,
   "src/features/chat/components/EngineSelector.tsx": 2,

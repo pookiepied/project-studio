@@ -895,8 +895,6 @@ export const ChatPage = () => {
       {/* @ app mention popup */}
       <ContextAutocomplete
         isVisible={atMentionVisible}
-        contexts={[]}
-        onSelect={() => {}}
         onClose={closeAtMention}
         searchQuery={atMentionQuery}
         position={atMentionPos}
