@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { buildGraph, listSupportedFiles } from "./build.js";
 import {
-  loadGraph, loadManifest, graphPaths, sha256, gitHead,
+  loadGraph, loadManifest, graphPaths, sha256, gitHead, gitDirtyFiles,
   type CodeGraph, type GraphEdge,
 } from "./store.js";
 
@@ -10,6 +10,23 @@ const DEFAULT_MAX_FILES = 1500;
 
 function root(args: Record<string, unknown>): string {
   return path.resolve((args.root_dir as string) || process.cwd());
+}
+
+/**
+ * Cheap staleness signal attached to every read-tool result so the model can't
+ * unknowingly trust a stale graph even if it skipped the graph_status gate.
+ * Deliberately fast — only checks whether HEAD moved or the working tree is
+ * dirty; the definitive per-file re-hash lives in graph_status. Undefined when
+ * the graph is plausibly fresh, so a fresh result carries no noise.
+ */
+function stalenessWarning(r: string, graph: CodeGraph): string | undefined {
+  const headMoved = graph.git_head !== gitHead(r);
+  const dirty = gitDirtyFiles(r).filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f));
+  if (headMoved || dirty.length > 0) {
+    const why = headMoved ? "git HEAD moved since the graph was built" : `${dirty.length} source file(s) have uncommitted changes`;
+    return `Graph may be stale (${why}). Run graph_status to confirm and graph_build to refresh.`;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +207,7 @@ export async function graphNeighbors(args: Record<string, unknown>): Promise<Rec
     count: results.length,
     neighbors: results.slice(0, 200),
     truncated,
+    stale_warning: stalenessWarning(r, graph),
   };
 }
 
@@ -243,7 +261,7 @@ export async function graphPath(args: Record<string, unknown>): Promise<Record<s
     chain.unshift({ from: nodeBrief(graph, step.from), to: nodeBrief(graph, cur), relation: step.edge.type, provenance: step.edge.provenance, direction: step.forward ? "->" : "<-" });
     cur = step.from;
   }
-  return { connected: true, from: nodeBrief(graph, a.id), to: nodeBrief(graph, b.id), hops: chain.length, path: chain };
+  return { connected: true, from: nodeBrief(graph, a.id), to: nodeBrief(graph, b.id), hops: chain.length, path: chain, stale_warning: stalenessWarning(r, graph) };
 }
 
 // ---------------------------------------------------------------------------
@@ -295,5 +313,6 @@ export async function graphImpact(args: Record<string, unknown>): Promise<Record
       ? `${provenanceMix.AMBIGUOUS} direct dependent edge(s) are AMBIGUOUS — verify those before assuming impact.`
       : undefined,
     truncated: affectedFiles.size > 60 || affectedIds.length > 60,
+    stale_warning: stalenessWarning(r, graph),
   };
 }
