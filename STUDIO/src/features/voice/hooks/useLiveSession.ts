@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from "react";
 import { apiClient } from "@/lib/api";
-import { aiService, APIChatMessage } from "@/features/chat/services/aiService";
+import { aiService } from "@/features/chat/services/aiService";
+import type { APIChatMessage } from "@/types/chat";
 import { logger } from "@/core/logging/logger";
 import type { VoiceCaptionState } from "@/core/platform/voiceCaptionTypes";
 
