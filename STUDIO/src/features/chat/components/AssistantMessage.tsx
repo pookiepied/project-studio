@@ -2,7 +2,7 @@ import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/features/markdown";
-import { StreamingText } from "@/ui/primitives/StreamingText";
+import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { RuntimeStepCard } from "@/runtime";
 import { InlineToolSteps } from "@/runtime";
 import { InlinePermissionRequest } from "@/features/permissions/components/InlinePermissionRequest";

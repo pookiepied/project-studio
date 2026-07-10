@@ -9,7 +9,7 @@ import { Spinner } from "@/ui/primitives/Spinner";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
 import { ModelPicker } from "@/features/models/components/ModelPicker";
 import { MODEL_FILTERS } from "@/features/models/services/modelFilter";
-import type { Model } from "@/features/models/services/modelService";
+import type { Model } from "@/core/models";
 import type { AdminMode, FetchState, ActionState } from "../types";
 import { ModeIcon } from "./ModeIcon";
 

@@ -11,5 +11,3 @@ export {
   type DaemonHealth,
   type LocalModel,
 } from "./daemonClient";
-
-export { useDaemon } from "./useDaemon";

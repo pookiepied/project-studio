@@ -9,7 +9,7 @@ import { apiManager } from "@/core/network/apiManager";
 import { environmentService } from "@/core/platform/environmentService";
 import { logger } from "@/core/logging/logger";
 import { useRuntimeInit } from "@/runtime";
-import { HarnessPermissionModal } from "@/ui/primitives/HarnessPermissionModal";
+import { LocalCapabilitiesModal } from "@/features/permissions";
 
 // Simple router component to handle authentication flow
 export function AppRouter({ onReady }: { onReady: () => void }) {
@@ -67,7 +67,7 @@ export function AppRouter({ onReady }: { onReady: () => void }) {
     return (
       <>
         <HomePage />
-        <HarnessPermissionModal open={showHarnessModal} onAllow={allowHarness} onDeny={denyHarness} />
+        <LocalCapabilitiesModal open={showHarnessModal} onAllow={allowHarness} onDeny={denyHarness} />
       </>
     );
   }

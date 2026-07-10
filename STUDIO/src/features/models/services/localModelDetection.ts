@@ -3,8 +3,8 @@
  * Detects capabilities of local models (Ollama) without relying on cloud API
  */
 
-import { Model } from "./modelService";
-import { OllamaModel } from "./ollamaService";
+import type { Model } from "@/core/models";
+import type { OllamaModel } from "./ollamaService";
 
 interface LocalModelCapabilities {
   supportsVision: boolean;

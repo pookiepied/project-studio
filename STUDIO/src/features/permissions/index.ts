@@ -8,6 +8,7 @@
  *
  * Public surface:
  *   - {@link ComposerApprovalCard}   - slide-in card above the composer
+ *   - {@link LocalCapabilitiesModal} - one-time local capability gate
  *   - {@link usePermissionNotifications} - fires OS toast when the window is
  *     unfocused and a tool is awaiting approval
  *
@@ -18,5 +19,6 @@
  */
 
 export { ComposerApprovalCard } from "./components/ComposerApprovalCard";
+export { LocalCapabilitiesModal } from "./components/LocalCapabilitiesModal";
 export { usePermissionNotifications } from "./hooks/usePermissionNotifications";
 export { PermissionLayerHost } from "./PermissionLayerHost";

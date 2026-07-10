@@ -33,8 +33,8 @@ import {
   loadConversation,
   addMessage,
   getContextMessages,
-} from "@/core/storage/chatHistoryService";
-import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
+} from "@/features/chat/conversations/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/conversations";
 import { isClaudeOwnedConversation } from "@/features/chat/conversations/ownership/conversationOwnership";
 import { pruneContextByTokens, applyAllSystemMessages } from "./messageBuilder";
 import { buildToolExecutionCallbacks } from "./toolExecutionCallbacks";

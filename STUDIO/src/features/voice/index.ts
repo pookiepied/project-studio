@@ -1,1 +1,1 @@
-export { VoicePage } from "./VoicePage";
+export { VoicePage } from "./pages/VoicePage";

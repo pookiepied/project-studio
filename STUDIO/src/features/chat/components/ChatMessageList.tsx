@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { StreamingText } from "@/ui/primitives/StreamingText";
+import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { ErrorDisplay } from "@/ui/feedback/ErrorDisplay";
 import { ToolPermissionCard } from "@/runtime";
 import { UserMessage } from "./UserMessage";

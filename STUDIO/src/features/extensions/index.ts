@@ -1,1 +1,1 @@
-export { ExtensionsPage } from "./ExtensionsPage";
+export { ExtensionsPage } from "./pages/ExtensionsPage";

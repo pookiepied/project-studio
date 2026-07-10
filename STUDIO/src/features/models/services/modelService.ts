@@ -6,61 +6,9 @@ import * as fasterWhisperService from "@/features/transcription/services/fasterW
 import { logger } from "@/core/logging/logger";
 import { isFeatureEnabled } from "@/core/platform/featureManager";
 import { CACHE_CONFIG, STORAGE_KEYS } from "@/core/config/constants";
-
-export interface Model {
-  id: string;
-  provider: string;
-  type: "audio" | "chat" | "embedding" | "image" | "multimodal" | "tts" | "video";
-  name: string;
-  description?: string;
-  maxTokens?: number;
-  contextWindow?: number;
-  pricing?: {
-    input: number;
-    output: number;
-    currency?: string;
-  };
-  free?: boolean;
-  rateLimit?: {
-    rpm: number;
-    rpd: number;
-  };
-  availableFrom?: string[];
-  primarySource?: string;
-  alternativeSources?: string[];
-  capabilities?: string[];
-  modality?: string[];
-  architecture?: string;
-  created?: number;
-  // Enhanced metadata for better model understanding
-  supportsVision?: boolean;
-  supportsTools?: boolean;
-  supportsStreaming?: boolean;
-  supportsSystemPrompts?: boolean;
-  inputTypes?: ("text" | "image" | "audio" | "video")[];
-  outputTypes?: ("text" | "image" | "audio" | "video")[];
-  maxImageSize?: number; // in MB
-  maxImages?: number; // per request
-  languages?: string[]; // supported languages
-  specialFeatures?: ("thinking" | "reasoning" | "code" | "math" | "creative")[];
-}
-
-export interface ProviderInfo {
-  provider: string;
-  status: "active" | "inactive" | "error";
-  lastChecked: string;
-  apiKeyValid: boolean;
-  modelCount: number;
-  errorMessage?: string;
-}
-
-export interface ModelsResponse {
-  models: Model[];
-  providers: Record<string, ProviderInfo>;
-  lastUpdated: string;
-  totalModels: number;
-  uniqueModels: number;
-}
+import { migrateModelId } from "@/core/models/modelIdMigration";
+export type { Model, ModelsResponse, ProviderInfo } from "@/core/models/types";
+import type { Model, ModelsResponse, ProviderInfo } from "@/core/models/types";
 
 // Cache for models
 let modelsCache: ModelsResponse | null = null;
@@ -541,30 +489,4 @@ export function isCacheValid(): boolean {
   return modelsCache !== null && Date.now() - cacheTimestamp < CACHE_DURATION;
 }
 
-// Model ID migrations (old format -> new format)
-// Used to migrate user settings from old non-namespaced format to new provider:model format
-const MODEL_MIGRATIONS: Record<string, string> = {
-  "whisper-large-v3-turbo": "groq:whisper-large-v3-turbo",
-  "whisper-large-v3": "groq:whisper-large-v3",
-  "llama-3.1-8b-instant": "groq:llama-3.1-8b-instant",
-  "llama-3.3-70b-versatile": "groq:llama-3.3-70b-versatile",
-  "llama-3.3-70b-specdec": "groq:llama-3.3-70b-specdec",
-  "llama-guard-3-8b": "groq:llama-guard-3-8b",
-};
-
-/**
- * Migrate old model ID to new namespaced format
- * Used for backward compatibility with old user settings
- */
-export function migrateModelId(oldId: string): string {
-  // If already namespaced, return as-is
-  if (oldId.includes(":")) return oldId;
-  
-  // Check migration map
-  if (MODEL_MIGRATIONS[oldId]) {
-    return MODEL_MIGRATIONS[oldId];
-  }
-  
-  // Default to groq for unknown models (legacy behavior)
-  return `groq:${oldId}`;
-}
+export { migrateModelId };

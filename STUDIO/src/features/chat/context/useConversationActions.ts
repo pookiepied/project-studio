@@ -25,8 +25,8 @@ import {
   deleteMessage,
   truncateMessagesAfter,
   forkConversationToStudio as forkConversationToStudioStorage,
-} from "@/core/storage/chatHistoryService";
-import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
+} from "@/features/chat/conversations/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/conversations";
 import { normalizeEngineForConversationOwner } from "@/features/chat/conversations/ownership/conversationOwnership";
 import { getPreferredChatEngine } from "@/features/chat/conversations/preferences/chatEnginePreference";
 import { backgroundSessionTracker } from "@/features/chat/conversations/backgroundSessionTracker";

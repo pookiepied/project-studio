@@ -3,7 +3,7 @@
 // this was originally a T5.5 "back-compat shim, retire in T6.2"; T6.2 audit
 // confirmed 97 consuming files — migrating them to direct `@/features/<x>/types`
 // imports would create inverted-dependency smells: shared services such as
-// `core/storage/chatHistoryService`, `services/conversations/claude/*`,
+// `features/chat/conversations/chatHistoryService`, `features/chat/conversations/claude/*`,
 // `services/conversations/storage/*`, `services/conversations/ownership/*`
 // would reach back into `features/chat/types` for ChatConversation. The barrel
 // is the PERMANENT structure, not a shim to retire. Mirror of D-422/D-524/D-527

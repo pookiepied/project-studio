@@ -239,3 +239,66 @@ cycles 10 → 9 afterward, since the charter requires locking in an improvement 
 reversible.
 
 **Awaiting human smoke test before further items.**
+
+---
+
+## 2026-07-10 — Human-led reorganization (out-of-band), verified and adopted
+
+**Author: the human, with Codex. Not dispatched through the loop.** 141 files changed,
+uncommitted, on top of `5347457`. The lead's job here was not to plan it but to audit it, so
+this entry records verification, not authorship.
+
+**Shape of the change.** Page components moved into per-feature `pages/`; the app shell
+(`TitleBar`, `NavPopup`, `AccountMenu`, `NotificationBell`) and global overlays
+(`ContextMenu`, `OfflineModal`, `UpdateBanner`, `CommandPalette`) moved from `ui/` to `app/`;
+chat-specific widgets left `ui/primitives/` for `features/chat/components/`; four new leaf
+directories appeared under `core/` (`models`, `attachments`, `cache`, `conversations`).
+
+**Gate.** typecheck clean · vite build passes · lint 279 → **257** · cycles 9 → **2**.
+Both baselines lowered in the same commit.
+
+**RT-015 is closed. All 22 upward imports are gone**, and the reconciliation is exact:
+015a=1, 015b=5, 015c=3, 015d=2, 015e=1, 015g=3, 015h=7 → 22, which is precisely the lint
+drop. `no-restricted-imports` now reports **zero** violations across the tree. Every one of
+the 257 remaining errors is a raw button (RT-007).
+
+**RT-001, RT-002 closed** (the `core → features` inversions they described no longer exist).
+**RT-005 half-closed**: `modelService > localModelDetection` is gone; `daemonService >
+localUsageService` remains. **RT-006 remains** — `BrowserPanel ↔ NativeBrowserHost`, now one
+of only two cycles left in the codebase.
+
+**Verification performed, independent of any agent's account.**
+- No gate tampering: `eslint.config.js`, `scripts/ratchet.mjs`, `knip.json`, `gate/` untouched.
+- No new silencing: `eslint-disable` count 66 → 66; zero `no-restricted-imports` disables.
+- Rename-aware baseline diff: 23 files are pure moves at identical counts; two are renames
+  (`ExternalLink`→`MarkdownExternalLink`, `HarnessPermissionModal`→`LocalCapabilitiesModal`)
+  at identical counts; **no existing file got worse.**
+- Two files improved on the move (`AccountMenu` 4→3, `FloatingIsland` 3→2) — both shed exactly
+  one upward import.
+- The four new `core/` directories were checked for upward imports: none.
+- `CommandPalette`'s 3 errors vanishing was investigated rather than assumed benign. At `HEAD`
+  it contained **no raw buttons**; all 3 errors were upward imports. Relocating it to `app/`,
+  the top layer, made them legal. Sound, not laundering.
+
+**On re-baselining a red gate.** The charter forbids re-baselining to turn a red gate green.
+This is the one admissible exception and it is worth naming precisely: the ratchet is keyed by
+file path and **cannot see a rename**, so 25 relocated files read as "new violations" while the
+identical debt disappears from the old paths. Re-keying identical debt to new paths while the
+total *falls* is not forgiveness. The test applied was `no existing file got worse` plus a
+basename-matched move ledger — both clean. **A falling total alone would not have been enough**,
+and must never be treated as sufficient on its own.
+
+**The architectural claim is now evidence.** Fixing layering dissolved seven of nine cycles
+without any of them being targeted. Both survivors are intra-feature tangles with no layering
+component. Cycles were the symptom; direction of dependency was the disease.
+
+**Two new findings, queued, not acted on.**
+- RT-017: five barrel files are now orphaned by the move (`core/daemon/index.ts`,
+  `core/skills/index.ts`, `features/chat/services/index.ts`,
+  `features/workspace/{rightWorkspace,services}/index.ts`).
+- RT-009 answered: the "unused devDependency" is **`madge`**, and it is a **false positive** —
+  `scripts/ratchet.mjs` invokes it, and `knip.json` ignores `scripts/**`. The gate's own tool
+  is invisible to the gate's own detector. Fix the config, do not remove the dependency.
+
+**Human smoke test now mandatory and overdue.** Three unverified changes (RT-003, RT-015f, and
+this) have touched the tool-execution path and every page-level import in the app.

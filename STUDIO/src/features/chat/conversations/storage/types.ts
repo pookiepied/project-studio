@@ -1,5 +1,5 @@
 import type { ChatConversation } from "@/types";
-import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/conversations";
 
 export interface ConversationIndexEntry {
   id: string;

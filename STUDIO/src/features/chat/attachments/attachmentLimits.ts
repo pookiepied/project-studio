@@ -1,16 +1,8 @@
-import { Model } from "@/features/models/services/modelService";
+import type { Model } from "@/core/models";
+import type { AttachmentLimits } from "@/core/attachments";
 import { FileAttachment, estimateAttachmentTokens } from "./fileAttachmentService";
 import { safeGetContextWindow, createFallbackAttachmentLimits, FALLBACK_VALUES } from "@/core/network/fallbackService";
 import { logger } from "@/core/logging/logger";
-
-export interface AttachmentLimits {
-  maxAttachments: number;
-  maxTokensForAttachments: number;
-  maxFileSizeText: number;
-  maxFileSizeImage: number;
-  reservedTokensForOutput: number;
-  availableTokensForInput: number;
-}
 
 export function calculateAttachmentLimits(
   models: Model[], 

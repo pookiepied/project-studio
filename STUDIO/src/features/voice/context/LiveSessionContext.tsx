@@ -12,7 +12,8 @@
  */
 
 import { createContext, useContext, useEffect, ReactNode, type RefObject } from "react";
-import { useLiveSession, SessionState, type VoiceCaptionState } from "@/features/voice/hooks/useLiveSession";
+import { useLiveSession, SessionState } from "@/features/voice/hooks/useLiveSession";
+import type { VoiceCaptionState } from "@/core/platform/voiceCaptionTypes";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { pulseCoordinator } from "@/core/platform/pulseCoordinator";
 import { environmentService } from "@/core/platform/environmentService";

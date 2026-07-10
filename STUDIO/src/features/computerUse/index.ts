@@ -1,1 +1,1 @@
-export { ComputerUsePage } from "./ComputerUsePage";
+export { ComputerUsePage } from "./pages/ComputerUsePage";

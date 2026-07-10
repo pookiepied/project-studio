@@ -1,1 +1,1 @@
-export { MemoriesPage } from "./MemoriesPage";
+export { MemoriesPage } from "./pages/MemoriesPage";

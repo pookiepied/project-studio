@@ -21,7 +21,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { emitTo } from "@tauri-apps/api/event";
 import { RecordingState } from "@/types";
 import type { PulseCard } from "@/types/pulse";
-import type { VoiceCaptionState } from "@/features/voice/hooks/useLiveSession";
+import type { VoiceCaptionState } from "@/core/platform/voiceCaptionTypes";
 import { featureManager } from "./featureManager";
 import { logger } from "../logging/logger";
 

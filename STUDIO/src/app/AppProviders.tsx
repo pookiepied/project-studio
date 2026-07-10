@@ -4,9 +4,9 @@ import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { OfflineProvider } from "@/app/contexts/OfflineContext";
 import { SettingsProvider, useSettings } from "@/app/contexts/SettingsContext";
 import { ModelsProvider } from "@/features/models/context";
-import { OfflineModal } from "@/ui/feedback/OfflineModal";
-import { UpdateBanner } from "@/ui/feedback/UpdateBanner";
-import { ContextMenu } from "@/ui/layout/ContextMenu";
+import { OfflineModal } from "@/app/globals/OfflineModal";
+import { UpdateBanner } from "@/app/globals/UpdateBanner";
+import { ContextMenu } from "@/app/globals/ContextMenu";
 import { resolveTheme } from "@/lib/theme";
 import { AppRouter } from "./AppRouter";
 

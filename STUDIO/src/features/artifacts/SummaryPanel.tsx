@@ -5,7 +5,7 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react";
 import type { TaskItem, ActiveToolCall } from "@/features/chat/context";
-import { TaskWriteCard } from "@/ui/primitives/TodoWriteCard";
+import { TaskWriteCard } from "@/features/chat/components/TaskWriteCard";
 import { SearchResultContent } from "./content/SearchResultContent";
 
 // ---------------------------------------------------------------------------

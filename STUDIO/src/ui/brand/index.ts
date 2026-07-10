@@ -3,3 +3,5 @@ export { BrandLogo } from "./BrandLogo";
 export type { BrandLogoProps, BrandLogoSize } from "./BrandLogo";
 export { AppLogo } from "./AppLogo";
 export type { AppLogoProps, AppLogoSize } from "./AppLogo";
+export { ClaudeCodeIcon } from "./ClaudeCodeIcon";
+export { StudioIcon } from "./StudioIcon";

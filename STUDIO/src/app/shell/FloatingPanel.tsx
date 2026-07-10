@@ -32,7 +32,7 @@ import {
   CaretDownIcon as CaretDown,
 } from "@phosphor-icons/react";
 import { StudioMark } from "@/ui/brand/StudioMark";
-import { NotificationBell } from "@/ui/notifications/NotificationBell";
+import { NotificationBell } from "@/app/shell/NotificationBell";
 import { useSettings } from "../contexts/SettingsContext";
 import { resolveTheme } from "@/lib/theme";
 import { useRightPanelWidth } from "./workspaceLayoutStore";

@@ -1,3 +1,3 @@
-export { default as markdownComponents } from "./MarkdownComponents";
-export { ImageLightbox } from "./MarkdownComponents";
+export { default as markdownComponents } from "./components/MarkdownComponents";
+export { ImageLightbox } from "./components/MarkdownComponents";
 export { ArtifactRenderer } from "./renderers/ArtifactRenderer";

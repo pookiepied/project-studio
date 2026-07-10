@@ -1,5 +1,5 @@
 import { ProviderIcon, getProviderDisplayName } from "@/features/models/components/ProviderIcon";
-import type { Model } from "@/features/models/services/modelService";
+import type { Model } from "@/core/models";
 import { isFreeModel } from "../../helpers";
 
 export function ProviderRail({

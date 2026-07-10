@@ -1,1 +1,1 @@
-export { ActivityPage } from "./ActivityPage";
+export { ActivityPage } from "./pages/ActivityPage";

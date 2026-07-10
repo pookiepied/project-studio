@@ -16,7 +16,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getCurrentWindow, currentMonitor } from "@tauri-apps/api/window";
 import { listen, emit } from "@tauri-apps/api/event";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
-import { FloatingIsland } from "@/ui/overlays/FloatingIsland";
+import { FloatingIsland } from "@/features/voice/overlay/FloatingIsland";
 import { RecordingState } from "@/types";
 import type { OverlayPayload, OverlayActionType } from "@/core/platform/overlayService";
 import { deriveIslandViewState, getIslandWindowSize } from "@/core/platform/islandViewState";

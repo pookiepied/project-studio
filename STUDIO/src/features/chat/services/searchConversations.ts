@@ -1,4 +1,4 @@
-import { getAllConversations, loadConversation } from "@/core/storage/chatHistoryService";
+import { getAllConversations, loadConversation } from "@/features/chat/conversations/chatHistoryService";
 
 export interface MessageHit {
   conversationId:    string;

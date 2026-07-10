@@ -15,7 +15,7 @@ import { logger } from "@/core/logging/logger";
 import {
   loadConversation,
   updateConversationSummary,
-} from "@/core/storage/chatHistoryService";
+} from "@/features/chat/conversations/chatHistoryService";
 import { summarizeMessages } from "@/features/chat/services/summarizationService";
 import type { ChatConversation } from "@/types";
 

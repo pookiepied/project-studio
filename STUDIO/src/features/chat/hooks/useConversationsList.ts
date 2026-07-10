@@ -4,9 +4,9 @@ import {
   deleteConversation,
   loadConversation,
   updateConversationTitle,
-  type ConversationStorageScope,
   type ConversationListOptions,
-} from "@/core/storage/chatHistoryService";
+} from "@/features/chat/conversations/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/conversations";
 import { TAURI_CONFIG } from "@/core/config/tauriConfig";
 
 export interface ConversationMetadata {

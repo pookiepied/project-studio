@@ -6,7 +6,7 @@
 
 import { ChatConversation } from '@/types';
 // import { CanvasData } from '@/types/canvas'; // Disabled - canvas removed
-import * as chatHistoryService from '@/core/storage/chatHistoryService';
+import * as chatHistoryService from '@/features/chat/conversations/chatHistoryService';
 // import * as canvasService from '../canvas/canvasService'; // Disabled - canvas removed
 import { errorService } from '@/core/errors/errorService';
 

@@ -5,7 +5,7 @@
  * hero banner, chat composer app picker) should render through this
  * component so they share one cache and one fallback behaviour.
  *
- * Backed by the local icon cache (see services/extensions/appIconCache.ts),
+ * Backed by the local icon cache (see core/cache/appIconCache.ts),
  * so the remote logo is fetched at most once every 7 days regardless of how
  * many times the badge remounts. Some logo hosts don't send CORS headers,
  * which makes the cache's `fetch()` fail even though the image loads fine

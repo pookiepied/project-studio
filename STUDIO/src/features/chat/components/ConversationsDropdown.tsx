@@ -15,8 +15,8 @@ import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { formatDate } from "@/lib/formatters";
 import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
-import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
-import { ClaudeCodeIcon } from "@/ui/primitives/ClaudeCodeIcon";
+import type { ConversationStorageScope } from "@/core/conversations";
+import { ClaudeCodeIcon } from "@/ui/brand";
 
 interface ConversationsDropdownProps {
   conversations:         ConversationMetadata[];

@@ -14,7 +14,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
-import { MainLayout }    from "@/ui/layout/MainLayout";
+import { MainLayout }    from "@/app/shell/MainLayout";
 import { TranscribePage } from "@/features/transcription";
 import { SettingsPage }   from "@/features/settings";
 import { ChatPage }       from "@/features/chat";

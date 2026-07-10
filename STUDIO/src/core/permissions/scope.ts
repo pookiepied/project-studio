@@ -14,7 +14,7 @@
  *      reaches execution in a cloud conversation - defence in depth.
  */
 
-import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/conversations";
 import type { ChatMode, LocalContext } from "./model";
 
 /**

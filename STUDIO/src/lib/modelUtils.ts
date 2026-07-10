@@ -3,8 +3,8 @@
  * Now uses centralized model capability service
  */
 
-import { Model } from "@/features/models/services/modelService";
-import { getModelCapabilities, detectVisionSupport, detectToolSupport, detectStreamingSupport } from "@/features/models/services/modelCapabilityService";
+import type { Model } from "@/core/models";
+import { getModelCapabilities, detectVisionSupport, detectToolSupport, detectStreamingSupport } from "@/core/models";
 
 /**
  * Check if a model supports vision/image input

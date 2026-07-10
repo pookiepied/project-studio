@@ -10,7 +10,7 @@ import {
   InfoIcon as Info,
   XIcon as X,
 } from '@phosphor-icons/react';
-import { useDaemon } from '@/core/daemon/useDaemon';
+import { useDaemon } from '@/features/models/hooks/useLocalProviderDaemon';
 import { createDaemonClient } from '@/core/daemon/daemonClient';
 
 export const LocalProviderStatus = () => {

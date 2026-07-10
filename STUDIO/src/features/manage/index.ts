@@ -1,1 +1,1 @@
-export { ManagePage } from "./ManagePage";
+export { ManagePage } from "./pages/ManagePage";

@@ -38,8 +38,8 @@ import { useModelsContext as useModels }                from "@/features/models/
 import {
   createConversation, saveConversation, loadConversation,
   getConversationMessages, updateConversationTitle, getAllConversations,
-} from "@/core/storage/chatHistoryService";
-import type { ConversationStorageScope } from "@/core/storage/chatHistoryService";
+} from "@/features/chat/conversations/chatHistoryService";
+import type { ConversationStorageScope } from "@/core/conversations";
 import {
   canContinueWithEngine,
   isClaudeOwnedConversation,
@@ -73,7 +73,7 @@ import {
   buildGrantLookupForConversation,
 } from "@/core/permissions";
 import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
-import { GlobalAccessModal } from "@/ui/overlays/GlobalAccessModal";
+import { GlobalAccessModal } from "@/features/permissions/components/GlobalAccessModal";
 import type { ToolApprovalDecision } from "./types";
 import { runClaudeTurn as runClaudeTurnDriver } from "./runClaudeTurn";
 import { useStreamHandlers } from "./useStreamHandlers";

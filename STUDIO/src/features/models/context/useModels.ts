@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { fetchModels, Model, ModelsResponse, ProviderInfo } from "@/features/models/services/modelService";
+import { fetchModels } from "@/features/models/services/modelService";
+import type { Model, ModelsResponse, ProviderInfo } from "@/core/models";
 import { errorService } from "@/core/errors/errorService";
 import { useSettings } from "@/app/contexts/SettingsContext";
-import { useDaemon } from "@/core/daemon/useDaemon";
+import { useDaemon } from "@/features/models/hooks/useLocalProviderDaemon";
 import { createDaemonClient } from "@/core/daemon/daemonClient";
 import { logger } from "@/core/logging/logger";
 

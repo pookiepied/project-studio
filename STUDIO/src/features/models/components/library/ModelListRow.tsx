@@ -6,7 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { Success, Icon } from "@/ui/icons";
 import { ProviderIcon } from "@/features/models/components/ProviderIcon";
-import type { Model } from "@/features/models/services/modelService";
+import type { Model } from "@/core/models";
 import {
   isFreeModel, isVisionModel, hasTools, hasReasoning,
   formatCtx, formatModelPrice, getModelSubtitle,

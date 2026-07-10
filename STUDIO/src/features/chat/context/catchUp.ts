@@ -9,7 +9,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import type { ChatConversation, ChatMessage }  from "@/types";
-import { addMessage, loadConversation }         from "@/core/storage/chatHistoryService";
+import { addMessage, loadConversation }         from "@/features/chat/conversations/chatHistoryService";
 import { parseChatResponse }                    from "@/lib/chatParser";
 
 export async function applyCatchUp(

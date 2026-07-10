@@ -9,11 +9,11 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { CaretDownIcon as CaretDown, CheckIcon as Check, EyeIcon as Eye, LeafIcon as Leaf } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Model,
   groupModelsByProvider,
   sortModels,
   sortProvidersByFree,
 } from "@/features/models/services/modelService";
+import type { Model } from "@/core/models";
 import {
   filterModels,
   MODEL_FILTERS,
