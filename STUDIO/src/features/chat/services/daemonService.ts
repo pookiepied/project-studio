@@ -1,13 +1,9 @@
 /**
- * Local model daemon streaming.
+ * Local model helpers.
  *
- * Handles the local_inference_required path: the cloud worker assembles the
- * full context (system prompt + memories + tools) and signals the client to
- * run the actual LLM inference against a local Ollama / LM Studio daemon.
+ * Model-id detection for the local_inference_required path — chatService calls
+ * the daemon directly — plus the chunk decoding shared with sseStream.
  */
-
-import { logger } from "@/core/logging/logger";
-import { reportLocalUsage, type LocalUsage } from "@/features/models/services/localUsageService";
 
 // ---------------------------------------------------------------------------
 // Model detection helpers
@@ -55,83 +51,4 @@ export function decodeChunk(
   } catch {
     return "";
   }
-}
-
-// ---------------------------------------------------------------------------
-// Daemon streaming
-// ---------------------------------------------------------------------------
-
-interface LocalInferencePayload {
-  model: string;
-  messages: unknown[];
-  tools?: unknown[];
-  temperature?: number;
-  max_tokens?: number;
-}
-
-/**
- * Stream directly from the local daemon after the cloud worker returns a
- * `local_inference_required` payload with the assembled context.
- */
-export async function* daemonStream(
-  payload: LocalInferencePayload,
-  daemonPort: number,
-  temperature: number,
-  signal?: AbortSignal
-): AsyncGenerator<string, void, unknown> {
-  const startedAt = Date.now();
-  const response = await fetch(
-    `http://localhost:${daemonPort}/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: payload.model,
-        messages: payload.messages,
-        tools: payload.tools,
-        stream: true,
-        stream_options: { include_usage: true },
-        temperature,
-      }),
-      signal,
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Daemon returned HTTP ${response.status}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("Daemon: no response body");
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let usage: LocalUsage | undefined;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decodeChunk(decoder, value);
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6);
-      if (data === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(data);
-        // Final chunk (stream_options.include_usage) carries usage with empty choices.
-        if (parsed.usage) usage = parsed.usage;
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) yield content;
-      } catch {
-        logger.warn("daemonService", "Failed to parse daemon chunk", { line });
-      }
-    }
-  }
-
-  // Report local usage once the stream completes (model may be bare → engine "local").
-  reportLocalUsage({ model: payload.model, startedAt, usage });
 }

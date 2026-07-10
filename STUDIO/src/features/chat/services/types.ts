@@ -1,21 +1,17 @@
 /**
- * AI service shared types.
+ * AI service shared types: the HTTP chat shapes (ChatRequest, ChatResponse,
+ * TranscribeResponse).
  *
  * Runtime / tool-relay types (APIChatMessage, extractMessageText, LocalToolCall,
- * ToolResultItem, AutoRoutedInfo) now live in `@/types/chat` — the neutral leaf
- * both `runtime/` and `features/chat/` import downward (D-9). They are
- * re-exported below for back-compat; importers should switch to `@/types/chat`.
- *
- * The HTTP chat shapes (ChatRequest / ChatResponse / TranscribeResponse /
- * VisionChatMessage) stay here until Phase 3 moves them to
- * `features/chat/services/types.ts`.
+ * AutoRoutedInfo) live in `@/types/chat` — the neutral leaf both `runtime/` and
+ * `features/chat/` import downward (D-9). The re-exports below exist only for
+ * this folder's own modules; new importers should take them from `@/types/chat`.
  */
 
 export { extractMessageText } from "@/types/chat";
 export type {
   APIChatMessage,
   LocalToolCall,
-  ToolResultItem,
   AutoRoutedInfo,
 } from "@/types/chat";
 
@@ -24,9 +20,6 @@ import type { APIChatMessage } from "@/types/chat";
 // ---------------------------------------------------------------------------
 // Request / Response
 // ---------------------------------------------------------------------------
-
-/** Vision message variant used by Ollama's OpenAI-compatible endpoint. */
-export type VisionChatMessage = APIChatMessage;
 
 export interface ChatRequest {
   model: string;

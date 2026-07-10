@@ -1,4 +1,3 @@
 {
-  "features/chat/services/daemonService.ts > features/models/services/localUsageService.ts": 1,
   "features/workspace/browser/BrowserPanel.tsx > features/workspace/browser/NativeBrowserHost.tsx": 1
 }
