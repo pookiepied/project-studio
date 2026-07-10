@@ -21,7 +21,7 @@ const BADGE: Record<BrandLogoSize, string> = {
   md: "w-7 h-7 text-3xs rounded-lg",
 };
 
-export interface BrandLogoProps {
+interface BrandLogoProps {
   /** SVG `d` path from simple-icons (e.g. `siAnthropic.path`). Renders the mark. */
   path?: string;
   /** 2-3 char fallback text shown when no `path` is provided. */

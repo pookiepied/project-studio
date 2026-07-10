@@ -16,7 +16,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useCachedIcon } from "@/lib/hooks/useCachedIcon";
 
-export type AppLogoSize = "xs" | "sm" | "md" | "lg" | "xl";
+type AppLogoSize = "xs" | "sm" | "md" | "lg" | "xl";
 
 const BADGE: Record<AppLogoSize, string> = {
   xs: "w-5 h-5 rounded-md text-3xs",
@@ -28,7 +28,7 @@ const BADGE: Record<AppLogoSize, string> = {
 
 const IMG_PX: Record<AppLogoSize, number> = { xs: 12, sm: 14, md: 20, lg: 24, xl: 32 };
 
-export interface AppLogoProps {
+interface AppLogoProps {
   /** Remote logo URL. Omit to always render `fallback`. */
   src?: string;
   /** Shown while there's no URL, or the image fails to load. */
