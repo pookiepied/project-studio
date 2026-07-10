@@ -1,0 +1,13 @@
+{
+  "core/network/fallbackService.ts > features/chat/attachments/attachmentLimits.ts": 1,
+  "core/network/fallbackService.ts > features/models/services/modelCapabilityService.ts": 1,
+  "core/storage/chatHistoryService.ts > features/chat/conversations/claude/claudeConversationAdapter.ts > features/chat/conversations/storage/types.ts": 1,
+  "features/chat/context/index.ts > features/chat/context/ChatProvider.tsx > features/chat/context/runClaudeTurn.ts > runtime/index.ts > runtime/ui/InlineToolSteps.tsx": 1,
+  "features/chat/services/daemonService.ts > features/models/services/localUsageService.ts": 1,
+  "features/models/services/modelService.ts > core/network/fallbackService.ts": 1,
+  "features/models/services/modelService.ts > core/network/fallbackService.ts > features/chat/attachments/attachmentLimits.ts": 1,
+  "features/models/services/modelService.ts > core/network/fallbackService.ts > features/models/services/modelCapabilityService.ts": 1,
+  "features/models/services/modelService.ts > features/models/services/localModelDetection.ts": 1,
+  "features/workspace/browser/BrowserPanel.tsx > features/workspace/browser/NativeBrowserHost.tsx": 1,
+  "runtime/execution/executeLocalTools.ts > runtime/execution/builtinTools.ts": 1
+}
