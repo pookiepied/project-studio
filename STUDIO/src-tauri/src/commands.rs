@@ -8,6 +8,9 @@ use tokio::io::{BufReader, AsyncBufReadExt};
 use tauri::Emitter;
 use std::sync::{LazyLock, Mutex};
 
+pub mod git;
+pub use git::{git_checkout_branch, git_create_branch, git_list_branches};
+
 // Store current CSP configuration
 static CURRENT_CSP: Mutex<Option<String>> = Mutex::new(None);
 static CLAUDE_BRIDGE_PROCESSES: LazyLock<Mutex<HashMap<String, u32>>> =
