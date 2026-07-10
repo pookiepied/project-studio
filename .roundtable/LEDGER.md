@@ -398,3 +398,50 @@ not from the report — including your own.
 What survives: the 286 non-barrel unused exports are a **more** trustworthy list than claimed.
 The real hazards are string-based usage (invisible to knip, as `madge` proved), re-export chains,
 and symbols that are dead inside files that are alive.
+
+---
+
+## 2026-07-10 — RT-020 batch 1: fasterWhisper (52a14d7, bafb003)
+
+**Two commits.** First the barrel, then the symbols — deliberately, because the barrel was
+lying to the detector.
+
+`fasterWhisper/index.ts` re-exported 40 symbols; 14 are consumed from outside the folder. The
+26 dead re-exports made sibling-only symbols (`markInstalled`, `getModelPath`,
+`getRecommendedDevice`) *look* alive to knip. Trimming the barrel first made the per-file view
+truthful; only then were the 25 dead exports visible. Two independent methods agreed exactly on
+the 14: knip's flags, and reading the four consumers by hand.
+
+Then 21 deletions + 4 privatizations. 377 lines removed, 4 declaration lines changed, no
+surviving line touched.
+
+### The finding that changes the method for every remaining batch
+
+**Dead-code removal is transitive.** The lead built the delete list from a `tsc` snapshot taken
+*before* any deletion, so it classified `checkVenvExists` and `validateModel` as live. They were
+live only because their sole callers — `verifyInstallation` and `cleanupIncompleteDownloads` —
+were themselves on the delete list. A one-shot analysis cannot see the cascade.
+
+**RT-020 batches must iterate to a fixed point:** delete, re-run `tsc --noUnusedLocals`, delete
+what newly became unreachable, repeat until clean. Here it converged after one extra round.
+
+### The implementer refused a contradictory instruction
+
+The item said "keep these 6, they are used internally" and "delete these 19." Those cannot both
+hold for `checkVenvExists` and `validateModel`. The implementer stopped, produced the two
+`TS6133` errors as evidence, laid out the two resolutions, and **declined to pick one** — rather
+than deleting both, reporting success, and handing back a green gate over a spec the lead never
+learned was wrong. That is the behavior the protocol exists to produce, and this time the
+defective artifact was the lead's.
+
+### Verified past the gate
+
+`tsc` and `knip` see static imports only. Independently confirmed: none of the 21 names appear
+in `src-tauri/`, `daemon/`, `mcp-servers/` or `skills/` (no Tauri command or string dispatch
+reaches them); `setupCUDAPaths` — reachable *only* via `await import('./cudaSetup')` — survives
+with its embedded Python template byte-identical; the `supportsTranslation` boolean property
+still exists on all 14 models while the identically-named function is gone (14 before, 14 after).
+
+Cold review: PASS, with each of seven points checked against the diff rather than any summary.
+
+Gate: typecheck clean · build passes · lint 256 · cycles 2.
