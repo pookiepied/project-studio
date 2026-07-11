@@ -1,4 +1,4 @@
-/** Centralized error taxonomy for the execution runtime. */
+/** Centralized error taxonomy shared by every runtime built on the engine. */
 
 export type ExecutionErrorCode =
   | "run_not_found"

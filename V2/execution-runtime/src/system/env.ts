@@ -1,14 +1,13 @@
-export interface Env {
-  ENVIRONMENT: string;
-  /** Gateway v2 — the only path to model providers. */
-  GATEWAY: Fetcher;
-  /** Studio Context — task-specific context packages. */
-  CONTEXT: Fetcher;
-  /** Studio Registry — capability lookups. */
+import type { RuntimeEnv } from "@studio/v2-runtime";
+
+/**
+ * Execution Runtime bindings. The shared engine needs GATEWAY, CONTEXT, DATA,
+ * and MCP (RuntimeEnv); this worker adds its own Durable Object namespace and
+ * the Registry binding it may consult directly.
+ */
+export interface Env extends RuntimeEnv {
+  /** Studio Registry — capability lookups when the runtime needs a direct check. */
   REGISTRY: Fetcher;
-  /** Studio Data — conversation and artifact persistence. */
-  DATA: Fetcher;
-  MCP: Fetcher;
   /** One session per active conversation/run. */
   EXECUTION_SESSION: DurableObjectNamespace;
 }

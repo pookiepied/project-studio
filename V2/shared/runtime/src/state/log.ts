@@ -30,7 +30,7 @@ export interface EventScope {
 }
 
 /**
- * Durable storage layer inside the ExecutionSession DO, backed by DO SQLite.
+ * Durable storage layer inside a RuntimeSession DO, backed by DO SQLite.
  * The append-only event log is the source of truth (decision #10); the runs
  * table holds the current RunState projection for fast reads, and checkpoints
  * accelerate replay. Events are written here BEFORE any client broadcast.

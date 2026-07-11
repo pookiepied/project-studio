@@ -1,6 +1,7 @@
 import {
   stepCountIs,
   streamText,
+  type LanguageModel,
   type ModelMessage,
   type ToolSet,
 } from "ai";
@@ -10,8 +11,6 @@ import type {
   RuntimeEventPayloads,
   RuntimeEventType,
 } from "@studio/v2-contracts";
-import type { Env } from "../system/env";
-import { gatewayModel } from "../gateway/client";
 
 /**
  * The main agent loop (ARCHITECTURE.md §3): a ReAct-style reason → act →
@@ -20,8 +19,10 @@ import { gatewayModel } from "../gateway/client";
  * parts into Studio Runtime Protocol events and hands control points back to
  * the caller.
  *
- * The loop is deliberately state-free: durable state, retries, and lifecycle
- * live in the ExecutionSession DO. The loop only reports and obeys.
+ * The loop is deliberately state-free and provider-free: durable state,
+ * retries, and lifecycle live in the RuntimeSession DO, and the concrete
+ * model is injected. Planner, Agent, and Execution runtimes all drive this
+ * exact loop with different config (prompt, tools, limits, model).
  */
 
 /** Persist-then-broadcast a protocol event. The session stamps identity. */
@@ -60,7 +61,8 @@ export type LoopObservation =
 export interface LoopInput {
   runId: string;
   attemptId: string;
-  modelId: string;
+  /** The provider-bound model to drive this loop (injected by the session). */
+  model: LanguageModel;
   system: string;
   /** Conversation so far — on resume, restored from the latest checkpoint. */
   messages: ModelMessage[];
@@ -75,7 +77,6 @@ export interface LoopResult {
 }
 
 export async function runAgentLoop(
-  env: Env,
   input: LoopInput,
   hooks: LoopHooks,
 ): Promise<LoopResult> {
@@ -85,7 +86,7 @@ export async function runAgentLoop(
   const completedToolCallIds = new Set<string>();
 
   const result = streamText({
-    model: gatewayModel(env, input.modelId),
+    model: input.model,
     system: input.system,
     messages: input.messages,
     tools: input.tools,

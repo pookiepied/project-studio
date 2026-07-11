@@ -3,7 +3,7 @@ import type { RunState, RunStatus } from "@studio/v2-contracts";
 /**
  * Loop lifecycle rules (ARCHITECTURE.md §7, RUNTIME-CHECKLIST.md §3): the
  * single place that decides which status transitions are legal, when a run
- * counts as stalled, and what the retry policy allows. The ExecutionSession
+ * counts as stalled, and what the retry policy allows. Every RuntimeSession
  * consults these; nothing else mutates run status.
  *
  * Working phases (reasoning / tool_calls_pending / tools_running / responding)

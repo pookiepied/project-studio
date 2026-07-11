@@ -6,7 +6,6 @@ import {
   type ToolPolicy,
 } from "@studio/v2-contracts";
 import { ToolExecutionCoordinator } from "./coordinator";
-import type { Env } from "../system/env";
 
 /**
  * Tool execution boundary (RUNTIME-CHECKLIST.md §7–§9). Every tool the model
@@ -29,7 +28,7 @@ export interface RegisteredTool {
   policy: ToolPolicy;
 }
 
-/** Runtime services the wrapper needs from the ExecutionSession. */
+/** Runtime services the wrapper needs from the RuntimeSession. */
 export interface ToolRuntime {
   runId: string;
   coordinator: ToolExecutionCoordinator;
@@ -133,18 +132,19 @@ function clamp(json: string, maxBytes: number): string {
 
 /**
  * Tool exposure: translates the context package's relevant capabilities
- * (connectors, MCP servers, skills, delegation) into RegisteredTools. Lands
- * with the Studio Context integration — until then the loop runs tool-less.
+ * (connectors, MCP servers, skills, delegation) into RegisteredTools. Cloud
+ * routes go through the Studio MCP hub (passed in as a Fetcher); local routes
+ * go through the caller-supplied `executeLocal` relay.
  */
 export function buildToolSet(
   context: ContextPackage,
-  env: Pick<Env, "MCP">,
+  mcp: Fetcher,
   executeLocal: (toolCallId:string,descriptor:StudioToolDescriptor,input:unknown)=>Promise<unknown>,
 ): Record<string, RegisteredTool> {
   const tools: Record<string, RegisteredTool> = {};
   for (const descriptor of context.tools) {
     tools[descriptor.name] = {
-      tool: descriptorToAiTool(descriptor, context, env, executeLocal),
+      tool: descriptorToAiTool(descriptor, context, mcp, executeLocal),
       policy: {
         ...DEFAULT_TOOL_POLICY,
         locality: descriptor.location,
@@ -160,7 +160,7 @@ export { DEFAULT_TOOL_POLICY };
 function descriptorToAiTool(
   descriptor: StudioToolDescriptor,
   context: ContextPackage,
-  env: Pick<Env, "MCP">,
+  mcp: Fetcher,
   executeLocal: (toolCallId:string,descriptor:StudioToolDescriptor,input:unknown)=>Promise<unknown>,
 ): Tool {
   return {
@@ -170,20 +170,20 @@ function descriptorToAiTool(
       const args = withRuntimeArgs(input, descriptor, context);
       switch (descriptor.route.kind) {
         case "connector":
-          return callHub(env.MCP, descriptor.route.hubPath ?? "/internal/composio/execute", {
+          return callHub(mcp, descriptor.route.hubPath ?? "/internal/composio/execute", {
             slug: descriptor.route.slug,
             connectionId: descriptor.route.connectionId,
             entityId: descriptor.route.entityId,
             args,
           });
         case "native-cloud":
-          return callHub(env.MCP, descriptor.route.hubPath ?? "/internal/native/execute", {
+          return callHub(mcp, descriptor.route.hubPath ?? "/internal/native/execute", {
             serviceId: descriptor.route.serviceId,
             toolName: descriptor.route.toolName,
             toolArgs: args,
           });
         case "remote-mcp":
-          return callHub(env.MCP, descriptor.route.hubPath ?? "/internal/remote/execute", {
+          return callHub(mcp, descriptor.route.hubPath ?? "/internal/remote/execute", {
             url: descriptor.route.endpoint,
             toolName: descriptor.route.toolName,
             args,
