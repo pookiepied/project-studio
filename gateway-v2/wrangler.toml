@@ -16,8 +16,9 @@ binding = "CREDITS_KV"
 id = "replace-with-credits-kv-id"
 
 [[kv_namespaces]]
-binding = "ADMIN_KV"
-id = "replace-with-admin-kv-id"
+binding = "MODEL_REGISTRY_KV"
+id = "replace-with-model-registry-kv-id"
 
 # Secrets:
 #   wrangler secret put CF_AIG_TOKEN
+#   wrangler secret put REGISTRY_MANAGEMENT_TOKEN

@@ -35,10 +35,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 5,
+        "outputPerMillionUsd": 30,
+        "source": "static",
+        "note": "Verified from OpenAI API pricing and GPT-5.6 model docs. Cache write is 1.25x input; cache read is 90% discounted."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -81,13 +81,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "cacheWritePerMillion": 6.25,
+          "outputPerMillion": 30,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -95,8 +95,8 @@ window.__MODEL_REGISTRY__ = {
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI API pricing and GPT-5.6 model docs. Cache write is 1.25x input; cache read is 90% discounted."
         },
         "reasoning": {
           "supported": true,
@@ -158,10 +158,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2.5,
+        "outputPerMillionUsd": 15,
+        "source": "static",
+        "note": "Verified from OpenAI API pricing and GPT-5.6 model docs. Cache write is 1.25x input; cache read is 90% discounted."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -204,13 +204,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 0.25,
+          "cacheWritePerMillion": 3.125,
+          "outputPerMillion": 15,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -218,8 +218,8 @@ window.__MODEL_REGISTRY__ = {
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI API pricing and GPT-5.6 model docs. Cache write is 1.25x input; cache read is 90% discounted."
         },
         "reasoning": {
           "supported": true,
@@ -281,10 +281,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 6,
+        "source": "static",
+        "note": "Verified from OpenAI API pricing and GPT-5.6 model docs. Cache write is 1.25x input; cache read is 90% discounted."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -327,13 +327,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "cacheWritePerMillion": 1.25,
+          "outputPerMillion": 6,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -341,8 +341,8 @@ window.__MODEL_REGISTRY__ = {
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI API pricing and GPT-5.6 model docs. Cache write is 1.25x input; cache read is 90% discounted."
         },
         "reasoning": {
           "supported": true,
@@ -404,10 +404,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 5,
+        "outputPerMillionUsd": 22.5,
+        "source": "static",
+        "note": "Verified from OpenAI API pricing for the long-context GPT-5.5 tier used by this registry record."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -450,13 +450,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 22.5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -464,8 +464,8 @@ window.__MODEL_REGISTRY__ = {
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI API pricing for the long-context GPT-5.5 tier used by this registry record."
         },
         "reasoning": {
           "supported": true,
@@ -511,7 +511,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": null,
         "outputPerMillionUsd": null,
         "source": "unknown",
-        "note": "Image pricing must preserve native units such as image, megapixel, generation, prediction, or compute seconds."
+        "note": "Verified from OpenAI API image generation pricing. Cost is token-metered by text/image input and image output, not a flat per-image price."
       },
       "inputTypes": [
         "text",
@@ -546,10 +546,42 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "image",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
-          "billingUnit": "image",
+          "billingUnit": "one_million_tokens",
           "price": null,
+          "tiers": [
+            {
+              "name": "text_input",
+              "unit": "one_million_tokens",
+              "price": 5,
+              "currency": "USD"
+            },
+            {
+              "name": "text_cached_input",
+              "unit": "one_million_tokens",
+              "price": 1.25,
+              "currency": "USD"
+            },
+            {
+              "name": "image_input",
+              "unit": "one_million_tokens",
+              "price": 8,
+              "currency": "USD"
+            },
+            {
+              "name": "image_cached_input",
+              "unit": "one_million_tokens",
+              "price": 2,
+              "currency": "USD"
+            },
+            {
+              "name": "image_output",
+              "unit": "one_million_tokens",
+              "price": 30,
+              "currency": "USD"
+            }
+          ],
           "dependsOn": [
             "resolution",
             "quality"
@@ -558,8 +590,8 @@ window.__MODEL_REGISTRY__ = {
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "Image pricing must preserve native units such as image, megapixel, generation, prediction, or compute seconds."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI API image generation pricing. Cost is token-metered by text/image input and image output, not a flat per-image price."
         },
         "freeAccess": {
           "isFree": false,
@@ -774,10 +806,10 @@ window.__MODEL_REGISTRY__ = {
         ]
       },
       "pricing": {
-        "inputPerMillionUsd": null,
+        "inputPerMillionUsd": 0.02,
         "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "Embedding pricing is token based; this exact route price is not verified in the curated registry yet."
+        "source": "static",
+        "note": "Verified from OpenAI embedding model pricing."
       },
       "inputTypes": [
         "text"
@@ -810,17 +842,17 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "embedding",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.02,
           "outputPerMillion": null,
           "sourceUrls": [
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "Embedding pricing is token based; this exact route price is not verified in the curated registry yet."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI embedding model pricing."
         },
         "freeAccess": {
           "isFree": false,
@@ -840,10 +872,10 @@ window.__MODEL_REGISTRY__ = {
         ]
       },
       "pricing": {
-        "inputPerMillionUsd": null,
+        "inputPerMillionUsd": 0.13,
         "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "Embedding pricing is token based; this exact route price is not verified in the curated registry yet."
+        "source": "static",
+        "note": "Verified from OpenAI embedding model pricing."
       },
       "inputTypes": [
         "text"
@@ -876,17 +908,17 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "embedding",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.13,
           "outputPerMillion": null,
           "sourceUrls": [
             "https://developers.openai.com/api/docs/models",
             "https://platform.openai.com/docs/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "Embedding pricing is token based; this exact route price is not verified in the curated registry yet."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from OpenAI embedding model pricing."
         },
         "freeAccess": {
           "isFree": false,
@@ -926,8 +958,8 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": 2.7,
-        "outputPerMillionUsd": 16.2,
+        "inputPerMillionUsd": 1.5,
+        "outputPerMillionUsd": 9,
         "source": "static",
         "note": "Verified from Gemini Developer API pricing. Output includes thinking tokens."
       },
@@ -977,10 +1009,10 @@ window.__MODEL_REGISTRY__ = {
           "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": 2.7,
-          "cachedInputPerMillion": 0.27,
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": 0.15,
           "cacheWritePerMillion": null,
-          "outputPerMillion": 16.2,
+          "outputPerMillion": 9,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -1103,7 +1135,7 @@ window.__MODEL_REGISTRY__ = {
           "currency": "USD",
           "billingUnit": "one_million_tokens",
           "inputPerMillion": 2,
-          "cachedInputPerMillion": null,
+          "cachedInputPerMillion": 0.2,
           "cacheWritePerMillion": null,
           "outputPerMillion": 12,
           "batchInputPerMillion": null,
@@ -1566,10 +1598,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 5,
+        "source": "static",
+        "note": "Verified from Anthropic Claude pricing."
       },
       "contextWindow": 200000,
       "maxTokens": 64000,
@@ -1612,13 +1644,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "cacheWritePerMillion": 1.25,
+          "outputPerMillion": 5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -1626,8 +1658,8 @@ window.__MODEL_REGISTRY__ = {
             "https://platform.claude.com/docs/en/about-claude/models/overview",
             "https://platform.claude.com/docs/en/about-claude/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Anthropic Claude pricing."
         },
         "reasoning": {
           "supported": true,
@@ -1691,7 +1723,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": 3,
         "outputPerMillionUsd": 15,
         "source": "static",
-        "note": "Verified from Anthropic Claude Sonnet 5 pricing note, which states pricing is unchanged from Sonnet 4.6."
+        "note": "Verified from Anthropic Claude pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -1738,8 +1770,8 @@ window.__MODEL_REGISTRY__ = {
           "currency": "USD",
           "billingUnit": "one_million_tokens",
           "inputPerMillion": 3,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
+          "cachedInputPerMillion": 0.3,
+          "cacheWritePerMillion": 3.75,
           "outputPerMillion": 15,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
@@ -1749,7 +1781,7 @@ window.__MODEL_REGISTRY__ = {
             "https://platform.claude.com/docs/en/about-claude/pricing"
           ],
           "verifiedAt": "2026-07-11",
-          "notes": "Verified from Anthropic Claude Sonnet 5 pricing note, which states pricing is unchanged from Sonnet 4.6."
+          "notes": "Verified from Anthropic Claude pricing."
         },
         "reasoning": {
           "supported": true,
@@ -1811,10 +1843,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": 3,
-        "outputPerMillionUsd": 15,
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 10,
         "source": "static",
-        "note": "Verified from Anthropic Claude Sonnet 5 pricing note."
+        "note": "Verified from Anthropic pricing. Current introductory pricing applies through 2026-08-31; standard pricing is preserved as dated tiers."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -1860,19 +1892,49 @@ window.__MODEL_REGISTRY__ = {
           "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": 3,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": 15,
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "cacheWritePerMillion": 2.5,
+          "outputPerMillion": 10,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
+          "longContext": [
+            {
+              "name": "standard_after_2026_08_31_input",
+              "unit": "one_million_tokens",
+              "price": 3,
+              "currency": "USD",
+              "appliesWhen": "starting 2026-09-01"
+            },
+            {
+              "name": "standard_after_2026_08_31_cache_write_5m",
+              "unit": "one_million_tokens",
+              "price": 3.75,
+              "currency": "USD",
+              "appliesWhen": "starting 2026-09-01"
+            },
+            {
+              "name": "standard_after_2026_08_31_cache_read",
+              "unit": "one_million_tokens",
+              "price": 0.3,
+              "currency": "USD",
+              "appliesWhen": "starting 2026-09-01"
+            },
+            {
+              "name": "standard_after_2026_08_31_output",
+              "unit": "one_million_tokens",
+              "price": 15,
+              "currency": "USD",
+              "appliesWhen": "starting 2026-09-01"
+            }
+          ],
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://platform.claude.com/docs/en/about-claude/models/overview",
             "https://platform.claude.com/docs/en/about-claude/pricing"
           ],
           "verifiedAt": "2026-07-11",
-          "notes": "Verified from Anthropic Claude Sonnet 5 pricing note."
+          "notes": "Verified from Anthropic pricing. Current introductory pricing applies through 2026-08-31; standard pricing is preserved as dated tiers."
         },
         "reasoning": {
           "supported": true,
@@ -1937,7 +1999,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": 5,
         "outputPerMillionUsd": 25,
         "source": "static",
-        "note": "Verified from Anthropic migration pricing note comparing Fable 5 and Opus 4.8."
+        "note": "Verified from Anthropic Claude pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -1984,8 +2046,8 @@ window.__MODEL_REGISTRY__ = {
           "currency": "USD",
           "billingUnit": "one_million_tokens",
           "inputPerMillion": 5,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
+          "cachedInputPerMillion": 0.5,
+          "cacheWritePerMillion": 6.25,
           "outputPerMillion": 25,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
@@ -1995,7 +2057,7 @@ window.__MODEL_REGISTRY__ = {
             "https://platform.claude.com/docs/en/about-claude/pricing"
           ],
           "verifiedAt": "2026-07-11",
-          "notes": "Verified from Anthropic migration pricing note comparing Fable 5 and Opus 4.8."
+          "notes": "Verified from Anthropic Claude pricing."
         },
         "reasoning": {
           "supported": true,
@@ -2060,7 +2122,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": 10,
         "outputPerMillionUsd": 50,
         "source": "static",
-        "note": "Verified from Anthropic migration pricing note."
+        "note": "Verified from Anthropic Claude pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -2107,8 +2169,8 @@ window.__MODEL_REGISTRY__ = {
           "currency": "USD",
           "billingUnit": "one_million_tokens",
           "inputPerMillion": 10,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
+          "cachedInputPerMillion": 1,
+          "cacheWritePerMillion": 12.5,
           "outputPerMillion": 50,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
@@ -2118,7 +2180,7 @@ window.__MODEL_REGISTRY__ = {
             "https://platform.claude.com/docs/en/about-claude/pricing"
           ],
           "verifiedAt": "2026-07-11",
-          "notes": "Verified from Anthropic migration pricing note."
+          "notes": "Verified from Anthropic Claude pricing."
         },
         "reasoning": {
           "supported": true,
@@ -2179,10 +2241,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 6,
+        "source": "static",
+        "note": "Verified from xAI Grok 4.5 API model docs."
       },
       "contextWindow": 500000,
       "maxTokens": 128000,
@@ -2225,13 +2287,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.5,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 6,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -2239,8 +2301,8 @@ window.__MODEL_REGISTRY__ = {
             "https://docs.x.ai/developers/models",
             "https://docs.x.ai/developers/pricing"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from xAI Grok 4.5 API model docs."
         },
         "reasoning": {
           "supported": true,
@@ -2422,10 +2484,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.435,
+        "outputPerMillionUsd": 0.87,
+        "source": "static",
+        "note": "Verified from DeepSeek Models & Pricing. inputPerMillion is cache-miss input; cachedInputPerMillion is cache-hit input."
       },
       "contextWindow": 1048576,
       "maxTokens": 384000,
@@ -2466,21 +2528,21 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.435,
+          "cachedInputPerMillion": 0.003625,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.87,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://api-docs.deepseek.com/quick_start/pricing/"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from DeepSeek Models & Pricing. inputPerMillion is cache-miss input; cachedInputPerMillion is cache-hit input."
         },
         "reasoning": {
           "supported": true,
@@ -2542,10 +2604,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.14,
+        "outputPerMillionUsd": 0.28,
+        "source": "static",
+        "note": "Verified from DeepSeek Models & Pricing. inputPerMillion is cache-miss input; cachedInputPerMillion is cache-hit input."
       },
       "contextWindow": 1048576,
       "maxTokens": 384000,
@@ -2586,21 +2648,21 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.14,
+          "cachedInputPerMillion": 0.0028,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.28,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://api-docs.deepseek.com/quick_start/pricing/"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from DeepSeek Models & Pricing. inputPerMillion is cache-miss input; cachedInputPerMillion is cache-hit input."
         },
         "reasoning": {
           "supported": true,
@@ -2763,10 +2825,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.075,
+        "outputPerMillionUsd": 0.3,
+        "source": "static",
+        "note": "Verified from Groq supported models pricing."
       },
       "contextWindow": 131072,
       "maxTokens": 65536,
@@ -2807,21 +2869,21 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.075,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.3,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://console.groq.com/docs/models"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Groq supported models pricing."
         },
         "reasoning": {
           "supported": true,
@@ -2879,10 +2941,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.15,
+        "outputPerMillionUsd": 0.6,
+        "source": "static",
+        "note": "Verified from Groq supported models pricing."
       },
       "contextWindow": 131072,
       "maxTokens": 65536,
@@ -2923,21 +2985,21 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.15,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.6,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://console.groq.com/docs/models"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Groq supported models pricing."
         },
         "reasoning": {
           "supported": true,
@@ -2996,10 +3058,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.29,
+        "outputPerMillionUsd": 0.59,
+        "source": "static",
+        "note": "Verified from Groq supported models pricing."
       },
       "contextWindow": 131072,
       "maxTokens": 40960,
@@ -3040,21 +3102,21 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.29,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.59,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://console.groq.com/docs/models"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Groq supported models pricing."
         },
         "reasoning": {
           "supported": true,
@@ -3114,10 +3176,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.6,
+        "outputPerMillionUsd": 3,
+        "source": "static",
+        "note": "Verified from Groq supported models pricing."
       },
       "contextWindow": 131072,
       "maxTokens": 32768,
@@ -3159,21 +3221,21 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.6,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 3,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
           "sourceUrls": [
             "https://console.groq.com/docs/models"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Groq supported models pricing."
         },
         "reasoning": {
           "supported": true,
@@ -3217,7 +3279,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": null,
         "outputPerMillionUsd": null,
         "source": "unknown",
-        "note": "Transcription pricing is duration based for most supported providers."
+        "note": "Verified from Groq supported models pricing."
       },
       "inputTypes": [
         "audio"
@@ -3249,15 +3311,15 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "audio",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "audio_hour",
-          "price": null,
+          "price": 0.111,
           "sourceUrls": [
             "https://console.groq.com/docs/models"
           ],
-          "verifiedAt": null,
-          "notes": "Transcription pricing is duration based for most supported providers."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Groq supported models pricing."
         },
         "freeAccess": {
           "isFree": false,
@@ -3280,7 +3342,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": null,
         "outputPerMillionUsd": null,
         "source": "unknown",
-        "note": "Transcription pricing is duration based for most supported providers."
+        "note": "Verified from Groq supported models pricing."
       },
       "inputTypes": [
         "audio"
@@ -3312,15 +3374,15 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "audio",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "audio_hour",
-          "price": null,
+          "price": 0.04,
           "sourceUrls": [
             "https://console.groq.com/docs/models"
           ],
-          "verifiedAt": null,
-          "notes": "Transcription pricing is duration based for most supported providers."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from Groq supported models pricing."
         },
         "freeAccess": {
           "isFree": false,
@@ -6005,7 +6067,7 @@ window.__MODEL_REGISTRY__ = {
         "inputPerMillionUsd": 5,
         "outputPerMillionUsd": 30,
         "source": "static",
-        "note": "Verified from OpenRouter model page for openai/gpt-5.6-sol. Do not copy to direct OpenAI pricing."
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6052,8 +6114,8 @@ window.__MODEL_REGISTRY__ = {
           "currency": "USD",
           "billingUnit": "one_million_tokens",
           "inputPerMillion": 5,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
+          "cachedInputPerMillion": 0.5,
+          "cacheWritePerMillion": 6.25,
           "outputPerMillion": 30,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
@@ -6063,7 +6125,7 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
           "verifiedAt": "2026-07-11",
-          "notes": "Verified from OpenRouter model page for openai/gpt-5.6-sol. Do not copy to direct OpenAI pricing."
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6121,10 +6183,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 5,
+        "outputPerMillionUsd": 30,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6167,13 +6229,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "cacheWritePerMillion": 6.25,
+          "outputPerMillion": 30,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6181,8 +6243,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6240,10 +6302,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2.5,
+        "outputPerMillionUsd": 15,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6286,13 +6348,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 0.25,
+          "cacheWritePerMillion": 3.125,
+          "outputPerMillion": 15,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6300,8 +6362,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6359,10 +6421,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2.5,
+        "outputPerMillionUsd": 15,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6405,13 +6467,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 0.25,
+          "cacheWritePerMillion": 3.125,
+          "outputPerMillion": 15,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6419,8 +6481,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6478,10 +6540,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 6,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6524,13 +6586,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "cacheWritePerMillion": 1.25,
+          "outputPerMillion": 6,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6538,8 +6600,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6597,10 +6659,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 6,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6643,13 +6705,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "cacheWritePerMillion": 1.25,
+          "outputPerMillion": 6,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6657,8 +6719,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6716,10 +6778,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 5,
+        "outputPerMillionUsd": 30,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6762,13 +6824,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 30,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6776,8 +6838,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6835,10 +6897,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 30,
+        "outputPerMillionUsd": 180,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -6881,13 +6943,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 30,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 180,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -6895,8 +6957,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -6954,10 +7016,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2.5,
+        "outputPerMillionUsd": 15,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -7000,13 +7062,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 2.5,
+          "cachedInputPerMillion": 0.25,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 15,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7014,8 +7076,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7073,10 +7135,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 30,
+        "outputPerMillionUsd": 180,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1050000,
       "maxTokens": 128000,
@@ -7119,13 +7181,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 30,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 180,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7133,8 +7195,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7192,10 +7254,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.75,
+        "outputPerMillionUsd": 4.5,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 400000,
       "maxTokens": 128000,
@@ -7238,13 +7300,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.75,
+          "cachedInputPerMillion": 0.075,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 4.5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7252,8 +7314,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7311,10 +7373,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.2,
+        "outputPerMillionUsd": 1.25,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 400000,
       "maxTokens": 128000,
@@ -7357,13 +7419,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": 0.02,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 1.25,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7371,8 +7433,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7430,10 +7492,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.32,
+        "outputPerMillionUsd": 1.28,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -7476,13 +7538,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 0.32,
+          "cachedInputPerMillion": 0.064,
+          "cacheWritePerMillion": 0.4,
+          "outputPerMillion": 1.28,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7490,8 +7552,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7549,10 +7611,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1.25,
+        "outputPerMillionUsd": 3.75,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -7594,13 +7656,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.25,
+          "cacheWritePerMillion": 1.5625,
+          "outputPerMillion": 3.75,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7608,8 +7670,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7667,10 +7729,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.1875,
+        "outputPerMillionUsd": 1.125,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -7713,13 +7775,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0.1875,
           "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "cacheWritePerMillion": 0.234375,
+          "outputPerMillion": 1.125,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7727,8 +7789,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7786,10 +7848,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 5,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 200000,
       "maxTokens": 128000,
@@ -7832,13 +7894,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1,
+          "cachedInputPerMillion": 0.1,
+          "cacheWritePerMillion": 1.25,
+          "outputPerMillion": 5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7846,8 +7908,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -7905,10 +7967,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 3,
+        "outputPerMillionUsd": 15,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -7951,13 +8013,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 3,
+          "cachedInputPerMillion": 0.3,
+          "cacheWritePerMillion": 3.75,
+          "outputPerMillion": 15,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -7965,8 +8027,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8024,10 +8086,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 10,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -8070,13 +8132,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "cacheWritePerMillion": 2.5,
+          "outputPerMillion": 10,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8084,8 +8146,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8143,10 +8205,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 5,
+        "outputPerMillionUsd": 25,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -8189,13 +8251,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 5,
+          "cachedInputPerMillion": 0.5,
+          "cacheWritePerMillion": 6.25,
+          "outputPerMillion": 25,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8203,8 +8265,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8262,10 +8324,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 10,
+        "outputPerMillionUsd": 50,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -8308,13 +8370,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 1,
+          "cacheWritePerMillion": 12.5,
+          "outputPerMillion": 50,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8322,8 +8384,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8381,10 +8443,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 10,
+        "outputPerMillionUsd": 50,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -8427,13 +8489,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 10,
+          "cachedInputPerMillion": 1,
+          "cacheWritePerMillion": 12.5,
+          "outputPerMillion": 50,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8441,8 +8503,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8500,10 +8562,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.435,
+        "outputPerMillionUsd": 0.87,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -8545,13 +8607,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.435,
+          "cachedInputPerMillion": 0.003625,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.87,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8559,8 +8621,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8618,10 +8680,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.077,
+        "outputPerMillionUsd": 0.154,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -8663,13 +8725,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.077,
+          "cachedInputPerMillion": 0.0154,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.154,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8677,8 +8739,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8736,10 +8798,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1.5,
+        "outputPerMillionUsd": 9,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -8782,13 +8844,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 1.5,
+          "cachedInputPerMillion": 0.15,
+          "cacheWritePerMillion": 0.08333333333333334,
+          "outputPerMillion": 9,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8796,8 +8858,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8855,10 +8917,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 12,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -8901,13 +8963,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.2,
+          "cacheWritePerMillion": 0.375,
+          "outputPerMillion": 12,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -8915,8 +8977,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -8974,10 +9036,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.25,
+        "outputPerMillionUsd": 1.5,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -9020,13 +9082,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
-          "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "inputPerMillion": 0.25,
+          "cachedInputPerMillion": 0.025,
+          "cacheWritePerMillion": 0.08333333333333334,
+          "outputPerMillion": 1.5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9034,8 +9096,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9093,10 +9155,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.3,
+        "outputPerMillionUsd": 1.2,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -9139,13 +9201,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.3,
+          "cachedInputPerMillion": 0.06,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 1.2,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9153,8 +9215,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9212,10 +9274,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.66,
+        "outputPerMillionUsd": 3.41,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
       "maxTokens": 128000,
@@ -9258,13 +9320,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.66,
+          "cachedInputPerMillion": 0.15,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 3.41,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9272,8 +9334,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9331,10 +9393,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.72,
+        "outputPerMillionUsd": 3.5,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
       "maxTokens": 128000,
@@ -9377,13 +9439,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.72,
+          "cachedInputPerMillion": 0.15,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 3.5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9391,8 +9453,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9450,10 +9512,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.06,
+        "outputPerMillionUsd": 0.12,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
       "maxTokens": 128000,
@@ -9495,13 +9557,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.06,
+          "cachedInputPerMillion": 0.03,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.12,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9509,8 +9571,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9568,10 +9630,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
       "maxTokens": 128000,
@@ -9613,13 +9675,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9627,8 +9689,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9687,10 +9749,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.2,
+        "outputPerMillionUsd": 0.4,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
       "maxTokens": 128000,
@@ -9732,13 +9794,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.2,
+          "cachedInputPerMillion": 0.1,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.4,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9746,8 +9808,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9805,10 +9867,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
       "maxTokens": 128000,
@@ -9850,13 +9912,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
+          "inputPerMillion": 0,
           "cachedInputPerMillion": null,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9864,8 +9926,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -9924,10 +9986,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 6,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 500000,
       "maxTokens": 128000,
@@ -9970,13 +10032,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 2,
+          "cachedInputPerMillion": 0.5,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 6,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -9984,8 +10046,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -10043,10 +10105,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 1.25,
+        "outputPerMillionUsd": 2.5,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1000000,
       "maxTokens": 128000,
@@ -10089,13 +10151,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 1.25,
+          "cachedInputPerMillion": 0.2,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 2.5,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -10103,8 +10165,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -10162,10 +10224,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.105,
+        "outputPerMillionUsd": 0.28,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -10208,13 +10270,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.105,
+          "cachedInputPerMillion": 0.028,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.28,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -10222,8 +10284,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -10281,10 +10343,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.435,
+        "outputPerMillionUsd": 0.87,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -10326,13 +10388,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.435,
+          "cachedInputPerMillion": 0.0036,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 0.87,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -10340,8 +10402,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,
@@ -10399,10 +10461,10 @@ window.__MODEL_REGISTRY__ = {
         }
       },
       "pricing": {
-        "inputPerMillionUsd": null,
-        "outputPerMillionUsd": null,
-        "source": "unknown",
-        "note": "N/A until this exact provider route is verified from official pricing or tested billing data."
+        "inputPerMillionUsd": 0.35,
+        "outputPerMillionUsd": 1.1,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 1048576,
       "maxTokens": 128000,
@@ -10444,13 +10506,13 @@ window.__MODEL_REGISTRY__ = {
         },
         "pricing": {
           "kind": "token",
-          "status": "unknown",
+          "status": "verified",
           "currency": "USD",
           "billingUnit": "one_million_tokens",
-          "inputPerMillion": null,
-          "cachedInputPerMillion": null,
+          "inputPerMillion": 0.35,
+          "cachedInputPerMillion": 0.065,
           "cacheWritePerMillion": null,
-          "outputPerMillion": null,
+          "outputPerMillion": 1.1,
           "batchInputPerMillion": null,
           "batchOutputPerMillion": null,
           "reasoningTokens": "unknown",
@@ -10458,8 +10520,8 @@ window.__MODEL_REGISTRY__ = {
             "https://openrouter.ai/api/v1/models",
             "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
           ],
-          "verifiedAt": null,
-          "notes": "N/A until this exact provider route is verified from official pricing or tested billing data."
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
         },
         "reasoning": {
           "supported": true,

@@ -82,25 +82,34 @@ export async function loadRegistrySchema(): Promise<RegistryManagementSchema> {
   }
 }
 
-export async function validateRegistryModel(model: RegistryModel): Promise<{ accepted: boolean; message: string }> {
+export async function saveRegistryModel(model: RegistryModel): Promise<{ accepted: boolean; persisted: boolean; message: string }> {
   try {
     const endpoints = await apiManager.getEndpoints();
     if (!endpoints.registryManagement) {
-      return { accepted: true, message: "Draft looks complete locally. Live validation is unavailable." };
+      return { accepted: false, persisted: false, message: "Registry management endpoint is unavailable; model was not saved." };
     }
     const response = await fetch(`${endpoints.registryManagement}/models`, {
       method: "POST",
       headers: await createHeaders(),
       body: JSON.stringify(model)
     });
-    const payload = (await response.json().catch(() => ({}))) as { accepted?: boolean; message?: string; error?: { message?: string } };
+    const payload = (await response.json().catch(() => ({}))) as {
+      accepted?: boolean;
+      persisted?: boolean;
+      message?: string;
+      error?: { message?: string };
+    };
     if (!response.ok) {
-      return { accepted: false, message: payload.error?.message ?? `Validation failed with HTTP ${response.status}.` };
+      return { accepted: false, persisted: false, message: payload.error?.message ?? `Save failed with HTTP ${response.status}.` };
     }
-    return { accepted: Boolean(payload.accepted), message: payload.message ?? "Draft is valid." };
+    return {
+      accepted: Boolean(payload.accepted),
+      persisted: Boolean(payload.persisted),
+      message: payload.message ?? "Model saved."
+    };
   } catch (error) {
-    logger.warn("RegistryManagement", "Live model validation failed", error);
-    return { accepted: true, message: "Draft kept locally. Live validation endpoint is unavailable." };
+    logger.warn("RegistryManagement", "Live model save failed", error);
+    return { accepted: false, persisted: false, message: "Save failed because the registry endpoint is unavailable." };
   }
 }
 

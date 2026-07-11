@@ -5,8 +5,10 @@ export interface Env {
   PLANNER_RUNTIME: Fetcher;
   DATA: Fetcher;
   REGISTRY: Fetcher;
+  GATEWAY: Fetcher;
   REVOKED_KV?: KVNamespace;
   JWT_SECRET?: string;
+  REGISTRY_MANAGEMENT_TOKEN?: string;
   ENVIRONMENT?: string;
 }
 

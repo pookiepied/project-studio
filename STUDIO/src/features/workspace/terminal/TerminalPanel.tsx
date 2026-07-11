@@ -117,6 +117,8 @@ export interface TerminalPanelProps {
   onWidthChange:      (w: number) => void;
   onClose:            () => void;
   projectCwd?:        string | null;
+  showChrome?:        boolean;
+  showResizeHandle?:  boolean;
 }
 
 // ─── Counters ─────────────────────────────────────────────────────────────────
@@ -138,7 +140,7 @@ function makeTabInfo(num: number): TabInfo {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function TerminalPanel({
-  width, onWidthChange, onClose, projectCwd,
+  width, onWidthChange, onClose, projectCwd, showChrome = true, showResizeHandle = true,
 }: TerminalPanelProps) {
   const [tabs,          setTabs]          = useState<TabInfo[]>(() => [makeTabInfo(1)]);
   const [activeId,      setActiveId]      = useState<string>(() => tabs[0].id);
@@ -393,7 +395,7 @@ export function TerminalPanel({
       style={{ width, minWidth: width }}
     >
       {/* ── Resize handle — invisible, cursor only, shadow does the separation ── */}
-      <ResizeHandle onMouseDown={onResizeDown} />
+      {showResizeHandle && <ResizeHandle onMouseDown={onResizeDown} />}
 
       {/* ── Docked window ── */}
       <div ref={panelRef} className="flex-1 flex flex-col overflow-hidden min-w-0
@@ -401,6 +403,7 @@ export function TerminalPanel({
                       transition-colors duration-300">
 
         {/* ── Window title bar ── */}
+        {showChrome && (
         <div className="flex items-center gap-2.5 px-3 h-10 flex-shrink-0
                         bg-surface-page
                         border-b border-gray-100 dark:border-white/[0.06]
@@ -482,6 +485,7 @@ export function TerminalPanel({
             <Plus size={10} weight="regular" />
           </button>
         </div>
+        )}
 
         {/* ── xterm.js containers (one per tab, hidden when not active) ── */}
         <div className="flex-1 relative overflow-hidden">

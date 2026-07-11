@@ -185,10 +185,10 @@ export const ChatPage = () => {
   // -- Extracted hooks ---------------------------------------------------------
   const {
     browserPanelOpen, setBrowserPanelOpen,
-    browserTabs, activeBrowserTabId, setActiveBrowserTabId,
+    browserTabs, setActiveBrowserTabId,
     setBrowserPanelWidth,
     browserPanelContextValue, handleTabClose,
-    createBrowserTab, ensureBrowserTab, navigateBrowserTab,
+    createBrowserTab, navigateBrowserTab,
     moveBrowserHistory, reloadBrowserTab, setBrowserZoom,
     toggleDeviceToolbar, clearBrowsingData,
   } = useBrowserPanel();
@@ -235,6 +235,8 @@ export const ChatPage = () => {
     setBrowserOpen: setBrowserPanelOpen,
     artifactsOpen: artifactPanelOpen,
     setArtifactsOpen: setArtifactPanelOpen,
+    createBrowserTab,
+    closeBrowserTab: handleTabClose,
   });
 
   // -- Mutually-exclusive top-right panels --------------------------------------
@@ -894,26 +896,25 @@ export const ChatPage = () => {
 
         <RightWorkspacePanel
           open={rightWorkspace.open}
-          homeOpen={rightWorkspace.homeOpen}
-          openViews={rightWorkspace.openViews}
-          activeView={rightWorkspace.activeView}
+          tabs={rightWorkspace.tabs}
+          activeTabId={rightWorkspace.activeTabId}
           onClose={rightWorkspace.closeAll}
-          onCloseView={rightWorkspace.closeView}
-          onOpenView={(view) => {
-            if (view === "browser") ensureBrowserTab();
-            rightWorkspace.openView(view);
+          onCloseTab={rightWorkspace.closeTab}
+          onActivateTab={rightWorkspace.setActiveTabId}
+          onCreateTab={(type, options) => {
+            const id = rightWorkspace.openView(type, {
+              rootPath: projectContext?.path ?? null,
+              cwd: projectContext?.path ?? null,
+              ...options,
+            });
             broadcastPanelOpen("tools");
+            return id;
           }}
+          onUpdateTab={rightWorkspace.updateTab}
           projectContext={projectContext}
           onTerminalWidthChange={setTerminalWidth}
           browserTabs={browserTabs}
-          activeBrowserTabId={activeBrowserTabId}
           onBrowserTabChange={setActiveBrowserTabId}
-          onBrowserTabClose={(id) => {
-            if (browserTabs.length <= 1) rightWorkspace.closeView("browser");
-            handleTabClose(id);
-          }}
-          onBrowserNewTab={() => createBrowserTab()}
           onBrowserNavigate={navigateBrowserTab}
           onBrowserHistory={moveBrowserHistory}
           onBrowserReload={reloadBrowserTab}

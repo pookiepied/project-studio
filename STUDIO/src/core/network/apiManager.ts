@@ -134,7 +134,7 @@ class APIManager {
       memories: `${baseUrl}/adapters/openai/v1/user/memories`,
       mcp: `${baseUrl}/adapters/openai/v1/mcp`,
       adminModes: `${baseUrl}/adapters/openai/v1/admin/modes-config`,
-      registryManagement: `${baseUrl}/management/registry`,
+      registryManagement: `${baseUrl}/studio/gateway/registry`,
       tracking: {
         summary: `${trackingBase}/summary`,
         usage: `${trackingBase}/usage`,

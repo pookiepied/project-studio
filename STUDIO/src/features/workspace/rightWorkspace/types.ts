@@ -5,6 +5,54 @@ export type RightWorkspaceView =
   | "files"
   | "side-chat";
 
+export type WorkspaceTabType = RightWorkspaceView;
+
+export interface BrowserWorkspaceState {
+  browserTabId: string;
+}
+
+export interface TerminalWorkspaceState {
+  cwd?: string | null;
+}
+
+export interface FilesWorkspaceState {
+  rootPath?: string | null;
+  selectedPath?: string | null;
+  expandedPaths: string[];
+}
+
+export interface SideChatWorkspaceState {
+  conversationId?: string | null;
+}
+
+export interface ArtifactWorkspaceState {
+  artifactTabId?: string | null;
+}
+
+export type WorkspaceTabState =
+  | BrowserWorkspaceState
+  | TerminalWorkspaceState
+  | FilesWorkspaceState
+  | SideChatWorkspaceState
+  | ArtifactWorkspaceState;
+
+export interface WorkspaceTab {
+  id: string;
+  type: WorkspaceTabType;
+  title: string;
+  state: WorkspaceTabState;
+}
+
+export interface WorkspaceTabCreateOptions {
+  title?: string;
+  browserTabId?: string;
+  conversationId?: string | null;
+  rootPath?: string | null;
+  selectedPath?: string | null;
+  cwd?: string | null;
+  artifactTabId?: string | null;
+}
+
 export interface ProjectContextLike {
   path: string;
 }

@@ -5,7 +5,7 @@ import { GatewayError, toErrorResponse } from "../../../core/errors";
 import { providers } from "../../../core/registry";
 import type { ImageEditRequest, ImageGenerationRequest, MediaResponse } from "../../../core/types";
 import type { GatewayEnv } from "../../../system/infrastructure/cloudflare/env";
-import { getRegistryModel } from "../../../registry";
+import { getRegistryModelForEnv } from "../../../registry";
 
 export const imagesRoute = new Hono<{ Bindings: GatewayEnv }>();
 
@@ -51,7 +51,7 @@ async function callImageProvider(
   body: ImageGenerationRequest | ImageEditRequest,
   capability: Capability
 ) {
-  const model = getRegistryModel(body.model);
+  const model = await getRegistryModelForEnv(env, body.model);
   if (!model) {
     throw new GatewayError("MODEL_NOT_FOUND", `Model ${body.model} is not registered with the gateway.`);
   }

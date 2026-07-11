@@ -1,62 +1,63 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpIcon as ArrowUp,
   ChatCircleTextIcon as ChatCircleText,
-  XIcon as X,
+  MagnifyingGlassIcon as Search,
+  PlusIcon as Plus,
 } from "@phosphor-icons/react";
 import { ChatProvider, useChat } from "@/features/chat/context";
-import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
+import { useConversationsList } from "@/features/chat/hooks/useConversationsList";
+import { formatDate } from "@/lib/formatters";
 
 interface SideChatPanelProps {
-  width: number;
-  onWidthChange: (width: number) => void;
-  onClose: () => void;
+  initialConversationId?: string | null;
+  onConversationChange?: (conversationId: string | null, title?: string) => void;
 }
 
-function SideChatContent({ width, onWidthChange, onClose }: SideChatPanelProps) {
-  const drag = useRef<{ sx: number; sw: number } | null>(null);
+function SideChatContent({ initialConversationId, onConversationChange }: SideChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+  const [query, setQuery] = useState("");
+  const [selectorOpen, setSelectorOpen] = useState(!initialConversationId);
   const {
+    conversation,
     createNewConversation,
+    loadConversationById,
     displayedMessages,
     sendMessage,
     isLoading,
     isStreaming,
     streamingContent,
+    error,
+    clearError,
   } = useChat();
 
+  const { conversations, reload } = useConversationsList();
+
   useEffect(() => {
-    createNewConversation();
+    if (initialConversationId) {
+      loadConversationById(initialConversationId).catch(() => {});
+    } else {
+      createNewConversation();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialConversationId]);
+
+  useEffect(() => {
+    onConversationChange?.(conversation?.id ?? null, conversation?.title);
+  }, [conversation?.id, conversation?.title, onConversationChange]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [displayedMessages.length, streamingContent]);
 
-  const onResizeDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    drag.current = { sx: e.clientX, sw: width };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    const onMove = (ev: MouseEvent) => {
-      if (!drag.current) return;
-      // Cap at half the window so the chat side always keeps >=50% (rail + text
-      // get crushed otherwise); never exceed 1000 or drop below 340.
-      const maxW = Math.max(340, Math.min(1000, Math.round(window.innerWidth * 0.5)));
-      onWidthChange(Math.max(340, Math.min(maxW, drag.current.sw + (drag.current.sx - ev.clientX))));
-    };
-    const onUp = () => {
-      drag.current = null;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  };
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((conv) =>
+      `${conv.title} ${conv.projectName ?? ""} ${conv.storageScope ?? ""}`.toLowerCase().includes(q),
+    );
+  }, [conversations, query]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -64,90 +65,148 @@ function SideChatContent({ width, onWidthChange, onClose }: SideChatPanelProps) 
     if (!text || isLoading || isStreaming) return;
     setInput("");
     await sendMessage(text, true);
+    reload().catch(() => {});
   };
 
-  const messages = displayedMessages;
+  const startNew = async () => {
+    await createNewConversation();
+    setSelectorOpen(false);
+  };
 
   return (
-    <div className="flex h-full transition-colors duration-300" style={{ width, minWidth: width }}>
-      <ResizeHandle onMouseDown={onResizeDown} />
+    <div className="flex h-full min-h-0 flex-col bg-surface-page">
+      <div className="flex h-9 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
+        <ChatCircleText size={14} className="text-muted" />
+        <button
+          type="button"
+          onClick={() => setSelectorOpen((value) => !value)}
+          className="min-w-0 flex-1 truncate text-left text-xs font-medium text-primary hover:text-secondary"
+        >
+          {conversation?.title ?? "Side chat"}
+        </button>
+        <button
+          type="button"
+          onClick={startNew}
+          title="New side chat"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
+        >
+          <Plus size={13} weight="bold" />
+        </button>
+      </div>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
-        <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
+      {selectorOpen && (
+        <div className="flex-shrink-0 border-b border-surface-divider p-2">
+          <label className="mb-2 flex h-8 items-center gap-2 rounded-xl border border-surface-border bg-surface-base px-3 text-muted">
+            <Search size={13} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search conversations"
+              className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted"
+            />
+          </label>
           <button
             type="button"
-            onClick={onClose}
-            title="Close side chat"
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            onClick={startNew}
+            className="mb-1 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-primary hover:bg-surface-hover"
           >
-            <X size={13} weight="bold" />
+            <Plus size={12} weight="bold" />
+            Start new conversation
           </button>
-          <ChatCircleText size={13} weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
-          <span className="truncate text-xs text-gray-500 dark:text-gray-500">Side chat</span>
-        </div>
-
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          {messages.length === 0 && !streamingContent ? (
-            <div className="flex h-full items-center justify-center text-center">
-              <div className="max-w-[220px]">
-                <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 dark:border-surface-border dark:bg-surface-raised dark:text-gray-500">
-                  <ChatCircleText size={17} weight="regular" />
-                </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">New side chat</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-400 dark:text-gray-600">
-                  Ask without leaving the main conversation.
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.map((conv) => (
+              <button
+                key={conv.id}
+                type="button"
+                onClick={() => {
+                  loadConversationById(conv.id).catch(() => {});
+                  setSelectorOpen(false);
+                }}
+                className={`mb-1 w-full rounded-lg px-2.5 py-2 text-left hover:bg-surface-hover ${
+                  conv.id === conversation?.id ? "bg-surface-selected" : ""
+                }`}
+              >
+                <p className="truncate text-xs font-medium text-primary">{conv.title}</p>
+                <p className="mt-0.5 truncate text-2xs text-muted">
+                  {conv.projectName ?? conv.storageScope ?? "Conversation"} · {formatDate(conv.updatedAt)}
                 </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                    message.role === "user"
-                      ? "ml-8 bg-gray-100 text-gray-800 dark:bg-surface-raised dark:text-gray-200"
-                      : "mr-8 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  {message.content}
-                </div>
-              ))}
-              {streamingContent && (
-                <div className="mr-8 rounded-lg px-3 py-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                  {streamingContent}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={submit} className="flex-shrink-0 border-t border-gray-100 bg-white p-3 dark:border-white/[0.06] dark:bg-surface-page">
-          <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-2 dark:border-white/[0.08] dark:bg-surface-raised">
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              placeholder="Ask side chat"
-              rows={1}
-              className="max-h-28 min-h-6 flex-1 resize-none bg-transparent text-sm leading-5 text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-600"
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || isLoading || isStreaming}
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 text-white transition-opacity disabled:opacity-35 dark:bg-gray-100 dark:text-gray-900"
-              title="Send"
-            >
-              <ArrowUp size={13} weight="bold" />
-            </button>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-2 py-5 text-center text-xs text-muted">No conversations found.</p>
+            )}
           </div>
-        </form>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex-shrink-0 border-b border-surface-divider px-3 py-2 text-xs text-muted">
+          <button type="button" onClick={clearError} className="mr-2 font-medium text-primary">Dismiss</button>
+          {error}
+        </div>
+      )}
+
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {displayedMessages.length === 0 && !streamingContent ? (
+          <div className="flex h-full items-center justify-center text-center">
+            <div className="max-w-[220px]">
+              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-base text-muted">
+                <ChatCircleText size={18} />
+              </div>
+              <p className="text-sm font-semibold text-primary">Independent side chat</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Start a separate thread without changing the main conversation.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {displayedMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                  message.role === "user"
+                    ? "ml-8 bg-surface-selected text-primary"
+                    : "mr-8 text-secondary"
+                }`}
+              >
+                {message.content}
+              </div>
+            ))}
+            {streamingContent && (
+              <div className="mr-8 rounded-xl px-3 py-2 text-sm leading-relaxed text-secondary">
+                {streamingContent}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      <form onSubmit={submit} className="flex-shrink-0 border-t border-surface-divider bg-surface-page p-3">
+        <div className="flex items-end gap-2 rounded-xl border border-surface-border bg-surface-base px-2.5 py-2">
+          <textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder="Ask side chat"
+            rows={1}
+            className="max-h-28 min-h-6 flex-1 resize-none bg-transparent text-sm leading-5 text-primary outline-none placeholder:text-muted"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading || isStreaming}
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-on-emphasis transition-opacity disabled:opacity-35"
+            title="Send"
+          >
+            <ArrowUp size={13} weight="bold" />
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

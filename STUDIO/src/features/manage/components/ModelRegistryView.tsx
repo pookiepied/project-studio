@@ -23,7 +23,7 @@ import { Spinner } from "@/ui/primitives/Spinner";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { ProviderIcon } from "@/features/models/components/ProviderIcon";
 import { categoryLabel, formatNumber, formatPricing, modelSearchText } from "../modelRegistry/formatters";
-import { loadRegistryModels, loadRegistrySchema, validateRegistryModel } from "../modelRegistry/service";
+import { loadRegistryModels, loadRegistrySchema, saveRegistryModel } from "../modelRegistry/service";
 import type { RegistryCategory, RegistryManagementSchema, RegistryModel, RegistryPricingUnit } from "../modelRegistry/types";
 
 interface Props {
@@ -123,12 +123,15 @@ export const ModelRegistryView = ({ onBack }: Props) => {
     });
   };
 
-  const validateDraft = async () => {
+  const saveDraft = async () => {
     if (!activeDraft) return;
     setSaveState("loading");
-    const result = await validateRegistryModel(activeDraft);
-    setSaveState(result.accepted ? "success" : "error");
+    const result = await saveRegistryModel(activeDraft);
+    setSaveState(result.persisted ? "success" : "error");
     setSaveMessage(result.message);
+    if (result.persisted) {
+      await refresh();
+    }
     window.setTimeout(() => setSaveState("idle"), 2500);
   };
 
@@ -246,11 +249,11 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={validateDraft}
+                      onClick={saveDraft}
                       loading={saveState === "loading"}
                       leftIcon={saveState === "success" ? <Success size="xs" /> : <Icon icon={FloppyDisk} size="xs" />}
                     >
-                      Validate
+                      Save
                     </Button>
                   )}
                 </div>

@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { toErrorResponse } from "../core/errors";
 import type { GatewayEnv } from "../system/infrastructure/cloudflare/env";
-import { getModelRegistry } from "./index";
+import { getModelRegistryForEnv } from "./index";
 
 export const modelsRoute = new Hono<{ Bindings: GatewayEnv }>();
 
 modelsRoute.get("/", async (c) => {
   try {
-    const registry = getModelRegistry();
+    const registry = await getModelRegistryForEnv(c.env);
     const providers = Object.fromEntries(
       registry.providers.map((provider) => [
         provider.provider,

@@ -50,6 +50,8 @@ interface BrowserPanelProps {
   width: number;
   onWidthChange: (w: number) => void;
   onClose: () => void;
+  showChrome?: boolean;
+  showResizeHandle?: boolean;
 }
 
 const makeSrcDoc = (html: string) => `<!DOCTYPE html>
@@ -206,6 +208,8 @@ export function BrowserPanel({
   width,
   onWidthChange,
   onClose,
+  showChrome = true,
+  showResizeHandle = true,
 }: BrowserPanelProps) {
   const [addressValue, setAddressValue] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -292,9 +296,10 @@ export function BrowserPanel({
 
   return (
     <div className="flex h-full transition-colors duration-300" style={{ width, minWidth: width }}>
-      <ResizeHandle onMouseDown={onResizeDown} />
+      {showResizeHandle && <ResizeHandle onMouseDown={onResizeDown} />}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
+        {showChrome && (
         <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <div className="flex min-w-0 items-center gap-1">
@@ -352,6 +357,7 @@ export function BrowserPanel({
             <X size={13} weight="bold" />
           </button>
         </div>
+        )}
 
         <div className="flex h-9 flex-shrink-0 items-center gap-1.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
           <button

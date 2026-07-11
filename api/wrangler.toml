@@ -27,6 +27,10 @@ service = "studio-data"
 binding = "REGISTRY"
 service = "studio-registry"
 
+[[services]]
+binding = "GATEWAY"
+service = "studio-gateway"
+
 # Revoked JWT tokens — checked at API edge before identity is forwarded.
 [[kv_namespaces]]
 binding = "REVOKED_KV"
@@ -34,3 +38,7 @@ id = "720a294c0a5844248a4ee8ac6a91fa8f"
 
 [build]
 command = "npm install && npx tsc"
+
+# Secrets:
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put REGISTRY_MANAGEMENT_TOKEN

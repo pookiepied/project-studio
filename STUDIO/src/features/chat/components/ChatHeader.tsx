@@ -207,64 +207,78 @@ export const ChatHeader = ({
   const convMenuRef = useRef<HTMLDivElement>(null);
   useOnClickOutside(convMenuRef, onCloseConvMenu, showConvMenu);
 
+  // The centered work identity: PROJECT / TITLE, feeding the switcher trigger.
+  const titleLabel = (
+    <span className="text-xs font-semibold tracking-extra-wide font-sans text-gray-400 dark:text-gray-600">
+      {projectName && (
+        <>
+          <span className="font-normal text-gray-300 dark:text-gray-700">{projectName.toUpperCase()}</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-700">/</span>
+        </>
+      )}
+      {conversationTitle?.toUpperCase() ?? "NEW CHAT"}
+    </span>
+  );
+
   return (
-    <div className="studio-chat-header flex-shrink-0 px-[3px] py-3 flex items-center justify-between min-w-0 gap-2">
-      <div className="studio-chat-left-zone flex items-center gap-1 min-w-0 flex-1">
+    // Three zones, each with one owner: left = navigation, center = this work,
+    // right = system + panels. Grid so the center is truly centered regardless
+    // of how wide the side zones get.
+    <div className="studio-chat-header flex-shrink-0 px-[3px] py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 min-w-0">
+      {/* Left: navigation only */}
+      <div className="studio-chat-left-zone flex items-center gap-1 min-w-0 justify-self-start">
         {navTrigger}
+      </div>
 
-        <ConversationsDropdown
-          conversations={conversations}
-          currentConvId={currentConvId}
-          showConversations={showConversations}
-          editingConvId={editingConvId}
-          editingConvTitle={editingConvTitle}
-          hoveredConvId={hoveredConvId}
-          projects={projects}
-          currentProjectPath={currentProjectPath}
-          onSelectProject={onSelectProject}
-          onOpenProjectFolder={onOpenProjectFolder}
-          onRemoveProject={onRemoveProject}
-          onDeleteProject={onDeleteProject}
-          onToggle={onToggleConversations}
-          onClose={onCloseConversations}
-          onSelectConversation={onSelectConversation}
-          onNewConversation={onNewConversation}
-          onDeleteConversation={onDeleteConversation}
-          onStartEditTitle={onStartEditTitle}
-          onSaveConvTitle={onSaveConvTitle}
-          onCancelConvEdit={onCancelConvEdit}
-          onEditTitleChange={onEditTitleChange}
-          onHoverConv={onHoverConv}
-          conversationStatuses={conversationStatuses}
-        />
+      {/* Center: the work identity — switcher (title), branch/worktree, context,
+          all in one pill. Clicking the title opens the projects/conversations
+          switcher; branch and context are their own controls inside the pill. */}
+      <div className="studio-chat-center-zone group/header flex min-w-0 items-center justify-self-center">
+        <div className="flex h-8 min-w-0 items-center gap-0.5 rounded-full border border-surface-border bg-surface-base/60 pl-1 pr-1">
+          <ConversationsDropdown
+            label={titleLabel}
+            conversations={conversations}
+            currentConvId={currentConvId}
+            showConversations={showConversations}
+            editingConvId={editingConvId}
+            editingConvTitle={editingConvTitle}
+            hoveredConvId={hoveredConvId}
+            projects={projects}
+            currentProjectPath={currentProjectPath}
+            onSelectProject={onSelectProject}
+            onOpenProjectFolder={onOpenProjectFolder}
+            onRemoveProject={onRemoveProject}
+            onDeleteProject={onDeleteProject}
+            onToggle={onToggleConversations}
+            onClose={onCloseConversations}
+            onSelectConversation={onSelectConversation}
+            onNewConversation={onNewConversation}
+            onDeleteConversation={onDeleteConversation}
+            onStartEditTitle={onStartEditTitle}
+            onSaveConvTitle={onSaveConvTitle}
+            onCancelConvEdit={onCancelConvEdit}
+            onEditTitleChange={onEditTitleChange}
+            onHoverConv={onHoverConv}
+            conversationStatuses={conversationStatuses}
+          />
 
-        {/* Title + ⋯ options */}
-        <div className="studio-chat-title-zone flex items-center gap-0.5 min-w-0 flex-1 group/header">
-          {/* min-w-0 + inner truncating span — the h2 is a flex row (for h-7
-              centering), so text-overflow only works on the inner span. */}
-          <h2 className="studio-chat-inline-title flex h-7 min-w-0 items-center rounded-lg px-1.5 text-xs font-semibold text-gray-400 dark:text-gray-600 tracking-extra-wide font-sans transition-colors duration-300">
-            <span className="min-w-0 truncate">
-              {projectName && (
-                <>
-                  <span className="font-normal text-gray-300 dark:text-gray-700">
-                    {projectName.toUpperCase()}
-                  </span>
-                  <span className="mx-1 text-gray-300 dark:text-gray-700">/</span>
-                </>
-              )}
-              {conversationTitle?.toUpperCase() ?? "NEW CHAT"}
-            </span>
-          </h2>
+          {contextControls && (
+            <>
+              <span className="mx-0.5 h-4 w-px flex-shrink-0 bg-surface-divider" />
+              {contextControls}
+            </>
+          )}
 
+          {/* Chat options — rename / new chat for the current conversation. */}
           <div className="relative flex-shrink-0" ref={convMenuRef}>
             <button
               type="button"
               onClick={onToggleConvMenu}
               title="Chat options"
-              className={`studio-chat-icon-button flex h-7 w-7 items-center justify-center rounded-lg transition-smooth opacity-0 group-hover/header:opacity-100 ${
+              className={`studio-chat-icon-button flex h-6 w-6 items-center justify-center rounded-md transition-smooth ${
                 showConvMenu
-                  ? "opacity-100 bg-gray-100 dark:bg-surface-raised text-gray-600 dark:text-gray-400"
-                  : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-raised"
+                  ? "bg-gray-100 dark:bg-surface-raised text-gray-600 dark:text-gray-400"
+                  : "text-gray-400 dark:text-gray-600 opacity-0 group-hover/header:opacity-100 hover:bg-gray-100 dark:hover:bg-surface-raised"
               }`}
             >
               <DotsThree size={13} weight="bold" />
@@ -277,8 +291,8 @@ export const ChatHeader = ({
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -4 }}
                   transition={{ duration: 0.12, ease: "easeOut" }}
-                  style={{ transformOrigin: "top left" }}
-                  className="absolute left-0 top-full mt-1.5 w-44 bg-white dark:bg-surface-raised border border-gray-200 dark:border-surface-border rounded-xl shadow-lg overflow-hidden z-50"
+                  style={{ transformOrigin: "top right" }}
+                  className="absolute right-0 top-full mt-1.5 w-44 bg-white dark:bg-surface-raised border border-gray-200 dark:border-surface-border rounded-xl shadow-lg overflow-hidden z-50"
                 >
                   <div className="p-1">
                     <button
@@ -303,19 +317,10 @@ export const ChatHeader = ({
             </AnimatePresence>
           </div>
         </div>
-
-        {/* Project state — branch, worktree, context window. Sits with the title
-            because it describes what this conversation is working on. */}
-        {contextControls && (
-          <div className="flex flex-shrink-0 items-center gap-1 pl-1">
-            <span className="mr-0.5 h-4 w-px bg-surface-divider" />
-            {contextControls}
-          </div>
-        )}
       </div>
 
       {/* Right: system controls — environment, notifications, theme, panels. */}
-      <div className="studio-chat-right-zone flex items-center gap-1.5 flex-shrink-0">
+      <div className="studio-chat-right-zone flex items-center gap-1.5 flex-shrink-0 justify-self-end">
         {accountControl}
         {rightControls ?? (
         <>

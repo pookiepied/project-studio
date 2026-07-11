@@ -1,18 +1,11 @@
 /**
- * FloatingPanel — global top-center navigation for the workspace shell.
+ * FloatingPanel - global top-center navigation for the workspace shell.
  *
- * A persistent floating control bar pinned top-center. Structure (left→right):
- *   • brand logo (StudioMark)
- *   • a row of CATEGORY buttons — each opens its own dropdown of related
- *     destinations (a grouped menu bar, not one flat list)
- *   • a theme toggle
- *
- * Only one category dropdown is open at a time. Clicking a destination travels
- * there and closes. Self-contained: carries its own grouped catalogue so the
- * standard NavPopup stays untouched.
+ * The frame and navigation content are exported separately so chat can reuse the
+ * same dock architecture while adding project/conversation state.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChatCircleIcon as ChatCircle,
@@ -45,7 +38,7 @@ interface Category {
   items: NavItem[];
 }
 
-const CATEGORIES: Category[] = [
+export const FLOATING_PANEL_CATEGORIES: Category[] = [
   {
     key: "studio",
     label: "Studio",
@@ -125,7 +118,7 @@ function CategoryMenu({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 460, damping: 30, mass: 0.7 }}
-            className="absolute left-1/2 top-full z-10 mt-2 w-[180px] -translate-x-1/2 overflow-hidden rounded-xl border border-surface-border bg-white dark:bg-surface-raised p-1.5 shadow-lg"
+            className="absolute left-1/2 top-full z-10 mt-2 w-[180px] -translate-x-1/2 overflow-hidden rounded-xl border border-surface-border bg-white p-1.5 shadow-lg dark:bg-surface-raised"
           >
             {category.items.map((item) => {
               const active = currentView === item.id;
@@ -165,17 +158,48 @@ function CategoryMenu({
   );
 }
 
-export function FloatingPanel({
+export function FloatingPanelFrame({
+  children,
+  className = "",
+  dockClassName = "",
+}: {
+  children: ReactNode;
+  className?: string;
+  dockClassName?: string;
+}) {
+  return (
+    <div className={`pointer-events-none fixed inset-x-0 top-[5.5px] z-toast flex justify-center ${className}`}>
+      <motion.div className="pointer-events-auto">
+        <motion.div
+          layout
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{
+            duration: 0.18,
+            ease: "easeOut",
+            layout: { type: "spring", stiffness: 420, damping: 34 },
+          }}
+          className={`flex min-h-[35px] items-center gap-1 rounded-full border border-surface-border bg-surface-base/80 px-1.5 shadow-lg backdrop-blur-xl ${dockClassName}`}
+        >
+          {children}
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}
+
+export function FloatingPanelNavigation({
   currentView,
   onNavigate,
+  onClose,
 }: {
   currentView: View;
   onNavigate: (view: View) => void;
+  onClose?: () => void;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Click-outside + Escape close any open category.
   useEffect(() => {
     if (!openKey) return;
     const onDown = (e: MouseEvent) => {
@@ -195,50 +219,51 @@ export function FloatingPanel({
   const go = (id: View) => {
     onNavigate(id);
     setOpenKey(null);
+    onClose?.();
   };
 
-  // Vertical center pinned in px (not rem) so it stays on the shared top-row
-  // center line regardless of the 14px root font — see WindowTrafficLights
-  // (TOP_ROW_CENTER_Y) and workspaceShell.css (.studio-chat-header).
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[5.5px] z-toast flex justify-center">
-      <motion.div ref={ref} className="pointer-events-auto">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="flex h-[35px] items-center gap-1 rounded-full border border-surface-border bg-surface-base/80 px-1.5 shadow-lg backdrop-blur-xl"
-        >
-          {/* Brand mark */}
-          <button
-            type="button"
-            onClick={() => go("chat")}
-            aria-label="Chat"
-            className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
-          >
-            <StudioMark size={15} className="text-primary" />
-          </button>
+    <div ref={ref} className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => go("chat")}
+        aria-label="Chat"
+        className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
+      >
+        <StudioMark size={15} className="text-primary" />
+      </button>
 
-          <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+      <span className="mx-0.5 h-4 w-px bg-surface-divider" />
 
-          {/* Category menus */}
-          {CATEGORIES.map((cat) => (
-            <CategoryMenu
-              key={cat.key}
-              category={cat}
-              open={openKey === cat.key}
-              onToggle={() => setOpenKey((k) => (k === cat.key ? null : cat.key))}
-              currentView={currentView}
-              onNavigate={go}
-            />
-          ))}
+      {FLOATING_PANEL_CATEGORIES.map((cat) => (
+        <CategoryMenu
+          key={cat.key}
+          category={cat}
+          open={openKey === cat.key}
+          onToggle={() => setOpenKey((k) => (k === cat.key ? null : cat.key))}
+          currentView={currentView}
+          onNavigate={go}
+        />
+      ))}
 
-          <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+      <span className="mx-0.5 h-4 w-px bg-surface-divider" />
 
-          <NotificationBell align="right" />
-          <ThemeToggle />
-        </motion.div>
-      </motion.div>
+      <NotificationBell align="right" />
+      <ThemeToggle />
     </div>
+  );
+}
+
+export function FloatingPanel({
+  currentView,
+  onNavigate,
+}: {
+  currentView: View;
+  onNavigate: (view: View) => void;
+}) {
+  return (
+    <FloatingPanelFrame>
+      <FloatingPanelNavigation currentView={currentView} onNavigate={onNavigate} />
+    </FloatingPanelFrame>
   );
 }

@@ -51,7 +51,7 @@ function createEnv(): GatewayEnv {
     CF_AIG_BYOK_ALIAS: "production",
     CF_AIG_TOKEN: "cf-token",
     CREDITS_KV: createKv(),
-    ADMIN_KV: createKv()
+    MODEL_REGISTRY_KV: createKv()
   };
 }
 
@@ -267,6 +267,118 @@ describe("gateway worker", () => {
     expect(body.source).toBe("studio-curated");
     expect(body.registryVersion).toBeDefined();
     expect(body.data.some((model) => model.id === "openai:gpt-5.5")).toBe(true);
+  });
+
+  it("persists registry model additions through MODEL_REGISTRY_KV and exposes them from /v1/models", async () => {
+    const env = createEnv();
+    const catalogResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const catalog = (await catalogResponse.json()) as { data: Array<Record<string, unknown>> };
+    const base = catalog.data.find((model) => model.id === "openai:gpt-5.6-sol") as Record<string, unknown>;
+    const custom = {
+      ...base,
+      id: "openai:gpt-admin-test",
+      providerModelId: "gpt-admin-test",
+      displayName: "GPT Admin Test",
+      registry: {
+        ...(base.registry as Record<string, unknown>),
+        aliases: ["gpt-admin-test"],
+        version: "gpt-admin-test"
+      }
+    };
+
+    const saveResponse = await worker.fetch(
+      new Request("https://gateway.test/management/registry/models", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(custom)
+      }),
+      env,
+      {} as ExecutionContext
+    );
+    const saveBody = (await saveResponse.json()) as { persisted: boolean };
+    expect(saveResponse.status).toBe(200);
+    expect(saveBody.persisted).toBe(true);
+
+    const updatedResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const updated = (await updatedResponse.json()) as { data: Array<{ id: string; displayName?: string }> };
+    expect(updated.data.some((model) => model.id === "openai:gpt-admin-test" && model.displayName === "GPT Admin Test")).toBe(true);
+  });
+
+  it("requires the internal registry management token when configured", async () => {
+    const env = { ...createEnv(), REGISTRY_MANAGEMENT_TOKEN: "registry-secret" };
+
+    const denied = await worker.fetch(
+      new Request("https://gateway.test/management/registry/export"),
+      env,
+      {} as ExecutionContext
+    );
+    expect(denied.status).toBe(403);
+
+    const allowed = await worker.fetch(
+      new Request("https://gateway.test/management/registry/export", {
+        headers: { "x-studio-registry-management-token": "registry-secret" }
+      }),
+      env,
+      {} as ExecutionContext
+    );
+    expect(allowed.status).toBe(200);
+  });
+
+  it("routes chat requests through a persisted registry model", async () => {
+    const env = createEnv();
+    const catalogResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const catalog = (await catalogResponse.json()) as { data: Array<Record<string, unknown>> };
+    const base = catalog.data.find((model) => model.id === "openai:gpt-5.6-sol") as Record<string, unknown>;
+    const custom = {
+      ...base,
+      id: "openai:gpt-admin-routing-test",
+      providerModelId: "gpt-admin-routing-test",
+      displayName: "GPT Admin Routing Test",
+      registry: {
+        ...(base.registry as Record<string, unknown>),
+        aliases: ["gpt-admin-routing-test"],
+        version: "gpt-admin-routing-test"
+      }
+    };
+
+    await worker.fetch(
+      new Request("https://gateway.test/management/registry/models", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(custom)
+      }),
+      env,
+      {} as ExecutionContext
+    );
+
+    vi.mocked(generateText).mockResolvedValue({
+      text: "custom model routed",
+      finishReason: "stop",
+      usage: { inputTokens: 1, outputTokens: 2 },
+      toolCalls: []
+    } as never);
+
+    const response = await postChat(env, {
+      model: "openai:gpt-admin-routing-test",
+      messages: [{ role: "user", content: "Say hello" }]
+    });
+
+    const body = (await response.json()) as { choices: Array<{ message: { content: string } }> };
+    expect(response.status).toBe(200);
+    expect(body.choices[0].message.content).toBe("custom model routed");
+    expect(generateText).toHaveBeenCalledOnce();
   });
 
   it("sends CF AI Gateway headers and strips provider Authorization", async () => {

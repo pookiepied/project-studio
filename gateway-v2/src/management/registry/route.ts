@@ -1,23 +1,54 @@
 import { Hono } from "hono";
+import type { Context, Next } from "hono";
 import { GatewayError, toErrorResponse } from "../../core/errors";
 import type { GatewayEnv } from "../../system/infrastructure/cloudflare/env";
-import { exportRegistry, listRegistryModels, readRegistryModel } from "./repository";
+import {
+  exportRegistry,
+  listRegistryModels,
+  readRegistryModel,
+  replacePersistedRegistryModels,
+  upsertRegistryModel
+} from "./repository";
 import { registryManagementSchema } from "./schema";
 import { assertRegistryModelPayload, validateRegistryModelsPayload } from "./validators";
 
 export const registryManagementRoute = new Hono<{ Bindings: GatewayEnv }>();
 
-registryManagementRoute.get("/models", (c) => {
+registryManagementRoute.use("*", requireRegistryManagementToken);
+
+async function requireRegistryManagementToken(c: Context<{ Bindings: GatewayEnv }>, next: Next) {
+  const expectedToken = c.env.REGISTRY_MANAGEMENT_TOKEN;
+  if (!expectedToken) {
+    if (c.env.ENVIRONMENT === "production") {
+      return toErrorResponse(
+        new GatewayError("PROVIDER_UNAVAILABLE", "Registry management is not configured for this gateway.", {
+          status: 503
+        })
+      );
+    }
+    return next();
+  }
+
+  const token = c.req.header("x-studio-registry-management-token");
+  if (token !== expectedToken) {
+    return toErrorResponse(
+      new GatewayError("VALIDATION_ERROR", "Registry management token is invalid or missing.", { status: 403 })
+    );
+  }
+  return next();
+}
+
+registryManagementRoute.get("/models", async (c) => {
   try {
-    return c.json({ object: "list", data: listRegistryModels() });
+    return c.json({ object: "list", data: await listRegistryModels(c.env) });
   } catch (error) {
     return toErrorResponse(error);
   }
 });
 
-registryManagementRoute.get("/models/:id", (c) => {
+registryManagementRoute.get("/models/:id", async (c) => {
   try {
-    const model = readRegistryModel(decodeURIComponent(c.req.param("id")));
+    const model = await readRegistryModel(c.env, decodeURIComponent(c.req.param("id")));
     if (!model) {
       throw new GatewayError("MODEL_NOT_FOUND", "Registry model was not found.");
     }
@@ -29,12 +60,14 @@ registryManagementRoute.get("/models/:id", (c) => {
 
 registryManagementRoute.post("/models", async (c) => {
   try {
-    const model = assertRegistryModelPayload(await c.req.json());
+    const model = await assertRegistryModelPayload(c.env, await c.req.json());
+    const persistedModels = await upsertRegistryModel(c.env, model);
     return c.json({
-      object: "registry.validation",
+      object: "registry.model",
       accepted: true,
-      persisted: false,
-      message: "Model payload is valid. Persistence is intentionally deferred until registry storage is added.",
+      persisted: true,
+      persistedModelCount: persistedModels.length,
+      message: "Model saved to the curated registry override store.",
       data: model
     });
   } catch (error) {
@@ -45,15 +78,17 @@ registryManagementRoute.post("/models", async (c) => {
 registryManagementRoute.put("/models/:id", async (c) => {
   try {
     const id = decodeURIComponent(c.req.param("id"));
-    const model = assertRegistryModelPayload(await c.req.json());
+    const model = await assertRegistryModelPayload(c.env, await c.req.json());
     if (model.id !== id) {
       throw new GatewayError("VALIDATION_ERROR", "Route id must match model.id.");
     }
+    const persistedModels = await upsertRegistryModel(c.env, model);
     return c.json({
-      object: "registry.validation",
+      object: "registry.model",
       accepted: true,
-      persisted: false,
-      message: "Model update payload is valid. Persistence is intentionally deferred until registry storage is added.",
+      persisted: true,
+      persistedModelCount: persistedModels.length,
+      message: "Model saved to the curated registry override store.",
       data: model
     });
   } catch (error) {
@@ -63,13 +98,15 @@ registryManagementRoute.put("/models/:id", async (c) => {
 
 registryManagementRoute.post("/import", async (c) => {
   try {
-    const models = validateRegistryModelsPayload(await c.req.json());
+    const models = await validateRegistryModelsPayload(c.env, await c.req.json());
+    const persistedModels = await replacePersistedRegistryModels(c.env, models);
     return c.json({
-      object: "registry.validation",
+      object: "registry.import",
       accepted: true,
-      persisted: false,
+      persisted: true,
       modelCount: models.length,
-      message: "Import payload is valid. Persistence is intentionally deferred until registry storage is added."
+      persistedModelCount: persistedModels.length,
+      message: "Import saved to the curated registry override store."
     });
   } catch (error) {
     return toErrorResponse(error);
@@ -78,16 +115,16 @@ registryManagementRoute.post("/import", async (c) => {
 
 registryManagementRoute.post("/validate", async (c) => {
   try {
-    const models = validateRegistryModelsPayload(await c.req.json());
+    const models = await validateRegistryModelsPayload(c.env, await c.req.json());
     return c.json({ object: "registry.validation", valid: true, modelCount: models.length });
   } catch (error) {
     return toErrorResponse(error);
   }
 });
 
-registryManagementRoute.get("/export", (c) => {
+registryManagementRoute.get("/export", async (c) => {
   try {
-    return c.json(exportRegistry());
+    return c.json(await exportRegistry(c.env));
   } catch (error) {
     return toErrorResponse(error);
   }
