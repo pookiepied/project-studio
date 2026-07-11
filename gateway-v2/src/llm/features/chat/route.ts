@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { GatewayError, toErrorResponse } from "../../../core/errors";
 import { providers } from "../../../core/registry";
 import { assertChatRequestAllowed, assertValidChatBody, normalizeChatRequest } from "../../../core/validation";
-import { getServedCatalog } from "../../discovery/catalog";
+import { getRegistryModel } from "../../../registry";
 import type { GatewayEnv } from "../../../system/infrastructure/cloudflare/env";
 
 export const chatRoute = new Hono<{ Bindings: GatewayEnv }>();
@@ -13,10 +13,7 @@ chatRoute.post("/", async (c) => {
     assertValidChatBody(rawBody);
     const body = normalizeChatRequest(rawBody);
 
-    const catalog = await getServedCatalog(c.env);
-    const model = catalog.models.find(
-      (candidate) => candidate.id === body.model || candidate.providerModelId === body.model
-    );
+    const model = getRegistryModel(body.model);
     if (!model) {
       throw new GatewayError("MODEL_NOT_FOUND", `Model ${body.model} is not registered with the gateway.`);
     }

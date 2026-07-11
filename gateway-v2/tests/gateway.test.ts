@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
 import { getTransport } from "../src/core/transport";
-import { listOpenAIModels } from "../src/llm/providers/openai/models";
-import { listAnthropicModels } from "../src/llm/providers/anthropic/models";
-import { listGroqModels } from "../src/llm/providers/groq/models";
-import { listXaiModels } from "../src/llm/providers/xai/models";
-import { listDeepSeekModels } from "../src/llm/providers/deepseek/models";
-import { listMistralModels } from "../src/llm/providers/mistral/models";
 import type { GatewayEnv } from "../src/system/infrastructure/cloudflare/env";
 import {
   embed,
@@ -56,7 +50,6 @@ function createEnv(): GatewayEnv {
     CF_AIG_GATEWAY_NAME: "studio-gateway",
     CF_AIG_BYOK_ALIAS: "production",
     CF_AIG_TOKEN: "cf-token",
-    MODELS_KV: createKv(),
     CREDITS_KV: createKv(),
     ADMIN_KV: createKv()
   };
@@ -67,13 +60,7 @@ function mockModelsFetch() {
     "fetch",
     vi.fn(async () =>
       Response.json({
-        data: [
-          { id: "gpt-5", created: 1 },
-          { id: "gpt-5.5", created: 2 },
-          { id: "gpt-4o", created: 2 },
-          { id: "gpt-4o-mini-search-preview", created: 3 },
-          { id: "gpt-3.5-turbo", created: 4 }
-        ]
+        data: []
       })
     )
   );
@@ -125,7 +112,7 @@ describe("gateway worker", () => {
     const body = (await response.json()) as { data: Array<{ id: string }> };
     expect(response.status).toBe(200);
     expect(body).toMatchObject({ object: "list" });
-    expect(body.data.some((model: { id: string }) => model.id === "openai:gpt-5")).toBe(true);
+    expect(body.data.some((model: { id: string }) => model.id === "openai:gpt-5.6-sol")).toBe(true);
   });
 
   it("handles a non-streaming chat completion", async () => {
@@ -137,7 +124,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "gpt-5",
+      model: "gpt-5.6-sol",
       messages: [{ role: "user", content: "Say hello" }]
     });
 
@@ -156,7 +143,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "gpt-5",
+      model: "gpt-5.6-sol",
       stream: true,
       messages: [{ role: "user", content: "Say hello" }]
     });
@@ -176,7 +163,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "gpt-5",
+      model: "gpt-5.6-sol",
       messages: [{ role: "user", content: "Use a tool" }],
       tools: [
         {
@@ -203,7 +190,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "gpt-4o",
+      model: "gpt-5.6-sol",
       messages: [
         {
           role: "user",
@@ -221,7 +208,7 @@ describe("gateway worker", () => {
 
   it("rejects unsupported capabilities before calling the provider", async () => {
     const response = await postChat(createEnv(), {
-      model: "gpt-3.5-turbo",
+      model: "openai/gpt-oss-20b",
       messages: [
         {
           role: "user",
@@ -241,15 +228,15 @@ describe("gateway worker", () => {
 
   it("rejects unsupported reasoning effort values before calling the provider", async () => {
     const response = await postChat(createEnv(), {
-      model: "gpt-5.4-mini",
-      reasoningEffort: "xhigh",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "minimal",
       messages: [{ role: "user", content: "Think carefully" }]
     });
 
     const body = (await response.json()) as { error: { code: string; message: string } };
     expect(response.status).toBe(400);
     expect(body.error.code).toBe("CAPABILITY_NOT_SUPPORTED");
-    expect(body.error.message).toContain("xhigh");
+    expect(body.error.message).toContain("minimal");
     expect(generateText).not.toHaveBeenCalled();
   });
 
@@ -269,23 +256,17 @@ describe("gateway worker", () => {
     expect(gpt55.capabilities.chat.reasoning.efforts).toContain("xhigh");
   });
 
-  it("uses a family-rule reasoning fallback for newer GPT-5.x models", async () => {
-    const discovered = await listOpenAIModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [{ id: "gpt-5.6", created: 10 }]
-        })
-      ) as typeof fetch
-    });
-    const gpt56 = discovered.find((model) => model.id === "openai:gpt-5.6") as {
-      capabilities: { chat: { reasoning: { source: string; confidence: string; efforts: string[] } } };
-    };
+  it("serves only Studio-curated registry metadata for models", async () => {
+    const response = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      createEnv(),
+      {} as ExecutionContext
+    );
+    const body = (await response.json()) as { source: string; registryVersion: string; data: Array<{ id: string }> };
 
-    expect(gpt56).toBeDefined();
-    expect(gpt56.capabilities.chat.reasoning.source).toBe("family-rule");
-    expect(gpt56.capabilities.chat.reasoning.confidence).toBe("family");
-    expect(gpt56.capabilities.chat.reasoning.efforts).toEqual(["none", "low", "medium", "high", "xhigh"]);
+    expect(body.source).toBe("studio-curated");
+    expect(body.registryVersion).toBeDefined();
+    expect(body.data.some((model) => model.id === "openai:gpt-5.5")).toBe(true);
   });
 
   it("sends CF AI Gateway headers and strips provider Authorization", async () => {
@@ -337,7 +318,7 @@ describe("gateway worker", () => {
     } as never);
 
     const form = new FormData();
-    form.set("model", "whisper-1");
+    form.set("model", "gpt-4o-transcribe");
     form.set("file", new File([new Uint8Array([1, 2, 3])], "sample.wav", { type: "audio/wav" }));
 
     const response = await worker.fetch(
@@ -364,7 +345,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/audio/speech", {
-      model: "tts-1",
+      model: "gpt-4o-mini-tts",
       input: "hello",
       voice: "alloy"
     });
@@ -388,7 +369,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/images/generations", {
-      model: "gpt-image-1",
+      model: "gpt-image-2",
       prompt: "A tiny test image"
     });
 
@@ -506,7 +487,7 @@ describe("gateway worker", () => {
     expect(embed).not.toHaveBeenCalled();
   });
 
-  it("marks exact reviewed reasoning metadata for a seeded Claude model", async () => {
+  it("marks exact reviewed reasoning metadata for a curated Claude model", async () => {
     const response = await worker.fetch(
       new Request("https://gateway.test/v1/models"),
       createEnv(),
@@ -522,23 +503,6 @@ describe("gateway worker", () => {
     expect(opus.capabilities.chat.reasoning.efforts).toContain("xhigh");
   });
 
-  it("uses a family-rule reasoning fallback for a discovered Claude model", async () => {
-    const discovered = await listAnthropicModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [{ id: "claude-sonnet-4-6", created_at: "2026-01-01T00:00:00Z" }]
-        })
-      ) as typeof fetch
-    });
-    const sonnet = discovered.find((model) => model.id === "anthropic:claude-sonnet-4-6") as {
-      capabilities: { chat: { reasoning: { source: string; confidence: string } } };
-    };
-
-    expect(sonnet).toBeDefined();
-    expect(sonnet.capabilities.chat.reasoning.source).toBe("family-rule");
-    expect(sonnet.capabilities.chat.reasoning.confidence).toBe("family");
-  });
 
   it("routes Anthropic through CF AI Gateway and strips the provider x-api-key header", async () => {
     const seen = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -573,7 +537,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [{ role: "user", content: "Say hello" }]
     });
 
@@ -613,7 +577,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       messages: [{ role: "user", content: "Use a tool" }],
       tools: [
         {
@@ -665,7 +629,7 @@ describe("gateway worker", () => {
     expect(call.providerOptions.groq.parallelToolCalls).toBeUndefined();
   });
 
-  it("accepts vision input for a vision-capable Groq (Llama 4) model", async () => {
+  it("accepts vision input for a vision-capable Groq Qwen model", async () => {
     vi.mocked(generateText).mockResolvedValue({
       text: "that is an image",
       finishReason: "stop",
@@ -674,7 +638,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      model: "qwen/qwen3.6-27b",
       messages: [
         {
           role: "user",
@@ -692,7 +656,7 @@ describe("gateway worker", () => {
 
   it("rejects vision input for a text-only Groq model before calling the provider", async () => {
     const response = await postChat(createEnv(), {
-      model: "llama-3.1-8b-instant",
+      model: "openai/gpt-oss-20b",
       messages: [
         {
           role: "user",
@@ -764,33 +728,6 @@ describe("gateway worker", () => {
     expect(experimental_transcribe).toHaveBeenCalledOnce();
   });
 
-  it("handles Groq Orpheus text-to-speech via the transport (no AI SDK speech model)", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = typeof input === "string" ? input : input.toString();
-        if (url.endsWith("/audio/speech")) {
-          // Assert the request went through CF AI Gateway with the provider key stripped.
-          const headers = new Headers(init?.headers);
-          expect(headers.get("cf-aig-authorization")).toBe("Bearer cf-token");
-          expect(headers.has("authorization")).toBe(false);
-          return new Response(new Uint8Array([9, 8, 7]), { headers: { "content-type": "audio/wav" } });
-        }
-        return Response.json({ data: [] });
-      })
-    );
-
-    const response = await postJson(createEnv(), "/v1/audio/speech", {
-      model: "canopylabs/orpheus-v1-english",
-      input: "hello",
-      voice: "troy"
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("audio/wav");
-    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([9, 8, 7]));
-  });
-
   it("rejects tools requested on a Groq Whisper (STT) model", async () => {
     const response = await postChat(createEnv(), {
       model: "whisper-large-v3",
@@ -808,7 +745,7 @@ describe("gateway worker", () => {
     vi.mocked(embed).mockResolvedValue({ embedding: [0.1], usage: {} } as never);
 
     const response = await postJson(createEnv(), "/v1/embeddings", {
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
       input: "hello"
     });
 
@@ -818,27 +755,20 @@ describe("gateway worker", () => {
     expect(embed).not.toHaveBeenCalled();
   });
 
-  it("excludes Groq safety/guard models from the catalog", async () => {
-    const discovered = await listGroqModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [
-            { id: "llama-3.3-70b-versatile", created: 1 },
-            { id: "meta-llama/llama-guard-4-12b", created: 2 },
-            { id: "meta-llama/llama-prompt-guard-2-86m", created: 3 },
-            { id: "openai/gpt-oss-safeguard-20b", created: 4 }
-          ]
-        })
-      ) as typeof fetch
-    });
+  it("excludes Groq safety/guard models from the curated catalog", async () => {
+    const response = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      createEnv(),
+      {} as ExecutionContext
+    );
+    const body = (await response.json()) as { data: Array<{ id: string; provider: string }> };
+    const ids = body.data.filter((model) => model.provider === "groq").map((model) => model.id);
 
-    const ids = discovered.map((model) => model.id);
-    expect(ids).toContain("groq:llama-3.3-70b-versatile");
+    expect(ids).toContain("groq:openai/gpt-oss-20b");
     expect(ids.some((id) => /guard/.test(id))).toBe(false);
   });
 
-  it("marks exact reviewed reasoning metadata for a seeded Groq (gpt-oss) model", async () => {
+  it("marks exact reviewed reasoning metadata for a curated Groq (gpt-oss) model", async () => {
     const response = await worker.fetch(
       new Request("https://gateway.test/v1/models"),
       createEnv(),
@@ -854,23 +784,6 @@ describe("gateway worker", () => {
     expect(gptOss.capabilities.chat.reasoning.efforts).toEqual(["low", "medium", "high"]);
   });
 
-  it("uses a family-rule reasoning fallback for a discovered Groq gpt-oss model", async () => {
-    const discovered = await listGroqModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [{ id: "openai/gpt-oss-70b", created: 10 }]
-        })
-      ) as typeof fetch
-    });
-    const gptOss = discovered.find((model) => model.id === "groq:openai/gpt-oss-70b") as {
-      capabilities: { chat: { reasoning: { source: string; confidence: string } } };
-    };
-
-    expect(gptOss).toBeDefined();
-    expect(gptOss.capabilities.chat.reasoning.source).toBe("family-rule");
-    expect(gptOss.capabilities.chat.reasoning.confidence).toBe("family");
-  });
 
   it("routes Groq through CF AI Gateway and strips the provider Authorization header", async () => {
     const seen = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -924,7 +837,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "grok-4.20-0309-non-reasoning",
+      model: "grok-4.5",
       stream: true,
       messages: [{ role: "user", content: "Say hello" }]
     });
@@ -987,27 +900,7 @@ describe("gateway worker", () => {
     expect(generateText).toHaveBeenCalledOnce();
   });
 
-  it("rejects vision input for a text-only Grok model (grok-3-mini) before calling the provider", async () => {
-    const response = await postChat(createEnv(), {
-      model: "grok-3-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "What is this?" },
-            { type: "image", image: "data:image/png;base64,abc", mediaType: "image/png" }
-          ]
-        }
-      ]
-    });
-
-    const body = (await response.json()) as { error: { code: string } };
-    expect(response.status).toBe(400);
-    expect(body.error.code).toBe("CAPABILITY_NOT_SUPPORTED");
-    expect(generateText).not.toHaveBeenCalled();
-  });
-
-  it("marks exact reviewed reasoning metadata for a seeded Grok model (grok-4.3)", async () => {
+  it("marks exact reviewed reasoning metadata for a curated Grok model (grok-4.3)", async () => {
     const response = await worker.fetch(
       new Request("https://gateway.test/v1/models"),
       createEnv(),
@@ -1023,41 +916,6 @@ describe("gateway worker", () => {
     expect(grok43.capabilities.chat.reasoning.efforts).toEqual(["none", "low", "medium", "high"]);
   });
 
-  it("uses a family-rule reasoning fallback for a discovered Grok reasoning variant", async () => {
-    const discovered = await listXaiModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [{ id: "grok-4.20-reasoning", created: 10 }]
-        })
-      ) as typeof fetch
-    });
-    const grokReasoning = discovered.find((model) => model.id === "xai:grok-4.20-reasoning") as {
-      capabilities: { chat: { reasoning: { source: string; confidence: string } } };
-    };
-
-    expect(grokReasoning).toBeDefined();
-    expect(grokReasoning.capabilities.chat.reasoning.source).toBe("family-rule");
-    expect(grokReasoning.capabilities.chat.reasoning.confidence).toBe("family");
-  });
-
-  it("declares reasoning unsupported for a non-reasoning Grok variant", async () => {
-    const discovered = await listXaiModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [{ id: "grok-4.20-0309-non-reasoning", created: 10 }]
-        })
-      ) as typeof fetch
-    });
-    const nonReasoning = discovered.find((model) => model.id === "xai:grok-4.20-0309-non-reasoning") as {
-      capabilities: { chat: { reasoning: { supported: boolean; source: string; confidence: string } } };
-    };
-
-    expect(nonReasoning).toBeDefined();
-    expect(nonReasoning.capabilities.chat.reasoning.supported).toBe(false);
-    expect(nonReasoning.capabilities.chat.reasoning.confidence).toBe("unknown");
-  });
 
   it("maps xAI reasoning effort straight through to providerOptions.xai.reasoningEffort", async () => {
     vi.mocked(generateText).mockResolvedValue({ text: "ok", finishReason: "stop", usage: {}, toolCalls: [] } as never);
@@ -1260,7 +1118,7 @@ describe("gateway worker", () => {
     expect(embed).not.toHaveBeenCalled();
   });
 
-  it("marks exact reviewed reasoning metadata for a seeded DeepSeek model (deepseek-v4-flash)", async () => {
+  it("marks exact reviewed reasoning metadata for a curated DeepSeek model (deepseek-v4-flash)", async () => {
     const response = await worker.fetch(
       new Request("https://gateway.test/v1/models"),
       createEnv(),
@@ -1276,23 +1134,6 @@ describe("gateway worker", () => {
     expect(flash.capabilities.chat.reasoning.efforts).toEqual(["none", "low", "medium", "high", "xhigh"]);
   });
 
-  it("uses a family-rule reasoning fallback for a discovered DeepSeek v4 model", async () => {
-    const discovered = await listDeepSeekModels({
-      env: createEnv(),
-      fetch: vi.fn(async () =>
-        Response.json({
-          data: [{ id: "deepseek-v4-turbo", created: 10 }]
-        })
-      ) as typeof fetch
-    });
-    const turbo = discovered.find((model) => model.id === "deepseek:deepseek-v4-turbo") as {
-      capabilities: { chat: { reasoning: { source: string; confidence: string } } };
-    };
-
-    expect(turbo).toBeDefined();
-    expect(turbo.capabilities.chat.reasoning.source).toBe("family-rule");
-    expect(turbo.capabilities.chat.reasoning.confidence).toBe("family");
-  });
 
   it("routes DeepSeek through CF AI Gateway and strips the provider Authorization header", async () => {
     const seen = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -1342,7 +1183,7 @@ describe("gateway worker", () => {
     } as never);
 
     await postChat(createEnv(), {
-      model: "gpt-5",
+      model: "gpt-5.6-sol",
       messages: [{ role: "user", content: "Give me a person" }],
       responseFormat: PERSON_JSON_SCHEMA
     });
@@ -1378,7 +1219,7 @@ describe("gateway worker", () => {
     } as never);
 
     await postChat(createEnv(), {
-      // Groq supports json_schema only on gpt-oss (strict) and llama-4 (best-effort).
+      // Groq supports json_schema on the curated gpt-oss routes.
       model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: "Give me a person" }],
       responseFormat: PERSON_JSON_SCHEMA
@@ -1406,9 +1247,9 @@ describe("gateway worker", () => {
     expect(call.experimental_output).toBeDefined();
   });
 
-  it("rejects json_schema on a Groq model that only supports json_object (llama-3.x)", async () => {
+  it("rejects json_schema on a Groq model that only supports json_object", async () => {
     const response = await postChat(createEnv(), {
-      model: "llama-3.3-70b-versatile",
+      model: "qwen/qwen3-32b",
       messages: [{ role: "user", content: "Give me a person" }],
       responseFormat: PERSON_JSON_SCHEMA
     });
@@ -1428,7 +1269,7 @@ describe("gateway worker", () => {
     } as never);
 
     await postChat(createEnv(), {
-      model: "gpt-5",
+      model: "gpt-5.6-sol",
       messages: [{ role: "user", content: "hi" }]
     });
 
@@ -1449,7 +1290,7 @@ describe("gateway worker", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 
-  // ── Mistral (OpenAI-wire-compatible: chat + embeddings) ────────────────────
+  // ── Mistral (OpenAI-wire-compatible: curated chat) ─────────────────────────
 
   it("handles a non-streaming Mistral chat completion", async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -1460,7 +1301,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "mistral-large-latest",
+      model: "mistral-medium-3.5",
       messages: [{ role: "user", content: "Say hello" }]
     });
 
@@ -1479,7 +1320,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postChat(createEnv(), {
-      model: "mistral-large-latest",
+      model: "mistral-medium-3.5",
       stream: true,
       messages: [{ role: "user", content: "Say hello" }]
     });
@@ -1490,24 +1331,9 @@ describe("gateway worker", () => {
     expect(text).toContain("[DONE]");
   });
 
-  it("maps Mistral reasoning effort onto the binary none|high option (Magistral)", async () => {
-    vi.mocked(generateText).mockResolvedValue({ text: "ok", finishReason: "stop", usage: {}, toolCalls: [] } as never);
-
-    await postChat(createEnv(), {
-      model: "magistral-medium-latest",
-      reasoningEffort: "high",
-      messages: [{ role: "user", content: "Think" }]
-    });
-
-    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
-      providerOptions: { mistral: { reasoningEffort?: string } };
-    };
-    expect(call.providerOptions.mistral.reasoningEffort).toBe("high");
-  });
-
-  it("rejects an unsupported reasoning effort on Magistral (only none|high exist)", async () => {
+  it("rejects reasoning effort on the curated non-reasoning Mistral model", async () => {
     const response = await postChat(createEnv(), {
-      model: "magistral-medium-latest",
+      model: "mistral-medium-3.5",
       reasoningEffort: "medium",
       messages: [{ role: "user", content: "Think" }]
     });
@@ -1518,7 +1344,7 @@ describe("gateway worker", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 
-  it("accepts vision input for a Pixtral model but rejects it for text-only Mistral Large", async () => {
+  it("accepts vision input for the curated Mistral model", async () => {
     vi.mocked(generateText).mockResolvedValue({ text: "an image", finishReason: "stop", usage: {}, toolCalls: [] } as never);
 
     const visionMessage = [
@@ -1526,49 +1352,27 @@ describe("gateway worker", () => {
       { type: "image" as const, image: "data:image/png;base64,abc", mediaType: "image/png" }
     ];
 
-    const pixtral = await postChat(createEnv(), {
-      model: "pixtral-large-latest",
+    const response = await postChat(createEnv(), {
+      model: "mistral-medium-3.5",
       messages: [{ role: "user", content: visionMessage }]
     });
-    expect(pixtral.status).toBe(200);
-
-    const large = await postChat(createEnv(), {
-      model: "mistral-large-latest",
-      messages: [{ role: "user", content: visionMessage }]
-    });
-    const body = (await large.json()) as { error: { code: string } };
-    expect(large.status).toBe(400);
-    expect(body.error.code).toBe("CAPABILITY_NOT_SUPPORTED");
+    expect(response.status).toBe(200);
   });
 
-  it("handles Mistral embeddings", async () => {
+  it("rejects embeddings on Mistral before calling the provider", async () => {
     vi.mocked(embed).mockResolvedValue({ embedding: [0.4, 0.5], usage: { tokens: 2 } } as never);
 
     const response = await postJson(createEnv(), "/v1/embeddings", {
-      model: "mistral-embed",
+      model: "mistral-medium-3.5",
       input: "hello"
     });
 
-    const body = (await response.json()) as { data: Array<{ embedding: number[] }> };
-    expect(response.status).toBe(200);
-    expect(body.data[0].embedding).toEqual([0.4, 0.5]);
-    expect(embed).toHaveBeenCalledOnce();
+    const body = (await response.json()) as { error: { code: string } };
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("CAPABILITY_NOT_SUPPORTED");
+    expect(embed).not.toHaveBeenCalled();
   });
 
-  it("uses a family-rule reasoning fallback for a discovered Magistral model", async () => {
-    const discovered = await listMistralModels({
-      env: createEnv(),
-      fetch: vi.fn(async () => Response.json({ data: [{ id: "magistral-medium-2510", created: 1 }] })) as typeof fetch
-    });
-    const magistral = discovered.find((model) => model.id === "mistral:magistral-medium-2510") as {
-      capabilities: { chat: { reasoning: { supported: boolean; source: string; confidence: string; efforts: string[] } } };
-    };
-
-    expect(magistral).toBeDefined();
-    expect(magistral.capabilities.chat.reasoning.supported).toBe(true);
-    expect(magistral.capabilities.chat.reasoning.efforts).toEqual(["none", "high"]);
-    expect(magistral.capabilities.chat.reasoning.confidence).toBe("family");
-  });
 
   it("routes Mistral through CF AI Gateway (with the /v1 base path) and strips Authorization", async () => {
     const seen = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -1596,7 +1400,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/images/generations", {
-      model: "fal-ai/flux/dev",
+      model: "fal-ai/bytedance/seedream/v5/lite/text-to-image",
       prompt: "a cat"
     });
 
@@ -1613,7 +1417,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/images/edits", {
-      model: "fal-ai/flux-pro/kontext/max",
+      model: "fal-ai/flux-pro/kontext",
       prompt: "make it night",
       images: ["aGVsbG8="]
     });
@@ -1625,7 +1429,7 @@ describe("gateway worker", () => {
 
   it("rejects image editing on a text-to-image-only Fal model", async () => {
     const response = await postJson(createEnv(), "/v1/images/edits", {
-      model: "fal-ai/flux/schnell",
+      model: "fal-ai/bytedance/seedream/v5/lite/text-to-image",
       prompt: "make it night",
       images: ["aGVsbG8="]
     });
@@ -1644,7 +1448,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/videos/generations", {
-      model: "luma-ray-2",
+      model: "fal-ai/veo3.1",
       prompt: "a rocket launch"
     });
 
@@ -1663,52 +1467,13 @@ describe("gateway worker", () => {
     } as never);
 
     await postJson(createEnv(), "/v1/videos/generations", {
-      model: "minimax-video-01",
+      model: "bytedance/seedance-2.0/image-to-video",
       prompt: "animate this",
       image: "data:image/png;base64,aGVsbG8="
     });
 
     const call = vi.mocked(experimental_generateVideo).mock.calls[0][0] as unknown as { prompt: { image?: unknown } };
     expect(call.prompt.image).toBeDefined();
-  });
-
-  it("handles Fal text-to-speech", async () => {
-    vi.mocked(experimental_generateSpeech).mockResolvedValue({
-      audio: { uint8Array: new Uint8Array([1, 2, 3]), mediaType: "audio/mpeg" }
-    } as never);
-
-    const response = await postJson(createEnv(), "/v1/audio/speech", {
-      model: "fal-ai/minimax/speech-02-hd",
-      input: "hello",
-      voice: "default"
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("audio/mpeg");
-    expect(experimental_generateSpeech).toHaveBeenCalledOnce();
-  });
-
-  it("handles Fal speech-to-text transcription", async () => {
-    vi.mocked(experimental_transcribe).mockResolvedValue({
-      text: "hello fal audio",
-      language: "en",
-      durationInSeconds: 1,
-      segments: []
-    } as never);
-
-    const form = new FormData();
-    form.set("model", "wizper");
-    form.set("file", new File([new Uint8Array([1, 2, 3])], "s.wav", { type: "audio/wav" }));
-
-    const response = await worker.fetch(
-      new Request("https://gateway.test/v1/audio/transcriptions", { method: "POST", body: form }),
-      createEnv(),
-      {} as ExecutionContext
-    );
-
-    const body = (await response.json()) as { text: string };
-    expect(response.status).toBe(200);
-    expect(body.text).toBe("hello fal audio");
   });
 
   // ── Replicate (media: image gen/edit, video) ───────────────────────────────
@@ -1720,7 +1485,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/images/generations", {
-      model: "black-forest-labs/flux-schnell",
+      model: "bytedance/seedream-4.5",
       prompt: "a dog"
     });
 
@@ -1736,7 +1501,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/images/edits", {
-      model: "black-forest-labs/flux-fill-pro",
+      model: "black-forest-labs/flux-2-flex",
       prompt: "fill the gap",
       images: ["aGVsbG8="]
     });
@@ -1753,7 +1518,7 @@ describe("gateway worker", () => {
     } as never);
 
     const response = await postJson(createEnv(), "/v1/videos/generations", {
-      model: "minimax/video-01",
+      model: "google/veo-3.1-lite",
       prompt: "ocean waves"
     });
 
@@ -1789,7 +1554,7 @@ describe("gateway worker", () => {
     } as never);
 
     const form = new FormData();
-    form.set("model", "scribe_v1");
+    form.set("model", "scribe_v2");
     form.set("file", new File([new Uint8Array([1, 2, 3])], "s.wav", { type: "audio/wav" }));
 
     const response = await worker.fetch(

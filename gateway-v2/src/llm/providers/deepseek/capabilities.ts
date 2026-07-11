@@ -1,7 +1,7 @@
 import { Capability } from "../../../core/capabilities";
 
 // DeepSeek is OpenAI-wire-compatible. Chat sub-features (vision, tools, reasoning, JSON
-// schema, streaming) are declared PER MODEL in ./models, not as separate capabilities.
+// schema, streaming) are declared in the central curated registry.
 // The current DeepSeek V4 lineup supports tools + reasoning (thinking mode) + JSON
 // output; it is text-only (no vision).
 //

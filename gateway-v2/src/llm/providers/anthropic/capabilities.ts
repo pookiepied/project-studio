@@ -2,7 +2,7 @@ import { Capability } from "../../../core/capabilities";
 
 // Anthropic (Claude) is a chat-only provider in this gateway. Chat sub-features
 // (vision, tools, reasoning/extended-thinking, prompt caching) are declared
-// per-model in ./models, not as separate capabilities.
+// per-model in the central curated registry.
 //
 // Intentionally NOT declared — Anthropic does not offer these, so no handler file
 // exists for them and the provider simply lacks the capability (mirrors Google's

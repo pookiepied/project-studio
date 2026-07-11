@@ -1,0 +1,831 @@
+import { Capability, type ChatFeatures, type ModelInfo, type ModelPricing, type ReasoningFeatures } from "../core/capabilities";
+import type { ProviderId } from "../core/types";
+import type {
+  RegistryCategory,
+  RegistryModel,
+  RegistryPricing,
+  RegistryReasoning,
+  RegistryStatus,
+  VerificationLevel
+} from "./schema";
+
+const CHECKED_AT = "2026-07-11";
+const VERSION = "2026-07-11.curated.1";
+
+export const MANUAL_REGISTRY_VERSION = VERSION;
+export const MANUAL_REGISTRY_GENERATED_AT = `${CHECKED_AT}T00:00:00.000Z`;
+
+const SOURCES: Record<ProviderId, string[]> = {
+  openai: ["https://developers.openai.com/api/docs/models", "https://platform.openai.com/docs/pricing"],
+  google: ["https://ai.google.dev/gemini-api/docs/gemini-3", "https://ai.google.dev/gemini-api/docs/pricing"],
+  anthropic: [
+    "https://platform.claude.com/docs/en/about-claude/models/overview",
+    "https://platform.claude.com/docs/en/about-claude/pricing"
+  ],
+  groq: ["https://console.groq.com/docs/models"],
+  xai: ["https://docs.x.ai/developers/models", "https://docs.x.ai/developers/pricing"],
+  deepseek: ["https://api-docs.deepseek.com/quick_start/pricing/"],
+  mistral: ["https://docs.mistral.ai/getting-started/models/models_overview/"],
+  fal: ["https://fal.ai/docs/platform-apis/v1/models/pricing", "https://fal.ai/models"],
+  replicate: ["https://replicate.com/pricing", "https://replicate.com/docs/topics/models/official-models"],
+  elevenlabs: ["https://elevenlabs.io/docs/overview/models", "https://elevenlabs.io/pricing/api"],
+  openrouter: [
+    "https://openrouter.ai/api/v1/models",
+    "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+  ],
+  alibaba: [
+    "https://www.alibabacloud.com/help/en/model-studio/models",
+    "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+  ],
+  minimax: ["https://platform.minimax.io/docs/guides/text-generation", "https://platform.minimax.io/docs/guides/pricing-paygo"],
+  zai: ["https://docs.z.ai/guides/llm/glm-5.2", "https://docs.z.ai/guides/overview/pricing"],
+  xiaomi: ["https://mimo.mi.com/docs/en-US/quick-start/summary/model", "https://mimo.mi.com/docs/price/pay-as-you-go"]
+};
+
+export const MANUAL_MODEL_REGISTRY: RegistryModel[] = [
+  // OpenAI direct.
+  chat("openai", "gpt-5.6-sol", "GPT-5.6 Sol", "OpenAI", "gpt-5.6", {
+    contextWindow: 1_050_000,
+    maxTokens: 128_000,
+    vision: true,
+    promptCaching: true,
+    reasoning: ["none", "low", "medium", "high", "xhigh"]
+  }),
+  chat("openai", "gpt-5.6-terra", "GPT-5.6 Terra", "OpenAI", "gpt-5.6", {
+    contextWindow: 1_050_000,
+    maxTokens: 128_000,
+    vision: true,
+    promptCaching: true,
+    reasoning: ["none", "low", "medium", "high", "xhigh"]
+  }),
+  chat("openai", "gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", "gpt-5.6", {
+    contextWindow: 1_050_000,
+    maxTokens: 128_000,
+    vision: true,
+    promptCaching: true,
+    reasoning: ["none", "low", "medium", "high", "xhigh"]
+  }),
+  chat("openai", "gpt-5.5", "GPT-5.5", "OpenAI", "gpt-5.5", {
+    contextWindow: 1_050_000,
+    maxTokens: 128_000,
+    vision: true,
+    promptCaching: true,
+    reasoning: ["none", "low", "medium", "high", "xhigh"]
+  }),
+  capability("openai", "gpt-image-2", "GPT Image 2", "OpenAI", "gpt-image", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("openai", "gpt-4o-transcribe", "GPT-4o Transcribe", "OpenAI", "gpt-4o-transcribe", "audio.transcription", [
+    Capability.Transcription
+  ]),
+  capability("openai", "gpt-4o-mini-transcribe", "GPT-4o Mini Transcribe", "OpenAI", "gpt-4o-transcribe", "audio.transcription", [
+    Capability.Transcription
+  ]),
+  capability("openai", "gpt-4o-mini-tts", "GPT-4o Mini TTS", "OpenAI", "gpt-4o-tts", "audio.speech", [Capability.Speech]),
+  capability("openai", "text-embedding-3-small", "Text Embedding 3 Small", "OpenAI", "text-embedding-3", "embeddings", [
+    Capability.Embeddings
+  ]),
+  capability("openai", "text-embedding-3-large", "Text Embedding 3 Large", "OpenAI", "text-embedding-3", "embeddings", [
+    Capability.Embeddings
+  ]),
+
+  // Google Gemini API direct.
+  chat("google", "gemini-3.5-flash", "Gemini 3.5 Flash", "Google", "gemini-3.5", googleThinking()),
+  chat("google", "gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", "Google", "gemini-3.1", {
+    ...googleThinking(),
+    status: "preview"
+  }),
+  chat("google", "gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "Google", "gemini-3.1", googleThinking()),
+  chat("google", "gemini-2.5-flash", "Gemini 2.5 Flash", "Google", "gemini-2.5", googleThinking()),
+  chat("google", "gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite", "Google", "gemini-2.5", googleThinking()),
+
+  // Anthropic direct.
+  chat("anthropic", "claude-haiku-4-5", "Claude Haiku 4.5", "Anthropic", "claude-haiku", {
+    contextWindow: 200_000,
+    maxTokens: 64_000,
+    vision: true,
+    jsonSchema: false,
+    promptCaching: true,
+    reasoning: ["none", "low", "medium", "high"],
+    reasoningControl: "thinking"
+  }),
+  chat("anthropic", "claude-sonnet-4-6", "Claude Sonnet 4.6", "Anthropic", "claude-sonnet", anthropicThinking()),
+  chat("anthropic", "claude-sonnet-5", "Claude Sonnet 5", "Anthropic", "claude-sonnet", anthropicThinking()),
+  chat("anthropic", "claude-opus-4-8", "Claude Opus 4.8", "Anthropic", "claude-opus", anthropicThinking()),
+  chat("anthropic", "claude-fable-5", "Claude Fable 5", "Anthropic", "claude-fable", anthropicThinking()),
+
+  // xAI direct.
+  chat("xai", "grok-4.5", "Grok 4.5", "xAI", "grok-4", {
+    contextWindow: 500_000,
+    maxTokens: 128_000,
+    vision: true,
+    reasoning: ["none", "low", "medium", "high"],
+    promptCaching: true
+  }),
+  chat("xai", "grok-4.3", "Grok 4.3", "xAI", "grok-4", {
+    contextWindow: 1_000_000,
+    maxTokens: 128_000,
+    vision: true,
+    reasoning: ["none", "low", "medium", "high"],
+    promptCaching: true
+  }),
+
+  // DeepSeek direct.
+  chat("deepseek", "deepseek-v4-pro", "DeepSeek V4 Pro", "DeepSeek", "deepseek-v4", deepseekThinking()),
+  chat("deepseek", "deepseek-v4-flash", "DeepSeek V4 Flash", "DeepSeek", "deepseek-v4", deepseekThinking()),
+
+  // Mistral direct.
+  chat("mistral", "mistral-medium-3.5", "Mistral Medium 3.5", "Mistral AI", "mistral-medium", {
+    contextWindow: 262_144,
+    maxTokens: 64_000,
+    vision: true,
+    reasoning: [],
+    reasoningSource: "unknown"
+  }),
+
+  // Groq.
+  chat("groq", "openai/gpt-oss-20b", "GPT-OSS 20B", "OpenAI", "gpt-oss", groqOss(131_072, 65_536)),
+  chat("groq", "openai/gpt-oss-120b", "GPT-OSS 120B", "OpenAI", "gpt-oss", groqOss(131_072, 65_536)),
+  chat("groq", "qwen/qwen3-32b", "Qwen3 32B", "Alibaba Qwen", "qwen3", {
+    contextWindow: 131_072,
+    maxTokens: 40_960,
+    vision: false,
+    jsonSchema: false,
+    reasoning: ["none", "low", "medium", "high"]
+  }),
+  chat("groq", "qwen/qwen3.6-27b", "Qwen3.6 27B", "Alibaba Qwen", "qwen3.6", {
+    contextWindow: 131_072,
+    maxTokens: 32_768,
+    vision: true,
+    jsonSchema: false,
+    reasoning: ["none", "low", "medium", "high"]
+  }),
+  capability("groq", "whisper-large-v3", "Whisper Large V3", "OpenAI", "whisper", "audio.transcription", [
+    Capability.Transcription
+  ]),
+  capability("groq", "whisper-large-v3-turbo", "Whisper Large V3 Turbo", "OpenAI", "whisper", "audio.transcription", [
+    Capability.Transcription
+  ]),
+
+  // Alibaba Model Studio direct.
+  chat("alibaba", "qwen3.7-max", "Qwen3.7 Max", "Alibaba Qwen", "qwen3.7", alibabaChat({ vision: false })),
+  chat("alibaba", "qwen3.7-plus", "Qwen3.7 Plus", "Alibaba Qwen", "qwen3.7", alibabaChat({ vision: true })),
+  chat("alibaba", "qwen3.6-plus", "Qwen3.6 Plus", "Alibaba Qwen", "qwen3.6", alibabaChat({ vision: true })),
+  chat("alibaba", "qwen3.6-flash", "Qwen3.6 Flash", "Alibaba Qwen", "qwen3.6", alibabaChat({ vision: true })),
+
+  // MiniMax, Z.ai, Xiaomi.
+  chat("minimax", "MiniMax-M3", "MiniMax M3", "MiniMax", "minimax-m3", {
+    contextWindow: 1_048_576,
+    maxTokens: 128_000,
+    vision: true,
+    reasoning: [],
+    reasoningSource: "unknown"
+  }),
+  chat("zai", "glm-5.2", "GLM-5.2", "Z.ai", "glm-5", {
+    contextWindow: 1_048_576,
+    maxTokens: 128_000,
+    vision: false,
+    reasoning: ["low", "medium", "high"],
+    reasoningControl: "reasoning_effort"
+  }),
+  chat("xiaomi", "mimo-v2.5", "MiMo V2.5", "Xiaomi", "mimo-v2.5", xiaomiMimo(true)),
+  chat("xiaomi", "mimo-v2.5-pro", "MiMo V2.5 Pro", "Xiaomi", "mimo-v2.5", xiaomiMimo(false)),
+
+  // fal.ai.
+  capability("fal", "fal-ai/bytedance/seedream/v5/lite/text-to-image", "Seedream 5 Lite Text to Image", "ByteDance", "seedream", "image.generation", [
+    Capability.ImageGenerate
+  ]),
+  capability("fal", "fal-ai/bytedance/seedream/v5/lite/edit", "Seedream 5 Lite Edit", "ByteDance", "seedream", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("fal", "bytedance/seedream/v5/pro/edit", "Seedream 5 Pro Edit", "ByteDance", "seedream", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("fal", "fal-ai/flux-pro/kontext", "FLUX.1 Kontext Pro", "Black Forest Labs", "flux-kontext", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("fal", "fal-ai/flux-pro/v1/fill", "FLUX.1 Fill Pro", "Black Forest Labs", "flux-fill", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("fal", "fal-ai/veo3.1", "Veo 3.1", "Google", "veo", "video.generation", [Capability.VideoGenerate]),
+  capability("fal", "fal-ai/veo3.1/fast", "Veo 3.1 Fast", "Google", "veo", "video.generation", [Capability.VideoGenerate]),
+  capability("fal", "fal-ai/veo3.1/lite", "Veo 3.1 Lite", "Google", "veo", "video.generation", [Capability.VideoGenerate]),
+  capability("fal", "bytedance/seedance-2.0/image-to-video", "Seedance 2.0 Image to Video", "ByteDance", "seedance", "video.generation", [
+    Capability.VideoGenerate
+  ]),
+  capability("fal", "fal-ai/wan/v2.7/image-to-video", "Wan 2.7 Image to Video", "Alibaba", "wan", "video.generation", [
+    Capability.VideoGenerate
+  ]),
+
+  // Replicate.
+  capability("replicate", "bytedance/seedream-4.5", "Seedream 4.5", "ByteDance", "seedream", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("replicate", "bytedance/seedream-4", "Seedream 4", "ByteDance", "seedream", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("replicate", "black-forest-labs/flux-2-flex", "FLUX.2 Flex", "Black Forest Labs", "flux", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("replicate", "black-forest-labs/flux-kontext-pro", "FLUX Kontext Pro", "Black Forest Labs", "flux-kontext", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("replicate", "black-forest-labs/flux-kontext-max", "FLUX Kontext Max", "Black Forest Labs", "flux-kontext", "image.editing", [
+    Capability.ImageGenerate,
+    Capability.ImageEdit
+  ]),
+  capability("replicate", "google/veo-3.1-lite", "Veo 3.1 Lite", "Google", "veo", "video.generation", [Capability.VideoGenerate]),
+  capability("replicate", "bytedance/seedance-2.0-fast", "Seedance 2.0 Fast", "ByteDance", "seedance", "video.generation", [
+    Capability.VideoGenerate
+  ]),
+  capability("replicate", "bytedance/seedance-2.0", "Seedance 2.0", "ByteDance", "seedance", "video.generation", [
+    Capability.VideoGenerate
+  ]),
+  capability("replicate", "kwaivgi/kling-v3-video", "Kling v3 Video", "Kuaishou", "kling", "video.generation", [
+    Capability.VideoGenerate
+  ]),
+
+  // ElevenLabs.
+  capability("elevenlabs", "eleven_v3", "Eleven v3", "ElevenLabs", "eleven", "audio.speech", [Capability.Speech]),
+  capability("elevenlabs", "eleven_multilingual_v2", "Eleven Multilingual v2", "ElevenLabs", "eleven", "audio.speech", [
+    Capability.Speech
+  ]),
+  capability("elevenlabs", "eleven_flash_v2_5", "Eleven Flash v2.5", "ElevenLabs", "eleven-flash", "audio.speech", [
+    Capability.Speech
+  ]),
+  capability("elevenlabs", "eleven_flash_v2", "Eleven Flash v2", "ElevenLabs", "eleven-flash", "audio.speech", [
+    Capability.Speech
+  ]),
+  capability("elevenlabs", "scribe_v2", "Scribe v2", "ElevenLabs", "scribe", "audio.transcription", [Capability.Transcription]),
+  capability("elevenlabs", "scribe_v2_realtime", "Scribe v2 Realtime", "ElevenLabs", "scribe", "audio.transcription", [
+    Capability.Transcription
+  ]),
+
+  // OpenRouter text/chat only.
+  ...openRouterChatModels()
+];
+
+interface ChatOptions {
+  contextWindow: number;
+  maxTokens: number;
+  vision: boolean;
+  tools?: boolean;
+  jsonSchema?: boolean;
+  promptCaching?: boolean;
+  reasoning: ReasoningFeatures["efforts"];
+  reasoningSource?: ReasoningFeatures["source"];
+  reasoningConfidence?: ReasoningFeatures["confidence"];
+  reasoningControl?: string;
+  status?: RegistryStatus;
+  inputTypes?: NonNullable<ModelInfo["inputTypes"]>;
+  pricing?: RegistryPricing;
+}
+
+function chat(
+  provider: ProviderId,
+  nativeId: string,
+  displayName: string,
+  developer: string,
+  family: string,
+  options: ChatOptions
+): RegistryModel {
+  const reasoning = reasoningFeatures(options.reasoning, options.reasoningSource, options.reasoningConfidence);
+  const chatFeatures: ChatFeatures = {
+    streaming: true,
+    vision: options.vision,
+    tools: options.tools ?? true,
+    reasoning,
+    jsonSchema: options.jsonSchema ?? true,
+    promptCaching: options.promptCaching ?? false
+  };
+
+  return withRegistry(
+    {
+      id: `${provider}:${nativeId}`,
+      provider,
+      providerModelId: nativeId,
+      displayName,
+      type: options.vision ? "multimodal" : "chat",
+      capabilities: { modalities: [Capability.Chat], chat: chatFeatures },
+      pricing: legacyPricing(options.pricing ?? pricingFor(provider, "text.chat", `${provider}:${nativeId}`)),
+      contextWindow: options.contextWindow,
+      maxTokens: options.maxTokens,
+      supportsVision: options.vision,
+      supportsTools: chatFeatures.tools,
+      supportsStreaming: true,
+      supportsSystemPrompts: true,
+      inputTypes: options.inputTypes ?? (options.vision ? ["text", "image"] : ["text"]),
+      outputTypes: ["text"],
+      specialFeatures: reasoning.supported ? ["reasoning"] : undefined
+    },
+    {
+      category: "text.chat",
+      provider,
+      developer,
+      family,
+      status: options.status ?? "active",
+      reasoningControl: options.reasoningControl,
+      pricing: options.pricing ?? pricingFor(provider, "text.chat", `${provider}:${nativeId}`)
+    }
+  );
+}
+
+function capability(
+  provider: ProviderId,
+  nativeId: string,
+  displayName: string,
+  developer: string,
+  family: string,
+  category: RegistryCategory,
+  modalities: Capability[],
+  pricing?: RegistryPricing
+): RegistryModel {
+  const inputTypes: NonNullable<ModelInfo["inputTypes"]> = modalities.includes(Capability.Transcription)
+    ? ["audio"]
+    : modalities.includes(Capability.Speech)
+      ? ["text"]
+      : modalities.includes(Capability.ImageEdit)
+        ? ["text", "image"]
+        : modalities.includes(Capability.VideoGenerate)
+          ? ["text", "image"]
+          : modalities.includes(Capability.Embeddings)
+            ? ["text"]
+            : ["text"];
+  const outputTypes: NonNullable<ModelInfo["outputTypes"]> = modalities.includes(Capability.Transcription)
+    ? ["text"]
+    : modalities.includes(Capability.Speech)
+      ? ["audio"]
+      : modalities.includes(Capability.Embeddings)
+        ? ["embedding"]
+        : modalities.includes(Capability.VideoGenerate)
+          ? ["video"]
+          : ["image"];
+
+  return withRegistry(
+    {
+      id: `${provider}:${nativeId}`,
+      provider,
+      providerModelId: nativeId,
+      displayName,
+      type: modelType(category),
+      capabilities: { modalities },
+      pricing: legacyPricing(pricing ?? pricingFor(provider, category, `${provider}:${nativeId}`)),
+      inputTypes,
+      outputTypes
+    },
+    { category, provider, developer, family, status: "active", pricing: pricing ?? pricingFor(provider, category, `${provider}:${nativeId}`) }
+  );
+}
+
+function withRegistry(
+  model: ModelInfo & { provider: ProviderId },
+  meta: {
+    category: RegistryCategory;
+    provider: ProviderId;
+    developer: string;
+    family: string;
+    status: RegistryStatus;
+    reasoningControl?: string;
+    pricing: RegistryPricing;
+  }
+): RegistryModel {
+  const registryReasoning = registryReasoningForModel(model, meta.reasoningControl);
+  return {
+    ...model,
+    registry: {
+      category: meta.category,
+      status: meta.status,
+      developer: meta.developer,
+      family: meta.family,
+      version: model.providerModelId,
+      supportedRegions: [],
+      endpoints: endpointsFor(model.capabilities.modalities),
+      aliases: [model.providerModelId],
+      fallbackModelIds: [],
+      verificationLevel: "verifiedDocumentationOnly" satisfies VerificationLevel,
+      source: {
+        authority: "studio-curated",
+        checkedAt: CHECKED_AT,
+        urls: SOURCES[meta.provider]
+      },
+      pricing: meta.pricing,
+      reasoning: registryReasoning,
+      freeAccess: {
+        isFree: model.id.endsWith(":free") || model.providerModelId.endsWith(":free"),
+        freeType: model.id.endsWith(":free") || model.providerModelId.endsWith(":free") ? "separate_route" : undefined,
+        isPromotional: false
+      }
+    }
+  };
+}
+
+function openRouterChatModels(): RegistryModel[] {
+  const specs: Array<[string, string, string, string, number, boolean, ReasoningFeatures["efforts"]]> = [
+    ["openai/gpt-5.6-sol", "OpenAI GPT-5.6 Sol", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.6-sol-pro", "OpenAI GPT-5.6 Sol Pro", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.6-terra", "OpenAI GPT-5.6 Terra", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.6-terra-pro", "OpenAI GPT-5.6 Terra Pro", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.6-luna", "OpenAI GPT-5.6 Luna", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.6-luna-pro", "OpenAI GPT-5.6 Luna Pro", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.5", "OpenAI GPT-5.5", "OpenAI", "gpt-5.5", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.5-pro", "OpenAI GPT-5.5 Pro", "OpenAI", "gpt-5.5", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.4", "OpenAI GPT-5.4", "OpenAI", "gpt-5.4", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.4-pro", "OpenAI GPT-5.4 Pro", "OpenAI", "gpt-5.4", 1_050_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.4-mini", "OpenAI GPT-5.4 Mini", "OpenAI", "gpt-5.4", 400_000, true, ["low", "medium", "high"]],
+    ["openai/gpt-5.4-nano", "OpenAI GPT-5.4 Nano", "OpenAI", "gpt-5.4", 400_000, true, ["low", "medium", "high"]],
+    ["qwen/qwen3.7-plus", "Qwen3.7 Plus", "Alibaba Qwen", "qwen3.7", 1_000_000, true, ["low", "medium", "high"]],
+    ["qwen/qwen3.7-max", "Qwen3.7 Max", "Alibaba Qwen", "qwen3.7", 1_000_000, false, ["low", "medium", "high"]],
+    ["qwen/qwen3.6-flash", "Qwen3.6 Flash", "Alibaba Qwen", "qwen3.6", 1_000_000, true, ["low", "medium", "high"]],
+    ["anthropic/claude-haiku-4.5", "Claude Haiku 4.5", "Anthropic", "claude-haiku", 200_000, true, ["low", "medium", "high"]],
+    ["anthropic/claude-sonnet-4.6", "Claude Sonnet 4.6", "Anthropic", "claude-sonnet", 1_000_000, true, ["low", "medium", "high"]],
+    ["anthropic/claude-sonnet-5", "Claude Sonnet 5", "Anthropic", "claude-sonnet", 1_000_000, true, ["low", "medium", "high"]],
+    ["anthropic/claude-opus-4.8", "Claude Opus 4.8", "Anthropic", "claude-opus", 1_000_000, true, ["low", "medium", "high"]],
+    ["anthropic/claude-opus-4.8-fast", "Claude Opus 4.8 Fast", "Anthropic", "claude-opus", 1_000_000, true, ["low", "medium", "high"]],
+    ["anthropic/claude-fable-5", "Claude Fable 5", "Anthropic", "claude-fable", 1_000_000, true, ["low", "medium", "high"]],
+    ["deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", "DeepSeek", "deepseek-v4", 1_048_576, false, ["low", "medium", "high"]],
+    ["deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "DeepSeek", "deepseek-v4", 1_048_576, false, ["low", "medium", "high"]],
+    ["google/gemini-3.5-flash", "Gemini 3.5 Flash", "Google", "gemini-3.5", 1_048_576, true, ["low", "medium", "high"]],
+    ["google/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", "Google", "gemini-3.1", 1_048_576, true, ["low", "medium", "high"]],
+    ["google/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite", "Google", "gemini-3.1", 1_048_576, true, ["low", "medium", "high"]],
+    ["minimax/minimax-m3", "MiniMax M3", "MiniMax", "minimax-m3", 1_048_576, true, ["low", "medium", "high"]],
+    ["moonshotai/kimi-k2.6", "Kimi K2.6", "Moonshot AI", "kimi-k2", 262_144, true, ["low", "medium", "high"]],
+    ["moonshotai/kimi-k2.7-code", "Kimi K2.7 Code", "Moonshot AI", "kimi-k2", 262_144, true, ["low", "medium", "high"]],
+    ["poolside/laguna-xs-2.1", "Laguna XS 2.1", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
+    ["poolside/laguna-xs-2.1:free", "Laguna XS 2.1 Free", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
+    ["poolside/laguna-m.1", "Laguna M.1", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
+    ["poolside/laguna-m.1:free", "Laguna M.1 Free", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
+    ["x-ai/grok-4.5", "Grok 4.5", "xAI", "grok-4", 500_000, true, ["low", "medium", "high"]],
+    ["x-ai/grok-4.3", "Grok 4.3", "xAI", "grok-4", 1_000_000, true, ["low", "medium", "high"]],
+    ["xiaomi/mimo-v2.5", "MiMo V2.5", "Xiaomi", "mimo-v2.5", 1_048_576, true, ["low", "medium", "high"]],
+    ["xiaomi/mimo-v2.5-pro", "MiMo V2.5 Pro", "Xiaomi", "mimo-v2.5", 1_048_576, false, ["low", "medium", "high"]],
+    ["z-ai/glm-5.2", "GLM 5.2", "Z.ai", "glm-5", 1_048_576, false, ["low", "medium", "high"]]
+  ];
+
+  return specs.map(([nativeId, displayName, developer, family, contextWindow, vision, reasoning]) =>
+    chat("openrouter", nativeId, displayName, developer, family, {
+      contextWindow,
+      maxTokens: 128_000,
+      vision,
+      reasoning,
+      reasoningSource: "static-reviewed"
+    })
+  );
+}
+
+function googleThinking(): ChatOptions {
+  return {
+    contextWindow: 1_048_576,
+    maxTokens: 64_000,
+    vision: true,
+    inputTypes: ["text", "image", "audio", "video"],
+    reasoning: ["none", "minimal", "low", "medium", "high"],
+    reasoningControl: "thinkingConfig"
+  };
+}
+
+function anthropicThinking(): ChatOptions {
+  return {
+    contextWindow: 1_000_000,
+    maxTokens: 128_000,
+    vision: true,
+    jsonSchema: false,
+    promptCaching: true,
+    reasoning: ["none", "low", "medium", "high", "xhigh"],
+    reasoningControl: "thinking"
+  };
+}
+
+function deepseekThinking(): ChatOptions {
+  return {
+    contextWindow: 1_048_576,
+    maxTokens: 384_000,
+    vision: false,
+    reasoning: ["none", "low", "medium", "high", "xhigh"],
+    promptCaching: true
+  };
+}
+
+function groqOss(contextWindow: number, maxTokens: number): ChatOptions {
+  return {
+    contextWindow,
+    maxTokens,
+    vision: false,
+    reasoning: ["low", "medium", "high"]
+  };
+}
+
+function alibabaChat(overrides: Partial<ChatOptions>): ChatOptions {
+  return {
+    contextWindow: 1_000_000,
+    maxTokens: 128_000,
+    vision: false,
+    reasoning: [],
+    reasoningSource: "unknown",
+    ...overrides
+  };
+}
+
+function xiaomiMimo(vision: boolean): ChatOptions {
+  return {
+    contextWindow: 1_048_576,
+    maxTokens: 128_000,
+    vision,
+    reasoning: [],
+    reasoningSource: "unknown"
+  };
+}
+
+function reasoningFeatures(
+  efforts: ReasoningFeatures["efforts"],
+  source: ReasoningFeatures["source"] = "official-docs",
+  confidence: ReasoningFeatures["confidence"] = "exact"
+): ReasoningFeatures {
+  return efforts.length
+    ? {
+        supported: true,
+        efforts,
+        defaultEffort: efforts.includes("medium") ? "medium" : efforts[0],
+        source,
+        confidence
+      }
+    : {
+        supported: false,
+        efforts: [],
+        source,
+        confidence: source === "unknown" ? "unknown" : confidence
+      };
+}
+
+function registryReasoningForModel(model: ModelInfo, reasoningControl?: string): RegistryReasoning | undefined {
+  const reasoning = model.capabilities.chat?.reasoning;
+  if (!reasoning) return undefined;
+  return {
+    supported: reasoning.supported,
+    alwaysOn: reasoning.supported && !reasoning.efforts.includes("none"),
+    canDisable: reasoning.efforts.includes("none"),
+    effortValues: reasoning.efforts,
+    returnsReasoningContent: "unknown",
+    reasoningTokensVisible: "unknown",
+    reasoningTokensBillable: reasoning.supported ? "unknown" : false,
+    worksWithTools: model.capabilities.chat?.tools ? "unknown" : false,
+    worksWhileStreaming: model.capabilities.chat?.streaming ? "unknown" : false,
+    requiresReasoningStateAfterTools: "unknown",
+    reducesOutputBudget: "unknown",
+    providerSpecificControls: reasoningControl ? [reasoningControl] : reasoning.supported ? ["reasoning_effort"] : []
+  };
+}
+
+function endpointsFor(modalities: Capability[]): string[] {
+  return modalities.map((capability) => {
+    switch (capability) {
+      case Capability.Chat:
+        return "chat";
+      case Capability.Embeddings:
+        return "embeddings";
+      case Capability.Transcription:
+        return "audio.transcriptions";
+      case Capability.Speech:
+        return "audio.speech";
+      case Capability.ImageGenerate:
+        return "images.generations";
+      case Capability.ImageEdit:
+        return "images.edits";
+      case Capability.VideoGenerate:
+        return "videos.generations";
+      case Capability.AudioGenerate:
+        return "audio.generations";
+      case Capability.Rerank:
+        return "rerank";
+      case Capability.Credits:
+        return "credits";
+    }
+  });
+}
+
+function modelType(category: RegistryCategory): NonNullable<ModelInfo["type"]> {
+  if (category === "embeddings") return "embedding";
+  if (category === "audio.speech") return "tts";
+  if (category === "audio.transcription") return "audio";
+  if (category === "video.generation") return "video";
+  if (category === "image.generation" || category === "image.editing") return "image";
+  return "chat";
+}
+
+function legacyPricing(pricing: RegistryPricing): ModelPricing {
+  if (pricing.kind === "token" || pricing.kind === "embedding") {
+    return {
+      inputPerMillionUsd: pricing.inputPerMillion ?? null,
+      outputPerMillionUsd: pricing.outputPerMillion ?? null,
+      source: pricing.status === "verified" ? "static" : "unknown",
+      note: pricing.notes
+    };
+  }
+  return {
+    inputPerMillionUsd: null,
+    outputPerMillionUsd: null,
+    source: "unknown",
+    note: pricing.notes
+  };
+}
+
+function pricingFor(provider: ProviderId, category: RegistryCategory, modelId?: string): RegistryPricing {
+  const override = modelId ? verifiedPricingFor(modelId) : undefined;
+  if (override) return override;
+  const sourceUrls = SOURCES[provider];
+  if (category === "text.chat") {
+    return {
+      kind: "token",
+      status: "unknown",
+      currency: "USD",
+      billingUnit: "one_million_tokens",
+      inputPerMillion: null,
+      cachedInputPerMillion: null,
+      cacheWritePerMillion: null,
+      outputPerMillion: null,
+      batchInputPerMillion: null,
+      batchOutputPerMillion: null,
+      reasoningTokens: "unknown",
+      sourceUrls,
+      verifiedAt: null,
+      notes: "N/A until this exact provider route is verified from official pricing or tested billing data."
+    };
+  }
+  if (category === "embeddings") {
+    return {
+      kind: "embedding",
+      status: "unknown",
+      currency: "USD",
+      billingUnit: "one_million_tokens",
+      inputPerMillion: null,
+      outputPerMillion: null,
+      sourceUrls,
+      verifiedAt: null,
+      notes: "Embedding pricing is token based; this exact route price is not verified in the curated registry yet."
+    };
+  }
+  if (category === "image.generation" || category === "image.editing") {
+    return {
+      kind: "image",
+      status: provider === "replicate" || provider === "fal" ? "provider_variable" : "unknown",
+      currency: "USD",
+      billingUnit: provider === "replicate" ? "prediction" : "image",
+      price: null,
+      dependsOn: provider === "replicate" || provider === "fal"
+        ? ["resolution", "quality", "provider_route", "hardware"]
+        : ["resolution", "quality"],
+      sourceUrls,
+      verifiedAt: null,
+      notes: "Image pricing must preserve native units such as image, megapixel, generation, prediction, or compute seconds."
+    };
+  }
+  if (category === "video.generation") {
+    return {
+      kind: "video",
+      status: provider === "replicate" || provider === "fal" ? "provider_variable" : "unknown",
+      currency: "USD",
+      billingUnit: provider === "replicate" ? "prediction" : "video_second",
+      price: null,
+      dependsOn: ["duration", "resolution", "fps", "quality", "provider_route", "hardware"],
+      sourceUrls,
+      verifiedAt: null,
+      notes: "Video pricing may depend on duration, resolution, frame rate, quality, route, and runtime hardware."
+    };
+  }
+  if (category === "audio.speech") {
+    return {
+      kind: "audio",
+      status: "unknown",
+      currency: "USD",
+      billingUnit: provider === "elevenlabs" ? "character" : "audio_minute",
+      price: null,
+      sourceUrls,
+      verifiedAt: null,
+      notes: "Speech pricing must preserve provider units such as character, credit, minute, or generation."
+    };
+  }
+  if (category === "audio.transcription") {
+    return {
+      kind: "audio",
+      status: "unknown",
+      currency: "USD",
+      billingUnit: provider === "groq" ? "audio_hour" : "audio_minute",
+      price: null,
+      sourceUrls,
+      verifiedAt: null,
+      notes: "Transcription pricing is duration based for most supported providers."
+    };
+  }
+  return {
+    kind: "custom",
+    status: "not_applicable",
+    currency: "USD",
+    billingUnit: "not_applicable",
+    price: null,
+    sourceUrls,
+    verifiedAt: null
+  };
+}
+
+function verifiedPricingFor(modelId: string): RegistryPricing | undefined {
+  const overrides: Record<string, RegistryPricing> = {
+    "google:gemini-3.5-flash": tokenPricing("google", {
+    input: 2.7,
+    output: 16.2,
+    cachedInput: 0.27,
+    notes: "Verified from Gemini Developer API pricing. Output includes thinking tokens."
+  }),
+    "google:gemini-3.1-pro-preview": tokenPricing("google", {
+    input: 2,
+    output: 12,
+    cachedInput: null,
+    longContext: [
+      { name: "over_200k_tokens_input", unit: "one_million_tokens", price: 4, currency: "USD", appliesWhen: "input tokens > 200k" },
+      { name: "over_200k_tokens_output", unit: "one_million_tokens", price: 18, currency: "USD", appliesWhen: "input tokens > 200k" }
+    ],
+    notes: "Verified from Gemini 3 developer guide. Listed base tier is under 200k tokens; long-context tiers are preserved separately."
+  }),
+    "google:gemini-3.1-flash-lite": tokenPricing("google", {
+    input: 0.25,
+    output: 1.5,
+    cachedInput: 0.025,
+    notes: "Verified from Gemini 3 developer guide. Audio input has a separate price not flattened into token text pricing."
+  }),
+    "google:gemini-2.5-flash": tokenPricing("google", {
+    input: 0.45,
+    output: 2.7,
+    cachedInput: 0.045,
+    notes: "Verified from Gemini Developer API pricing. Audio input has a separate price not flattened into token text pricing."
+  }),
+    "google:gemini-2.5-flash-lite": tokenPricing("google", {
+    input: 0.1,
+    output: 0.4,
+    cachedInput: 0.01,
+    notes: "Verified from Gemini Developer API pricing. Audio input has a separate price not flattened into token text pricing."
+  }),
+    "anthropic:claude-sonnet-4-6": tokenPricing("anthropic", {
+    input: 3,
+    output: 15,
+    notes: "Verified from Anthropic Claude Sonnet 5 pricing note, which states pricing is unchanged from Sonnet 4.6."
+  }),
+    "anthropic:claude-sonnet-5": tokenPricing("anthropic", {
+    input: 3,
+    output: 15,
+    notes: "Verified from Anthropic Claude Sonnet 5 pricing note."
+  }),
+    "anthropic:claude-opus-4-8": tokenPricing("anthropic", {
+    input: 5,
+    output: 25,
+    notes: "Verified from Anthropic migration pricing note comparing Fable 5 and Opus 4.8."
+  }),
+    "anthropic:claude-fable-5": tokenPricing("anthropic", {
+    input: 10,
+    output: 50,
+    notes: "Verified from Anthropic migration pricing note."
+  }),
+    "openrouter:openai/gpt-5.6-sol": tokenPricing("openrouter", {
+    input: 5,
+    output: 30,
+    notes: "Verified from OpenRouter model page for openai/gpt-5.6-sol. Do not copy to direct OpenAI pricing."
+  })
+  };
+  return overrides[modelId];
+}
+
+function tokenPricing(
+  provider: ProviderId,
+  options: {
+    input: number;
+    output: number;
+    cachedInput?: number | null;
+    cacheWrite?: number | null;
+    longContext?: RegistryPricing["longContext"];
+    notes: string;
+  }
+): RegistryPricing {
+  return {
+    kind: "token",
+    status: "verified",
+    currency: "USD",
+    billingUnit: "one_million_tokens",
+    inputPerMillion: options.input,
+    cachedInputPerMillion: options.cachedInput ?? null,
+    cacheWritePerMillion: options.cacheWrite ?? null,
+    outputPerMillion: options.output,
+    batchInputPerMillion: null,
+    batchOutputPerMillion: null,
+    longContext: options.longContext,
+    reasoningTokens: "unknown",
+    sourceUrls: SOURCES[provider],
+    verifiedAt: CHECKED_AT,
+    notes: options.notes
+  };
+}

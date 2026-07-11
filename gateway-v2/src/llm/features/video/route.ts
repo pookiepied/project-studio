@@ -5,7 +5,7 @@ import { GatewayError, toErrorResponse } from "../../../core/errors";
 import { providers } from "../../../core/registry";
 import type { MediaResponse, VideoGenerationRequest, VideoGenerationResponse } from "../../../core/types";
 import type { GatewayEnv } from "../../../system/infrastructure/cloudflare/env";
-import { getServedCatalog } from "../../discovery/catalog";
+import { getRegistryModel } from "../../../registry";
 
 export const videoRoute = new Hono<{ Bindings: GatewayEnv }>();
 
@@ -32,10 +32,7 @@ async function handleVideoGeneration(c: Context<{ Bindings: GatewayEnv }>) {
       throw new GatewayError("VALIDATION_ERROR", "Request must include a prompt (text-to-video) or an image (image-to-video).");
     }
 
-    const catalog = await getServedCatalog(c.env);
-    const model = catalog.models.find(
-      (candidate) => candidate.id === body.model || candidate.providerModelId === body.model
-    );
+    const model = getRegistryModel(body.model);
     if (!model) {
       throw new GatewayError("MODEL_NOT_FOUND", `Model ${body.model} is not registered with the gateway.`);
     }

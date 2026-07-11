@@ -1,7 +1,7 @@
 import { Capability } from "../../../core/capabilities";
 
 // xAI (Grok) is OpenAI-wire-compatible. Chat sub-features (vision, tools, reasoning,
-// JSON schema, streaming) are declared PER MODEL in ./models, not as separate
+// JSON schema, streaming) are declared in the central curated registry.
 // capabilities. xAI's current chat lineup is multimodal (vision) + tool-calling, with
 // reasoning on the -reasoning / grok-4.3 / multi-agent / grok-3-mini variants.
 //

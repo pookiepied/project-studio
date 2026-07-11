@@ -1,7 +1,6 @@
 import type { ProviderModule } from "../../../core/registry";
 import { xaiCapabilities } from "./capabilities";
 import { xaiChat } from "./chat";
-import { listXaiModels } from "./models";
 
 // xAI (Grok, OpenAI-wire-compatible): chat (text + vision per model + tools + reasoning per
 // model + streaming) only. The current Grok lineup is uniformly multimodal+tools, with
@@ -13,6 +12,5 @@ import { listXaiModels } from "./models";
 export const xaiProvider: ProviderModule = {
   id: "xai",
   capabilities: xaiCapabilities,
-  models: listXaiModels,
   chat: xaiChat
 };

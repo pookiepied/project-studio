@@ -1,4 +1,4 @@
-import type { Capability, ModelInfo } from "./capabilities";
+import type { Capability } from "./capabilities";
 import type {
   ChatRequest,
   ChatResponse,
@@ -33,6 +33,7 @@ import { alibabaProvider } from "../llm/providers/alibaba";
 import { minimaxProvider } from "../llm/providers/minimax";
 import { zaiProvider } from "../llm/providers/zai";
 import { xiaomiProvider } from "../llm/providers/xiaomi";
+export { getCatalog, getModel } from "../registry";
 
 export interface HandlerContext {
   env: GatewayEnv;
@@ -62,7 +63,6 @@ export type CreditsHandler = (context: HandlerContext) => Promise<unknown>;
 export interface ProviderModule {
   id: string;
   capabilities: Capability[];
-  models(context?: { env?: GatewayEnv; fetch?: typeof fetch }): Promise<ModelInfo[]>;
   chat?: ChatHandler;
   embed?: EmbedHandler;
   rerank?: RerankHandler;
@@ -94,14 +94,4 @@ export const providers: ProviderModule[] = [
 
 export function getProvider(providerId: string): ProviderModule | undefined {
   return providers.find((provider) => provider.id === providerId);
-}
-
-export async function getModel(modelId: string, context?: { env?: GatewayEnv; fetch?: typeof fetch }) {
-  const catalogs = await Promise.all(providers.map((provider) => provider.models(context)));
-  return catalogs.flat().find((model) => model.id === modelId);
-}
-
-export async function getCatalog(context?: { env?: GatewayEnv; fetch?: typeof fetch }): Promise<ModelInfo[]> {
-  const catalogs = await Promise.all(providers.map((provider) => provider.models(context)));
-  return catalogs.flat();
 }

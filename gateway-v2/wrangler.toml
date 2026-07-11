@@ -12,19 +12,12 @@ CF_AIG_GATEWAY_NAME = "studio-gateway"
 CF_AIG_BYOK_ALIAS = "production"
 
 [[kv_namespaces]]
-binding = "MODELS_KV"
-id = "replace-with-models-kv-id"
-
-[[kv_namespaces]]
 binding = "CREDITS_KV"
 id = "replace-with-credits-kv-id"
 
 [[kv_namespaces]]
 binding = "ADMIN_KV"
 id = "replace-with-admin-kv-id"
-
-[triggers]
-crons = ["0 */6 * * *"]
 
 # Secrets:
 #   wrangler secret put CF_AIG_TOKEN

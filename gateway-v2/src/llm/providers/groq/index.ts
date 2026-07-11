@@ -1,8 +1,6 @@
 import type { ProviderModule } from "../../../core/registry";
 import { groqCapabilities } from "./capabilities";
 import { groqChat } from "./chat";
-import { listGroqModels } from "./models";
-import { groqSpeech } from "./speech";
 import { groqTranscription } from "./transcription";
 
 // Groq (OpenAI-wire-compatible): chat + STT (Whisper) + TTS (Orpheus). No embed/rerank/
@@ -10,8 +8,6 @@ import { groqTranscription } from "./transcription";
 export const groqProvider: ProviderModule = {
   id: "groq",
   capabilities: groqCapabilities,
-  models: listGroqModels,
   chat: groqChat,
-  transcribe: groqTranscription,
-  speak: groqSpeech
+  transcribe: groqTranscription
 };

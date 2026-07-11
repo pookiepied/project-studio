@@ -1,7 +1,7 @@
 import { Capability } from "../../../core/capabilities";
 
 // Xiaomi MiMo via CF custom provider. Scope for now: text + multimodal (vision) CHAT only.
-// Chat sub-features (vision, tools, JSON schema) are declared PER MODEL in ./models.
+// Chat sub-features (vision, tools, JSON schema) are declared in the central curated registry.
 // Reasoning (MiMo's `thinking: { type: "enabled" | "disabled" }` control) is intentionally NOT
 // wired yet — it is a structural toggle, not OpenAI-style reasoning_effort, so it is deferred.
 //

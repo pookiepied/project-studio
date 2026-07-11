@@ -4,7 +4,7 @@ import { GatewayError, toErrorResponse } from "../../../core/errors";
 import { providers } from "../../../core/registry";
 import type { SpeechRequest, TranscriptionRequest } from "../../../core/types";
 import type { GatewayEnv } from "../../../system/infrastructure/cloudflare/env";
-import { getServedCatalog } from "../../discovery/catalog";
+import { getRegistryModel } from "../../../registry";
 
 export const audioRoute = new Hono<{ Bindings: GatewayEnv }>();
 
@@ -113,10 +113,7 @@ async function readTranscriptionRequest(request: Request): Promise<Transcription
 }
 
 async function requireModel(env: GatewayEnv, requestedModel: string, capability: Capability) {
-  const catalog = await getServedCatalog(env);
-  const model = catalog.models.find(
-    (candidate) => candidate.id === requestedModel || candidate.providerModelId === requestedModel
-  );
+  const model = getRegistryModel(requestedModel);
   if (!model) {
     throw new GatewayError("MODEL_NOT_FOUND", `Model ${requestedModel} is not registered with the gateway.`);
   }

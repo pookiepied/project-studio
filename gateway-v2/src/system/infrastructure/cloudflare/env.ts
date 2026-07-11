@@ -4,7 +4,6 @@ export interface GatewayEnv {
   CF_AIG_GATEWAY_NAME?: string;
   CF_AIG_BYOK_ALIAS?: string;
   CF_AIG_TOKEN: string;
-  MODELS_KV: KVNamespace;
   CREDITS_KV?: KVNamespace;
   ADMIN_KV?: KVNamespace;
 }

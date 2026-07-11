@@ -1,7 +1,6 @@
 import type { ProviderModule } from "../../../core/registry";
 import { xiaomiCapabilities } from "./capabilities";
 import { xiaomiChat } from "./chat";
-import { listXiaomiModels } from "./models";
 
 // Xiaomi MiMo via Cloudflare AI Gateway CUSTOM provider (slug `custom-xiaomi`) + the official
 // @ai-sdk/openai-compatible package. Scope: text + multimodal (vision) chat only (see
@@ -9,6 +8,5 @@ import { listXiaomiModels } from "./models";
 export const xiaomiProvider: ProviderModule = {
   id: "xiaomi",
   capabilities: xiaomiCapabilities,
-  models: listXiaomiModels,
   chat: xiaomiChat
 };
