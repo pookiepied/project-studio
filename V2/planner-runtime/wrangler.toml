@@ -8,10 +8,31 @@ preview_urls = false
 [vars]
 ENVIRONMENT = "production"
 
+# Gateway v2 — all model access goes through the gateway, never direct providers.
 [[services]]
 binding = "GATEWAY"
 service = "studio-gateway"
 
+# Studio Context — task-specific context packages (planner consumer).
 [[services]]
 binding = "CONTEXT"
 service = "studio-context"
+
+# Studio Data — durable plan persistence.
+[[services]]
+binding = "DATA"
+service = "studio-data"
+
+# Studio MCP hub — read-only cloud tools used while planning.
+[[services]]
+binding = "MCP"
+service = "studio-mcp"
+
+# Durable Object: one PlannerSession per conversation.
+[[durable_objects.bindings]]
+name = "PLANNER_SESSION"
+class_name = "PlannerSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PlannerSession"]

@@ -3,6 +3,8 @@ import type { Env } from "./system/env";
 import { healthRoute } from "./server/routes/health";
 import { plansRoute } from "./server/routes/plans";
 
+export { PlannerSession } from "./session/PlannerSession";
+
 const app = new Hono<{ Bindings: Env }>();
 
 app.route("/health", healthRoute);

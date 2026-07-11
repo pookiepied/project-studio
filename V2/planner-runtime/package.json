@@ -12,7 +12,10 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.5",
     "@studio/v2-contracts": "file:../shared/contracts",
+    "@studio/v2-runtime": "file:../shared/runtime",
+    "ai": "^7.0.15",
     "hono": "^4.0.0"
   },
   "devDependencies": {
