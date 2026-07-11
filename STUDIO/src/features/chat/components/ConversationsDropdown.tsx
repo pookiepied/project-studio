@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   PencilSimpleIcon as PencilSimple,
@@ -10,6 +10,7 @@ import {
   StackIcon as Stack,
   FolderOpenIcon as FolderOpen,
   MinusCircleIcon as MinusCircle,
+  CaretDownIcon as CaretDown,
 } from "@phosphor-icons/react";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { formatDate } from "@/lib/formatters";
@@ -21,6 +22,8 @@ import { ClaudeCodeIcon } from "@/ui/brand";
 type Tab = "projects" | "conversations";
 
 interface ConversationsDropdownProps {
+  /** The centered work identity shown in the trigger — project / conversation title. */
+  label:                 ReactNode;
   conversations:         ConversationMetadata[];
   currentConvId:         string | undefined;
   showConversations:     boolean;
@@ -48,6 +51,7 @@ interface ConversationsDropdownProps {
 }
 
 export const ConversationsDropdown = ({
+  label,
   conversations,
   currentConvId,
   showConversations,
@@ -80,18 +84,23 @@ export const ConversationsDropdown = ({
   const hasActivity = conversationStatuses && conversationStatuses.size > 0;
 
   return (
-    <div ref={ref} className="relative flex-shrink-0">
+    <div ref={ref} className="relative flex min-w-0 flex-shrink">
+      {/* Center trigger — the work identity, Safari-address-bar style: it is both
+          the label and the switcher control. */}
       <button
+        data-conv-toggle
         onClick={onToggle}
         aria-expanded={showConversations}
         aria-haspopup="dialog"
-        className="studio-chat-icon-button relative flex h-7 w-7 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
+        className="relative flex h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
         title="Projects and conversations"
       >
-        <Stack size={14} weight="bold" className="text-gray-500 dark:text-gray-500 transition-colors duration-300" />
+        <Stack size={13} weight="bold" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
+        <span className="min-w-0 truncate">{label}</span>
+        <CaretDown size={8} weight="bold" className={`flex-shrink-0 text-gray-400 dark:text-gray-600 transition-transform duration-200 ${showConversations ? "rotate-180" : ""}`} />
         {/* Activity dot — shows when any background conversation has a status */}
         {hasActivity && (
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary dark:bg-primary" />
+          <span className="absolute left-4 top-1 h-1.5 w-1.5 rounded-full bg-primary dark:bg-primary" />
         )}
       </button>
 
@@ -104,7 +113,7 @@ export const ConversationsDropdown = ({
             transition={{ duration: 0.15 }}
             role="dialog"
             aria-label="Conversations"
-            className="absolute left-0 top-12 w-80 bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col transition-colors duration-300"
+            className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 w-80 bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col transition-colors duration-300"
           >
             <div className="px-2 pt-2 border-b border-gray-200 dark:border-surface-border transition-colors duration-300">
               <div className="relative flex items-center gap-1" role="tablist">

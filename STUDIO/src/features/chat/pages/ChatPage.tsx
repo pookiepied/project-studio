@@ -669,6 +669,7 @@ export const ChatPage = () => {
                 />
                 <NotificationBell align="right" />
                 <ThemeToggle />
+                <span className="mx-0.5 h-4 w-px bg-surface-divider" />
                 <RightWorkspaceControls
                   isTauri={isTauri}
                   projectContext={projectContext}
