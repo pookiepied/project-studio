@@ -1,102 +1,36 @@
-# API Gateway Configuration
-
-# DEPLOYMENT INSTRUCTIONS:
-# 
-# 1. Create D1 database:
-#    wrangler d1 create studio-jobs
-#    Copy the database_id and paste it below in [[d1_databases]]
-# 
-# 2. Create KV namespace:
-#    wrangler kv namespace create "API_KV"
-#    wrangler kv namespace create "API_KV" --preview
-#    Copy the IDs and paste them below in [[kv_namespaces]]
-# 
-# 3. Initialize database:
-#    wrangler d1 execute studio-jobs --remote --file=./schema.sql
-# 
-# 4. Set secrets:
-#    wrangler secret put JWT_SECRET
-#
-# 5. Deploy:
-#    npm run deploy
-# 
-# 6. Add custom domain:
-#    Dashboard > Workers & Pages > api > Settings > Domains & Routes
-#    Add: api.example.com
-
 name = "api"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
-
-[[services]]
-binding = "AI"
-service = "studio-chat"
-
-[[services]]
-binding = "GATEWAY"
-service = "studio-gateway"
-
-[[services]]
-binding = "CHATS_SERVICE"
-service = "chats"
-
-# Studio worker — user preferences and Studio-specific backend logic.
-[[services]]
-binding = "STUDIO"
-service  = "studio"
-
-# Studio Connectors — first-party app integrations such as Composio.
-[[services]]
-binding = "CONNECTORS"
-service  = "connectors"
-
-# STUDIO Skills — bundled + local skill catalog. Proxy routes in routes/skills.ts
-# forward frontend requests here with the authenticated user's ID injected.
-[[services]]
-binding = "SKILLS"
-service  = "studio-skills"
-
-# Centralized telemetry — job lifecycle events go here.
-[[services]]
-binding = "TRACKER"
-service  = "tracker"
-
-# Tail consumer — Cloudflare auto-routes invocation logs to the tracker worker.
-[[tail_consumers]]
-service = "tracker"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "studio-jobs"
-database_id = "4c66facc-4a61-48b3-ae4c-63c65c25e531"
-
-[[kv_namespaces]]
-binding = "KV"
-id = "b89be83157724d539403c468f5a7acef"
-
-# Revoked JWT tokens — shared with auth/ and mcp/hub/.
-# Checked on every authenticated request so revoked tokens are rejected immediately.
-[[kv_namespaces]]
-binding = "REVOKED_KV"
-id = "720a294c0a5844248a4ee8ac6a91fa8f"
-
-# Release manifests for the STUDIO auto-updater.
-[[kv_namespaces]]
-binding = "RELEASES_KV"
-id = "35f6ec05519142ca91278067caa2fba9"
-
-# Release file storage (.exe update bundles).
-[[r2_buckets]]
-binding = "RELEASES_BUCKET"
-bucket_name = "studio-releases"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
 
 [vars]
 ENVIRONMENT = "production"
 
-# Cron schedule:
-#   * * * * * — stale job reaper (every minute)
-[triggers]
-crons = ["* * * * *"]
+# Studio Execution Runtime — main agent loop and live run sessions.
+[[services]]
+binding = "EXECUTION_RUNTIME"
+service = "studio-execution-runtime"
+
+# Studio Planner Runtime — planning loop. Mounted after planner runtime is ready.
+[[services]]
+binding = "PLANNER_RUNTIME"
+service = "studio-planner-runtime"
+
+# Studio Data — conversations, uploads, generated artifacts, metadata.
+[[services]]
+binding = "DATA"
+service = "studio-data"
+
+[[services]]
+binding = "REGISTRY"
+service = "studio-registry"
+
+# Revoked JWT tokens — checked at API edge before identity is forwarded.
+[[kv_namespaces]]
+binding = "REVOKED_KV"
+id = "720a294c0a5844248a4ee8ac6a91fa8f"
 
 [build]
 command = "npm install && npx tsc"
