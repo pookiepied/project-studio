@@ -1,0 +1,42 @@
+name = "studio-execution-runtime"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# Gateway v2 — all model access goes through the gateway, never direct providers.
+[[services]]
+binding = "GATEWAY"
+service = "studio-gateway"
+
+# Studio Context — task-specific context packages.
+[[services]]
+binding = "CONTEXT"
+service = "studio-context"
+
+# Studio Registry — capability lookups when the runtime needs a direct check.
+[[services]]
+binding = "REGISTRY"
+service = "studio-registry"
+
+# Studio Data — conversation persistence and artifacts.
+[[services]]
+binding = "DATA"
+service = "studio-data"
+
+[[services]]
+binding = "MCP"
+service = "studio-mcp"
+
+# Durable Object: one ExecutionSession per active conversation/run.
+[[durable_objects.bindings]]
+name = "EXECUTION_SESSION"
+class_name = "ExecutionSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ExecutionSession"]

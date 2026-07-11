@@ -1,0 +1,15 @@
+{
+  "name": "@studio/v2-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Studio V2 - shared cross-worker types and contracts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,17 @@
+name = "studio-planner-runtime"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+[[services]]
+binding = "GATEWAY"
+service = "studio-gateway"
+
+[[services]]
+binding = "CONTEXT"
+service = "studio-context"

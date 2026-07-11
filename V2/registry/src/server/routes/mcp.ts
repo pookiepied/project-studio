@@ -1,0 +1,12 @@
+import { Hono } from "hono";
+import type { RegistryMcpRecord } from "@studio/v2-contracts";
+import type { Env } from "../../system/env";
+import { deleteMcpServer, getMcpServer, listMcpServers, upsertMcpServer } from "../../domains/mcp/repository";
+import { requireUser } from "../identity";
+export const mcpRoute = new Hono<{ Bindings: Env }>();
+mcpRoute.get("/",async c=>{const u=requireUser(c);return typeof u==="string"?c.json({items:await listMcpServers(c.env.REGISTRY_DB,u)}):u;});
+mcpRoute.post("/",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const r=await c.req.json<RegistryMcpRecord>();if(r.userId!==u)return c.json({error:"forbidden"},403);await upsertMcpServer(c.env.REGISTRY_DB,r);return c.json(r,201);});
+mcpRoute.get("/:id",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const r=await getMcpServer(c.env.REGISTRY_DB,u,c.req.param("id"));return r?c.json(r):c.json({error:"not_found"},404);});
+mcpRoute.patch("/:id",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const old=await getMcpServer(c.env.REGISTRY_DB,u,c.req.param("id"));if(!old)return c.json({error:"not_found"},404);const patch=await c.req.json<Partial<RegistryMcpRecord>>();const next={...old,...patch,ref:old.ref,userId:u};await upsertMcpServer(c.env.REGISTRY_DB,next);return c.json(next);});
+mcpRoute.delete("/:id",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;await deleteMcpServer(c.env.REGISTRY_DB,u,c.req.param("id"));return c.body(null,204);});
+mcpRoute.post("/:id/availability",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const old=await getMcpServer(c.env.REGISTRY_DB,u,c.req.param("id"));if(!old)return c.json({error:"not_found"},404);const body=await c.req.json<{available:boolean}>();await upsertMcpServer(c.env.REGISTRY_DB,{...old,available:Boolean(body.available)});return c.json({available:Boolean(body.available)});});

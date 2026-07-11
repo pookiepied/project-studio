@@ -1,0 +1,30 @@
+name = "studio-data"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# Structured metadata: conversations, messages, attachment/artifact records.
+[[d1_databases]]
+binding = "DATA_DB"
+database_name = "studio-data"
+database_id = "replace-with-data-db-id"
+
+# Cloud conversation transcripts and related durable conversation exports.
+[[r2_buckets]]
+binding = "CONVERSATIONS"
+bucket_name = "studio-conversations"
+
+# User-provided uploads: documents, images, video, audio, and other files.
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "studio-uploads"
+
+# Generated or edited media/artifacts: images, video, documents, outputs.
+[[r2_buckets]]
+binding = "GENERATED"
+bucket_name = "studio-generated"

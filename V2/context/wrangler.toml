@@ -1,0 +1,19 @@
+name = "studio-context"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# Studio Registry — what exists for this user.
+[[services]]
+binding = "REGISTRY"
+service = "studio-registry"
+
+# Studio Data — conversations, attachments, files.
+[[services]]
+binding = "DATA"
+service = "studio-data"
