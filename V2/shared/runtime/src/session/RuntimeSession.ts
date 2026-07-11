@@ -92,6 +92,14 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
   // ── runtime specialization hooks ───────────────────────────────────────
 
   /**
+   * Runs at the start of every execution attempt (initial, retry, recovery),
+   * before context is loaded and before the loop is configured. Subclasses
+   * hydrate in-memory config here that the synchronous hooks below need — e.g.
+   * the Agent Runtime loads its durable AgentDefinition. Default: no-op.
+   */
+  protected async beforeExecute(_run: RunState): Promise<void> {}
+
+  /**
    * Narrow the tool set exposed to the loop. Default: expose everything Studio
    * Context supplied. Planner overrides this to strip write/destructive tools.
    */
@@ -352,6 +360,7 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
     this.store.saveRun(run);
     await this.emit(run, "run.started", { attemptId: run.attemptId });
     try {
+      await this.beforeExecute(run);
       const context = await this.loadContext(run);
       const messages = this.restoreMessages(run, context);
       // Persist intent BEFORE the model call: if this attempt dies before

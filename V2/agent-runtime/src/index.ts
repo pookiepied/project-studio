@@ -3,6 +3,8 @@ import type { Env } from "./system/env";
 import { healthRoute } from "./server/routes/health";
 import { invokeRoute } from "./server/routes/invoke";
 
+export { AgentSession } from "./session/AgentSession";
+
 const app = new Hono<{ Bindings: Env }>();
 
 app.route("/health", healthRoute);

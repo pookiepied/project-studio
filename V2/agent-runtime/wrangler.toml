@@ -8,14 +8,36 @@ preview_urls = false
 [vars]
 ENVIRONMENT = "production"
 
+# Gateway v2 — all model access goes through the gateway, never direct providers.
 [[services]]
 binding = "GATEWAY"
 service = "studio-gateway"
 
+# Studio Registry — agent definitions.
 [[services]]
 binding = "REGISTRY"
 service = "studio-registry"
 
+# Studio Context — capability resolution for the agent.
 [[services]]
 binding = "CONTEXT"
 service = "studio-context"
+
+# Studio Data — durable result/transcript persistence.
+[[services]]
+binding = "DATA"
+service = "studio-data"
+
+# Studio MCP hub — cloud tool execution for permitted tools.
+[[services]]
+binding = "MCP"
+service = "studio-mcp"
+
+# Durable Object: one AgentSession per agent invocation/conversation.
+[[durable_objects.bindings]]
+name = "AGENT_SESSION"
+class_name = "AgentSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AgentSession"]

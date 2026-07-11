@@ -6,13 +6,17 @@ permissions, loads the permitted toolset and skills via Studio Context, runs the
 loop, enforces limits, and returns a structured result to the requesting user or
 parent agent (delegation — ARCHITECTURE.md §17).
 
-## Open architecture question (decision #3)
+## Architecture decision #3 — resolved: reuse the shared engine
 
-Whether this remains a separate worker or reuses Studio Execution Runtime's engine is
-unresolved. The guiding principle: **do not build a second agent engine** — prefer one
-reusable execution engine with different runtime configurations. `src/engine/` is
-written as a configuration layer over a shared engine for exactly that reason. If the
-decision lands on "execute inside Execution Runtime", this worker folds into it.
+This worker is a separate deployable, but it does **not** contain its own loop. It runs
+on `@studio/v2-runtime` — the same durable `RuntimeSession` engine as Execution and
+Planner. `AgentSession` (`src/session/`) subclasses it and specializes three points:
+`composeSystemPrompt` (the agent's prompt/personality/output format), `gateTools` (the
+agent's permission allowlist + read/write gate), and `finalize` (store a
+`DelegationResult`). `src/engine/config.ts` is the pure configuration layer that maps an
+`AgentDefinition` + delegation request into engine inputs (model, limits, narrowed
+permissions). State machine, checkpoints, recovery, and streaming are inherited, so a
+correctness fix in the engine lands here for free.
 
 ## Must NOT
 
