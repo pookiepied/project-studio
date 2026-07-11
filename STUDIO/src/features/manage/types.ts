@@ -21,6 +21,6 @@ export interface AdminMode {
   autoDefaultStaticModel?: string;
 }
 
-export type SubView = null | "whitelist" | "aimodels";
+export type SubView = null | "whitelist" | "aimodels" | "modelRegistry";
 export type FetchState = "idle" | "loading" | "ready" | "error";
 export type ActionState = "idle" | "loading" | "success" | "error";

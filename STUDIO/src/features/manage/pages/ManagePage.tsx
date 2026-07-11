@@ -3,6 +3,7 @@ import {
   LockIcon as Lock,
   UsersIcon as Users,
   CpuIcon as Cpu,
+  DatabaseIcon as Database,
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Manage, Collapse, Icon } from "@/ui/icons";
@@ -16,7 +17,7 @@ import { fetchModels } from "@/features/models/services/modelService";
 import type { Model } from "@/core/models";
 import type { WhitelistedUser, AdminMode, SubView, FetchState } from "../types";
 import { isValidEmail } from "../helpers";
-import { WhitelistView, AiModelsView } from "../components";
+import { WhitelistView, AiModelsView, ModelRegistryView } from "../components";
 
 export const ManagePage = () => {
   const { user: currentUser } = useAuth();
@@ -302,6 +303,20 @@ export const ManagePage = () => {
                   )}
                   <Collapse size="xs" className="text-muted flex-shrink-0" />
                 </button>
+
+                <button
+                  onClick={() => setSubView("modelRegistry")}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover transition-colors duration-fast text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
+                    <Icon icon={Database} size="sm" className="text-muted" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-secondary">Model Registry</p>
+                    <p className="text-2xs text-muted mt-0.5">Curated model catalogue and pricing</p>
+                  </div>
+                  <Collapse size="xs" className="text-muted flex-shrink-0" />
+                </button>
               </div>
             </div>
           </motion.div>
@@ -352,6 +367,13 @@ export const ManagePage = () => {
             onSave={handleAmSave}
             onReset={handleAmReset}
             onRetry={() => { setAmState("idle"); fetchAdminModes(); }}
+          />
+        )}
+
+        {subView === "modelRegistry" && (
+          <ModelRegistryView
+            key="modelRegistry"
+            onBack={() => setSubView(null)}
           />
         )}
 

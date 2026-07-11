@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 mod commands;
 mod mcp;
+mod local_registry;
 mod daemon;
 mod pty;
 mod native_browser;
@@ -431,6 +432,11 @@ pub fn run() {
             mcp_run_setup,
             mcp_resolve_studio_harness_server_path,
             mcp_resolve_computer_use_server_path,
+            local_registry::local_registry_register_stdio,
+            local_registry::local_registry_register_remote,
+            local_registry::local_registry_list,
+            local_registry::local_registry_remove,
+            local_registry::local_registry_sync_payload,
             local_provider_start,
             local_provider_stop,
             local_provider_is_running,

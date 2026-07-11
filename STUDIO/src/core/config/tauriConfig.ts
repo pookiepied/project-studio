@@ -51,6 +51,7 @@ export const API_ENDPOINTS = {
     attachments: `${TAURI_CONFIG.API_BASE_URL}/adapters/openai/v1/attachments`,
     mcp: `${TAURI_CONFIG.API_BASE_URL}/adapters/openai/v1/mcp`,
     adminModes: `${TAURI_CONFIG.API_BASE_URL}/adapters/openai/v1/admin/modes-config`,
+    registryManagement: `${TAURI_CONFIG.API_BASE_URL}/management/registry`,
     memories: `${TAURI_CONFIG.API_BASE_URL}/adapters/openai/v1/user/memories`,
     tracking: {
       summary: `${TAURI_CONFIG.API_BASE_URL}/adapters/openai/v1/tracking/summary`,

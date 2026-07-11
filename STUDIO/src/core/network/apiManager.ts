@@ -18,6 +18,7 @@ interface APIEndpoints {
   memories: string;
   mcp: string;
   adminModes: string;
+  registryManagement: string;
   tracking: {
     summary: string;
     usage: string;
@@ -91,6 +92,7 @@ class APIManager {
         memories: API_ENDPOINTS.adapter.memories,
         mcp: API_ENDPOINTS.adapter.mcp,
         adminModes: API_ENDPOINTS.adapter.adminModes,
+        registryManagement: API_ENDPOINTS.adapter.registryManagement,
         tracking: API_ENDPOINTS.adapter.tracking,
       };
     }
@@ -112,6 +114,7 @@ class APIManager {
         memories: "",
         mcp: "",
         adminModes: "",
+        registryManagement: "",
         tracking: empty,
       };
     }
@@ -131,6 +134,7 @@ class APIManager {
       memories: `${baseUrl}/adapters/openai/v1/user/memories`,
       mcp: `${baseUrl}/adapters/openai/v1/mcp`,
       adminModes: `${baseUrl}/adapters/openai/v1/admin/modes-config`,
+      registryManagement: `${baseUrl}/management/registry`,
       tracking: {
         summary: `${trackingBase}/summary`,
         usage: `${trackingBase}/usage`,

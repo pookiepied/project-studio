@@ -37,6 +37,7 @@ keyring = "2"
 base64 = "0.21"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 portable-pty = "0.8"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 webview2-com = "0.38"

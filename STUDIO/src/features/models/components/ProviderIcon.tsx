@@ -11,21 +11,29 @@
 
 import {
   siAnthropic,
+  siAlibabacloud,
+  siBytedance,
   siDeepseek,
+  siElevenlabs,
   siGoogle,
   siMeta,
   siMistralai,
   siOllama,
   siOpenrouter,
   siPerplexity,
+  siReplicate,
   siX,
+  siXiaomi,
 } from "simple-icons";
 import { BrandLogo } from '@/ui/brand/BrandLogo';
 import type { BrandLogoSize } from '@/ui/brand/BrandLogo';
 
 const SVG_MAP: Record<string, { path: string }> = {
   anthropic:  siAnthropic,
+  alibaba:    siAlibabacloud,
+  bytedance:  siBytedance,
   deepseek:   siDeepseek,
+  elevenlabs: siElevenlabs,
   google:     siGoogle,
   local:      siOllama,
   meta:       siMeta,
@@ -33,7 +41,10 @@ const SVG_MAP: Record<string, { path: string }> = {
   ollama:     siOllama,
   openrouter: siOpenrouter,
   perplexity: siPerplexity,
+  replicate:  siReplicate,
   xai:        siX,
+  "x-ai":     siX,
+  xiaomi:     siXiaomi,
 };
 
 const MONOGRAM: Record<string, string> = {
@@ -47,8 +58,12 @@ const MONOGRAM: Record<string, string> = {
   fireworks:        "Fw",
   groq:             "Gq",
   minimax:          "Mx",
+  moonshotai:       "Ms",
   openai:           "OA",
+  poolside:         "Ps",
   together:         "Tg",
+  zai:              "Z",
+  "z-ai":           "Z",
   "faster-whisper": "FW",
 };
 
@@ -61,7 +76,7 @@ function getEffectiveProvider(provider: string, modelId?: string): string {
       const slash = after.indexOf("/");
       if (slash > -1) {
         const upstream = after.slice(0, slash).toLowerCase();
-        if (upstream && upstream !== "openrouter") return upstream;
+        if (upstream && upstream !== "openrouter") return upstream === "x-ai" ? "xai" : upstream === "z-ai" ? "zai" : upstream;
       }
     }
   }
@@ -115,13 +130,19 @@ export function getProviderDisplayName(provider: string): string {
     local:            "Local",
     meta:             "Meta",
     minimax:          "MiniMax",
+    moonshotai:       "Moonshot AI",
     mistral:          "Mistral",
     ollama:           "Ollama",
     openai:           "OpenAI",
     openrouter:       "OpenRouter",
+    poolside:         "Poolside",
     perplexity:       "Perplexity",
     together:         "Together",
     xai:              "xAI",
+    xiaomi:           "Xiaomi",
+    zai:              "Z.ai",
+    "x-ai":           "xAI",
+    "z-ai":           "Z.ai",
     "faster-whisper": "Faster Whisper",
   };
 
