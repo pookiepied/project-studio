@@ -52,3 +52,14 @@ desktop.ini
 # Visual Studio per-user solution state (not project artifacts). Note: the
 # intentionally-vendored ripgrep under STUDIO/vendor/ is deliberately committed.
 .vs/
+
+# ── Editor launch/debug configs ──────────────────────────────
+# Keep shared launch configs tracked (mirrors the .vscode convention below);
+# ignore the rest of the tool's per-user session cruft.
+.claude/*
+!.claude/launch.json
+
+# ── External reference checkouts ─────────────────────────────
+# Vendored copies of upstream/3rd-party projects kept locally for reference
+# only — never part of this repo.
+Research/
