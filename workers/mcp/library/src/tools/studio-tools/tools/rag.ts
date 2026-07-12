@@ -18,7 +18,7 @@ export interface RagArgs {
 }
 
 export async function runRag(env: RagEnv, args: RagArgs): Promise<unknown> {
-  if (!env?.VECTORIZE || !env?.AI) {
+  if (!env?.RAG_VECTORIZE || !env?.AI) {
     return { error: "RAG requires VECTORIZE and AI bindings — not configured." };
   }
 
@@ -44,7 +44,7 @@ export async function runRag(env: RagEnv, args: RagArgs): Promise<unknown> {
     const vector = embed?.data?.[0];
     if (!vector) return { error: "Failed to generate query embedding" };
 
-    const results = await env.VECTORIZE!.query(vector, {
+    const results = await env.RAG_VECTORIZE!.query(vector, {
       topK,
       filter: { session_id: sessionId },
       returnMetadata: "all",
@@ -80,7 +80,7 @@ export async function runRag(env: RagEnv, args: RagArgs): Promise<unknown> {
       }
     }
 
-    const results = await env.VECTORIZE!.query(new Array(768).fill(0) as number[], {
+    const results = await env.RAG_VECTORIZE!.query(new Array(768).fill(0) as number[], {
       topK: 100,
       filter: { session_id: sessionId },
       returnMetadata: "all",

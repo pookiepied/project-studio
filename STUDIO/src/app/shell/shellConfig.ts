@@ -72,11 +72,10 @@ export const WORKSPACE_SHELL = {
    *  the native rounded window edge and avoid reading as a second bezel. */
   frameInset: 0,
   /** Corner radius of the app panel.
-   *  Must match the native Windows 11 DWM corner rounding (8px) so the CSS
-   *  border on .zen-surface follows the SAME curve the OS clips the window
-   *  to. A mismatch here makes the border trace a different radius than the
-   *  window edge, which reads as an extruded/offset outline. */
-  frameRadius: 8,
+   *  With transparent: true the OS window is fully transparent, so this
+   *  CSS radius IS the visible window shape — Mac-style rounded corners.
+   *  The transparent areas outside this radius show the desktop behind. */
+  frameRadius: 12,
   /** Height of the invisible hover hot-zone at the very top edge (px). */
   topHotZone: 8,
   /** How long controls stay revealed after the cursor leaves the top (ms). */

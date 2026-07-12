@@ -22,12 +22,17 @@ const NATIVE_SERVICES: Array<{
   id:           string;
   display_name: string;
   binding:      keyof Pick<Env, "MEMORY" | "YOUTUBE_TRANSCRIPT" | "TOOLS" | "SKILLS">;
+  // Path the MCP Streamable HTTP handshake targets on the bound service.
+  // Defaults to "/mcp". MEMORY and TOOLS both live in studio-mcp-library now
+  // (one worker, routed by path prefix), so they need distinct paths.
+  mcpPath?: string;
   tools: Array<{ name: string; description: string; parameters: unknown }>;
 }> = [
   {
     id:           "memory",
     display_name: "STUDIO Memory",
     binding:      "MEMORY",
+    mcpPath:      "/services/studio-memory/mcp",
     tools: [
       {
         name:        "memory_recall",
@@ -151,6 +156,7 @@ const NATIVE_SERVICES: Array<{
     id:           "studio-tools",
     display_name: "STUDIO Tools",
     binding:      "TOOLS",
+    mcpPath:      "/tools/studio-tools/mcp",
     tools: [
       {
         name:        "http_request",
@@ -422,6 +428,8 @@ export async function handleNativeExecute(env: Env, request: Request): Promise<R
     return json({ success: false, error: `Native service '${serviceId}' is not bound in this environment` }, 503);
   }
 
+  const mcpUrl = `https://${serviceId}${svcDef.mcpPath ?? "/mcp"}`;
+
   try {
     // MCP Streamable HTTP transport — initialize session first, then call tool
     const mcpHeaders: Record<string, string> = {
@@ -430,7 +438,7 @@ export async function handleNativeExecute(env: Env, request: Request): Promise<R
     };
 
     // Step 1: Initialize
-    const initRes = await fetcher.fetch(`https://${serviceId}/mcp`, {
+    const initRes = await fetcher.fetch(mcpUrl, {
       method: "POST",
       headers: mcpHeaders,
       body: JSON.stringify({
@@ -449,14 +457,14 @@ export async function handleNativeExecute(env: Env, request: Request): Promise<R
     if (sessionId) mcpHeaders["Mcp-Session-Id"] = sessionId;
 
     // Step 2: Notify initialized
-    await fetcher.fetch(`https://${serviceId}/mcp`, {
+    await fetcher.fetch(mcpUrl, {
       method: "POST",
       headers: mcpHeaders,
       body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
     });
 
     // Step 3: Call the tool
-    const callRes = await fetcher.fetch(`https://${serviceId}/mcp`, {
+    const callRes = await fetcher.fetch(mcpUrl, {
       method: "POST",
       headers: mcpHeaders,
       body: JSON.stringify({

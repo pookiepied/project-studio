@@ -68,7 +68,7 @@ export async function runWebFetch(env: RagEnv, args: WebFetchArgs): Promise<unkn
   const sessionId   = sessionIdFromUrl(url);
   const autoIndexed = content.length > AUTO_INDEX_THRESHOLD;
 
-  if (autoIndexed && env?.VECTORIZE && env?.AI) {
+  if (autoIndexed && env?.RAG_VECTORIZE && env?.AI) {
     await indexContent(env, content, sessionId, url).catch(() => {});
   }
 

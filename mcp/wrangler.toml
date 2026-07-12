@@ -29,20 +29,22 @@ database_id = "372d8d03-1d80-4595-9069-1739f7b5bb6f"
 # Service bindings — native system MCP workers
 # ---------------------------------------------------------------------------
 
-# STUDIO Memory — persistent user memory (facts, profiles, conversation history)
+# STUDIO Memory — persistent user memory (facts, profiles, conversation history).
+# Lives in studio-mcp-library under path prefix /services/studio-memory/.
 [[services]]
 binding = "MEMORY"
-service = "studio-mcp-memory"
+service = "studio-mcp-library"
 
 # STUDIO YouTube Transcript MCP
 [[services]]
 binding = "YOUTUBE_TRANSCRIPT"
 service = "studio-youtube-transcript"
 
-# STUDIO Tools — first-party native work tools (web_search, http_request, gen, …)
+# STUDIO Tools — first-party native work tools (web_search, http_request, gen, …).
+# Lives in studio-mcp-library under path prefix /tools/studio-tools/.
 [[services]]
 binding = "TOOLS"
-service = "studio-mcp-tools"
+service = "studio-mcp-library"
 
 # STUDIO Skills — bundled + local skill catalog (skill_read, skill_list, …).
 # Advertised to BOTH the main chat agent and sub-agents through this hub's

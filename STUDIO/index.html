@@ -13,13 +13,7 @@
       html.zen-window,
       html.zen-window body,
       html.zen-window #root {
-        background: #ffffff !important;
-      }
-
-      html.dark.zen-window,
-      html.dark.zen-window body,
-      html.dark.zen-window #root {
-        background: #121212 !important;
+        background: transparent !important;
       }
 
     </style>
@@ -50,7 +44,7 @@
           if (!isOverlay && !isSplashPreview && workspaceShellEnabled) {
             root.classList.add('zen-window');
             root.style.setProperty('--zen-frame-inset', '0px');
-            root.style.setProperty('--zen-frame-radius', '8px');
+            root.style.setProperty('--zen-frame-radius', '12px');
           }
         } catch(e) {}
       })();

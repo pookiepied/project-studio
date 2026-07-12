@@ -89,7 +89,7 @@ Exposes an OpenAI-compatible API surface (`/adapters/openai/v1/*`) so the STUDIO
 | `CHATS_SERVICE` | Service | Chat storage worker |
 | `STUDIO` | Service | User preferences worker |
 | `TRACKER` | Service | Telemetry + analytics |
-| `MEMORY` | Service | `studio-mcp-memory` — memory management |
+| `MEMORY` | Service | `studio-mcp-library` (studio-memory service) — memory management |
 | `DB` | D1 | Job queue database |
 | `KV` | KV | General key-value cache |
 | `RELEASES_KV` | KV | App update manifests |

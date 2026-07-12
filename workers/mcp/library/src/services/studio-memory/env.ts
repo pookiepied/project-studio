@@ -2,9 +2,9 @@
 
 export interface Env {
   // Cloudflare bindings
-  MCP_OBJECT: DurableObjectNamespace;
+  MEMORY_OBJECT: DurableObjectNamespace;
   MEMORY_DB: D1Database;
-  VECTORIZE: VectorizeIndex;
+  MEMORY_VECTORIZE: VectorizeIndex;
   AI: Ai;
   PROFILE_KV: KVNamespace;
 

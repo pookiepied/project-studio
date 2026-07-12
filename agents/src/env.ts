@@ -15,7 +15,8 @@ export interface Env {
   // Service bindings
   MCP_TOOLS: Fetcher;  // studio-mcp hub — tool catalog + cloud execution router
   TRACKER?:  Fetcher;  // tracker Worker
-  MEMORY?:   Fetcher;  // studio-mcp-memory — context inject at loop start
+  MEMORY?:   Fetcher;  // studio-mcp-library (studio-memory service) — context inject at loop start.
+                       // Requests must target /services/studio-memory/* paths.
 
   // KV — MCP tool manifests (mcp_manifest:{name}); shared namespace with chat.
   // Read by the tool loader to get local/remote MCP tool schemas.
@@ -27,6 +28,6 @@ export interface Env {
   // Gateway — all LLM calls go through the studio-gateway worker
   GATEWAY: Fetcher;
 
-  // Service-to-service auth with studio-mcp-memory
+  // Service-to-service auth with studio-mcp-library's studio-memory service
   MEMORY_AUTH_SECRET?: string;
 }

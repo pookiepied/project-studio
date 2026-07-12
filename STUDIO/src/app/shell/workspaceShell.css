@@ -4,22 +4,16 @@
  * staying inside the monochrome system.
  */
 
-/* Solid workspace shell ------------------------------------------------------
- * The native Tauri window stays opaque so Windows owns the real outer shape.
- * We intentionally avoid app-drawn edge decoration here; the workspace shell
- * keeps the floating chrome model without trying to fake a different shell. */
+/* Transparent workspace shell --------------------------------------------------
+ * With transparent: true (tauri.conf.json) the native window is fully
+ * transparent. html/body/#root are transparent so .zen-surface — with its
+ * border-radius — becomes the actual visible window shape. Areas outside
+ * the radius (the 4 corner triangles) are transparent → Mac-style rounded
+ * window on Windows. */
 html.zen-window,
 html.zen-window body,
 html.zen-window #root {
-  --zen-shell-bg: var(--surface-page);
-  background: var(--zen-shell-bg) !important;
-}
-
-html.dark.zen-window,
-html.dark.zen-window body,
-html.dark.zen-window #root {
-  --zen-shell-bg: var(--app-bg-dark);
-  background: var(--zen-shell-bg) !important;
+  background: transparent !important;
 }
 
 /* Elegant window outline ------------------------------------------------------
@@ -39,15 +33,31 @@ html.dark.zen-window #root {
  * box-sizing: border-box means the border draws inside the fixed inset.
  * --surface-border auto-switches in dark mode via tokens.css. */
 
-/* The app surface — flush with the native window, border follows its radius. */
+/* The app surface — its border-radius IS the visible window shape because the
+ * OS window is transparent. Areas outside this radius are transparent.
+ * The border + box-shadow follow the same rounded curve.
+ * box-sizing: border-box means the border draws inside the fixed inset.
+ * --surface-border auto-switches in dark mode via tokens.css. */
 .zen-surface {
   position: fixed;
-  inset: var(--zen-frame-inset, 8px);
-  border-radius: var(--zen-frame-radius, 16px);
+  inset: var(--zen-frame-inset, 0px);
+  border-radius: var(--zen-frame-radius, 12px);
   overflow: hidden;
   border: 4px solid var(--surface-border);
-  background: var(--zen-shell-bg);
+  background: var(--surface-page);
   isolation: isolate;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.03),
+    0 8px 28px -4px rgb(0 0 0 / 0.14),
+    0 2px 8px -2px rgb(0 0 0 / 0.08);
+}
+
+html.dark .zen-surface {
+  background: var(--app-bg-dark);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.40),
+    0 8px 28px -4px rgb(0 0 0 / 0.50),
+    0 2px 8px -2px rgb(0 0 0 / 0.30);
 }
 
 /* ── Hover-reveal window chrome ──────────────────────────────────────────── */

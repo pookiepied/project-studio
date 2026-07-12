@@ -18,7 +18,7 @@ export interface RagEnv {
   // AI / VECTORIZE typed loosely (as in the chat originals) to avoid
   // Workers-types method-variance friction; call sites are exact.
   AI?:        any;
-  VECTORIZE?: any;
+  RAG_VECTORIZE?: any;
   MCP_KV?:    KVNamespace;
 }
 
@@ -242,7 +242,7 @@ export async function indexContent(
   source:    string,
   options:   IndexOptions = {}
 ): Promise<IndexResult> {
-  if (!env?.VECTORIZE) throw new Error("VECTORIZE binding not configured.");
+  if (!env?.RAG_VECTORIZE) throw new Error("RAG_VECTORIZE binding not configured.");
   if (!env?.AI)        throw new Error("AI binding not configured.");
 
   const structured = chunkTextWithStructure(text);
@@ -274,7 +274,7 @@ export async function indexContent(
   }
 
   for (let i = 0; i < allVectors.length; i += VECTORIZE_BATCH) {
-    await env.VECTORIZE.insert(allVectors.slice(i, i + VECTORIZE_BATCH));
+    await env.RAG_VECTORIZE.insert(allVectors.slice(i, i + VECTORIZE_BATCH));
   }
 
   const toc = buildToc(structured, sessionId, source);

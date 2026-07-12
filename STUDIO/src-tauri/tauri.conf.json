@@ -21,7 +21,7 @@
         "maximizable": true,
         "decorations": false,
         "shadow": false,
-        "transparent": false,
+        "transparent": true,
         "center": true,
         "visible": false,
         "focus": false

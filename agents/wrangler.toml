@@ -11,8 +11,9 @@ ENVIRONMENT = "production"
 # ---------------------------------------------------------------------------
 # Secrets — set via: wrangler secret put <NAME>
 # ---------------------------------------------------------------------------
-# MEMORY_AUTH_SECRET   — shared secret for service-to-service auth with studio-mcp-memory.
-#                        Must match MEMORY_AUTH_SECRET in studio-mcp-memory.
+# MEMORY_AUTH_SECRET   — shared secret for service-to-service auth with studio-mcp-library's
+#                        studio-memory service (path prefix /services/studio-memory/).
+#                        Must match MEMORY_AUTH_SECRET in studio-mcp-library.
 #   wrangler secret put MEMORY_AUTH_SECRET
 
 # ---------------------------------------------------------------------------
@@ -44,10 +45,12 @@ service  = "tracker"
 binding = "GATEWAY"
 service  = "studio-gateway"
 
-# Memory — context injection at agent loop start
+# Memory — context injection at agent loop start.
+# studio-mcp-library hosts studio-memory under path prefix /services/studio-memory/
+# (e.g. POST /services/studio-memory/inject, POST /services/studio-memory/process).
 [[services]]
 binding = "MEMORY"
-service  = "studio-mcp-memory"
+service  = "studio-mcp-library"
 
 # Tail consumer
 [[tail_consumers]]
