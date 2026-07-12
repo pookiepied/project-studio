@@ -332,6 +332,129 @@ describe("gateway worker", () => {
     expect(allowed.status).toBe(200);
   });
 
+  it("deletes persisted custom registry models", async () => {
+    const env = createEnv();
+    const catalogResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const catalog = (await catalogResponse.json()) as { data: Array<Record<string, unknown>> };
+    const base = catalog.data.find((model) => model.id === "openai:gpt-5.6-sol") as Record<string, unknown>;
+    const custom = {
+      ...base,
+      id: "openai:gpt-delete-test",
+      providerModelId: "gpt-delete-test",
+      displayName: "GPT Delete Test",
+      registry: {
+        ...(base.registry as Record<string, unknown>),
+        aliases: ["gpt-delete-test"],
+        version: "gpt-delete-test"
+      }
+    };
+
+    await worker.fetch(
+      new Request("https://gateway.test/management/registry/models", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(custom)
+      }),
+      env,
+      {} as ExecutionContext
+    );
+
+    const deleteResponse = await worker.fetch(
+      new Request(`https://gateway.test/management/registry/models/${encodeURIComponent("openai:gpt-delete-test")}`, {
+        method: "DELETE"
+      }),
+      env,
+      {} as ExecutionContext
+    );
+    const deleteBody = (await deleteResponse.json()) as { deleted: boolean };
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteBody.deleted).toBe(true);
+
+    const updatedResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const updated = (await updatedResponse.json()) as { data: Array<{ id: string }> };
+    expect(updated.data.some((model) => model.id === "openai:gpt-delete-test")).toBe(false);
+  });
+
+  it("deletes built-in curated registry models from the active registry", async () => {
+    const env = createEnv();
+
+    const deleteResponse = await worker.fetch(
+      new Request(`https://gateway.test/management/registry/models/${encodeURIComponent("openai:gpt-5.5")}`, {
+        method: "DELETE"
+      }),
+      env,
+      {} as ExecutionContext
+    );
+    expect(deleteResponse.status).toBe(200);
+
+    const updatedResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const updated = (await updatedResponse.json()) as { data: Array<{ id: string }> };
+    expect(updated.data.some((model) => model.id === "openai:gpt-5.5")).toBe(false);
+  });
+
+  it("includes curated OpenRouter free routes with free metadata", async () => {
+    const response = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      createEnv(),
+      {} as ExecutionContext
+    );
+    const body = (await response.json()) as {
+      data: Array<{ id: string; contextWindow?: number; maxTokens?: number; registry: { freeAccess?: { isFree?: boolean } } }>;
+    };
+    const freeIds = [
+      "openrouter:openai/gpt-oss-20b:free",
+      "openrouter:openai/gpt-oss-120b:free",
+      "openrouter:poolside/laguna-xs-2.1:free",
+      "openrouter:cohere/north-mini-code:free",
+      "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
+      "openrouter:tencent/hy3:free",
+      "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free",
+      "openrouter:google/gemma-4-31b-it:free"
+    ];
+
+    for (const id of freeIds) {
+      const model = body.data.find((candidate) => candidate.id === id);
+      expect(model, id).toBeDefined();
+      expect(model?.registry.freeAccess?.isFree).toBe(true);
+    }
+
+    expect(body.data.find((model) => model.id === "openrouter:google/gemma-4-31b-it:free")?.maxTokens).toBe(8192);
+    expect(body.data.find((model) => model.id === "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free")?.contextWindow).toBe(1_000_000);
+  });
+
+  it("deletes OpenRouter models whose ids include slashes", async () => {
+    const env = createEnv();
+    const id = "openrouter:poolside/laguna-xs-2.1:free";
+    const deleteResponse = await worker.fetch(
+      new Request(`https://gateway.test/management/registry/models/${encodeURIComponent(id)}`, {
+        method: "DELETE"
+      }),
+      env,
+      {} as ExecutionContext
+    );
+    expect(deleteResponse.status).toBe(200);
+
+    const updatedResponse = await worker.fetch(
+      new Request("https://gateway.test/v1/models"),
+      env,
+      {} as ExecutionContext
+    );
+    const updated = (await updatedResponse.json()) as { data: Array<{ id: string }> };
+    expect(updated.data.some((model) => model.id === id)).toBe(false);
+  });
+
   it("routes chat requests through a persisted registry model", async () => {
     const env = createEnv();
     const catalogResponse = await worker.fetch(

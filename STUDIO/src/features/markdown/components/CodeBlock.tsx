@@ -157,7 +157,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
             <AnimatePresence mode="wait">
               {copied ? (
                 <motion.div key="check" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.15 }} className="flex items-center gap-1">
-                  <Check size={13} weight="bold" className="text-secondary" />
+                  <Check size={14} weight="bold" className="text-secondary" />
                   <span className="text-secondary">Copied</span>
                 </motion.div>
               ) : (
@@ -216,7 +216,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                     transition={{ duration: 0.15 }}
                     className="flex items-center gap-1"
                   >
-                    <Check size={13} weight="bold" className="text-secondary" />
+                    <Check size={14} weight="bold" className="text-secondary" />
                     <span className="text-secondary">Opened</span>
                   </motion.div>
                 ) : (
@@ -282,7 +282,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                   transition={{ duration: 0.15 }}
                   className="flex items-center gap-1"
                 >
-                  <Check size={13} weight="bold" className="text-secondary" />
+                  <Check size={14} weight="bold" className="text-secondary" />
                   <span className="text-secondary">Copied</span>
                 </motion.div>
               ) : (
@@ -355,7 +355,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
           onClick={() => setIsCollapsed(false)}
           className="w-full py-3 text-xs text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-raised transition-colors flex items-center justify-center gap-2"
         >
-          <CaretDown size={12} weight="bold" />
+          <CaretDown size={14} weight="bold" />
           <span>Show {lineCount} lines</span>
         </motion.button>
       )}

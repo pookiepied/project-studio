@@ -16,9 +16,9 @@ interface Props {
 }
 
 const themeOptions = [
-  { value: "system" as const, label: "System", icon: <Desktop size={13} weight="regular" /> },
-  { value: "light" as const,  label: "Light",  icon: <Sun size={13} weight="regular" /> },
-  { value: "dark" as const,   label: "Dark",   icon: <Moon size={13} weight="regular" /> },
+  { value: "system" as const, label: "System", icon: <Desktop size={14} weight="regular" /> },
+  { value: "light" as const,  label: "Light",  icon: <Sun size={14} weight="regular" /> },
+  { value: "dark" as const,   label: "Dark",   icon: <Moon size={14} weight="regular" /> },
 ];
 
 export const InterfaceView = ({ updateSetting, onThemeChange }: Props) => {

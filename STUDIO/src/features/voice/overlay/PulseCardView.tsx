@@ -27,19 +27,19 @@ export function CardIcon({ type }: { type: PulseCardType }) {
   const cls = "text-gray-500 dark:text-gray-400 flex-shrink-0";
   switch (type) {
     case "price-lookup":
-      return <CurrencyDollar size={13} weight="regular" className={cls} />;
+      return <CurrencyDollar size={14} weight="regular" className={cls} />;
     case "web-search":
-      return <MagnifyingGlass size={13} weight="regular" className={cls} />;
+      return <MagnifyingGlass size={14} weight="regular" className={cls} />;
     case "image-generation":
     case "video-generation":
-      return <ImageIcon size={13} weight="regular" className={cls} />;
+      return <ImageIcon size={14} weight="regular" className={cls} />;
     case "memory":
-      return <Brain size={13} weight="regular" className={cls} />;
+      return <Brain size={14} weight="regular" className={cls} />;
     case "computer-use":
     case "ocr":
-      return <Terminal size={13} weight="regular" className={cls} />;
+      return <Terminal size={14} weight="regular" className={cls} />;
     default:
-      return <CheckCircle size={13} weight="regular" className={cls} />;
+      return <CheckCircle size={14} weight="regular" className={cls} />;
   }
 }
 
@@ -107,7 +107,7 @@ export function PulseCardContent({ card, onAction }: PulseCardContentProps) {
       )}
 
       <ActionBtn
-        icon={<X size={10} weight="regular" />}
+        icon={<X size={12} weight="regular" />}
         label="Dismiss"
         onClick={() => onAction("dismiss")}
       />

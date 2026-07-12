@@ -32,7 +32,7 @@ export function ProjectsPage() {
             onClick={openProject}
             className="inline-flex h-8 items-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors duration-150 hover:bg-gray-50 dark:border-surface-border dark:text-gray-400 dark:hover:bg-surface-raised"
           >
-            <Plus size={12} weight="regular" />
+            <Plus size={14} weight="regular" />
             Open project
           </button>
         </div>
@@ -79,7 +79,7 @@ export function ProjectsPage() {
                     onClick={() => { void removeProject(project.id); }}
                     className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
                   >
-                    <MinusCircle size={13} weight="bold" />
+                    <MinusCircle size={14} weight="bold" />
                   </button>
                   <button
                     type="button"
@@ -87,7 +87,7 @@ export function ProjectsPage() {
                     onClick={() => { void deleteProject(project.id); }}
                     className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
                   >
-                    <Trash size={13} weight="bold" />
+                    <Trash size={14} weight="bold" />
                   </button>
                 </div>
               </div>

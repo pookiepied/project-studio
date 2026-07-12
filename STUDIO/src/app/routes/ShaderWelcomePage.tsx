@@ -93,8 +93,8 @@ function LoginContextMenu({
           transition-colors duration-100 text-left"
       >
         {isDark
-          ? <Sun size={13} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-          : <Moon size={13} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          ? <Sun size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          : <Moon size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
         }
         {isDark ? "Switch to light" : "Switch to dark"}
       </button>
@@ -214,13 +214,13 @@ export const ShaderWelcomePage = () => {
               onClick={handleMinimize}
               className="p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-gray-700 dark:hover:text-muted hover:bg-gray-900/[0.06] dark:hover:bg-white/[0.06] transition-colors"
             >
-              <Minus size={13} weight="bold" />
+              <Minus size={14} weight="bold" />
             </button>
             <button
               onClick={handleClose}
               className="p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-secondary hover:bg-surface-raised/10 transition-colors"
             >
-              <X size={13} weight="bold" />
+              <X size={14} weight="bold" />
             </button>
           </div>
         )}

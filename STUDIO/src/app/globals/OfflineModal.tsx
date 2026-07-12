@@ -78,7 +78,7 @@ export const OfflineModal = () => {
                 transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                 className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-surface-border border border-surface-border flex items-center justify-center"
               >
-                <WifiSlash size={11} weight="regular" className="text-muted" />
+                <WifiSlash size={12} weight="regular" className="text-muted" />
               </motion.div>
             </div>
 
@@ -95,7 +95,7 @@ export const OfflineModal = () => {
               onClick={handleTryAgain}
               className="flex items-center gap-1 text-sm text-muted hover:text-secondary transition-colors duration-fast"
             >
-              <ArrowsClockwise size={11} weight="regular" />
+              <ArrowsClockwise size={12} weight="regular" />
               Try again
             </button>
           </motion.div>

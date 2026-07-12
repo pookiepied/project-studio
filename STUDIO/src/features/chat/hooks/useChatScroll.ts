@@ -14,6 +14,9 @@ interface UseChatScrollReturn {
   messagesEndRef:       React.RefObject<HTMLDivElement | null>;
   messagesContentRef:   React.RefObject<HTMLDivElement | null>;
   loadMoreTriggerRef:   React.RefObject<HTMLDivElement | null>;
+  /** Forward a wheel delta into the message scroller from an element that
+   *  isn't a DOM descendant of it (e.g. the floating composer overlay). */
+  forwardWheel: (deltaY: number) => void;
 }
 
 /**
@@ -44,10 +47,18 @@ export function useChatScroll({
   const prevMessageCountRef  = useRef(0);
   const touchStartYRef       = useRef<number | null>(null);
   const prependAnchorRef     = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const isStreamingRef       = useRef(isStreaming);
+  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
 
   // Suspend auto-follow only on upward wheel scroll or touch drag upward.
   // Downward scrolling, clicks, and other interactions do not suspend it.
-  // Re-enable once the user returns to within 10 px of the bottom.
+  // Re-enable once the user returns to within 10 px of the bottom — but only
+  // once the turn has actually finished. Re-arming on mere proximity mid-stream
+  // meant a user who scrolled up got yanked back the moment the growing answer
+  // caught up to their scroll position, which felt like scroll never actually
+  // disabled. Once suspended during a generating answer, it now stays off for
+  // the rest of that answer; only after it settles does hitting the bottom
+  // re-arm auto-follow again.
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -68,6 +79,7 @@ export function useChatScroll({
     };
 
     const onScroll = () => {
+      if (isStreamingRef.current) return;
       const d = container.scrollHeight - container.scrollTop - container.clientHeight;
       if (d < 10) shouldAutoFollowRef.current = true;
     };
@@ -92,8 +104,36 @@ export function useChatScroll({
     };
   }, []);
 
+  // The floating composer overlay sits as a DOM sibling of the scroll container
+  // (positioned on top of it visually), not a descendant — so native wheel
+  // scrolling never reaches the container while the cursor is over the
+  // composer's interactive column (TurnStatus, approval cards, banner). That
+  // made the list feel completely unscrollable while an answer was generating,
+  // since that's exactly the area users hover to read it. This replays the
+  // same delta + auto-follow bookkeeping the container's own wheel handler
+  // does, just triggered from outside the container.
+  function forwardWheel(deltaY: number): void {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (deltaY < 0) shouldAutoFollowRef.current = false;
+    container.scrollTop += deltaY;
+    if (container.scrollHeight - container.scrollTop - container.clientHeight < 10) {
+      shouldAutoFollowRef.current = true;
+    }
+  }
+
   function isNearBottom(container: HTMLDivElement): boolean {
     return container.scrollHeight - container.scrollTop - container.clientHeight < 24;
+  }
+
+  // Single source of truth for "the bottom": the max scrollTop. This lands the
+  // last line exactly at the container's paddingBottom edge — i.e. just above the
+  // floating composer — instead of behind it (which is what scrollIntoView on the
+  // end sentinel did, since the sentinel sits ABOVE the paddingBottom).
+  function scrollToBottom(container: HTMLDivElement, smooth: boolean): void {
+    const top = container.scrollHeight - container.clientHeight;
+    if (smooth) container.scrollTo({ top, behavior: "smooth" });
+    else container.scrollTop = top;
   }
 
   useLayoutEffect(() => {
@@ -111,7 +151,7 @@ export function useChatScroll({
     const container = messagesContainerRef.current;
     const previousCount = prevMessageCountRef.current;
     if (messageCount > previousCount && (previousCount === 0 || shouldAutoFollowRef.current || (container && isNearBottom(container)))) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      if (container) scrollToBottom(container, true);
       shouldAutoFollowRef.current = true;
     }
     prevMessageCountRef.current = messageCount;
@@ -125,7 +165,10 @@ export function useChatScroll({
   useEffect(() => {
     if (!conversationId) return;
     shouldAutoFollowRef.current = true;
-    const jump = () => messagesEndRef.current?.scrollIntoView({ block: "end" });
+    const jump = () => {
+      const container = messagesContainerRef.current;
+      if (container) scrollToBottom(container, false);
+    };
     const raf = requestAnimationFrame(() => requestAnimationFrame(jump));
     const t = setTimeout(jump, 120); // fallback for late async message layout
     return () => { cancelAnimationFrame(raf); clearTimeout(t); };
@@ -139,13 +182,17 @@ export function useChatScroll({
 
     const follow = () => {
       if (shouldAutoFollowRef.current) {
+        // Ease toward the true bottom (proportional step, no fixed px/frame cap)
+        // — this is what gives the Apple-style "gliding" feel instead of a hard
+        // per-frame snap. The old version capped the step at 48px/frame, so on
+        // long/fast streams the target kept outrunning it and the view never
+        // caught up. A proportional step has no such ceiling: it always closes
+        // most of the remaining gap every frame, so it converges immediately
+        // even when a lot of text lands in one tick.
         const target = container.scrollHeight - container.clientHeight;
-        const diff   = target - container.scrollTop;
-        if (diff > 0.5) {
-          container.scrollTop += Math.min(Math.max(1, diff * 0.22), 48);
-        } else if (diff > 0) {
-          container.scrollTop = target;
-        }
+        const diff = target - container.scrollTop;
+        if (diff > 0.5) container.scrollTop += diff * 0.35;
+        else if (diff > 0) container.scrollTop = target;
       }
       streamScrollFrameRef.current = window.requestAnimationFrame(follow);
     };
@@ -165,9 +212,8 @@ export function useChatScroll({
   useEffect(() => {
     if (isStreaming) return;
     const t = setTimeout(() => {
-      if (shouldAutoFollowRef.current) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-      }
+      const container = messagesContainerRef.current;
+      if (container && shouldAutoFollowRef.current) scrollToBottom(container, true);
     }, 300);
     return () => clearTimeout(t);
   }, [isStreaming]);
@@ -196,5 +242,5 @@ export function useChatScroll({
     return () => observer.disconnect();
   }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
-  return { messagesContainerRef, messagesEndRef, messagesContentRef, loadMoreTriggerRef };
+  return { messagesContainerRef, messagesEndRef, messagesContentRef, loadMoreTriggerRef, forwardWheel };
 }

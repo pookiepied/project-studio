@@ -163,7 +163,7 @@ export function RuntimeStepCard({ event }: HarnessStepCardProps) {
         {/* Expand chevron */}
         {canExpand && (
           <CaretRight
-            size={9}
+            size={12}
             weight="bold"
             className={`flex-shrink-0 ml-auto text-gray-400 dark:text-gray-600 transition-transform duration-150 ${
               expanded ? "rotate-90" : ""

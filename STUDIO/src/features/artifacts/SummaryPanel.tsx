@@ -65,7 +65,7 @@ function CollapsibleSection({
           transition={{ duration: 0.15 }}
           className="text-gray-400 dark:text-gray-600"
         >
-          <CaretRight size={11} weight="bold" />
+          <CaretRight size={12} weight="bold" />
         </motion.span>
       </button>
 
@@ -118,7 +118,7 @@ export function SummaryPanel({
           onClick={onClose}
           className="w-5 h-5 flex items-center justify-center rounded-md text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-selected hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-100"
         >
-          <X size={11} weight="bold" />
+          <X size={12} weight="bold" />
         </button>
       </div>
 

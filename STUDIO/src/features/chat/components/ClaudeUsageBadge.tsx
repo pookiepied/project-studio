@@ -167,7 +167,7 @@ export function ClaudeUsageBadge({
                 className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-raised hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 title="Refresh Claude status"
               >
-                <ArrowClockwise size={12} weight="bold" className={loading ? "animate-spin" : ""} />
+                <ArrowClockwise size={14} weight="bold" className={loading ? "animate-spin" : ""} />
               </button>
             </div>
 
@@ -217,7 +217,7 @@ export function ClaudeUsageBadge({
 
               {updatedAtLabel && (
                 <div className="flex items-center gap-1.5 text-2xs text-gray-400 dark:text-gray-500 pt-0.5">
-                  <Clock size={10} weight="regular" />
+                  <Clock size={12} weight="regular" />
                   <span>{updatedAtLabel}</span>
                 </div>
               )}

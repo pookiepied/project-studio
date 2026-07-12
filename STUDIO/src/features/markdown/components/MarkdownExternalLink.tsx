@@ -102,7 +102,7 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
         title={href}
       >
         {children}
-        <ArrowSquareOut size={11} className="inline opacity-50 ml-0.5" />
+        <ArrowSquareOut size={12} className="inline opacity-50 ml-0.5" />
       </a>
 
       {showPopover && createPortal(
@@ -120,7 +120,7 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
               transformOrigin: "top left",
             }}
           >
-            <Globe size={12} className="text-muted flex-shrink-0" />
+            <Globe size={14} className="text-muted flex-shrink-0" />
             <span className="text-xs text-muted font-mono max-w-[180px] truncate">
               {displayUrl}
             </span>
@@ -129,7 +129,7 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary text-on-emphasis rounded-full hover:bg-secondary transition-colors whitespace-nowrap"
             >
               Open
-              <ArrowUpRight size={10} weight="regular" />
+              <ArrowUpRight size={12} weight="regular" />
             </button>
           </motion.div>
         </AnimatePresence>,

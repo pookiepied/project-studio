@@ -50,10 +50,10 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
         }}
         className="flex items-center gap-1.5 px-2 h-6 rounded-md text-xs font-medium text-secondary hover:bg-surface-hover transition-colors disabled:opacity-60 disabled:cursor-default"
       >
-        <Icon size={12} weight={open ? "fill" : "regular"} />
+        <Icon size={14} weight={open ? "fill" : "regular"} />
         <span>{label}</span>
         {!disabled && (
-          <CaretDown size={8} weight="bold" className={`opacity-50 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+          <CaretDown size={12} weight="bold" className={`opacity-50 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
         )}
       </button>
 
@@ -92,21 +92,21 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
               active={scope === "cloud"}
               onClick={() => { onScopeChange("cloud"); setOpen(false); }}
             />
-            <AddRow icon={<Plus size={12} weight="bold" />} label="Add Cloud Environment" />
+            <AddRow icon={<Plus size={14} weight="bold" />} label="Add Cloud Environment" />
 
             <div className="my-1.5 mx-2 h-px bg-surface-divider" />
 
             <p className="px-2 pt-0.5 pb-1.5 text-2xs font-semibold tracking-wide text-muted">
               REMOTE CONTROL
             </p>
-            <AddRow icon={<Broadcast size={13} weight="regular" />} label="Setup Remote Control" />
+            <AddRow icon={<Broadcast size={14} weight="regular" />} label="Setup Remote Control" />
 
             <div className="my-1.5 mx-2 h-px bg-surface-divider" />
 
             <p className="px-2 pt-0.5 pb-1.5 text-2xs font-semibold tracking-wide text-muted">
               SSH
             </p>
-            <AddRow icon={<TerminalWindow size={13} weight="regular" />} label="Add SSH Host" />
+            <AddRow icon={<TerminalWindow size={14} weight="regular" />} label="Add SSH Host" />
           </motion.div>
           </>
         )}
@@ -133,7 +133,7 @@ function EnvOption({
         <p className="text-xs font-medium leading-tight text-primary">{title}</p>
         <p className="text-2xs text-muted mt-0.5 leading-tight">{description}</p>
       </div>
-      {active && <Check size={11} weight="bold" className="flex-shrink-0 text-secondary" />}
+      {active && <Check size={12} weight="bold" className="flex-shrink-0 text-secondary" />}
     </button>
   );
 }

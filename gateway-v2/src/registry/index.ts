@@ -9,6 +9,11 @@ const PERSISTED_REGISTRY_KEY = "model-registry:v1";
 
 let cachedRegistry: ModelRegistry | undefined;
 
+interface PersistedRegistryStore {
+  models: RegistryModel[];
+  deletedModelIds: string[];
+}
+
 export function getModelRegistry(): ModelRegistry {
   if (!cachedRegistry) {
     cachedRegistry = {
@@ -37,10 +42,10 @@ export function getRegistryModel(modelId: string) {
 
 export async function getModelRegistryForEnv(env: Pick<GatewayEnv, "MODEL_REGISTRY_KV"> | undefined): Promise<ModelRegistry> {
   const base = getModelRegistry();
-  const persisted = await readPersistedRegistryModels(env);
-  if (!persisted.length) return base;
+  const persistedStore = await readPersistedRegistryStore(env);
+  if (!persistedStore.models.length && !persistedStore.deletedModelIds.length) return base;
 
-  const merged = mergeRegistryModels(base.models, persisted);
+  const merged = mergeRegistryModels(base.models, persistedStore.models, persistedStore.deletedModelIds);
   const registry: ModelRegistry = {
     ...base,
     version: `${base.version}+admin`,
@@ -60,16 +65,31 @@ export async function getRegistryModelForEnv(
 }
 
 export async function readPersistedRegistryModels(env: Pick<GatewayEnv, "MODEL_REGISTRY_KV"> | undefined): Promise<RegistryModel[]> {
-  if (!env?.MODEL_REGISTRY_KV) return [];
+  return (await readPersistedRegistryStore(env)).models;
+}
+
+export async function readPersistedDeletedModelIds(env: Pick<GatewayEnv, "MODEL_REGISTRY_KV"> | undefined): Promise<string[]> {
+  return (await readPersistedRegistryStore(env)).deletedModelIds;
+}
+
+export async function readPersistedRegistryStore(
+  env: Pick<GatewayEnv, "MODEL_REGISTRY_KV"> | undefined
+): Promise<PersistedRegistryStore> {
+  if (!env?.MODEL_REGISTRY_KV) return { models: [], deletedModelIds: [] };
   const stored = await env.MODEL_REGISTRY_KV.get(PERSISTED_REGISTRY_KEY, "json");
-  if (!stored || typeof stored !== "object") return [];
+  if (!stored || typeof stored !== "object") return { models: [], deletedModelIds: [] };
   const models = (stored as { models?: unknown }).models;
-  return Array.isArray(models) ? (models as RegistryModel[]) : [];
+  const deletedModelIds = (stored as { deletedModelIds?: unknown }).deletedModelIds;
+  return {
+    models: Array.isArray(models) ? (models as RegistryModel[]) : [],
+    deletedModelIds: Array.isArray(deletedModelIds) ? deletedModelIds.filter((id): id is string => typeof id === "string") : []
+  };
 }
 
 export async function writePersistedRegistryModels(
   env: Pick<GatewayEnv, "MODEL_REGISTRY_KV">,
-  models: RegistryModel[]
+  models: RegistryModel[],
+  deletedModelIds: string[] = []
 ): Promise<void> {
   if (!env.MODEL_REGISTRY_KV) {
     throw new Error("MODEL_REGISTRY_KV is not configured.");
@@ -77,15 +97,25 @@ export async function writePersistedRegistryModels(
   const payload = {
     version: `${MANUAL_REGISTRY_VERSION}.admin`,
     updatedAt: new Date().toISOString(),
-    models
+    models,
+    deletedModelIds: Array.from(new Set(deletedModelIds)).sort()
   };
   await env.MODEL_REGISTRY_KV.put(PERSISTED_REGISTRY_KEY, JSON.stringify(payload));
 }
 
-export function mergeRegistryModels(baseModels: RegistryModel[], persistedModels: RegistryModel[]): RegistryModel[] {
+export function mergeRegistryModels(
+  baseModels: RegistryModel[],
+  persistedModels: RegistryModel[],
+  deletedModelIds: string[] = []
+): RegistryModel[] {
+  const deleted = new Set(deletedModelIds);
   const byId = new Map<string, RegistryModel>();
-  for (const model of baseModels) byId.set(model.id, model);
-  for (const model of persistedModels) byId.set(model.id, model);
+  for (const model of baseModels) {
+    if (!deleted.has(model.id)) byId.set(model.id, model);
+  }
+  for (const model of persistedModels) {
+    if (!deleted.has(model.id)) byId.set(model.id, model);
+  }
   return Array.from(byId.values()).sort((a, b) => a.id.localeCompare(b.id));
 }
 

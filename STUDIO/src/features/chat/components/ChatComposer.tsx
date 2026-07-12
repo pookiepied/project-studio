@@ -374,8 +374,8 @@ export const ChatComposer = ({
                   )}
                 >
                   {autonomous
-                    ? <Brain size={10} weight="fill" />
-                    : <Eye size={10} weight="regular" />}
+                    ? <Brain size={12} weight="fill" />
+                    : <Eye size={12} weight="regular" />}
                   <span className={composerPillLabel}>{autonomous ? "Autonomous" : "Review"}</span>
                 </button>
               );
@@ -421,7 +421,7 @@ export const ChatComposer = ({
                   "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-active",
                 )}
               >
-                <Stop size={13} weight="fill" />
+                <Stop size={14} weight="fill" />
               </button>
             ) : (
               <button
@@ -436,7 +436,7 @@ export const ChatComposer = ({
                     : "bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-surface-selected dark:text-gray-700",
                 )}
               >
-                <ArrowUp size={13} weight="bold" />
+                <ArrowUp size={14} weight="bold" />
               </button>
             )}
           </div>

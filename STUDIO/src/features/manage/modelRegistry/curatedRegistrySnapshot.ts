@@ -9507,7 +9507,7 @@ export const curatedRegistrySnapshot = {
             "source": "static-reviewed",
             "confidence": "exact"
           },
-          "jsonSchema": true,
+          "jsonSchema": false,
           "promptCaching": false
         }
       },
@@ -9518,7 +9518,7 @@ export const curatedRegistrySnapshot = {
         "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
-      "maxTokens": 128000,
+      "maxTokens": 32768,
       "supportsVision": false,
       "supportsTools": true,
       "supportsStreaming": true,
@@ -9625,7 +9625,7 @@ export const curatedRegistrySnapshot = {
             "source": "static-reviewed",
             "confidence": "exact"
           },
-          "jsonSchema": true,
+          "jsonSchema": false,
           "promptCaching": false
         }
       },
@@ -9636,7 +9636,7 @@ export const curatedRegistrySnapshot = {
         "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
-      "maxTokens": 128000,
+      "maxTokens": 32768,
       "supportsVision": false,
       "supportsTools": true,
       "supportsStreaming": true,
@@ -9744,7 +9744,7 @@ export const curatedRegistrySnapshot = {
             "source": "static-reviewed",
             "confidence": "exact"
           },
-          "jsonSchema": true,
+          "jsonSchema": false,
           "promptCaching": false
         }
       },
@@ -9755,7 +9755,7 @@ export const curatedRegistrySnapshot = {
         "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
-      "maxTokens": 128000,
+      "maxTokens": 32768,
       "supportsVision": false,
       "supportsTools": true,
       "supportsStreaming": true,
@@ -9862,7 +9862,7 @@ export const curatedRegistrySnapshot = {
             "source": "static-reviewed",
             "confidence": "exact"
           },
-          "jsonSchema": true,
+          "jsonSchema": false,
           "promptCaching": false
         }
       },
@@ -9873,7 +9873,7 @@ export const curatedRegistrySnapshot = {
         "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
       },
       "contextWindow": 262144,
-      "maxTokens": 128000,
+      "maxTokens": 32768,
       "supportsVision": false,
       "supportsTools": true,
       "supportsStreaming": true,
@@ -10548,6 +10548,841 @@ export const curatedRegistrySnapshot = {
           "isPromotional": false
         }
       }
+    },
+    {
+      "id": "openrouter:openai/gpt-oss-20b:free",
+      "provider": "openrouter",
+      "providerModelId": "openai/gpt-oss-20b:free",
+      "displayName": "GPT-OSS 20B Free",
+      "type": "chat",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": false,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": true,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 131072,
+      "maxTokens": 32768,
+      "supportsVision": false,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "OpenAI",
+        "family": "gpt-oss",
+        "version": "openai/gpt-oss-20b:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "openai/gpt-oss-20b:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
+    },
+    {
+      "id": "openrouter:openai/gpt-oss-120b:free",
+      "provider": "openrouter",
+      "providerModelId": "openai/gpt-oss-120b:free",
+      "displayName": "GPT-OSS 120B Free",
+      "type": "chat",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": false,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": false,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 131072,
+      "maxTokens": 131072,
+      "supportsVision": false,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "OpenAI",
+        "family": "gpt-oss",
+        "version": "openai/gpt-oss-120b:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "openai/gpt-oss-120b:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
+    },
+    {
+      "id": "openrouter:cohere/north-mini-code:free",
+      "provider": "openrouter",
+      "providerModelId": "cohere/north-mini-code:free",
+      "displayName": "North Mini Code Free",
+      "type": "chat",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": false,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": false,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 256000,
+      "maxTokens": 64000,
+      "supportsVision": false,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "Cohere",
+        "family": "north",
+        "version": "cohere/north-mini-code:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "cohere/north-mini-code:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
+    },
+    {
+      "id": "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
+      "provider": "openrouter",
+      "providerModelId": "nvidia/nemotron-3-super-120b-a12b:free",
+      "displayName": "Nemotron 3 Super Free",
+      "type": "chat",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": false,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": true,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 262144,
+      "maxTokens": 262144,
+      "supportsVision": false,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "NVIDIA",
+        "family": "nemotron-3",
+        "version": "nvidia/nemotron-3-super-120b-a12b:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "nvidia/nemotron-3-super-120b-a12b:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
+    },
+    {
+      "id": "openrouter:tencent/hy3:free",
+      "provider": "openrouter",
+      "providerModelId": "tencent/hy3:free",
+      "displayName": "Hy3 Free",
+      "type": "chat",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": false,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": true,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 262144,
+      "maxTokens": 262144,
+      "supportsVision": false,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "Tencent",
+        "family": "hy3",
+        "version": "tencent/hy3:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "tencent/hy3:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
+    },
+    {
+      "id": "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free",
+      "provider": "openrouter",
+      "providerModelId": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "displayName": "Nemotron 3 Ultra Free",
+      "type": "chat",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": false,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": false,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 1000000,
+      "maxTokens": 65536,
+      "supportsVision": false,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "NVIDIA",
+        "family": "nemotron-3",
+        "version": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "nvidia/nemotron-3-ultra-550b-a55b:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
+    },
+    {
+      "id": "openrouter:google/gemma-4-31b-it:free",
+      "provider": "openrouter",
+      "providerModelId": "google/gemma-4-31b-it:free",
+      "displayName": "Gemma 4 31B IT Free",
+      "type": "multimodal",
+      "capabilities": {
+        "modalities": [
+          "chat"
+        ],
+        "chat": {
+          "streaming": true,
+          "vision": true,
+          "tools": true,
+          "reasoning": {
+            "supported": true,
+            "efforts": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultEffort": "medium",
+            "source": "static-reviewed",
+            "confidence": "exact"
+          },
+          "jsonSchema": true,
+          "promptCaching": false
+        }
+      },
+      "pricing": {
+        "inputPerMillionUsd": 0,
+        "outputPerMillionUsd": 0,
+        "source": "static",
+        "note": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+      },
+      "contextWindow": 262144,
+      "maxTokens": 8192,
+      "supportsVision": true,
+      "supportsTools": true,
+      "supportsStreaming": true,
+      "supportsSystemPrompts": true,
+      "inputTypes": [
+        "text",
+        "image",
+        "video"
+      ],
+      "outputTypes": [
+        "text"
+      ],
+      "specialFeatures": [
+        "reasoning"
+      ],
+      "registry": {
+        "category": "text.chat",
+        "status": "active",
+        "developer": "Google",
+        "family": "gemma-4",
+        "version": "google/gemma-4-31b-it:free",
+        "supportedRegions": [],
+        "endpoints": [
+          "chat"
+        ],
+        "aliases": [
+          "google/gemma-4-31b-it:free"
+        ],
+        "fallbackModelIds": [],
+        "verificationLevel": "verifiedDocumentationOnly",
+        "source": {
+          "authority": "studio-curated",
+          "checkedAt": "2026-07-11",
+          "urls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ]
+        },
+        "pricing": {
+          "kind": "token",
+          "status": "verified",
+          "currency": "USD",
+          "billingUnit": "one_million_tokens",
+          "inputPerMillion": 0,
+          "cachedInputPerMillion": null,
+          "cacheWritePerMillion": null,
+          "outputPerMillion": 0,
+          "batchInputPerMillion": null,
+          "batchOutputPerMillion": null,
+          "reasoningTokens": "unknown",
+          "sourceUrls": [
+            "https://openrouter.ai/api/v1/models",
+            "https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties"
+          ],
+          "verifiedAt": "2026-07-11",
+          "notes": "Verified from live OpenRouter /api/v1/models. Do not copy to direct provider pricing."
+        },
+        "reasoning": {
+          "supported": true,
+          "alwaysOn": true,
+          "canDisable": false,
+          "effortValues": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "returnsReasoningContent": "unknown",
+          "reasoningTokensVisible": "unknown",
+          "reasoningTokensBillable": "unknown",
+          "worksWithTools": "unknown",
+          "worksWhileStreaming": "unknown",
+          "requiresReasoningStateAfterTools": "unknown",
+          "reducesOutputBudget": "unknown",
+          "providerSpecificControls": [
+            "reasoning_effort"
+          ]
+        },
+        "freeAccess": {
+          "isFree": true,
+          "freeType": "separate_route",
+          "isPromotional": false
+        }
+      }
     }
   ],
   "providers": [
@@ -10642,7 +11477,7 @@ export const curatedRegistrySnapshot = {
     {
       "provider": "openrouter",
       "status": "active",
-      "modelCount": 38,
+      "modelCount": 45,
       "categories": [
         "text.chat"
       ]

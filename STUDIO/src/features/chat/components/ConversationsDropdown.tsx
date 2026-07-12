@@ -95,9 +95,9 @@ export const ConversationsDropdown = ({
         className="relative flex h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
         title="Projects and conversations"
       >
-        <Stack size={13} weight="bold" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
+        <Stack size={14} weight="bold" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
         <span className="min-w-0 truncate">{label}</span>
-        <CaretDown size={8} weight="bold" className={`flex-shrink-0 text-gray-400 dark:text-gray-600 transition-transform duration-200 ${showConversations ? "rotate-180" : ""}`} />
+        <CaretDown size={12} weight="bold" className={`flex-shrink-0 text-gray-400 dark:text-gray-600 transition-transform duration-200 ${showConversations ? "rotate-180" : ""}`} />
         {/* Activity dot — shows when any background conversation has a status */}
         {hasActivity && (
           <span className="absolute left-4 top-1 h-1.5 w-1.5 rounded-full bg-primary dark:bg-primary" />
@@ -176,7 +176,7 @@ export const ConversationsDropdown = ({
                           className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-surface-raised rounded-lg transition-smooth"
                         >
                           <div className="flex items-center gap-2 pr-16">
-                            <FolderOpen size={13} weight={isCurrent ? "fill" : "regular"} className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
+                            <FolderOpen size={14} weight={isCurrent ? "fill" : "regular"} className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
                             <p className="text-gray-900 dark:text-gray-300 truncate flex-1 transition-colors duration-300">
                               {project.name}
                             </p>
@@ -199,14 +199,14 @@ export const ConversationsDropdown = ({
                                 onClick={(e) => { e.stopPropagation(); onRemoveProject(project.id); }}
                                 className="p-1 hover:bg-gray-200 dark:hover:bg-surface-border rounded transition-smooth bg-white dark:bg-surface-base"
                               >
-                                <MinusCircle size={12} weight="bold" className="text-gray-600 dark:text-gray-500" />
+                                <MinusCircle size={14} weight="bold" className="text-gray-600 dark:text-gray-500" />
                               </button>
                               <button
                                 title="Delete Studio's data for this project (your folder is untouched)"
                                 onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
                                 className="p-1 hover:bg-gray-200 dark:hover:bg-surface-border rounded transition-smooth bg-white dark:bg-surface-base"
                               >
-                                <Trash size={12} weight="bold" className="text-gray-600 dark:text-gray-500" />
+                                <Trash size={14} weight="bold" className="text-gray-600 dark:text-gray-500" />
                               </button>
                             </motion.div>
                           )}
@@ -257,13 +257,13 @@ export const ConversationsDropdown = ({
                               onClick={() => onSaveConvTitle(conv.id)}
                               className="p-1 hover:bg-gray-200 rounded transition-smooth"
                             >
-                              <Check size={12} weight="bold" className="text-gray-600" />
+                              <Check size={14} weight="bold" className="text-gray-600" />
                             </button>
                             <button
                               onClick={onCancelConvEdit}
                               className="p-1 hover:bg-gray-200 rounded transition-smooth"
                             >
-                              <X size={12} weight="bold" className="text-gray-600" />
+                              <X size={14} weight="bold" className="text-gray-600" />
                             </button>
                           </div>
                         </div>
@@ -276,7 +276,7 @@ export const ConversationsDropdown = ({
                             <div className="flex items-center gap-2 pr-16">
                               {isClaudeOwned && (
                                 <span title="Claude Code native conversation" className="flex-shrink-0">
-                                  <ClaudeCodeIcon size={13} />
+                                  <ClaudeCodeIcon size={14} />
                                 </span>
                               )}
                               <p className="text-gray-900 dark:text-gray-300 truncate flex-1 transition-colors duration-300">
@@ -319,13 +319,13 @@ export const ConversationsDropdown = ({
                                   onClick={(e) => onStartEditTitle(conv.id, conv.title, e)}
                                   className="p-1 hover:bg-gray-200 dark:hover:bg-surface-border rounded transition-smooth bg-white dark:bg-surface-base"
                                 >
-                                  <PencilSimple size={12} weight="bold" className="text-gray-600 dark:text-gray-500" />
+                                  <PencilSimple size={14} weight="bold" className="text-gray-600 dark:text-gray-500" />
                                 </button>
                                 <button
                                   onClick={(e) => onDeleteConversation(conv.id, e)}
                                   className="p-1 hover:bg-gray-200 dark:hover:bg-surface-border rounded transition-smooth bg-white dark:bg-surface-base"
                                 >
-                                  <Trash size={12} weight="bold" className="text-gray-600 dark:text-gray-500" />
+                                  <Trash size={14} weight="bold" className="text-gray-600 dark:text-gray-500" />
                                 </button>
                               </motion.div>
                             )}

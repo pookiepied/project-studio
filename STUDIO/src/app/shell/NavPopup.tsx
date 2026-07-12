@@ -91,7 +91,7 @@ function NavRow({
     >
       <div className="flex-shrink-0 w-[18px] h-[18px] flex items-center justify-center">
         <item.Icon
-          size={13}
+          size={14}
           weight={active ? "fill" : "regular"}
           className={`transition-colors duration-fast ${
             active ? "text-primary" : "text-muted group-hover:text-primary"

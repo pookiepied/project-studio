@@ -70,7 +70,7 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
         <PermIcon icon={active.icon} />
         <span className={composerPillLabel}>{active.label}</span>
         <motion.div className="inline-flex items-center" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
-          <CaretDown size={10} weight="bold" className="opacity-50" />
+          <CaretDown size={12} weight="bold" className="opacity-50" />
         </motion.div>
       </button>
 
@@ -98,7 +98,7 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
                   }`}
                 >
                   <div className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400">
-                    <PermIcon icon={mode.icon} size={13} />
+                    <PermIcon icon={mode.icon} size={14} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium leading-tight ${
@@ -111,7 +111,7 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
                     </p>
                   </div>
                   {isActive && (
-                    <Check size={11} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                    <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                   )}
                 </button>
               );

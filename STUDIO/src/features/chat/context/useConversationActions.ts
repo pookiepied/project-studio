@@ -60,7 +60,6 @@ export interface ConversationActionDeps {
   isLoading: boolean;
   isStreaming: boolean;
   reasoningBudget: number | undefined;
-  messageToolCalls: Map<string, string[]>;
   settings: AppSettings;
 
   // ── Refs ────────────────────────────────────────────────────────────────
@@ -80,7 +79,6 @@ export interface ConversationActionDeps {
   setPendingMessages: React.Dispatch<React.SetStateAction<PendingMessage[]>>;
   setHasMoreMessages: React.Dispatch<React.SetStateAction<boolean>>;
   setMessageOffset: React.Dispatch<React.SetStateAction<number>>;
-  setMessageToolCalls: React.Dispatch<React.SetStateAction<Map<string, string[]>>>;
   setCurrentModel: React.Dispatch<React.SetStateAction<string>>;
   setChatEngineState: React.Dispatch<React.SetStateAction<ChatEngine>>;
   setContextTokens: React.Dispatch<React.SetStateAction<number>>;
@@ -118,7 +116,6 @@ export interface ConversationActions {
   deleteMessageById: (messageId: string) => Promise<void>;
   setModel: (model: string) => void;
   clearChat: () => Promise<void>;
-  getMessageToolCalls: (messageId: string) => string[] | null;
   abortGeneration: () => void;
   enableMemoryForConversation: (enabled: boolean) => Promise<void>;
 }
@@ -133,7 +130,6 @@ export function useConversationActions(deps: ConversationActionDeps): Conversati
     isLoading,
     isStreaming,
     reasoningBudget,
-    messageToolCalls,
     settings,
     activeConversationIdRef,
     optimisticAssistantIdRef,
@@ -149,7 +145,6 @@ export function useConversationActions(deps: ConversationActionDeps): Conversati
     setPendingMessages,
     setHasMoreMessages,
     setMessageOffset,
-    setMessageToolCalls,
     setCurrentModel,
     setChatEngineState,
     setContextTokens,
@@ -208,7 +203,6 @@ export function useConversationActions(deps: ConversationActionDeps): Conversati
     setHasMoreMessages(false);
     setMessageOffset(0);
     setError(null);
-    setMessageToolCalls(new Map());
     resetPermittedTools();
     setCurrentModel(settings.defaultChatModel || "auto");
     setChatEngineState(nextEngine);
@@ -260,7 +254,6 @@ export function useConversationActions(deps: ConversationActionDeps): Conversati
     setChatEngineState(nextScope === "cloud" ? "studio" : normalizeEngineForConversationOwner(conv.metadata, preferredProvider));
     setCurrentModel(conv.model);
     setError(null);
-    setMessageToolCalls(new Map());
     await loadInitialMessages(id, conv.messages.length);
     const limit = getContextLimit(conv.model);
     setContextLimit(limit);
@@ -405,11 +398,6 @@ export function useConversationActions(deps: ConversationActionDeps): Conversati
 
   const clearChat = useCallback(() => createNewConversation(), [createNewConversation]);
 
-  const getMessageToolCalls = useCallback(
-    (messageId: string) => messageToolCalls.get(messageId) ?? null,
-    [messageToolCalls]
-  );
-
   const abortGeneration = useCallback(() => {
     agentChat.abort();
     claudeBridgeService.stopActiveTurn().catch(() => {});
@@ -443,7 +431,6 @@ export function useConversationActions(deps: ConversationActionDeps): Conversati
     deleteMessageById,
     setModel,
     clearChat,
-    getMessageToolCalls,
     abortGeneration,
     enableMemoryForConversation,
   };

@@ -38,8 +38,8 @@ export function CodeView({ content, language }: CodeViewProps) {
                    backdrop-blur-sm transition-colors duration-100"
       >
         {copied
-          ? <><Check size={10} weight="bold" className="text-secondary" /> Copied</>
-          : <><Copy size={10} weight="regular" /> Copy</>
+          ? <><Check size={12} weight="bold" className="text-secondary" /> Copied</>
+          : <><Copy size={12} weight="regular" /> Copy</>
         }
       </button>
 

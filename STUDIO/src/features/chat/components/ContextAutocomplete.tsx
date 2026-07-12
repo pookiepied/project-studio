@@ -133,9 +133,9 @@ export const ContextAutocomplete = ({
                 className="!w-7 !h-7 !rounded-lg bg-gray-100 dark:bg-surface-selected border border-gray-200 dark:border-[#333]"
                 fallback={
                   app.type === 'remote' || app.type === 'composio' ? (
-                    <Cloud size={13} weight="fill" className="text-gray-400 dark:text-gray-500" />
+                    <Cloud size={14} weight="fill" className="text-gray-400 dark:text-gray-500" />
                   ) : (
-                    <Plug size={13} weight="regular" className="text-gray-400 dark:text-gray-600" />
+                    <Plug size={14} weight="regular" className="text-gray-400 dark:text-gray-600" />
                   )
                 }
               />

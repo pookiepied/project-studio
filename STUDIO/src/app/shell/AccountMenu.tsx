@@ -138,7 +138,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
                 }}
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
               >
-                <UserCircle size={13} weight="regular" />
+                <UserCircle size={14} weight="regular" />
                 Manage account
               </button>
 
@@ -151,7 +151,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
                   }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-secondary transition-colors hover:bg-surface-raised dark:hover:bg-surface-raised/[0.06]"
                 >
-                  <SignOut size={13} weight="regular" />
+                  <SignOut size={14} weight="regular" />
                   Sign out
                 </button>
               )}

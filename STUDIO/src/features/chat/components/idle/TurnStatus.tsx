@@ -28,6 +28,28 @@ import type { ChatEngine } from "@/cliBridges/types";
 import { EngineGlyph } from "./EngineGlyph";
 import { ContextMeter } from "./ContextMeter";
 
+/**
+ * Human phrase for the status line while a specific tool is running. Keeps the
+ * live state honest ("Searching the web" instead of a generic "Working"). Order
+ * matters — first match wins. Exported so the docked status line (ChatPage) and
+ * any other surface derive the same label from the running tool.
+ */
+export function toolPhrase(tool: string): string {
+  const t = tool.toLowerCase();
+  if (t.startsWith("memory")) return "Recalling memory";
+  if (t.includes("web_search")) return "Searching the web";
+  if (t.includes("web_fetch") || t.includes("http") || t.includes("browse")) return "Browsing the web";
+  if (t.includes("write") || t.includes("edit") || t.includes("create")) return "Editing files";
+  if (t.includes("read") || t.includes("grep") || t.includes("glob") || t.includes("file_search") || t.includes("cat")) return "Reading files";
+  if (t === "bash" || t === "powershell" || t.includes("terminal") || t.includes("shell") || t.includes("command")) return "Running commands";
+  if (t.includes("image")) return "Generating an image";
+  if (t.includes("video")) return "Generating video";
+  if (t.includes("agent") || t.includes("spawn")) return "Delegating to an agent";
+  if (t.includes("rag") || t.includes("doc")) return "Searching your docs";
+  if (t.startsWith("mcp")) return "Using a connected tool";
+  return "Working";
+}
+
 const startKey = (convId: string) => `studio.genstart.${convId}`;
 
 // Swallow busy→idle→busy flaps that happen between turn phases. Long enough to
@@ -170,7 +192,7 @@ export function TurnStatus({
           transition={{ duration: 0.14 }}
           className="flex-shrink-0 text-gray-400 dark:text-gray-600"
         >
-          <CaretRight size={9} weight="bold" />
+          <CaretRight size={12} weight="bold" />
         </motion.span>
       )}
       <ContextMeter used={contextUsed} limit={contextLimit} />

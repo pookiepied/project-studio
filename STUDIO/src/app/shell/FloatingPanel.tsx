@@ -105,7 +105,7 @@ function CategoryMenu({
       >
         {category.label}
         <CaretDown
-          size={9}
+          size={12}
           weight="bold"
           className={`text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
@@ -133,7 +133,7 @@ function CategoryMenu({
                   }`}
                 >
                   <item.Icon
-                    size={13}
+                    size={14}
                     weight={active ? "fill" : "regular"}
                     className={`flex-shrink-0 transition-colors ${
                       active ? "text-primary" : "text-muted group-hover:text-primary"
@@ -230,7 +230,7 @@ export function FloatingPanelNavigation({
         aria-label="Chat"
         className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
       >
-        <StudioMark size={15} className="text-primary" />
+        <StudioMark size={16} className="text-primary" />
       </button>
 
       <span className="mx-0.5 h-4 w-px bg-surface-divider" />

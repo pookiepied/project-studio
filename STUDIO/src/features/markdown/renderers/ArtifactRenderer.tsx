@@ -63,7 +63,7 @@ function ArtifactActionLink({ action }: { action: ArtifactAction }) {
       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-surface-border text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors"
     >
       <span>{action.label}</span>
-      <ArrowSquareOut size={12} weight="bold" />
+      <ArrowSquareOut size={14} weight="bold" />
     </a>
   );
 }
@@ -127,7 +127,7 @@ function ArtifactLinks({ items }: { items: ArtifactLink[] }) {
               <div className="text-sm font-medium text-secondary dark:text-secondary truncate">{item.label}</div>
               {item.description && <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{item.description}</div>}
             </div>
-            <ArrowSquareOut size={12} weight="bold" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <ArrowSquareOut size={14} weight="bold" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
           </div>
         </a>
       ))}

@@ -166,7 +166,7 @@ function WorkspaceHeader({
                     : "text-secondary hover:bg-surface-hover hover:text-primary"
                 }`}
               >
-                <Icon size={13} className="flex-shrink-0 text-muted" />
+                <Icon size={14} className="flex-shrink-0 text-muted" />
                 <span className="min-w-0 flex-1 truncate">{tab.title}</span>
                 <span
                   role="button"
@@ -176,7 +176,7 @@ function WorkspaceHeader({
                   }}
                   className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-surface-border"
                 >
-                  <X size={9} weight="bold" />
+                  <X size={12} weight="bold" />
                 </span>
               </button>
             );
@@ -244,7 +244,7 @@ function WorkspaceLauncher({ onCreateTab }: { onCreateTab: (type: WorkspaceTabTy
               className="group flex flex-col items-start gap-3 rounded-xl border border-surface-border bg-surface-base p-3.5 text-left transition-colors duration-fast hover:bg-surface-hover"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-surface-divider bg-surface-raised">
-                <Icon size={15} weight="regular" className="text-secondary" />
+                <Icon size={16} weight="regular" className="text-secondary" />
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-primary">{label}</span>
@@ -420,10 +420,13 @@ export function RightWorkspacePanel({
       {open && (
         <motion.div
           key="right-workspace"
-          initial={{ opacity: 0, x: 48 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 48 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: workspaceWidth, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{
+            width: { duration: 0.42, ease: [0.32, 0.72, 0, 1] },
+            opacity: { duration: 0.24, ease: "easeOut" },
+          }}
           className="h-full flex-shrink-0 overflow-hidden"
         >
           <div className="flex h-full transition-colors duration-300" style={{ width: workspaceWidth, minWidth: workspaceWidth }}>

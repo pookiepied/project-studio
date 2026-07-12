@@ -92,8 +92,11 @@ export const ConversationRail = ({ messages, containerRef, bottomInset = 0 }: Pr
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="absolute top-0 z-10"
-          style={{ left: 8, bottom: bottomInset, width: 16 }}
+          className="absolute z-10"
+          // top clears the fixed window traffic lights (14/23 + radius) and the
+          // floating dock — without this the rail's ticks render underneath /
+          // overlapping the close/minimize/zoom buttons at the window's top-left.
+          style={{ left: 8, top: 60, bottom: bottomInset, width: 16 }}
         >
           {/* Track container */}
           <div

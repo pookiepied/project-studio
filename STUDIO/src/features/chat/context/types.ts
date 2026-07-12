@@ -91,8 +91,6 @@ export interface ChatContextType {
   hasMoreMessages:           boolean;
   loadMoreMessages:          () => Promise<void>;
   isLoadingMore:             boolean;
-  // Per-message tool usage
-  getMessageToolCalls:   (messageId: string) => string[] | null;
   // Active tool cards (real-time during streaming)
   activeToolCalls:       ActiveToolCall[];
   // Permission system

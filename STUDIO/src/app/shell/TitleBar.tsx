@@ -69,10 +69,10 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
         aria-label="Search or jump to (Ctrl+K)"
         className="absolute left-1/2 flex h-6 w-[430px] max-w-[50vw] -translate-x-1/2 items-center gap-1.5 rounded-full bg-gray-900/[0.04] px-3 text-gray-400 transition-colors duration-150 hover:bg-gray-900/[0.07] dark:bg-white/[0.04] dark:text-gray-500 dark:hover:bg-white/[0.07]"
       >
-        <Search size={12} className="flex-shrink-0" />
+        <Search size={14} className="flex-shrink-0" />
         <span className="flex-1 truncate text-left text-xs">Search or jump to...</span>
         <kbd className="flex items-center gap-0.5 rounded border border-gray-300/60 px-1.5 py-0.5 font-sans text-3xs dark:border-white/10">
-          <CommandIcon size={9} />
+          <CommandIcon size={12} />
           K
         </kbd>
       </button>
@@ -94,7 +94,7 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
       </div>
 
       <div className="flex items-center gap-1">
-        <NotificationBell align="right" size={13} />
+        <NotificationBell align="right" size={14} />
 
         {showWindowControls && (
           <div className="flex items-center" style={{ gap: 8 }}>

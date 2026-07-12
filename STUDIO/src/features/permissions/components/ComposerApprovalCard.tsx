@@ -173,7 +173,7 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
         {/* Header strip */}
         <div className="flex items-center gap-2 px-3.5 pt-3 pb-2.5">
           <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-selected border border-gray-200 dark:border-surface-border flex items-center justify-center flex-shrink-0">
-            <LockSimple size={11} weight="fill" className="text-gray-400 dark:text-gray-500" />
+            <LockSimple size={12} weight="fill" className="text-gray-400 dark:text-gray-500" />
           </div>
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
             Permission required

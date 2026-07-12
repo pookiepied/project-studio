@@ -78,7 +78,7 @@ export function ClaudeModelSelector({
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="flex-shrink-0"
         >
-          <CaretDown size={10} weight="bold" className="text-gray-400 dark:text-gray-600" />
+          <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
         </motion.div>
       </motion.button>
 
@@ -122,7 +122,7 @@ export function ClaudeModelSelector({
                       </p>
                     </div>
                     {isActive && (
-                      <Check size={10} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                     )}
                   </motion.button>
                 );
@@ -140,7 +140,7 @@ export function ClaudeModelSelector({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100"
               >
                 <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
-                  <Gauge size={11} weight="regular" className="text-gray-400 dark:text-gray-600" />
+                  <Gauge size={12} weight="regular" className="text-gray-400 dark:text-gray-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-tight">
@@ -155,7 +155,7 @@ export function ClaudeModelSelector({
                   transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                   className="flex-shrink-0"
                 >
-                  <CaretDown size={10} weight="bold" className="text-gray-400 dark:text-gray-600" />
+                  <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
                 </motion.div>
               </button>
 

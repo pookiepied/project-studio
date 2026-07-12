@@ -25,16 +25,24 @@ export default {
         bold: '700',
       },
       fontSize: {
-        // Micro sizes for intentional dense UI (timestamps, badges, captions).
+        // Minimalist scale (2026-07-12 trim): default UI text is `sm` (12px) /
+        // `xs` (11px); the sub-10px steps are reserved for rare micro-labels only.
+        // Every text-* utility in the app routes through these tokens — there
+        // are no arbitrary `text-[Npx]` call sites (verified via grep) — so
+        // changing a value here is the single place that reflows the whole UI.
         '3xs': ['9px', { lineHeight: '12px' }],
-        '2xs': ['10px', { lineHeight: '14px' }],
-        'xs': ['11px', { lineHeight: '16px' }],
-        'sm': ['12px', { lineHeight: '18px' }],
-        'base': ['14px', { lineHeight: '20px' }],
-        'lg': ['16px', { lineHeight: '24px' }],
-        'xl': ['18px', { lineHeight: '26px' }],
-        '2xl': ['22px', { lineHeight: '30px' }],
-        '3xl': ['28px', { lineHeight: '36px' }],
+        '2xs': ['10px', { lineHeight: '13px' }],
+        'xs': ['11px', { lineHeight: '15px' }],
+        'sm': ['12px', { lineHeight: '16px' }],
+        'base': ['13px', { lineHeight: '18px' }],
+        // Editorial reading size for chat message copy (assistant + user body).
+        // Still a step above UI chrome, but trimmed with the rest of the scale;
+        // pairs with the .prose-chat base font-size (src/index.css).
+        'body': ['14px', { lineHeight: '1.6' }],
+        'lg': ['15px', { lineHeight: '22px' }],
+        'xl': ['17px', { lineHeight: '24px' }],
+        '2xl': ['20px', { lineHeight: '28px' }],
+        '3xl': ['26px', { lineHeight: '34px' }],
       },
       colors: {
         gray: {

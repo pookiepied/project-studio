@@ -59,16 +59,16 @@ export function WorkspacePlaceholderPanel({
             title={`Close ${title.toLowerCase()}`}
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={13} weight="bold" />
+            <X size={14} weight="bold" />
           </button>
-          <Icon size={12} weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
+          <Icon size={14} weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
           <span className="truncate text-xs text-gray-500 dark:text-gray-500">{title}</span>
         </div>
 
         <div className="flex flex-1 items-center justify-center px-8 text-center">
           <div className="max-w-[220px]">
             <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 dark:border-surface-border dark:bg-surface-raised dark:text-gray-500">
-              <Icon size={17} weight="regular" />
+              <Icon size={16} weight="regular" />
             </div>
             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
             <p className="mt-1 text-xs leading-relaxed text-gray-400 dark:text-gray-600">

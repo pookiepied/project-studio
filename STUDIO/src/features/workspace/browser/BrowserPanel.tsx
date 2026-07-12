@@ -127,7 +127,7 @@ function BrowserMenu({
           className="flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-surface-selected"
           title="Zoom out"
         >
-          <Minus size={11} />
+          <Minus size={12} />
         </button>
         <span className="w-9 text-center text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
         <button
@@ -137,7 +137,7 @@ function BrowserMenu({
           className="flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-surface-selected"
           title="Zoom in"
         >
-          <Plus size={11} />
+          <Plus size={12} />
         </button>
       </div>
       <button
@@ -183,7 +183,7 @@ function SidePanelMenu({
           onClick={() => { onOpenWorkspaceView(view); onClose(); }}
           className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
-          <Icon size={13} weight="regular" className="text-gray-500" />
+          <Icon size={14} weight="regular" className="text-gray-500" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
         </button>
       ))}
@@ -316,14 +316,14 @@ export function BrowserPanel({
                         : "text-gray-500 hover:bg-gray-50 dark:text-gray-500 dark:hover:bg-surface-raised"
                     }`}
                   >
-                    <Globe size={13} weight="regular" className="flex-shrink-0" />
+                    <Globe size={14} weight="regular" className="flex-shrink-0" />
                     <span className="truncate">{tab.label}</span>
                     <span
                       role="button"
                       onClick={(ev) => { ev.stopPropagation(); onTabClose(tab.id); }}
                       className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-gray-200 dark:hover:bg-surface-border"
                     >
-                      <X size={8} weight="bold" />
+                      <X size={12} weight="bold" />
                     </span>
                   </button>
                 );
@@ -354,7 +354,7 @@ export function BrowserPanel({
             title="Close browser"
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={13} weight="bold" />
+            <X size={14} weight="bold" />
           </button>
         </div>
         )}
@@ -389,7 +389,7 @@ export function BrowserPanel({
           </button>
 
           <form onSubmit={submitAddress} className="relative mx-auto min-w-[180px] flex-[0_1_420px]">
-            <MagnifyingGlass size={12} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
+            <MagnifyingGlass size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
             <input
               value={addressValue}
               onChange={(event) => setAddressValue(event.target.value)}
@@ -405,7 +405,7 @@ export function BrowserPanel({
               title="Browser options"
               className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
             >
-              <DotsThreeVertical size={15} weight="bold" />
+              <DotsThreeVertical size={16} weight="bold" />
             </button>
             {menuOpen && (
               <BrowserMenu

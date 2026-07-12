@@ -117,7 +117,7 @@ function NotificationPanel({
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface-hover">
-            <Bell size={22} className="text-muted" />
+            <Bell size={20} className="text-muted" />
           </div>
           <p className="mb-1 text-sm font-semibold text-secondary">
             You're all caught up!

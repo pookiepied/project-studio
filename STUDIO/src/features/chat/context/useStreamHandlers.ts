@@ -73,7 +73,6 @@ export interface StreamHandlerDeps {
   thinkingContentRef: React.MutableRefObject<string>;
   harnessSegmentsRef: React.MutableRefObject<MessageSegment[]>;
   pendingSegmentTextRef: React.MutableRefObject<string>;
-  pendingToolCallsRef: React.MutableRefObject<string[]>;
   pendingQuestionResolveRef: React.MutableRefObject<((a: string) => void) | null>;
   pendingQuestionSegmentIdRef: React.MutableRefObject<string | null>;
   pendingApprovalResolveRef: React.MutableRefObject<((d: ToolApprovalDecision) => void) | null>;
@@ -84,7 +83,6 @@ export interface StreamHandlerDeps {
   setDisplayedMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setHasMoreMessages: React.Dispatch<React.SetStateAction<boolean>>;
   setMessageOffset: React.Dispatch<React.SetStateAction<number>>;
-  setMessageToolCalls: React.Dispatch<React.SetStateAction<Map<string, string[]>>>;
   setActiveToolCalls: React.Dispatch<React.SetStateAction<ActiveToolCall[]>>;
   setSessionTasks: React.Dispatch<React.SetStateAction<TaskItem[]>>;
   setHarnessSegments: React.Dispatch<React.SetStateAction<MessageSegment[]>>;
@@ -135,7 +133,6 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
     thinkingContentRef,
     harnessSegmentsRef,
     pendingSegmentTextRef,
-    pendingToolCallsRef,
     pendingQuestionResolveRef,
     pendingQuestionSegmentIdRef,
     pendingApprovalResolveRef,
@@ -144,7 +141,6 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
     setDisplayedMessages,
     setHasMoreMessages,
     setMessageOffset,
-    setMessageToolCalls,
     setActiveToolCalls,
     setSessionTasks,
     setHarnessSegments,
@@ -203,7 +199,6 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
       latestStreamingContentRef.current = "";
       setStreamingMessageId(null);
       setActiveToolCalls([]);
-      pendingToolCallsRef.current = [];
       // Remove the empty optimistic assistant placeholder so the error is visible
       const optId = optimisticAssistantIdRef.current;
       if (optId) {
@@ -241,9 +236,6 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
           ...(tool === "spawn_agent" ? { type: "sub_agent" as const } : {}),
         },
       ]);
-      if (!pendingToolCallsRef.current.includes(tool)) {
-        pendingToolCallsRef.current = [...pendingToolCallsRef.current, tool];
-      }
 
       // Harness tools: flush pending text and insert a running segment
       if (dc === "stream") {
@@ -555,11 +547,6 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
       const last = finalConv.messages[finalConv.messages.length - 1];
       if (last?.role === "assistant") {
         appendToDisplayedMessages(last);
-        if (pendingToolCallsRef.current.length > 0) {
-          const tools = [...pendingToolCallsRef.current];
-          setMessageToolCalls((prev) => new Map(prev).set(last.id, tools));
-          pendingToolCallsRef.current = [];
-        }
       }
       // Background memory processing
       if (isMemoryEnabled) {

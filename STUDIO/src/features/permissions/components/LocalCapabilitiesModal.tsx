@@ -110,7 +110,7 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
 
                 <div className="relative flex h-full flex-col justify-between p-7">
                   <div className="flex items-center gap-2.5 text-white">
-                    <StudioMark size={22} className="text-white" />
+                    <StudioMark size={20} className="text-white" />
                     <span className="text-xs font-medium uppercase tracking-[0.28em] text-white/85">
                       Studio
                     </span>

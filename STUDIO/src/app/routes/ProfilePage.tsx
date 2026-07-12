@@ -58,7 +58,7 @@ function ProfileTile({ entry, onOpen }: { entry: ProfileEntry; onOpen: (view: Vi
           {entry.subtitle}
         </span>
       </span>
-      <ArrowRight size={13} className="flex-shrink-0 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-gray-700" />
+      <ArrowRight size={14} className="flex-shrink-0 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-gray-700" />
     </button>
   );
 }

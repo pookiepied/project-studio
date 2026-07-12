@@ -5,17 +5,14 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from '../src/App';
+import App from '../src/app/App';
 
-// Match the desktop entry's self-hosted typography stack.
-import "@fontsource-variable/dm-sans";
-import "@fontsource-variable/fraunces/opsz.css";
-import "@fontsource-variable/fraunces/opsz-italic.css";
-import "@fontsource/dm-mono/300.css";
-import "@fontsource/dm-mono/400.css";
-import "@fontsource/dm-mono/300-italic.css";
-import "@fontsource/dm-mono/400-italic.css";
-import '../src/styles/typography.css';
+// Match the desktop entry's self-hosted typography stack (Inter + Cascadia Code).
+import "@fontsource-variable/inter/index.css";
+import "@fontsource/cascadia-code/400.css";
+import "@fontsource/cascadia-code/600.css";
+import '../src/design/typography.css';
+import '../src/design/tokens.css';
 
 // Web-specific styles
 import '../src/index.css';

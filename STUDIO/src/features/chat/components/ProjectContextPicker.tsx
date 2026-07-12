@@ -141,7 +141,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
               onClick={() => { setShowForm(false); setFormName(""); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border transition-colors"
             >
-              <X size={10} weight="bold" />
+              <X size={12} weight="bold" />
             </button>
           </>
         ) : (
@@ -163,9 +163,9 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                     }`
               }
             >
-              <FolderOpen size={12} weight={projectContext ? "duotone" : "regular"} />
+              <FolderOpen size={14} weight={projectContext ? "duotone" : "regular"} />
               <span>{projectContext ? projectContext.name : "Work in a project"}</span>
-              <CaretDown size={9} weight="bold" className={`transition-transform duration-150 ${showMenu ? "rotate-180" : ""}`} />
+              <CaretDown size={12} weight="bold" className={`transition-transform duration-150 ${showMenu ? "rotate-180" : ""}`} />
             </button>
 
             {projectContext && (
@@ -175,7 +175,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                 title="Clear project"
                 className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border transition-colors"
               >
-                <X size={10} weight="bold" />
+                <X size={12} weight="bold" />
               </button>
             )}
           </>
@@ -216,7 +216,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                     onClick={() => { setShowMenu(false); setShowForm(true); }}
                     className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
                   >
-                    <Plus size={13} weight="bold" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                    <Plus size={14} weight="bold" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Start from scratch</span>
                   </button>
                   <div className="mx-3 h-px bg-gray-100 dark:bg-surface-border" />
@@ -225,7 +225,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                     onClick={handleSelectFolder}
                     className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
                   >
-                    <FolderOpen size={13} weight="duotone" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                    <FolderOpen size={14} weight="duotone" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Use an existing folder</span>
                   </button>
                 </motion.div>
@@ -274,7 +274,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
 
                       <div className="relative flex h-full flex-col justify-between p-7">
                         <div className="flex items-center gap-2.5 text-white">
-                          <StudioMark size={22} className="text-white" />
+                          <StudioMark size={20} className="text-white" />
                           <span className="text-xs font-medium uppercase tracking-[0.28em] text-white/85">
                             Studio
                           </span>

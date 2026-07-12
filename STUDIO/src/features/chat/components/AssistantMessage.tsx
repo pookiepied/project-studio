@@ -35,8 +35,6 @@ interface AssistantMessageProps {
   ttsPlayingId:       string | null;
   ttsLoadingId:       string | null;
   ttsMenuId:          string | null;
-  toolsPopupId:       string | null;
-  toolCalls:          string[] | null;
   onEditChange:       (v: string) => void;
   onSaveEdit:         () => void;
   onCancelEdit:       () => void;
@@ -45,7 +43,6 @@ interface AssistantMessageProps {
   onDelete:           (id: string) => void;
   onSpeak:            (id: string, content: string) => void;
   onSetTtsMenuId:     (id: string | null) => void;
-  onSetToolsPopupId:  (id: string | null) => void;
   onRegenerate:       () => void;
   onContinue:         () => void;
 }
@@ -66,8 +63,6 @@ export const AssistantMessage = ({
   ttsPlayingId,
   ttsLoadingId,
   ttsMenuId,
-  toolsPopupId,
-  toolCalls,
   onEditChange,
   onSaveEdit,
   onCancelEdit,
@@ -76,7 +71,6 @@ export const AssistantMessage = ({
   onDelete,
   onSpeak,
   onSetTtsMenuId,
-  onSetToolsPopupId,
   onRegenerate,
   onContinue,
 }: AssistantMessageProps) => {
@@ -229,14 +223,11 @@ export const AssistantMessage = ({
           ttsPlayingId={ttsPlayingId}
           ttsLoadingId={ttsLoadingId}
           ttsMenuId={ttsMenuId}
-          toolsPopupId={toolsPopupId}
-          toolCalls={toolCalls}
           onCopy={onCopy}
           onEdit={onEdit}
           onDelete={onDelete}
           onSpeak={onSpeak}
           onSetTtsMenuId={onSetTtsMenuId}
-          onSetToolsPopupId={onSetToolsPopupId}
           onRegenerate={onRegenerate}
           onContinue={onContinue}
         />

@@ -71,7 +71,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
         <span className={composerPillLabel}>{active.label}</span>
         {canOpen && (
           <motion.div className="inline-flex items-center" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
-            <CaretDown size={10} weight="bold" className="opacity-50" />
+            <CaretDown size={12} weight="bold" className="opacity-50" />
           </motion.div>
         )}
       </button>
@@ -116,7 +116,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
                     </p>
                   </div>
                   {isActive && (
-                    <Check size={11} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                    <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                   )}
                 </button>
               );

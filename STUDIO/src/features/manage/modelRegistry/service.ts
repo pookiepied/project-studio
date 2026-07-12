@@ -113,6 +113,65 @@ export async function saveRegistryModel(model: RegistryModel): Promise<{ accepte
   }
 }
 
+export async function updateRegistryModel(model: RegistryModel): Promise<{ accepted: boolean; persisted: boolean; message: string }> {
+  try {
+    const endpoints = await apiManager.getEndpoints();
+    if (!endpoints.registryManagement) {
+      return { accepted: false, persisted: false, message: "Registry management endpoint is unavailable; model was not saved." };
+    }
+    const response = await fetch(`${endpoints.registryManagement}/models/${encodeURIComponent(model.id)}`, {
+      method: "PUT",
+      headers: await createHeaders(),
+      body: JSON.stringify(model)
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      accepted?: boolean;
+      persisted?: boolean;
+      message?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      return { accepted: false, persisted: false, message: payload.error?.message ?? `Update failed with HTTP ${response.status}.` };
+    }
+    return {
+      accepted: Boolean(payload.accepted),
+      persisted: Boolean(payload.persisted),
+      message: payload.message ?? "Model updated."
+    };
+  } catch (error) {
+    logger.warn("RegistryManagement", "Live model update failed", error);
+    return { accepted: false, persisted: false, message: "Update failed because the registry endpoint is unavailable." };
+  }
+}
+
+export async function deleteRegistryModel(modelId: string): Promise<{ deleted: boolean; message: string }> {
+  try {
+    const endpoints = await apiManager.getEndpoints();
+    if (!endpoints.registryManagement) {
+      return { deleted: false, message: "Registry management endpoint is unavailable; model was not deleted." };
+    }
+    const response = await fetch(`${endpoints.registryManagement}/models/${encodeURIComponent(modelId)}`, {
+      method: "DELETE",
+      headers: await createHeaders()
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      deleted?: boolean;
+      message?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      return { deleted: false, message: payload.error?.message ?? `Delete failed with HTTP ${response.status}.` };
+    }
+    return {
+      deleted: Boolean(payload.deleted),
+      message: payload.message ?? "Model deleted."
+    };
+  } catch (error) {
+    logger.warn("RegistryManagement", "Live model delete failed", error);
+    return { deleted: false, message: "Delete failed because the registry endpoint is unavailable." };
+  }
+}
+
 function snapshotResult(): RegistryLoadResult {
   const registry = curatedRegistrySnapshot as unknown as ModelRegistry;
   return {

@@ -71,7 +71,7 @@ export function WorkspaceHomePanel({
             title="Close workspace"
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={13} weight="bold" />
+            <X size={14} weight="bold" />
           </button>
           <span className="truncate text-xs text-gray-500 dark:text-gray-500">Workspace</span>
         </div>

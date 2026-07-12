@@ -101,8 +101,8 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="flex-shrink-0 mt-0.5 p-1 rounded-md text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-border transition-colors"
                 >
                   {copied
-                    ? <Check size={11} weight="bold" className="text-gray-500 dark:text-gray-400" />
-                    : <Copy size={11} />
+                    ? <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400" />
+                    : <Copy size={12} />
                   }
                 </button>
               </div>
@@ -114,7 +114,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReset}
                 className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               >
-                <ArrowClockwise size={11} weight="bold" />
+                <ArrowClockwise size={12} weight="bold" />
                 Try again
               </button>
               <span className="text-gray-200 dark:text-gray-700">·</span>

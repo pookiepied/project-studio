@@ -46,7 +46,7 @@ function ResultRow({ item }: { item: ArtifactLink }) {
         )}
       </div>
       <ArrowSquareOut
-        size={11}
+        size={12}
         weight="bold"
         className="mt-0.5 flex-shrink-0 text-gray-300 transition-colors group-hover:text-secondary dark:text-gray-600"
       />
@@ -65,7 +65,7 @@ export function WebSearchArtifact({ artifact }: Props) {
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.08] dark:bg-surface-base">
       <div className="flex items-center gap-2.5 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
         <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.07]">
-          <MagnifyingGlass size={13} weight="bold" className="text-gray-500 dark:text-gray-400" />
+          <MagnifyingGlass size={14} weight="bold" className="text-gray-500 dark:text-gray-400" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">

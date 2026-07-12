@@ -94,11 +94,11 @@ function formatRelative(ts: number): string {
 
 function runStatusIcon(status: AgentRun["status"]) {
   switch (status) {
-    case "completed": return <CheckCircle size={12} weight="fill" className="text-secondary" />;
-    case "failed": return <XCircle size={12} weight="fill" className="text-secondary" />;
-    case "running": return <SpinnerGap size={12} className="animate-spin text-secondary" />;
-    case "queued": return <Clock size={12} className="text-gray-400" />;
-    case "cancelled": return <Pause size={12} weight="fill" className="text-gray-400" />;
+    case "completed": return <CheckCircle size={14} weight="fill" className="text-secondary" />;
+    case "failed": return <XCircle size={14} weight="fill" className="text-secondary" />;
+    case "running": return <SpinnerGap size={14} className="animate-spin text-secondary" />;
+    case "queued": return <Clock size={14} className="text-gray-400" />;
+    case "cancelled": return <Pause size={14} weight="fill" className="text-gray-400" />;
   }
 }
 
@@ -181,7 +181,7 @@ function DocumentList({
             title="Delete document"
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
-            {deletingDocId === doc.id ? <SpinnerGap size={13} className="animate-spin" /> : <Trash size={13} />}
+            {deletingDocId === doc.id ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
           </button>
         </li>
       ))}
@@ -232,7 +232,7 @@ function MemoryList({
                   <p className="text-xs leading-relaxed text-gray-700 dark:text-gray-300">{fact.content}</p>
                   {fact.tags?.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <Tag size={9} className="text-gray-300 dark:text-gray-700" />
+                      <Tag size={12} className="text-gray-300 dark:text-gray-700" />
                       {fact.tags.slice(0, 4).map((tag) => (
                         <span key={tag} className="rounded bg-gray-100/80 px-1.5 py-0.5 text-2xs text-gray-400 dark:bg-surface-raised dark:text-gray-600">{tag}</span>
                       ))}
@@ -252,7 +252,7 @@ function MemoryList({
                     title="Delete memory"
                     className="flex h-7 w-7 items-center justify-center rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
                   >
-                    {deletingFactId === fact.key ? <SpinnerGap size={13} className="animate-spin" /> : <Trash size={13} />}
+                    {deletingFactId === fact.key ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
                   </button>
                 </div>
               </li>
@@ -317,7 +317,7 @@ function CreateAgentForm({
     <form onSubmit={handleSubmit} className="border-b border-gray-100 bg-gray-50/50 px-5 py-4 dark:border-surface-divider dark:bg-white/[0.015]">
       {error && (
         <div className="mb-3 flex items-center gap-2 text-xs text-secondary">
-          <WarningCircle size={13} /> {error}
+          <WarningCircle size={14} /> {error}
         </div>
       )}
       <div className="grid grid-cols-[1fr_112px_132px] gap-3">
@@ -377,7 +377,7 @@ function CreateAgentForm({
             Cancel
           </button>
           <ToolbarButton disabled={saving}>
-            {saving && <SpinnerGap size={12} className="animate-spin" />}
+            {saving && <SpinnerGap size={14} className="animate-spin" />}
             Save routine
           </ToolbarButton>
         </div>
@@ -453,14 +453,14 @@ function AgentRow({
         onClick={handleExpand}
         className="group flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02]"
       >
-        <CaretRight size={12} className={`mt-1 flex-shrink-0 text-gray-300 transition-transform dark:text-gray-700 ${expanded ? "rotate-90" : ""}`} />
+        <CaretRight size={14} className={`mt-1 flex-shrink-0 text-gray-300 transition-transform dark:text-gray-700 ${expanded ? "rotate-90" : ""}`} />
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-2">
             <span className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
             <span className="rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium text-gray-500 dark:bg-surface-raised dark:text-gray-500">{agent.agentType}</span>
             {agent.triggerType === "cron" && agent.cronExpr && (
               <span className="flex items-center gap-1 text-2xs text-gray-400 dark:text-gray-600">
-                <Clock size={9} /> {agent.cronExpr}
+                <Clock size={12} /> {agent.cronExpr}
               </span>
             )}
           </div>
@@ -475,7 +475,7 @@ function AgentRow({
             title="Run now"
             className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
-            {busy === "run" ? <SpinnerGap size={13} className="animate-spin" /> : <Play size={13} weight="fill" />}
+            {busy === "run" ? <SpinnerGap size={14} className="animate-spin" /> : <Play size={14} weight="fill" />}
           </button>
           <button
             type="button"
@@ -484,7 +484,7 @@ function AgentRow({
             title="Delete routine"
             className="flex h-7 w-7 items-center justify-center rounded-md text-gray-300 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
-            {busy === "delete" ? <SpinnerGap size={13} className="animate-spin" /> : <Trash size={13} />}
+            {busy === "delete" ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
           </button>
         </div>
       </button>
@@ -683,7 +683,7 @@ export const WorkspacePage = () => {
           </div>
           <div className="flex items-center gap-2">
             <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-              {uploading ? <SpinnerGap size={12} className="animate-spin" /> : <UploadSimple size={12} weight="bold" />}
+              {uploading ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />}
               {uploading ? "Indexing" : "Add context"}
             </ToolbarButton>
             <input ref={fileInputRef} type="file" accept={ACCEPTED_TYPES} className="hidden" onChange={handleFileChange} />
@@ -810,22 +810,22 @@ export const WorkspacePage = () => {
                       <button type="button" onClick={() => setSection("context")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Database size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Review context package</span>
-                        <CaretRight size={12} className="text-gray-300" />
+                        <CaretRight size={14} className="text-gray-300" />
                       </button>
                       <button type="button" onClick={() => setSection("automation")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Lightning size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Create automation routine</span>
-                        <CaretRight size={12} className="text-gray-300" />
+                        <CaretRight size={14} className="text-gray-300" />
                       </button>
                       <button type="button" onClick={() => setSection("activity")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Graph size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Inspect timeline</span>
-                        <CaretRight size={12} className="text-gray-300" />
+                        <CaretRight size={14} className="text-gray-300" />
                       </button>
                       <button type="button" onClick={() => setSection("artifacts")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Lightning size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Open artifact lab</span>
-                        <CaretRight size={12} className="text-gray-300" />
+                        <CaretRight size={14} className="text-gray-300" />
                       </button>
                     </div>
                   </section>
@@ -848,7 +848,7 @@ export const WorkspacePage = () => {
                       <p className="text-xs text-gray-400 dark:text-gray-600">{docs.length} documents · {formatBytes(totalBytes)}</p>
                     </div>
                     <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                      {uploading ? <SpinnerGap size={12} className="animate-spin" /> : <UploadSimple size={12} />}
+                      {uploading ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
                       Add
                     </ToolbarButton>
                   </div>
@@ -872,7 +872,7 @@ export const WorkspacePage = () => {
                     <p className="text-xs text-gray-400 dark:text-gray-600">Saved agent definitions, schedules, and run history.</p>
                   </div>
                   <ToolbarButton onClick={() => setShowCreateAgent((prev) => !prev)}>
-                    <Plus size={12} weight="bold" />
+                    <Plus size={14} weight="bold" />
                     New routine
                   </ToolbarButton>
                 </div>

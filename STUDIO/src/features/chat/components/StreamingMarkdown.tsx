@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from '@/features/markdown';
@@ -89,20 +88,31 @@ export const StreamingText = ({
     };
   }, [content]);
 
-  const normalized = normalizeStreamingMarkdown(displayedContent);
+  const normalized = useMemo(
+    () => normalizeStreamingMarkdown(displayedContent),
+    [displayedContent]
+  );
 
-  return (
-    <div className={className}>
+  // Parse only when the revealed string actually changes — not on every parent
+  // re-render (cursor blink, sibling stream updates). Cuts the per-frame reflow
+  // that made streaming tables/lists flicker.
+  const rendered = useMemo(
+    () => (
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {normalized}
       </ReactMarkdown>
-      {showCursor && displayedContent.length > 0 && (
-        <motion.span
-          animate={{ opacity: [0, 0.55, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-          className="inline-block w-[2px] h-[0.72em] rounded-full bg-gray-400 dark:bg-gray-500 ml-[3px] align-middle"
-        />
-      )}
+    ),
+    [normalized]
+  );
+
+  // Caret is a CSS ::after on the LAST rendered block (see .is-streaming-caret in
+  // index.css), so it sits inline at the end of the final line instead of dropping
+  // to its own line below the markdown block like a sibling <span> would.
+  const showCaret = showCursor && displayedContent.length > 0;
+
+  return (
+    <div className={`${className}${showCaret ? ' is-streaming-caret' : ''}`}>
+      {rendered}
     </div>
   );
 };

@@ -44,7 +44,7 @@ export function CollapsibleUserText({ content }: { content: string }) {
       >
         <p
           ref={textRef}
-          className="text-sm font-normal leading-relaxed whitespace-pre-wrap"
+          className="text-body font-normal whitespace-pre-wrap"
         >
           {content}
         </p>
@@ -71,7 +71,7 @@ export function CollapsibleUserText({ content }: { content: string }) {
         >
           {expanded ? "Show less" : "Show more"}
           <CaretDown
-            size={11}
+            size={12}
             weight="bold"
             className="transition-transform duration-200"
             style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}

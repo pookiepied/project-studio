@@ -86,7 +86,7 @@ const AttachmentThumbnail = ({ attachment, onRemove }: AttachmentThumbnailProps)
           className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 dark:bg-gray-600 rounded-full flex items-center justify-center transition-opacity"
           title="Remove"
         >
-          <X size={11} className="text-white" />
+          <X size={12} className="text-white" />
         </button>
       )}
     </motion.div>

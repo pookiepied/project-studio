@@ -393,7 +393,7 @@ export const SettingsDebugPanel = () => {
 
           {!apiHealth && !apiHealthError && (
             <div className="flex items-center gap-1.5 text-3xs text-muted">
-              <WifiHigh size={11} className="text-disabled" />
+              <WifiHigh size={12} className="text-disabled" />
               <span>Checking…</span>
             </div>
           )}

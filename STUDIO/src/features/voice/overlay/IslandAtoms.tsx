@@ -172,11 +172,11 @@ export function IdleIcon({ mode }: { mode: IslandMode }) {
       className="flex items-center justify-center"
     >
       {mode === "voice" ? (
-        <ChatCircle size={12} weight="regular" className="text-gray-500 dark:text-gray-500" />
+        <ChatCircle size={14} weight="regular" className="text-gray-500 dark:text-gray-500" />
       ) : mode === "global" || mode === "artifact" ? (
-        <PulseMark size={13} />
+        <PulseMark size={14} />
       ) : (
-        <Microphone size={12} weight="regular" className="text-gray-500 dark:text-gray-500" />
+        <Microphone size={14} weight="regular" className="text-gray-500 dark:text-gray-500" />
       )}
     </motion.div>
   );

@@ -57,7 +57,7 @@ export function InlineToolSteps({ steps, cycle }: InlineToolStepsProps) {
         className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors w-full text-left"
       >
         <CaretDown
-          size={9}
+          size={12}
           weight="bold"
           className={`flex-shrink-0 transition-transform duration-150 ${isCollapsed ? "-rotate-90" : ""}`}
         />
@@ -117,8 +117,8 @@ function StepRow({ step }: { step: ActiveToolCall }) {
 
       {/* Status indicator */}
       <div className="flex-shrink-0 w-3 flex items-center justify-center">
-        {isDone && <Check size={10} weight="bold" className="text-gray-400 dark:text-gray-600" />}
-        {isError && <X size={10} weight="bold" className="text-secondary dark:text-secondary" />}
+        {isDone && <Check size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />}
+        {isError && <X size={12} weight="bold" className="text-secondary dark:text-secondary" />}
         {isRunning && (
           <span className="w-1.5 h-1.5 rounded-full bg-surface-raised dark:bg-surface-raised animate-pulse block" />
         )}

@@ -56,12 +56,12 @@ export function CommandPalette() {
 
   const actions: ActionItem[] = useMemo(() => {
     const nav = (label: string, view: View, keywords = "") => ({
-      id: `go-${view}`, label, keywords, icon: <ArrowRight size={15} />,
+      id: `go-${view}`, label, keywords, icon: <ArrowRight size={16} />,
       run: () => navigateTo(view),
     });
     return [
       { id: "new-chat", label: "New chat", keywords: "new conversation create start",
-        icon: <Plus size={15} weight="regular" />,
+        icon: <Plus size={16} weight="regular" />,
         run: () => { createNewConversation(); navigateTo("chat"); } },
       nav("Go to Chat",       "chat",       "conversation"),
       nav("Open Live",        "voice",      "voice realtime talk"),
@@ -154,7 +154,7 @@ export function CommandPalette() {
                     <div className={headingCls}>Conversations</div>
                     {filteredConversations.map(c => (
                       <Command.Item key={c.id} value={`conv-${c.id}`} onSelect={() => goConversation(c.id)} className={itemCls}>
-                        <Chat size={15} className="text-muted flex-shrink-0" />
+                        <Chat size={16} className="text-muted flex-shrink-0" />
                         <span className="truncate">{c.title || "Untitled"}</span>
                       </Command.Item>
                     ))}
@@ -171,7 +171,7 @@ export function CommandPalette() {
                         onSelect={() => goConversation(h.conversationId)}
                         className={itemCls + " items-start"}
                       >
-                        <Search size={13} className="text-muted flex-shrink-0 mt-0.5" />
+                        <Search size={14} className="text-muted flex-shrink-0 mt-0.5" />
                         <span className="flex flex-col min-w-0">
                           <span className="truncate text-secondary">{h.snippet}</span>
                           <span className="truncate text-xs text-muted">

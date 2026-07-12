@@ -429,53 +429,73 @@ function withRegistry(
 }
 
 function openRouterChatModels(): RegistryModel[] {
-  const specs: Array<[string, string, string, string, number, boolean, ReasoningFeatures["efforts"]]> = [
-    ["openai/gpt-5.6-sol", "OpenAI GPT-5.6 Sol", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.6-sol-pro", "OpenAI GPT-5.6 Sol Pro", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.6-terra", "OpenAI GPT-5.6 Terra", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.6-terra-pro", "OpenAI GPT-5.6 Terra Pro", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.6-luna", "OpenAI GPT-5.6 Luna", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.6-luna-pro", "OpenAI GPT-5.6 Luna Pro", "OpenAI", "gpt-5.6", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.5", "OpenAI GPT-5.5", "OpenAI", "gpt-5.5", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.5-pro", "OpenAI GPT-5.5 Pro", "OpenAI", "gpt-5.5", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.4", "OpenAI GPT-5.4", "OpenAI", "gpt-5.4", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.4-pro", "OpenAI GPT-5.4 Pro", "OpenAI", "gpt-5.4", 1_050_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.4-mini", "OpenAI GPT-5.4 Mini", "OpenAI", "gpt-5.4", 400_000, true, ["low", "medium", "high"]],
-    ["openai/gpt-5.4-nano", "OpenAI GPT-5.4 Nano", "OpenAI", "gpt-5.4", 400_000, true, ["low", "medium", "high"]],
-    ["qwen/qwen3.7-plus", "Qwen3.7 Plus", "Alibaba Qwen", "qwen3.7", 1_000_000, true, ["low", "medium", "high"]],
-    ["qwen/qwen3.7-max", "Qwen3.7 Max", "Alibaba Qwen", "qwen3.7", 1_000_000, false, ["low", "medium", "high"]],
-    ["qwen/qwen3.6-flash", "Qwen3.6 Flash", "Alibaba Qwen", "qwen3.6", 1_000_000, true, ["low", "medium", "high"]],
-    ["anthropic/claude-haiku-4.5", "Claude Haiku 4.5", "Anthropic", "claude-haiku", 200_000, true, ["low", "medium", "high"]],
-    ["anthropic/claude-sonnet-4.6", "Claude Sonnet 4.6", "Anthropic", "claude-sonnet", 1_000_000, true, ["low", "medium", "high"]],
-    ["anthropic/claude-sonnet-5", "Claude Sonnet 5", "Anthropic", "claude-sonnet", 1_000_000, true, ["low", "medium", "high"]],
-    ["anthropic/claude-opus-4.8", "Claude Opus 4.8", "Anthropic", "claude-opus", 1_000_000, true, ["low", "medium", "high"]],
-    ["anthropic/claude-opus-4.8-fast", "Claude Opus 4.8 Fast", "Anthropic", "claude-opus", 1_000_000, true, ["low", "medium", "high"]],
-    ["anthropic/claude-fable-5", "Claude Fable 5", "Anthropic", "claude-fable", 1_000_000, true, ["low", "medium", "high"]],
-    ["deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", "DeepSeek", "deepseek-v4", 1_048_576, false, ["low", "medium", "high"]],
-    ["deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "DeepSeek", "deepseek-v4", 1_048_576, false, ["low", "medium", "high"]],
-    ["google/gemini-3.5-flash", "Gemini 3.5 Flash", "Google", "gemini-3.5", 1_048_576, true, ["low", "medium", "high"]],
-    ["google/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", "Google", "gemini-3.1", 1_048_576, true, ["low", "medium", "high"]],
-    ["google/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite", "Google", "gemini-3.1", 1_048_576, true, ["low", "medium", "high"]],
-    ["minimax/minimax-m3", "MiniMax M3", "MiniMax", "minimax-m3", 1_048_576, true, ["low", "medium", "high"]],
-    ["moonshotai/kimi-k2.6", "Kimi K2.6", "Moonshot AI", "kimi-k2", 262_144, true, ["low", "medium", "high"]],
-    ["moonshotai/kimi-k2.7-code", "Kimi K2.7 Code", "Moonshot AI", "kimi-k2", 262_144, true, ["low", "medium", "high"]],
-    ["poolside/laguna-xs-2.1", "Laguna XS 2.1", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
-    ["poolside/laguna-xs-2.1:free", "Laguna XS 2.1 Free", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
-    ["poolside/laguna-m.1", "Laguna M.1", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
-    ["poolside/laguna-m.1:free", "Laguna M.1 Free", "Poolside", "laguna", 262_144, false, ["low", "medium", "high"]],
-    ["x-ai/grok-4.5", "Grok 4.5", "xAI", "grok-4", 500_000, true, ["low", "medium", "high"]],
-    ["x-ai/grok-4.3", "Grok 4.3", "xAI", "grok-4", 1_000_000, true, ["low", "medium", "high"]],
-    ["xiaomi/mimo-v2.5", "MiMo V2.5", "Xiaomi", "mimo-v2.5", 1_048_576, true, ["low", "medium", "high"]],
-    ["xiaomi/mimo-v2.5-pro", "MiMo V2.5 Pro", "Xiaomi", "mimo-v2.5", 1_048_576, false, ["low", "medium", "high"]],
-    ["z-ai/glm-5.2", "GLM 5.2", "Z.ai", "glm-5", 1_048_576, false, ["low", "medium", "high"]]
+  const specs: Array<{
+    nativeId: string;
+    displayName: string;
+    developer: string;
+    family: string;
+    contextWindow: number;
+    maxTokens?: number;
+    vision: boolean;
+    reasoning: ReasoningFeatures["efforts"];
+    jsonSchema?: boolean;
+    inputTypes?: NonNullable<ModelInfo["inputTypes"]>;
+  }> = [
+    { nativeId: "openai/gpt-5.6-sol", displayName: "OpenAI GPT-5.6 Sol", developer: "OpenAI", family: "gpt-5.6", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.6-sol-pro", displayName: "OpenAI GPT-5.6 Sol Pro", developer: "OpenAI", family: "gpt-5.6", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.6-terra", displayName: "OpenAI GPT-5.6 Terra", developer: "OpenAI", family: "gpt-5.6", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.6-terra-pro", displayName: "OpenAI GPT-5.6 Terra Pro", developer: "OpenAI", family: "gpt-5.6", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.6-luna", displayName: "OpenAI GPT-5.6 Luna", developer: "OpenAI", family: "gpt-5.6", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.6-luna-pro", displayName: "OpenAI GPT-5.6 Luna Pro", developer: "OpenAI", family: "gpt-5.6", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.5", displayName: "OpenAI GPT-5.5", developer: "OpenAI", family: "gpt-5.5", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.5-pro", displayName: "OpenAI GPT-5.5 Pro", developer: "OpenAI", family: "gpt-5.5", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.4", displayName: "OpenAI GPT-5.4", developer: "OpenAI", family: "gpt-5.4", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.4-pro", displayName: "OpenAI GPT-5.4 Pro", developer: "OpenAI", family: "gpt-5.4", contextWindow: 1_050_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.4-mini", displayName: "OpenAI GPT-5.4 Mini", developer: "OpenAI", family: "gpt-5.4", contextWindow: 400_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-5.4-nano", displayName: "OpenAI GPT-5.4 Nano", developer: "OpenAI", family: "gpt-5.4", contextWindow: 400_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "qwen/qwen3.7-plus", displayName: "Qwen3.7 Plus", developer: "Alibaba Qwen", family: "qwen3.7", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "qwen/qwen3.7-max", displayName: "Qwen3.7 Max", developer: "Alibaba Qwen", family: "qwen3.7", contextWindow: 1_000_000, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "qwen/qwen3.6-flash", displayName: "Qwen3.6 Flash", developer: "Alibaba Qwen", family: "qwen3.6", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "anthropic/claude-haiku-4.5", displayName: "Claude Haiku 4.5", developer: "Anthropic", family: "claude-haiku", contextWindow: 200_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "anthropic/claude-sonnet-4.6", displayName: "Claude Sonnet 4.6", developer: "Anthropic", family: "claude-sonnet", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "anthropic/claude-sonnet-5", displayName: "Claude Sonnet 5", developer: "Anthropic", family: "claude-sonnet", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "anthropic/claude-opus-4.8", displayName: "Claude Opus 4.8", developer: "Anthropic", family: "claude-opus", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "anthropic/claude-opus-4.8-fast", displayName: "Claude Opus 4.8 Fast", developer: "Anthropic", family: "claude-opus", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "anthropic/claude-fable-5", displayName: "Claude Fable 5", developer: "Anthropic", family: "claude-fable", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "deepseek/deepseek-v4-pro", displayName: "DeepSeek V4 Pro", developer: "DeepSeek", family: "deepseek-v4", contextWindow: 1_048_576, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "deepseek/deepseek-v4-flash", displayName: "DeepSeek V4 Flash", developer: "DeepSeek", family: "deepseek-v4", contextWindow: 1_048_576, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "google/gemini-3.5-flash", displayName: "Gemini 3.5 Flash", developer: "Google", family: "gemini-3.5", contextWindow: 1_048_576, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "google/gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro Preview", developer: "Google", family: "gemini-3.1", contextWindow: 1_048_576, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "google/gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite", developer: "Google", family: "gemini-3.1", contextWindow: 1_048_576, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "minimax/minimax-m3", displayName: "MiniMax M3", developer: "MiniMax", family: "minimax-m3", contextWindow: 1_048_576, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "moonshotai/kimi-k2.6", displayName: "Kimi K2.6", developer: "Moonshot AI", family: "kimi-k2", contextWindow: 262_144, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "moonshotai/kimi-k2.7-code", displayName: "Kimi K2.7 Code", developer: "Moonshot AI", family: "kimi-k2", contextWindow: 262_144, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "poolside/laguna-xs-2.1", displayName: "Laguna XS 2.1", developer: "Poolside", family: "laguna", contextWindow: 262_144, maxTokens: 32_768, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "poolside/laguna-xs-2.1:free", displayName: "Laguna XS 2.1 Free", developer: "Poolside", family: "laguna", contextWindow: 262_144, maxTokens: 32_768, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "poolside/laguna-m.1", displayName: "Laguna M.1", developer: "Poolside", family: "laguna", contextWindow: 262_144, maxTokens: 32_768, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "poolside/laguna-m.1:free", displayName: "Laguna M.1 Free", developer: "Poolside", family: "laguna", contextWindow: 262_144, maxTokens: 32_768, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "x-ai/grok-4.5", displayName: "Grok 4.5", developer: "xAI", family: "grok-4", contextWindow: 500_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "x-ai/grok-4.3", displayName: "Grok 4.3", developer: "xAI", family: "grok-4", contextWindow: 1_000_000, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "xiaomi/mimo-v2.5", displayName: "MiMo V2.5", developer: "Xiaomi", family: "mimo-v2.5", contextWindow: 1_048_576, vision: true, reasoning: ["low", "medium", "high"] },
+    { nativeId: "xiaomi/mimo-v2.5-pro", displayName: "MiMo V2.5 Pro", developer: "Xiaomi", family: "mimo-v2.5", contextWindow: 1_048_576, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "z-ai/glm-5.2", displayName: "GLM 5.2", developer: "Z.ai", family: "glm-5", contextWindow: 1_048_576, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-oss-20b:free", displayName: "GPT-OSS 20B Free", developer: "OpenAI", family: "gpt-oss", contextWindow: 131_072, maxTokens: 32_768, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "openai/gpt-oss-120b:free", displayName: "GPT-OSS 120B Free", developer: "OpenAI", family: "gpt-oss", contextWindow: 131_072, maxTokens: 131_072, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "cohere/north-mini-code:free", displayName: "North Mini Code Free", developer: "Cohere", family: "north", contextWindow: 256_000, maxTokens: 64_000, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "nvidia/nemotron-3-super-120b-a12b:free", displayName: "Nemotron 3 Super Free", developer: "NVIDIA", family: "nemotron-3", contextWindow: 262_144, maxTokens: 262_144, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "tencent/hy3:free", displayName: "Hy3 Free", developer: "Tencent", family: "hy3", contextWindow: 262_144, maxTokens: 262_144, vision: false, reasoning: ["low", "medium", "high"] },
+    { nativeId: "nvidia/nemotron-3-ultra-550b-a55b:free", displayName: "Nemotron 3 Ultra Free", developer: "NVIDIA", family: "nemotron-3", contextWindow: 1_000_000, maxTokens: 65_536, vision: false, reasoning: ["low", "medium", "high"], jsonSchema: false },
+    { nativeId: "google/gemma-4-31b-it:free", displayName: "Gemma 4 31B IT Free", developer: "Google", family: "gemma-4", contextWindow: 262_144, maxTokens: 8_192, vision: true, reasoning: ["low", "medium", "high"], inputTypes: ["text", "image", "video"] }
   ];
 
-  return specs.map(([nativeId, displayName, developer, family, contextWindow, vision, reasoning]) =>
-    chat("openrouter", nativeId, displayName, developer, family, {
-      contextWindow,
-      maxTokens: 128_000,
-      vision,
-      reasoning,
+  return specs.map((spec) =>
+    chat("openrouter", spec.nativeId, spec.displayName, spec.developer, spec.family, {
+      contextWindow: spec.contextWindow,
+      maxTokens: spec.maxTokens ?? 128_000,
+      vision: spec.vision,
+      jsonSchema: spec.jsonSchema,
+      inputTypes: spec.inputTypes,
+      reasoning: spec.reasoning,
       reasoningSource: "static-reviewed"
     })
   );
@@ -945,6 +965,13 @@ function openRouterVerifiedPricing(): Record<string, RegistryPricing> {
     ["poolside/laguna-xs-2.1:free", 0, 0, null, null],
     ["poolside/laguna-m.1", 0.2, 0.4, 0.1, null],
     ["poolside/laguna-m.1:free", 0, 0, null, null],
+    ["openai/gpt-oss-20b:free", 0, 0, null, null],
+    ["openai/gpt-oss-120b:free", 0, 0, null, null],
+    ["cohere/north-mini-code:free", 0, 0, null, null],
+    ["nvidia/nemotron-3-super-120b-a12b:free", 0, 0, null, null],
+    ["tencent/hy3:free", 0, 0, null, null],
+    ["nvidia/nemotron-3-ultra-550b-a55b:free", 0, 0, null, null],
+    ["google/gemma-4-31b-it:free", 0, 0, null, null],
     ["x-ai/grok-4.5", 2, 6, 0.5, null],
     ["x-ai/grok-4.3", 1.25, 2.5, 0.2, null],
     ["xiaomi/mimo-v2.5", 0.105, 0.28, 0.028, null],

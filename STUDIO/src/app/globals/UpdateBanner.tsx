@@ -43,7 +43,7 @@ export const UpdateBanner = () => {
                 <>
                   <div className="flex items-start gap-3">
                     <div className="w-7 h-7 rounded-xl bg-surface-hover border border-surface-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <ArrowCircleUp size={15} weight="fill" className="text-primary" />
+                      <ArrowCircleUp size={16} weight="fill" className="text-primary" />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -60,7 +60,7 @@ export const UpdateBanner = () => {
                       className="flex-shrink-0 text-disabled hover:text-muted transition-colors duration-fast mt-0.5"
                       aria-label="Dismiss"
                     >
-                      <X size={13} weight="regular" />
+                      <X size={14} weight="regular" />
                     </button>
                   </div>
 
@@ -110,7 +110,7 @@ export const UpdateBanner = () => {
               {state.status === "ready" && (
                 <div className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-xl bg-surface-hover border border-surface-border flex items-center justify-center flex-shrink-0">
-                    <CheckCircle size={15} weight="fill" className="text-primary" />
+                    <CheckCircle size={16} weight="fill" className="text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-primary leading-tight">

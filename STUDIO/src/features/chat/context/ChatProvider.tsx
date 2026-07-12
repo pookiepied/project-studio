@@ -174,7 +174,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messageOffset,     setMessageOffset]      = useState(0);
 
   // ── Tool / interaction state ────────────────────────────────────────────
-  const [messageToolCalls, setMessageToolCalls] = useState<Map<string, string[]>>(new Map());
   const [activeToolCalls,  setActiveToolCalls]  = useState<ActiveToolCall[]>([]);
   const [sessionTasks,     setSessionTasks]     = useState<TaskItem[]>([]);
 
@@ -403,7 +402,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const pendingSegmentTextRef = useRef<string>("");
 
   // ── Refs ────────────────────────────────────────────────────────────────
-  const pendingToolCallsRef      = useRef<string[]>([]);
   const agentIdToCallId          = useRef<Map<string, string>>(new Map());
   const pendingQuestionResolveRef = useRef<((a: string) => void) | null>(null);
   const pendingQuestionSegmentIdRef = useRef<string | null>(null);
@@ -627,7 +625,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     thinkingContentRef,
     harnessSegmentsRef,
     pendingSegmentTextRef,
-    pendingToolCallsRef,
     pendingQuestionResolveRef,
     pendingQuestionSegmentIdRef,
     pendingApprovalResolveRef,
@@ -636,7 +633,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setDisplayedMessages,
     setHasMoreMessages,
     setMessageOffset,
-    setMessageToolCalls,
     setActiveToolCalls,
     setSessionTasks,
     setHarnessSegments,
@@ -731,7 +727,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     fullContentRef.current         = existingContent;
     screenshotUrlsRef.current      = [];
     thinkingContentRef.current     = "";
-    pendingToolCallsRef.current    = [];
     agentIdToCallId.current.clear();
     harnessSegmentsRef.current     = [];
     pendingSegmentTextRef.current  = existingContent; // seed pending text for continue/regen
@@ -870,7 +865,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     deleteMessageById,
     setModel,
     clearChat,
-    getMessageToolCalls,
     abortGeneration,
     enableMemoryForConversation,
   } = useConversationActions({
@@ -882,7 +876,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     isLoading,
     isStreaming,
     reasoningBudget,
-    messageToolCalls,
     settings,
     activeConversationIdRef,
     optimisticAssistantIdRef,
@@ -898,7 +891,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setPendingMessages,
     setHasMoreMessages,
     setMessageOffset,
-    setMessageToolCalls,
     setCurrentModel,
     setChatEngineState,
     setContextTokens,
@@ -939,7 +931,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       editMessage, editMessageAndRegenerate, deleteMessageById, regenerateResponse, continueResponse,
       clearChat, setModel, loadConversationById, createNewConversation, forkConversationToStudio, updateTitle,
       displayedMessages, appendToDisplayedMessages, hasMoreMessages, loadMoreMessages, isLoadingMore,
-      getMessageToolCalls,
       activeToolCalls,
       permittedTools, grantToolPermission, revokeToolPermission,
       currentModelSupportsVision,

@@ -88,7 +88,7 @@ export const AppConnectModal = ({
             <Icon icon={Plus} size="xs" className="text-white" />
           </div>
           <div className="w-[52px] h-[52px] rounded-xl bg-gradient-to-br from-surface-raised via-surface-raised to-surface-raised shadow-md flex items-center justify-center">
-            <StudioMarkIcon size={22} />
+            <StudioMarkIcon size={20} />
           </div>
         </div>
 

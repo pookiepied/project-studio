@@ -15,7 +15,7 @@ function StatusIcon({ status }: { status: TaskItem["status"] }) {
   if (status === "completed") {
     return (
       <CheckCircle
-        size={13}
+        size={14}
         weight="fill"
         className="text-gray-300 dark:text-gray-600 flex-shrink-0 mt-px"
       />
@@ -28,13 +28,13 @@ function StatusIcon({ status }: { status: TaskItem["status"] }) {
         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
         className="flex-shrink-0 mt-px"
       >
-        <CircleDashed size={13} weight="bold" className="text-gray-500 dark:text-gray-400" />
+        <CircleDashed size={14} weight="bold" className="text-gray-500 dark:text-gray-400" />
       </motion.div>
     );
   }
   return (
     <Circle
-      size={13}
+      size={14}
       weight="regular"
       className="text-gray-200 dark:text-gray-700 flex-shrink-0 mt-px"
     />

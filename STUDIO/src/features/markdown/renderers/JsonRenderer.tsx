@@ -67,8 +67,8 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
         >
           {!isEmpty && (
             open
-              ? <CaretDown size={10} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-              : <CaretRight size={10} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              ? <CaretDown size={12} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              : <CaretRight size={12} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
           )}
           {keyLabel}{colon}
           <span className="text-gray-500 dark:text-gray-400">{"["}</span>
@@ -101,8 +101,8 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
         >
           {!isEmpty && (
             open
-              ? <CaretDown size={10} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-              : <CaretRight size={10} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              ? <CaretDown size={12} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              : <CaretRight size={12} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
           )}
           {keyLabel}{colon}
           <span className="text-gray-500 dark:text-gray-400">{"{"}</span>

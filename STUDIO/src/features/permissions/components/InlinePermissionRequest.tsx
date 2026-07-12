@@ -53,7 +53,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
             onClick={onApprove}
             className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
           >
-            <Check size={12} />
+            <Check size={14} />
             Allow
           </button>
           
@@ -61,7 +61,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
             onClick={onDeny}
             className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
           >
-            <X size={12} />
+            <X size={14} />
             Deny
           </button>
         </div>

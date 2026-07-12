@@ -263,21 +263,21 @@ export function FloatingIsland({
                 title="Pulse"
                 className="flex h-[26px] w-[26px] items-center justify-center rounded-full"
               >
-                <PulseMark size={15} />
+                <PulseMark size={16} />
               </button>
               <div className="w-px h-4 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-0.5" />
               <ActionBtn
-                icon={<UserSound size={13} weight="regular" />}
+                icon={<UserSound size={14} weight="regular" />}
                 label="Start live agent"
                 onClick={() => runAction("startVoice")}
               />
               <ActionBtn
-                icon={<ChatsCircle size={13} weight="regular" />}
+                icon={<ChatsCircle size={14} weight="regular" />}
                 label="Open chat"
                 onClick={() => runAction("openChat")}
               />
               <ActionBtn
-                icon={<ArrowsOut size={12} weight="regular" />}
+                icon={<ArrowsOut size={14} weight="regular" />}
                 label="Open Studio"
                 onClick={() => runAction("focus")}
               />
@@ -302,7 +302,7 @@ export function FloatingIsland({
               </span>
               {view.isVoice && (
                 <ActionBtn
-                  icon={<X size={10} weight="regular" />}
+                  icon={<X size={12} weight="regular" />}
                   label="End live agent"
                   onClick={() => onAction("dismiss")}
                 />
@@ -327,7 +327,7 @@ export function FloatingIsland({
               </span>
               {view.isVoice && (
                 <ActionBtn
-                  icon={<X size={10} weight="regular" />}
+                  icon={<X size={12} weight="regular" />}
                   label="End live agent"
                   onClick={() => onAction("dismiss")}
                 />
@@ -356,12 +356,12 @@ export function FloatingIsland({
 
               <div className="flex items-center gap-1 flex-shrink-0">
                 <ActionBtn
-                  icon={<ArrowsOut size={11} weight="regular" />}
+                  icon={<ArrowsOut size={12} weight="regular" />}
                   label="Expand in Studio"
                   onClick={() => onAction("expand")}
                 />
                 <ActionBtn
-                  icon={<X size={10} weight="regular" />}
+                  icon={<X size={12} weight="regular" />}
                   label="Dismiss"
                   onClick={() => onAction("dismiss")}
                 />
@@ -378,14 +378,14 @@ export function FloatingIsland({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <SpeakerHigh
-                size={13}
+                size={14}
                 weight="regular"
                 className="text-gray-500 dark:text-gray-400 flex-shrink-0"
               />
               <SpeakingBars />
               <VoiceCaptionLine caption={voiceCaption} fallbackText={aiText} />
               <ActionBtn
-                icon={<X size={10} weight="regular" />}
+                icon={<X size={12} weight="regular" />}
                 label="End live agent"
                 onClick={() => onAction("dismiss")}
               />
@@ -401,7 +401,7 @@ export function FloatingIsland({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <WarningCircle
-                size={13}
+                size={14}
                 weight="regular"
                 className="text-secondary flex-shrink-0"
               />
@@ -413,7 +413,7 @@ export function FloatingIsland({
               </span>
               <div className="w-px h-3.5 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-1" />
               <ActionBtn
-                icon={<X size={10} weight="regular" />}
+                icon={<X size={12} weight="regular" />}
                 label="Dismiss"
                 onClick={() => onAction("dismiss")}
               />

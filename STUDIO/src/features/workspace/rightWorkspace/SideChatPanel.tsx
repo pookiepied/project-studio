@@ -90,14 +90,14 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
           title="New side chat"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
         >
-          <Plus size={13} weight="bold" />
+          <Plus size={14} weight="bold" />
         </button>
       </div>
 
       {selectorOpen && (
         <div className="flex-shrink-0 border-b border-surface-divider p-2">
           <label className="mb-2 flex h-8 items-center gap-2 rounded-xl border border-surface-border bg-surface-base px-3 text-muted">
-            <Search size={13} />
+            <Search size={14} />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -110,7 +110,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
             onClick={startNew}
             className="mb-1 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-primary hover:bg-surface-hover"
           >
-            <Plus size={12} weight="bold" />
+            <Plus size={14} weight="bold" />
             Start new conversation
           </button>
           <div className="max-h-48 overflow-y-auto">
@@ -203,7 +203,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-on-emphasis transition-opacity disabled:opacity-35"
             title="Send"
           >
-            <ArrowUp size={13} weight="bold" />
+            <ArrowUp size={14} weight="bold" />
           </button>
         </div>
       </form>

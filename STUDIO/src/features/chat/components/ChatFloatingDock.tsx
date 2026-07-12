@@ -170,7 +170,7 @@ export function ChatFloatingDock({
                     : "text-secondary hover:bg-surface-hover hover:text-primary"
                 }`}
               >
-                <FolderOpen size={13} weight={currentProjectPath ? "fill" : "regular"} />
+                <FolderOpen size={14} weight={currentProjectPath ? "fill" : "regular"} />
                 <span className="max-w-28 truncate">{projectEnabled ? projectName ?? "Projects" : "Cloud"}</span>
               </button>
 
@@ -184,9 +184,9 @@ export function ChatFloatingDock({
                     : "text-secondary hover:bg-surface-hover hover:text-primary"
                 }`}
               >
-                <Stack size={13} weight={currentConvId ? "fill" : "regular"} />
+                <Stack size={14} weight={currentConvId ? "fill" : "regular"} />
                 <span className="max-w-48 truncate">{conversationTitle ?? "New chat"}</span>
-                <CaretDown size={8} weight="bold" className={`text-muted transition-transform ${browser === "conversations" ? "rotate-180" : ""}`} />
+                <CaretDown size={12} weight="bold" className={`text-muted transition-transform ${browser === "conversations" ? "rotate-180" : ""}`} />
                 {hasActivity && <span className="absolute left-4 top-1 h-1.5 w-1.5 rounded-full bg-primary" />}
               </button>
 
@@ -218,10 +218,10 @@ export function ChatFloatingDock({
                       className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-surface-border bg-surface-base p-1.5 shadow-xl"
                     >
                       <button type="button" onClick={() => { setOptionsOpen(false); onRenameChat(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-secondary hover:bg-surface-hover hover:text-primary">
-                        <PencilSimple size={13} /> Rename
+                        <PencilSimple size={14} /> Rename
                       </button>
                       <button type="button" onClick={() => { setOptionsOpen(false); onNewConversation(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-secondary hover:bg-surface-hover hover:text-primary">
-                        <Plus size={13} weight="bold" /> New chat
+                        <Plus size={14} weight="bold" /> New chat
                       </button>
                     </motion.div>
                   )}
@@ -273,7 +273,7 @@ export function ChatFloatingDock({
                 onClick={onNewConversation}
                 className="flex h-7 items-center gap-1.5 rounded-full bg-surface-selected px-2.5 text-xs font-medium text-primary transition-colors hover:bg-surface-hover"
               >
-                <Plus size={12} weight="bold" />
+                <Plus size={14} weight="bold" />
                 New
               </button>
             </motion.div>
@@ -381,11 +381,11 @@ function BrowserHeader({
           <p className="text-xs leading-relaxed text-muted">{subtitle}</p>
         </div>
         <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-primary">
-          <X size={13} weight="bold" />
+          <X size={14} weight="bold" />
         </button>
       </div>
       <label className="flex h-8 items-center gap-2 rounded-xl border border-surface-border bg-surface-page px-3 text-muted">
-        <Search size={13} />
+        <Search size={14} />
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
@@ -448,7 +448,7 @@ function ProjectBrowser({
         <>
           <div className="p-2">
             <button type="button" onClick={onOpenProjectFolder} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-primary hover:bg-surface-hover">
-              <Plus size={13} weight="bold" />
+              <Plus size={14} weight="bold" />
               Open project folder
             </button>
           </div>
@@ -473,10 +473,10 @@ function ProjectBrowser({
                     </button>
                     <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
                       <button type="button" title="Remove from list" onClick={(event) => { event.stopPropagation(); onRemoveProject(project.id); }} className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary">
-                        <X size={11} weight="bold" />
+                        <X size={12} weight="bold" />
                       </button>
                       <button type="button" title="Delete Studio project data" onClick={(event) => { event.stopPropagation(); onDeleteProject(project.id); }} className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary">
-                        <Trash size={11} weight="bold" />
+                        <Trash size={12} weight="bold" />
                       </button>
                     </div>
                   </div>
@@ -541,7 +541,7 @@ function ConversationBrowser({
       />
       <div className="p-2">
         <button type="button" onClick={onNewConversation} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-primary hover:bg-surface-hover">
-          <Plus size={13} weight="bold" />
+          <Plus size={14} weight="bold" />
           Start new conversation
         </button>
       </div>
@@ -676,7 +676,7 @@ function ConversationActionsButton({
       }}
       className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
     >
-      <DotsThree size={12} weight="bold" />
+      <DotsThree size={14} weight="bold" />
     </button>
   );
 }
@@ -720,7 +720,7 @@ function ConversationActionsMenu({
         }}
         className={itemClass}
       >
-        <ChatCircle size={13} /> Open
+        <ChatCircle size={14} /> Open
       </button>
       <button
         type="button"
@@ -730,7 +730,7 @@ function ConversationActionsMenu({
         }}
         className={itemClass}
       >
-        <SidebarSimple size={13} /> Open in Side Chat
+        <SidebarSimple size={14} /> Open in Side Chat
       </button>
       <button
         type="button"
@@ -740,16 +740,16 @@ function ConversationActionsMenu({
         }}
         className={itemClass}
       >
-        <Stack size={13} /> Open in New Window
+        <Stack size={14} /> Open in New Window
       </button>
       {!isClaudeOwned && (
         <>
           <div className="my-1 h-px bg-surface-divider" />
           <button type="button" onClick={(event) => { onStartEditTitle(conv.id, conv.title, event); onClose(); }} className={itemClass}>
-            <PencilSimple size={13} /> Rename
+            <PencilSimple size={14} /> Rename
           </button>
           <button type="button" onClick={(event) => { onDeleteConversation(conv.id, event); onClose(); }} className={itemClass}>
-            <Trash size={13} /> Delete
+            <Trash size={14} /> Delete
           </button>
         </>
       )}

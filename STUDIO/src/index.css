@@ -132,7 +132,7 @@ a, button, input, select, textarea, [role="button"] {
 /*
  * Prevent auto-zoom on iOS Safari and Android Chrome.
  * Both browsers zoom the viewport when a focused input has font-size < 16px.
- * We override to 16px on mobile only — desktop retains the tailwind text-sm (13px).
+ * We override to 16px on mobile only — desktop retains the tailwind text-sm (12px).
  */
 @media (max-width: 768px) {
   input[type="text"],
@@ -217,7 +217,7 @@ a, button, input, select, textarea, [role="button"] {
 /* Base code styling */
 pre code {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--syntax-text);
   font-weight: 400;
@@ -359,8 +359,8 @@ pre code {
 .prose-chat {
   /* Base text styling - proper font family */
   font-family: var(--font-sans);
-  font-size: 0.875rem; /* 14px - matches text-sm for consistency */
-  line-height: 1.5; /* Match user message line-height */
+  font-size: 14px; /* editorial body size — mirrors the `body` Tailwind token (tailwind.config.js) */
+  line-height: 1.6;
   color: var(--text-secondary);
   min-width: 0;
   max-width: 100%;
@@ -368,12 +368,33 @@ pre code {
   overflow-wrap: break-word;
 }
 
-/* Paragraphs - generous spacing */
+/* Streaming caret — an inline bar appended to the END of the last rendered
+   block, so it trails the final word on its own line instead of dropping to a
+   new line below the block (which is what a sibling <span> used to do). */
+.prose-chat.is-streaming-caret > *:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  vertical-align: text-bottom;
+  animation: chat-caret-blink 1.15s ease-in-out infinite;
+}
+
+@keyframes chat-caret-blink {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.6; }
+}
+
+/* Paragraphs - generous spacing. Color inherits the softer --text-secondary
+   from .prose-chat (no override) — body copy reads as a calm mid-grey instead
+   of near-black; headings/strong/code keep --text-primary for hierarchy. */
 .prose-chat p {
-  margin-top: 1.25rem;
-  margin-bottom: 1.25rem;
-  line-height: 1.75;
-  color: var(--text-primary);
+  margin-top: 0.9em;
+  margin-bottom: 0.9em;
+  line-height: 1.7;
   font-family: var(--font-sans);
 }
 
@@ -529,11 +550,11 @@ pre code {
   border-top: 1px solid var(--surface-border);
 }
 
-/* Tables - clean styling */
+/* Tables - clean styling. Vertical margin lives on the overflow-x wrapper
+   (see markdownComponents.table), so the bare table carries none. */
 .prose-chat table {
   width: 100%;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  margin: 0;
   border-collapse: collapse;
   font-size: 0.875rem;
 }

@@ -5,31 +5,20 @@ import { ErrorDisplay } from "@/ui/feedback/ErrorDisplay";
 import { ToolPermissionCard } from "@/runtime";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";
-import { getTurnAnchorIndices } from "@/lib/turnAnchors";
 import { TurnStatus } from "./idle/TurnStatus";
+import { getTurnAnchorIndices } from "@/lib/turnAnchors";
 import type { ChatMessage, MessageSegment } from "@/types";
 import type { ActiveToolCall } from "@/features/chat/context/types";
 import type { ChatEngine } from "@/cliBridges/types";
 
-/**
- * Human phrase for the status line while a specific tool is running. Keeps the
- * live state honest ("Searching the web" instead of a generic "Working") and
- * gives the surface a bit of personality. Order matters — first match wins.
- */
-function toolPhrase(tool: string): string {
-  const t = tool.toLowerCase();
-  if (t.startsWith("memory")) return "Recalling memory";
-  if (t.includes("web_search")) return "Searching the web";
-  if (t.includes("web_fetch") || t.includes("http") || t.includes("browse")) return "Browsing the web";
-  if (t.includes("write") || t.includes("edit") || t.includes("create")) return "Editing files";
-  if (t.includes("read") || t.includes("grep") || t.includes("glob") || t.includes("file_search") || t.includes("cat")) return "Reading files";
-  if (t === "bash" || t === "powershell" || t.includes("terminal") || t.includes("shell") || t.includes("command")) return "Running commands";
-  if (t.includes("image")) return "Generating an image";
-  if (t.includes("video")) return "Generating video";
-  if (t.includes("agent") || t.includes("spawn")) return "Delegating to an agent";
-  if (t.includes("rag") || t.includes("doc")) return "Searching your docs";
-  if (t.startsWith("mcp")) return "Using a connected tool";
-  return "Working";
+interface TurnStatusData {
+  engine: ChatEngine;
+  convId?: string;
+  generating: boolean;
+  label: string;
+  thinking?: string;
+  contextUsed?: number;
+  contextLimit?: number;
 }
 
 interface ChatMessageListProps {
@@ -47,7 +36,6 @@ interface ChatMessageListProps {
   isStreaming:          boolean;
   streamingContent:     string;
   streamingMessageId:   string | null;
-  thinkingContent:      string;
   harnessSegments:      MessageSegment[];
   activeToolCalls:      ActiveToolCall[];
   // Edit state
@@ -62,14 +50,11 @@ interface ChatMessageListProps {
   ttsPlayingId:         string | null;
   ttsLoadingId:         string | null;
   ttsMenuId:            string | null;
-  toolsPopupId:         string | null;
-  getMessageToolCalls:  (id: string) => string[] | null;
   onCopy:               (content: string, id: string) => void;
   onEdit:               (id: string, content: string) => void;
   onDelete:             (id: string) => void;
   onSpeak:              (id: string, content: string) => void;
   onSetTtsMenuId:       (id: string | null) => void;
-  onSetToolsPopupId:    (id: string | null) => void;
   onRegenerate:         () => void;
   onContinue:           () => void;
   // Permission
@@ -81,16 +66,10 @@ interface ChatMessageListProps {
   onClearError:         () => void;
   // Floating composer — bottom padding so the last message clears the overlay
   scrollPaddingBottom?: number;
-  // Active engine — drives the idle "ready" indicator's animation + label
-  chatEngine:           ChatEngine;
-  // Current conversation id — keys the persisted generation timer
-  convId?:              string;
-  // Conversation token footprint (tokenizer estimate — fallback only)
-  contextTokens?:       number;
-  // Real context-window occupancy from model usage (preferred; 0 = unknown)
-  usageContextTokens?:  number;
-  // Model context-window limit — denominator for the fullness meter
-  contextLimit?:        number;
+  // Rendered inline as the last content item (below the answer in normal
+  // flow) instead of docked as a fixed HUD above the composer — see
+  // ChatPage's comment at the composer overlay for why.
+  turnStatus?: TurnStatusData | null;
 }
 
 export const ChatMessageList = ({
@@ -105,7 +84,6 @@ export const ChatMessageList = ({
   isStreaming,
   streamingContent,
   streamingMessageId,
-  thinkingContent,
   harnessSegments,
   activeToolCalls,
   editingMessageId,
@@ -118,14 +96,11 @@ export const ChatMessageList = ({
   ttsPlayingId,
   ttsLoadingId,
   ttsMenuId,
-  toolsPopupId,
-  getMessageToolCalls,
   onCopy,
   onEdit,
   onDelete,
   onSpeak,
   onSetTtsMenuId,
-  onSetToolsPopupId,
   onRegenerate,
   onContinue,
   pendingPermission,
@@ -134,18 +109,8 @@ export const ChatMessageList = ({
   error,
   onClearError,
   scrollPaddingBottom,
-  chatEngine,
-  convId,
-  contextTokens,
-  usageContextTokens,
-  contextLimit,
+  turnStatus,
 }: ChatMessageListProps) => {
-  // Real usage only — the tokenizer estimate can't see the system prompt, tools,
-  // or file-read results, so showing it as truth is misleading. When there's no
-  // real number yet (a fresh turn, or the Studio engine which doesn't report
-  // usage) the meter renders nothing rather than a wrong figure.
-  const contextUsed = usageContextTokens && usageContextTokens > 0 ? usageContextTokens : undefined;
-  void contextTokens; // retained as a prop for pre-send pruning; not shown here
   // Tag each turn-anchor message with its ordinal so ConversationRail can query
   // them. Shared anchor rule keeps the rail and the list in sync under deletion.
   const messagesWithTurnIndex = useMemo(() => {
@@ -182,11 +147,11 @@ export const ChatMessageList = ({
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Scroll area */}
       <div
-        className="chat-scroll-container flex-1 overflow-y-auto overflow-x-hidden scrollbar-auto-hide px-5 pt-10"
+        className="chat-scroll-container flex-1 overflow-y-auto overflow-x-hidden scrollbar-auto-hide px-5 pt-14"
         style={{ paddingBottom: scrollPaddingBottom ?? 40 }}
         ref={messagesContainerRef}
       >
-        <div ref={messagesContentRef} className="space-y-6 max-w-2xl mx-auto">
+        <div ref={messagesContentRef} className="space-y-8 max-w-2xl mx-auto">
 
           {isLoadingMore && (
             <div className="flex justify-center py-4">
@@ -233,8 +198,6 @@ export const ChatMessageList = ({
                     ttsPlayingId={ttsPlayingId}
                     ttsLoadingId={ttsLoadingId}
                     ttsMenuId={ttsMenuId}
-                    toolsPopupId={toolsPopupId}
-                    toolCalls={getMessageToolCalls(message.id)}
                     onEditChange={onEditChange}
                     onSaveEdit={onSaveEdit}
                     onCancelEdit={onCancelEdit}
@@ -243,7 +206,6 @@ export const ChatMessageList = ({
                     onDelete={onDelete}
                     onSpeak={onSpeak}
                     onSetTtsMenuId={onSetTtsMenuId}
-                    onSetToolsPopupId={onSetToolsPopupId}
                     onRegenerate={onRegenerate}
                     onContinue={onContinue}
                   />
@@ -264,8 +226,6 @@ export const ChatMessageList = ({
                     ttsPlayingId={ttsPlayingId}
                     ttsLoadingId={ttsLoadingId}
                     ttsMenuId={ttsMenuId}
-                    toolsPopupId={toolsPopupId}
-                    toolCalls={getMessageToolCalls(message.id)}
                     onEditChange={onEditChange}
                     onSaveEdit={onSaveEdit}
                     onCancelEdit={onCancelEdit}
@@ -274,7 +234,6 @@ export const ChatMessageList = ({
                     onDelete={onDelete}
                     onSpeak={onSpeak}
                     onSetTtsMenuId={onSetTtsMenuId}
-                    onSetToolsPopupId={onSetToolsPopupId}
                     onRegenerate={onRegenerate}
                     onContinue={onContinue}
                   />
@@ -316,35 +275,23 @@ export const ChatMessageList = ({
             </motion.div>
           )}
 
-          {/* Bottom status — ONE persistent line for the whole conversation.
-              It morphs between the live turn state (glyph + phase + elapsed timer
-              + context) and the idle "ready for your next task" line without ever
-              unmounting, so it can't flicker/reprovision on phase hand-offs.
-              Keyed by conversation so switching chats remounts cleanly.
-              Suppressed while a permission prompt owns the surface. */}
-          {pendingPermission ? null : messages.length > 0 ? (
+          {/* The bottom status line ("Thinking" / "Responding" / "…is ready for
+              your next task") renders inline here, right after the last message,
+              like Claude.ai: on a short answer it sits wherever that lands (not
+              glued to the composer); on a long/streaming answer the existing
+              auto-scroll pin keeps it hugging the composer as content grows. */}
+          {turnStatus && (
             <TurnStatus
-              key={`turn-${convId ?? "new"}`}
-              engine={chatEngine}
-              convId={convId}
-              generating={isLoading || isStreaming || !!streamingMessageId}
-              label={(() => {
-                // A running tool wins (most specific). Otherwise it's "Responding"
-                // only when real text is streaming — NOT merely because a
-                // streamingMessageId exists (that's set at turn start, before any
-                // output, which is why it used to say "Responding" while thinking).
-                const runningTool = activeToolCalls.find(
-                  (tc) => tc.status === "running" && !tc.parentCallId
-                );
-                if (runningTool) return toolPhrase(runningTool.tool);
-                if (streamingContent && streamingContent.length > 0) return "Responding";
-                return "Thinking";
-              })()}
-              thinking={thinkingContent}
-              contextUsed={contextUsed}
-              contextLimit={contextLimit}
+              key={`turn-${turnStatus.convId ?? "new"}`}
+              engine={turnStatus.engine}
+              convId={turnStatus.convId}
+              generating={turnStatus.generating}
+              label={turnStatus.label}
+              thinking={turnStatus.thinking}
+              contextUsed={turnStatus.contextUsed}
+              contextLimit={turnStatus.contextLimit}
             />
-          ) : null}
+          )}
 
           <div ref={messagesEndRef} className="chat-scroll-anchor" />
         </div>

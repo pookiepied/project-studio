@@ -42,7 +42,7 @@ export const PendingMessageQueue = ({ messages, onCancel }: PendingMessageQueueP
                 className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-surface-border transition-smooth"
                 title="Cancel"
               >
-                <X size={10} weight="bold" className="text-gray-400 dark:text-gray-600" />
+                <X size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
               </button>
             </motion.div>
           ))}

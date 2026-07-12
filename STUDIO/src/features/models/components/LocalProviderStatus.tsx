@@ -105,7 +105,7 @@ export const LocalProviderStatus = () => {
             disabled={isStarting}
             className="text-xs font-medium text-gray-400 hover:text-secondary transition-colors"
           >
-            {isStarting ? <ArrowClockwise size={12} className="animate-spin inline" /> : 'Start'}
+            {isStarting ? <ArrowClockwise size={14} className="animate-spin inline" /> : 'Start'}
           </button>
         )}
 
@@ -132,7 +132,7 @@ export const LocalProviderStatus = () => {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 tracking-wide">Providers</span>
                     <button onClick={() => setIsExpanded(false)} className="text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
-                      <X size={12} weight="bold" />
+                      <X size={14} weight="bold" />
                     </button>
                   </div>
 

@@ -415,12 +415,12 @@ export function TerminalPanel({
             title="Close terminal"
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={13} weight="bold" />
+            <X size={14} weight="bold" />
           </button>
 
           {/* Icon + active tab name + status dot */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <Terminal size={11} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
+            <Terminal size={12} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
             <span className="text-xs text-gray-500 dark:text-gray-500 truncate">
               {activeTab?.label ?? "terminal"}
             </span>
@@ -463,7 +463,7 @@ export function TerminalPanel({
                                  hover:bg-gray-200 dark:hover:bg-surface-border
                                  text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     >
-                      <X size={8} weight="bold" />
+                      <X size={12} weight="bold" />
                     </span>
                   </button>
                 );
@@ -482,7 +482,7 @@ export function TerminalPanel({
                        hover:text-gray-600 dark:hover:text-gray-400
                        transition-colors duration-100"
           >
-            <Plus size={10} weight="regular" />
+            <Plus size={12} weight="regular" />
           </button>
         </div>
         )}

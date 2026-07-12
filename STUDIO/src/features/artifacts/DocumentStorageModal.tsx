@@ -82,7 +82,7 @@ export function DocumentStorageModal({
                   onClick={onCancel}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-selected transition-colors flex-shrink-0"
                 >
-                  <X size={13} />
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -98,7 +98,7 @@ export function DocumentStorageModal({
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-selected border border-transparent hover:border-gray-200 dark:hover:border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
-                  <CloudUp size={15} weight="duotone" className="text-secondary dark:text-secondary" />
+                  <CloudUp size={16} weight="duotone" className="text-secondary dark:text-secondary" />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">Keep forever</div>
@@ -115,7 +115,7 @@ export function DocumentStorageModal({
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-selected border border-transparent hover:border-gray-200 dark:hover:border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
-                  <Clock size={15} weight="duotone" className="text-secondary dark:text-secondary" />
+                  <Clock size={16} weight="duotone" className="text-secondary dark:text-secondary" />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">Just for today</div>

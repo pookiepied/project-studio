@@ -101,15 +101,15 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
         title={inWorktree ? `${current} — checked out in worktree ${currentBranch?.worktreePath}` : current}
         className="flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-hover"
       >
-        <GitBranch size={12} />
+        <GitBranch size={14} />
         <span className="max-w-28 truncate">{current}</span>
         {inWorktree && (
           <span className="flex items-center gap-1 rounded border border-surface-border px-1 text-2xs font-medium text-muted">
-            <TreeStructure size={9} weight="bold" />
+            <TreeStructure size={12} weight="bold" />
             worktree
           </span>
         )}
-        <CaretDown size={8} weight="bold" className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
+        <CaretDown size={12} weight="bold" className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {createPortal(
@@ -126,25 +126,25 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
               {!creating ? (
                 <>
                   <div className="flex items-center gap-2 px-2 py-1.5 text-muted">
-                    <Search size={13} />
+                    <Search size={14} />
                     <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search branches" className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted" />
-                    {query && <button type="button" onClick={() => setQuery("")}><X size={11} /></button>}
+                    {query && <button type="button" onClick={() => setQuery("")}><X size={12} /></button>}
                   </div>
                   <div className="my-1 h-px bg-surface-divider" />
                   <div className="max-h-52 overflow-y-auto">
                     {filtered.map(branch => (
                       <button key={branch.name} type="button" disabled={busy} onClick={() => checkout(branch)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-primary hover:bg-surface-hover disabled:opacity-50">
-                        <GitBranch size={13} className="text-secondary" />
+                        <GitBranch size={14} className="text-secondary" />
                         <span className="min-w-0 flex-1 truncate">{branch.name}</span>
                         {branch.worktreePath && !branch.current && <span className="text-2xs text-muted">Worktree</span>}
-                        {branch.current && <Check size={11} weight="bold" />}
+                        {branch.current && <Check size={12} weight="bold" />}
                       </button>
                     ))}
                     {!filtered.length && !error && <p className="px-2.5 py-3 text-xs text-muted">No branches found</p>}
                   </div>
                   <div className="my-1 h-px bg-surface-divider" />
                   <button type="button" onClick={() => { setCreating(true); setError(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-surface-hover">
-                    <Plus size={12} weight="bold" /> Create and check out new branch
+                    <Plus size={14} weight="bold" /> Create and check out new branch
                   </button>
                 </>
               ) : (

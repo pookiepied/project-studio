@@ -55,7 +55,7 @@ export function TextBlock({ code }: TextBlockProps) {
                            hover:bg-gray-200 dark:hover:bg-surface-border
                            rounded-lg transition-colors duration-100"
               >
-                <Check size={12} weight="bold" />
+                <Check size={14} weight="bold" />
                 Done
               </motion.button>
             </div>
@@ -95,11 +95,11 @@ export function TextBlock({ code }: TextBlockProps) {
           <AnimatePresence mode="wait">
             {saved ? (
               <motion.div key="saved" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.12 }}>
-                <Check size={13} weight="bold" className="text-secondary" />
+                <Check size={14} weight="bold" className="text-secondary" />
               </motion.div>
             ) : (
               <motion.div key="edit" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.12 }}>
-                <PencilSimple size={13} weight="regular" />
+                <PencilSimple size={14} weight="regular" />
               </motion.div>
             )}
           </AnimatePresence>

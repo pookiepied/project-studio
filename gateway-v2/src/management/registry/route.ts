@@ -4,6 +4,7 @@ import { GatewayError, toErrorResponse } from "../../core/errors";
 import type { GatewayEnv } from "../../system/infrastructure/cloudflare/env";
 import {
   exportRegistry,
+  deleteRegistryModel,
   listRegistryModels,
   readRegistryModel,
   replacePersistedRegistryModels,
@@ -90,6 +91,23 @@ registryManagementRoute.put("/models/:id", async (c) => {
       persistedModelCount: persistedModels.length,
       message: "Model saved to the curated registry override store.",
       data: model
+    });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+});
+
+registryManagementRoute.delete("/models/:id", async (c) => {
+  try {
+    const id = decodeURIComponent(c.req.param("id"));
+    const result = await deleteRegistryModel(c.env, id);
+    return c.json({
+      object: "registry.model.deleted",
+      deleted: true,
+      id,
+      persistedModelCount: result.persistedModels.length,
+      deletedModelCount: result.deletedModelIds.length,
+      message: "Model removed from the active curated registry."
     });
   } catch (error) {
     return toErrorResponse(error);

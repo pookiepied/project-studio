@@ -204,48 +204,56 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
         }
 
         if (event.type === "assistant" && Array.isArray(event.message?.content)) {
-          const block = event.message.content[0];
-          if (block?.type === "thinking" && typeof block.thinking === "string") {
-            thinkingContentRef.current = block.thinking;
-            setThinkingContent(block.thinking);
-            return;
-          }
+          // Claude assistant events carry a MULTI-block content array
+          // (e.g. [thinking, text], [text, tool_use], several tool_use in one
+          // event). Iterate every block — inspecting only content[0] silently
+          // dropped later tool_use blocks, which is what made tool steps go
+          // missing / appear out of order.
+          for (const block of event.message.content) {
+            if (block?.type === "thinking" && typeof block.thinking === "string") {
+              thinkingContentRef.current = block.thinking;
+              setThinkingContent(block.thinking);
+              continue;
+            }
 
-          if (block?.type === "tool_use") {
-            const toolName = mapClaudeToolName(block.name ?? "tool");
-            const args = (block.input ?? {}) as Record<string, unknown>;
-            const displayClass = classifyToolDisplay(toolName);
-            setActiveToolCalls((prev) => [
-              ...prev.filter((item) => item.callId !== block.id),
-              {
-                callId: block.id,
-                tool: toolName,
-                args,
-                status: "running",
-                displayClass,
-              },
-            ]);
+            if (block?.type === "tool_use") {
+              const toolName = mapClaudeToolName(block.name ?? "tool");
+              const args = (block.input ?? {}) as Record<string, unknown>;
+              const displayClass = classifyToolDisplay(toolName);
+              setActiveToolCalls((prev) => [
+                ...prev.filter((item) => item.callId !== block.id),
+                {
+                  callId: block.id,
+                  tool: toolName,
+                  args,
+                  status: "running",
+                  displayClass,
+                },
+              ]);
 
-            if (displayClass === "stream") {
-              const pendingText = pendingSegmentTextRef.current;
-              if (pendingText) {
+              if (displayClass === "stream") {
+                const pendingText = pendingSegmentTextRef.current;
+                if (pendingText) {
+                  harnessSegmentsRef.current = [
+                    ...harnessSegmentsRef.current,
+                    { type: "text", content: pendingText },
+                  ];
+                  pendingSegmentTextRef.current = "";
+                  setStreamingContent("");
+                  latestStreamingContentRef.current = "";
+                }
                 harnessSegmentsRef.current = [
                   ...harnessSegmentsRef.current,
-                  { type: "text", content: pendingText },
+                  { type: "harness_event", event: buildHarnessEvent(block.id, toolName, args, "running") },
                 ];
-                pendingSegmentTextRef.current = "";
-                setStreamingContent("");
-                latestStreamingContentRef.current = "";
+                setHarnessSegments([...harnessSegmentsRef.current]);
               }
-              harnessSegmentsRef.current = [
-                ...harnessSegmentsRef.current,
-                { type: "harness_event", event: buildHarnessEvent(block.id, toolName, args, "running") },
-              ];
-              setHarnessSegments([...harnessSegmentsRef.current]);
+              continue;
             }
-            return;
           }
 
+          // Text snapshot fallback — only when we haven't been receiving live
+          // text deltas (which are the normal streaming path).
           if (!seenTextDeltas.current) {
             const textBlock = event.message.content.find((item: any) => item.type === "text");
             if (typeof textBlock?.text === "string" && textBlock.text) {
@@ -258,11 +266,17 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
         }
 
         if (event.type === "user" && Array.isArray(event.message?.content)) {
-          const block = event.message.content[0];
-          if (block?.type === "tool_result" && block.tool_use_id) {
-            completeClaudeTool(block.tool_use_id, event.tool_use_result ?? block.content);
+          // A single user event can batch multiple tool_result blocks; iterate
+          // all of them so every matching card is marked complete (only reading
+          // content[0] left later tools stuck showing "running").
+          let changed = false;
+          for (const block of event.message.content) {
+            if (block?.type !== "tool_result" || !block.tool_use_id) continue;
+            const result = event.tool_use_result ?? block.content;
+            completeClaudeTool(block.tool_use_id, result);
             harnessSegmentsRef.current = harnessSegmentsRef.current.map((segment) => {
               if (segment.type !== "harness_event" || segment.event.callId !== block.tool_use_id) return segment;
+              changed = true;
               return {
                 type: "harness_event" as const,
                 event: buildHarnessEvent(
@@ -270,12 +284,12 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
                   segment.event.tool,
                   segment.event.args,
                   "complete",
-                  event.tool_use_result ?? block.content
+                  result
                 ),
               };
             });
-            setHarnessSegments([...harnessSegmentsRef.current]);
           }
+          if (changed) setHarnessSegments([...harnessSegmentsRef.current]);
           return;
         }
 

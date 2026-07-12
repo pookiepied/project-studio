@@ -9,6 +9,7 @@ import {
   ImageIcon as Image,
   PlusIcon as Plus,
   SpeakerHighIcon as SpeakerHigh,
+  TrashIcon as Trash,
   VideoCameraIcon as VideoCamera,
   WaveformIcon as Waveform,
 } from "@phosphor-icons/react";
@@ -23,7 +24,7 @@ import { Spinner } from "@/ui/primitives/Spinner";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { ProviderIcon } from "@/features/models/components/ProviderIcon";
 import { categoryLabel, formatNumber, formatPricing, modelSearchText } from "../modelRegistry/formatters";
-import { loadRegistryModels, loadRegistrySchema, saveRegistryModel } from "../modelRegistry/service";
+import { deleteRegistryModel, loadRegistryModels, loadRegistrySchema, saveRegistryModel, updateRegistryModel } from "../modelRegistry/service";
 import type { RegistryCategory, RegistryManagementSchema, RegistryModel, RegistryPricingUnit } from "../modelRegistry/types";
 
 interface Props {
@@ -54,6 +55,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
   const [category, setCategory] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RegistryModel | null>(null);
+  const [draftSourceId, setDraftSourceId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -68,6 +70,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
       setSource(registryResult.source);
       setSelectedId((current) => current ?? registryResult.models[0]?.id ?? null);
       setDraft(null);
+      setDraftSourceId(null);
       setState("ready");
     } catch {
       setState("error");
@@ -106,12 +109,14 @@ export const ModelRegistryView = ({ onBack }: Props) => {
     clone.displayName = "New Model";
     clone.registry.aliases = ["new-model"];
     setDraft(clone);
+    setDraftSourceId(null);
     setSelectedId(base.id);
   };
 
   const editSelected = () => {
     if (!selected) return;
     setDraft(structuredClone(selected));
+    setDraftSourceId(selected.id);
   };
 
   const updateDraft = (updater: (model: RegistryModel) => void) => {
@@ -126,10 +131,27 @@ export const ModelRegistryView = ({ onBack }: Props) => {
   const saveDraft = async () => {
     if (!activeDraft) return;
     setSaveState("loading");
-    const result = await saveRegistryModel(activeDraft);
+    const result = draftSourceId ? await updateRegistryModel(activeDraft) : await saveRegistryModel(activeDraft);
     setSaveState(result.persisted ? "success" : "error");
     setSaveMessage(result.message);
     if (result.persisted) {
+      await refresh();
+    }
+    window.setTimeout(() => setSaveState("idle"), 2500);
+  };
+
+  const deleteSelected = async () => {
+    if (!selected) return;
+    const confirmed = window.confirm(`Delete ${selected.displayName ?? selected.id} from the active model registry?`);
+    if (!confirmed) return;
+    setSaveState("loading");
+    const result = await deleteRegistryModel(selected.id);
+    setSaveState(result.deleted ? "success" : "error");
+    setSaveMessage(result.message);
+    if (result.deleted) {
+      setSelectedId(null);
+      setDraft(null);
+      setDraftSourceId(null);
       await refresh();
     }
     window.setTimeout(() => setSaveState("idle"), 2500);
@@ -245,6 +267,17 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                   <Button variant="outline" size="sm" onClick={editSelected} leftIcon={<Icon icon={Database} size="xs" />}>
                     Edit
                   </Button>
+                  {!draft && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={deleteSelected}
+                      loading={saveState === "loading"}
+                      leftIcon={<Icon icon={Trash} size="xs" />}
+                    >
+                      Delete
+                    </Button>
+                  )}
                   {draft && (
                     <Button
                       variant="primary"
@@ -253,7 +286,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                       loading={saveState === "loading"}
                       leftIcon={saveState === "success" ? <Success size="xs" /> : <Icon icon={FloppyDisk} size="xs" />}
                     >
-                      Save
+                      {draftSourceId ? "Update" : "Save"}
                     </Button>
                   )}
                 </div>
@@ -268,7 +301,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                   <section className="rounded-lg border border-surface-border bg-surface-base">
                     <SectionTitle icon={<Database size={14} />} label="Identity" />
                     <div className="p-4 grid grid-cols-2 gap-3">
-                      <EditorInput label="Gateway ID" value={activeDraft.id} disabled={!draft} onChange={(value) => updateDraft((model) => { model.id = value; })} />
+                      <EditorInput label="Gateway ID" value={activeDraft.id} disabled={!draft || Boolean(draftSourceId)} onChange={(value) => updateDraft((model) => { model.id = value; })} />
                       <EditorInput label="Provider model ID" value={activeDraft.providerModelId} disabled={!draft} onChange={(value) => updateDraft((model) => { model.providerModelId = value; })} />
                       <EditorInput label="Display name" value={activeDraft.displayName ?? ""} disabled={!draft} onChange={(value) => updateDraft((model) => { model.displayName = value; })} />
                       <EditorSelect

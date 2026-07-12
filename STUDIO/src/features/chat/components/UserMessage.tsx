@@ -16,8 +16,6 @@ interface UserMessageProps {
   ttsPlayingId:     string | null;
   ttsLoadingId:     string | null;
   ttsMenuId:        string | null;
-  toolsPopupId:     string | null;
-  toolCalls:        string[] | null;
   onEditChange:     (v: string) => void;
   onSaveEdit:       () => void;
   onCancelEdit:     () => void;
@@ -26,7 +24,6 @@ interface UserMessageProps {
   onDelete:         (id: string) => void;
   onSpeak:          (id: string, content: string) => void;
   onSetTtsMenuId:   (id: string | null) => void;
-  onSetToolsPopupId:(id: string | null) => void;
   onRegenerate:     () => void;
   onContinue:       () => void;
 }
@@ -41,8 +38,6 @@ export const UserMessage = ({
   ttsPlayingId,
   ttsLoadingId,
   ttsMenuId,
-  toolsPopupId,
-  toolCalls,
   onEditChange,
   onSaveEdit,
   onCancelEdit,
@@ -51,7 +46,6 @@ export const UserMessage = ({
   onDelete,
   onSpeak,
   onSetTtsMenuId,
-  onSetToolsPopupId,
   onRegenerate,
   onContinue,
 }: UserMessageProps) => (
@@ -84,7 +78,7 @@ export const UserMessage = ({
               disabled={!editingContent.trim()}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40 transition-colors"
             >
-              <Check size={11} weight="bold" />
+              <Check size={12} weight="bold" />
               Save &amp; Send
             </button>
             <button
@@ -138,14 +132,11 @@ export const UserMessage = ({
         ttsPlayingId={ttsPlayingId}
         ttsLoadingId={ttsLoadingId}
         ttsMenuId={ttsMenuId}
-        toolsPopupId={toolsPopupId}
-        toolCalls={toolCalls}
         onCopy={onCopy}
         onEdit={onEdit}
         onDelete={onDelete}
         onSpeak={onSpeak}
         onSetTtsMenuId={onSetTtsMenuId}
-        onSetToolsPopupId={onSetToolsPopupId}
         onRegenerate={onRegenerate}
         onContinue={onContinue}
       />

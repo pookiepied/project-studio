@@ -29,21 +29,18 @@ import { useLocalCapabilities }                      from "@/features/chat/hooks
 import { useClaudeAccountStatus }                    from "@/features/chat/hooks/useClaudeAccountStatus";
 import type { ConversationStorageScope }             from "@/core/conversations";
 
-import { ChatHeader }           from "@/features/chat/components/ChatHeader";
+import { ChatFloatingDock }     from "@/features/chat/components/ChatFloatingDock";
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
 import { RenameModal }          from "@/features/chat/components/RenameModal";
 import { ContextWindowButton }  from "@/features/chat/components/ContextWindowButton";
 import { BranchSelector }       from "@/features/chat/components/BranchSelector";
-import { EnvironmentSelector }  from "@/features/chat/components/EnvironmentSelector";
-import { HeaderNavButton }      from "@/app/shell/HeaderNavButton";
-import { NotificationBell }     from "@/app/shell/NotificationBell";
-import { ThemeToggle }          from "@/app/shell/ThemeToggle";
 import { useProjects }          from "@/features/chat/hooks/useProjects";
 import { projectRegistry, type ProjectEntry } from "@/core/projects";
 import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
+import { toolPhrase } from "@/features/chat/components/idle/TurnStatus";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import { ComposerApprovalCard } from "@/features/permissions";
 import { AskUserQuestionCard }  from "@/features/chat/components/AskUserQuestionCard";
@@ -63,7 +60,7 @@ import type { ChatEngine } from "@/cliBridges/types";
 // clears the floating composer's top fade (~16px) with comfortable slack, in
 // every scenario including landing at the bottom of an old conversation after a
 // restart. Also leaves room for the last message's absolute hover action bar.
-const BOTTOM_SCROLL_CLEARANCE = 48;
+const BOTTOM_SCROLL_CLEARANCE = 12;
 
 // Claude-owns-transcript banner — Claude Code brand-warm accent (Anthropic
 // terracotta family, matches ClaudeCodeIcon #CC785C). Not a neutral surface;
@@ -114,7 +111,6 @@ export const ChatPage = () => {
     hasMoreMessages,
     loadMoreMessages,
     isLoadingMore,
-    getMessageToolCalls,
     activeToolCalls,
     resolveToolApproval,
     answerPendingQuestion,
@@ -170,7 +166,7 @@ export const ChatPage = () => {
   }, [conversation?.id, conversationStorageScope]);
 
   const {
-    messagesContainerRef, messagesEndRef, messagesContentRef, loadMoreTriggerRef,
+    messagesContainerRef, messagesEndRef, messagesContentRef, loadMoreTriggerRef, forwardWheel,
   } = useChatScroll({
     conversationId: conversation?.id,
     messageCount: messages.length, isStreaming, hasMoreMessages, isLoadingMore, loadMoreMessages,
@@ -205,7 +201,7 @@ export const ChatPage = () => {
   } = useMessageEdit({ messages, editMessage, editMessageAndRegenerate });
 
   const {
-    copiedMessageId, ttsMenuId, setTtsMenuId, toolsPopupId, setToolsPopupId,
+    copiedMessageId, ttsMenuId, setTtsMenuId,
     handleCopyMessage,
   } = useMessagePopups();
 
@@ -251,12 +247,9 @@ export const ChatPage = () => {
   const { isEditingTitle, titleInput, setIsEditingTitle, setTitleInput, handleSaveTitle } =
     useConvRename({ conversation, updateTitle, reloadConversations });
 
-  // -- Conversation options + dropdown -----------------------------------------
-  const [showConvMenu,      setShowConvMenu]      = useState(false);
-  const [showConversations, setShowConversations] = useState(false);
+  // -- Conversation inline-rename state (dock owns its own browser/options UI) --
   const [editingConvId,     setEditingConvId]     = useState<string | null>(null);
   const [editingConvTitle,  setEditingConvTitle]  = useState("");
-  const [hoveredConvId,     setHoveredConvId]     = useState<string | null>(null);
 
   // reload when conversation id changes; conversation/ref excluded to avoid reload storms
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -458,7 +451,6 @@ export const ChatPage = () => {
     setProjectContext({ path: project.path, name: project.name, accessMode: project.accessMode });
     await projectRegistry.touch(project.id);
     await refreshProjects();
-    setShowConversations(false);
   }, [setProjectContext, refreshProjects]);
 
   const handleOpenProjectFolder = useCallback(async () => {
@@ -467,7 +459,6 @@ export const ChatPage = () => {
     const entry = await projectRegistry.add(selected);
     setProjectContext({ path: entry.path, name: entry.name, accessMode: entry.accessMode });
     await refreshProjects();
-    setShowConversations(false);
   }, [setProjectContext, refreshProjects]);
 
   // Any project that becomes the active context gets registered, whichever way
@@ -514,18 +505,6 @@ export const ChatPage = () => {
         onCancel={cancelDocUpload}
       />
 
-      {/* Backdrop - conversations dropdown */}
-      <AnimatePresence>
-        {showConversations && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => setShowConversations(false)}
-            className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40"
-          />
-        )}
-      </AnimatePresence>
-
       <ModelLibraryPanel
         isOpen={libraryOpen}
         onClose={() => setLibraryOpen(false)}
@@ -539,6 +518,96 @@ export const ChatPage = () => {
         onTitleChange={setTitleInput}
         onSave={handleSaveTitle}
         onCancel={() => { setIsEditingTitle(false); setTitleInput(""); }}
+      />
+
+      {/* Floating top-center dock — project/conversation switcher, title,
+          branch/context/device controls, workspace panels. Fixed-position
+          (does not occupy layout), so it overlays the chat column below. */}
+      <ChatFloatingDock
+        active={hasStartedConversation}
+        conversationTitle={conversation?.title}
+        projectName={conversationStorageScope === "local" ? projectContext?.name : undefined}
+        scope={conversationStorageScope}
+        onScopeChange={handleStorageScopeChange}
+        projects={projects}
+        currentProjectPath={projectContext?.path}
+        conversations={conversations}
+        currentConvId={conversation?.id}
+        conversationStatuses={conversationStatuses}
+        contextControls={
+          <>
+            {projectContext && conversationStorageScope === "local" && (
+              <BranchSelector
+                projectContext={projectContext}
+                setProjectContext={setProjectContext}
+                placement="down"
+              />
+            )}
+            {!isEmptyConversation && (
+              <ContextWindowButton
+                usedTokens={usageContextTokens > 0 ? usageContextTokens : contextTokens}
+                maxTokens={contextLimit}
+                isSummarizing={isSummarizing}
+                hasContextSummary={!!conversation?.contextSummary}
+                variant="header"
+                placement="down"
+              />
+            )}
+          </>
+        }
+        accountControl={
+          conversationStorageScope === "local" && chatEngine === "claude" ? (
+            <ClaudeUsageBadge
+              status={claudeAccountStatus}
+              loading={claudeAccountLoading}
+              rateLimit={claudeSession?.rateLimit}
+              onRefresh={() => refreshClaudeAccountStatus(true)}
+              compact
+            />
+          ) : null
+        }
+        rightControls={
+          <RightWorkspaceControls
+            isTauri={isTauri}
+            projectContext={projectContext}
+            open={rightWorkspace.open}
+            summaryPanelOpen={summaryPanelOpen}
+            onToggleSummaryPanel={() => {
+              const next = !summaryPanelOpen;
+              setSummaryPanelOpen(next);
+              if (next) broadcastPanelOpen("overview");
+            }}
+            onToggleOpen={() => {
+              if (!rightWorkspace.open) broadcastPanelOpen("tools");
+              rightWorkspace.toggleOpen();
+            }}
+          />
+        }
+        onSelectProject={handleSelectProject}
+        onOpenProjectFolder={handleOpenProjectFolder}
+        onRemoveProject={(id) => { void removeProject(id); }}
+        onDeleteProject={(id) => { void deleteProject(id); }}
+        onSelectConversation={async (id) => { await loadConversationById(id); }}
+        onNewConversation={() => {
+          createNewConversation(conversationListScope, {
+            preserveProject: conversationListScope === "local" && !!projectContext,
+          });
+        }}
+        onRenameChat={() => setIsEditingTitle(true)}
+        onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
+        onDeleteConversation={(id, e) => {
+          e.stopPropagation();
+          deleteConversation(id, conversation?.id, loadConversationById, createNewConversation)
+            .catch(() => {});
+        }}
+        editingConvId={editingConvId}
+        editingConvTitle={editingConvTitle}
+        onEditTitleChange={setEditingConvTitle}
+        onSaveConvTitle={(id) =>
+          saveConvTitle(id, editingConvTitle, conversation?.id, updateTitle)
+            .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
+        }
+        onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
       />
 
       {/* -- SPLIT VIEW: chat column + side panels -- */}
@@ -569,127 +638,6 @@ export const ChatPage = () => {
             )}
           </AnimatePresence>
 
-          <ChatHeader
-            conversationTitle={conversation?.title}
-            projectName={conversationStorageScope === "local" ? projectContext?.name : undefined}
-            isTauri={isTauri}
-            summaryPanelOpen={summaryPanelOpen}
-            onToggleSummaryPanel={() => {
-              const next = !summaryPanelOpen;
-              setSummaryPanelOpen(next);
-              if (next) broadcastPanelOpen("overview");
-            }}
-            terminalOpen={terminalOpen}
-            onToggleTerminal={() =>
-              setTerminalOpen(v => {
-                const next = !v;
-                if (next) broadcastPanelOpen("tools");
-                return next;
-              })
-            }
-            showConvMenu={showConvMenu}
-            onToggleConvMenu={() => setShowConvMenu(v => !v)}
-            onCloseConvMenu={() => setShowConvMenu(false)}
-            onRenameChat={() => setIsEditingTitle(true)}
-            onNewChat={() => { createNewConversation(); setShowConversations(false); }}
-            conversations={conversations}
-            currentConvId={conversation?.id}
-            showConversations={showConversations}
-            editingConvId={editingConvId}
-            editingConvTitle={editingConvTitle}
-            hoveredConvId={hoveredConvId}
-            onToggleConversations={() => setShowConversations(v => !v)}
-            onCloseConversations={() => setShowConversations(false)}
-            projects={projects}
-            currentProjectPath={projectContext?.path}
-            onSelectProject={handleSelectProject}
-            onOpenProjectFolder={handleOpenProjectFolder}
-            onRemoveProject={(id) => { void removeProject(id); }}
-            onDeleteProject={(id) => { void deleteProject(id); }}
-            onSelectConversation={async (id) => { await loadConversationById(id); setShowConversations(false); }}
-            onNewConversation={() => {
-              createNewConversation(conversationListScope, {
-                preserveProject: conversationListScope === "local" && !!projectContext,
-              });
-              setShowConversations(false);
-            }}
-            onDeleteConversation={(id, e) => {
-              e.stopPropagation();
-              deleteConversation(id, conversation?.id, loadConversationById, createNewConversation)
-                .catch(() => {});
-            }}
-            onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
-            onSaveConvTitle={(id) =>
-              saveConvTitle(id, editingConvTitle, conversation?.id, updateTitle)
-                .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
-            }
-            onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
-            onEditTitleChange={setEditingConvTitle}
-            onHoverConv={setHoveredConvId}
-            conversationStatuses={conversationStatuses}
-            navTrigger={
-              <HeaderNavButton onNewChat={() => { createNewConversation(); setShowConversations(false); }} />
-            }
-            contextControls={
-              <>
-                {projectContext && conversationStorageScope === "local" && (
-                  <BranchSelector
-                    projectContext={projectContext}
-                    setProjectContext={setProjectContext}
-                    placement="down"
-                  />
-                )}
-                {!isEmptyConversation && (
-                  <ContextWindowButton
-                    usedTokens={usageContextTokens > 0 ? usageContextTokens : contextTokens}
-                    maxTokens={contextLimit}
-                    isSummarizing={isSummarizing}
-                    hasContextSummary={!!conversation?.contextSummary}
-                    variant="header"
-                    placement="down"
-                  />
-                )}
-              </>
-            }
-            accountControl={
-              conversationStorageScope === "local" && chatEngine === "claude" ? (
-                <ClaudeUsageBadge
-                  status={claudeAccountStatus}
-                  loading={claudeAccountLoading}
-                  rateLimit={claudeSession?.rateLimit}
-                  onRefresh={() => refreshClaudeAccountStatus(true)}
-                  compact
-                />
-              ) : null
-            }
-            rightControls={
-              <>
-                <EnvironmentSelector
-                  scope={conversationStorageScope}
-                  onScopeChange={handleStorageScopeChange}
-                  placement="down"
-                />
-                <NotificationBell align="right" />
-                <ThemeToggle />
-                <RightWorkspaceControls
-                  isTauri={isTauri}
-                  projectContext={projectContext}
-                  open={rightWorkspace.open}
-                  summaryPanelOpen={summaryPanelOpen}
-                  onToggleSummaryPanel={() => {
-                    const next = !summaryPanelOpen;
-                    setSummaryPanelOpen(next);
-                    if (next) broadcastPanelOpen("overview");
-                  }}
-                  onToggleOpen={() => {
-                    if (!rightWorkspace.open) broadcastPanelOpen("tools");
-                    rightWorkspace.toggleOpen();
-                  }}
-                />
-              </>
-            }
-          />
-
           {/* -- MAIN CONTENT: empty-centred ↔ conversation -- */}
           <AnimatePresence mode="popLayout" initial={false}>
             {isEmptyConversation ? (
@@ -705,7 +653,7 @@ export const ChatPage = () => {
                 <motion.p
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }}
-                  className="text-2xl font-light text-gray-500 dark:text-gray-400 mb-7 select-none tracking-tight"
+                  className="font-display text-3xl font-normal text-secondary mb-7 select-none"
                 >
                   What should we work on?
                 </motion.p>
@@ -714,7 +662,7 @@ export const ChatPage = () => {
                   <ConnectionStatusBar convId={conversation?.id} />
                   {/* Review-mode permission slide-in - surfaces the first
                       pending_approval tool call right above the composer. */}
-                  <div className="mb-2">
+                  <div className="[&:not(:empty)]:mb-2">
                     <ComposerApprovalCard
                       toolCall={
                         activeToolCalls.find((tc) =>
@@ -752,9 +700,6 @@ export const ChatPage = () => {
                 {/* Rail + scroll area - fills full height; the composer floats over
                     its bottom so messages scroll behind and dissolve at the field */}
                 <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
-                  {/* Top fade - messages dissolve into the header as they scroll
-                      up, instead of hard-clipping at the scroll edge. */}
-                  <div className="pointer-events-none absolute top-0 inset-x-0 h-8 z-10 bg-gradient-to-b from-white to-transparent dark:from-surface-page" />
                   <ConversationRail
                     messages={messages}
                     containerRef={messagesContainerRef}
@@ -762,6 +707,22 @@ export const ChatPage = () => {
                   />
                   <ChatMessageList
                   scrollPaddingBottom={composerDockH + BOTTOM_SCROLL_CLEARANCE}
+                  turnStatus={messages.length > 0 && !pendingPermission ? {
+                    engine: chatEngine,
+                    convId: conversation?.id,
+                    generating: isLoading || isStreaming || !!streamingMessageId,
+                    label: (() => {
+                      const runningTool = activeToolCalls.find(
+                        (tc) => tc.status === "running" && !tc.parentCallId
+                      );
+                      if (runningTool) return toolPhrase(runningTool.tool);
+                      if (streamingContent && streamingContent.length > 0) return "Responding";
+                      return "Thinking";
+                    })(),
+                    thinking: thinkingContent,
+                    contextUsed: usageContextTokens && usageContextTokens > 0 ? usageContextTokens : undefined,
+                    contextLimit,
+                  } : null}
                   messages={messages}
                   isLoadingMore={isLoadingMore}
                   hasMoreMessages={hasMoreMessages}
@@ -769,16 +730,10 @@ export const ChatPage = () => {
                   messagesEndRef={messagesEndRef}
                   messagesContentRef={messagesContentRef}
                   loadMoreTriggerRef={loadMoreTriggerRef}
-                  chatEngine={chatEngine}
-                  convId={conversation?.id}
-                  contextTokens={contextTokens}
-                  usageContextTokens={usageContextTokens}
-                  contextLimit={contextLimit}
                   isLoading={isLoading}
                   isStreaming={isStreaming}
                   streamingContent={streamingContent}
                   streamingMessageId={streamingMessageId}
-                  thinkingContent={thinkingContent}
                   harnessSegments={harnessSegments}
                   activeToolCalls={activeToolCalls}
                   editingMessageId={editingMessageId}
@@ -791,14 +746,11 @@ export const ChatPage = () => {
                   ttsPlayingId={tts.playingId}
                   ttsLoadingId={tts.loadingId}
                   ttsMenuId={ttsMenuId}
-                  toolsPopupId={toolsPopupId}
-                  getMessageToolCalls={getMessageToolCalls}
                   onCopy={handleCopyMessage}
                   onEdit={handleEditMessage}
                   onDelete={deleteMessageById}
                   onSpeak={(id, content) => tts.speak(id, content, settings.ttsModel)}
                   onSetTtsMenuId={setTtsMenuId}
-                  onSetToolsPopupId={setToolsPopupId}
                   onRegenerate={regenerateResponse}
                   onContinue={continueResponse}
                   pendingPermission={pendingPermission}
@@ -816,6 +768,12 @@ export const ChatPage = () => {
                 <div
                   ref={composerDockRef}
                   className="absolute bottom-0 inset-x-0 z-20 pointer-events-none"
+                  // This overlay is a DOM sibling of the message scroller, not a
+                  // descendant, so native wheel scrolling stops working the moment
+                  // the cursor is over its pointer-events-auto column (TurnStatus,
+                  // approval cards) — forward the delta manually so scroll/lock
+                  // behaves the same everywhere over the conversation.
+                  onWheel={(e) => forwardWheel(e.deltaY)}
                 >
                   {/* Soft fade above the dock - messages dissolve just before the
                       text field (and above the Claude-owns-transcript banner when
@@ -827,7 +785,7 @@ export const ChatPage = () => {
                       {isClaudeOwnedConversation && (
                         <div className={CLAUDE_TRANSCRIPT_BANNER}>
                           <div className="flex items-center gap-2">
-                            <ClaudeCodeIcon size={15} />
+                            <ClaudeCodeIcon size={16} />
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
                                 Claude Code owns this transcript
@@ -860,7 +818,7 @@ export const ChatPage = () => {
                           pendingApprovalResolveRef keeps waiting while the
                           user navigates to another view; the card re-renders
                           from activeToolCalls the moment chat comes back. */}
-                      <div className="mb-2">
+                      <div className="[&:not(:empty)]:mb-2">
                         <ComposerApprovalCard
                           toolCall={
                             activeToolCalls.find((tc) =>
@@ -882,6 +840,14 @@ export const ChatPage = () => {
                           ) : null;
                         })()}
                       </div>
+
+                      {/* Turn status now renders inline in the scroll flow (see
+                          ChatMessageList's `turnStatus` prop below) so a short
+                          answer just sits below its own text wherever that
+                          lands, instead of being glued to the composer as a
+                          permanent HUD. It only ends up hugging the composer
+                          once real content grows tall enough to reach it —
+                          the existing auto-scroll pin handles that for free. */}
 
                       {composerBlock(conversationInputRef)}
                     </div>

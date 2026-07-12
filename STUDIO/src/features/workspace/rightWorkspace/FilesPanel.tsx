@@ -74,7 +74,7 @@ function FileTreeNode({
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         {entry.isDir ? (
-          <CaretRight size={11} weight="bold" className={`flex-shrink-0 text-muted transition-transform ${expanded ? "rotate-90" : ""}`} />
+          <CaretRight size={12} weight="bold" className={`flex-shrink-0 text-muted transition-transform ${expanded ? "rotate-90" : ""}`} />
         ) : (
           <span className="w-[11px] flex-shrink-0" />
         )}
@@ -177,7 +177,7 @@ export function FilesPanel({
           title="Refresh files"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
         >
-          <Refresh size={13} className={loading ? "animate-spin" : ""} />
+          <Refresh size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
       {error && (

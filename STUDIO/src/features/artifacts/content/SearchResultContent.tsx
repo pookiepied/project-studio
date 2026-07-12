@@ -29,7 +29,7 @@ function Favicon({ domain }: { domain: string }) {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
-    return <Globe size={11} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />;
+    return <Globe size={12} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />;
   }
 
   return (

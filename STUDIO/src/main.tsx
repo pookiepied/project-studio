@@ -4,8 +4,14 @@ import App from "./app/App";
 import { isWorkspaceShell, WORKSPACE_SHELL } from "./app/shell/shellConfig";
 import { isThemePreference, resolveTheme } from "./lib/theme";
 
-// Typography variables must load before the rest of the app styles.
-// We intentionally use system font stacks for a compact Codex-like feel.
+// Self-hosted fonts (bundled via @fontsource — no network requests).
+// Direction: Inter (body/UI/display) · Cascadia Code (code/terminal).
+// These register the font-families that design/typography.css references, so they
+// must load before the typography variables and the rest of the app styles.
+import "@fontsource-variable/inter/index.css";
+import "@fontsource/cascadia-code/400.css";
+import "@fontsource/cascadia-code/600.css";
+// Typography variables (--font-sans/-display/-mono) consume the families above.
 import "./design/typography.css";
 // Semantic design tokens (single source of truth) load before index.css so
 // every global rule can read the CSS variables they define.

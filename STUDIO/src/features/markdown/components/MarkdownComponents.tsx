@@ -214,6 +214,14 @@ const markdownComponents = {
       {children}
     </CodeBlock>
   ),
+  // Wrap tables so wide ones scroll horizontally inside their own box instead of
+  // overflowing/clipping the fixed-width message column. The inner <table> keeps
+  // its .prose-chat styling; vertical rhythm lives on this wrapper.
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="my-6 max-w-full overflow-x-auto scrollbar-thin rounded-lg border border-surface-border">
+      <table>{children}</table>
+    </div>
+  ),
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
     <ExternalLink href={href}>{children}</ExternalLink>
   ),

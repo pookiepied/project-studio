@@ -72,7 +72,7 @@ function SurfaceStage({
     return (
       <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100/80 p-4 shadow-[0_24px_70px_-38px_rgba(15,23,42,0.35)] dark:border-surface-border dark:from-surface-base dark:via-surface-base dark:to-surface-raised">
         <div className="mb-3 flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-          <Layout size={12} />
+          <Layout size={14} />
           Panel surface
         </div>
         <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-surface-border">
@@ -85,7 +85,7 @@ function SurfaceStage({
   return (
     <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-surface-deep to-surface-raised p-4 shadow-[0_30px_90px_-44px_rgba(15,23,42,0.35)] dark:border-surface-border dark:from-surface-page dark:to-surface-base">
       <div className="mb-4 flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-        <ChatCircleText size={12} />
+        <ChatCircleText size={14} />
         Chat surface
       </div>
       <div className="flex justify-start">
@@ -170,7 +170,7 @@ export function ArtifactLabPanel() {
 
         <div className="mt-5">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            <Stack size={12} />
+            <Stack size={14} />
             Example library
           </div>
           <div className="space-y-2">
@@ -209,7 +209,7 @@ export function ArtifactLabPanel() {
 
         <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-3 dark:border-surface-border dark:bg-surface-base">
           <div className="mb-3 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            <Layout size={12} />
+            <Layout size={14} />
             Canvas surfaces
           </div>
           <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
@@ -239,7 +239,7 @@ export function ArtifactLabPanel() {
               disabled={!activeArtifact}
               className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
             >
-              <Plus size={12} weight="bold" />
+              <Plus size={14} weight="bold" />
               Spawn artifact
             </button>
             <button
@@ -247,7 +247,7 @@ export function ArtifactLabPanel() {
               onClick={() => setCanvasItems([])}
               className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-border dark:bg-surface-base dark:text-gray-300 dark:hover:bg-surface-raised"
             >
-              <Broom size={12} />
+              <Broom size={14} />
               Clear canvas
             </button>
           </div>
@@ -285,7 +285,7 @@ export function ArtifactLabPanel() {
             onClick={handleReset}
             className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-border dark:bg-surface-base dark:text-gray-300 dark:hover:bg-surface-raised"
           >
-            <ArrowClockwise size={12} />
+            <ArrowClockwise size={14} />
             Reset example
           </button>
           <button
@@ -294,7 +294,7 @@ export function ArtifactLabPanel() {
             disabled={!activeArtifact}
             className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-border dark:bg-surface-base dark:text-gray-300 dark:hover:bg-surface-raised"
           >
-            <Copy size={12} />
+            <Copy size={14} />
             Copy `artifact` fence
           </button>
         </div>
@@ -302,7 +302,7 @@ export function ArtifactLabPanel() {
         {parsed.error && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-raised px-3 py-2 text-xs text-secondary dark:border-surface-border/40 dark:bg-surface-raised/20 dark:text-secondary">
             <div className="flex items-center gap-2 font-medium">
-              <WarningCircle size={12} weight="fill" />
+              <WarningCircle size={14} weight="fill" />
               Artifact validation
             </div>
             <p className="mt-1 leading-relaxed">{parsed.error}</p>
@@ -311,7 +311,7 @@ export function ArtifactLabPanel() {
 
         <label className="block">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            <BracketsCurly size={12} />
+            <BracketsCurly size={14} />
             JSON payload
           </div>
           <textarea

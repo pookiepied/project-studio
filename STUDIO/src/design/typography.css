@@ -1,12 +1,13 @@
-/* Typography system: single source of truth for font families. */
+/* Typography system: single source of truth for font families.
+   Two families only — trim any fallback beyond one system font + a generic. */
 
 :root {
-  /* Windows Codex-like UI stack: Segoe Variable first, then standard system sans fallbacks. */
-  --font-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Body & UI — Inter: modern app/dev-tool sans, sharp at small sizes. */
+  --font-sans: "Inter Variable", "Segoe UI", sans-serif;
 
-  /* Keep headings in the same UI family so the interface stays minimal. */
-  --font-display: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Display / headings / hero — same Inter family (unified look, weight does the work). */
+  --font-display: "Inter Variable", "Segoe UI", sans-serif;
 
-  /* Windows-friendly mono stack that reads closer to Codex on this platform. */
-  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* Code / mono — Cascadia Code (VS Code's default), Consolas as the Windows fallback. */
+  --font-mono: "Cascadia Code", Consolas, ui-monospace, monospace;
 }
