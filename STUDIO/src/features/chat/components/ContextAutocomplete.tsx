@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlugIcon as Plug, CloudIcon as Cloud } from '@phosphor-icons/react';
 import { AppLogo } from '@/ui/brand';
+import { Button } from '@/ui/primitives/Button';
 
 export interface AppMention {
   id: string;
@@ -117,10 +118,11 @@ export const ContextAutocomplete = ({
         <div className="overflow-y-auto max-h-[360px] scrollbar-auto-hide py-1.5">
           <p className="px-3 py-1.5 text-2xs font-semibold text-gray-400 dark:text-gray-600 tracking-wider uppercase">Apps</p>
           {filteredApps.map((app, i) => (
-            <button
+            <Button
               key={app.id}
+              variant="ghost"
               onClick={() => onSelectApp?.(app)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 transition-colors ${
+              className={`h-auto w-full justify-start gap-2.5 px-3 py-2 ${
                 i === selectedIndex
                   ? 'bg-gray-50 dark:bg-surface-selected'
                   : 'hover:bg-gray-50 dark:hover:bg-surface-selected'
@@ -150,7 +152,7 @@ export const ContextAutocomplete = ({
               {app.isRunning && (
                 <span className="w-1.5 h-1.5 rounded-full bg-surface-raised flex-shrink-0" />
               )}
-            </button>
+            </Button>
           ))}
         </div>
       </motion.div>

@@ -10,7 +10,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChatCircleIcon as ChatCircle,
   WaveformIcon as Waveform,
-  FolderOpenIcon as FolderOpen,
   BriefcaseIcon as Briefcase,
   SquaresFourIcon as SquaresFour,
   BrainIcon as Brain,
@@ -22,6 +21,8 @@ import {
   CaretDownIcon as CaretDown,
 } from "@phosphor-icons/react";
 import { StudioMark } from "@/ui/brand/StudioMark";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { NotificationBell } from "@/app/shell/NotificationBell";
 import { ThemeToggle } from "@/app/shell/ThemeToggle";
 import type { View } from "@/types/navigation";
@@ -51,7 +52,6 @@ export const FLOATING_PANEL_CATEGORIES: Category[] = [
     key: "spaces",
     label: "Spaces",
     items: [
-      { id: "projects", label: "Projects", Icon: FolderOpen },
       { id: "workspace", label: "Workspace", Icon: Briefcase },
       { id: "extensions", label: "Apps", Icon: SquaresFour },
     ],
@@ -93,11 +93,11 @@ function CategoryMenu({
 
   return (
     <div className="relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onToggle}
         aria-expanded={open}
-        className={`flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors ${
+        className={`h-7 gap-1 rounded-full px-2.5 text-xs font-medium ${
           open || ownsCurrent
             ? "bg-surface-selected text-primary"
             : "text-secondary hover:bg-surface-hover hover:text-primary"
@@ -109,7 +109,7 @@ function CategoryMenu({
           weight="bold"
           className={`text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && (
@@ -123,12 +123,12 @@ function CategoryMenu({
             {category.items.map((item) => {
               const active = currentView === item.id;
               return (
-                <button
+                <Button
                   key={item.id}
-                  type="button"
+                  variant="ghost"
                   onClick={() => onNavigate(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                  className={`group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${
                     active ? "bg-surface-selected" : "hover:bg-surface-hover"
                   }`}
                 >
@@ -148,7 +148,7 @@ function CategoryMenu({
                   >
                     {item.label}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </motion.div>
@@ -192,10 +192,12 @@ export function FloatingPanelNavigation({
   currentView,
   onNavigate,
   onClose,
+  hideBrand = false,
 }: {
   currentView: View;
   onNavigate: (view: View) => void;
   onClose?: () => void;
+  hideBrand?: boolean;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -224,16 +226,19 @@ export function FloatingPanelNavigation({
 
   return (
     <div ref={ref} className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => go("chat")}
-        aria-label="Chat"
-        className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
-      >
-        <StudioMark size={16} className="text-primary" />
-      </button>
+      {!hideBrand && (
+        <>
+          <IconButton
+            aria-label="Chat"
+            onClick={() => go("chat")}
+            className="rounded-full"
+          >
+            <StudioMark size={16} className="text-primary" />
+          </IconButton>
 
-      <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+          <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+        </>
+      )}
 
       {FLOATING_PANEL_CATEGORIES.map((cat) => (
         <CategoryMenu

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { XIcon as X } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { FileAttachment } from "@/features/chat/attachments/fileAttachmentService";
 import { DOC_RAG_THRESHOLD } from "@/features/chat/attachments/docIndexService";
 
@@ -81,13 +82,14 @@ const AttachmentThumbnail = ({ attachment, onRemove }: AttachmentThumbnailProps)
       </div>
       
       {onRemove && (
-        <button
+        <IconButton
           onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 dark:bg-gray-600 rounded-full flex items-center justify-center transition-opacity"
+          aria-label="Remove"
           title="Remove"
+          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-gray-800 dark:bg-gray-600 transition-opacity"
         >
           <X size={12} className="text-white" />
-        </button>
+        </IconButton>
       )}
     </motion.div>
   );

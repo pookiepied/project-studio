@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowsClockwise, ChatCircle, Waveform, CopySimple, SelectionAll, ArrowBendUpRight } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
 
 type MenuMode = "default" | "selection";
 
@@ -119,7 +120,7 @@ export function ContextMenu() {
   };
 
   const itemClass =
-    "flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-secondary rounded-lg transition-colors w-full text-left outline-none hover:bg-surface-hover hover:text-primary focus:bg-surface-hover focus:text-primary";
+    "h-auto w-full justify-start gap-2.5 px-3 py-2 text-sm text-left focus:bg-surface-hover focus:text-primary";
 
   return (
     <AnimatePresence>
@@ -146,51 +147,53 @@ export function ContextMenu() {
                 </p>
               </div>
 
-              <button role="menuitem" tabIndex={-1} onClick={handleCopy} className={itemClass}>
+              <Button role="menuitem" tabIndex={-1} onClick={handleCopy} variant="ghost" className={itemClass}>
                 <CopySimple size={14} className="text-muted" />
                 Copy
-              </button>
+              </Button>
 
-              <button role="menuitem" tabIndex={-1} onClick={handleSelectAll} className={itemClass}>
+              <Button role="menuitem" tabIndex={-1} onClick={handleSelectAll} variant="ghost" className={itemClass}>
                 <SelectionAll size={14} className="text-muted" />
                 Select All
-              </button>
+              </Button>
 
               <div className="h-px bg-surface-divider my-1 mx-2" />
 
-              <button role="menuitem" tabIndex={-1} onClick={handleChatAboutThis} className={itemClass}>
+              <Button role="menuitem" tabIndex={-1} onClick={handleChatAboutThis} variant="ghost" className={itemClass}>
                 <ArrowBendUpRight size={14} className="text-muted" />
                 Chat about this
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
                 role="menuitem"
                 tabIndex={-1}
+                variant="ghost"
                 onClick={() => { window.dispatchEvent(new CustomEvent("new-chat")); setIsOpen(false); }}
                 className={itemClass}
               >
                 <ChatCircle size={14} className="text-muted" />
                 New Chat
-              </button>
+              </Button>
 
-              <button
+              <Button
                 role="menuitem"
                 tabIndex={-1}
+                variant="ghost"
                 onClick={() => { window.dispatchEvent(new CustomEvent("start-live-session")); setIsOpen(false); }}
                 className={itemClass}
               >
                 <Waveform size={14} className="text-muted" />
                 Live Agent
-              </button>
+              </Button>
 
               <div className="h-px bg-surface-divider my-1 mx-2" />
 
-              <button role="menuitem" tabIndex={-1} onClick={handleReloadApp} className={itemClass}>
+              <Button role="menuitem" tabIndex={-1} variant="ghost" onClick={handleReloadApp} className={itemClass}>
                 <ArrowsClockwise size={14} className="text-muted" />
                 Reload App
-              </button>
+              </Button>
             </>
           )}
         </motion.div>

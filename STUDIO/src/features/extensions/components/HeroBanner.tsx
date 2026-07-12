@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ChatCircleIcon as ChatCircle } from "@phosphor-icons/react";
 import { AppLogo } from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import type { ComposioApp } from "@/features/extensions/services/composioService";
 import { GithubLetterIcon } from "./ExtensionIcons";
 
@@ -78,26 +80,31 @@ export const HeroBanner = ({ onTryInChat, composioApps }: HeroBannerProps) => {
         </motion.div>
 
         {/* Try in chat */}
-        <button
+        <Button
+          variant="ghost"
           onClick={onTryInChat}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-surface-hover hover:bg-gray-50 dark:hover:bg-surface-border text-gray-800 dark:text-gray-200 text-sm font-semibold rounded-full shadow-sm transition-all hover:shadow-md active:scale-95 border border-gray-150 dark:border-surface-active"
+          className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-surface-hover hover:bg-gray-50 dark:hover:bg-surface-border text-gray-800 dark:text-gray-200 text-sm font-semibold rounded-full shadow-sm transition-all hover:shadow-md border border-gray-150 dark:border-surface-active"
+          leftIcon={<ChatCircle size={14} weight="fill" className="text-gray-600 dark:text-gray-400" />}
         >
-          <ChatCircle size={14} weight="fill" className="text-gray-600 dark:text-gray-400" />
           Try in chat
-        </button>
+        </Button>
 
         {/* Pagination dots */}
         <div className="flex items-center gap-1.5">
           {HERO_EXAMPLES.map((_, i) => (
-            <button
+            <IconButton
               key={i}
+              variant="ghost"
+              aria-label={`Show example ${i + 1}`}
               onClick={() => setActiveIndex(i)}
               className={`rounded-full transition-all duration-300 ${
                 i === activeIndex
-                  ? "w-4 h-1.5 bg-gray-700 dark:bg-gray-300"
+                  ? "w-4 h-1.5 bg-gray-700 dark:bg-gray-300 hover:bg-gray-700 dark:hover:bg-gray-300"
                   : "w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
               }`}
-            />
+            >
+              {null}
+            </IconButton>
           ))}
         </div>
       </div>

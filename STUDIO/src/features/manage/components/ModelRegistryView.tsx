@@ -193,9 +193,9 @@ export const ModelRegistryView = ({ onBack }: Props) => {
           <div className="text-center space-y-2">
             <Warning size="md" weight="fill" className="mx-auto text-primary" />
             <p className="text-xs text-secondary">Failed to load registry.</p>
-            <button onClick={refresh} className="text-xs text-muted underline hover:text-primary transition-colors duration-fast">
+            <Button variant="ghost" onClick={refresh} className="text-xs text-muted underline h-auto px-0 py-0 hover:bg-transparent hover:text-primary">
               Try again
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -226,10 +226,11 @@ export const ModelRegistryView = ({ onBack }: Props) => {
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-surface-divider">
               {filtered.map((model) => (
-                <button
+                <Button
                   key={model.id}
+                  variant="ghost"
                   onClick={() => { setSelectedId(model.id); setDraft(null); }}
-                  className={`w-full px-4 py-3 text-left transition-colors duration-fast hover:bg-surface-hover ${
+                  className={`w-full px-4 py-3 text-left justify-start h-auto rounded-none hover:bg-surface-hover ${
                     selected?.id === model.id && !draft ? "bg-surface-selected" : ""
                   }`}
                 >
@@ -250,7 +251,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                       {model.registry.pricing.status.replace("_", " ")}
                     </Badge>
                   </div>
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -346,8 +347,9 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                           {schema.reasoningEfforts.map((effort) => {
                             const active = activeDraft.registry.reasoning?.effortValues.includes(effort) ?? false;
                             return (
-                              <button
+                              <Button
                                 key={effort}
+                                variant="ghost"
                                 disabled={!draft}
                                 onClick={() => updateDraft((model) => {
                                   const reasoning = model.registry.reasoning;
@@ -358,12 +360,12 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                                   reasoning.canDisable = reasoning.effortValues.includes("none");
                                   if (model.capabilities.chat) model.capabilities.chat.reasoning.efforts = reasoning.effortValues;
                                 })}
-                                className={`rounded-md border px-2 py-1 text-2xs transition-colors duration-fast disabled:opacity-50 ${
+                                className={`rounded-md border px-2 py-1 text-2xs h-auto disabled:opacity-50 ${
                                   active ? "border-primary bg-surface-selected text-primary" : "border-surface-border text-muted hover:bg-surface-hover"
                                 }`}
                               >
                                 {effort}
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>

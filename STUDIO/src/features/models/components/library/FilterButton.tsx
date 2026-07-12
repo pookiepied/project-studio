@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@/ui/primitives/Button";
 
 /** Filter toggle chip. Active = sanctioned inverted-emphasis (bg-primary, #1A1A1A). */
 export function FilterButton({
@@ -11,9 +12,10 @@ export function FilterButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
+      size="sm"
       className={`h-7 px-2.5 rounded-md text-xs font-medium border transition-colors duration-fast ${
         active
           ? "bg-primary text-on-emphasis border-transparent"
@@ -21,7 +23,7 @@ export function FilterButton({
       }`}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

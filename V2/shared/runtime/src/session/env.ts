@@ -14,4 +14,6 @@ export interface RuntimeEnv {
   DATA: Fetcher;
   /** Studio MCP hub — cloud tool execution. */
   MCP: Fetcher;
+  /** Existing Studio Tracker ingestion service. Telemetry is best-effort. */
+  TRACKER?: Fetcher;
 }

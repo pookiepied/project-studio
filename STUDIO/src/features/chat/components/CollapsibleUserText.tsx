@@ -1,5 +1,6 @@
 import { useRef, useState, useLayoutEffect } from "react";
 import { CaretDownIcon as CaretDown } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
 
 const COLLAPSED_MAX = 200; // px — height cap while collapsed (~9 lines)
 const OVERFLOW_SLOP = 28;  // px — only collapse if content meaningfully exceeds the cap
@@ -62,10 +63,10 @@ export function CollapsibleUserText({ content }: { content: string }) {
 
       {/* Toggle */}
       {overflowing && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setExpanded(v => !v)}
-          className="self-start mt-1.5 flex items-center gap-1 text-sm font-medium
+          className="h-auto self-start mt-1.5 gap-1 text-sm
                      text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200
                      transition-colors duration-150"
         >
@@ -76,7 +77,7 @@ export function CollapsibleUserText({ content }: { content: string }) {
             className="transition-transform duration-200"
             style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
           />
-        </button>
+        </Button>
       )}
     </div>
   );

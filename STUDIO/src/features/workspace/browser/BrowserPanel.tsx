@@ -14,6 +14,8 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react";
 import { FONT_SANS } from "@/design/fonts";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "../rightWorkspace/types";
@@ -94,68 +96,68 @@ function BrowserMenu({
 
   return (
     <div className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => { onNewTab(); onClose(); }}
-        className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
       >
         New tab
-      </button>
+      </Button>
       <div className="my-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => { onReload(); onClose(); }}
         disabled={!canUsePageTools}
-        className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
       >
         Force reload
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
         disabled={!canUsePageTools}
-        className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
       >
         Find in page
-      </button>
+      </Button>
       <div className="my-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
       <div className="flex h-8 items-center gap-2 px-2.5 text-sm text-gray-700 dark:text-gray-300">
         <span className="min-w-0 flex-1">Zoom</span>
-        <button
-          type="button"
+        <IconButton
+          aria-label="Zoom out"
+          variant="ghost"
           onClick={() => onZoom(zoom - 0.1)}
           disabled={!canUsePageTools}
-          className="flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-surface-selected"
-          title="Zoom out"
+          className="h-6 w-6 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
           <Minus size={12} />
-        </button>
+        </IconButton>
         <span className="w-9 text-center text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
-        <button
-          type="button"
+        <IconButton
+          aria-label="Zoom in"
+          variant="ghost"
           onClick={() => onZoom(zoom + 0.1)}
           disabled={!canUsePageTools}
-          className="flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-surface-selected"
-          title="Zoom in"
+          className="h-6 w-6 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
           <Plus size={12} />
-        </button>
+        </IconButton>
       </div>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => { onToggleDeviceToolbar(); onClose(); }}
         disabled={!canUsePageTools}
-        className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
       >
         Show device toolbar
-      </button>
+      </Button>
       <div className="my-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => { onClearBrowsingData(); onClose(); }}
-        className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
       >
         Clear cookies and cache
-      </button>
+      </Button>
     </div>
   );
 }
@@ -177,15 +179,15 @@ function SidePanelMenu({
   return (
     <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
       {items.map(({ view, label, Icon }) => (
-        <button
+        <Button
           key={view}
-          type="button"
+          variant="ghost"
           onClick={() => { onOpenWorkspaceView(view); onClose(); }}
-          className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
+          className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
           <Icon size={14} weight="regular" className="text-gray-500" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -306,11 +308,11 @@ export function BrowserPanel({
               {tabs.map(tab => {
                 const active = tab.id === activeTab?.id;
                 return (
-                  <button
+                  <Button
                     key={tab.id}
-                    type="button"
+                    variant="ghost"
                     onClick={() => onTabChange(tab.id)}
-                    className={`group/tab flex h-7 min-w-0 max-w-[120px] items-center gap-1.5 rounded-lg px-2 text-sm transition-colors ${
+                    className={`group/tab h-7 min-w-0 max-w-[120px] items-center justify-start gap-1.5 rounded-lg px-2 text-sm transition-colors ${
                       active
                         ? "bg-gray-100 text-gray-800 dark:bg-surface-raised dark:text-gray-200"
                         : "text-gray-500 hover:bg-gray-50 dark:text-gray-500 dark:hover:bg-surface-raised"
@@ -325,20 +327,21 @@ export function BrowserPanel({
                     >
                       <X size={12} weight="bold" />
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
 
             <div className="relative flex-shrink-0" ref={sideMenuRef}>
-              <button
-                type="button"
+              <IconButton
+                aria-label="Open side panel"
+                variant="ghost"
+                size="sm"
                 onClick={() => setSideMenuOpen((v) => !v)}
-                title="Open side panel"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+                className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
               >
                 <Plus size={14} weight="regular" />
-              </button>
+              </IconButton>
               {sideMenuOpen && (
                 <SidePanelMenu
                   onOpenWorkspaceView={onOpenWorkspaceView}
@@ -348,45 +351,49 @@ export function BrowserPanel({
             </div>
           </div>
 
-          <button
-            type="button"
+          <IconButton
+            aria-label="Close browser"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
-            title="Close browser"
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            className="flex-shrink-0 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
             <X size={14} weight="bold" />
-          </button>
+          </IconButton>
         </div>
         )}
 
         <div className="flex h-9 flex-shrink-0 items-center gap-1.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
-          <button
-            type="button"
+          <IconButton
+            aria-label="Back"
+            variant="ghost"
+            size="sm"
             onClick={() => handleHistory(-1)}
             disabled={!canGoBack}
-            title="Back"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
           >
             <ArrowLeft size={14} />
-          </button>
-          <button
-            type="button"
+          </IconButton>
+          <IconButton
+            aria-label="Forward"
+            variant="ghost"
+            size="sm"
             onClick={() => handleHistory(1)}
             disabled={!canGoForward}
-            title="Forward"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
           >
             <ArrowRight size={14} />
-          </button>
-          <button
-            type="button"
+          </IconButton>
+          <IconButton
+            aria-label="Reload"
+            variant="ghost"
+            size="sm"
             onClick={handleReload}
             disabled={!canReload}
-            title="Reload"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
           >
             <ArrowClockwise size={14} />
-          </button>
+          </IconButton>
 
           <form onSubmit={submitAddress} className="relative mx-auto min-w-[180px] flex-[0_1_420px]">
             <MagnifyingGlass size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
@@ -399,14 +406,15 @@ export function BrowserPanel({
           </form>
 
           <div className="relative flex-shrink-0" ref={menuRef}>
-            <button
-              type="button"
+            <IconButton
+              aria-label="Browser options"
+              variant="ghost"
+              size="sm"
               onClick={() => setMenuOpen((v) => !v)}
-              title="Browser options"
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+              className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
             >
               <DotsThreeVertical size={16} weight="bold" />
-            </button>
+            </IconButton>
             {menuOpen && (
               <BrowserMenu
                 activeTab={activeTab}

@@ -27,6 +27,11 @@ function run(cmd, cwd = ROOT) {
 }
 
 console.log("[mcp-build] Building MCP servers...");
-run("npm --prefix mcp-servers/studio-harness run build");
-run("npm --prefix mcp-servers/computer-use run build");
+for (const server of [
+  "harness/studio-harness",
+  "desktop/computer-use",
+  "system/mcp-management",
+  "system/skill-management",
+  "system/skill-execution",
+]) run(`npm --prefix library/mcp-servers/${server} run build`);
 console.log("[mcp-build] Done.");

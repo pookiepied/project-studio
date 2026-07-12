@@ -2,5 +2,5 @@ src-tauri/
 node_modules/
 dist/
 dist-web/
-mcp-servers/
+library/
 *.bat

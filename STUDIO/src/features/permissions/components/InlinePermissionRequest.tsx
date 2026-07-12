@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check, X, Shield } from '@phosphor-icons/react';
+import { Button } from '@/ui/primitives/Button';
 
 interface InlinePermissionRequestProps {
   operation: {
@@ -49,21 +50,23 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
         </div>
         
         <div className="flex gap-2 ml-4">
-          <button
+          <Button
+            variant="primary"
             onClick={onApprove}
             className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
           >
             <Check size={14} />
             Allow
-          </button>
-          
-          <button
+          </Button>
+
+          <Button
+            variant="primary"
             onClick={onDeny}
             className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
           >
             <X size={14} />
             Deny
-          </button>
+          </Button>
         </div>
       </div>
     </div>

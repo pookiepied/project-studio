@@ -1,4 +1,5 @@
 import { MoonIcon as Moon, SunIcon as Sun } from "@phosphor-icons/react";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { resolveTheme } from "@/lib/theme";
 
@@ -11,21 +12,19 @@ export function ThemeToggle() {
   const Icon = isDark ? Moon : Sun;
 
   return (
-    <button
-      type="button"
+    <IconButton
       onClick={(e) => {
         e.stopPropagation();
         updateSettings({ theme: next });
       }}
       aria-label={`Switch to ${next} mode`}
-      title={`Switch to ${next} mode`}
-      className="group flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
+      className="group rounded-full"
     >
       <Icon
         size={14}
         weight="regular"
         className="text-muted transition-colors group-hover:text-primary"
       />
-    </button>
+    </IconButton>
   );
 }

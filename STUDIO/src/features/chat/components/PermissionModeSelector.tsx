@@ -9,6 +9,7 @@ import {
   CheckIcon as Check,
 } from "@phosphor-icons/react";
 import { composerPillButton, composerPillLabel, cx } from "./composerControlStyles";
+import { Button } from "@/ui/primitives/Button";
 import { getPermissionModesForEngine } from "@/core/permissions";
 import type { PermissionIconKey, PermissionModeId } from "@/core/permissions";
 import type { ChatEngine } from "@/cliBridges/types";
@@ -54,8 +55,8 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
 
   return (
     <div ref={ref} className="relative flex h-7 flex-shrink-0 items-center">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
         title={active.description}
@@ -72,7 +73,7 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
         <motion.div className="inline-flex items-center" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
           <CaretDown size={12} weight="bold" className="opacity-50" />
         </motion.div>
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && (
@@ -89,11 +90,11 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
             {modes.map((mode) => {
               const isActive = mode.id === value;
               return (
-                <button
+                <Button
                   key={mode.id}
-                  type="button"
+                  variant="ghost"
                   onClick={() => { onChange(mode.id); setOpen(false); }}
-                  className={`flex items-start gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                  className={`h-auto w-full items-start justify-start gap-2.5 px-2.5 py-1.5 rounded-lg text-left ${
                     isActive ? "bg-gray-50 dark:bg-surface-selected" : "hover:bg-gray-50 dark:hover:bg-surface-border"
                   }`}
                 >
@@ -113,7 +114,7 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
                   {isActive && (
                     <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                   )}
-                </button>
+                </Button>
               );
             })}
           </motion.div>

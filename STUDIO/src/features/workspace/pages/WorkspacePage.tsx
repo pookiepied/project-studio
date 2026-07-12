@@ -27,6 +27,8 @@ import {
   XCircleIcon as XCircle,
 } from "@phosphor-icons/react";
 import { EmptyState } from "@/ui/primitives/EmptyState";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   deleteKbDoc,
@@ -112,14 +114,14 @@ function ToolbarButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="primary"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+      className="inline-flex gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 h-auto text-xs font-medium text-white transition-colors duration-150 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -174,15 +176,16 @@ function DocumentList({
               {doc.truncated && <span className="ml-1.5 text-secondary">truncated</span>}
             </p>
           </div>
-          <button
-            type="button"
+          <IconButton
+            aria-label="Delete document"
+            variant="ghost"
+            size="sm"
             onClick={() => onDelete(doc.id, doc.size)}
             disabled={deletingDocId === doc.id}
-            title="Delete document"
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+            className="flex-shrink-0 rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
             {deletingDocId === doc.id ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
-          </button>
+          </IconButton>
         </li>
       ))}
     </ul>
@@ -245,15 +248,16 @@ function MemoryList({
                     className="h-1.5 w-1.5 rounded-full"
                     style={{ background: `hsl(${(fact.importance ?? 5) * 12}, 60%, 55%)` }}
                   />
-                  <button
-                    type="button"
+                  <IconButton
+                    aria-label="Delete memory"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onDelete(fact.key)}
                     disabled={deletingFactId === fact.key}
-                    title="Delete memory"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+                    className="rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
                   >
                     {deletingFactId === fact.key ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
-                  </button>
+                  </IconButton>
                 </div>
               </li>
             ))}
@@ -373,9 +377,9 @@ function CreateAgentForm({
           </label>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" onClick={onCancel} className="rounded-md px-3 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-surface-raised">
+          <Button variant="ghost" onClick={onCancel} className="px-3 py-1.5 h-auto justify-start text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-surface-raised">
             Cancel
-          </button>
+          </Button>
           <ToolbarButton disabled={saving}>
             {saving && <SpinnerGap size={14} className="animate-spin" />}
             Save routine
@@ -448,10 +452,10 @@ function AgentRow({
 
   return (
     <div className="border-b border-gray-50 last:border-b-0 dark:border-surface-divider">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={handleExpand}
-        className="group flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02]"
+        className="group w-full items-start justify-start gap-3 px-5 py-3.5 h-auto text-left transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02]"
       >
         <CaretRight size={14} className={`mt-1 flex-shrink-0 text-gray-300 transition-transform dark:text-gray-700 ${expanded ? "rotate-90" : ""}`} />
         <div className="min-w-0 flex-1">
@@ -468,26 +472,28 @@ function AgentRow({
           {error && <p className="mt-1 text-xs text-secondary">{error}</p>}
         </div>
         <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            type="button"
+          <IconButton
+            aria-label="Run now"
+            variant="ghost"
+            size="sm"
             onClick={handleRun}
             disabled={busy !== null}
-            title="Run now"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+            className="rounded-md text-gray-400 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
             {busy === "run" ? <SpinnerGap size={14} className="animate-spin" /> : <Play size={14} weight="fill" />}
-          </button>
-          <button
-            type="button"
+          </IconButton>
+          <IconButton
+            aria-label="Delete routine"
+            variant="ghost"
+            size="sm"
             onClick={handleDelete}
             disabled={busy !== null}
-            title="Delete routine"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-300 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+            className="rounded-md text-gray-300 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
             {busy === "delete" ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
-          </button>
+          </IconButton>
         </div>
-      </button>
+      </Button>
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -710,11 +716,11 @@ export const WorkspacePage = () => {
           <div className="mb-3 px-2 text-2xs font-medium uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">Workspace OS</div>
           <nav className="space-y-1">
             {SECTIONS.map(({ id, label, icon: Icon, hint }) => (
-              <button
+              <Button
                 key={id}
-                type="button"
+                variant="ghost"
                 onClick={() => setSection(id)}
-                className={`group flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors ${
+                className={`group w-full items-center gap-3 rounded-md px-2.5 py-2 h-auto justify-start text-left transition-colors ${
                   section === id
                     ? "bg-white shadow-sm dark:bg-surface-base"
                     : "hover:bg-white/80 dark:hover:bg-white/[0.03]"
@@ -727,7 +733,7 @@ export const WorkspacePage = () => {
                   <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">{label}</span>
                   <span className="block truncate text-2xs text-gray-400 dark:text-gray-600">{hint}</span>
                 </span>
-              </button>
+              </Button>
             ))}
           </nav>
 
@@ -807,26 +813,26 @@ export const WorkspacePage = () => {
                       <p className="text-xs text-gray-400 dark:text-gray-600">Fast paths into the real workspace objects.</p>
                     </div>
                     <div className="divide-y divide-gray-50 dark:divide-surface-divider">
-                      <button type="button" onClick={() => setSection("context")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      <Button variant="ghost" onClick={() => setSection("context")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Database size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Review context package</span>
                         <CaretRight size={14} className="text-gray-300" />
-                      </button>
-                      <button type="button" onClick={() => setSection("automation")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      </Button>
+                      <Button variant="ghost" onClick={() => setSection("automation")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Lightning size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Create automation routine</span>
                         <CaretRight size={14} className="text-gray-300" />
-                      </button>
-                      <button type="button" onClick={() => setSection("activity")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      </Button>
+                      <Button variant="ghost" onClick={() => setSection("activity")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Graph size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Inspect timeline</span>
                         <CaretRight size={14} className="text-gray-300" />
-                      </button>
-                      <button type="button" onClick={() => setSection("artifacts")} className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      </Button>
+                      <Button variant="ghost" onClick={() => setSection("artifacts")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                         <Lightning size={14} className="text-gray-400" />
                         <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Open artifact lab</span>
                         <CaretRight size={14} className="text-gray-300" />
-                      </button>
+                      </Button>
                     </div>
                   </section>
                 </div>

@@ -1,0 +1,1 @@
+export interface ToolDefinition{name:string;description:string;inputSchema:{type:"object";properties:Record<string,unknown>;required?:string[];additionalProperties:false}}export const defineTools=(v:ToolDefinition[])=>v;

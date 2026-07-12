@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { cn } from "@/lib/cn";
 
 type IconButtonVariant = "ghost" | "outline" | "emphasis" | "destructive";
 type IconButtonSize = "sm" | "md" | "lg";
@@ -44,7 +45,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         ref={ref}
         type={type}
         disabled={disabled}
-        className={`inline-flex shrink-0 items-center justify-center rounded-lg transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page ${variantClasses[variant]} ${sizeClasses[size]} ${disabledClasses} ${className}`}
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center rounded-lg transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page",
+          variantClasses[variant],
+          sizeClasses[size],
+          disabledClasses,
+          className,
+        )}
         {...props}
       >
         {children}

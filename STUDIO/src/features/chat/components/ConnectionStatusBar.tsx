@@ -14,6 +14,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useConnectionManager } from "@/app/hooks/useConnectionManager";
+import { Button } from "@/ui/primitives/Button";
 
 interface Props {
   convId?: string;
@@ -64,12 +65,13 @@ export function ConnectionStatusBar({ convId }: Props) {
                     : conversationState?.lastError ?? "Connection lost"}
                 </span>
                 {isWsFailed && canRetry && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={retry}
-                    className="text-xs font-medium text-secondary hover:text-secondary transition-colors shrink-0"
+                    className="h-auto text-xs text-secondary hover:text-secondary shrink-0"
                   >
                     Retry
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

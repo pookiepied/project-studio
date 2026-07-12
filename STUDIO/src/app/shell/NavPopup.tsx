@@ -16,7 +16,6 @@ import {
   WaveformIcon         as Waveform,
   MicrophoneIcon       as Microphone,
   BrainIcon            as Brain,
-  FolderOpenIcon       as FolderOpen,
   SquaresFourIcon      as SquaresFour,
   BriefcaseIcon        as Briefcase,
   UserIcon             as User,
@@ -26,6 +25,8 @@ import {
   QuestionIcon         as Question,
 } from "@phosphor-icons/react";
 import { AccountMenu } from "./AccountMenu";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import type { View } from "@/types/navigation";
 
 interface NavItem { id: View; label: string; Icon: React.ElementType }
@@ -42,7 +43,6 @@ const SECTIONS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Spaces",
     items: [
-      { id: "projects",   label: "Projects",  Icon: FolderOpen  },
       { id: "workspace",  label: "Workspace", Icon: Briefcase   },
       { id: "extensions", label: "Apps",      Icon: SquaresFour },
     ],
@@ -81,12 +81,11 @@ function NavRow({
   onNavigate: (v: View) => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={() => onNavigate(item.id)}
       aria-current={active ? "page" : undefined}
-      className={`w-full flex items-center gap-2 px-2 py-[5px] rounded-lg text-left group
-        transition-colors duration-fast
+      className={`w-full items-center gap-2 px-2 py-[5px] rounded-lg text-left group
         ${active ? "bg-surface-selected" : "hover:bg-surface-hover"}`}
     >
       <div className="flex-shrink-0 w-[18px] h-[18px] flex items-center justify-center">
@@ -105,7 +104,7 @@ function NavRow({
       >
         {item.label}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -209,29 +208,29 @@ export function NavPopup({
         </div>
         <div className="flex flex-shrink-0 gap-1">
           {onNewChat && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => { onNewChat(); navigate("chat"); }}
-              className="flex items-center gap-1.5 rounded-xl bg-surface-raised px-2.5 py-1.5 text-xs font-medium text-secondary transition-colors duration-fast hover:bg-surface-hover hover:text-primary"
+              className="items-center gap-1.5 rounded-xl bg-surface-raised px-2.5 py-1.5 text-xs font-medium text-secondary hover:bg-surface-hover hover:text-primary"
             >
               New chat
-            </button>
+            </Button>
           )}
           {BOTTOM.map((item) => (
-            <button
+            <IconButton
               key={item.id}
-              type="button"
+              aria-label={item.label}
+              title={item.label}
               onClick={() => navigate(item.id)}
               aria-current={currentView === item.id ? "page" : undefined}
-              title={item.label}
-              className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors duration-fast ${
+              className={`rounded-xl ${
                 currentView === item.id
                   ? "bg-surface-selected text-primary"
                   : "text-secondary hover:bg-surface-hover hover:text-primary"
               }`}
             >
               <item.Icon size={14} weight={currentView === item.id ? "fill" : "regular"} />
-            </button>
+            </IconButton>
           ))}
         </div>
       </div>

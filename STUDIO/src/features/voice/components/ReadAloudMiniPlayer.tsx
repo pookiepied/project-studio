@@ -6,6 +6,7 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react";
 import { useTTSContext } from "@/features/voice/context/TTSContext";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 /**
  * Global "read aloud" mini player — a small floating pill, same visual
@@ -43,26 +44,24 @@ export function ReadAloudMiniPlayer() {
               {isLoading ? "Preparing to read…" : (label ?? "Reading aloud")}
             </span>
 
-            <button
-              type="button"
+            <IconButton
               onClick={togglePause}
               disabled={isLoading}
               aria-label={isPaused ? "Resume" : "Pause"}
               title={isPaused ? "Resume" : "Pause"}
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-hover hover:text-primary disabled:opacity-40"
+              className="h-6 w-6 rounded-full disabled:opacity-40"
             >
               {isPaused ? <Play size={12} weight="fill" /> : <Pause size={12} weight="fill" />}
-            </button>
+            </IconButton>
 
-            <button
-              type="button"
+            <IconButton
               onClick={stop}
               aria-label="Stop reading"
               title="Stop reading"
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
+              className="h-6 w-6 rounded-full"
             >
               <X size={12} weight="bold" />
-            </button>
+            </IconButton>
           </div>
         </motion.div>
       )}

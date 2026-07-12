@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { WifiSlashIcon as WifiSlash, ArrowsClockwiseIcon as ArrowsClockwise } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
 import { useOffline } from "@/app/contexts/OfflineContext";
 
 const Tear = ({ x, delay }: { x: number; delay: number }) => (
@@ -91,13 +92,14 @@ export const OfflineModal = () => {
               </p>
             </div>
 
-            <button
+            <Button
               onClick={handleTryAgain}
-              className="flex items-center gap-1 text-sm text-muted hover:text-secondary transition-colors duration-fast"
+              variant="ghost"
+              className="h-auto gap-1 px-0 py-0 text-sm text-muted hover:bg-transparent hover:text-secondary"
             >
               <ArrowsClockwise size={12} weight="regular" />
               Try again
-            </button>
+            </Button>
           </motion.div>
         </motion.div>
       )}

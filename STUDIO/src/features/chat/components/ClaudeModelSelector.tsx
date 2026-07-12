@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import { CLAUDE_MODELS, CLAUDE_EFFORT_LEVELS } from "@/cliBridges";
 import type { ClaudeEffortLevel } from "@/cliBridges/types";
+import { Button } from "@/ui/primitives/Button";
 import { composerPillButton, composerPillLabel, cx } from "./composerControlStyles";
 
 /**
@@ -54,15 +55,13 @@ export function ClaudeModelSelector({
   return (
     <div className="relative flex h-7 shrink-0 items-center" ref={containerRef}>
       {/* Trigger */}
-      <motion.button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
-        whileTap={{ scale: 0.95 }}
-        transition={{ duration: 0.1 }}
         className={cx(
           composerPillButton,
-          "gap-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40 focus:outline-none dark:text-gray-400 dark:hover:bg-surface-raised",
+          "gap-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-surface-raised",
         )}
       >
         <span className={cx(composerPillLabel, "max-w-[110px] truncate")}>
@@ -80,7 +79,7 @@ export function ClaudeModelSelector({
         >
           <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
         </motion.div>
-      </motion.button>
+      </Button>
 
       {/* Dropdown */}
       <AnimatePresence>
@@ -96,18 +95,14 @@ export function ClaudeModelSelector({
           >
             {/* Model items */}
             <div className="p-1.5 space-y-0.5">
-              {CLAUDE_MODELS.map((m, i) => {
+              {CLAUDE_MODELS.map((m) => {
                 const isActive = m.id === model;
                 return (
-                  <motion.button
+                  <Button
                     key={m.id}
-                    type="button"
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.12, delay: i * 0.03, ease: "easeOut" }}
+                    variant="ghost"
                     onClick={() => { onModelChange(m.id); setOpen(false); setEffortOpen(false); }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-colors duration-100 ${
+                    className={`h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left text-gray-700 dark:text-gray-300 transition-colors duration-100 ${
                       isActive ? "bg-gray-50 dark:bg-surface-raised" : "hover:bg-gray-50 dark:hover:bg-surface-raised"
                     }`}
                   >
@@ -124,7 +119,7 @@ export function ClaudeModelSelector({
                     {isActive && (
                       <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                     )}
-                  </motion.button>
+                  </Button>
                 );
               })}
             </div>
@@ -134,10 +129,10 @@ export function ClaudeModelSelector({
 
             {/* Effort section mirrors Studio's Reasoning section. */}
             <div className="p-1.5">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => setEffortOpen((v) => !v)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100"
+                className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100"
               >
                 <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
                   <Gauge size={12} weight="regular" className="text-gray-400 dark:text-gray-600" />
@@ -157,7 +152,7 @@ export function ClaudeModelSelector({
                 >
                   <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
                 </motion.div>
-              </button>
+              </Button>
 
               <AnimatePresence initial={false}>
                 {effortOpen && (
@@ -169,26 +164,22 @@ export function ClaudeModelSelector({
                     className="overflow-hidden"
                   >
                     <div className="pt-1 grid grid-cols-4 gap-1">
-                      {CLAUDE_EFFORT_LEVELS.map((level, i) => {
+                      {CLAUDE_EFFORT_LEVELS.map((level) => {
                         const isActive = level.id === effort;
                         return (
-                          <motion.button
+                          <Button
                             key={level.id}
-                            type="button"
-                            initial={{ opacity: 0, y: -2 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.1, delay: i * 0.015, ease: "easeOut" }}
+                            variant="ghost"
                             onClick={() => { onEffortChange(level.id); setOpen(false); setEffortOpen(false); }}
                             title={level.title}
-                            whileTap={{ scale: 0.96 }}
-                            className={`h-7 rounded-md text-xs font-medium transition-colors duration-100 ${
+                            className={`h-7 rounded-md text-xs transition-colors duration-100 ${
                               isActive
                                 ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
                                 : "text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-surface-raised"
                             }`}
                           >
                             {level.label}
-                          </motion.button>
+                          </Button>
                         );
                       })}
                     </div>

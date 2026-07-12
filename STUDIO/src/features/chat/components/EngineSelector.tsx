@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CaretDownIcon as CaretDown, CheckIcon as Check } from "@phosphor-icons/react";
 import { ClaudeCodeIcon, StudioIcon } from "@/ui/brand";
 import { composerPillButton, composerPillLabel, cx } from "./composerControlStyles";
+import { Button } from "@/ui/primitives/Button";
 import type { ChatEngine } from "@/cliBridges/types";
 
 const ENGINES: {
@@ -52,8 +53,8 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
 
   return (
     <div ref={ref} className="relative flex h-7 flex-shrink-0 items-center">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         disabled={disabled}
         onClick={() => { if (canOpen) setOpen((v) => !v); }}
         className={cx(
@@ -74,7 +75,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
             <CaretDown size={12} weight="bold" className="opacity-50" />
           </motion.div>
         )}
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && canOpen && (
@@ -88,11 +89,11 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
             {engines.map((engine) => {
               const isActive = engine.id === value;
               return (
-                <button
+                <Button
                   key={engine.id}
-                  type="button"
+                  variant="ghost"
                   onClick={() => { onChange(engine.id); setOpen(false); }}
-                  className={`flex items-start gap-2.5 w-full px-2.5 py-2 rounded-lg text-left transition-colors ${
+                  className={`h-auto w-full items-start justify-start gap-2.5 px-2.5 py-2 rounded-lg text-left ${
                     isActive
                       ? engine.id === "claude"
                         ? CLAUDE_ACCENT
@@ -118,7 +119,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
                   {isActive && (
                     <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                   )}
-                </button>
+                </Button>
               );
             })}
           </motion.div>

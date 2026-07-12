@@ -47,6 +47,17 @@ export class ExecutionSession extends RuntimeSession<Env> {
         run.userId,
         { id: `msg_${run.turnId}_assistant`, role: "assistant", content: result.text },
       );
+      const records = this.eventsForRun(run.runId).flatMap((event) => {
+        const base = { id: `tr_${event.eventId}`, conversationId: run.conversationId, turnId: run.turnId, runId: run.runId, sequence: event.sequence, metadata: { eventId: event.eventId, eventType: event.type, timestamp: event.timestamp } };
+        switch (event.type) {
+          case "assistant.delta": return [{ ...base, kind: event.payload.channel === "reasoning" ? "assistant_reasoning" : "assistant_text", content: event.payload.text }];
+          case "tool.call_created": return [{ ...base, kind: "tool_call", toolCallId: event.payload.toolCallId, toolName: event.payload.toolName, content: JSON.stringify(event.payload) }];
+          case "tool.completed": return [{ ...base, kind: "tool_result", toolCallId: event.payload.toolCallId, content: JSON.stringify(event.payload.output) ?? event.payload.summary }];
+          case "tool.failed": return [{ ...base, kind: "tool_result", toolCallId: event.payload.toolCallId, content: event.payload.error, metadata: { ...base.metadata, failed: true } }];
+          default: return [];
+        }
+      });
+      if (records.length) await this.postData("/transcripts", run.userId, { records });
     } catch (error) {
       await this.emit(run, "run.progress", {
         message: `Studio Data persistence failed: ${describe(error)}`,

@@ -5,6 +5,8 @@ import {
   ClockIcon as Clock,
   XIcon as X,
 } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024)              return `${bytes} B`;
@@ -78,12 +80,13 @@ export function DocumentStorageModal({
                 </div>
               </div>
               {!isUploading && (
-                <button
+                <IconButton
+                  aria-label="Close"
                   onClick={onCancel}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-selected transition-colors flex-shrink-0"
+                  className="p-1.5 !h-auto !w-auto rounded-lg !text-gray-400 hover:!text-gray-600 dark:hover:!text-gray-400 hover:!bg-gray-100 dark:hover:!bg-surface-selected transition-colors flex-shrink-0"
                 >
                   <X size={14} />
-                </button>
+                </IconButton>
               )}
             </div>
 
@@ -92,10 +95,11 @@ export function DocumentStorageModal({
             {/* Options */}
             <div className="p-3 space-y-2">
               {/* Keep forever */}
-              <button
+              <Button
+                variant="ghost"
                 onClick={onPermanent}
                 disabled={isUploading}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-selected border border-transparent hover:border-gray-200 dark:hover:border-surface-border transition-all text-left disabled:opacity-50"
+                className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-gray-50 dark:hover:!bg-surface-selected hover:!border-gray-200 dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
                   <CloudUp size={16} weight="duotone" className="text-secondary dark:text-secondary" />
@@ -106,13 +110,14 @@ export function DocumentStorageModal({
                     Stored permanently — accessible across conversations
                   </div>
                 </div>
-              </button>
+              </Button>
 
               {/* Just for today */}
-              <button
+              <Button
+                variant="ghost"
                 onClick={onTemporary}
                 disabled={isUploading}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-selected border border-transparent hover:border-gray-200 dark:hover:border-surface-border transition-all text-left disabled:opacity-50"
+                className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-gray-50 dark:hover:!bg-surface-selected hover:!border-gray-200 dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
                   <Clock size={16} weight="duotone" className="text-secondary dark:text-secondary" />
@@ -123,7 +128,7 @@ export function DocumentStorageModal({
                     Deleted after 24 hours automatically
                   </div>
                 </div>
-              </button>
+              </Button>
             </div>
 
             <div className="h-px bg-gray-100 dark:bg-surface-border" />
@@ -137,13 +142,14 @@ export function DocumentStorageModal({
                   The file will also be attached to this message
                 </span>
               )}
-              <button
+              <Button
+                variant="ghost"
                 onClick={onSkip}
                 disabled={isUploading}
-                className="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors disabled:opacity-40"
+                className="!h-auto !px-0 !py-0 !rounded-none text-xs !text-gray-400 dark:!text-gray-600 hover:!text-gray-600 dark:hover:!text-gray-400 hover:bg-transparent transition-colors disabled:opacity-40"
               >
                 Skip
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>

@@ -9,6 +9,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { Button } from "@/ui/primitives/Button";
 import { WarningCircleIcon as WarningCircle } from "@phosphor-icons/react";
 import { apiManager } from "@/core/network/apiManager";
 import { environmentService } from "@/core/platform/environmentService";
@@ -205,15 +206,15 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
       <div className="relative">
         {isTauri ? (
           /* Custom button for Tauri - Beautiful styling matching original shader buttons */
-          <motion.button
+          <Button
+            variant="ghost"
             onClick={handleTauriLogin}
             disabled={isLoading || checkingAPI || !hasAPIConfigured}
             whileHover={{ scale: hasAPIConfigured ? 1.02 : 1 }}
-            whileTap={{ scale: hasAPIConfigured ? 0.98 : 1 }}
-            className={`flex items-center gap-3 px-8 py-3 rounded-full font-sans text-xs transition-all duration-200 backdrop-blur-sm tracking-wide ${
-              hasAPIConfigured 
-                ? "bg-black hover:bg-gray-800 text-white cursor-pointer shadow-lg hover:shadow-xl" 
-                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+            className={`flex items-center !gap-3 !px-8 py-3 !rounded-full font-sans text-xs !transition-all !duration-200 backdrop-blur-sm tracking-wide ${
+              hasAPIConfigured
+                ? "!bg-black hover:!bg-gray-800 !text-white cursor-pointer shadow-lg hover:shadow-xl"
+                : "!bg-gray-200 !text-gray-500 cursor-not-allowed"
             } disabled:opacity-50`}
           >
             {/* Google "G" — official 4-colour brand mark; brand hex required, no neutral-token equivalent (§17 brand-logo carve-out) */}
@@ -226,10 +227,11 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             </svg>
             {/* eslint-enable no-restricted-syntax */}
             Continue with Google
-          </motion.button>
+          </Button>
         ) : (
           /* Google's button for web - Beautiful custom styled to match shader buttons */
-          <motion.button
+          <Button
+            variant="ghost"
             onClick={() => {
               // Mobile: Use redirect flow
               if (useRedirect) {
@@ -247,8 +249,7 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             }}
             disabled={isLoading || !googleReady || checkingAPI}
             whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-3 px-8 py-3 rounded-full font-sans text-xs transition-all duration-200 backdrop-blur-sm bg-black hover:bg-gray-800 text-white cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-50 tracking-wide"
+            className="flex items-center !gap-3 !px-8 py-3 !rounded-full font-sans text-xs !transition-all !duration-200 backdrop-blur-sm !bg-black hover:!bg-gray-800 !text-white cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-50 tracking-wide"
           >
             {/* Google "G" — official 4-colour brand mark; brand hex required, no neutral-token equivalent (§17 brand-logo carve-out) */}
             {/* eslint-disable no-restricted-syntax */}
@@ -260,7 +261,7 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             </svg>
             {/* eslint-enable no-restricted-syntax */}
             Continue with Google
-          </motion.button>
+          </Button>
         )}
         
         {/* Loading Overlay */}

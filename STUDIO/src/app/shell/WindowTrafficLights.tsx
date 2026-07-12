@@ -7,6 +7,7 @@
  */
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { environmentService } from "@/core/platform/environmentService";
 import { logger } from "@/core/logging/logger";
 
@@ -57,12 +58,10 @@ export function WindowTrafficLights() {
       style={{ left: LEFT_OFFSET, top: TOP_OFFSET, gap: DOT_GAP }}
     >
       {LIGHTS.map(({ kind, color, label }) => (
-        <button
+        <IconButton
           key={kind}
-          type="button"
           onClick={() => handleClick(kind)}
           aria-label={label}
-          title={label}
           className="rounded-full transition-opacity hover:opacity-80 active:opacity-60"
           style={{
             width: DOT_SIZE,
@@ -70,7 +69,9 @@ export function WindowTrafficLights() {
             backgroundColor: color,
             boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.18)",
           }}
-        />
+        >
+          {null}
+        </IconButton>
       ))}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LockSimpleIcon as LockSimple } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
 import { toolLabel, getToolIcon } from "@/runtime";
 import { RISK_CLASS_META, extractTargetPaths } from "@/core/permissions";
 import type { GrantScope } from "@/core/permissions";
@@ -222,9 +223,10 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
           {/* Action buttons - first button (broadest always) is the focused/primary */}
           <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
             {scopes.map((scope, i) => (
-              <button
+              <Button
                 key={scope}
                 ref={i === 0 ? allowRef : undefined}
+                variant={i === 0 ? "primary" : "ghost"}
                 onClick={() => onDecision(scope)}
                 className={
                   i === 0
@@ -233,14 +235,15 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
                 }
               >
                 {SCOPE_LABELS[scope]}
-              </button>
+              </Button>
             ))}
-            <button
+            <Button
+              variant="ghost"
               onClick={() => onDecision("deny")}
               className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-selected hover:text-secondary dark:hover:text-secondary active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-1"
             >
               Deny
-            </button>
+            </Button>
           </div>
         </div>
       </motion.div>

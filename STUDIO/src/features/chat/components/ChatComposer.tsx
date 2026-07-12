@@ -15,6 +15,8 @@ import {
 } from "@phosphor-icons/react";
 import { FEATURED_APPS } from "@/features/extensions/components/ComposioCards";
 import { AppLogo } from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { useComposioLogos } from "@/features/extensions/hooks/useComposioLogos";
 import { TierSelector } from "@/features/models/components/TierSelector";
 import { VoiceInput } from "@/features/voice/components/VoiceInput";
@@ -219,8 +221,8 @@ export const ChatComposer = ({
       <div className="flex min-w-0 items-center justify-between gap-3 px-2.5 pb-2.5 pt-0.5">
         <div className={cx(composerToolbarGroup, "min-w-0 flex-1")}>
           <div className="flex-shrink-0" ref={attachMenuRef}>
-            <button
-              type="button"
+            <IconButton
+              aria-label="Add files or folder"
               onClick={onToggleAttachMenu}
               aria-expanded={showAttachMenu}
               aria-haspopup="menu"
@@ -233,7 +235,7 @@ export const ChatComposer = ({
               )}
             >
               <Plus size={14} weight="regular" />
-            </button>
+            </IconButton>
 
             <AnimatePresence>
               {showAttachMenu && (
@@ -251,50 +253,54 @@ export const ChatComposer = ({
                       Add
                     </div>
 
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       role="menuitem"
+                      tabIndex={-1}
                       onClick={() => { onTriggerFileInput(); onToggleAttachMenu(); }}
-                      className="group flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
                     >
                       <Files size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-400" />
                       <span className="min-w-0 flex-1 truncate">Files and folders</span>
-                    </button>
+                    </Button>
 
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       role="menuitem"
-                      className="group flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
+                      tabIndex={-1}
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
                     >
                       <Target size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-500" />
                       <span className="shrink-0 text-gray-700 dark:text-gray-300">Goal</span>
                       <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                         Set a goal that Studio will keep working towards
                       </span>
-                    </button>
+                    </Button>
 
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       role="menuitem"
-                      className="group flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
+                      tabIndex={-1}
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
                     >
                       <ListChecks size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-500" />
                       <span className="shrink-0 text-gray-700 dark:text-gray-300">Plan mode</span>
                       <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                         Turn plan mode on
                       </span>
-                    </button>
+                    </Button>
 
                     <div className="px-2 pb-1 pt-3 text-sm leading-none text-gray-400 dark:text-gray-500">
                       Apps
                     </div>
 
                     {addMenuApps.map((app) => (
-                      <button
+                      <Button
                         key={app.id}
-                        type="button"
+                        variant="ghost"
                         role="menuitem"
-                        className="group flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
+                        tabIndex={-1}
+                        className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
                       >
                         <AppLogo
                           src={composioLogos.get(app.id)}
@@ -309,21 +315,22 @@ export const ChatComposer = ({
                         <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                           {app.description}
                         </span>
-                      </button>
+                      </Button>
                     ))}
 
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       role="menuitem"
+                      tabIndex={-1}
                       onClick={() => { navigateTo("extensions"); onToggleAttachMenu(); }}
-                      className="group flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
                     >
                       <SquaresFour size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-500" />
                       <span className="shrink-0 text-gray-700 dark:text-gray-300">More apps</span>
                       <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                         Browse connected tools and extensions
                       </span>
-                    </button>
+                    </Button>
                   </div>
                 </motion.div>
               )}
@@ -355,8 +362,8 @@ export const ChatComposer = ({
                 ? projectContext.accessMode === "autonomous"
                 : settings.autopilotMode;
               return (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={onToggleAutopilot}
                   title={
                     (isStreaming || isLoading
@@ -377,7 +384,7 @@ export const ChatComposer = ({
                     ? <Brain size={12} weight="fill" />
                     : <Eye size={12} weight="regular" />}
                   <span className={composerPillLabel}>{autonomous ? "Autonomous" : "Review"}</span>
-                </button>
+                </Button>
               );
             })()
           ) : null}
@@ -412,23 +419,23 @@ export const ChatComposer = ({
 
           <div className="relative flex-shrink-0">
             {isStreaming || isLoading ? (
-              <button
-                type="button"
-                onClick={onAbort}
+              <IconButton
+                aria-label="Stop generation"
                 title="Stop generation"
+                onClick={onAbort}
                 className={cx(
                   composerRoundIconButton,
                   "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-active",
                 )}
               >
                 <Stop size={14} weight="fill" />
-              </button>
+              </IconButton>
             ) : (
-              <button
-                type="button"
+              <IconButton
+                aria-label="Send message"
+                title="Send (Enter)"
                 onClick={onSend}
                 disabled={!inputMessage.trim() && attachments.length === 0}
-                title="Send (Enter)"
                 className={cx(
                   composerRoundIconButton,
                   inputMessage.trim() || attachments.length > 0
@@ -437,7 +444,7 @@ export const ChatComposer = ({
                 )}
               >
                 <ArrowUp size={14} weight="bold" />
-              </button>
+              </IconButton>
             )}
           </div>
         </div>

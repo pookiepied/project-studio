@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { Button } from "@/ui/primitives/Button";
 import { logger } from "@/core/logging/logger";
 
 let tauriOAuth: typeof import("@/features/auth/services/tauriOAuth") | null = null;
@@ -38,12 +38,12 @@ export const AuthControls = () => {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <motion.button
+      <Button
+        variant="ghost"
         whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
         onClick={handleLogin}
         disabled={isLoading}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+        className="flex items-center gap-2 px-3 py-1.5 text-sm !bg-gray-100 hover:!bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
       >
         <svg width="16" height="16" viewBox="0 0 24 24">
           {/* Google "G" — official 4-colour brand mark; brand hex required, no neutral-token equivalent (§17 brand-logo carve-out) */}
@@ -55,7 +55,7 @@ export const AuthControls = () => {
           {/* eslint-enable no-restricted-syntax */}
         </svg>
         <span className="text-gray-700">{isLoading ? "Signing in…" : "Sign in"}</span>
-      </motion.button>
+      </Button>
       {loginError && (
         <p className="text-xs text-secondary max-w-[200px] text-right leading-tight">{loginError}</p>
       )}

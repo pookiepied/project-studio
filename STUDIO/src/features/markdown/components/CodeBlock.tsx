@@ -3,6 +3,7 @@ import { FONT_MONO } from "@/design/fonts";
 import { CopyIcon as Copy, CheckIcon as Check, CaretDownIcon as CaretDown, CaretUpIcon as CaretUp, TextAlignLeftIcon as TextAlignLeft, EyeIcon as Eye } from "@phosphor-icons/react";
 import { useBrowserPanel } from "@/app/contexts/BrowserPanelContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneLight, atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { errorService } from "@/core/errors/errorService";
@@ -147,7 +148,8 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
       <div className="group relative my-4 rounded-xl overflow-hidden border border-gray-200 dark:border-surface-border transition-colors duration-300 w-full min-w-0">
         <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-surface-base border-b border-gray-200 dark:border-surface-border">
           <span className="text-xs font-medium text-gray-500 dark:text-gray-600">{displayName(language)}</span>
-          <motion.button
+          <Button
+            variant="ghost"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleCopy}
@@ -166,7 +168,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.button>
+          </Button>
         </div>
         <div className="bg-white dark:bg-surface-base">
           {renderBody()}
@@ -199,7 +201,8 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
         <div className="flex items-center gap-0.5">
           {/* HTML preview button */}
           {language === "html" && (
-            <motion.button
+            <Button
+              variant="ghost"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handlePreview}
@@ -233,39 +236,44 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.button>
+            </Button>
           )}
 
           {/* Word wrap toggle */}
-          <motion.button
+          <Button
+            variant="ghost"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setWordWrap((w) => !w)}
+            aria-label={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+            title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
             className={`p-1.5 rounded-lg transition-colors ${
               wordWrap
                 ? "text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-surface-raised"
                 : "text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised"
             }`}
-            title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
           >
             <TextAlignLeft size={14} weight="regular" />
-          </motion.button>
+          </Button>
 
           {/* Expand/collapse for long blocks */}
           {isLong && (
-            <motion.button
+            <Button
+              variant="ghost"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsCollapsed((c) => !c)}
-              className="p-1.5 text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-colors"
+              aria-label={isCollapsed ? `Expand ${lineCount} lines` : "Collapse"}
               title={isCollapsed ? `Expand ${lineCount} lines` : "Collapse"}
+              className="p-1.5 text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-colors"
             >
               {isCollapsed ? <CaretDown size={14} weight="regular" /> : <CaretUp size={14} weight="regular" />}
-            </motion.button>
+            </Button>
           )}
 
           {/* Copy button */}
-          <motion.button
+          <Button
+            variant="ghost"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleCopy}
@@ -297,7 +305,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.button>
+          </Button>
         </div>
       </div>
 
@@ -349,7 +357,8 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
 
       {/* Collapsed state */}
       {isCollapsed && (
-        <motion.button
+        <Button
+          variant="ghost"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={() => setIsCollapsed(false)}
@@ -357,7 +366,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
         >
           <CaretDown size={14} weight="bold" />
           <span>Show {lineCount} lines</span>
-        </motion.button>
+        </Button>
       )}
     </div>
   );

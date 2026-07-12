@@ -4,4 +4,6 @@ export interface Env {
   REGISTRY: Fetcher;
   /** Studio Data — conversations, attachments, files. */
   DATA: Fetcher;
+  /** Studio MCP hub, used for scoped native memory retrieval. */
+  MCP: Fetcher;
 }

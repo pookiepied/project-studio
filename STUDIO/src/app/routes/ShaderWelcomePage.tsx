@@ -11,6 +11,8 @@ import {
   MoonIcon   as Moon,
   SunIcon    as Sun,
 } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 const SESSION_AUTH_ERROR_KEY = "studio_auth_error";
 
@@ -85,19 +87,20 @@ function LoginContextMenu({
       <div className="h-px bg-gray-100 dark:bg-white/[0.06] mx-1.5 mb-1" />
 
       {/* Theme toggle */}
-      <button
+      <Button
         onClick={toggleTheme}
-        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg
+        variant="ghost"
+        className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg
           text-sm font-medium text-gray-700 dark:text-gray-300
           hover:bg-gray-100/80 dark:hover:bg-white/[0.06]
-          transition-colors duration-100 text-left"
+          hover:text-gray-700 dark:hover:text-gray-300"
       >
         {isDark
           ? <Sun size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
           : <Moon size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
         }
         {isDark ? "Switch to light" : "Switch to dark"}
-      </button>
+      </Button>
 
       <div className="h-px bg-gray-100 dark:bg-white/[0.06] mx-1.5 my-1" />
 
@@ -210,18 +213,20 @@ export const ShaderWelcomePage = () => {
 
         {isTauri && (
           <div className="flex items-center gap-0.5">
-            <button
+            <IconButton
+              aria-label="Minimize"
               onClick={handleMinimize}
-              className="p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-gray-700 dark:hover:text-muted hover:bg-gray-900/[0.06] dark:hover:bg-white/[0.06] transition-colors"
+              className="h-auto w-auto p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-gray-700 dark:hover:text-muted hover:bg-gray-900/[0.06] dark:hover:bg-white/[0.06]"
             >
               <Minus size={14} weight="bold" />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
+              aria-label="Close"
               onClick={handleClose}
-              className="p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-secondary hover:bg-surface-raised/10 transition-colors"
+              className="h-auto w-auto p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-secondary hover:bg-surface-raised/10"
             >
               <X size={14} weight="bold" />
-            </button>
+            </IconButton>
           </div>
         )}
       </motion.nav>

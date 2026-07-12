@@ -11,7 +11,7 @@ ENVIRONMENT = "production"
 [[d1_databases]]
 binding = "REGISTRY_DB"
 database_name = "studio-registry"
-database_id = "replace-with-registry-db-id"
+database_id = "eafac4b3-4db2-4c56-833e-83dc993fb33f"
 
 [[services]]
 binding = "MCP"

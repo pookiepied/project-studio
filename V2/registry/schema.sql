@@ -69,12 +69,14 @@ CREATE TABLE IF NOT EXISTS local_registry_sync (
 );
 
 CREATE TABLE IF NOT EXISTS skills (
-  id TEXT PRIMARY KEY,
+  id TEXT NOT NULL,
   user_id TEXT NOT NULL,
   name TEXT NOT NULL,
   origin TEXT NOT NULL CHECK (origin IN ('studio', 'user', 'third-party')),
+  location TEXT NOT NULL DEFAULT 'cloud' CHECK (location IN ('cloud', 'local')),
   version TEXT NOT NULL DEFAULT '0.1.0',
   enabled INTEGER NOT NULL DEFAULT 1,
+  available INTEGER NOT NULL DEFAULT 1,
   description TEXT NOT NULL DEFAULT '',
   instructions_ref TEXT,                     -- loaded progressively, not inlined
   required_tools TEXT NOT NULL DEFAULT '[]',
@@ -83,12 +85,13 @@ CREATE TABLE IF NOT EXISTS skills (
   activation_rules TEXT NOT NULL DEFAULT '{}',
   resources TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_skills_user ON skills (user_id);
 
 CREATE TABLE IF NOT EXISTS agents (
-  id TEXT PRIMARY KEY,
+  id TEXT NOT NULL,
   user_id TEXT NOT NULL,
   name TEXT NOT NULL,
   origin TEXT NOT NULL CHECK (origin IN ('studio', 'user')),
@@ -97,6 +100,7 @@ CREATE TABLE IF NOT EXISTS agents (
   location TEXT NOT NULL CHECK (location IN ('cloud', 'local')),
   definition TEXT NOT NULL,                  -- JSON AgentDefinition
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_agents_user ON agents (user_id);

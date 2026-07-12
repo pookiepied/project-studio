@@ -34,6 +34,8 @@ import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { FONT_MONO } from "@/design/fonts";
 
 // ─── Xterm themes (matched to tailwind.config.js palette) ────────────────────
@@ -449,14 +451,16 @@ export function TerminalPanel({
                         border-b border-gray-100 dark:border-white/[0.06]
                         transition-colors duration-300">
 
-          <button
-            type="button"
-            onClick={onClose}
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label="Close terminal"
             title="Close terminal"
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            onClick={onClose}
+            className="flex-shrink-0 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
             <X size={14} weight="bold" />
-          </button>
+          </IconButton>
 
           {/* Icon + active tab name + status dot */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -483,17 +487,17 @@ export function TerminalPanel({
               {tabs.map(tab => {
                 const active = tab.id === activeId;
                 return (
-                  <motion.button
+                  <Button
                     key={tab.id}
+                    variant="ghost"
                     layout
                     initial={{ opacity: 0, scale: 0.96 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.12, ease: "easeOut" }}
-                    type="button"
                     onClick={() => setActiveId(tab.id)}
                     onDoubleClick={() => tab.exited && restartTab(tab.id)}
-                    className={`group/tab flex items-center gap-1 px-2 h-6 rounded text-2xs flex-shrink-0
+                    className={`group/tab flex items-center gap-1 px-2 h-6 text-2xs flex-shrink-0
                       transition-colors duration-100
                       ${active
                         ? "bg-white dark:bg-surface-raised text-gray-600 dark:text-gray-300 shadow-sm"
@@ -511,7 +515,7 @@ export function TerminalPanel({
                     >
                       <X size={12} weight="bold" />
                     </span>
-                  </motion.button>
+                  </Button>
                 );
               })}
               </AnimatePresence>
@@ -519,18 +523,20 @@ export function TerminalPanel({
           )}
 
           {/* New tab */}
-          <button
-            type="button"
-            onClick={addTab}
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label="New terminal tab"
             title="New terminal tab"
-            className="w-6 h-6 flex items-center justify-center rounded flex-shrink-0
+            onClick={addTab}
+            className="w-6 h-6 flex-shrink-0
                        text-gray-400 dark:text-gray-600
                        hover:bg-gray-200 dark:hover:bg-surface-selected
                        hover:text-gray-600 dark:hover:text-gray-400
                        transition-colors duration-100"
           >
             <Plus size={12} weight="regular" />
-          </button>
+          </IconButton>
         </div>
         )}
 

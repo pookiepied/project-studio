@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useNavigation } from "../contexts/NavigationContext";
 import type { View } from "@/types/navigation";
+import { Button } from "@/ui/primitives/Button";
 
 type ProfileEntry = {
   title: string;
@@ -42,10 +43,10 @@ function ProfileTile({ entry, onOpen }: { entry: ProfileEntry; onOpen: (view: Vi
   const Icon = entry.icon;
 
   return (
-    <button
-      type="button"
+    <Button
       onClick={() => onOpen(entry.view)}
-      className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+      variant="ghost"
+      className="group w-full gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.03]"
     >
       <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-surface-raised dark:text-gray-600">
         <Icon size={14} weight="regular" />
@@ -59,7 +60,7 @@ function ProfileTile({ entry, onOpen }: { entry: ProfileEntry; onOpen: (view: Vi
         </span>
       </span>
       <ArrowRight size={14} className="flex-shrink-0 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-gray-700" />
-    </button>
+    </Button>
   );
 }
 

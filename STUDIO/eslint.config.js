@@ -102,7 +102,7 @@ export default tseslint.config(
       "src-tauri",
       "web",
       "daemon",
-      "mcp-servers",
+      "library",
       "scripts",
       "public",
       "vendor",

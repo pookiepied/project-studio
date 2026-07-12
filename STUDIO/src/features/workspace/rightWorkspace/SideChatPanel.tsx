@@ -12,6 +12,8 @@ import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { useConversationsList } from "@/features/chat/hooks/useConversationsList";
 import { markdownComponents } from "@/features/markdown";
 import { formatDate } from "@/lib/formatters";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface SideChatPanelProps {
   initialConversationId?: string | null;
@@ -100,21 +102,22 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
     <div className="flex h-full min-h-0 flex-col bg-surface-page">
       <div className="flex h-9 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
         <ChatCircleText size={14} className="text-muted" />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setSelectorOpen((value) => !value)}
-          className="min-w-0 flex-1 truncate text-left text-xs font-medium text-primary hover:text-secondary"
+          className="min-w-0 flex-1 justify-start truncate px-0 py-0 h-auto text-left text-xs font-medium text-primary hover:bg-transparent hover:text-secondary"
         >
           {conversation?.title ?? "Side chat"}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <IconButton
+          aria-label="New side chat"
+          variant="ghost"
+          size="sm"
           onClick={startNew}
-          title="New side chat"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
+          className="text-muted"
         >
           <Plus size={14} weight="bold" />
-        </button>
+        </IconButton>
       </div>
 
       {selectorOpen && (
@@ -128,24 +131,24 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
               className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted"
             />
           </label>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            leftIcon={<Plus size={14} weight="bold" />}
             onClick={startNew}
-            className="mb-1 flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-primary hover:bg-surface-hover"
+            className="mb-1 w-full h-8 justify-start px-2.5 text-left text-xs text-primary hover:bg-surface-hover"
           >
-            <Plus size={14} weight="bold" />
             Start new conversation
-          </button>
+          </Button>
           <div className="max-h-48 overflow-y-auto">
             {filtered.map((conv) => (
-              <button
+              <Button
                 key={conv.id}
-                type="button"
+                variant="ghost"
                 onClick={() => {
                   loadConversationById(conv.id).catch(() => {});
                   setSelectorOpen(false);
                 }}
-                className={`mb-1 w-full rounded-lg px-2.5 py-2 text-left hover:bg-surface-hover ${
+                className={`mb-1 w-full justify-start rounded-lg px-2.5 py-2 h-auto flex-col items-start gap-0 text-left hover:bg-surface-hover ${
                   conv.id === conversation?.id ? "bg-surface-selected" : ""
                 }`}
               >
@@ -153,7 +156,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
                 <p className="mt-0.5 truncate text-2xs text-muted">
                   {conv.projectName ?? conv.storageScope ?? "Conversation"} · {formatDate(conv.updatedAt)}
                 </p>
-              </button>
+              </Button>
             ))}
             {filtered.length === 0 && (
               <p className="px-2 py-5 text-center text-xs text-muted">No conversations found.</p>
@@ -164,7 +167,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
 
       {error && (
         <div className="flex-shrink-0 border-b border-surface-divider px-3 py-2 text-xs text-muted">
-          <button type="button" onClick={clearError} className="mr-2 font-medium text-primary">Dismiss</button>
+          <Button variant="ghost" onClick={clearError} className="mr-2 px-0 py-0 h-auto justify-start text-xs font-medium text-primary hover:bg-transparent">Dismiss</Button>
           {error}
         </div>
       )}
@@ -229,14 +232,16 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
             rows={1}
             className="max-h-28 min-h-6 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-sm leading-5 text-primary outline-none placeholder:text-muted scrollbar-thin"
           />
-          <button
+          <IconButton
             type="submit"
+            aria-label="Send"
+            variant="emphasis"
+            size="sm"
             disabled={!input.trim() || isLoading || isStreaming}
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary text-on-emphasis transition-[opacity,transform] hover:opacity-90 active:scale-95 disabled:pointer-events-none disabled:opacity-35"
-            title="Send"
+            className="flex-shrink-0 rounded-md transition-[opacity,transform] hover:bg-primary hover:opacity-90 active:scale-95 disabled:pointer-events-none disabled:opacity-35"
           >
             <ArrowUp size={14} weight="bold" />
-          </button>
+          </IconButton>
         </div>
       </form>
     </div>

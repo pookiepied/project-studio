@@ -31,7 +31,7 @@ const components: Components = {
   a: ({ children, href }) => <a href={href} className="text-sky-500 underline underline-offset-2">{children}</a>,
   code: ({ children, className }) => className ? (
     <code className="block overflow-x-auto rounded-md border border-surface-divider bg-surface-base p-4 font-mono text-xs leading-5 text-secondary scrollbar-files">{children}</code>
-  ) : <code className="rounded bg-surface-base px-1 py-0.5 font-mono text-[0.9em] text-primary">{children}</code>,
+  ) : <code className="rounded bg-surface-base px-1 py-0.5 font-mono text-xs text-primary">{children}</code>,
   table: ({ children }) => <div className="my-4 overflow-x-auto scrollbar-files"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
   th: ({ children }) => <th className="border border-surface-divider bg-surface-base px-3 py-2 font-semibold text-primary">{children}</th>,
   td: ({ children }) => <td className="border border-surface-divider px-3 py-2 text-secondary">{children}</td>,

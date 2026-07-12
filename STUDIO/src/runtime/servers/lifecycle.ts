@@ -30,7 +30,7 @@ export function grantedServers(grants: LocalPermissionGrants): LocalMcpServerDef
   return LOCAL_MCP_SERVERS.filter((srv) => {
     if (srv.name === "studio-harness") return grants.studioHarness;
     if (srv.name === "computer-use") return grants.computerUse;
-    return false;
+    return grants.studioHarness;
   });
 }
 
@@ -50,11 +50,14 @@ export async function restartServer(srv: LocalMcpServerDef): Promise<boolean> {
   connectionManager.emit({ type: "mcp:restarting", timestamp: Date.now(), serverName: srv.name });
   try {
     const serverPath = await resolveLocalMcpPath(srv);
+    const control = srv.name.includes("management") || srv.name === "skill-execution"
+      ? await invoke<{ url: string; token: string }>("local_control_config")
+      : null;
     await invoke("mcp_start_server", {
       name: srv.name,
       command: "node",
       args: [serverPath],
-      envVars: { ...HARNESS_ENV },
+      envVars: { ...HARNESS_ENV, ...(control ? { STUDIO_CONTROL_URL: control.url, STUDIO_CONTROL_TOKEN: control.token } : {}) },
     });
     logger.warn("HarnessInit", `Auto-restarted ${srv.name} after crash`);
     connectionManager.emit({ type: "mcp:restored", timestamp: Date.now(), serverName: srv.name });

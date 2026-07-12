@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { getAIMode, type AIMode } from "@/core/config/autoMode";
 import { useModes } from "@/features/models/hooks/useModes";
+import { Button } from "@/ui/primitives/Button";
 import { composerPillButton, composerPillLabel, cx } from "@/features/chat/components/composerControlStyles";
 
 // ---------------------------------------------------------------------------
@@ -103,8 +104,8 @@ export function TierSelector({
   return (
     <div className="relative flex h-7 shrink-0 items-center" ref={containerRef}>
       {/* Trigger */}
-      <motion.button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
         whileTap={{ scale: 0.95 }}
@@ -142,7 +143,7 @@ export function TierSelector({
         >
           <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
         </motion.div>
-      </motion.button>
+      </Button>
 
       {/* Dropdown */}
       <AnimatePresence>
@@ -162,9 +163,9 @@ export function TierSelector({
               {modes.map((mode, i) => {
                 const isActive = mode.modelId === value || mode.id === value;
                 return (
-                  <motion.button
+                  <Button
                     key={mode.id}
-                    type="button"
+                    variant="ghost"
                     initial={{ opacity: 0, x: -4 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.12, delay: i * 0.03, ease: "easeOut" }}
@@ -199,7 +200,7 @@ export function TierSelector({
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </motion.button>
+                  </Button>
                 );
               })}
             </div>
@@ -209,8 +210,8 @@ export function TierSelector({
 
             {/* Browse all */}
             <div className="p-1.5 pt-0">
-              <motion.button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={handleOpenLibrary}
                 whileTap={{ scale: 0.98 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border"
@@ -219,7 +220,7 @@ export function TierSelector({
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Browse all models
                 </span>
-              </motion.button>
+              </Button>
             </div>
 
             {/* Reasoning section only renders when onReasoningChange is provided. */}
@@ -227,8 +228,8 @@ export function TierSelector({
               <>
                 <div className="mx-3 border-t border-gray-100 dark:border-surface-border" />
                 <div className="p-1.5">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => setReasoningOpen((v) => !v)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border"
                   >
@@ -250,7 +251,7 @@ export function TierSelector({
                     >
                       <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
                     </motion.div>
-                  </button>
+                  </Button>
 
                   <AnimatePresence initial={false}>
                     {reasoningOpen && (
@@ -265,9 +266,9 @@ export function TierSelector({
                           {REASONING_LEVELS.map((level, i) => {
                             const isActive = level.budget === reasoning;
                             return (
-                              <motion.button
+                              <Button
                                 key={level.label}
-                                type="button"
+                                variant={isActive ? "primary" : "ghost"}
                                 initial={{ opacity: 0, y: -2 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.1, delay: i * 0.015, ease: "easeOut" }}
@@ -285,7 +286,7 @@ export function TierSelector({
                                 }`}
                               >
                                 {level.label}
-                              </motion.button>
+                              </Button>
                             );
                           })}
                         </div>

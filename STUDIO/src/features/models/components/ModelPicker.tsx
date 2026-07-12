@@ -21,6 +21,7 @@ import {
 } from "@/features/models/services/modelFilter";
 import { isVisionModel } from "@/lib/modelUtils";
 import { ProviderIcon, getProviderDisplayName } from "./ProviderIcon";
+import { Button } from "@/ui/primitives/Button";
 import { AI_MODES } from "@/core/config/autoMode";
 
 export interface ModelPickerProps {
@@ -140,8 +141,8 @@ export function ModelPicker({
 
       {/* ── Trigger ── */}
       {isCompact ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => open(!isOpen)}
           disabled={disabled}
           className="flex items-center gap-1 px-2 h-6 rounded-md hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth disabled:opacity-40"
@@ -155,10 +156,10 @@ export function ModelPicker({
             weight="bold"
             className={`text-gray-400 dark:text-gray-600 flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
-        </button>
+        </Button>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => open(!isOpen)}
           disabled={disabled}
           className="w-full px-3 py-1.5 text-sm text-left bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-md hover:bg-gray-50 dark:hover:bg-surface-raised transition-smooth focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 flex items-center justify-between disabled:opacity-50"
@@ -172,7 +173,7 @@ export function ModelPicker({
             weight="bold"
             className={`text-gray-400 dark:text-gray-600 flex-shrink-0 ml-2 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
-        </button>
+        </Button>
       )}
 
       {/* ── Dropdown ── */}
@@ -207,8 +208,8 @@ export function ModelPicker({
               {/* Auto option — always at top for chat type */}
               {showAutoOption && (
                 <div className="border-b border-gray-100 dark:border-surface-border pb-1 mb-0.5">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => handleSelect(autoMode.id)}
                     title={autoMode.description}
                     className={`w-full flex items-center text-left px-3 py-1.5 transition-colors duration-100 ${
@@ -224,7 +225,7 @@ export function ModelPicker({
                         <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400" />
                       )}
                     </div>
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -254,9 +255,9 @@ export function ModelPicker({
                       const isSelected = model.id === value;
 
                       return (
-                        <button
+                        <Button
                           key={model.id}
-                          type="button"
+                          variant="ghost"
                           onClick={() => handleSelect(model.id)}
                           title={[
                             ctx ? `${formatContextWindow(ctx)} context` : null,
@@ -293,7 +294,7 @@ export function ModelPicker({
                               <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400 transition-colors duration-300" />
                             )}
                           </div>
-                        </button>
+                        </Button>
                       );
                     })}
 

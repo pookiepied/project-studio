@@ -87,6 +87,14 @@ runsRoute.post("/:conversationId/external-tools/:toolCallId/resolve", async (c) 
   });
 });
 
+runsRoute.post("/:conversationId/client-actions/:toolCallId/resolve", async (c) => {
+  const userId = authenticatedUserId(c.req.raw);
+  if (!userId) return c.json({ error: "unauthorized" }, 401);
+  return forward(c.env, c.req.param("conversationId"), `/client-actions/${c.req.param("toolCallId")}/resolve`, {
+    method: "POST", body: await c.req.text(), headers: { "content-type": "application/json", "x-user-id": userId },
+  });
+});
+
 // Control commands may carry { expectedVersion } for compare-and-swap:
 // a command built against an older run version is rejected as stale.
 for (const action of ["pause", "resume", "cancel"] as const) {

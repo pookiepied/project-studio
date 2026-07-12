@@ -12,6 +12,8 @@ import {
 } from '@phosphor-icons/react';
 import { useDaemon } from '@/features/models/hooks/useLocalProviderDaemon';
 import { createDaemonClient } from '@/core/daemon/daemonClient';
+import { Button } from '@/ui/primitives/Button';
+import { IconButton } from '@/ui/primitives/IconButton';
 
 export const LocalProviderStatus = () => {
   const { status, isStarting, start, stop } = useDaemon();
@@ -92,32 +94,35 @@ export const LocalProviderStatus = () => {
       {/* Action Buttons */}
       <div className="flex items-center gap-2 relative">
         {status.running ? (
-          <button
+          <Button
+            variant="ghost"
             onClick={handleStop}
             disabled={isStarting}
             className="text-xs font-medium text-gray-400 hover:text-secondary transition-colors"
           >
             Stop
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
+            variant="ghost"
             onClick={handleStart}
             disabled={isStarting}
             className="text-xs font-medium text-gray-400 hover:text-secondary transition-colors"
           >
             {isStarting ? <ArrowClockwise size={14} className="animate-spin inline" /> : 'Start'}
-          </button>
+          </Button>
         )}
 
         {status.running && (
           <>
-            <button
+            <IconButton
               onClick={() => setIsExpanded(!isExpanded)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label="Bridge details"
               title="Bridge Details"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               <Info size={14} weight="regular" />
-            </button>
+            </IconButton>
 
             <AnimatePresence>
               {isExpanded && (
@@ -131,9 +136,9 @@ export const LocalProviderStatus = () => {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 tracking-wide">Providers</span>
-                    <button onClick={() => setIsExpanded(false)} className="text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
+                    <IconButton onClick={() => setIsExpanded(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
                       <X size={14} weight="bold" />
-                    </button>
+                    </IconButton>
                   </div>
 
                   {daemonHealth?.providers?.ollama && (

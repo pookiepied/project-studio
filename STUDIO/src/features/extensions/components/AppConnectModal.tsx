@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { PlusIcon as Plus } from "@phosphor-icons/react";
 import { Close, Icon } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { StudioMarkIcon } from "./ExtensionIcons";
 
@@ -65,9 +67,13 @@ export const AppConnectModal = ({
     >
       {/* Gradient header — intentional marketing surface (D-408) */}
       <div className="relative bg-gradient-to-br from-surface-raised via-surface-raised to-surface-raised px-6 pt-7 pb-9 flex flex-col items-center text-center">
-        <button onClick={onClose} className="absolute top-3.5 right-3.5 p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          className="absolute top-3.5 right-3.5 h-auto w-auto rounded-full bg-white/20 p-1.5 text-white hover:bg-white/30"
+        >
           <Close size="xs" className="text-white" />
-        </button>
+        </IconButton>
 
         {/* Dual icons */}
         <div className="flex items-center gap-3 mb-5">
@@ -96,13 +102,14 @@ export const AppConnectModal = ({
         <p className="text-sm text-white/80 leading-relaxed max-w-[264px]">{config.description}</p>
 
         <div className="mt-5 flex flex-col items-center gap-1.5">
-          <button
+          <Button
+            variant="ghost"
             onClick={onPrimary}
             disabled={primaryDisabled || isLoading}
-            className="px-8 py-2.5 bg-white text-secondary font-semibold text-sm rounded-full hover:bg-surface-raised transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+            className="h-auto px-8 py-2.5 rounded-full bg-white text-secondary font-semibold text-sm shadow-sm hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? "Connecting…" : primaryLabel}
-          </button>
+          </Button>
           {primaryNote && <p className="text-2xs text-white/60 mt-0.5">{primaryNote}</p>}
         </div>
       </div>
@@ -144,7 +151,9 @@ export const AppConnectModal = ({
             {config.tosUrl     && <a href={config.tosUrl}     target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary transition-colors">Terms</a>}
             {config.privacyUrl && <a href={config.privacyUrl} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary transition-colors">Privacy</a>}
             {onDestructive && destructiveLabel && (
-              <button onClick={onDestructive} className="text-primary font-medium hover:underline transition-colors">{destructiveLabel}</button>
+              <Button variant="ghost" onClick={onDestructive} className="h-auto w-auto px-0 py-0 text-xs font-medium text-primary underline-offset-2 hover:underline">
+                {destructiveLabel}
+              </Button>
             )}
           </div>
         </div>

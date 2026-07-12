@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": ["src/main.tsx", "web/web-main.tsx"],
   "project": ["src/**/*.{ts,tsx}", "web/**/*.{ts,tsx}"],
-  "ignore": ["src-tauri/**", "daemon/**", "mcp-servers/**", "scripts/**", "vendor/**"],
+  "ignore": ["src-tauri/**", "daemon/**", "library/mcp-servers/**", "library/skills/**", "scripts/**", "vendor/**"],
   "ignoreBinaries": ["tauri", "powershell"],
   "ignoreDependencies": ["madge"]
 }

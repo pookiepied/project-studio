@@ -4,7 +4,7 @@ This folder is STUDIO's **single, canonical home for third-party native binaries
 that we ship bundled with the app** — the executables our tools shell out to that
 are not guaranteed to exist on the user's machine.
 
-It lives at the **STUDIO project root** (not under `mcp-servers/`) because it is
+It lives at the **STUDIO project root** (not under `library/mcp-servers/`) because it is
 app-wide: any part of STUDIO — not just the MCP harness — can vendor a binary here.
 
 The problem it solves: a fresh Windows install has **neither** `ripgrep` (`rg`)
@@ -61,7 +61,7 @@ anything** — the binaries are inside the signed installer. The sync is idempot
 
 `src-tauri/tauri.conf.json` lists `../vendor` under `bundle.resources`, so the
 whole folder is copied into the app's resource dir at install time. The resolver
-(`mcp-servers/studio-harness/src/tools/shared/vendor.ts`) walks up from its own
+(`library/mcp-servers/harness/studio-harness/src/tools/shared/vendor.ts`) walks up from its own
 bundle location to find `vendor/` in both dev and packaged builds.
 
 ## Resolution order (in the tools)

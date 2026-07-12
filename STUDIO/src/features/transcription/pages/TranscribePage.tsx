@@ -303,10 +303,12 @@ export const TranscribePage = () => {
           </AnimatePresence>
 
           <div className="flex flex-col items-center gap-3">
-            <motion.button
+            <Button
+              variant="ghost"
               onClick={handleButtonClick}
               disabled={isProcessing}
               whileTap={!isProcessing ? { scale: 0.95 } : {}}
+              aria-label={isRecording ? "Stop recording" : "Start recording"}
               className={`
                 w-12 h-12 flex items-center justify-center rounded-full
                 transition-colors duration-normal
@@ -334,7 +336,7 @@ export const TranscribePage = () => {
               ) : (
                 <Icon icon={Microphone} size="md" className="text-secondary" />
               )}
-            </motion.button>
+            </Button>
 
             <p className="text-2xs text-muted min-h-[14px]">
               {isRecording ? "Tap to stop" : displayText ? "Record again" : shortcutKeys.length > 0 ? `${shortcutKeys.join(" + ")} to record` : ""}

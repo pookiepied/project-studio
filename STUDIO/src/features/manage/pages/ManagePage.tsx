@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Manage, Collapse, Icon } from "@/ui/icons";
 import { Badge } from "@/ui/primitives/Badge";
+import { Button } from "@/ui/primitives/Button";
 import { EmptyState } from "@/ui/primitives/EmptyState";
 import { createHeaders } from "@/lib/api";
 import { apiManager } from "@/core/network/apiManager";
@@ -268,9 +269,10 @@ export const ManagePage = () => {
             </div>
             <div className="flex-1 overflow-y-auto">
               <div className="divide-y divide-surface-divider">
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => setSubView("whitelist")}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover transition-colors duration-fast text-left"
+                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover text-left justify-start h-auto rounded-none"
                 >
                   <div className="w-8 h-8 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
                     <Icon icon={Users} size="sm" className="text-muted" />
@@ -283,11 +285,12 @@ export const ManagePage = () => {
                     <Badge tone="default" size="sm">{users.length}</Badge>
                   )}
                   <Collapse size="xs" className="text-muted flex-shrink-0" />
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => setSubView("aimodels")}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover transition-colors duration-fast text-left"
+                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover text-left justify-start h-auto rounded-none"
                 >
                   <div className="w-8 h-8 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
                     <Icon icon={Cpu} size="sm" className="text-muted" />
@@ -302,11 +305,12 @@ export const ManagePage = () => {
                     </Badge>
                   )}
                   <Collapse size="xs" className="text-muted flex-shrink-0" />
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => setSubView("modelRegistry")}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover transition-colors duration-fast text-left"
+                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-hover text-left justify-start h-auto rounded-none"
                 >
                   <div className="w-8 h-8 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
                     <Icon icon={Database} size="sm" className="text-muted" />
@@ -316,7 +320,7 @@ export const ManagePage = () => {
                     <p className="text-2xs text-muted mt-0.5">Curated model catalogue and pricing</p>
                   </div>
                   <Collapse size="xs" className="text-muted flex-shrink-0" />
-                </button>
+                </Button>
               </div>
             </div>
           </motion.div>

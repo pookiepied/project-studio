@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { CodeBlock } from "./CodeBlock";
 import ExternalLink from "@/features/markdown/components/MarkdownExternalLink";
 import { tokenManager } from "@/lib/tokenManager";
@@ -58,9 +60,10 @@ export function ImageLightbox({
           className="absolute top-4 right-4 flex items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
+          <Button
+            variant="ghost"
             onClick={handleDownload}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors backdrop-blur-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:!bg-white/20 !text-white text-xs font-medium transition-colors backdrop-blur-sm"
             title="Download image"
           >
             {downloaded ? (
@@ -80,17 +83,18 @@ export function ImageLightbox({
                 Download
               </>
             )}
-          </button>
-          <button
+          </Button>
+          <IconButton
             onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors backdrop-blur-sm"
+            aria-label="Close"
             title="Close (Esc)"
+            className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/10 hover:!bg-white/20 !text-white transition-colors backdrop-blur-sm"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
-          </button>
+          </IconButton>
         </div>
 
         {/* Image */}

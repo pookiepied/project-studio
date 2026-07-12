@@ -13,7 +13,7 @@ import type {
 } from "@studio/v2-contracts";
 import type { RuntimeEnv } from "./env";
 import type { RuntimeProfile } from "./profile";
-import { ExecutionError } from "../system/errors";
+import { ExecutionError, normalizeRuntimeError } from "../system/errors";
 import { SessionStore, type EventScope } from "../state/log";
 import {
   runAgentLoop,
@@ -156,6 +156,10 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
           if (external && request.method === "POST") {
             return json(await this.resolveExternalTool(external[1], await request.json(), authenticatedUserId(request)));
           }
+          const client = url.pathname.match(/^\/client-actions\/([^/]+)\/resolve$/);
+          if (client && request.method === "POST") {
+            return json(await this.resolveClientAction(client[1], await request.json(), authenticatedUserId(request)));
+          }
           return json({ error: "not_found" }, 404);
         }
       }
@@ -246,6 +250,7 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
       request: run.request,
       modelId: run.modelId,
     });
+    this.telemetry(run, "run.started", { modelId: run.modelId });
     await this.transition(run, "starting", "execution scheduled");
     await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
     this.ctx.waitUntil(this.execute(run));
@@ -375,6 +380,7 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
       const registered = context
         ? buildToolSet(context, this.env.MCP, (id, descriptor, input) =>
             this.requestExternalTool(run, id, descriptor, input),
+            (id, descriptor, input) => this.requestClientAction(run, id, descriptor, input),
           )
         : {};
       const result = await runAgentLoop(
@@ -401,6 +407,7 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
       if (current && isExecuting(current.status)) {
         const output = await this.finalize(current, result);
         await this.emit(current, "run.completed", { output });
+        this.telemetry(current, "run.completed", { usage: current.usage });
         await this.transition(current, "completed", "run finished");
       }
     } catch (error) {
@@ -423,7 +430,8 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
       await this.transition(run, "cancelled", "loop stopped after cancel");
       return;
     }
-    if (canRetry(run)) {
+    const normalized = normalizeRuntimeError(error);
+    if (normalized.retryable && canRetry(run)) {
       run.retryAttempts += 1;
       this.store.saveRun(run);
       await this.transition(
@@ -434,8 +442,9 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
       await this.ctx.storage.setAlarm(Date.now() + retryDelayMs(run.retryAttempts));
       return;
     }
-    const failureSummary = `Run failed after ${run.retryAttempts} retries: ${describe(error)}`;
-    await this.emit(run, "run.failed", { failureSummary });
+    const failureSummary = `Run failed after ${run.retryAttempts} retries: ${normalized.message}`;
+    await this.emit(run, "run.failed", { failureSummary, error: normalized });
+    this.telemetry(run, "run.failed", { error: normalized, retryAttempts: run.retryAttempts });
     run.failureSummary = failureSummary;
     await this.transition(run, "failed", failureSummary);
   }
@@ -453,6 +462,28 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
     if (!response.ok) {
       throw new Error(`Studio Data ${path} returned ${response.status}`);
     }
+  }
+
+  /** Read the authoritative event log for transcript handoff hooks. */
+  protected eventsForRun(runId: string) {
+    return this.store.eventsSince(0).filter((event) => event.runId === runId);
+  }
+
+  private telemetry(run: RunState, event: string, data: Record<string, unknown>): void {
+    if (!this.env.TRACKER) return;
+    this.ctx.waitUntil(this.env.TRACKER.fetch("https://tracker/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": run.userId },
+      body: JSON.stringify({
+        worker: "execution-runtime",
+        category: event.startsWith("tool.") ? "tool" : event.startsWith("usage.") ? "usage" : "runtime",
+        event,
+        severity: event.endsWith("failed") ? "error" : "info",
+        userId: run.userId,
+        runId: run.runId,
+        data: { conversationId: run.conversationId, turnId: run.turnId, ...data },
+      }),
+    }).then(() => undefined, () => undefined));
   }
 
   // ── tool boundary: idempotency + approvals ─────────────────────────────
@@ -530,6 +561,36 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
     }
     await this.phase(run.runId, "waiting_for_external_result");
     return new Promise((resolve, reject) => this.externalToolWaiters.set(toolCallId, { resolve, reject }));
+  }
+
+  private async requestClientAction(run: RunState, toolCallId: string, descriptor: StudioToolDescriptor, input: unknown): Promise<unknown> {
+    if (descriptor.route.kind !== "client") throw new ExecutionError("invalid_request", "Invalid client action route.");
+    const existing = this.store.loadExternalCall(toolCallId);
+    if (existing?.status === "completed") return existing.result;
+    if (existing?.status === "failed") throw new ExecutionError("tool_failure", existing.error ?? "Client action failed.");
+    if (!existing) {
+      this.store.saveExternalCall(run.runId, toolCallId, "client", descriptor.route.action, input);
+      await this.emit(run, "client.action_requested", { toolCallId, action: descriptor.route.action, input });
+    }
+    await this.phase(run.runId, "waiting_for_external_result");
+    return new Promise((resolve, reject) => this.externalToolWaiters.set(toolCallId, { resolve, reject }));
+  }
+
+  private async resolveClientAction(toolCallId: string, body: { result?: unknown; error?: string }, userId: string | null): Promise<{ resolved: boolean }> {
+    const run = this.store.activeRun();
+    if (!run || !userId || run.userId !== userId) throw new ExecutionError("forbidden", "Authenticated user does not own this client action.");
+    const pending = this.store.loadExternalCall(toolCallId);
+    if (!pending || pending.serverId !== "client") throw new ExecutionError("invalid_request", "Client action not found.");
+    if (pending.status !== "pending") return { resolved: true };
+    this.store.resolveExternalCall(toolCallId, body.result, body.error);
+    this.store.markOperation(`${run.runId}:${toolCallId}`, body.error ? "failed" : "completed", body.error ? undefined : JSON.stringify(body.result ?? null));
+    await this.emit(run, "client.action_resolved", { toolCallId, action: pending.toolName });
+    await this.phase(run.runId, "tools_running");
+    const waiter = this.externalToolWaiters.get(toolCallId);
+    this.externalToolWaiters.delete(toolCallId);
+    if (waiter) body.error ? waiter.reject(new Error(body.error)) : waiter.resolve(body.result);
+    else if (!this.abortController) this.ctx.waitUntil(this.execute(run));
+    return { resolved: true };
   }
 
   private async resolveExternalTool(
@@ -813,6 +874,9 @@ export abstract class RuntimeSession<E extends RuntimeEnv> extends DurableObject
   ): Promise<void> {
     const event = this.store.appendEvent(scope, type, payload);
     broadcast(this.ctx.getWebSockets(), event);
+    if (type === "usage.updated" || type === "tool.completed" || type === "tool.failed") {
+      this.telemetry(scope as RunState, type, payload as Record<string, unknown>);
+    }
     if (type === "run.completed" || type === "run.failed" || type === "run.cancelled") {
       for (const ws of this.ctx.getWebSockets()) {
         ws.send(closeMessage(type));

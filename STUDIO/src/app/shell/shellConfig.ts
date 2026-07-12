@@ -72,9 +72,11 @@ export const WORKSPACE_SHELL = {
    *  the native rounded window edge and avoid reading as a second bezel. */
   frameInset: 0,
   /** Corner radius of the app panel.
-   *  Keep this closer to the native Windows 11 corner so the app panel does
-   *  not appear more rounded than the outer shell and create a visible extrude. */
-  frameRadius: 12,
+   *  Must match the native Windows 11 DWM corner rounding (8px) so the CSS
+   *  border on .zen-surface follows the SAME curve the OS clips the window
+   *  to. A mismatch here makes the border trace a different radius than the
+   *  window edge, which reads as an extruded/offset outline. */
+  frameRadius: 8,
   /** Height of the invisible hover hot-zone at the very top edge (px). */
   topHotZone: 8,
   /** How long controls stay revealed after the cursor leaves the top (ms). */

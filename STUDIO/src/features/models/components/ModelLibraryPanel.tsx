@@ -209,14 +209,15 @@ export function ModelLibraryPanel({
                       className="flex-1 min-w-0 bg-transparent outline-none text-sm text-primary placeholder:text-muted"
                     />
                     {search && (
-                      <button
-                        type="button"
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setSearch("")}
                         aria-label="Clear search"
                         className="text-muted hover:text-primary transition-colors"
                       >
                         <Close size="xs" />
-                      </button>
+                      </IconButton>
                     )}
                   </div>
 

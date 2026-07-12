@@ -24,6 +24,7 @@ import {
 import { SessionState } from "@/features/voice/hooks/useLiveSession";
 import { useLiveSessionContext } from "@/features/voice/context/LiveSessionContext";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Button } from "@/ui/primitives/Button";
 import { Icon, Settings, Warning } from "@/ui/icons";
 import { liveSessionSounds } from "../utils/liveSessionSounds";
 
@@ -175,8 +176,9 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
           {/* Idle: tap-to-start */}
           <AnimatePresence mode="wait">
             {sessionState === "idle" && (
-              <motion.button
+              <Button
                 key="tap-hint"
+                variant="ghost"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
@@ -194,7 +196,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                 <span className="text-xs text-muted font-mono tracking-widest">
                   tap to start
                 </span>
-              </motion.button>
+              </Button>
             )}
           </AnimatePresence>
 
@@ -263,7 +265,8 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
               >
                 {/* Mic — circular motion.button (no circular-button primitive;
                     C-406 precedent). "muted" = stronger fill; "on" = ghost. */}
-                <motion.button
+                <Button
+                  variant="ghost"
                   initial={{ opacity: 0, scale: 0.72, y: 14 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0 }}
@@ -280,24 +283,26 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                     ? <Icon icon={MicrophoneSlashIcon} size="sm" />
                     : <Icon icon={MicrophoneIcon}      size="sm" />
                   }
-                </motion.button>
+                </Button>
 
                 {/* End call — destructive (filled graphite/near-black + icon,
                     never red, per §11.3 + D-401). 52px hero control. */}
-                <motion.button
+                <Button
+                  variant="primary"
                   initial={{ opacity: 0, scale: 0.72, y: 14 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.08 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={endSession}
                   aria-label="End voice session"
-                  className="flex items-center justify-center w-[52px] h-[52px] rounded-full bg-primary text-on-emphasis border border-surface-border hover:bg-secondary transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+                  className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-surface-border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
                 >
                   <Icon icon={PhoneXIcon} size="md" />
-                </motion.button>
+                </Button>
 
                 {/* Speaker — same state model as mic */}
-                <motion.button
+                <Button
+                  variant="ghost"
                   initial={{ opacity: 0, scale: 0.72, y: 14 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.16 }}
@@ -314,23 +319,24 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                     ? <Icon icon={SpeakerSlashIcon} size="sm" />
                     : <Icon icon={SpeakerHighIcon}  size="sm" />
                   }
-                </motion.button>
+                </Button>
               </motion.div>
             )}
           </AnimatePresence>
 
           <AnimatePresence>
             {sessionState === "error" && (
-              <motion.button
+              <Button
+                variant="primary"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => { endSession(); setTimeout(startSession, 80); }}
-                className="px-5 py-2.5 rounded-full bg-primary text-on-emphasis border border-surface-border hover:bg-secondary text-sm font-mono tracking-wide transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+                className="px-5 py-2.5 rounded-full border border-surface-border text-sm font-mono tracking-wide transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
               >
                 Retry
-              </motion.button>
+              </Button>
             )}
           </AnimatePresence>
         </div>

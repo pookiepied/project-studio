@@ -46,6 +46,7 @@ import { ComposerApprovalCard } from "@/features/permissions";
 import { AskUserQuestionCard }  from "@/features/chat/components/AskUserQuestionCard";
 import { DocumentStorageModal } from "@/features/artifacts";
 import { ClaudeCodeIcon }       from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
 import { ClaudeUsageBadge }     from "@/features/chat/components/ClaudeUsageBadge";
 import {
   RightWorkspaceControls,
@@ -155,10 +156,7 @@ export const ChatPage = () => {
     reload:                   reloadConversations,
     handleDeleteConversation: deleteConversation,
     handleSaveConvTitle:      saveConvTitle,
-  } = useConversationsList(conversationListScope, {
-    projectPath: conversationListScope === "local" ? projectContext?.path ?? null : null,
-    claudeProjectPath: conversationListScope === "local" ? projectContext?.path ?? null : null,
-  });
+  } = useConversationsList(conversationListScope);
 
   useEffect(() => {
     setConversationListScope(conversationStorageScope);
@@ -380,8 +378,8 @@ export const ChatPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectContext?.path, projectContext?.accessMode]);
 
-  // Shared by the header's ConversationsDropdown and the composer's
-  // EnvironmentSelector — both let the user flip local/cloud scope.
+  // Shared by the chat dock and the composer's EnvironmentSelector —
+  // both let the user flip local/cloud scope.
   const handleStorageScopeChange = useCallback(async (scope: ConversationStorageScope) => {
     setConversationListScope(scope);
 
@@ -782,13 +780,13 @@ export const ChatPage = () => {
                                 Continue with Claude to keep the native history intact, or fork a Studio-owned copy.
                               </p>
                             </div>
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
                               onClick={forkConversationToStudio}
                               className={CLAUDE_FORK_BUTTON}
                             >
                               Fork to Studio
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )}

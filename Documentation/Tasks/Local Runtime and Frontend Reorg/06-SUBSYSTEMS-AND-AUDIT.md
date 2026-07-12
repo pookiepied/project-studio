@@ -44,7 +44,7 @@ flow **downward only**: `app → features → {runtime, core} → {types, ui, li
 | 16 | **Platform / Storage / Network / Errors / Notifications** | `core/*` | tray, overlay, autostart, shortcuts; unified/secure/conversation storage; apiManager + fallback; diagnostics; toasts/bell |
 
 **Out of scope (do not touch):** **CLI Bridge** (`cliBridges/`), **Skills** deploy
-(`core/skills/`), the bundled MCP servers (`mcp-servers/`), `vendor/`, `daemon/` server
+(`core/skills/`), the bundled MCP servers (`library/mcp-servers/`), `vendor/`, `daemon/` server
 code itself.
 
 ---

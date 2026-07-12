@@ -84,6 +84,7 @@ export interface McpContext {
 export interface SkillContext {
   ref: CapabilityRef;
   summary: string;
+  activationHint?: string;
   /** Full instructions are loaded progressively, only when activated. */
   instructions?: string;
 }

@@ -36,6 +36,8 @@ import {
 
 import { PulseCardContent } from "./PulseCardView";
 import type { VoiceCaptionState } from "@/core/platform/voiceCaptionTypes";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface FloatingIslandProps {
   payload: OverlayPayload;
@@ -234,8 +236,9 @@ export function FloatingIsland({
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {view.kind === "idle" && (
-            <motion.button
+            <Button
               key="idle"
+              variant="ghost"
               layout
               {...CONTENT_ANIM}
               onClick={toggleIdleMenu}
@@ -244,9 +247,10 @@ export function FloatingIsland({
               className="flex items-center justify-center px-4 h-7 cursor-pointer"
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
               title="Pulse"
+              aria-label="Pulse"
             >
               <IdleIcon mode={view.mode} />
-            </motion.button>
+            </Button>
           )}
 
           {view.kind === "idleExpanded" && (
@@ -257,14 +261,14 @@ export function FloatingIsland({
               className="flex w-full items-center justify-center gap-1.5 px-2 h-[38px]"
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
-              <button
-                type="button"
+              <IconButton
                 onClick={toggleIdleMenu}
+                aria-label="Pulse"
                 title="Pulse"
                 className="flex h-[26px] w-[26px] items-center justify-center rounded-full"
               >
                 <PulseMark size={16} />
-              </button>
+              </IconButton>
               <div className="w-px h-4 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-0.5" />
               <ActionBtn
                 icon={<UserSound size={14} weight="regular" />}

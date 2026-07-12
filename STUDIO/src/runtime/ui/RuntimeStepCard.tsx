@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 import { CaretRightIcon as CaretRight } from "@phosphor-icons/react";
 import type { HarnessEvent } from "@/types";
 import { getToolIcon } from "./toolCardUtils";
@@ -102,10 +103,11 @@ export function RuntimeStepCard({ event }: HarnessStepCardProps) {
   return (
     <div className="select-none">
       {/* ── Row ── */}
-      <button
+      <Button
+        variant="ghost"
         onClick={handleToggle}
         disabled={!canExpand}
-        className={`flex items-center gap-2 py-0.5 w-full text-left transition-colors ${
+        className={`flex items-center gap-2 py-0.5 w-full text-left justify-start transition-colors ${
           canExpand
             ? "hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer"
             : "cursor-default"
@@ -170,7 +172,7 @@ export function RuntimeStepCard({ event }: HarnessStepCardProps) {
             }`}
           />
         )}
-      </button>
+      </Button>
 
       {/* ── Expanded preview pane ── */}
       <AnimatePresence>

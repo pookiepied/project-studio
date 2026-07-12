@@ -8,6 +8,8 @@ import {
 } from "@phosphor-icons/react";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "./types";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Button } from "@/ui/primitives/Button";
 
 interface WorkspaceHomePanelProps {
   width: number;
@@ -65,25 +67,26 @@ export function WorkspaceHomePanel({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
         <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
-          <button
-            type="button"
+          <IconButton
+            size="sm"
             onClick={onClose}
+            aria-label="Close workspace"
             title="Close workspace"
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
             <X size={14} weight="bold" />
-          </button>
+          </IconButton>
           <span className="truncate text-xs text-gray-500 dark:text-gray-500">Workspace</span>
         </div>
 
         <div className="mt-auto mb-auto px-6">
           <div className="space-y-2">
             {ITEMS.map(({ view, label, shortcut, Icon }) => (
-              <button
+              <Button
                 key={view}
-                type="button"
+                variant="ghost"
                 onClick={() => onOpenView(view)}
-                className="flex h-10 w-full items-center gap-3 rounded-md bg-gray-100 px-3 text-left text-sm text-gray-700 transition-colors duration-100 hover:bg-gray-200/70 dark:bg-surface-raised dark:text-gray-300 dark:hover:bg-surface-selected"
+                className="flex h-10 w-full items-center gap-3 rounded-md bg-gray-100 px-3 text-left justify-start text-sm text-gray-700 transition-colors duration-100 hover:bg-gray-200/70 dark:bg-surface-raised dark:text-gray-300 dark:hover:bg-surface-selected"
               >
                 <Icon size={14} weight="regular" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
                 <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -92,7 +95,7 @@ export function WorkspaceHomePanel({
                     {shortcut}
                   </kbd>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

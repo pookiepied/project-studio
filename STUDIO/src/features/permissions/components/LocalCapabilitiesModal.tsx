@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StudioMark } from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
 import type { LocalPermissionGrants } from "@/runtime";
 
 interface LocalCapabilitiesModalProps {
@@ -158,21 +159,21 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
                 </div>
 
                 <div className="mt-8 flex flex-col-reverse sm:flex-row gap-2.5">
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
                     onClick={onDeny}
                     className="flex-1 py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-200 dark:border-surface-border rounded-2xl transition-colors"
                   >
                     Not now
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="primary"
                     onClick={() => onAllow(grants)}
                     disabled={!anyEnabled}
                     className="flex-1 py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -193,8 +194,8 @@ interface CapabilityRowProps {
 
 function CapabilityRow({ title, caption, enabled, Icon, onToggle }: CapabilityRowProps) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onToggle}
       className={`flex w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors duration-200 ${
         enabled
@@ -218,7 +219,7 @@ function CapabilityRow({ title, caption, enabled, Icon, onToggle }: CapabilityRo
       </div>
 
       <Toggle on={enabled} />
-    </button>
+    </Button>
   );
 }
 

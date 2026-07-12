@@ -9,6 +9,7 @@
 import { PlayIcon as Play, StopIcon as Stop } from "@phosphor-icons/react";
 import { Icon } from "@/ui/icons";
 import { Toggle } from "@/ui/primitives/Toggle";
+import { Button } from "@/ui/primitives/Button";
 import type { McpServer } from "@/core/mcpRegistry/registryClient";
 import {
   DotState, StatusDot,
@@ -22,12 +23,13 @@ const StartStopRow = ({ isTauri, isEnabled, isRunning, onStart, onStop }: {
 }) => {
   if (!isTauri || !isEnabled) return null;
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={isRunning ? onStop : onStart}
-      className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-secondary bg-surface-raised hover:bg-surface-hover rounded-md transition-colors duration-fast"
+      className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium h-auto bg-surface-raised rounded-md"
     >
       <Icon icon={isRunning ? Stop : Play} size="xs" weight="fill" />{isRunning ? "Stop" : "Start"}
-    </button>
+    </Button>
   );
 };
 

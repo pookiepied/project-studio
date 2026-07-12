@@ -27,6 +27,7 @@ import { CaretRightIcon as CaretRight } from "@phosphor-icons/react";
 import type { ChatEngine } from "@/cliBridges/types";
 import { EngineGlyph } from "./EngineGlyph";
 import { ContextMeter } from "./ContextMeter";
+import { Button } from "@/ui/primitives/Button";
 
 /**
  * Human phrase for the status line while a specific tool is running. Keeps the
@@ -207,13 +208,13 @@ export function TurnStatus({
       className="pt-3 pb-1 select-none"
     >
       {hasThinking ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center transition-opacity hover:opacity-80"
+          className="h-auto justify-start transition-opacity hover:opacity-80"
         >
           {row}
-        </button>
+        </Button>
       ) : (
         row
       )}

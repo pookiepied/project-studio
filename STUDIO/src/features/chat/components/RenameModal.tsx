@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 
 interface RenameModalProps {
   isOpen:       boolean;
@@ -49,20 +50,20 @@ export const RenameModal = ({ isOpen, titleInput, onTitleChange, onSave, onCance
               placeholder="Chat name…"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={onCancel}
                 className="px-3.5 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border rounded-lg transition-colors duration-150"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={onSave}
                 className="px-3.5 py-1.5 text-sm font-medium text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-surface-border hover:bg-gray-200 dark:hover:bg-surface-border rounded-lg transition-colors duration-150"
               >
                 Save
-              </button>
+              </Button>
             </div>
           </div>
         </motion.div>

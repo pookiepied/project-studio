@@ -22,18 +22,32 @@ html.dark.zen-window #root {
   background: var(--zen-shell-bg) !important;
 }
 
-/* The app surface is flush with the native window. */
+/* Elegant window outline ------------------------------------------------------
+ * A single light-grey hairline that hugs the whole app window, following its
+ * rounded corners exactly — same shape, one ring.
+ *
+ * The border lives ONLY on .zen-surface, the element that owns the
+ * border-radius. CSS border + border-radius always follows the curve, and
+ * overflow:hidden clips all children to the padding box so they can never
+ * paint over the border. No pseudo-elements, no z-index, no #root border.
+ *
+ * IMPORTANT: #root must NOT have its own border — it fills the full
+ * rectangular viewport and its border draws square, which shows through
+ * .zen-surface's rounded corners as a mismatched square outline behind the
+ * rounded one. Only .zen-surface gets the border.
+ *
+ * box-sizing: border-box means the border draws inside the fixed inset.
+ * --surface-border auto-switches in dark mode via tokens.css. */
+
+/* The app surface — flush with the native window, border follows its radius. */
 .zen-surface {
   position: fixed;
   inset: var(--zen-frame-inset, 8px);
   border-radius: var(--zen-frame-radius, 16px);
   overflow: hidden;
-  box-shadow: none;
+  border: 4px solid var(--surface-border);
   background: var(--zen-shell-bg);
   isolation: isolate;
-}
-html.dark .zen-surface {
-  box-shadow: none;
 }
 
 /* ── Hover-reveal window chrome ──────────────────────────────────────────── */

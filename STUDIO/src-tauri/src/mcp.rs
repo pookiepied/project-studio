@@ -514,15 +514,21 @@ fn strip_unc_prefix(path: std::path::PathBuf) -> String {
 /// Resolve the path to a local MCP server bundle.
 ///
 /// Studio Harness and Computer Use are now two independent packages, each
-/// building a single bundle at `mcp-servers/<server>/dist/index.js` (where
-/// `<server>` is `studio-harness` or `computer-use`). This helper resolves that
+/// building a single bundle at `library/mcp-servers/<category>/<server>/dist/index.js`.
+/// This helper resolves that
 /// path for either of them. Checks the bundled resources directory first
 /// (production), then falls back to the dev-build path relative to the executable.
 fn resolve_local_mcp_server_path(
     app: &tauri::AppHandle,
     server: &str,
 ) -> Result<String, String> {
-    let rel = format!("mcp-servers/{}/dist/index.js", server);
+    let category = match server {
+        "studio-harness" => "harness",
+        "computer-use" => "desktop",
+        "mcp-management" | "skill-management" | "skill-execution" => "system",
+        _ => return Err(format!("Unknown bundled MCP server: {}", server)),
+    };
+    let rel = format!("library/mcp-servers/{}/{}/dist/index.js", category, server);
 
     if let Ok(res_dir) = app.path().resource_dir() {
         let candidate = res_dir.join(&rel);
@@ -538,7 +544,7 @@ fn resolve_local_mcp_server_path(
     let canonical = std::fs::canonicalize(&workspace).map_err(|e| {
         format!(
             "{} MCP server not found at '{:?}': {}. \
-             Run `npm run build` inside mcp-servers/{} first.",
+             Run `npm run build` inside library/mcp-servers/{} first.",
             server, workspace, e, server
         )
     })?;
@@ -555,3 +561,12 @@ pub fn mcp_resolve_studio_harness_server_path(app: tauri::AppHandle) -> Result<S
 pub fn mcp_resolve_computer_use_server_path(app: tauri::AppHandle) -> Result<String, String> {
     resolve_local_mcp_server_path(&app, "computer-use")
 }
+
+#[tauri::command]
+pub fn mcp_resolve_bundled_server_path(app: tauri::AppHandle, server: String) -> Result<String, String> {
+    resolve_local_mcp_server_path(&app, &server)
+}
+
+#[tauri::command] pub fn mcp_resolve_mcp_management_server_path(app: tauri::AppHandle) -> Result<String,String> { resolve_local_mcp_server_path(&app,"mcp-management") }
+#[tauri::command] pub fn mcp_resolve_skill_management_server_path(app: tauri::AppHandle) -> Result<String,String> { resolve_local_mcp_server_path(&app,"skill-management") }
+#[tauri::command] pub fn mcp_resolve_skill_execution_server_path(app: tauri::AppHandle) -> Result<String,String> { resolve_local_mcp_server_path(&app,"skill-execution") }

@@ -14,6 +14,8 @@ import {
   ListIcon as List,
 } from "@phosphor-icons/react";
 import { setRightPanelWidth } from "@/app/shell/workspaceLayoutStore";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { ArtifactPanel } from "@/features/artifacts";
 import { BrowserPanel } from "../browser/BrowserPanel";
 import type { BrowserTab } from "../browser/BrowserPanel";
@@ -124,12 +126,12 @@ function WorkspaceCreateMenu({
       className="fixed z-popover w-64 overflow-hidden rounded-xl border border-surface-border/80 bg-surface-base p-1.5 shadow-xl dark:shadow-[0_18px_44px_rgba(0,0,0,0.45)]"
     >
       {WORKSPACE_TYPES.map(({ type, label, description, Icon }, itemIndex) => (
-        <button
+        <Button
           key={type}
-          type="button"
+          variant="ghost"
           onMouseEnter={() => setIndex(itemIndex)}
           onClick={() => onCreate(type)}
-          className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+          className={`flex w-full items-center justify-start gap-2.5 rounded-lg px-2.5 py-2 h-auto text-left transition-colors ${
             index === itemIndex ? "bg-surface-hover" : ""
           }`}
         >
@@ -138,7 +140,7 @@ function WorkspaceCreateMenu({
             <span className="block text-xs font-medium text-primary">{label}</span>
             <span className="block truncate text-2xs text-muted">{description}</span>
           </span>
-        </button>
+        </Button>
       ))}
     </motion.div>
   );
@@ -167,7 +169,7 @@ function WorkspaceHeader({
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const tabListButtonRef = useRef<HTMLButtonElement>(null);
   const tabStripRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const tabRefs = useRef(new Map<string, HTMLElement>());
   const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
 
   useEffect(() => {
@@ -195,8 +197,8 @@ function WorkspaceHeader({
 
   return (
     <div className="flex h-10 flex-shrink-0 items-center border-b border-surface-divider bg-surface-page px-1.5">
-      <button type="button" onClick={() => moveTab(-1)} disabled={tabs.length < 2} title="Previous tab" className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-muted hover:bg-surface-hover hover:text-primary disabled:opacity-25"><CaretLeft size={14} /></button>
-      <button type="button" onClick={() => moveTab(1)} disabled={tabs.length < 2} title="Next tab" className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-muted hover:bg-surface-hover hover:text-primary disabled:opacity-25"><CaretRight size={14} /></button>
+      <IconButton aria-label="Previous tab" variant="ghost" size="sm" onClick={() => moveTab(-1)} disabled={tabs.length < 2} className="flex-shrink-0 text-muted disabled:opacity-25"><CaretLeft size={14} /></IconButton>
+      <IconButton aria-label="Next tab" variant="ghost" size="sm" onClick={() => moveTab(1)} disabled={tabs.length < 2} className="flex-shrink-0 text-muted disabled:opacity-25"><CaretRight size={14} /></IconButton>
       <div ref={tabStripRef} role="tablist" className="scrollbar-hide min-w-0 flex-1 overflow-x-auto overflow-y-hidden" onWheel={(event) => {
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) event.currentTarget.scrollLeft += event.deltaY;
       }}>
@@ -209,6 +211,7 @@ function WorkspaceHeader({
               <motion.div
                 layout
                 key={tab.id}
+                ref={(node) => { if (node) tabRefs.current.set(tab.id, node); else tabRefs.current.delete(tab.id); }}
                 initial={{ opacity: 0, scale: 0.94, x: 8 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.92, width: 0, paddingLeft: 0, paddingRight: 0 }}
@@ -219,10 +222,9 @@ function WorkspaceHeader({
                     : "text-secondary hover:bg-surface-hover hover:text-primary"
                 }`}
               >
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   role="tab"
-                  ref={(node) => { if (node) tabRefs.current.set(tab.id, node); else tabRefs.current.delete(tab.id); }}
                   aria-selected={active}
                   tabIndex={active ? 0 : -1}
                   onClick={() => onActivateTab(tab.id)}
@@ -233,64 +235,64 @@ function WorkspaceHeader({
                     if (event.key === "End") { event.preventDefault(); onActivateTab(tabs[tabs.length - 1].id); }
                     if (event.key === "Delete") { event.preventDefault(); onCloseTab(tab.id); }
                   }}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 justify-start px-0 py-0 h-auto w-full rounded-none text-xs outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus hover:bg-transparent"
                 >
                   <Icon size={14} className="flex-shrink-0 text-muted" />
                   <span className="min-w-0 flex-1 truncate">{tab.title}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCloseTab(tab.id)}
-                  title={`Close ${tab.title}`}
+                </Button>
+                <IconButton
                   aria-label={`Close ${tab.title}`}
+                  variant="ghost"
+                  onClick={() => onCloseTab(tab.id)}
                   className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded transition-opacity hover:bg-surface-border focus-visible:opacity-100 ${active ? "opacity-60" : "opacity-0 group-hover/tab:opacity-60"}`}
                 >
                   <X size={12} weight="bold" />
-                </button>
+                </IconButton>
               </motion.div>
             );
           })}
           </AnimatePresence>
         </motion.div>
       </div>
-      <button
+      <IconButton
         ref={tabListButtonRef}
-        type="button"
-        title="All workspace tabs"
+        aria-label="All workspace tabs"
+        variant="ghost"
+        size="sm"
         onClick={() => {
           const rect = tabListButtonRef.current?.getBoundingClientRect();
           if (rect) setTabListPosition({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) });
           setTabListOpen((value) => !value);
           setMenuOpen(false);
         }}
-        className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-muted hover:bg-surface-hover hover:text-primary"
-      ><List size={14} /></button>
+        className="flex-shrink-0 text-muted"
+      ><List size={14} /></IconButton>
       {createPortal(
         <AnimatePresence>
           {tabListOpen && (
             <motion.div role="menu" tabIndex={-1} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} style={{ top: tabListPosition.top, right: tabListPosition.right }} className="fixed z-popover max-h-72 w-64 overflow-y-auto rounded-lg border border-surface-border bg-surface-base p-1 shadow-xl scrollbar-auto-hide">
               {tabs.map((tab) => {
                 const Icon = iconFor(tab.type);
-                return <button key={tab.id} type="button" role="menuitem" onClick={() => { onActivateTab(tab.id); setTabListOpen(false); }} className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs ${tab.id === activeTabId ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover"}`}><Icon size={14} /><span className="min-w-0 flex-1 truncate">{tab.title}</span></button>;
+                return <Button key={tab.id} variant="ghost" role="menuitem" onClick={() => { onActivateTab(tab.id); setTabListOpen(false); }} className={`flex h-8 w-full items-center justify-start gap-2 rounded-md px-2 text-left text-xs ${tab.id === activeTabId ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover"}`}><Icon size={14} /><span className="min-w-0 flex-1 truncate">{tab.title}</span></Button>;
               })}
             </motion.div>
           )}
         </AnimatePresence>, document.body,
       )}
       <div className="relative flex-shrink-0" ref={menuRef}>
-        <button
+        <IconButton
           ref={addButtonRef}
-          type="button"
+          aria-label="Create workspace panel"
+          variant="ghost"
           onClick={() => {
             const rect = addButtonRef.current?.getBoundingClientRect();
             if (rect) setMenuPosition({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
             setMenuOpen((value) => !value);
           }}
-          title="Create workspace panel"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
+          className="text-muted"
         >
           <Plus size={14} weight="bold" />
-        </button>
+        </IconButton>
         {createPortal(
           <AnimatePresence>
             {menuOpen && (
@@ -308,14 +310,14 @@ function WorkspaceHeader({
           document.body,
         )}
       </div>
-      <button
-        type="button"
+      <IconButton
+        aria-label="Close workspace"
+        variant="ghost"
         onClick={onClose}
-        title="Close workspace"
-        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
+        className="flex-shrink-0 text-muted"
       >
         <X size={14} weight="bold" />
-      </button>
+      </IconButton>
     </div>
   );
 }

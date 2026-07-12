@@ -6,6 +6,7 @@ use std::sync::Mutex;
 mod commands;
 mod mcp;
 mod local_registry;
+mod control_server;
 mod daemon;
 mod pty;
 mod native_browser;
@@ -30,6 +31,10 @@ use mcp::{
     mcp_get_tools, mcp_list_running, mcp_run_setup,
     mcp_resolve_studio_harness_server_path,
     mcp_resolve_computer_use_server_path,
+    mcp_resolve_bundled_server_path,
+    mcp_resolve_mcp_management_server_path,
+    mcp_resolve_skill_management_server_path,
+    mcp_resolve_skill_execution_server_path,
 };
 
 // Store tray icon reference
@@ -330,6 +335,9 @@ pub fn run() {
             // Register the MCP manager. Servers are started on-demand from the
             // Settings UI — nothing auto-starts until the user configures a server.
             app.manage(mcp::McpManager::new());
+            let control = tauri::async_runtime::block_on(control_server::start(app.handle().clone()))
+                .map_err(|error| Box::<dyn std::error::Error>::from(std::io::Error::other(error)))?;
+            app.manage(control);
 
             // Register the Local Provider Daemon. The daemon is started on-demand
             // from the Settings UI for Ollama/LM Studio integration.
@@ -439,11 +447,20 @@ pub fn run() {
             mcp_run_setup,
             mcp_resolve_studio_harness_server_path,
             mcp_resolve_computer_use_server_path,
+            mcp_resolve_bundled_server_path,
+            mcp_resolve_mcp_management_server_path,
+            mcp_resolve_skill_management_server_path,
+            mcp_resolve_skill_execution_server_path,
             local_registry::local_registry_register_stdio,
             local_registry::local_registry_register_remote,
             local_registry::local_registry_list,
             local_registry::local_registry_remove,
+            local_registry::local_registry_set_enabled,
+            local_registry::local_skill_register,
+            local_registry::local_skill_unregister,
+            local_registry::local_skill_list,
             local_registry::local_registry_sync_payload,
+            control_server::local_control_config,
             local_provider_start,
             local_provider_stop,
             local_provider_is_running,

@@ -113,16 +113,16 @@ async function main() {
     // 3. Build MCP servers while devDependencies (esbuild, tsx) are still present.
     //    Prune happens after — devDeps must exist for this step.
     console.log(cyan("\nBuilding MCP servers..."));
-    run("npm --prefix mcp-servers/studio-harness run build");
-    run("npm --prefix mcp-servers/computer-use run build");
+    run("node scripts/mcp-build.mjs");
     console.log(green("MCP build complete."));
 
     // 4. Prune dev dependencies from MCP servers that ship their node_modules.
     //    typescript, esbuild, tsx etc. add ~10 MB to the compressed EXE for no reason.
     //    Must happen AFTER the builds above and BEFORE Tauri packages node_modules.
     console.log(cyan("\nPruning dev dependencies from bundled MCP servers..."));
-    run("npm prune --omit=dev", join(ROOT, "mcp-servers", "studio-harness"));
-    run("npm prune --omit=dev", join(ROOT, "mcp-servers", "computer-use"));
+    for (const server of ["harness/studio-harness", "desktop/computer-use", "system/mcp-management", "system/skill-management", "system/skill-execution"]) {
+      run("npm prune --omit=dev", join(ROOT, "library", "mcp-servers", ...server.split("/")));
+    }
     console.log(green("Prune complete."));
 
     // Signal mcp-build.mjs (run by beforeBuildCommand) to skip re-building MCP servers.

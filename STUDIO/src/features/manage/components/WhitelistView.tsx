@@ -78,12 +78,13 @@ export const WhitelistView = ({
         <div className="text-center space-y-2">
           <Warning size="md" weight="fill" className="mx-auto text-primary" />
           <p className="text-xs text-secondary">Failed to load.</p>
-          <button
+          <Button
+            variant="ghost"
             onClick={onRetry}
-            className="text-xs text-muted underline hover:text-primary transition-colors duration-fast"
+            className="text-xs text-muted underline h-auto px-0 py-0 hover:bg-transparent hover:text-primary"
           >
             Try again
-          </button>
+          </Button>
         </div>
       </div>
     )}

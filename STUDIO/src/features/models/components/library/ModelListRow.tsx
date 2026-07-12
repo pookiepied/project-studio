@@ -5,6 +5,7 @@ import {
   LeafIcon as Leaf,
 } from "@phosphor-icons/react";
 import { Success, Icon } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
 import { ProviderIcon } from "@/features/models/components/ProviderIcon";
 import type { Model } from "@/core/models";
 import {
@@ -31,8 +32,8 @@ export function ModelListRow({
   const reasoning = hasReasoning(model);
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onPreview}
       className={`w-full grid grid-cols-[minmax(0,1fr)_88px_82px_72px] items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-fast ${
         active ? "bg-surface-selected" : "hover:bg-surface-hover"
@@ -75,6 +76,6 @@ export function ModelListRow({
       <span className="text-xs tabular-nums text-secondary truncate">
         {free ? "Free" : formatModelPrice(model.pricing?.input)}
       </span>
-    </button>
+    </Button>
   );
 }

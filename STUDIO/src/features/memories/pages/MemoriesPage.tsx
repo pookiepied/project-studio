@@ -189,13 +189,15 @@ export const MemoriesPage = () => {
             className="w-full pl-8 pr-9 h-9 text-sm rounded-lg bg-surface-base border border-surface-border text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
           />
           {search && (
-            <button
+            <IconButton
+              variant="ghost"
+              size="sm"
               onClick={() => setSearch("")}
               aria-label="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-muted hover:text-primary transition-colors duration-fast"
             >
               <Close size="xs" />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>

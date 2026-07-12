@@ -8,6 +8,8 @@ import {
 } from "@phosphor-icons/react";
 import type { ClaudeAccountStatus } from "@/cliBridges";
 import type { ClaudeRateLimitInfo } from "@/types";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface ClaudeUsageBadgeProps {
   status: ClaudeAccountStatus | null;
@@ -119,10 +121,10 @@ export function ClaudeUsageBadge({
 
   return (
     <div className="relative flex-shrink-0" ref={containerRef}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setOpen((value) => !value)}
-        className={`flex items-center justify-center gap-1.5 rounded-md transition-colors ${
+        className={`gap-1.5 rounded-md ${
           compact ? "h-8 w-8 px-0" : "h-7 px-2"
         } ${
           healthTone === "warning"
@@ -141,7 +143,7 @@ export function ClaudeUsageBadge({
             {summary}
           </span>
         )}
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && (
@@ -161,14 +163,14 @@ export function ClaudeUsageBadge({
                   {status?.email ?? status?.detail ?? "Bridge status"}
                 </p>
               </div>
-              <button
-                type="button"
+              <IconButton
                 onClick={() => void onRefresh()}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-raised hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                aria-label="Refresh Claude status"
                 title="Refresh Claude status"
+                className="h-7 w-7 rounded-md text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-raised hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <ArrowClockwise size={14} weight="bold" className={loading ? "animate-spin" : ""} />
-              </button>
+              </IconButton>
             </div>
 
             <div className="p-3 space-y-2.5">

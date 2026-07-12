@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ImageLightbox } from "@/features/markdown";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface ScreenshotThumbnailProps {
   url: string;
@@ -28,10 +29,11 @@ export const ScreenshotThumbnail = ({ url, idx }: ScreenshotThumbnailProps) => {
 
   return (
     <>
-      <button
-        onClick={() => setLightbox(true)}
-        className="block rounded-xl overflow-hidden border border-gray-150 dark:border-surface-border hover:border-gray-300 dark:hover:border-surface-border transition-colors cursor-zoom-in group relative"
+      <IconButton
+        aria-label="Click to preview"
         title="Click to preview"
+        onClick={() => setLightbox(true)}
+        className="h-auto w-auto shrink-0 overflow-hidden rounded-xl border border-gray-150 dark:border-surface-border hover:border-gray-300 dark:hover:border-surface-border hover:bg-transparent transition-colors cursor-zoom-in group relative"
       >
         <img
           src={url}
@@ -40,7 +42,7 @@ export const ScreenshotThumbnail = ({ url, idx }: ScreenshotThumbnailProps) => {
           onError={() => setFailed(true)}
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl" />
-      </button>
+      </IconButton>
       {lightbox && (
         <ImageLightbox
           src={url}

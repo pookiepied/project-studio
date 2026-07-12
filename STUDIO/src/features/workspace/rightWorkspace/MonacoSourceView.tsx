@@ -25,6 +25,8 @@ export default function MonacoSourceView({ content, path }: { content: string; p
       base: "vs-dark",
       inherit: true,
       rules: [],
+      // Monaco's defineTheme colors API takes literal hex/rgba strings (no CSS-var tokens).
+      /* eslint-disable no-restricted-syntax */
       colors: {
         "editor.background": "#00000000",
         "editorGutter.background": "#00000000",
@@ -32,6 +34,7 @@ export default function MonacoSourceView({ content, path }: { content: string; p
         "editorLineNumber.activeForeground": "#b8b8b8",
         "scrollbar.shadow": "#00000000",
       },
+      /* eslint-enable no-restricted-syntax */
     });
   }, []);
 

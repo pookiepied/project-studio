@@ -46,6 +46,9 @@ export const LOCAL_MCP_SERVERS: readonly LocalMcpServerDef[] = [
     resolveCmd: "mcp_resolve_computer_use_server_path",
     permissionKey: "computer-use-permission",
   },
+  { name: "mcp-management", displayName: "MCP Management", resolveCmd: "mcp_resolve_mcp_management_server_path", permissionKey: "studio-system-mcp-permission" },
+  { name: "skill-management", displayName: "Skill Management", resolveCmd: "mcp_resolve_skill_management_server_path", permissionKey: "studio-system-mcp-permission" },
+  { name: "skill-execution", displayName: "Skill Execution", resolveCmd: "mcp_resolve_skill_execution_server_path", permissionKey: "studio-system-mcp-permission" },
 ] as const;
 
 export function getLocalMcpServer(name: string): LocalMcpServerDef | undefined {

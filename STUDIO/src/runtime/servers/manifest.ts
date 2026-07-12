@@ -31,11 +31,14 @@ export async function resolveLocalMcpPath(server: LocalMcpServerDef): Promise<st
 export async function startLocalMcp(server: LocalMcpServerDef): Promise<void> {
   await ensureLocalMcpRegistered(server);
   const serverPath = await resolveLocalMcpPath(server);
+  const control = server.name.includes("management") || server.name === "skill-execution"
+    ? await invoke<{ url: string; token: string }>("local_control_config")
+    : null;
   await invoke("mcp_start_server", {
     name: server.name,
     command: "node",
     args: [serverPath],
-    envVars: { ...HARNESS_ENV },
+    envVars: { ...HARNESS_ENV, ...(control ? { STUDIO_CONTROL_URL: control.url, STUDIO_CONTROL_TOKEN: control.token } : {}) },
   });
   await syncLocalMcpManifest(server);
 }

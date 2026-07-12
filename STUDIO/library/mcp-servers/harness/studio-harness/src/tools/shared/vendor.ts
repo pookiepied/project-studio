@@ -32,7 +32,7 @@ interface VendorManifest {
   >;
 }
 
-/** Absolute path to `mcp-servers/vendor`, resolved once and cached. */
+/** Absolute path to `library/mcp-servers/vendor`, resolved once and cached. */
 let cachedVendorDir: string | null | undefined;
 
 function locateVendorDir(): string | null {
@@ -40,8 +40,8 @@ function locateVendorDir(): string | null {
 
   // Anchor points to search up from: this module's own location (the bundled
   // dist/index.js) and the entry script node was launched with. In every layout
-  // the harness bundle sits at `mcp-servers/studio-harness/dist/…`, so the vendor
-  // folder is `../../vendor` from there.
+  // the harness bundle sits at `library/mcp-servers/harness/studio-harness/dist/...`,
+  // so the vendor folder is found by walking up from there.
   const anchors: string[] = [];
   try {
     anchors.push(path.dirname(fileURLToPath(import.meta.url)));

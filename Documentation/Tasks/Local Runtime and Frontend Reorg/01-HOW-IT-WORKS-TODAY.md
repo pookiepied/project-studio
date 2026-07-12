@@ -31,11 +31,11 @@ There are exactly **two bundled local MCP servers**, each a Node process built t
 single bundle:
 
 - `studio-harness` — filesystem, shell, git, LSP, code-intel, etc.
-  (`STUDIO/mcp-servers/studio-harness/`). Its running state is also the
+  (`STUDIO/library/mcp-servers/studio-harness/`). Its running state is also the
   **connectivity signal**: when it is up, the cloud enables local-tool mode
   (`local_engine_connected = true`).
 - `computer-use` — desktop automation, system settings, vision, network
-  (`STUDIO/mcp-servers/computer-use/`). Separately permissioned; more sensitive.
+  (`STUDIO/library/mcp-servers/computer-use/`). Separately permissioned; more sensitive.
 
 ### Step-by-step
 

@@ -14,6 +14,8 @@ import {
 } from "@phosphor-icons/react";
 import MarkdownDocumentPreview from "./MarkdownDocumentPreview";
 import "./filesPanel.css";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 const MonacoSourceView = lazy(() => import("./MonacoSourceView"));
 
@@ -101,11 +103,11 @@ function FileTreeNode({
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => entry.isDir ? onToggle(entry.path) : onSelect(entry)}
         onDoubleClick={() => onSelect(entry)}
-        className={`group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs transition-colors ${
+        className={`group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left justify-start text-xs transition-colors ${
           selected ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
         }`}
         style={{ paddingLeft: 8 + depth * 14 }}
@@ -122,7 +124,7 @@ function FileTreeNode({
         )}
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
         {loading && <span className="h-3 w-3 rounded-full border border-muted border-t-transparent animate-spin" />}
-      </button>
+      </Button>
       {entry.isDir && expanded && (
         <div>
           {children.map((child) => (
@@ -245,14 +247,15 @@ export function FilesPanel({
       <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
         <FolderOpen size={14} className="text-amber-500" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary">{rootName}</span>
-        <button
-          type="button"
+        <IconButton
+          size="sm"
           onClick={refresh}
+          aria-label="Refresh files"
           title="Refresh files"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
         >
           <Refresh size={14} className={loading ? "animate-spin" : ""} />
-        </button>
+        </IconButton>
       </div>
       {error && (
         <div className="border-b border-surface-divider px-3 py-2 text-xs text-muted">
@@ -300,36 +303,39 @@ export function FilesPanel({
                 </div>
                 <span className="rounded-md bg-surface-base px-1.5 py-0.5 text-2xs text-muted">{formatBytes(fileContent.length)}</span>
                 <div className="flex h-8 items-center rounded-lg bg-surface-base p-0.5">
-                  <button
-                    type="button"
+                  <IconButton
+                    size="sm"
                     onClick={() => setViewMode("preview")}
                     disabled={!canPreviewMarkdown}
+                    aria-label="Preview file"
                     title="Preview file"
                     className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                       viewMode === "preview" ? "bg-surface-selected text-primary" : "text-muted hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
                     }`}
                   >
                     <Eye size={14} />
-                  </button>
-                  <button
-                    type="button"
+                  </IconButton>
+                  <IconButton
+                    size="sm"
                     onClick={() => setViewMode("raw")}
+                    aria-label="View source"
                     title="View source"
                     className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                       viewMode === "raw" ? "bg-surface-selected text-primary" : "text-muted hover:text-primary"
                     }`}
                   >
                     <Code size={14} />
-                  </button>
+                  </IconButton>
                 </div>
-                <button
-                  type="button"
+                <IconButton
+                  size="sm"
                   onClick={() => onStateChange({ selectedPath: null })}
+                  aria-label="Close file"
                   title="Close file"
                   className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-hover hover:text-primary"
                 >
                   <X size={14} />
-                </button>
+                </IconButton>
               </div>
               {fileLoading ? (
                 <div className="flex flex-1 items-center justify-center text-xs text-muted">

@@ -6,6 +6,7 @@ import {
 } from "@phosphor-icons/react";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "./types";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface WorkspacePlaceholderPanelProps {
   view: Extract<RightWorkspaceView, "files" | "side-chat">;
@@ -53,14 +54,15 @@ export function WorkspacePlaceholderPanel({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
         <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
-          <button
-            type="button"
+          <IconButton
+            size="sm"
             onClick={onClose}
+            aria-label={`Close ${title.toLowerCase()}`}
             title={`Close ${title.toLowerCase()}`}
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
             <X size={14} weight="bold" />
-          </button>
+          </IconButton>
           <Icon size={14} weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
           <span className="truncate text-xs text-gray-500 dark:text-gray-500">{title}</span>
         </div>

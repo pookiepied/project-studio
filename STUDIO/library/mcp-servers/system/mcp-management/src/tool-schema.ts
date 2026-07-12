@@ -1,0 +1,2 @@
+export interface ToolDefinition{name:string;description:string;inputSchema:{type:"object";properties:Record<string,unknown>;required?:string[];additionalProperties:false}}
+export function defineTools(tools:ToolDefinition[]):ToolDefinition[]{const names=new Set<string>();for(const tool of tools){if(names.has(tool.name))throw new Error(`Duplicate tool: ${tool.name}`);names.add(tool.name)}return tools}

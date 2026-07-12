@@ -3,6 +3,7 @@ import { EnvironmentSelector } from "@/features/chat/components/EnvironmentSelec
 import { ProjectLauncher } from "./ProjectLauncher";
 import type { ProjectContextLike } from "./types";
 import type { ConversationStorageScope } from "@/core/conversations";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface RightWorkspaceControlsProps {
   isTauri: boolean;
@@ -33,18 +34,19 @@ export function RightWorkspaceControls({
 
       <ProjectLauncher isTauri={isTauri} projectContext={projectContext} />
 
-      <button
-        type="button"
+      <IconButton
+        size="sm"
         onClick={onToggleOpen}
+        aria-label={open ? "Hide workspace" : "Show workspace"}
         title={open ? "Hide workspace" : "Show workspace"}
         className={`studio-chat-icon-button flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-100 ${
           open
             ? "bg-gray-100 text-gray-700 dark:bg-surface-raised dark:text-gray-300"
-            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
         }`}
       >
         <NavToggleIcon size={14} open={open} />
-      </button>
+      </IconButton>
     </div>
   );
 }

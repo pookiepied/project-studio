@@ -6,6 +6,7 @@ import {
   UserCircleIcon as UserCircle,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { Button } from "@/ui/primitives/Button";
 
 interface AccountMenuProps {
   expanded?: boolean;
@@ -76,13 +77,12 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
 
   return (
     <div ref={wrapperRef} className="relative">
-      <button
-        type="button"
+      <Button
         onClick={() => setOpen((value) => !value)}
-        title={!expanded ? "Account" : undefined}
+        variant="ghost"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="group flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors duration-fast hover:bg-surface-hover"
+        className="group w-full gap-2 rounded-xl px-2 py-2 text-left"
       >
         {avatar}
         <span
@@ -98,7 +98,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
             </span>
           )}
         </span>
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && panelPos && createPortal(
@@ -130,30 +130,30 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
             </div>
 
             <div className="p-1.5">
-              <button
-                type="button"
+              <Button
                 onClick={() => {
                   setOpen(false);
                   onManageAccount?.();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
+                variant="ghost"
+                className="w-full gap-2.5 rounded-lg px-3 py-2 text-left text-sm"
               >
                 <UserCircle size={14} weight="regular" />
                 Manage account
-              </button>
+              </Button>
 
               {user && (
-                <button
-                  type="button"
+                <Button
                   onClick={() => {
                     logout();
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-secondary transition-colors hover:bg-surface-raised dark:hover:bg-surface-raised/[0.06]"
+                  variant="ghost"
+                  className="w-full gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised dark:hover:bg-surface-raised/[0.06]"
                 >
                   <SignOut size={14} weight="regular" />
                   Sign out
-                </button>
+                </Button>
               )}
             </div>
           </motion.div>,

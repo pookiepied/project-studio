@@ -51,10 +51,13 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../mcp-servers/studio-harness/dist": "mcp-servers/studio-harness/dist",
-      "../mcp-servers/studio-harness/node_modules": "mcp-servers/studio-harness/node_modules",
-      "../mcp-servers/computer-use/dist": "mcp-servers/computer-use/dist",
-      "../mcp-servers/computer-use/node_modules": "mcp-servers/computer-use/node_modules",
+      "../library/mcp-servers/harness/studio-harness/dist": "library/mcp-servers/harness/studio-harness/dist",
+      "../library/mcp-servers/harness/studio-harness/node_modules": "library/mcp-servers/harness/studio-harness/node_modules",
+      "../library/mcp-servers/desktop/computer-use/dist": "library/mcp-servers/desktop/computer-use/dist",
+      "../library/mcp-servers/desktop/computer-use/node_modules": "library/mcp-servers/desktop/computer-use/node_modules",
+      "../library/mcp-servers/system/mcp-management/dist": "library/mcp-servers/system/mcp-management/dist",
+      "../library/mcp-servers/system/skill-management/dist": "library/mcp-servers/system/skill-management/dist",
+      "../library/mcp-servers/system/skill-execution/dist": "library/mcp-servers/system/skill-execution/dist",
       "../vendor": "vendor"
     },
     "windows": {

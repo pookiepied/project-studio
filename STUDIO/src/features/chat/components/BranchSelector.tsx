@@ -12,6 +12,8 @@ import {
 } from "@phosphor-icons/react";
 import { gitService, type GitBranch as Branch } from "@/core/git/gitService";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 type ProjectCtx = { path: string; name: string; accessMode?: "review" | "autonomous" };
 
@@ -95,11 +97,11 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={openMenu}
         title={inWorktree ? `${current} — checked out in worktree ${currentBranch?.worktreePath}` : current}
-        className="flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-hover"
+        className="h-6 gap-1.5 rounded-md px-2 text-xs text-secondary"
       >
         <GitBranch size={14} />
         <span className="max-w-28 truncate">{current}</span>
@@ -110,7 +112,7 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
           </span>
         )}
         <CaretDown size={12} weight="bold" className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      </Button>
 
       {createPortal(
         <AnimatePresence>
@@ -128,33 +130,64 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
                   <div className="flex items-center gap-2 px-2 py-1.5 text-muted">
                     <Search size={14} />
                     <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search branches" className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted" />
-                    {query && <button type="button" onClick={() => setQuery("")}><X size={12} /></button>}
+                    {query && (
+                      <IconButton
+                        aria-label="Clear search"
+                        onClick={() => setQuery("")}
+                        className="h-4 w-4"
+                      >
+                        <X size={12} />
+                      </IconButton>
+                    )}
                   </div>
                   <div className="my-1 h-px bg-surface-divider" />
                   <div className="max-h-52 overflow-y-auto">
                     {filtered.map(branch => (
-                      <button key={branch.name} type="button" disabled={busy} onClick={() => checkout(branch)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-primary hover:bg-surface-hover disabled:opacity-50">
+                      <Button
+                        key={branch.name}
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => checkout(branch)}
+                        className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-primary hover:bg-surface-hover disabled:opacity-50"
+                      >
                         <GitBranch size={14} className="text-secondary" />
                         <span className="min-w-0 flex-1 truncate">{branch.name}</span>
                         {branch.worktreePath && !branch.current && <span className="text-2xs text-muted">Worktree</span>}
                         {branch.current && <Check size={12} weight="bold" />}
-                      </button>
+                      </Button>
                     ))}
                     {!filtered.length && !error && <p className="px-2.5 py-3 text-xs text-muted">No branches found</p>}
                   </div>
                   <div className="my-1 h-px bg-surface-divider" />
-                  <button type="button" onClick={() => { setCreating(true); setError(null); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-surface-hover">
+                  <Button
+                    variant="ghost"
+                    onClick={() => { setCreating(true); setError(null); }}
+                    className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover"
+                  >
                     <Plus size={14} weight="bold" /> Create and check out new branch
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <div className="p-1">
                   <p className="px-1 pb-2 text-xs font-medium text-primary">Create and check out branch</p>
                   <div className="flex gap-1.5">
                     <input autoFocus value={branchName} onChange={event => setBranchName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void createBranch(); if (event.key === "Escape") setCreating(false); }} placeholder="Branch name" className="min-w-0 flex-1 rounded-lg border border-surface-border bg-surface-page px-2 py-1.5 text-xs text-primary outline-none focus:ring-1 focus:ring-focus" />
-                    <button type="button" disabled={!branchName.trim() || busy} onClick={createBranch} className="rounded-lg bg-primary px-2.5 text-xs font-medium text-on-emphasis disabled:opacity-40">Create</button>
+                    <Button
+                      variant="primary"
+                      disabled={!branchName.trim() || busy}
+                      onClick={createBranch}
+                      className="h-auto rounded-lg px-2.5 text-xs text-on-emphasis disabled:opacity-40"
+                    >
+                      Create
+                    </Button>
                   </div>
-                  <button type="button" onClick={() => setCreating(false)} className="mt-2 px-1 text-xs text-muted hover:text-primary">Back</button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setCreating(false)}
+                    className="mt-2 h-auto px-1 text-xs text-muted hover:text-primary"
+                  >
+                    Back
+                  </Button>
                 </div>
               )}
               {error && <p className="mx-2 mb-1 mt-2 text-2xs text-secondary">{error}</p>}

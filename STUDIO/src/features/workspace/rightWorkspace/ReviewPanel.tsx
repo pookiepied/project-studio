@@ -21,6 +21,8 @@ import {
 } from "@phosphor-icons/react";
 import { Select } from "@/ui/primitives/Select";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { createSplitRows, parseUnifiedDiff, type DiffLine } from "./unifiedDiff";
 
 interface GitChangedFile {
@@ -97,16 +99,18 @@ function ControlButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <IconButton
+      aria-label={title}
       title={title}
+      variant="ghost"
+      size="sm"
       onClick={onClick}
-      className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
-        active ? "bg-surface-selected text-primary" : "text-muted hover:bg-surface-hover hover:text-primary"
+      className={`rounded-lg transition-colors ${
+        active ? "bg-surface-selected text-primary hover:bg-surface-selected" : "text-muted"
       }`}
     >
       {children}
-    </button>
+    </IconButton>
   );
 }
 
@@ -285,13 +289,13 @@ export function ReviewPanel({
           <p className="mt-1 text-xs leading-relaxed text-muted">
             {projectName(rootPath)} is not a Git repository, so the workspace opens best as a file reader.
           </p>
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={onOpenFiles}
-            className="mt-4 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-inverse hover:opacity-90"
+            className="mt-4 px-3 py-1.5 h-auto text-xs font-medium text-inverse hover:bg-primary hover:opacity-90"
           >
             Open files
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -313,7 +317,7 @@ export function ReviewPanel({
           <div className="hidden items-center gap-0.5 rounded-lg bg-surface-base p-0.5 md:flex">
             <ControlButton title="Enable word wrap" active={wordWrap} onClick={() => setWordWrap((value) => !value)}><WordWrap size={14} /></ControlButton>
             <ControlButton title="Switch to split diff" active={splitDiff} onClick={() => setSplitDiff((value) => !value)}><Split size={14} /></ControlButton>
-            <ControlButton title="Ignore whitespace" active={ignoreWhitespace} onClick={() => setIgnoreWhitespace((value) => !value)}><span className="text-[10px] font-semibold">WS</span></ControlButton>
+            <ControlButton title="Ignore whitespace" active={ignoreWhitespace} onClick={() => setIgnoreWhitespace((value) => !value)}><span className="text-2xs font-semibold">WS</span></ControlButton>
           </div>
           <ControlButton title="Show files" active={showFiles} onClick={() => setShowFiles((value) => !value)}><SidebarSimple size={14} /></ControlButton>
           <ControlButton title="Refresh changes" onClick={load}><Refresh size={14} className={loading ? "animate-spin" : ""} /></ControlButton>
@@ -330,8 +334,8 @@ export function ReviewPanel({
             <p className="mt-0.5 max-h-20 overflow-auto whitespace-pre-wrap break-words text-2xs opacity-80 scrollbar-thin">{error}</p>
           </div>
           <div className="flex flex-shrink-0 items-center gap-1">
-            {pendingBranch && <button type="button" onClick={stashAndCheckout} disabled={loading} className="rounded-md border border-rose-500/20 bg-surface-page px-2 py-1 text-2xs font-semibold hover:bg-rose-500/10 disabled:opacity-50">Stash and retry</button>}
-            <button type="button" onClick={() => { setError(null); setPendingBranch(null); }} className="rounded px-1.5 py-1 text-2xs font-medium hover:bg-rose-500/10">Dismiss</button>
+            {pendingBranch && <Button variant="outline" onClick={stashAndCheckout} disabled={loading} className="rounded-md border-rose-500/20 bg-surface-page px-2 py-1 h-auto text-2xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 disabled:opacity-50">Stash and retry</Button>}
+            <Button variant="ghost" onClick={() => { setError(null); setPendingBranch(null); }} className="rounded px-1.5 py-1 h-auto text-2xs font-medium text-rose-700 dark:text-rose-300 hover:bg-rose-500/10">Dismiss</Button>
           </div>
         </div>
       )}
@@ -359,11 +363,11 @@ export function ReviewPanel({
                   const badge = statusBadge(file);
                   const StatusIcon = badge.Icon;
                   return (
-                    <button
+                    <Button
                       key={`${file.status}-${file.path}`}
-                      type="button"
+                      variant="ghost"
                       onClick={() => onStateChange({ selectedPath: file.path })}
-                      className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
+                      className={`mb-1 w-full items-center justify-start gap-2 rounded-lg px-2 py-2 h-auto text-left transition-colors ${
                         selectedPath === file.path ? "bg-surface-selected" : "hover:bg-surface-hover"
                       }`}
                     >
@@ -374,7 +378,7 @@ export function ReviewPanel({
                         <span className="block truncate text-xs text-primary">{file.path}</span>
                         <span className="block text-2xs text-muted">{statusLabel(file)}</span>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })()
               ))}
@@ -414,7 +418,7 @@ export function ReviewPanel({
               Loading diff
             </div>
           ) : splitDiff ? (
-            <div className="h-full overflow-auto font-mono text-[11px] leading-relaxed">
+            <div className="h-full overflow-auto font-mono text-xs leading-relaxed">
               <div className={wordWrap ? "min-w-0" : "min-w-max"}>
                 {splitRows.map((row, index) => (
                   <div key={index} className="grid grid-cols-2 items-stretch">
@@ -426,7 +430,7 @@ export function ReviewPanel({
               {!diff && <p className="px-4 py-6 text-xs text-muted">No diff for this selection.</p>}
             </div>
           ) : (
-            <div className="h-full overflow-auto font-mono text-[11px] leading-relaxed">
+            <div className="h-full overflow-auto font-mono text-xs leading-relaxed">
               <div className={wordWrap ? "min-w-0" : "min-w-max"}>
                 {diffLines.map((line, index) => (
                   <div key={index} className={`flex min-w-0 ${richPreview ? classifyLine(line) : "text-secondary"}`}>
@@ -457,35 +461,35 @@ export function ReviewPanel({
         />
         </div>
           <div className="flex flex-shrink-0 items-center gap-1">
-            <button
-              type="button"
+            <Button
+              variant="outline"
               onClick={() => runGitAction("stage", "file")}
               disabled={actionBusy !== null || !selectedPath}
-              className="flex h-8 items-center gap-1 rounded-md border border-surface-border bg-surface-page px-2 text-2xs font-medium text-secondary transition hover:bg-surface-hover disabled:opacity-40"
+              className="h-8 gap-1 rounded-md bg-surface-page px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40"
             >
               <StageIcon size={13} />
               Stage file
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => runGitAction("stage", "all")}
               disabled={actionBusy !== null}
-              className="h-8 rounded-md px-2 text-2xs font-medium text-secondary transition hover:bg-surface-hover disabled:opacity-40"
+              className="h-8 rounded-md px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40"
             >
               Stage all
-            </button>
-            <button type="button" onClick={() => runGitAction("unstage", "file")} disabled={actionBusy !== null || !selectedPath} className="flex h-8 items-center gap-1 rounded-md border border-surface-border bg-surface-page px-2 text-2xs font-medium text-secondary transition hover:bg-surface-hover disabled:opacity-40"><UnstageIcon size={13} />Unstage file</button>
-            <button type="button" onClick={() => runGitAction("unstage", "all")} disabled={actionBusy !== null} className="h-8 rounded-md px-2 text-2xs font-medium text-secondary transition hover:bg-surface-hover disabled:opacity-40">Unstage all</button>
+            </Button>
+            <Button variant="outline" onClick={() => runGitAction("unstage", "file")} disabled={actionBusy !== null || !selectedPath} className="h-8 gap-1 rounded-md bg-surface-page px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40"><UnstageIcon size={13} />Unstage file</Button>
+            <Button variant="ghost" onClick={() => runGitAction("unstage", "all")} disabled={actionBusy !== null} className="h-8 rounded-md px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40">Unstage all</Button>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => runGitAction("commit")}
             disabled={actionBusy !== null || !commitMessage.trim() || stagedCount === 0}
-            className="flex h-8 flex-shrink-0 items-center gap-1.5 rounded-md border border-surface-border bg-surface-page px-3 text-xs font-semibold text-primary transition hover:bg-surface-hover disabled:opacity-40"
+            className="h-8 flex-shrink-0 gap-1.5 rounded-md bg-surface-page px-3 text-xs font-semibold text-primary transition hover:bg-surface-hover disabled:opacity-40"
           >
             {actionBusy === "commit" ? "Committing..." : "Commit"}
             {actionBusy !== "commit" && <ArrowRight size={13} weight="bold" />}
-          </button>
+          </Button>
       </div>
     </div>
   );

@@ -6,10 +6,10 @@ import type { Env } from "../system/env";
  */
 
 export async function assertOwnership(
-  _env: Env,
-  _userId: string,
-  _table: "conversations" | "attachments" | "artifacts",
-  _id: string,
+  env: Env, userId: string,
+  table: "conversations" | "attachments" | "artifacts",
+  id: string,
 ): Promise<void> {
-  throw new Error("not_implemented");
+  const row=await env.DATA_DB.prepare(`SELECT id FROM ${table} WHERE id=? AND user_id=?`).bind(id,userId).first();
+  if(!row)throw new Error("not_found");
 }

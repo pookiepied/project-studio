@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { PencilSimpleIcon as PencilSimple, CheckIcon as Check } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 
 interface TextBlockProps {
   code: string;
@@ -45,7 +46,8 @@ export function TextBlock({ code }: TextBlockProps) {
               rows={Math.max(3, text.split("\n").length + 1)}
             />
             <div className="flex justify-end px-4 pb-3">
-              <motion.button
+              <Button
+                variant="ghost"
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={handleSave}
@@ -57,7 +59,7 @@ export function TextBlock({ code }: TextBlockProps) {
               >
                 <Check size={14} weight="bold" />
                 Done
-              </motion.button>
+              </Button>
             </div>
           </motion.div>
         ) : (
@@ -78,11 +80,14 @@ export function TextBlock({ code }: TextBlockProps) {
 
       {/* Edit button — top-right, visible on hover */}
       {!editing && (
-        <motion.button
+        <Button
+          variant="ghost"
           initial={{ opacity: 0 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setEditing(true)}
+          aria-label="Edit text"
+          title="Edit text"
           className="absolute top-2 right-2
                      opacity-0 group-hover/textblock:opacity-100
                      w-7 h-7 flex items-center justify-center rounded-lg
@@ -90,7 +95,6 @@ export function TextBlock({ code }: TextBlockProps) {
                      hover:text-gray-600 dark:hover:text-gray-400
                      hover:bg-gray-100 dark:hover:bg-surface-raised
                      transition-all duration-100"
-          title="Edit text"
         >
           <AnimatePresence mode="wait">
             {saved ? (
@@ -103,7 +107,7 @@ export function TextBlock({ code }: TextBlockProps) {
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.button>
+        </Button>
       )}
     </div>
   );

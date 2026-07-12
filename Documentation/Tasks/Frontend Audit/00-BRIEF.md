@@ -60,7 +60,7 @@ squarely your job.
 
 **Audit:** everything under `STUDIO/src/`. All of it, including `cliBridges/`.
 
-**Do not audit:** `STUDIO/daemon/`, `STUDIO/src-tauri/`, `STUDIO/mcp-servers/`,
+**Do not audit:** `STUDIO/daemon/`, `STUDIO/src-tauri/`, `STUDIO/library/mcp-servers/`,
 `STUDIO/vendor/`, and the backend services at the repo root (`chat/`, `api/`, `auth/`,
 `gateway/`, `gateway-v2/`, `ai/`, `skills/`). Where `src/` depends on them, **describe
 the dependency and where it crosses** — that boundary is one of the most important

@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { Icon, Refresh, Warning } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { createHeaders } from "@/lib/api";
 import { apiManager } from "@/core/network/apiManager";
@@ -245,17 +246,18 @@ export const ActivityPage = () => {
               { key: "agents",  label: "Agents"  },
               { key: "system",  label: "System"  },
             ] as const).map((tab) => (
-              <button
+              <Button
                 key={tab.key}
+                variant="ghost"
                 onClick={() => setMode(tab.key)}
-                className={`px-3 py-0.5 text-2xs rounded transition-colors duration-fast font-sans ${
+                className={`px-3 !py-0.5 !text-2xs !rounded !h-auto transition-colors duration-fast font-sans ${
                   mode === tab.key
-                    ? "bg-surface-raised text-primary font-semibold shadow-sm"
-                    : "text-muted hover:text-secondary"
+                    ? "!bg-surface-raised !text-primary font-semibold shadow-sm"
+                    : "!text-muted hover:!text-secondary"
                 }`}
               >
                 {tab.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -322,31 +324,33 @@ export const ActivityPage = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     {([7, 14, 30] as const).map((d) => (
-                      <button
+                      <Button
                         key={d}
+                        variant="ghost"
                         onClick={() => setDays(d)}
-                        className={`px-2 py-0.5 text-2xs rounded transition-colors duration-fast ${
+                        className={`!px-2 !py-0.5 !text-2xs !rounded !h-auto transition-colors duration-fast ${
                           days === d
-                            ? "bg-surface-selected text-primary font-medium"
-                            : "text-muted hover:text-secondary"
+                            ? "!bg-surface-selected !text-primary font-medium"
+                            : "!text-muted hover:!text-secondary"
                         }`}
                       >
                         {d}d
-                      </button>
+                      </Button>
                     ))}
                     <div className="w-px h-3 bg-surface-border mx-0.5" />
                     {CHART_METRICS.map((m) => (
-                      <button
+                      <Button
                         key={m.key}
+                        variant="ghost"
                         onClick={() => setMetric(m.key)}
-                        className={`px-2 py-0.5 text-2xs rounded transition-colors duration-fast ${
+                        className={`!px-2 !py-0.5 !text-2xs !rounded !h-auto transition-colors duration-fast ${
                           metric === m.key
-                            ? "bg-surface-selected text-primary font-medium"
-                            : "text-muted hover:text-secondary"
+                            ? "!bg-surface-selected !text-primary font-medium"
+                            : "!text-muted hover:!text-secondary"
                         }`}
                       >
                         {m.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -425,12 +429,13 @@ export const ActivityPage = () => {
                   </div>
                 )}
                 {providerFilter !== "all" && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={() => setProviderFilter("all")}
-                    className="mt-2 text-xs text-muted hover:text-secondary transition-colors duration-fast"
+                    className="mt-2 !h-auto !px-0 !py-0 !rounded-none text-xs !text-muted hover:!text-secondary transition-colors duration-fast"
                   >
                     Clear filter ×
-                  </button>
+                  </Button>
                 )}
               </section>
             )}

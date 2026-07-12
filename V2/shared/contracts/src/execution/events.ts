@@ -8,6 +8,7 @@
  */
 
 import type { RunStatus } from "./run";
+import type { NormalizedRuntimeError } from "./errors";
 
 export const RUNTIME_PROTOCOL_VERSION = 1;
 
@@ -33,13 +34,15 @@ export interface RuntimeEventPayloads {
   /** Accumulated assistant text at a step boundary (replay accelerator). */
   "assistant.snapshot": { step: number; text: string };
   "assistant.completed": { text: string };
-  "tool.call_created": { toolCallId: string; toolName: string };
+  "tool.call_created": { toolCallId: string; toolName: string; input: unknown };
   "tool.started": { toolCallId: string; toolName: string };
   "tool.progress": { toolCallId: string; message: string };
-  "tool.completed": { toolCallId: string; summary: string };
+  "tool.completed": { toolCallId: string; summary: string; output: unknown };
   "tool.failed": { toolCallId: string; error: string };
   "tool.external_requested": { toolCallId: string; serverId: string; toolName: string; input: unknown };
   "tool.external_resolved": { toolCallId: string };
+  "client.action_requested": { toolCallId: string; action: string; input: unknown };
+  "client.action_resolved": { toolCallId: string; action: string };
   "approval.required": {
     approvalId: string;
     toolCallId: string;
@@ -57,7 +60,7 @@ export interface RuntimeEventPayloads {
   "run.recovering": { attempt: number; reason: string };
   "run.progress": { message: string };
   "run.completed": { output: string };
-  "run.failed": { failureSummary: string };
+  "run.failed": { failureSummary: string; error: NormalizedRuntimeError };
   "run.cancelled": { reason: string };
 }
 

@@ -10,6 +10,7 @@ import {
   CaretDownIcon as CaretDown,
 } from '@phosphor-icons/react';
 import { Toggle } from '@/ui/primitives/Toggle';
+import { IconButton } from '@/ui/primitives/IconButton';
 import { useDaemon } from '@/features/models/hooks/useLocalProviderDaemon';
 import { createDaemonClient, LocalModel } from '@/core/daemon/daemonClient';
 
@@ -95,28 +96,30 @@ export const LMStudioStatus = ({ enabled, onToggle }: LMStudioStatusProps) => {
 
         <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
           {enabled && status.running && (
-            <button
+            <IconButton
               onClick={checkStatus}
               disabled={isChecking}
-              className="text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-300 p-1"
+              aria-label="Refresh models"
               title="Refresh Models"
+              className="text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-300 p-1"
             >
               <ArrowClockwise size={16} className={isChecking ? 'animate-spin' : ''} />
-            </button>
+            </IconButton>
           )}
 
           <Toggle checked={enabled} onChange={onToggle} />
 
           {enabled && status.running && isConnected && models.length > 0 && (
-            <button
+            <IconButton
               onClick={() => setIsExpanded(!isExpanded)}
+              aria-label="Toggle models"
               className="text-gray-400 p-1 transition-transform duration-300"
             >
               <CaretDown
                 size={16}
                 className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
               />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>

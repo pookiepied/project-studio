@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CopyIcon as Copy, CheckIcon as Check } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
 
 interface DocumentViewProps {
   content: string;
@@ -17,23 +18,17 @@ export function DocumentView({ content }: DocumentViewProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* Copy button */}
-      <button
+      <Button
+        variant="ghost"
         onClick={handleCopy}
         title="Copy content"
-        className="absolute top-3 right-3 z-10
-                   flex items-center gap-1.5 px-2 h-6 rounded
-                   text-2xs font-medium
-                   bg-gray-100/80 dark:bg-surface-raised/80
-                   border border-gray-200/60 dark:border-surface-border/60
-                   text-gray-500 dark:text-gray-400
-                   hover:text-gray-700 dark:hover:text-gray-200
-                   backdrop-blur-sm transition-colors duration-100"
+        className="absolute top-3 right-3 z-10 flex items-center !gap-1.5 !px-2 !h-6 !rounded !text-2xs font-medium !bg-gray-100/80 dark:!bg-surface-raised/80 border !border-gray-200/60 dark:!border-surface-border/60 !text-gray-500 dark:!text-gray-400 hover:!text-gray-700 dark:hover:!text-gray-200 backdrop-blur-sm transition-colors !duration-100"
       >
         {copied
           ? <><Check size={12} weight="bold" className="text-secondary" /> Copied</>
           : <><Copy size={12} weight="regular" /> Copy</>
         }
-      </button>
+      </Button>
 
       {/* Document body — plain prose, pre-wrap for whitespace */}
       <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-auto-hide">

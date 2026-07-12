@@ -5,6 +5,7 @@ import { logger } from "@/core/logging/logger";
 import { environmentService } from "@/core/platform/environmentService";
 import { NavToggleIcon } from "@/ui/icons/WorkspaceIcons";
 import { NotificationBell } from "@/app/shell/NotificationBell";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface TitleBarProps {
   onToggle: () => void;
@@ -63,11 +64,10 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
       data-tauri-drag-region={environmentService.isTauri() ? "" : undefined}
       className="relative flex h-10 select-none items-center justify-between border-b border-gray-900/[0.06] bg-gray-50 px-2.5 transition-colors duration-300 dark:border-white/[0.04] dark:bg-surface-page"
     >
-      <button
-        type="button"
+      <IconButton
         onClick={() => openPalette(true)}
         aria-label="Search or jump to (Ctrl+K)"
-        className="absolute left-1/2 flex h-6 w-[430px] max-w-[50vw] -translate-x-1/2 items-center gap-1.5 rounded-full bg-gray-900/[0.04] px-3 text-gray-400 transition-colors duration-150 hover:bg-gray-900/[0.07] dark:bg-white/[0.04] dark:text-gray-500 dark:hover:bg-white/[0.07]"
+        className="absolute left-1/2 -translate-x-1/2 h-6 w-[430px] max-w-[50vw] gap-1.5 rounded-full bg-gray-900/[0.04] px-3 text-gray-400 hover:bg-gray-900/[0.07] dark:bg-white/[0.04] dark:text-gray-500 dark:hover:bg-white/[0.07]"
       >
         <Search size={14} className="flex-shrink-0" />
         <span className="flex-1 truncate text-left text-xs">Search or jump to...</span>
@@ -75,14 +75,14 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
           <CommandIcon size={12} />
           K
         </kbd>
-      </button>
+      </IconButton>
 
       <div className="flex items-center gap-1.5">
-        <button
-          type="button"
+        <IconButton
           data-nav-toggle
+          variant="ghost"
           onClick={onToggle}
-          className={`rounded-md p-1.5 transition-colors duration-150 ${
+          className={`h-auto w-auto rounded-md p-1.5 ${
             navOpen
               ? "bg-gray-900/[0.07] text-gray-700 dark:bg-white/[0.07] dark:text-gray-200"
               : "text-gray-500 hover:bg-gray-900/[0.06] dark:text-gray-500 dark:hover:bg-white/[0.06]"
@@ -90,7 +90,7 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
           aria-label={navOpen ? "Close navigation" : "Open navigation"}
         >
           <NavToggleIcon open={navOpen} />
-        </button>
+        </IconButton>
       </div>
 
       <div className="flex items-center gap-1">
@@ -106,12 +106,10 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
               { color: "#28C840", label: "Zoom",     action: handleMaximize },
               /* eslint-enable no-restricted-syntax */
             ] as const).map(({ color, label, action }) => (
-              <button
+              <IconButton
                 key={label}
-                type="button"
                 onClick={action}
                 aria-label={label}
-                title={label}
                 className="rounded-full transition-opacity hover:opacity-80 active:opacity-60"
                 style={{
                   width: 12,
@@ -119,7 +117,9 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
                   backgroundColor: color,
                   boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.18)",
                 }}
-              />
+              >
+                {null}
+              </IconButton>
             ))}
           </div>
         )}

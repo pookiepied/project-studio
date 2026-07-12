@@ -11,6 +11,7 @@ import { MessageActions } from "./MessageActions";
 import type { ChatMessage, MessageSegment } from "@/types";
 import type { ActiveToolCall } from "@/features/chat/context/types";
 import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 
 // Memoised markdown to avoid re-renders on unrelated state changes.
 const MemoizedMarkdown = memo(({ content }: { content: string }) => (
@@ -101,19 +102,21 @@ export const AssistantMessage = ({
               }}
             />
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={onSaveEdit}
                 disabled={!editingContent.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40 transition-colors"
+                variant="primary"
+                className="h-auto gap-1.5 px-3 py-1.5 text-xs bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40"
               >
                 Save
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={onCancelEdit}
-                className="px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                variant="ghost"
+                className="h-auto px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400"
               >
                 Cancel
-              </button>
+              </Button>
               <span className="text-2xs text-gray-300 dark:text-gray-700 ml-auto">⌘ Enter · Esc to cancel</span>
             </div>
           </motion.div>

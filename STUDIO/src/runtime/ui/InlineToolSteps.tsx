@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 import { CheckIcon as Check, XIcon as X, CaretDownIcon as CaretDown } from "@phosphor-icons/react";
 import type { ActiveToolCall } from "@/types/tools";
 import { getToolIcon, toolLabel, argsPreview } from "./toolCardUtils";
@@ -52,9 +53,10 @@ export function InlineToolSteps({ steps, cycle }: InlineToolStepsProps) {
   return (
     <div className="mt-2 select-none">
       {/* Header row — always visible */}
-      <button
+      <Button
+        variant="ghost"
         onClick={toggleCycle}
-        className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors w-full text-left"
+        className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors w-full text-left justify-start"
       >
         <CaretDown
           size={12}
@@ -69,7 +71,7 @@ export function InlineToolSteps({ steps, cycle }: InlineToolStepsProps) {
         {errorCount > 0 && (
           <span className="text-secondary dark:text-secondary">· {errorCount} error{errorCount !== 1 ? "s" : ""}</span>
         )}
-      </button>
+      </Button>
 
       <AnimatePresence>
         {!isCollapsed && (

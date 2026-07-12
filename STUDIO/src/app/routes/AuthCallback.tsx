@@ -10,6 +10,7 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 import { googleSDK } from "@/features/auth/services/googleSDK";
 import { logger } from "@/core/logging/logger";
 import { SplashScreen } from "@/ui/feedback/SplashScreen";
+import { Button } from "@/ui/primitives/Button";
 
 export const AuthCallback = () => {
   const { login } = useAuth();
@@ -89,7 +90,7 @@ export const AuthCallback = () => {
             </div>
             <p className="text-lg font-medium text-gray-900">Sign in failed</p>
             <p className="mt-2 text-sm text-gray-600">{errorMessage}</p>
-            <button
+            <Button
               onClick={() => {
                 // Store the error so the login page can surface a toast notification.
                 try {
@@ -97,10 +98,10 @@ export const AuthCallback = () => {
                 } catch { /* storage unavailable */ }
                 window.location.href = '/';
               }}
-              className="mt-6 px-6 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition-colors"
+              className="mt-6 h-auto rounded-full px-6 py-2 text-sm bg-black text-white hover:bg-gray-800"
             >
               Return to home
-            </button>
+            </Button>
           </>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckIcon as Check } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
 import type { ChatMessage } from "@/types";
 import { DocumentAttachmentChip } from "./DocumentAttachmentChip";
 import { ImageWithFallback } from "./ImageWithFallback";
@@ -73,20 +74,22 @@ export const UserMessage = ({
             }}
           />
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="ghost"
               onClick={onSaveEdit}
               disabled={!editingContent.trim()}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40 transition-colors"
             >
               <Check size={12} weight="bold" />
               Save &amp; Send
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               onClick={onCancelEdit}
               className="px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
             >
               Cancel
-            </button>
+            </Button>
             <span className="text-2xs text-gray-300 dark:text-gray-700 ml-auto">⌘ Enter · Esc to cancel</span>
           </div>
         </motion.div>

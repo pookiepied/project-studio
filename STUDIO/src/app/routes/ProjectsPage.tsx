@@ -9,6 +9,8 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { projectRegistry } from "@/core/projects";
 import { useProjects } from "@/features/chat/hooks/useProjects";
 import { formatDate } from "@/lib/formatters";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 export function ProjectsPage() {
   const { projects, loading, refresh, removeProject, deleteProject } = useProjects();
@@ -27,14 +29,14 @@ export function ProjectsPage() {
           <h1 className="text-xs font-semibold uppercase tracking-extra-wide text-gray-400 transition-colors duration-300 dark:text-gray-600">
             Projects
           </h1>
-          <button
-            type="button"
+          <Button
             onClick={openProject}
-            className="inline-flex h-8 items-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors duration-150 hover:bg-gray-50 dark:border-surface-border dark:text-gray-400 dark:hover:bg-surface-raised"
+            variant="outline"
+            className="h-8 gap-2 px-3 text-xs font-medium border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-surface-border dark:text-gray-400 dark:hover:bg-surface-raised"
           >
             <Plus size={14} weight="regular" />
             Open project
-          </button>
+          </Button>
         </div>
 
         {!loading && projects.length === 0 ? (
@@ -73,22 +75,20 @@ export function ProjectsPage() {
                   {formatDate(project.lastOpenedAt)}
                 </span>
                 <div className="flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button
-                    type="button"
-                    title="Remove from list (keeps all files)"
+                  <IconButton
+                    aria-label="Remove from list (keeps all files)"
                     onClick={() => { void removeProject(project.id); }}
-                    className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
+                    className="h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
                   >
                     <MinusCircle size={14} weight="bold" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Delete Studio's data for this project (your folder is untouched)"
+                  </IconButton>
+                  <IconButton
+                    aria-label="Delete Studio's data for this project (your folder is untouched)"
                     onClick={() => { void deleteProject(project.id); }}
-                    className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
+                    className="h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
                   >
                     <Trash size={14} weight="bold" />
-                  </button>
+                  </IconButton>
                 </div>
               </div>
             ))}

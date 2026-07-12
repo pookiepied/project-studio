@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { XIcon as X } from "@phosphor-icons/react";
+import { IconButton } from "@/ui/primitives/IconButton";
 import type { PendingMessage } from "@/features/chat/context/types";
 
 interface PendingMessageQueueProps {
@@ -37,13 +38,14 @@ export const PendingMessageQueue = ({ messages, onCancel }: PendingMessageQueueP
               <p className="flex-1 text-sm text-gray-500 dark:text-gray-500 truncate">
                 {msg.content || (msg.attachments.length > 0 ? `${msg.attachments.length} attachment(s)` : "—")}
               </p>
-              <button
+              <IconButton
                 onClick={() => onCancel(i)}
-                className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-surface-border transition-smooth"
+                aria-label="Cancel"
                 title="Cancel"
+                className="flex-shrink-0 h-4 w-4 rounded opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-surface-border transition-smooth"
               >
                 <X size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
-              </button>
+              </IconButton>
             </motion.div>
           ))}
         </div>

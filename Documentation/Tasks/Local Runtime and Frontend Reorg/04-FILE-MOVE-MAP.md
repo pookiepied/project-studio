@@ -194,4 +194,4 @@ Prove each is unreferenced (grep `src/`, `index.html`, router) **before** deleti
 | any `index.ts` barrels left empty after moves | — | delete |
 
 **Not dead — do not touch:** everything under `features/workspace/rightWorkspace/`,
-`cliBridges/`, `daemon/`, `mcp-servers/`, `vendor/`.
+`cliBridges/`, `daemon/`, `library/mcp-servers/`, `vendor/`.

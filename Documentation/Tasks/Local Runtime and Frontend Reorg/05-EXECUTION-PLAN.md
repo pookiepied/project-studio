@@ -260,7 +260,7 @@ slices. ☑ Build + tsc pass. ☐ Smoke pass.
    exported symbol. Paste the evidence into the commit body.
 2. Delete only those with no external references.
 3. Do **not** touch `features/workspace/rightWorkspace/`, `cliBridges/`, `daemon/`,
-   `mcp-servers/`, `vendor/`.
+   `library/mcp-servers/`, `vendor/`.
 
 ### Outcome (VERIFY-FIRST corrected two candidates from the original draft)
 

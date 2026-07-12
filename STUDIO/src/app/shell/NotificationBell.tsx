@@ -11,6 +11,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BellIcon as Bell } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { useNotifications } from "@/app/hooks/useNotifications";
 import {
   broadcastPanelOpen,
@@ -104,13 +106,13 @@ function NotificationPanel({
       <div className="flex items-center justify-between border-b border-surface-border px-4 py-3">
         <h3 className="text-sm font-semibold text-primary">Notifications</h3>
         {items.length > 0 && (
-          <button
-            type="button"
+          <Button
             onClick={clear}
-            className="text-xs text-muted transition-colors hover:text-primary"
+            variant="ghost"
+            className="h-auto gap-2 px-0 py-0 text-xs text-muted"
           >
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
@@ -158,8 +160,7 @@ export function NotificationBell({
 
   return (
     <div className="relative" ref={wrapperRef}>
-      <button
-        type="button"
+      <IconButton
         onClick={() =>
           setOpen((value) => {
             const next = !value;
@@ -170,13 +171,12 @@ export function NotificationBell({
             return next;
           })
         }
-        className="group relative flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
+        className="group relative rounded-full"
         aria-label={
           unreadCount > 0
             ? `Notifications (${unreadCount} unread)`
             : "Notifications"
         }
-        title="Notifications"
       >
         <Bell
           size={size}
@@ -188,7 +188,7 @@ export function NotificationBell({
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-      </button>
+      </IconButton>
 
       <AnimatePresence>
         {open && (

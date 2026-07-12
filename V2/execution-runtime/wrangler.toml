@@ -32,6 +32,10 @@ service = "studio-data"
 binding = "MCP"
 service = "studio-mcp"
 
+[[services]]
+binding = "TRACKER"
+service = "studio-tracker"
+
 # Durable Object: one ExecutionSession per active conversation/run.
 [[durable_objects.bindings]]
 name = "EXECUTION_SESSION"

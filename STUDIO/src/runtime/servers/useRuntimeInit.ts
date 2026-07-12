@@ -13,6 +13,7 @@ import {
   type LocalPermissionGrants,
 } from "./lifecycle";
 import { startManifestResyncOnReconnect } from "./manifestSync";
+import { startLocalRegistrySync } from "@/core/mcpRegistry/localRegistry";
 
 // Back-compat re-exports (canonical home is ./lifecycle.ts).
 export { HARNESS_PERMISSION_KEY, COMPUTER_USE_PERMISSION_KEY } from "./lifecycle";
@@ -47,6 +48,7 @@ export function useRuntimeInit(): HarnessInitState {
   const healthCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
   const stopResyncRef = useRef<(() => void) | null>(null);
+  const stopRegistrySyncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (didInit.current) return;
@@ -58,6 +60,7 @@ export function useRuntimeInit(): HarnessInitState {
     // does, the cloud holds a stale tool list, so re-push on every reconnect
     // rather than waiting for the next launch (audit B5).
     stopResyncRef.current = startManifestResyncOnReconnect();
+    void startLocalRegistrySync().then((stop) => { stopRegistrySyncRef.current = stop; });
 
     const harnessServer = getLocalMcpServer("studio-harness")!;
     const computerUseServer = getLocalMcpServer("computer-use")!;
@@ -146,6 +149,8 @@ export function useRuntimeInit(): HarnessInitState {
       unlistenRef.current = null;
       stopResyncRef.current?.();
       stopResyncRef.current = null;
+      stopRegistrySyncRef.current?.();
+      stopRegistrySyncRef.current = null;
     };
   }, []);
 

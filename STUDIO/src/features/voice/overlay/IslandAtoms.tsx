@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { RecordingState } from "@/types";
 import type { IslandMode } from "@/core/platform/overlayService";
+import { Button } from "@/ui/primitives/Button";
 
 // ─── Shared animation spring ──────────────────────────────────────────────────
 // Matches Studio's panel / NavPopup spring exactly.
@@ -196,14 +197,16 @@ interface ActionBtnProps {
  */
 export function ActionBtn({ icon, label, onClick }: ActionBtnProps) {
   return (
-    <motion.button
+    <Button
+      variant="ghost"
       onClick={onClick}
       title={label}
+      aria-label={label}
       whileHover={{ scale: 1.06 }}
       whileTap={{ scale: 0.94 }}
       transition={{ duration: 0.15 }}
       className="
-        flex items-center justify-center w-[26px] h-[26px] rounded-full
+        flex items-center justify-center w-[26px] h-[26px] rounded-full p-0
         bg-gray-900/[0.05] dark:bg-white/[0.06]
         hover:bg-gray-900/[0.08] dark:hover:bg-white/[0.10]
         text-gray-500 dark:text-gray-400
@@ -212,7 +215,7 @@ export function ActionBtn({ icon, label, onClick }: ActionBtnProps) {
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
     >
       {icon}
-    </motion.button>
+    </Button>
   );
 }
 

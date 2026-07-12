@@ -3,6 +3,7 @@ import { useAudioRecorder } from "@/features/voice/hooks/useAudioRecorder";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { AudioWaveform } from "./AudioWaveform";
 import { composerRoundIconButton, cx } from "@/features/chat/components/composerControlStyles";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -34,22 +35,25 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
 
   if (isProcessing) {
     return (
-      <button
-        type="button"
+      <IconButton
+        size="sm"
         disabled
-        className={cx(composerRoundIconButton, "flex-shrink-0 text-gray-400 opacity-60 cursor-not-allowed")}
+        aria-label="Transcribing..."
         title="Transcribing..."
+        className={cx(composerRoundIconButton, "flex-shrink-0 text-gray-400 opacity-60 cursor-not-allowed")}
       >
         <div className="h-[16px] w-[16px] border-2 border-current border-t-transparent rounded-full animate-spin" />
-      </button>
+      </IconButton>
     );
   }
 
   return (
-    <button
-      type="button"
+    <IconButton
+      size="sm"
       onClick={handleClick}
       disabled={disabled}
+      aria-label={isRecording ? "Stop recording" : "Voice input"}
+      title={isRecording ? "Stop recording" : "Voice input"}
       className={cx(
         composerRoundIconButton,
         "flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed",
@@ -57,7 +61,6 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
           ? "text-gray-500"
           : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-border",
       )}
-      title={isRecording ? "Stop recording" : "Voice input"}
     >
       {isRecording ? (
         <span className="w-[16px] h-[16px] flex items-center justify-center">
@@ -75,6 +78,6 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
       ) : (
         <Microphone size={14} weight="regular" />
       )}
-    </button>
+    </IconButton>
   );
 }

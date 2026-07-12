@@ -11,6 +11,8 @@ import {
   CopyIcon as Copy,
 } from "@phosphor-icons/react";
 import type { ChatMessage } from "@/types";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -72,40 +74,44 @@ export const MessageActions = ({
     } ${message.role === "user" ? "right-0" : "left-0"}`}
   >
     {/* Copy */}
-    <button
+    <IconButton
       onClick={() => onCopy(message.content, message.id)}
-      className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 dark:hover:bg-surface-raised rounded transition-smooth"
+      aria-label="Copy"
       title="Copy"
+      className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
     >
       {copiedMessageId === message.id
         ? <Check       size={14} weight="bold" className="text-secondary" />
         : <Copy        size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />}
-    </button>
+    </IconButton>
 
     {/* Edit */}
-    <button
+    <IconButton
       onClick={() => onEdit(message.id, message.content)}
-      className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 dark:hover:bg-surface-raised rounded transition-smooth"
+      aria-label="Edit"
       title="Edit"
+      className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
     >
       <PencilSimple size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />
-    </button>
+    </IconButton>
 
     {/* Delete */}
-    <button
+    <IconButton
       onClick={() => onDelete(message.id)}
-      className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 dark:hover:bg-surface-raised rounded transition-smooth"
+      aria-label="Delete"
       title="Delete"
+      className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
     >
       <Trash size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />
-    </button>
+    </IconButton>
 
     {/* Read aloud — assistant only */}
     {message.role === "assistant" && (
-      <button
+      <IconButton
         onClick={() => onSpeak(message.id, message.content)}
-        className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 dark:hover:bg-surface-raised rounded transition-smooth"
+        aria-label={ttsPlayingId === message.id ? "Stop" : "Read aloud"}
         title={ttsPlayingId === message.id ? "Stop" : "Read aloud"}
+        className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
       >
         {ttsLoadingId === message.id ? (
           <span className="w-3 h-3 border border-gray-400 dark:border-gray-600 border-t-transparent rounded-full animate-spin block flex-shrink-0" />
@@ -114,37 +120,38 @@ export const MessageActions = ({
         ) : (
           <SpeakerHigh size={14} weight="bold"  className="text-gray-400 dark:text-gray-600" />
         )}
-      </button>
+      </IconButton>
     )}
 
     {/* More actions (Regenerate / Continue) — assistant only */}
     {message.role === "assistant" && (
       <div className="relative flex items-center">
-        <button
+        <IconButton
           onClick={(e) => { e.stopPropagation(); onSetTtsMenuId(ttsMenuId === message.id ? null : message.id); }}
+          aria-label="More actions"
           aria-expanded={ttsMenuId === message.id}
           aria-haspopup="menu"
-          className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 dark:hover:bg-surface-raised rounded transition-smooth"
           title="More actions"
+          className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
         >
           <DotsThree size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />
-        </button>
+        </IconButton>
         {ttsMenuId === message.id && (
           <div role="menu" className="absolute bottom-full right-0 mb-1 bg-white dark:bg-surface-raised border border-gray-100 dark:border-surface-border rounded-lg shadow-lg py-1 min-w-[140px] z-50">
             {isLastAssistant ? (
               <>
-                <button role="menuitem" onClick={() => { onRegenerate(); onSetTtsMenuId(null); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border transition-colors"
+                <Button variant="ghost" role="menuitem" onClick={() => { onRegenerate(); onSetTtsMenuId(null); }}
+                  className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border"
                 >
                   <ArrowClockwise size={14} weight="bold" className="flex-shrink-0" />
                   Regenerate
-                </button>
-                <button role="menuitem" onClick={() => { onContinue(); onSetTtsMenuId(null); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border transition-colors"
+                </Button>
+                <Button variant="ghost" role="menuitem" onClick={() => { onContinue(); onSetTtsMenuId(null); }}
+                  className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border"
                 >
                   <ArrowRight size={14} weight="bold" className="flex-shrink-0" />
                   Continue
-                </button>
+                </Button>
               </>
             ) : (
               <p className="px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600 italic">No actions</p>

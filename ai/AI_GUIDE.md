@@ -438,7 +438,7 @@ The local sidecar needs a host. Two candidates:
 - **Bun** — faster, native WS, supports CF Workers syntax via `Bun.serve` (could theoretically
   run the Worker code near-unchanged). Newer ecosystem.
 - **Node** — more mature, more library compatibility, the existing MCP servers
-  (`STUDIO/mcp-servers/studio-local`) are already Node. Slower WS, requires `ws` lib.
+  (`STUDIO/library/mcp-servers/studio-local`) are already Node. Slower WS, requires `ws` lib.
 
 Decision deferred to Phase 0 — does not block the guide or any Phase 1+ work, because the
 `SessionBackend` interface hides the choice from the loop.

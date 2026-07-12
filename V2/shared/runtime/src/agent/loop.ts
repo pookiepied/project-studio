@@ -151,6 +151,7 @@ export async function runAgentLoop(
         await hooks.emit("tool.call_created", {
           toolCallId: part.toolCallId,
           toolName: part.toolName,
+          input: part.input,
         });
         await hooks.emit("tool.started", {
           toolCallId: part.toolCallId,
@@ -164,6 +165,7 @@ export async function runAgentLoop(
         await hooks.emit("tool.completed", {
           toolCallId: part.toolCallId,
           summary: summarize(part.output),
+          output: part.output,
         });
         break;
       case "tool-error":

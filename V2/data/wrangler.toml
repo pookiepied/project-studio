@@ -12,7 +12,7 @@ ENVIRONMENT = "production"
 [[d1_databases]]
 binding = "DATA_DB"
 database_name = "studio-data"
-database_id = "replace-with-data-db-id"
+database_id = "7b926d75-d88a-4444-ae78-dfdb0fe78379"
 
 # Cloud conversation transcripts and related durable conversation exports.
 [[r2_buckets]]

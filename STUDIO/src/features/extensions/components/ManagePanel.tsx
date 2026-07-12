@@ -13,6 +13,7 @@ import { Back, Delete, Icon } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Button } from "@/ui/primitives/Button";
 import { EmptyState } from "@/ui/primitives/EmptyState";
 import type { McpServer } from "@/core/mcpRegistry/registryClient";
 import type { ComposioApp, ComposioConnection } from "@/features/extensions/services/composioService";
@@ -72,12 +73,13 @@ const ServerRow = ({ icon, name, dotState, status, isTauri, isEnabled, isRunning
     </div>
     <div className="flex items-center gap-2 flex-shrink-0">
       {!isRemote && isTauri && isEnabled && (
-        <button
+        <Button
+          variant="ghost"
           onClick={isRunning ? onStop : onStart}
-          className="flex items-center gap-1 px-2 py-1 text-2xs font-medium text-secondary bg-surface-raised hover:bg-surface-hover rounded-lg transition-colors duration-fast"
+          className="flex items-center gap-1 px-2 py-1 text-2xs font-medium h-auto bg-surface-raised rounded-lg"
         >
           <Icon icon={isRunning ? Stop : Play} size="xs" weight="fill" />{isRunning ? "Stop" : "Start"}
-        </button>
+        </Button>
       )}
       {onToggle && (
         <Toggle size="sm" checked={isEnabled} onChange={() => onToggle()} aria-label={isEnabled ? "Disable" : "Enable"} />

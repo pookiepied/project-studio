@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowSquareOutIcon as ArrowSquareOut, GlobeIcon as Globe, ArrowUpRightIcon as ArrowUpRight } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { environmentService } from "@/core/platform/environmentService";
+import { Button } from "@/ui/primitives/Button";
 
 interface ExternalLinkProps {
   href?: string;
@@ -124,13 +125,14 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
             <span className="text-xs text-muted font-mono max-w-[180px] truncate">
               {displayUrl}
             </span>
-            <button
+            <Button
+              variant="primary"
               onClick={handleOpen}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary text-on-emphasis rounded-full hover:bg-secondary transition-colors whitespace-nowrap"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap"
             >
               Open
               <ArrowUpRight size={12} weight="regular" />
-            </button>
+            </Button>
           </motion.div>
         </AnimatePresence>,
         document.body

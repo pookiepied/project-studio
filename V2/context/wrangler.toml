@@ -17,3 +17,7 @@ service = "studio-registry"
 [[services]]
 binding = "DATA"
 service = "studio-data"
+
+[[services]]
+binding = "MCP"
+service = "studio-mcp"

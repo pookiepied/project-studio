@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
+import { Button } from "@/ui/primitives/Button";
 import { SplashPreviewPage } from "@/app/routes/SplashPreviewPage";
 import { OverlayPage } from "@/app/routes/OverlayPage";
 import { SplashScreen } from "@/ui/feedback/SplashScreen";
@@ -153,12 +154,12 @@ function MainApp() {
       <div className="text-center p-8">
         <h1 className="text-2xl font-bold text-secondary mb-4">Initialization Error</h1>
         <p className="text-gray-700 dark:text-gray-300 mb-4">{error}</p>
-        <button
+        <Button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300"
+          className="h-auto px-4 py-2 bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300"
         >
           Retry
-        </button>
+        </Button>
       </div>
     </div>
   ) : isInitialized ? (

@@ -40,17 +40,21 @@ export const ConversationRail = ({ messages, containerRef, bottomInset = 0 }: Pr
     return () => ro.disconnect();
   }, [trackEl]);
 
-  // Highlight the turn currently at/above the top of the viewport
+  // Highlight the newest turn whose anchor has crossed the reading line
   useEffect(() => {
     const c = containerRef.current;
     if (!c || count === 0) return;
     const onScroll = () => {
       const cTop = c.getBoundingClientRect().top;
+      const readingLine = c.clientHeight * 0.4;
       let active = 0;
-      for (let i = count - 1; i >= 0; i--) {
+      for (let i = 0; i < count; i++) {
         const el = c.querySelector(`[data-turn-index="${i}"]`) as HTMLElement | null;
-        if (el && el.getBoundingClientRect().top - cTop <= 80) {
+        if (!el) continue;
+        const elTop = el.getBoundingClientRect().top - cTop;
+        if (elTop <= readingLine) {
           active = i;
+        } else {
           break;
         }
       }

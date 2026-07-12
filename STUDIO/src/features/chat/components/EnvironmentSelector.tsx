@@ -11,6 +11,7 @@ import {
   BroadcastIcon as Broadcast,
 } from "@phosphor-icons/react";
 import type { ConversationStorageScope } from "@/core/conversations";
+import { Button } from "@/ui/primitives/Button";
 
 interface EnvironmentSelectorProps {
   scope: ConversationStorageScope;
@@ -35,8 +36,8 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
 
   return (
     <div className="relative flex-shrink-0">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         disabled={disabled}
         onClick={event => {
           const rect = event.currentTarget.getBoundingClientRect();
@@ -48,14 +49,14 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
           );
           setOpen(value => !value);
         }}
-        className="flex items-center gap-1.5 px-2 h-6 rounded-md text-xs font-medium text-secondary hover:bg-surface-hover transition-colors disabled:opacity-60 disabled:cursor-default"
+        className="gap-1.5 px-2 h-6 rounded-md text-xs text-secondary hover:bg-surface-hover disabled:opacity-60 disabled:cursor-default"
       >
         <Icon size={14} weight={open ? "fill" : "regular"} />
         <span>{label}</span>
         {!disabled && (
           <CaretDown size={12} weight="bold" className={`opacity-50 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
         )}
-      </button>
+      </Button>
 
       {createPortal(
         <AnimatePresence>
@@ -121,10 +122,10 @@ function EnvOption({
   icon, title, description, active, onClick,
 }: { icon: React.ReactNode; title: string; description: string; active: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left transition-colors ${
+      className={`h-auto w-full justify-start gap-2.5 px-2.5 py-2 rounded-lg text-left ${
         active ? "bg-surface-selected" : "hover:bg-surface-hover"
       }`}
     >
@@ -134,7 +135,7 @@ function EnvOption({
         <p className="text-2xs text-muted mt-0.5 leading-tight">{description}</p>
       </div>
       {active && <Check size={12} weight="bold" className="flex-shrink-0 text-secondary" />}
-    </button>
+    </Button>
   );
 }
 

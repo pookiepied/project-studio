@@ -12,6 +12,7 @@ import {
   WarningCircleIcon as WarningCircle,
 } from "@phosphor-icons/react";
 import { ArtifactRenderer } from "@/features/markdown";
+import { Button } from "@/ui/primitives/Button";
 import { ARTIFACT_EXAMPLES } from "@/features/artifacts/examples";
 import type { Artifact, ArtifactSurface } from "@/types/artifacts";
 import { artifactToMarkdown, parseArtifact } from "@/lib/artifact";
@@ -177,14 +178,14 @@ export function ArtifactLabPanel() {
             {ARTIFACT_EXAMPLES.map((artifact, index) => {
               const selected = index === selectedExampleIndex;
               return (
-                <button
+                <Button
                   key={`${artifact.kind}-${index}`}
-                  type="button"
+                  variant="ghost"
                   onClick={() => loadExample(index)}
-                  className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+                  className={`w-full !h-auto flex-col items-stretch !gap-0 !rounded-2xl border px-3 py-3 text-left transition ${
                     selected
-                      ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
-                      : "border-gray-200 bg-white hover:bg-gray-50 dark:border-surface-border dark:bg-surface-base dark:hover:bg-surface-raised"
+                      ? "!border-gray-900 !bg-gray-900 !text-white dark:!border-white dark:!bg-white dark:!text-gray-900"
+                      : "!border-gray-200 !bg-white hover:!bg-gray-50 dark:!border-surface-border dark:!bg-surface-base dark:hover:!bg-surface-raised"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -201,7 +202,7 @@ export function ArtifactLabPanel() {
                   <div className={`mt-1 line-clamp-2 text-xs leading-relaxed ${selected ? "text-white/75 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"}`}>
                     {artifact.summary}
                   </div>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -233,23 +234,23 @@ export function ArtifactLabPanel() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={handleSpawn}
               disabled={!activeArtifact}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+              className="inline-flex items-center !gap-1.5 rounded-xl !bg-gray-900 px-3 py-2 text-xs font-medium !text-white transition hover:!bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
             >
               <Plus size={14} weight="bold" />
               Spawn artifact
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => setCanvasItems([])}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-border dark:bg-surface-base dark:text-gray-300 dark:hover:bg-surface-raised"
+              className="inline-flex items-center !gap-1.5 rounded-xl border !border-gray-200 !bg-white px-3 py-2 text-xs font-medium !text-gray-700 transition hover:!bg-gray-50 dark:!border-surface-border dark:!bg-surface-base dark:!text-gray-300 dark:hover:!bg-surface-raised"
             >
               <Broom size={14} />
               Clear canvas
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -280,23 +281,23 @@ export function ArtifactLabPanel() {
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={handleReset}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-border dark:bg-surface-base dark:text-gray-300 dark:hover:bg-surface-raised"
+            className="inline-flex items-center !gap-1.5 rounded-xl border !border-gray-200 !bg-white px-3 py-2 text-xs font-medium !text-gray-700 transition hover:!bg-gray-50 dark:!border-surface-border dark:!bg-surface-base dark:!text-gray-300 dark:hover:!bg-surface-raised"
           >
             <ArrowClockwise size={14} />
             Reset example
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={handleCopyFence}
             disabled={!activeArtifact}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-border dark:bg-surface-base dark:text-gray-300 dark:hover:bg-surface-raised"
+            className="inline-flex items-center !gap-1.5 rounded-xl border !border-gray-200 !bg-white px-3 py-2 text-xs font-medium !text-gray-700 transition hover:!bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:!border-surface-border dark:!bg-surface-base dark:!text-gray-300 dark:hover:!bg-surface-raised"
           >
             <Copy size={14} />
             Copy `artifact` fence
-          </button>
+          </Button>
         </div>
 
         {parsed.error && (

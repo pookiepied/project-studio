@@ -14,6 +14,8 @@ import {
 } from "@phosphor-icons/react";
 import { useAppUpdater } from "@/app/hooks/useAppUpdater";
 import { environmentService } from "@/core/platform/environmentService";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 export const UpdateBanner = () => {
   const isTauri = environmentService.isTauri();
@@ -55,13 +57,13 @@ export const UpdateBanner = () => {
                       </p>
                     </div>
 
-                    <button
+                    <IconButton
                       onClick={dismiss}
-                      className="flex-shrink-0 text-disabled hover:text-muted transition-colors duration-fast mt-0.5"
                       aria-label="Dismiss"
+                      className="h-auto w-auto shrink-0 mt-0.5 text-disabled hover:bg-transparent hover:text-muted"
                     >
                       <X size={14} weight="regular" />
-                    </button>
+                    </IconButton>
                   </div>
 
                   {state.notes && (
@@ -70,12 +72,12 @@ export const UpdateBanner = () => {
                     </p>
                   )}
 
-                  <button
+                  <Button
                     onClick={install}
-                    className="w-full text-xs font-semibold bg-primary text-on-emphasis rounded-xl px-3 py-2.5 hover:bg-secondary transition-colors duration-fast"
+                    className="w-full h-auto rounded-xl px-3 py-2.5 text-xs font-semibold"
                   >
                     Install &amp; Restart
-                  </button>
+                  </Button>
                 </>
               )}
 

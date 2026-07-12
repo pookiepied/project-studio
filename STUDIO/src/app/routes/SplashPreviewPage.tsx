@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { SplashScreen } from "@/ui/feedback/SplashScreen";
+import { Button } from "@/ui/primitives/Button";
 
 export function SplashPreviewPage() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
@@ -26,13 +27,13 @@ export function SplashPreviewPage() {
           <div className="h-8 rounded-lg bg-gray-950 px-3 text-sm leading-8 text-white dark:bg-gray-100 dark:text-gray-950">
             Brand Mark
           </div>
-          <button
-            type="button"
+          <Button
             onClick={() => setDark((value) => !value)}
-            className="h-8 rounded-lg px-3 text-sm text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+            variant="ghost"
+            className="h-8 px-3 text-sm text-gray-500 hover:bg-gray-900/[0.05] hover:text-gray-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
           >
             {dark ? "Dark" : "Light"}
-          </button>
+          </Button>
         </motion.div>
       </div>
     </div>

@@ -5,6 +5,8 @@ import {
   FileTextIcon as FileText,
 } from "@phosphor-icons/react";
 import type { ArtifactTab } from "@/app/hooks/useArtifactPanel";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { CodeView }     from "./artifact/CodeView";
 import { DocumentView } from "./artifact/DocumentView";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
@@ -79,14 +81,14 @@ export function ArtifactPanel({
                         border-b border-gray-100 dark:border-white/[0.06]
                         transition-colors duration-300">
 
-          <button
-            type="button"
-            onClick={onClose}
+          <IconButton
+            aria-label="Close panel"
             title="Close panel"
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            onClick={onClose}
+            className="flex !h-7 !w-7 flex-shrink-0 items-center justify-center rounded-lg !text-gray-400 transition-colors duration-150 hover:!bg-gray-100 hover:!text-gray-700 dark:!text-gray-600 dark:hover:!bg-surface-raised dark:hover:!text-gray-300"
           >
             <X size={14} weight="bold" />
-          </button>
+          </IconButton>
 
           {/* Active tab icon + label */}
           <div className="flex items-center gap-1.5 min-w-0 text-gray-400 dark:text-gray-600">
@@ -102,15 +104,14 @@ export function ArtifactPanel({
               {tabs.map(tab => {
                 const isActive = tab.id === activeTabId;
                 return (
-                  <button
+                  <Button
                     key={tab.id}
-                    type="button"
+                    variant="ghost"
                     onClick={() => onTabChange(tab.id)}
-                    className={`group/tab flex items-center gap-1 px-2 h-6 rounded text-2xs flex-shrink-0
-                      transition-colors duration-100
+                    className={`group/tab flex items-center !gap-1 !px-2 !h-6 !rounded !text-2xs flex-shrink-0 transition-colors !duration-100
                       ${isActive
-                        ? "bg-white dark:bg-surface-raised text-gray-600 dark:text-gray-300 shadow-sm"
-                        : "text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400"
+                        ? "!bg-white dark:!bg-surface-raised !text-gray-600 dark:!text-gray-300 shadow-sm"
+                        : "!text-gray-400 dark:!text-gray-600 hover:!text-gray-600 dark:hover:!text-gray-400"
                       }`}
                   >
                     <span className="flex-shrink-0">{tabIcon(tab, 9)}</span>
@@ -124,7 +125,7 @@ export function ArtifactPanel({
                     >
                       <X size={12} weight="bold" />
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

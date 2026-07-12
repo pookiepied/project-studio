@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from "react";
 import { motion } from "framer-motion";
 import { ArrowRightIcon as ArrowRight } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 interface AskUserQuestionCardProps {
   question: string;
@@ -59,14 +61,14 @@ export function AskUserQuestionCard({
         {suggestions && suggestions.length > 0 && (
           <div className="mt-3 space-y-1.5">
             {suggestions.map((s) => (
-              <button
+              <Button
                 key={s}
-                type="button"
+                variant="ghost"
                 onClick={() => onAnswer(s)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2.5 text-left text-sm font-medium leading-relaxed text-gray-700 transition-colors hover:border-gray-300 hover:bg-white active:bg-gray-50 dark:border-surface-border dark:bg-surface-raised/40 dark:text-gray-300 dark:hover:border-white/20 dark:hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-600 dark:focus-visible:ring-offset-surface-base"
+                className="h-auto w-full justify-start rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2.5 text-left text-sm font-medium leading-relaxed text-gray-700 transition-colors hover:border-gray-300 hover:bg-white active:bg-gray-50 dark:border-surface-border dark:bg-surface-raised/40 dark:text-gray-300 dark:hover:border-white/20 dark:hover:bg-surface-raised focus-visible:ring-gray-400 focus-visible:ring-offset-white dark:focus-visible:ring-gray-600 dark:focus-visible:ring-offset-surface-base"
               >
                 {s}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -81,15 +83,14 @@ export function AskUserQuestionCard({
             placeholder="Type your answer..."
             className="max-h-[120px] min-h-10 flex-1 resize-none bg-transparent py-1 text-sm leading-5 text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
           />
-          <button
-            type="button"
+          <IconButton
             onClick={submit}
             disabled={!answer.trim()}
             aria-label="Send answer"
-            className="mb-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:disabled:bg-surface-selected dark:disabled:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-600 dark:focus-visible:ring-offset-surface-base"
+            className="mb-1 h-8 w-8 bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:disabled:bg-surface-selected dark:disabled:text-gray-600 focus-visible:ring-gray-400 focus-visible:ring-offset-white dark:focus-visible:ring-gray-600 dark:focus-visible:ring-offset-surface-base"
           >
             <ArrowRight size={14} weight="bold" />
-          </button>
+          </IconButton>
         </div>
       </div>
     </motion.div>

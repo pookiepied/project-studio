@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { Button } from "@/ui/primitives/Button";
 
 interface VideoPlayerProps {
   videoUrl: string;
@@ -45,9 +46,10 @@ export function VideoPlayer({ videoUrl, aspectRatio, duration, resolution, mode 
             .filter(Boolean)
             .join(" · ")}
         </span>
-        <button
+        <Button
+          variant="ghost"
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:!bg-white/20 !text-white text-xs font-medium transition-colors"
         >
           {downloaded ? (
             <>
@@ -66,7 +68,7 @@ export function VideoPlayer({ videoUrl, aspectRatio, duration, resolution, mode 
               Download
             </>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

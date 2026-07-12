@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { TokenRing } from "@/features/chat/components/ContextTokenRing";
 import { composerRoundIconButton, cx } from "./composerControlStyles";
+import { Button } from "@/ui/primitives/Button";
 
 interface ContextWindowButtonProps {
   usedTokens: number;
@@ -52,8 +53,8 @@ export function ContextWindowButton({
       )}
       ref={containerRef}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setOpen((value) => !value)}
         title="Context window"
         className={cx(
@@ -75,7 +76,7 @@ export function ContextWindowButton({
           active={usedTokens > 0}
         />
         {variant === "header" && <span>{Math.round(percentage * 100)}%</span>}
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && (

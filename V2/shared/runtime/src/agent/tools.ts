@@ -6,6 +6,7 @@ import {
   type ToolPolicy,
 } from "@studio/v2-contracts";
 import { ToolExecutionCoordinator } from "./coordinator";
+import { ExecutionError } from "../system/errors";
 
 /**
  * Tool execution boundary (RUNTIME-CHECKLIST.md §7–§9). Every tool the model
@@ -107,7 +108,17 @@ export function wrapToolSet(
             return JSON.parse(serialized);
           } catch (error) {
             runtime.mark(toolCallId, "failed");
-            throw error;
+            const message = error instanceof Error ? error.message : String(error);
+            if (/timed out|timeout/i.test(message)) {
+              throw new ExecutionError("tool_failure", message, false, "timeout");
+            }
+            const safeToRetry = policy.retryable && policy.idempotent && policy.effect !== "destructive";
+            throw new ExecutionError(
+              "tool_failure",
+              message,
+              safeToRetry,
+              safeToRetry ? "tool_transient" : "tool_terminal",
+            );
           }
         });
       },
@@ -140,11 +151,12 @@ export function buildToolSet(
   context: ContextPackage,
   mcp: Fetcher,
   executeLocal: (toolCallId:string,descriptor:StudioToolDescriptor,input:unknown)=>Promise<unknown>,
+  executeClient: (toolCallId:string,descriptor:StudioToolDescriptor,input:unknown)=>Promise<unknown>,
 ): Record<string, RegisteredTool> {
   const tools: Record<string, RegisteredTool> = {};
   for (const descriptor of context.tools) {
     tools[descriptor.name] = {
-      tool: descriptorToAiTool(descriptor, context, mcp, executeLocal),
+      tool: descriptorToAiTool(descriptor, context, mcp, executeLocal, executeClient),
       policy: {
         ...DEFAULT_TOOL_POLICY,
         locality: descriptor.location,
@@ -162,6 +174,7 @@ function descriptorToAiTool(
   context: ContextPackage,
   mcp: Fetcher,
   executeLocal: (toolCallId:string,descriptor:StudioToolDescriptor,input:unknown)=>Promise<unknown>,
+  executeClient: (toolCallId:string,descriptor:StudioToolDescriptor,input:unknown)=>Promise<unknown>,
 ): Tool {
   return {
     description: descriptor.description,
@@ -191,9 +204,7 @@ function descriptorToAiTool(
         case "local-relay":
           return executeLocal(options.toolCallId, descriptor, args);
         case "client":
-          throw new Error(
-            `Tool ${descriptor.name} requires client action '${descriptor.route.action}'; client tool result protocol is not wired yet.`,
-          );
+          return executeClient(options.toolCallId, descriptor, args);
       }
     },
   } as Tool;

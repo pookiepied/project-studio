@@ -1,3 +1,4 @@
+import { Button } from "@/ui/primitives/Button";
 import { ProviderIcon, getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import type { Model } from "@/core/models";
 import { isFreeModel } from "../../helpers";
@@ -16,8 +17,8 @@ export function ProviderRail({
   return (
     <aside className="hidden lg:block border-r border-surface-border bg-surface-base overflow-y-auto scrollbar-auto-hide">
       <div className="p-2">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => onSelectProvider("all")}
           className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition-colors duration-fast ${
             selectedProvider === "all"
@@ -27,7 +28,7 @@ export function ProviderRail({
         >
           <span className="text-sm font-medium">All providers</span>
           <span className="text-2xs tabular-nums text-muted">{total}</span>
-        </button>
+        </Button>
 
         <div className="mt-2 space-y-0.5">
           {providers.map(([provider, models]) => {
@@ -35,9 +36,9 @@ export function ProviderRail({
             const freeCount = models.filter(isFreeModel).length;
 
             return (
-              <button
+              <Button
                 key={provider}
-                type="button"
+                variant="ghost"
                 onClick={() => onSelectProvider(provider)}
                 className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors duration-fast ${
                   active
@@ -55,7 +56,7 @@ export function ProviderRail({
                 {freeCount > 0 && (
                   <span className="w-1.5 h-1.5 rounded-full bg-primary" title={`${freeCount} free`} />
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>

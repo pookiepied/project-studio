@@ -1,15 +1,11 @@
 import { Hono } from "hono";
+import type { AgentDefinition } from "@studio/v2-contracts";
 import type { Env } from "../../system/env";
-
-/**
- * Agent definitions (ARCHITECTURE.md §13): user-created and Studio-provided
- * agents as versioned records. The registry stores definitions; the Agent
- * Runtime executes them.
- */
-export const agentsRoute = new Hono<{ Bindings: Env }>();
-
-agentsRoute.get("/", (c) => c.json({ error: "not_implemented" }, 501));
-agentsRoute.post("/", (c) => c.json({ error: "not_implemented" }, 501));
-agentsRoute.get("/:id", (c) => c.json({ error: "not_implemented" }, 501));
-agentsRoute.patch("/:id", (c) => c.json({ error: "not_implemented" }, 501));
-agentsRoute.delete("/:id", (c) => c.json({ error: "not_implemented" }, 501));
+import { deleteAgent,getAgent,listAgents,upsertAgent } from "../../domains/agents/repository";
+import { requireUser } from "../identity";
+export const agentsRoute=new Hono<{Bindings:Env}>();
+agentsRoute.get("/",async c=>{const u=requireUser(c);return typeof u==="string"?c.json({items:await listAgents(c.env.REGISTRY_DB,u)}):u;});
+agentsRoute.post("/",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const a=await c.req.json<AgentDefinition>();if(a.userId!==u||!(["studio","user"] as string[]).includes(a.origin))return c.json({error:"forbidden"},403);await upsertAgent(c.env.REGISTRY_DB,a);return c.json({agent:a},201);});
+agentsRoute.get("/:id",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const a=await getAgent(c.env.REGISTRY_DB,u,c.req.param("id"));return a?c.json({agent:a}):c.json({error:"not_found"},404);});
+agentsRoute.patch("/:id",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;const old=await getAgent(c.env.REGISTRY_DB,u,c.req.param("id"));if(!old)return c.json({error:"not_found"},404);const p=await c.req.json<Partial<AgentDefinition>>();const next={...old,...p,id:old.id,userId:u};await upsertAgent(c.env.REGISTRY_DB,next);return c.json({agent:next});});
+agentsRoute.delete("/:id",async c=>{const u=requireUser(c);if(typeof u!=="string")return u;return c.json({deleted:await deleteAgent(c.env.REGISTRY_DB,u,c.req.param("id"))});});

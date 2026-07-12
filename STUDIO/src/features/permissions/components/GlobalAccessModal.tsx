@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { StudioMark } from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
 
 interface GlobalAccessModalProps {
   /** Whether the machine-access request is pending. */
@@ -98,18 +99,20 @@ export function GlobalAccessModal({ open, onResolve }: GlobalAccessModalProps) {
                 </p>
 
                 <div className="mt-8 flex flex-col-reverse sm:flex-row gap-2.5">
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() => onResolve(false)}
                     className="flex-1 py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-200 dark:border-surface-border rounded-2xl transition-colors"
                   >
                     Not now
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
                     onClick={() => onResolve(true)}
                     className="flex-1 py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl transition-colors"
                   >
                     Grant access
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

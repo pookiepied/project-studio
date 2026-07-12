@@ -6,6 +6,8 @@ import {
   CopyIcon as Copy,
   CheckIcon as Check,
 } from "@phosphor-icons/react";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 import { reportError } from "../core/errors/errorReporting";
 import { logger } from "@/core/logging/logger";
 
@@ -95,35 +97,37 @@ export class ErrorBoundary extends Component<Props, State> {
                 <p className="flex-1 text-xs font-mono text-gray-500 dark:text-gray-500 break-words leading-relaxed">
                   {error.message}
                 </p>
-                <button
+                <IconButton
                   onClick={this.handleCopy}
-                  title={copied ? "Copied!" : "Copy error details"}
-                  className="flex-shrink-0 mt-0.5 p-1 rounded-md text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-border transition-colors"
+                  aria-label={copied ? "Copied!" : "Copy error details"}
+                  className="shrink-0 mt-0.5 h-auto w-auto p-1 rounded-md text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-border"
                 >
                   {copied
                     ? <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400" />
                     : <Copy size={12} />
                   }
-                </button>
+                </IconButton>
               </div>
             )}
 
             {/* Actions */}
             <div className="flex items-center gap-3 text-sm">
-              <button
+              <Button
                 onClick={this.handleReset}
-                className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                variant="ghost"
+                className="h-auto gap-1 px-0 py-0 text-gray-500 dark:text-gray-400 hover:bg-transparent hover:text-gray-700 dark:hover:text-gray-200"
               >
                 <ArrowClockwise size={12} weight="bold" />
                 Try again
-              </button>
+              </Button>
               <span className="text-gray-200 dark:text-gray-700">·</span>
-              <button
+              <Button
                 onClick={() => window.location.reload()}
-                className="text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                variant="ghost"
+                className="h-auto gap-2 px-0 py-0 text-gray-400 dark:text-gray-600 hover:bg-transparent hover:text-gray-600 dark:hover:text-gray-400"
               >
                 Reload
-              </button>
+              </Button>
             </div>
           </motion.div>
         </div>

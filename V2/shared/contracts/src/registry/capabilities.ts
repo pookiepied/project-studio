@@ -63,6 +63,17 @@ export interface RegistryBundleRecord extends CapabilityRecord {
   tools: RegisteredToolMetadata[];
 }
 
+export interface RegistrySkillRecord extends CapabilityRecord {
+  ref: CapabilityRef & { kind: "skill" };
+  description: string;
+  instructionsRef?: string;
+  requiredTools: string[];
+  requiredPermissions: string[];
+  environments: string[];
+  activationRules: Record<string, unknown>;
+  resources: string[];
+}
+
 /** Sanitized desktop-to-cloud payload. It intentionally cannot represent secrets or endpoints. */
 export interface LocalRegistrySyncRequest {
   userId: string;
@@ -70,6 +81,8 @@ export interface LocalRegistrySyncRequest {
   revision: number;
   mcpServers: RegistryMcpRecord[];
   bundles: RegistryBundleRecord[];
+  /** Sanitized metadata only; skill bodies remain local or behind instructionsRef. */
+  skills?: RegistrySkillRecord[];
 }
 
 export interface RegistrySnapshot {
@@ -77,4 +90,5 @@ export interface RegistrySnapshot {
   connectors: RegistryConnectorRecord[];
   mcpServers: RegistryMcpRecord[];
   bundles: RegistryBundleRecord[];
+  skills?: RegistrySkillRecord[];
 }

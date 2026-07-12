@@ -6,6 +6,7 @@ import {
   LeafIcon as Leaf,
 } from "@phosphor-icons/react";
 import { Icon } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
 import { ProviderIcon, getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import type { Model } from "@/core/models";
 import {
@@ -140,8 +141,8 @@ export function ModelDetail({
         </div>
 
         {selectable && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onSelect}
             disabled={selected}
             className={`mt-5 w-full h-9 rounded-lg text-sm font-medium transition-colors duration-fast ${
@@ -151,7 +152,7 @@ export function ModelDetail({
             }`}
           >
             {selected ? "Selected" : "Select model"}
-          </button>
+          </Button>
         )}
       </div>
     </aside>

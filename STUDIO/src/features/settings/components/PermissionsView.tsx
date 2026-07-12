@@ -6,6 +6,7 @@ import {
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
 import { Icon } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
 import {
   listGlobalMachineGrants,
   revokeGlobalMachineGrant,
@@ -154,12 +155,13 @@ export const PermissionsView = () => {
       {/* RESET */}
       {!nothingGranted && (
         <section className="pt-2">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => { clearAllPermissions(); refresh(); }}
             className="text-xs font-medium text-secondary hover:text-secondary transition-colors"
           >
             Revoke all permissions
-          </button>
+          </Button>
           <p className="mt-1 text-2xs text-muted">
             Clears every trust decision, machine grant, and saved tool approval. The AI will ask again next time.
           </p>
@@ -175,12 +177,13 @@ export const PermissionsView = () => {
 
 function RevokeButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
+    <Button
+      variant="outline"
       onClick={onClick}
       className="text-xs font-medium text-secondary hover:text-secondary border border-surface-border rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap"
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

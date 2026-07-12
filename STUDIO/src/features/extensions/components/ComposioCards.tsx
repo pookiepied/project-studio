@@ -9,6 +9,7 @@ import { PlusIcon as Plus } from "@phosphor-icons/react";
 import { Success, Icon } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";
 import { Toggle } from "@/ui/primitives/Toggle";
+import { Button } from "@/ui/primitives/Button";
 import { Badge } from "@/ui/primitives/Badge";
 import type { ComposioApp, ComposioConnection } from "@/features/extensions/services/composioService";
 import { StatusDot, GithubLetterIcon } from "./ExtensionIcons";
@@ -109,9 +110,10 @@ interface FeaturedCardProps {
 }
 
 export const FeaturedCard = ({ app, isInstalled, onClick, logo }: FeaturedCardProps) => (
-  <button
+  <Button
+    variant="ghost"
     onClick={onClick}
-    className="flex items-center gap-3 p-3 rounded-2xl border border-surface-border bg-surface-base hover:bg-surface-hover hover:shadow-sm transition-all text-left w-full"
+    className="flex items-center gap-3 p-3 rounded-2xl border border-surface-border bg-surface-base hover:bg-surface-hover hover:shadow-sm transition-all text-left w-full h-auto justify-start"
   >
     <AppLogo
       src={logo}
@@ -138,5 +140,5 @@ export const FeaturedCard = ({ app, isInstalled, onClick, logo }: FeaturedCardPr
     }`}>
       {isInstalled ? <Success size="xs" /> : <Icon icon={Plus} size="xs" />}
     </div>
-  </button>
+  </Button>
 );

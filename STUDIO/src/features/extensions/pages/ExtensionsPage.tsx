@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { PlusIcon as Plus } from "@phosphor-icons/react";
 import { Warning, Close, Search, Manage, Refresh, Expand, Icon } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Button } from "@/ui/primitives/Button";
 import { useNavigation } from "@/app/contexts/NavigationContext";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useChat } from "@/features/chat/context";
@@ -141,19 +142,21 @@ export const ExtensionsPage = () => {
                 className="w-36 pl-7 pr-6 py-1.5 text-xs bg-surface-raised border border-transparent rounded-full text-secondary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
               />
               {search && (
-                <button onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors">
+                <IconButton variant="ghost" size="sm" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:bg-transparent">
                   <Close size="xs" />
-                </button>
+                </IconButton>
               )}
             </div>
-            <button onClick={() => setShowManagePanel(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-secondary bg-surface-raised hover:bg-surface-hover rounded-full transition-colors duration-fast flex-shrink-0">
-              <Manage size="xs" />Manage
-            </button>
-            <button onClick={() => { setShowCustomModal(true); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-secondary bg-surface-raised hover:bg-surface-hover rounded-full transition-colors duration-fast flex-shrink-0">
-              <Icon icon={Plus} size="xs" />Custom
-            </button>
+            <Button variant="ghost" onClick={() => setShowManagePanel(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium h-auto bg-surface-raised rounded-full flex-shrink-0"
+              leftIcon={<Manage size="xs" />}>
+              Manage
+            </Button>
+            <Button variant="ghost" onClick={() => { setShowCustomModal(true); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium h-auto bg-surface-raised rounded-full flex-shrink-0"
+              leftIcon={<Icon icon={Plus} size="xs" />}>
+              Custom
+            </Button>
           </div>
         </div>
       </div>
@@ -164,9 +167,9 @@ export const ExtensionsPage = () => {
           <div className="flex items-center gap-2 mx-6 mt-3 px-3 py-2 bg-surface-raised border border-surface-border rounded-xl text-xs text-secondary">
             <Warning size="xs" weight="fill" className="text-primary flex-shrink-0" />
             <span className="flex-1">{mcp.mcpError}</span>
-            <button onClick={() => mcp.setMcpError(null)} aria-label="Dismiss error" className="flex-shrink-0 text-muted hover:text-primary transition-colors">
+            <IconButton variant="ghost" size="sm" aria-label="Dismiss error" onClick={() => mcp.setMcpError(null)} className="flex-shrink-0 text-muted hover:bg-transparent">
               <Close size="xs" />
-            </button>
+            </IconButton>
           </div>
         )}
       </AnimatePresence>
@@ -244,11 +247,11 @@ export const ExtensionsPage = () => {
               <div className="space-y-4">
                 {groupedApps.map(([category, apps]) => (
                   <div key={category} className="space-y-2">
-                    <button onClick={() => toggleComposioGroup(`browse:${category}`)} className="flex items-center gap-1.5 w-full">
+                    <Button variant="ghost" onClick={() => toggleComposioGroup(`browse:${category}`)} className="flex items-center gap-1.5 w-full justify-start h-auto px-0 py-0 hover:bg-transparent">
                       <p className="text-2xs font-semibold text-muted tracking-wider uppercase px-0.5">{category}</p>
                       <Expand size="xs" className={`text-muted transition-transform duration-150 ${collapsedComposioGroups.has(`browse:${category}`) ? "-rotate-90" : ""}`} />
                       <span className="ml-auto text-2xs text-muted">{apps.length}</span>
-                    </button>
+                    </Button>
                     {!collapsedComposioGroups.has(`browse:${category}`) && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {apps.map(app => {

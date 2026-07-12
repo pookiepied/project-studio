@@ -15,6 +15,8 @@ import { documentDir } from "@tauri-apps/api/path";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { setWorkspaceTrust } from "@/core/permissions";
 import { StudioMark } from "@/ui/brand";
+import { Button } from "@/ui/primitives/Button";
+import { IconButton } from "@/ui/primitives/IconButton";
 
 type AccessMode = "review" | "autonomous";
 type ProjectCtx  = { path: string; name: string; accessMode?: AccessMode };
@@ -128,26 +130,26 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
               autoFocus
               className="px-2.5 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-surface-border bg-transparent text-xs text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-gray-400 dark:focus:border-surface-border transition-colors min-w-0 w-36"
             />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={handleCreate}
               disabled={!formName.trim()}
               className="px-2 py-1.5 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-selected disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Create
-            </button>
-            <button
-              type="button"
+            </Button>
+            <IconButton
+              aria-label="Cancel"
               onClick={() => { setShowForm(false); setFormName(""); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border transition-colors"
             >
               <X size={12} weight="bold" />
-            </button>
+            </IconButton>
           </>
         ) : (
           <>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={openMenu}
               className={
                 isBar
@@ -166,17 +168,17 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
               <FolderOpen size={14} weight={projectContext ? "duotone" : "regular"} />
               <span>{projectContext ? projectContext.name : "Work in a project"}</span>
               <CaretDown size={12} weight="bold" className={`transition-transform duration-150 ${showMenu ? "rotate-180" : ""}`} />
-            </button>
+            </Button>
 
             {projectContext && (
-              <button
-                type="button"
+              <IconButton
+                aria-label="Clear project"
                 onClick={() => setProjectContext(null)}
                 title="Clear project"
                 className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border transition-colors"
               >
                 <X size={12} weight="bold" />
-              </button>
+              </IconButton>
             )}
           </>
         )}
@@ -211,23 +213,27 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                   transition={{ duration: 0.1 }}
                   className="w-48 bg-surface-base border border-surface-border rounded-xl shadow-lg overflow-hidden"
                 >
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    role="menuitem"
+                    tabIndex={-1}
                     onClick={() => { setShowMenu(false); setShowForm(true); }}
-                    className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
+                    className="flex items-center gap-2.5 h-auto w-full px-3 py-2.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
                   >
                     <Plus size={14} weight="bold" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Start from scratch</span>
-                  </button>
+                  </Button>
                   <div className="mx-3 h-px bg-gray-100 dark:bg-surface-border" />
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    role="menuitem"
+                    tabIndex={-1}
                     onClick={handleSelectFolder}
-                    className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
+                    className="flex items-center gap-2.5 h-auto w-full px-3 py-2.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
                   >
                     <FolderOpen size={14} weight="duotone" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Use an existing folder</span>
-                  </button>
+                  </Button>
                 </motion.div>
               </div>
             )}
@@ -378,37 +384,37 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                         <div className="flex flex-1 gap-2.5">
                           {step === "trust" ? (
                             <>
-                              <button
-                                type="button"
+                              <Button
+                                variant="outline"
                                 onClick={resetFlow}
-                                className="flex-1 py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-200 dark:border-surface-border rounded-2xl transition-colors"
+                                className="h-auto flex-1 justify-center py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 border-gray-200 dark:border-surface-border hover:bg-gray-100 dark:hover:bg-surface-selected hover:text-gray-900 dark:hover:text-gray-100 rounded-2xl"
                               >
                                 Cancel
-                              </button>
-                              <button
-                                type="button"
+                              </Button>
+                              <Button
+                                variant="primary"
                                 onClick={handleTrustConfirm}
-                                className="flex-1 py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl transition-colors"
+                                className="h-auto flex-1 justify-center py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl"
                               >
                                 I trust it
-                              </button>
+                              </Button>
                             </>
                           ) : (
                             <>
-                              <button
-                                type="button"
+                              <Button
+                                variant="outline"
                                 onClick={() => (hasTrustStep ? setStep("trust") : resetFlow())}
-                                className="flex-1 py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-200 dark:border-surface-border rounded-2xl transition-colors"
+                                className="h-auto flex-1 justify-center py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 border-gray-200 dark:border-surface-border hover:bg-gray-100 dark:hover:bg-surface-selected hover:text-gray-900 dark:hover:text-gray-100 rounded-2xl"
                               >
                                 {hasTrustStep ? "Back" : "Cancel"}
-                              </button>
-                              <button
-                                type="button"
+                              </Button>
+                              <Button
+                                variant="primary"
                                 onClick={handleConfirmMode}
-                                className="flex-1 py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl transition-colors"
+                                className="h-auto flex-1 justify-center py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl"
                               >
                                 Continue
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>
@@ -448,18 +454,18 @@ interface ModeOptionProps {
 
 function ModeOption({ icon, title, description, selected, onClick }: ModeOptionProps) {
   return (
-    <motion.button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
       whileTap={{ scale: 0.985 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
-      className={`w-full text-left p-3.5 rounded-2xl border transition-colors duration-200 ${
+      className={`w-full h-auto justify-start text-left p-3.5 rounded-2xl border transition-colors duration-200 ${
         selected
           ? "border-gray-300/70 dark:border-white/15 bg-gray-50 dark:bg-white/[0.05]"
           : "border-gray-200 dark:border-white/10 hover:bg-gray-50/70 dark:hover:bg-white/[0.03]"
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div className="w-full flex items-center gap-3">
         <span
           className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
             selected
@@ -488,6 +494,6 @@ function ModeOption({ icon, title, description, selected, onClick }: ModeOptionP
           />
         </span>
       </div>
-    </motion.button>
+    </Button>
   );
 }

@@ -113,12 +113,13 @@ export const AiModelsView = ({
         <div className="text-center space-y-2">
           <Warning size="md" weight="fill" className="mx-auto text-primary" />
           <p className="text-xs text-secondary">Failed to load.</p>
-          <button
+          <Button
+            variant="ghost"
             onClick={onRetry}
-            className="text-xs text-muted underline hover:text-primary transition-colors duration-fast"
+            className="text-xs text-muted underline h-auto px-0 py-0 hover:bg-transparent hover:text-primary"
           >
             Try again
-          </button>
+          </Button>
         </div>
       </div>
     )}
@@ -145,14 +146,15 @@ export const AiModelsView = ({
                     )}
                   </div>
                   {mode.isCustomized && (
-                    <button
+                    <Button
+                      variant="ghost"
                       onClick={() => onReset(mode.id)}
                       disabled={amSaveState === "loading"}
-                      className="flex items-center gap-1 text-2xs text-muted hover:text-primary disabled:opacity-40 transition-colors duration-fast"
+                      className="flex items-center gap-1 text-2xs text-muted hover:text-primary h-auto px-0 py-0 hover:bg-transparent disabled:opacity-40"
                     >
                       <Icon icon={ArrowCounterClockwise} size="xs" />
                       <span>Reset</span>
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -189,14 +191,15 @@ export const AiModelsView = ({
                   )}
                 </div>
                 {loadedAuto.isCustomized && (
-                  <button
-                    onClick={() => onReset("auto")}
-                    disabled={amSaveState === "loading"}
-                    className="flex items-center gap-1 text-2xs text-muted hover:text-primary disabled:opacity-40 transition-colors duration-fast"
-                  >
-                    <Icon icon={ArrowCounterClockwise} size="xs" />
-                    <span>Reset</span>
-                  </button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => onReset("auto")}
+                      disabled={amSaveState === "loading"}
+                      className="flex items-center gap-1 text-2xs text-muted hover:text-primary h-auto px-0 py-0 hover:bg-transparent disabled:opacity-40"
+                    >
+                      <Icon icon={ArrowCounterClockwise} size="xs" />
+                      <span>Reset</span>
+                    </Button>
                 )}
               </div>
 

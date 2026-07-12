@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { formatLabel } from "@/lib/formatters";
+import { Button } from "@/ui/primitives/Button";
 
 interface ToolPermissionCardProps {
   tool: string;
@@ -35,18 +36,20 @@ export function ToolPermissionCard({ tool, onAllow, onDeny }: ToolPermissionCard
       </div>
 
       <div className="flex items-center gap-2">
-        <button
+        <Button
+          variant="primary"
           onClick={onAllow}
           className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300 transition-colors"
         >
           Allow for this chat
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           onClick={onDeny}
           className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-raised transition-colors"
         >
           Deny
-        </button>
+        </Button>
       </div>
     </motion.div>
   );

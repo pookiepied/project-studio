@@ -1,4 +1,5 @@
 import { Warning } from "@/ui/icons";
+import { Button } from "@/ui/primitives/Button";
 import { ProviderIcon, getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import { fmtTokens, fmtCost } from "../formatters";
 import type { UsageRow, CreditEntry } from "../types";
@@ -38,12 +39,13 @@ export const ProviderCard = ({
     : 0;
 
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`flex-shrink-0 w-36 rounded-lg border px-2.5 py-2 text-left transition-colors duration-fast ${
+      className={`flex-shrink-0 w-36 !h-auto !gap-0 flex-col items-stretch border !px-2.5 py-2 text-left transition-colors duration-fast ${
         isActive
-          ? "border-surface-border bg-surface-selected"
-          : "border-surface-border bg-surface-base hover:bg-surface-hover"
+          ? "border-surface-border !bg-surface-selected"
+          : "border-surface-border !bg-surface-base hover:bg-surface-hover"
       }`}
     >
       <div className="flex items-center gap-1.5 mb-2 h-[18px]">
@@ -87,6 +89,6 @@ export const ProviderCard = ({
           />
         </div>
       </div>
-    </button>
+    </Button>
   );
 };

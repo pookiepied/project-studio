@@ -120,9 +120,9 @@ export class SessionStore {
     this.sql.exec(`INSERT INTO external_tool_calls(tool_call_id,run_id,server_id,tool_name,input,status,created_at) VALUES(?,?,?,?,?,'pending',?) ON CONFLICT(tool_call_id) DO NOTHING`,toolCallId,runId,serverId,toolName,JSON.stringify(input),new Date().toISOString());
   }
 
-  loadExternalCall(toolCallId:string):{status:string;result?:unknown;error?:string}|null {
-    const rows=this.sql.exec("SELECT status,result,error FROM external_tool_calls WHERE tool_call_id=?",toolCallId).toArray();
-    if(!rows.length)return null;return {status:String(rows[0].status),result:rows[0].result?JSON.parse(String(rows[0].result)):undefined,error:rows[0].error?String(rows[0].error):undefined};
+  loadExternalCall(toolCallId:string):{status:string;serverId:string;toolName:string;result?:unknown;error?:string}|null {
+    const rows=this.sql.exec("SELECT status,server_id,tool_name,result,error FROM external_tool_calls WHERE tool_call_id=?",toolCallId).toArray();
+    if(!rows.length)return null;return {status:String(rows[0].status),serverId:String(rows[0].server_id),toolName:String(rows[0].tool_name),result:rows[0].result?JSON.parse(String(rows[0].result)):undefined,error:rows[0].error?String(rows[0].error):undefined};
   }
 
   resolveExternalCall(toolCallId:string,result:unknown,error?:string):void {

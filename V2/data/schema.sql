@@ -45,3 +45,20 @@ CREATE TABLE IF NOT EXISTS artifacts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_artifacts_user ON artifacts (user_id);
+
+CREATE TABLE IF NOT EXISTS plans (
+  id TEXT NOT NULL, user_id TEXT NOT NULL, conversation_id TEXT,
+  goal TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_plans_conversation ON plans (user_id, conversation_id, created_at);
+
+CREATE TABLE IF NOT EXISTS transcript_records (
+  id TEXT NOT NULL, user_id TEXT NOT NULL, conversation_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL, run_id TEXT NOT NULL, sequence INTEGER NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('assistant_text','assistant_reasoning','tool_call','tool_result')),
+  tool_call_id TEXT, tool_name TEXT, content TEXT NOT NULL, metadata TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (id, user_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transcript_sequence ON transcript_records(user_id, run_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_transcript_conversation ON transcript_records(user_id, conversation_id, turn_id, sequence);

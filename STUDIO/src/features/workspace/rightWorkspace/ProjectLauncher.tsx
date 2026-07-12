@@ -4,6 +4,8 @@ import { CaretDownIcon as CaretDown } from "@phosphor-icons/react";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { resolveTheme } from "@/lib/theme";
+import { IconButton } from "@/ui/primitives/IconButton";
+import { Button } from "@/ui/primitives/Button";
 import { PROJECT_APPS } from "./projectApps";
 import { psArray, psString, runPowerShell } from "./projectAppsShell";
 import {
@@ -222,22 +224,24 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
   return (
     <div ref={containerRef} className="relative flex items-center">
       <div className="flex h-7 items-center rounded-lg border border-gray-200 bg-white shadow-sm dark:border-surface-border dark:bg-surface-raised">
-        <button
-          type="button"
+        <IconButton
+          size="sm"
           onClick={() => openApp(defaultApp)}
+          aria-label={`Open project in ${defaultApp.label}`}
           title={`Open project in ${defaultApp.label}`}
           className="flex h-7 w-7 items-center justify-center rounded-l-lg text-gray-500 transition-colors duration-100 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-surface-selected dark:hover:text-gray-300"
         >
           <ProjectAppIcon app={defaultApp} isDark={isDark} />
-        </button>
-        <button
-          type="button"
+        </IconButton>
+        <IconButton
+          size="sm"
           onClick={() => setOpen((v) => !v)}
+          aria-label="Choose project app"
           title="Choose project app"
-          className="flex h-7 w-5 items-center justify-center rounded-r-lg border-l border-gray-100 text-gray-400 transition-colors duration-100 hover:bg-gray-50 hover:text-gray-600 dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-gray-300"
+          className="flex h-7 !w-5 items-center justify-center rounded-r-lg border-l border-gray-100 text-gray-400 transition-colors duration-100 hover:bg-gray-50 hover:text-gray-600 dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-gray-300"
         >
           <CaretDown size={12} weight="bold" />
-        </button>
+        </IconButton>
       </div>
 
       <AnimatePresence>
@@ -251,11 +255,11 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
             className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised"
           >
             {availableApps.map((app) => (
-              <button
+              <Button
                 key={app.id}
-                type="button"
+                variant="ghost"
                 onClick={() => openApp(app, true)}
-                className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm transition-colors duration-100 hover:bg-gray-50 dark:hover:bg-surface-selected ${
+                className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left justify-start text-sm transition-colors duration-100 hover:bg-gray-50 dark:hover:bg-surface-selected ${
                   app.id === defaultApp.id
                     ? "bg-gray-50 text-gray-900 dark:bg-surface-selected dark:text-gray-100"
                     : "text-gray-700 dark:text-gray-300"
@@ -263,7 +267,7 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
               >
                 <ProjectAppIcon app={app} isDark={isDark} />
                 <span className="truncate">{app.label}</span>
-              </button>
+              </Button>
             ))}
           </motion.div>
         )}

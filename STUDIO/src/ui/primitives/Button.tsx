@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { motion, type HTMLMotionProps } from "framer-motion";
 import { Spinner } from "@/ui/primitives/Spinner";
+import { cn } from "@/lib/cn";
 
 interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
   children: ReactNode;
@@ -54,7 +55,7 @@ export const Button = ({
     <motion.button
       whileTap={!isDisabled ? { scale: 0.98 } : {}}
       transition={{ duration: 0.15 }}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabledStyles} ${className}`}
+      className={cn(baseStyles, variantStyles[variant], sizeStyles[size], disabledStyles, className)}
       disabled={isDisabled}
       {...props}
     >
