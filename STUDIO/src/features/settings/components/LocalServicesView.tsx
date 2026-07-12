@@ -2,6 +2,7 @@ import {
   DesktopTowerIcon as DesktopTower,
   CpuIcon as Cpu,
   WaveformIcon as Waveform,
+  SpeakerHighIcon as SpeakerHigh,
   TerminalIcon as Terminal,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
@@ -11,7 +12,8 @@ import { Toggle } from "@/ui/primitives/Toggle";
 import { useFeatures } from "@/app/hooks/useFeatures";
 import { OllamaStatus } from "@/features/models/components/OllamaStatus";
 import { LMStudioStatus } from "@/features/models/components/LMStudioStatus";
-import { FasterWhisperStatus } from "@/features/transcription";
+import { ParakeetStatus } from "@/features/transcription";
+import { EdgeTtsStatus } from "@/features/tts";
 import { LocalProviderStatus } from "@/features/models/components/LocalProviderStatus";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import type { AppSettings } from "@/types";
@@ -139,23 +141,47 @@ export const LocalServicesView = ({
       </section>
 
       {/* LOCAL TRANSCRIPTION */}
-      {isEnabled("fasterWhisper") && (
+      {isEnabled("parakeet") && (
         <section className="space-y-4">
           <SectionLabel icon={<Icon icon={Waveform as unknown as PhosphorIcon} size="md" />} title="LOCAL TRANSCRIPTION" />
           <div>
             <SettingsRow
-              label="Enable Faster Whisper"
-              description="Transcribe audio locally using Faster Whisper"
+              label="Enable Parakeet-TDT"
+              description="Transcribe audio locally using Parakeet-TDT — rarely hallucinates on silence, unlike Whisper"
               control={
                 <Toggle
-                  checked={settings.fasterWhisperEnabled || false}
-                  onChange={(v) => updateSetting("fasterWhisperEnabled", v)}
+                  checked={settings.parakeetEnabled || false}
+                  onChange={(v) => updateSetting("parakeetEnabled", v)}
                 />
               }
             />
-            {settings.fasterWhisperEnabled && (
+            {settings.parakeetEnabled && (
               <div className="py-3 border-t border-surface-divider">
-                <FasterWhisperStatus />
+                <ParakeetStatus />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* LOCAL TEXT-TO-SPEECH */}
+      {isEnabled("edgeTts") && (
+        <section className="space-y-4">
+          <SectionLabel icon={<Icon icon={SpeakerHigh as unknown as PhosphorIcon} size="md" />} title="LOCAL TEXT-TO-SPEECH" />
+          <div>
+            <SettingsRow
+              label="Enable Edge TTS"
+              description="Free, multilingual text-to-speech from Microsoft Edge — used in Chat read-aloud and Live conversations"
+              control={
+                <Toggle
+                  checked={settings.edgeTtsEnabled || false}
+                  onChange={(v) => updateSetting("edgeTtsEnabled", v)}
+                />
+              }
+            />
+            {settings.edgeTtsEnabled && (
+              <div className="py-3 border-t border-surface-divider">
+                <EdgeTtsStatus />
               </div>
             )}
           </div>

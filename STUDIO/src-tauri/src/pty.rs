@@ -14,7 +14,6 @@
 /// Tauri events emitted:
 ///   "pty-data"   { sessionId, data: String }  — shell stdout/stderr
 ///   "pty-exit"   { sessionId }                — shell process exited
-
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::{
     collections::HashMap,
@@ -40,8 +39,12 @@ pub struct PtyExitEvent {
 
 /// One live PTY session.
 pub struct PtySession {
-    /// Send bytes into the shell's stdin.
-    pub input_tx: std::sync::mpsc::SyncSender<Vec<u8>>,
+    pub request_tx: std::sync::mpsc::SyncSender<PtyRequest>,
+}
+
+pub enum PtyRequest {
+    Write(Vec<u8>),
+    Resize(PtySize),
 }
 
 pub type PtyStore = Arc<Mutex<HashMap<String, PtySession>>>;
@@ -63,12 +66,12 @@ pub fn pty_create(
     app_handle: tauri::AppHandle,
     store: tauri::State<'_, PtyStore>,
 ) -> Result<(), String> {
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(128);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<PtyRequest>(128);
 
     // Register BEFORE spawning so the first pty_write never races.
     {
         let mut s = store.lock().unwrap();
-        s.insert(session_id.clone(), PtySession { input_tx: tx });
+        s.insert(session_id.clone(), PtySession { request_tx: tx });
     }
 
     let sid = session_id.clone();
@@ -79,15 +82,18 @@ pub fn pty_create(
         let pair = match pty_system.openpty(PtySize {
             rows,
             cols,
-            pixel_width:  0,
+            pixel_width: 0,
             pixel_height: 0,
         }) {
-            Ok(p)  => p,
+            Ok(p) => p,
             Err(e) => {
-                let _ = app_handle.emit("pty-data", PtyDataEvent {
-                    session_id: sid.clone(),
-                    data: format!("\r\n\x1b[31mFailed to open PTY: {e}\x1b[0m\r\n"),
-                });
+                let _ = app_handle.emit(
+                    "pty-data",
+                    PtyDataEvent {
+                        session_id: sid.clone(),
+                        data: format!("\r\n\x1b[31mFailed to open PTY: {e}\x1b[0m\r\n"),
+                    },
+                );
                 return;
             }
         };
@@ -97,9 +103,13 @@ pub fn pty_create(
         let shell_cmd = {
             let mut c = CommandBuilder::new("powershell");
             c.args(["-NoLogo"]);
-            if let Some(ref dir) = cwd { c.cwd(dir); }
+            if let Some(ref dir) = cwd {
+                c.cwd(dir);
+            }
             if let Some(ref vars) = env {
-                for (k, v) in vars { c.env(k, v); }
+                for (k, v) in vars {
+                    c.env(k, v);
+                }
             }
             c
         };
@@ -107,20 +117,27 @@ pub fn pty_create(
         let shell_cmd = {
             let mut c = CommandBuilder::new("bash");
             c.arg("-l");
-            if let Some(ref dir) = cwd { c.cwd(dir); }
+            if let Some(ref dir) = cwd {
+                c.cwd(dir);
+            }
             if let Some(ref vars) = env {
-                for (k, v) in vars { c.env(k, v); }
+                for (k, v) in vars {
+                    c.env(k, v);
+                }
             }
             c
         };
 
         let mut child = match pair.slave.spawn_command(shell_cmd) {
-            Ok(c)  => c,
+            Ok(c) => c,
             Err(e) => {
-                let _ = app_handle.emit("pty-data", PtyDataEvent {
-                    session_id: sid.clone(),
-                    data: format!("\r\n\x1b[31mFailed to spawn shell: {e}\x1b[0m\r\n"),
-                });
+                let _ = app_handle.emit(
+                    "pty-data",
+                    PtyDataEvent {
+                        session_id: sid.clone(),
+                        data: format!("\r\n\x1b[31mFailed to spawn shell: {e}\x1b[0m\r\n"),
+                    },
+                );
                 return;
             }
         };
@@ -132,8 +149,8 @@ pub fn pty_create(
         let mut writer = pair.master.take_writer().expect("take writer");
 
         // ── Reader thread: PTY output → frontend ──
-        let app_read  = app_handle.clone();
-        let sid_read  = sid.clone();
+        let app_read = app_handle.clone();
+        let sid_read = sid.clone();
         std::thread::spawn(move || {
             let mut buf = vec![0u8; 4096];
             loop {
@@ -141,18 +158,30 @@ pub fn pty_create(
                     Ok(0) | Err(_) => break,
                     Ok(n) => {
                         let data = String::from_utf8_lossy(&buf[..n]).into_owned();
-                        let _ = app_read.emit("pty-data", PtyDataEvent {
-                            session_id: sid_read.clone(),
-                            data,
-                        });
+                        let _ = app_read.emit(
+                            "pty-data",
+                            PtyDataEvent {
+                                session_id: sid_read.clone(),
+                                data,
+                            },
+                        );
                     }
                 }
             }
         });
 
         // ── Writer loop: receive key data from frontend, write to PTY stdin ──
-        for bytes in rx {
-            if writer.write_all(&bytes).is_err() { break; }
+        for request in rx {
+            match request {
+                PtyRequest::Write(bytes) => {
+                    if writer.write_all(&bytes).is_err() {
+                        break;
+                    }
+                }
+                PtyRequest::Resize(size) => {
+                    let _ = pair.master.resize(size);
+                }
+            }
         }
 
         // Channel dropped (pty_close called) — let child exit naturally.
@@ -175,8 +204,30 @@ pub fn pty_write(
     let s = store.lock().unwrap();
     match s.get(&session_id) {
         Some(sess) => sess
-            .input_tx
-            .send(data.into_bytes())
+            .request_tx
+            .send(PtyRequest::Write(data.into_bytes()))
+            .map_err(|e| e.to_string()),
+        None => Err(format!("PTY session not found: {session_id}")),
+    }
+}
+
+#[tauri::command]
+pub fn pty_resize(
+    session_id: String,
+    cols: u16,
+    rows: u16,
+    store: tauri::State<'_, PtyStore>,
+) -> Result<(), String> {
+    let s = store.lock().unwrap();
+    match s.get(&session_id) {
+        Some(sess) => sess
+            .request_tx
+            .send(PtyRequest::Resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            }))
             .map_err(|e| e.to_string()),
         None => Err(format!("PTY session not found: {session_id}")),
     }
@@ -184,10 +235,7 @@ pub fn pty_write(
 
 /// Close the PTY session (drop the sender → stdin EOF → shell exits).
 #[tauri::command]
-pub fn pty_close(
-    session_id: String,
-    store: tauri::State<'_, PtyStore>,
-) -> Result<(), String> {
+pub fn pty_close(session_id: String, store: tauri::State<'_, PtyStore>) -> Result<(), String> {
     let mut s = store.lock().unwrap();
     s.remove(&session_id);
     Ok(())

@@ -343,7 +343,7 @@ class ComprehensiveDiagnostics {
   private async testModelLoading(test: DiagnosticTest) {
     try {
       const { fetchModels } = await import('@/features/models/services/modelService');
-      const result = await fetchModels(false, false, false); // Quick check without local models
+      const result = await fetchModels(false, false, false, false); // Quick check without local models
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch models');

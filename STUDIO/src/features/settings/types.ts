@@ -31,7 +31,10 @@ export interface AppSettings {
   localProviderPort: number; // Default: 11435
 
   // Local transcription settings
-  fasterWhisperEnabled: boolean; // Whether to enable Faster Whisper
+  parakeetEnabled: boolean; // Whether to enable local Parakeet-TDT transcription
+
+  // Local text-to-speech settings
+  edgeTtsEnabled: boolean; // Whether to enable local Edge TTS
 
   // Keyboard shortcuts
   recordingShortcut: string[];

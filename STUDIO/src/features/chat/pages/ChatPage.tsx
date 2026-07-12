@@ -3,14 +3,15 @@ import { motion, AnimatePresence }                   from "framer-motion";
 import { BrowserPanelContext }                       from "@/app/contexts/BrowserPanelContext";
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
 import { ModelLibraryPanel }                         from "@/features/models";
-import { SummaryPanel }                              from "@/features/artifacts";
 import { ContextAutocomplete }                       from "@/features/chat/components/ContextAutocomplete";
 import { environmentService }                        from "@/core/platform/environmentService";
+import { openConversationWindow }                    from "@/core/platform/conversationWindowService";
+import { useRightPanelWidth }                         from "@/app/shell/workspaceLayoutStore";
 import { useChat }                                   from "@/features/chat/context";
 import { useModelsContext as useModels }              from "@/features/models/context";
 import { useDraftPersistence }                       from "@/features/chat/hooks/useDraftPersistence";
 import { useSettings }                               from "@/app/contexts/SettingsContext";
-import { useTTS }                                    from "@/features/voice/hooks/useTTS";
+import { useTTSContext as useTTS }                   from "@/features/voice/context/TTSContext";
 import { useChatScroll }                             from "@/features/chat/hooks/useChatScroll";
 import { useAtMention }                              from "@/features/chat/hooks/useAtMention";
 import { useConversationsList }                      from "@/features/chat/hooks/useConversationsList";
@@ -21,7 +22,6 @@ import { useTerminalPanel }                          from "@/app/hooks/useTermin
 import { useMessageEdit }                            from "@/features/chat/hooks/useMessageEdit";
 import { useMessagePopups }                          from "@/features/chat/hooks/useMessagePopups";
 import { useConversationStatuses }                   from "@/features/chat/hooks/useConversationStatuses";
-import { useSummaryPanel }                           from "@/app/hooks/useSummaryPanel";
 import { useConvRename }                             from "@/features/chat/hooks/useConvRename";
 import { usePermissionPrompt }                       from "@/features/chat/hooks/usePermissionPrompt";
 import { useExclusivePanel, broadcastPanelOpen }     from "@/lib/hooks/useExclusivePanel";
@@ -60,7 +60,7 @@ import type { ChatEngine } from "@/cliBridges/types";
 // clears the floating composer's top fade (~16px) with comfortable slack, in
 // every scenario including landing at the bottom of an old conversation after a
 // restart. Also leaves room for the last message's absolute hover action bar.
-const BOTTOM_SCROLL_CLEARANCE = 12;
+const BOTTOM_SCROLL_CLEARANCE = 6;
 
 // Claude-owns-transcript banner — Claude Code brand-warm accent (Anthropic
 // terracotta family, matches ClaudeCodeIcon #CC785C). Not a neutral surface;
@@ -127,7 +127,6 @@ export const ChatPage = () => {
     harnessSegments,
     pendingMessages,
     cancelPendingMessage,
-    sessionTasks,
   } = useChat();
 
   const messages = displayedMessages;
@@ -217,9 +216,11 @@ export const ChatPage = () => {
   } = useArtifactPanel();
 
   const isTauri = environmentService.isTauri();
+  // Width the right workspace panel currently occupies (0 when closed). The
+  // top-right control cluster shifts left by this so it rides the panel's edge
+  // instead of being covered by it.
+  const rightPanelWidth = useRightPanelWidth();
 
-  // -- Summary panel -----------------------------------------------------------
-  const { summaryPanelOpen, summaryPanelWidth, setSummaryPanelOpen } = useSummaryPanel(sessionTasks.length);
   const rightWorkspace = useRightWorkspace({
     projectContext,
     terminalOpen,
@@ -236,8 +237,7 @@ export const ChatPage = () => {
   });
 
   // -- Mutually-exclusive top-right panels --------------------------------------
-  // Opening Overview closes Tools/Terminal & Notifications, and vice-versa.
-  useExclusivePanel("overview", summaryPanelOpen, () => setSummaryPanelOpen(false));
+  // Opening Tools/Terminal closes Notifications, and vice-versa.
   useExclusivePanel("tools", rightWorkspace.open, rightWorkspace.closeAll);
 
   // -- Model library -----------------------------------------------------------
@@ -566,34 +566,21 @@ export const ChatPage = () => {
             />
           ) : null
         }
-        rightControls={
-          <RightWorkspaceControls
-            isTauri={isTauri}
-            projectContext={projectContext}
-            open={rightWorkspace.open}
-            summaryPanelOpen={summaryPanelOpen}
-            onToggleSummaryPanel={() => {
-              const next = !summaryPanelOpen;
-              setSummaryPanelOpen(next);
-              if (next) broadcastPanelOpen("overview");
-            }}
-            onToggleOpen={() => {
-              if (!rightWorkspace.open) broadcastPanelOpen("tools");
-              rightWorkspace.toggleOpen();
-            }}
-          />
-        }
         onSelectProject={handleSelectProject}
         onOpenProjectFolder={handleOpenProjectFolder}
         onRemoveProject={(id) => { void removeProject(id); }}
         onDeleteProject={(id) => { void deleteProject(id); }}
         onSelectConversation={async (id) => { await loadConversationById(id); }}
+        onOpenConversationInSideChat={(id) => {
+          rightWorkspace.openView("side-chat", { conversationId: id });
+          broadcastPanelOpen("tools");
+        }}
+        onOpenConversationInNewWindow={(id) => { void openConversationWindow(id); }}
         onNewConversation={() => {
           createNewConversation(conversationListScope, {
             preserveProject: conversationListScope === "local" && !!projectContext,
           });
         }}
-        onRenameChat={() => setIsEditingTitle(true)}
         onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
         onDeleteConversation={(id, e) => {
           e.stopPropagation();
@@ -610,33 +597,34 @@ export const ChatPage = () => {
         onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
       />
 
+      {/* Top-right control cluster — the app-level mirror of the window traffic
+          lights on the left edge: environment selector, project launcher,
+          workspace toggle. Fixed (never occupies layout), aligned to the shared
+          top-row center line (23px) so it sits level with the dock + lights.
+          Rides the workspace panel's edge: `right` = panel width + inset, so it
+          slides left (animated) as the panel opens or is resized. */}
+      <div
+        className="pointer-events-auto fixed top-[9px] z-toast transition-[right] duration-300 ease-standard"
+        style={{ right: rightPanelWidth + 14 }}
+      >
+        <RightWorkspaceControls
+          isTauri={isTauri}
+          projectContext={projectContext}
+          open={rightWorkspace.open}
+          onToggleOpen={() => {
+            if (!rightWorkspace.open) broadcastPanelOpen("tools");
+            rightWorkspace.toggleOpen();
+          }}
+          scope={conversationStorageScope}
+          onScopeChange={handleStorageScopeChange}
+        />
+      </div>
+
       {/* -- SPLIT VIEW: chat column + side panels -- */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* -- Chat column -- */}
         <div className="flex-1 flex flex-col overflow-hidden relative" style={{ minWidth: "380px" }}>
-
-          {/* Floating overview panel - overlays chat, does not push layout */}
-          <AnimatePresence>
-            {summaryPanelOpen && (
-              <motion.div
-                key="summary-panel-float"
-                initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                style={{ transformOrigin: "top right", width: summaryPanelWidth, top: "46px", right: "12px" }}
-                className="absolute z-50"
-              >
-                <SummaryPanel
-                  onClose={() => setSummaryPanelOpen(false)}
-                  sessionTasks={sessionTasks}
-                  isStreaming={isStreaming}
-                  activeToolCalls={activeToolCalls}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* -- MAIN CONTENT: empty-centred ↔ conversation -- */}
           <AnimatePresence mode="popLayout" initial={false}>

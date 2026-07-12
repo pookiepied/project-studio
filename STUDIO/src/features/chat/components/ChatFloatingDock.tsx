@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CaretDownIcon as CaretDown,
@@ -19,7 +20,6 @@ import {
   FloatingPanelFrame,
   FloatingPanelNavigation,
 } from "@/app/shell/FloatingPanel";
-import { EnvironmentSelector } from "@/features/chat/components/EnvironmentSelector";
 import { formatDate } from "@/lib/formatters";
 import { useNavigation } from "@/app/contexts/NavigationContext";
 import { ClaudeCodeIcon, StudioMark } from "@/ui/brand";
@@ -28,7 +28,7 @@ import type { ProjectEntry } from "@/core/projects";
 import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
 
-type BrowserKind = "projects" | "conversations" | null;
+type BrowserTab = "conversations" | "projects";
 
 interface ChatFloatingDockProps {
   active: boolean;
@@ -43,7 +43,6 @@ interface ChatFloatingDockProps {
   conversationStatuses?: Map<string, ConversationSessionStatus>;
   contextControls?: ReactNode;
   accountControl?: ReactNode;
-  rightControls?: ReactNode;
   onSelectProject: (project: ProjectEntry) => void;
   onOpenProjectFolder: () => void;
   onRemoveProject: (id: string) => void;
@@ -52,7 +51,6 @@ interface ChatFloatingDockProps {
   onOpenConversationInSideChat?: (id: string, title?: string) => void;
   onOpenConversationInNewWindow?: (id: string) => void;
   onNewConversation: () => void;
-  onRenameChat: () => void;
   onStartEditTitle: (id: string, title: string, e: React.MouseEvent) => void;
   onDeleteConversation: (id: string, e: React.MouseEvent) => void;
   editingConvId: string | null;
@@ -75,7 +73,6 @@ export function ChatFloatingDock({
   conversationStatuses,
   contextControls,
   accountControl,
-  rightControls,
   onSelectProject,
   onOpenProjectFolder,
   onRemoveProject,
@@ -84,7 +81,6 @@ export function ChatFloatingDock({
   onOpenConversationInSideChat,
   onOpenConversationInNewWindow,
   onNewConversation,
-  onRenameChat,
   onStartEditTitle,
   onDeleteConversation,
   editingConvId,
@@ -95,15 +91,22 @@ export function ChatFloatingDock({
 }: ChatFloatingDockProps) {
   const { currentView, navigateTo } = useNavigation();
   const [mode, setMode] = useState<"navigation" | "conversation">(active ? "conversation" : "navigation");
-  const [browser, setBrowser] = useState<BrowserKind>(null);
+  // Resting-dock collapse: when collapsed the app-space categories fold away and
+  // only Studio + the conversation/project picker remain (chat page only).
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [browserTab, setBrowserTab] = useState<BrowserTab>("conversations");
   const [projectQuery, setProjectQuery] = useState("");
   const [conversationQuery, setConversationQuery] = useState("");
-  const [optionsOpen, setOptionsOpen] = useState(false);
   const previousActiveRef = useRef(active);
 
   const projectEnabled = scope === "local";
   const showConversationMode = active && mode === "conversation";
   const hasActivity = conversationStatuses && conversationStatuses.size > 0;
+  // A conversation only belongs to a project in local scope with a folder
+  // actually attached — a plain local chat (or any cloud chat) is not a
+  // project, so it shows no folder icon, just its title.
+  const hasProject = projectEnabled && !!currentProjectPath && !!projectName;
 
   const filteredProjects = useMemo(() => {
     const q = projectQuery.trim().toLowerCase();
@@ -130,9 +133,9 @@ export function ChatFloatingDock({
     previousActiveRef.current = active;
   }, [active]);
 
-  const openBrowser = (next: BrowserKind) => {
-    setMode("conversation");
-    setBrowser((value) => (value === next ? null : next));
+  const openBrowser = (tab: BrowserTab) => {
+    setBrowserTab(tab);
+    setBrowserOpen(true);
   };
 
   return (
@@ -146,92 +149,64 @@ export function ChatFloatingDock({
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               exit={{ opacity: 0, y: 4, filter: "blur(2px)" }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="flex max-w-[calc(100vw-150px)] items-center gap-1"
+              className="flex items-center gap-1"
             >
               <button
                 type="button"
                 onClick={() => setMode("navigation")}
                 aria-label="Show navigation"
                 title="Show navigation"
-                className="flex h-7 w-7 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
               >
                 <SidebarSimple size={14} weight="regular" />
               </button>
 
-              <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+              <span className="mx-0.5 h-4 w-px flex-shrink-0 bg-surface-divider" />
 
-              <button
-                type="button"
-                onClick={() => openBrowser("projects")}
-                aria-expanded={browser === "projects"}
-                className={`flex h-7 min-w-0 items-center gap-1.5 rounded-full px-2 text-xs font-medium transition-colors ${
-                  browser === "projects"
-                    ? "bg-surface-selected text-primary"
-                    : "text-secondary hover:bg-surface-hover hover:text-primary"
-                }`}
-              >
-                <FolderOpen size={14} weight={currentProjectPath ? "fill" : "regular"} />
-                <span className="max-w-28 truncate">{projectEnabled ? projectName ?? "Projects" : "Cloud"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => openBrowser("conversations")}
-                aria-expanded={browser === "conversations"}
-                className={`relative flex h-7 min-w-0 items-center gap-1.5 rounded-full px-2 text-xs font-medium transition-colors ${
-                  browser === "conversations"
-                    ? "bg-surface-selected text-primary"
-                    : "text-secondary hover:bg-surface-hover hover:text-primary"
-                }`}
-              >
-                <Stack size={14} weight={currentConvId ? "fill" : "regular"} />
-                <span className="max-w-48 truncate">{conversationTitle ?? "New chat"}</span>
-                <CaretDown size={12} weight="bold" className={`text-muted transition-transform ${browser === "conversations" ? "rotate-180" : ""}`} />
-                {hasActivity && <span className="absolute left-4 top-1 h-1.5 w-1.5 rounded-full bg-primary" />}
-              </button>
+              {/* Unified project / conversation title. Fixed width so the dock
+                  never grows or shrinks with the title — the conversation name
+                  is centered and truncates to `…`. Only the caret is clickable
+                  (it opens the combined browser); the title itself is display
+                  only, so the whole capsule no longer reads as one big button. */}
+              <div className="relative flex h-7 w-[300px] items-center justify-center gap-1.5 rounded-full pl-2.5 pr-7 text-xs font-medium">
+                {hasProject ? (
+                  <>
+                    <FolderOpen size={14} weight="fill" className="flex-shrink-0 text-secondary" />
+                    <span className="max-w-[110px] flex-shrink-0 truncate text-secondary">{projectName}</span>
+                    <span className="flex-shrink-0 text-muted">/</span>
+                  </>
+                ) : (
+                  <ChatCircle size={14} weight={currentConvId ? "fill" : "regular"} className="flex-shrink-0 text-secondary" />
+                )}
+                <span className="min-w-0 truncate text-primary">{conversationTitle ?? "New chat"}</span>
+                {hasActivity && <span className="absolute left-1 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />}
+                <button
+                  type="button"
+                  onClick={() => openBrowser("conversations")}
+                  aria-expanded={browserOpen}
+                  aria-label="Browse conversations and projects"
+                  title="Browse conversations and projects"
+                  className={`absolute right-0.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-colors ${
+                    browserOpen ? "bg-surface-selected text-primary" : "text-muted hover:bg-surface-hover hover:text-primary"
+                  }`}
+                >
+                  <CaretDown size={12} weight="bold" className={`transition-transform ${browserOpen ? "rotate-180" : ""}`} />
+                </button>
+              </div>
 
               {contextControls && (
                 <>
-                  <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+                  <span className="mx-0.5 h-4 w-px flex-shrink-0 bg-surface-divider" />
                   {contextControls}
                 </>
               )}
 
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setOptionsOpen((value) => !value)}
-                  title="Chat options"
-                  className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                    optionsOpen ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
-                  }`}
-                >
-                  <DotsThree size={14} weight="bold" />
-                </button>
-                <AnimatePresence>
-                  {optionsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                      transition={{ duration: 0.14, ease: "easeOut" }}
-                      className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-surface-border bg-surface-base p-1.5 shadow-xl"
-                    >
-                      <button type="button" onClick={() => { setOptionsOpen(false); onRenameChat(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-secondary hover:bg-surface-hover hover:text-primary">
-                        <PencilSimple size={14} /> Rename
-                      </button>
-                      <button type="button" onClick={() => { setOptionsOpen(false); onNewConversation(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-secondary hover:bg-surface-hover hover:text-primary">
-                        <Plus size={14} weight="bold" /> New chat
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <span className="mx-0.5 h-4 w-px bg-surface-divider" />
-              {accountControl}
-              <EnvironmentSelector scope={scope} onScopeChange={onScopeChange} placement="down" />
-              {rightControls}
+              {accountControl && (
+                <>
+                  <span className="mx-0.5 h-4 w-px flex-shrink-0 bg-surface-divider" />
+                  {accountControl}
+                </>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -242,58 +217,117 @@ export function ChatFloatingDock({
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="flex items-center gap-1"
             >
-              <FloatingPanelNavigation currentView={currentView} onNavigate={navigateTo} />
-              <span className="mx-0.5 h-4 w-px bg-surface-divider" />
-              <button
-                type="button"
-                onClick={() => openBrowser("projects")}
-                className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                  browser === "projects" ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
-                }`}
-                aria-label="Browse projects"
-                title="Browse projects"
-              >
-                <FolderOpen size={14} weight={currentProjectPath ? "fill" : "regular"} />
-              </button>
-              <button
-                type="button"
-                onClick={() => openBrowser("conversations")}
-                className={`relative flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                  browser === "conversations" ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
-                }`}
-                aria-label="Browse conversations"
-                title="Browse conversations"
-              >
-                <ChatCircle size={14} weight={currentConvId ? "fill" : "regular"} />
-                {hasActivity && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />}
-              </button>
-              <EnvironmentSelector scope={scope} onScopeChange={onScopeChange} placement="down" />
-              <button
-                type="button"
-                onClick={onNewConversation}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-surface-selected px-2.5 text-xs font-medium text-primary transition-colors hover:bg-surface-hover"
-              >
-                <Plus size={14} weight="bold" />
-                New
-              </button>
+              {/* Resting dock expand/collapse. Expanded shows the full app-space
+                  switcher; clicking the conversation glyph folds the categories
+                  away to just Studio + a conversation/project picker. The Studio
+                  mark expands them back. The FloatingPanelFrame's layout spring
+                  morphs the width for the Apple-style ease. */}
+              <AnimatePresence mode="wait" initial={false}>
+                {navCollapsed ? (
+                  <motion.div
+                    key="nav-collapsed"
+                    initial={{ opacity: 0, filter: "blur(2px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(2px)" }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex items-center gap-1"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setNavCollapsed(false)}
+                      aria-label="Show navigation"
+                      title="Show navigation"
+                      className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
+                    >
+                      <StudioMark size={16} className="text-primary" />
+                    </button>
+                    <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+                    <button
+                      type="button"
+                      onClick={() => openBrowser("conversations")}
+                      className={`relative flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors ${
+                        browserOpen && browserTab === "conversations" ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
+                      }`}
+                    >
+                      <ChatCircle size={14} weight={currentConvId ? "fill" : "regular"} />
+                      Conversations
+                      {hasActivity && <span className="absolute left-6 top-1 h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openBrowser("projects")}
+                      className={`flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors ${
+                        browserOpen && browserTab === "projects" ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
+                      }`}
+                    >
+                      <FolderOpen size={14} weight={currentProjectPath ? "fill" : "regular"} />
+                      Projects
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="nav-expanded"
+                    initial={{ opacity: 0, filter: "blur(2px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(2px)" }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex items-center gap-1"
+                  >
+                    <FloatingPanelNavigation currentView={currentView} onNavigate={navigateTo} />
+                    <span className="mx-0.5 h-4 w-px bg-surface-divider" />
+                    <button
+                      type="button"
+                      onClick={() => setNavCollapsed(true)}
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
+                      aria-label="Pick a conversation or project"
+                      title="Pick a conversation or project"
+                    >
+                      <ChatCircle size={14} weight={currentConvId ? "fill" : "regular"} />
+                      {hasActivity && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
       </FloatingPanelFrame>
 
       <AnimatePresence>
-        {browser && (
+        {browserOpen && (
           <motion.div
-            key={browser}
+            key="workspace-browser"
             role="dialog"
-            aria-label={browser === "projects" ? "Project browser" : "Conversation browser"}
+            aria-label="Project and conversation browser"
             initial={{ opacity: 0, y: -10, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.75 }}
             className="fixed left-1/2 top-[50px] z-popover w-[440px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-2xl border border-surface-border bg-surface-base shadow-2xl"
           >
-            {browser === "projects" ? (
+            {/* Combined browser: one popover, two tabs. Picking a conversation
+                loads its project automatically (handled downstream), so
+                conversations are the default landing tab. */}
+            <div className="flex items-center gap-1 border-b border-surface-divider p-2">
+              <TabButton active={browserTab === "conversations"} onClick={() => setBrowserTab("conversations")}>
+                <ChatCircle size={13} weight={browserTab === "conversations" ? "fill" : "regular"} />
+                Conversations
+              </TabButton>
+              <TabButton active={browserTab === "projects"} onClick={() => setBrowserTab("projects")}>
+                <FolderOpen size={13} weight={browserTab === "projects" ? "fill" : "regular"} />
+                Projects
+              </TabButton>
+              <button
+                type="button"
+                onClick={() => setBrowserOpen(false)}
+                aria-label="Close"
+                className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-primary"
+              >
+                <X size={14} weight="bold" />
+              </button>
+            </div>
+
+            {browserTab === "projects" ? (
               <ProjectBrowser
                 enabled={projectEnabled}
                 projects={filteredProjects}
@@ -303,17 +337,16 @@ export function ChatFloatingDock({
                 onSelectProject={(project) => {
                   if (!projectEnabled) return;
                   onSelectProject(project);
-                  setBrowser(null);
+                  setBrowserTab("conversations");
                 }}
                 onOpenProjectFolder={() => {
                   if (!projectEnabled) return;
                   onOpenProjectFolder();
-                  setBrowser(null);
+                  setBrowserOpen(false);
                 }}
                 onRemoveProject={onRemoveProject}
                 onDeleteProject={onDeleteProject}
                 onSwitchLocal={() => onScopeChange("local")}
-                onClose={() => setBrowser(null)}
               />
             ) : (
               <ConversationBrowser
@@ -326,26 +359,26 @@ export function ChatFloatingDock({
                 onQueryChange={setConversationQuery}
                 onSelectConversation={(id) => {
                   onSelectConversation(id);
-                  setBrowser(null);
+                  setBrowserOpen(false);
                 }}
                 onOpenConversationInSideChat={(id, title) => {
                   onOpenConversationInSideChat?.(id, title);
-                  setBrowser(null);
+                  setBrowserOpen(false);
                 }}
                 onOpenConversationInNewWindow={(id) => {
                   onOpenConversationInNewWindow?.(id);
-                  setBrowser(null);
+                  setBrowserOpen(false);
                 }}
                 onNewConversation={() => {
                   onNewConversation();
-                  setBrowser(null);
+                  setBrowserOpen(false);
                 }}
                 onDeleteConversation={onDeleteConversation}
                 onStartEditTitle={onStartEditTitle}
                 onSaveConvTitle={onSaveConvTitle}
                 onCancelConvEdit={onCancelConvEdit}
                 onEditTitleChange={onEditTitleChange}
-                onClose={() => setBrowser(null)}
+                onClose={() => setBrowserOpen(false)}
               />
             )}
           </motion.div>
@@ -355,35 +388,35 @@ export function ChatFloatingDock({
   );
 }
 
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
+        active ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function BrowserHeader({
-  title,
   subtitle,
   query,
   placeholder,
   onQueryChange,
-  onClose,
 }: {
-  title: string;
   subtitle: string;
   query: string;
   placeholder: string;
   onQueryChange: (value: string) => void;
-  onClose: () => void;
 }) {
   return (
     <div className="border-b border-surface-divider p-3">
-      <div className="mb-3 flex items-start gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-selected">
-          <StudioMark size={16} className="text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-primary">{title}</p>
-          <p className="text-xs leading-relaxed text-muted">{subtitle}</p>
-        </div>
-        <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-primary">
-          <X size={14} weight="bold" />
-        </button>
-      </div>
+      <p className="mb-2.5 px-0.5 text-xs leading-relaxed text-muted">{subtitle}</p>
       <label className="flex h-8 items-center gap-2 rounded-xl border border-surface-border bg-surface-page px-3 text-muted">
         <Search size={14} />
         <input
@@ -408,7 +441,6 @@ function ProjectBrowser({
   onRemoveProject,
   onDeleteProject,
   onSwitchLocal,
-  onClose,
 }: {
   enabled: boolean;
   projects: ProjectEntry[];
@@ -420,17 +452,14 @@ function ProjectBrowser({
   onRemoveProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
   onSwitchLocal: () => void;
-  onClose: () => void;
 }) {
   return (
     <>
       <BrowserHeader
-        title="Projects"
         subtitle={enabled ? "Local workspaces available on this machine." : "Local projects require the Local environment."}
         query={query}
         placeholder="Search projects"
         onQueryChange={onQueryChange}
-        onClose={onClose}
       />
       {!enabled ? (
         <div className="p-4">
@@ -527,17 +556,17 @@ function ConversationBrowser({
   onEditTitleChange: (value: string) => void;
   onClose: () => void;
 }) {
-  const [menuConvId, setMenuConvId] = useState<string | null>(null);
+  // Menu is portalled to <body> at a fixed position so it is never clipped by
+  // the browser's own `overflow-y-auto` scroll region.
+  const [menu, setMenu] = useState<{ id: string; top: number; right: number } | null>(null);
 
   return (
     <>
       <BrowserHeader
-        title="Conversations"
         subtitle="Recent threads, filtered to the current environment and project when applicable."
         query={query}
         placeholder="Search conversations"
         onQueryChange={onQueryChange}
-        onClose={onClose}
       />
       <div className="p-2">
         <button type="button" onClick={onNewConversation} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-primary hover:bg-surface-hover">
@@ -556,13 +585,13 @@ function ConversationBrowser({
             const status = conversationStatuses?.get(conv.id);
             const current = conv.id === currentConvId;
             const isClaudeOwned = conv.owner === "claude";
-            const menuOpen = menuConvId === conv.id;
+            const menuOpen = menu?.id === conv.id;
             return (
               <div
                 key={conv.id}
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  setMenuConvId(conv.id);
+                  setMenu({ id: conv.id, top: event.clientY, right: Math.max(8, window.innerWidth - event.clientX) });
                 }}
                 className={`group relative mb-1 rounded-xl ${current ? "bg-surface-selected" : ""}`}
               >
@@ -593,86 +622,61 @@ function ConversationBrowser({
                     </p>
                   </button>
                 )}
-                {!isClaudeOwned && editingConvId !== conv.id && (
-                  <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+                {editingConvId !== conv.id && (
+                  <div className="absolute right-2 top-1/2 hidden -translate-y-1/2 gap-1 group-hover:flex">
                     <ConversationActionsButton
-                      conv={conv}
-                      isClaudeOwned={isClaudeOwned}
                       open={menuOpen}
-                      onOpenChange={(open) => setMenuConvId(open ? conv.id : null)}
-                      onSelectConversation={onSelectConversation}
-                      onOpenConversationInSideChat={onOpenConversationInSideChat}
-                      onOpenConversationInNewWindow={onOpenConversationInNewWindow}
-                      onStartEditTitle={onStartEditTitle}
-                      onDeleteConversation={onDeleteConversation}
-                      onClose={onClose}
+                      onOpen={(rect) => setMenu({ id: conv.id, top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })}
+                      onClose={() => setMenu(null)}
                     />
                   </div>
-                )}
-                {(isClaudeOwned || editingConvId === conv.id) && (
-                  <div className="absolute right-2 top-2 hidden group-hover:flex">
-                    <ConversationActionsButton
-                      conv={conv}
-                      isClaudeOwned={isClaudeOwned}
-                      open={menuOpen}
-                      onOpenChange={(open) => setMenuConvId(open ? conv.id : null)}
-                      onSelectConversation={onSelectConversation}
-                      onOpenConversationInSideChat={onOpenConversationInSideChat}
-                      onOpenConversationInNewWindow={onOpenConversationInNewWindow}
-                      onStartEditTitle={onStartEditTitle}
-                      onDeleteConversation={onDeleteConversation}
-                      onClose={onClose}
-                    />
-                  </div>
-                )}
-                {menuOpen && (
-                  <ConversationActionsMenu
-                    conv={conv}
-                    isClaudeOwned={isClaudeOwned}
-                    onSelectConversation={onSelectConversation}
-                    onOpenConversationInSideChat={onOpenConversationInSideChat}
-                    onOpenConversationInNewWindow={onOpenConversationInNewWindow}
-                    onStartEditTitle={onStartEditTitle}
-                    onDeleteConversation={onDeleteConversation}
-                    onClose={() => setMenuConvId(null)}
-                    onPanelClose={onClose}
-                  />
                 )}
               </div>
             );
           })
         )}
       </div>
+
+      {menu && (() => {
+        const conv = conversations.find((c) => c.id === menu.id);
+        if (!conv) return null;
+        return (
+          <ConversationActionsMenu
+            conv={conv}
+            isClaudeOwned={conv.owner === "claude"}
+            isCurrent={conv.id === currentConvId}
+            pos={{ top: menu.top, right: menu.right }}
+            onSelectConversation={onSelectConversation}
+            onOpenConversationInSideChat={onOpenConversationInSideChat}
+            onOpenConversationInNewWindow={onOpenConversationInNewWindow}
+            onStartEditTitle={onStartEditTitle}
+            onDeleteConversation={onDeleteConversation}
+            onClose={() => setMenu(null)}
+            onPanelClose={onClose}
+          />
+        );
+      })()}
     </>
   );
 }
 
 function ConversationActionsButton({
-  conv,
-  isClaudeOwned,
   open,
-  onOpenChange,
+  onOpen,
+  onClose,
 }: {
-  conv: ConversationMetadata;
-  isClaudeOwned: boolean;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSelectConversation: (id: string) => void;
-  onOpenConversationInSideChat?: (id: string, title?: string) => void;
-  onOpenConversationInNewWindow?: (id: string) => void;
-  onStartEditTitle: (id: string, title: string, e: React.MouseEvent) => void;
-  onDeleteConversation: (id: string, e: React.MouseEvent) => void;
+  onOpen: (rect: DOMRect) => void;
   onClose: () => void;
 }) {
-  void conv;
-  void isClaudeOwned;
   return (
     <button
       type="button"
       title="Conversation actions"
       onClick={(event) => {
         event.stopPropagation();
-        onOpenChange(!open);
+        if (open) onClose();
+        else onOpen(event.currentTarget.getBoundingClientRect());
       }}
       className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
     >
@@ -684,6 +688,8 @@ function ConversationActionsButton({
 function ConversationActionsMenu({
   conv,
   isClaudeOwned,
+  isCurrent,
+  pos,
   onSelectConversation,
   onOpenConversationInSideChat,
   onOpenConversationInNewWindow,
@@ -694,6 +700,8 @@ function ConversationActionsMenu({
 }: {
   conv: ConversationMetadata;
   isClaudeOwned: boolean;
+  isCurrent: boolean;
+  pos: { top: number; right: number };
   onSelectConversation: (id: string) => void;
   onOpenConversationInSideChat?: (id: string, title?: string) => void;
   onOpenConversationInNewWindow?: (id: string) => void;
@@ -703,56 +711,65 @@ function ConversationActionsMenu({
   onPanelClose: () => void;
 }) {
   const itemClass = "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-secondary hover:bg-surface-hover hover:text-primary";
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -4, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-      transition={{ duration: 0.12, ease: "easeOut" }}
-      className="absolute right-2 top-9 z-20 w-48 overflow-hidden rounded-xl border border-surface-border bg-surface-base p-1.5 shadow-xl"
-    >
-      <button
-        type="button"
-        onClick={() => {
-          onSelectConversation(conv.id);
-          onClose();
-          onPanelClose();
-        }}
-        className={itemClass}
+  return createPortal(
+    <>
+      {/* Backdrop closes the menu on any outside click. */}
+      <div className="fixed inset-0" style={{ zIndex: 9998 }} onMouseDown={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: -4, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -4, scale: 0.98 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+        style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 9999 }}
+        className="w-48 overflow-hidden rounded-xl border border-surface-border bg-surface-base p-1.5 shadow-xl"
       >
-        <ChatCircle size={14} /> Open
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          onOpenConversationInSideChat?.(conv.id, conv.title);
-          onClose();
-        }}
-        className={itemClass}
-      >
-        <SidebarSimple size={14} /> Open in Side Chat
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          onOpenConversationInNewWindow?.(conv.id);
-          onClose();
-        }}
-        className={itemClass}
-      >
-        <Stack size={14} /> Open in New Window
-      </button>
-      {!isClaudeOwned && (
-        <>
-          <div className="my-1 h-px bg-surface-divider" />
-          <button type="button" onClick={(event) => { onStartEditTitle(conv.id, conv.title, event); onClose(); }} className={itemClass}>
-            <PencilSimple size={14} /> Rename
+        {/* "Open" is pointless on the conversation you're already in. */}
+        {!isCurrent && (
+          <button
+            type="button"
+            onClick={() => {
+              onSelectConversation(conv.id);
+              onClose();
+              onPanelClose();
+            }}
+            className={itemClass}
+          >
+            <ChatCircle size={14} /> Open
           </button>
-          <button type="button" onClick={(event) => { onDeleteConversation(conv.id, event); onClose(); }} className={itemClass}>
-            <Trash size={14} /> Delete
-          </button>
-        </>
-      )}
-    </motion.div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            onOpenConversationInSideChat?.(conv.id, conv.title);
+            onClose();
+          }}
+          className={itemClass}
+        >
+          <SidebarSimple size={14} /> Open in Side Chat
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onOpenConversationInNewWindow?.(conv.id);
+            onClose();
+          }}
+          className={itemClass}
+        >
+          <Stack size={14} /> Open in New Window
+        </button>
+        {!isClaudeOwned && (
+          <>
+            <div className="my-1 h-px bg-surface-divider" />
+            <button type="button" onClick={(event) => { onStartEditTitle(conv.id, conv.title, event); onClose(); }} className={itemClass}>
+              <PencilSimple size={14} /> Rename
+            </button>
+            <button type="button" onClick={(event) => { onDeleteConversation(conv.id, event); onClose(); }} className={itemClass}>
+              <Trash size={14} /> Delete
+            </button>
+          </>
+        )}
+      </motion.div>
+    </>,
+    document.body,
   );
 }

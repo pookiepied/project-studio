@@ -21,8 +21,12 @@ export const AudioView = ({ updateSetting }: Props) => {
       .catch((err) => logger.error("AudioView", "Failed to enumerate devices", err));
   }, []);
 
+  // Radix Select reserves the empty string for "no selection" — it throws if
+  // an item uses value="". Use a sentinel for "system default" instead and
+  // map it back to undefined when persisting the setting.
+  const DEFAULT_MIC_VALUE = "__default__";
   const microphoneOptions = [
-    { value: "", label: "Default" },
+    { value: DEFAULT_MIC_VALUE, label: "Default" },
     ...microphones.map((mic) => ({
       value: mic.deviceId,
       label: mic.label || `Microphone ${mic.deviceId.slice(0, 8)}`,
@@ -42,9 +46,9 @@ export const AudioView = ({ updateSetting }: Props) => {
         control={
           <div className="w-full sm:w-64">
             <Select
-              value={settings.selectedMicrophone || ""}
+              value={settings.selectedMicrophone || DEFAULT_MIC_VALUE}
               options={microphoneOptions}
-              onChange={(v) => updateSetting("selectedMicrophone", v || undefined)}
+              onChange={(v) => updateSetting("selectedMicrophone", v === DEFAULT_MIC_VALUE ? undefined : v)}
             />
           </div>
         }

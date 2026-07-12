@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 /**
  * Lightweight coordinator for the top-right floating panels
- * (Overview, Tools/Terminal, Notifications).
+ * (Tools/Terminal, Notifications).
  *
  * These panels live in different component trees (ChatPage vs TitleBar), so we
  * coordinate them through a window event rather than shared React state. Each

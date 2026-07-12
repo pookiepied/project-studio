@@ -4,6 +4,7 @@ import { aiService } from "@/features/chat/services/aiService";
 import type { APIChatMessage } from "@/types/chat";
 import { logger } from "@/core/logging/logger";
 import type { VoiceCaptionState } from "@/core/platform/voiceCaptionTypes";
+import { isEdgeTtsModel, voiceIdFromModel, synthesizeSpeech } from "@/features/tts/local";
 
 export type SessionState =
   | "idle"
@@ -136,8 +137,20 @@ export function useLiveSession(options: LiveSessionOptions = {}): LiveSessionRet
   // of N ends the audio for N+1 is already (or almost) ready.
 
   const fetchAudio = useCallback(
-    (text: string, generation: number): Promise<string | null> =>
-      apiClient
+    (text: string, generation: number): Promise<string | null> => {
+      // Local Edge TTS: each "sentence" from extractSentences() is already a
+      // reasonably sized chunk, so we synthesize it directly (no further
+      // chunking needed here — see textChunker.ts, used on the Chat side).
+      if (isEdgeTtsModel(ttsModel)) {
+        return synthesizeSpeech(text, voiceIdFromModel(ttsModel))
+          .then((blob) => (ttsGenerationRef.current !== generation ? null : URL.createObjectURL(blob)))
+          .catch((error) => {
+            logger.error("LiveSession", "Local TTS synthesis failed", error);
+            return null;
+          });
+      }
+
+      return apiClient
         .postBinary("/audio/speech", { model: ttsModel, input: text })
         .then(async (res) => {
           if (ttsGenerationRef.current !== generation) return null;
@@ -146,7 +159,8 @@ export function useLiveSession(options: LiveSessionOptions = {}): LiveSessionRet
           if (ttsGenerationRef.current !== generation) return null;
           return URL.createObjectURL(blob);
         })
-        .catch(() => null),
+        .catch(() => null);
+    },
     [ttsModel]
   );
 

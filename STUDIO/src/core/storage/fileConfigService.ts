@@ -38,7 +38,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ollamaBaseUrl: "http://localhost:11434",
   
   // Local transcription settings
-  fasterWhisperEnabled: false, // Disabled by default (requires setup)
+  parakeetEnabled: false, // Disabled by default (requires setup)
+
+  // Local text-to-speech settings
+  edgeTtsEnabled: false, // Disabled by default (requires setup)
 
   // Keyboard shortcuts
   recordingShortcut: ["Ctrl", "Shift", "R"],
@@ -96,8 +99,11 @@ function settingsToConf(settings: AppSettings): string {
     `ollamaEnabled=${settings.ollamaEnabled}`,
     `ollamaBaseUrl=${settings.ollamaBaseUrl}`,
     "",
-    "# Local Transcription Settings", 
-    `fasterWhisperEnabled=${settings.fasterWhisperEnabled}`,
+    "# Local Transcription Settings",
+    `parakeetEnabled=${settings.parakeetEnabled}`,
+    "",
+    "# Local Text-to-Speech Settings",
+    `edgeTtsEnabled=${settings.edgeTtsEnabled}`,
     "",
     "# Tone Settings",
     `rephraseTone=${settings.rephraseTone}`,
@@ -227,8 +233,11 @@ function confToSettings(content: string): Partial<AppSettings> {
       case "ollamaBaseUrl":
         settings.ollamaBaseUrl = value;
         break;
-      case "fasterWhisperEnabled":
-        settings.fasterWhisperEnabled = value === "true";
+      case "parakeetEnabled":
+        settings.parakeetEnabled = value === "true";
+        break;
+      case "edgeTtsEnabled":
+        settings.edgeTtsEnabled = value === "true";
         break;
       case "localProviderEnabled":
         settings.localProviderEnabled = value === "true";

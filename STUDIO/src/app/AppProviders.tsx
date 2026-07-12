@@ -4,6 +4,8 @@ import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { OfflineProvider } from "@/app/contexts/OfflineContext";
 import { SettingsProvider, useSettings } from "@/app/contexts/SettingsContext";
 import { ModelsProvider } from "@/features/models/context";
+import { TTSProvider } from "@/features/voice/context/TTSContext";
+import { ReadAloudMiniPlayer } from "@/features/voice/components/ReadAloudMiniPlayer";
 import { OfflineModal } from "@/app/globals/OfflineModal";
 import { UpdateBanner } from "@/app/globals/UpdateBanner";
 import { ContextMenu } from "@/app/globals/ContextMenu";
@@ -18,7 +20,8 @@ function AppToaster() {
 /**
  * AppProviders — the provider/error-boundary stack wrapping the router.
  * Renders ErrorBoundary > SettingsProvider > ModelsProvider > AuthProvider >
- * OfflineProvider, plus the router and global chrome (modals, toaster, menus).
+ * OfflineProvider > TTSProvider, plus the router and global chrome (modals,
+ * toaster, menus, and the read-aloud mini player).
  */
 export function AppProviders({ onRouterReady }: { onRouterReady: () => void }) {
   return (
@@ -27,11 +30,14 @@ export function AppProviders({ onRouterReady }: { onRouterReady: () => void }) {
         <ModelsProvider>
           <AuthProvider>
             <OfflineProvider>
-              <AppRouter onReady={onRouterReady} />
-              <OfflineModal />
-              <UpdateBanner />
-              <ContextMenu />
-              <AppToaster />
+              <TTSProvider>
+                <AppRouter onReady={onRouterReady} />
+                <ReadAloudMiniPlayer />
+                <OfflineModal />
+                <UpdateBanner />
+                <ContextMenu />
+                <AppToaster />
+              </TTSProvider>
             </OfflineProvider>
           </AuthProvider>
         </ModelsProvider>

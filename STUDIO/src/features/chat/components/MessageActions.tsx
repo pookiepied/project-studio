@@ -60,12 +60,15 @@ export const MessageActions = ({
   <motion.div
     initial={{ opacity: 0 }}
     whileHover={{ opacity: 1 }}
-    className={`absolute top-full pt-2 pb-1 flex items-center gap-0.5 transition-opacity duration-150 z-10 ${
+    className={`absolute top-full pt-2 pb-1 flex items-center gap-0.5 pointer-events-auto transition-opacity duration-150 z-10 ${
       isLoading
         ? "opacity-0 pointer-events-none"
         : forceVisible
-          ? "opacity-100 pointer-events-auto"
-          : "opacity-100 md:opacity-0 md:group-hover:opacity-100 pointer-events-auto md:pointer-events-none md:group-hover:pointer-events-auto"
+          ? "opacity-100"
+          // Faint-but-clickable at rest on desktop (not fully hidden) — you no
+          // longer have to hunt for a precise hover spot to find or use these
+          // actions; hovering the message just brings them to full opacity.
+          : "opacity-100 md:opacity-35 md:group-hover:opacity-100"
     } ${message.role === "user" ? "right-0" : "left-0"}`}
   >
     {/* Copy */}

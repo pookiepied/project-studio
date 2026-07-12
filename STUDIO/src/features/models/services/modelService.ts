@@ -2,7 +2,8 @@ import { APIResponse } from "@/types";
 import { convertOllamaToModel } from "./localModelDetection";
 import { handleNetworkFailure } from "@/core/network/fallbackService";
 import * as ollamaService from "./ollamaService";
-import * as fasterWhisperService from "@/features/transcription/services/fasterWhisper";
+import * as parakeetService from "@/features/transcription/services/parakeet";
+import { CURATED_EDGE_TTS_VOICES, modelFromVoiceId } from "@/features/tts/local";
 import { logger } from "@/core/logging/logger";
 import { isFeatureEnabled } from "@/core/platform/featureManager";
 import { CACHE_CONFIG, STORAGE_KEYS } from "@/core/config/constants";
@@ -54,28 +55,35 @@ loadCacheFromStorage();
 
 
 /**
- * Fetch all available models from API + local Ollama models + Faster Whisper models
+ * Fetch all available models from API + local Ollama models + Parakeet
  * @param forceRefresh - If true, bypass cache and fetch fresh data
  * @param includeOllama - If true, include Ollama models (default: true)
- * @param includeFasterWhisper - If true, include Faster Whisper models (default: true)
+ * @param includeParakeet - If true, include the local Parakeet transcription model (default: true)
+ * @param includeEdgeTts - If true, include the local Edge TTS voices (default: true)
  */
 export async function fetchModels(
   forceRefresh: boolean = false,
   includeOllama: boolean = true,
-  includeFasterWhisper: boolean = true
+  includeParakeet: boolean = true,
+  includeEdgeTts: boolean = true
 ): Promise<APIResponse<ModelsResponse>> {
-  logger.debug('Models', `fetchModels called - forceRefresh: ${forceRefresh}, includeOllama: ${includeOllama}, includeFasterWhisper: ${includeFasterWhisper}`);
-  
+  logger.debug('Models', `fetchModels called - forceRefresh: ${forceRefresh}, includeOllama: ${includeOllama}, includeParakeet: ${includeParakeet}, includeEdgeTts: ${includeEdgeTts}`);
+
   // Override feature flags based on platform capabilities
   const actualIncludeOllama = includeOllama && isFeatureEnabled('ollamaIntegration');
-  const actualIncludeFasterWhisper = includeFasterWhisper && isFeatureEnabled('fasterWhisper');
-  
+  const actualIncludeParakeet = includeParakeet && isFeatureEnabled('parakeet');
+  const actualIncludeEdgeTts = includeEdgeTts && isFeatureEnabled('edgeTts');
+
   if (includeOllama && !actualIncludeOllama) {
     logger.debug('Models', 'Ollama integration disabled by feature manager');
   }
-  
-  if (includeFasterWhisper && !actualIncludeFasterWhisper) {
-    logger.debug('Models', 'Faster Whisper disabled by feature manager');
+
+  if (includeParakeet && !actualIncludeParakeet) {
+    logger.debug('Models', 'Parakeet disabled by feature manager');
+  }
+
+  if (includeEdgeTts && !actualIncludeEdgeTts) {
+    logger.debug('Models', 'Edge TTS disabled by feature manager');
   }
   // Check cache first (unless force refresh)
   if (!forceRefresh && modelsCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
@@ -261,48 +269,71 @@ export async function fetchModels(
     }
   }
 
-  // Fetch local Faster Whisper models if enabled
-  if (actualIncludeFasterWhisper) {
-    try {
-      const fwConfig = await fasterWhisperService.loadConfig();
-      
-      // Only include if Faster Whisper is installed and has models
-      if (fwConfig.installed && fwConfig.installedModels.length > 0) {
-        // Convert Faster Whisper models to our Model format
-        const fasterWhisperModels = fwConfig.installedModels.map(modelName => {
-          const metadata = fasterWhisperService.getModelById(modelName);
-          return {
-            id: `faster-whisper:${modelName}`,
-            provider: "faster-whisper",
-            type: "audio" as const,
-            name: modelName,
-            description: metadata?.description || `Local Faster Whisper model`,
-            free: true, // Local models are always free
-            capabilities: ["transcription", "translation"],
-          };
-        });
+  // Local Parakeet transcription model — a fixed, known-in-advance catalog
+  // (exactly one model), so this is a hardcoded entry, not a live fetch like
+  // Ollama's. Shown as soon as "Enable Parakeet-TDT" is on in Local Services,
+  // independent of whether the venv/model download has finished — picking it
+  // before it's actually installed just surfaces a clear "not installed yet"
+  // error on first use (see transcriptionService.ts), same as picking an
+  // Ollama model while the daemon is down.
+  if (actualIncludeParakeet) {
+    const parakeetModels = [{
+      id: `parakeet:${parakeetService.MODEL_NAME}`,
+      provider: "parakeet",
+      type: "audio" as const,
+      name: "Parakeet-TDT 0.6B",
+      description: "Local speech-to-text — English + ~25 European languages",
+      free: true, // Local models are always free
+      capabilities: ["transcription"],
+    }];
 
-        allModels = [...allModels, ...fasterWhisperModels];
+    allModels = [...allModels, ...parakeetModels];
 
-        // Add faster-whisper provider info
-        providers = {
-          ...providers,
-          "faster-whisper": {
-            provider: "faster-whisper",
-            status: "active",
-            lastChecked: new Date().toISOString(),
-            apiKeyValid: true, // No API key needed for local
-            modelCount: fasterWhisperModels.length,
-          } as ProviderInfo,
-        };
-        
-        logger.debug('Models', `Added ${fasterWhisperModels.length} Faster Whisper models`);
-      }
-    } catch (error) {
-      logger.warn('Models', 'Failed to fetch Faster Whisper models', error);
-      // Continue without Faster Whisper models
-    }
+    providers = {
+      ...providers,
+      parakeet: {
+        provider: "parakeet",
+        status: "active",
+        lastChecked: new Date().toISOString(),
+        apiKeyValid: true, // No API key needed for local
+        modelCount: parakeetModels.length,
+      } as ProviderInfo,
+    };
+
+    logger.debug('Models', 'Added local Parakeet model');
   }
+
+  // Local Edge TTS voices — also a fixed, hardcoded catalog (see voices.ts),
+  // shown as soon as "Enable Edge TTS" is on. Note this isn't local inference
+  // (see edgeTts/local's own docs) — it's a local client for a free
+  // Microsoft cloud voice service, so it needs internet at synthesis time.
+  if (actualIncludeEdgeTts) {
+    const edgeTtsModels = CURATED_EDGE_TTS_VOICES.map((voice) => ({
+      id: modelFromVoiceId(voice.id),
+      provider: "edge-tts",
+      type: "tts" as const,
+      name: voice.label,
+      description: "Free multilingual text-to-speech via Microsoft Edge (requires internet)",
+      free: true,
+      capabilities: ["speech"],
+    }));
+
+    allModels = [...allModels, ...edgeTtsModels];
+
+    providers = {
+      ...providers,
+      "edge-tts": {
+        provider: "edge-tts",
+        status: "active",
+        lastChecked: new Date().toISOString(),
+        apiKeyValid: true,
+        modelCount: edgeTtsModels.length,
+      } as ProviderInfo,
+    };
+
+    logger.debug('Models', `Added ${edgeTtsModels.length} Edge TTS voices`);
+  }
+
   const mergedResponse: ModelsResponse = {
     models: allModels,
     providers,
@@ -345,7 +376,8 @@ const PROVIDER_PRIORITY: Record<string, number> = {
   openrouter: 4, // Largest catalog
   openai: 5,
   anthropic: 6,
-  "faster-whisper": 7,
+  parakeet: 7,
+  "edge-tts": 8,
   local: 99,     // Always last
 };
 

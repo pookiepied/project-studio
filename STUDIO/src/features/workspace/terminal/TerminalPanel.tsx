@@ -110,6 +110,10 @@ interface XtermEntry {
   fitAddon:  FitAddon;
   sessionId: string;
   unlistens: Array<() => void>;
+  resizeObserver: ResizeObserver | null;
+  fitFrame: number | null;
+  ptyReady: boolean;
+  lastPtySize: { cols: number; rows: number } | null;
 }
 
 export interface TerminalPanelProps {
@@ -159,6 +163,32 @@ export function TerminalPanel({
 
   // Floating window ref for Ctrl+scroll listener
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const scheduleFit = useCallback((tabId: string, focus = false) => {
+    const entry = xtermMap.current.get(tabId);
+    if (!entry) return;
+
+    if (entry.fitFrame !== null) cancelAnimationFrame(entry.fitFrame);
+    entry.fitFrame = requestAnimationFrame(() => {
+      entry.fitFrame = null;
+      const container = containerRefs.current.get(tabId);
+      if (!container || container.offsetWidth === 0 || container.offsetHeight === 0) return;
+
+      try {
+        entry.fitAddon.fit();
+      } catch {
+        return;
+      }
+
+      const { cols, rows } = entry.terminal;
+      const previous = entry.lastPtySize;
+      if (entry.ptyReady && (!previous || previous.cols !== cols || previous.rows !== rows)) {
+        entry.lastPtySize = { cols, rows };
+        invoke("pty_resize", { sessionId: entry.sessionId, cols, rows }).catch(() => {});
+      }
+      if (focus) entry.terminal.focus();
+    });
+  }, []);
 
   // ── Create xterm + PTY for a new tab ─────────────────────────────────────
 
@@ -219,12 +249,22 @@ export function TerminalPanel({
       }
     );
 
-    xtermMap.current.set(tabId, {
+    const entry: XtermEntry = {
       terminal: xterm,
       fitAddon,
       sessionId,
       unlistens: [ulData, ulExit],
-    });
+      resizeObserver: null,
+      fitFrame: null,
+      ptyReady: false,
+      lastPtySize: { cols, rows },
+    };
+    xtermMap.current.set(tabId, entry);
+
+    if (typeof ResizeObserver !== "undefined") {
+      entry.resizeObserver = new ResizeObserver(() => scheduleFit(tabId));
+      entry.resizeObserver.observe(container);
+    }
 
     // Mark running
     setTabs(prev => prev.map(t =>
@@ -239,19 +279,23 @@ export function TerminalPanel({
         rows,
         cwd: projectCwd ?? null,
       });
+      entry.ptyReady = true;
+      scheduleFit(tabId);
     } catch (err) {
       xterm.writeln(`\r\n\x1b[31mpty_create failed: ${err}\x1b[0m\r\n`);
       setTabs(prev => prev.map(t =>
         t.id === tabId ? { ...t, running: false, exited: true } : t
       ));
     }
-  }, [projectCwd]);
+  }, [projectCwd, scheduleFit]);
 
   // ── Tear down a tab's xterm + PTY ────────────────────────────────────────
 
   const destroyTerminal = useCallback((tabId: string) => {
     const entry = xtermMap.current.get(tabId);
     if (!entry) return;
+    entry.resizeObserver?.disconnect();
+    if (entry.fitFrame !== null) cancelAnimationFrame(entry.fitFrame);
     entry.unlistens.forEach(fn => fn());
     invoke("pty_close", { sessionId: entry.sessionId }).catch(() => {});
     entry.terminal.dispose();
@@ -267,7 +311,7 @@ export function TerminalPanel({
     return () => {
       clearTimeout(t);
       // Cleanup all tabs on unmount
-      tabs.forEach(t => destroyTerminal(t.id));
+      [...xtermMap.current.keys()].forEach(destroyTerminal);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -277,21 +321,17 @@ export function TerminalPanel({
   useEffect(() => {
     const entry = xtermMap.current.get(activeId);
     if (!entry) return;
-    // Small delay so the container is visible before focus
-    const t = setTimeout(() => {
-      entry.fitAddon.fit();
-      entry.terminal.focus();
-    }, 30);
-    return () => clearTimeout(t);
-  }, [activeId]);
+    scheduleFit(activeId, true);
+    // A second frame catches display/layout changes caused by tab and panel chrome.
+    const frame = requestAnimationFrame(() => scheduleFit(activeId, true));
+    return () => cancelAnimationFrame(frame);
+  }, [activeId, tabs.length, showChrome, scheduleFit]);
 
   // ── Refit all terminals when panel width changes (resize drag) ────────────
 
   useEffect(() => {
-    const entry = xtermMap.current.get(activeId);
-    if (!entry) return;
-    requestAnimationFrame(() => entry.fitAddon.fit());
-  }, [width, activeId]);
+    scheduleFit(activeId);
+  }, [width, activeId, scheduleFit]);
 
   // ── Ctrl+scroll to zoom font size ─────────────────────────────────────────
 
@@ -303,14 +343,14 @@ export function TerminalPanel({
       e.preventDefault();
       const next = Math.max(8, Math.min(24, fontSizeRef.current + (e.deltaY < 0 ? 1 : -1)));
       fontSizeRef.current = next;
-      xtermMap.current.forEach(({ terminal, fitAddon }) => {
+      xtermMap.current.forEach(({ terminal }, tabId) => {
         terminal.options.fontSize = next;
-        requestAnimationFrame(() => fitAddon.fit());
+        scheduleFit(tabId);
       });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [scheduleFit]);
 
   // ── Update xterm theme when app colour mode changes ───────────────────────
 
@@ -439,11 +479,17 @@ export function TerminalPanel({
           {/* Tab switcher — only when >1 tab */}
           {tabs.length > 1 && (
             <div className="flex items-center gap-0.5 flex-shrink min-w-0 overflow-hidden">
+              <AnimatePresence initial={false} mode="popLayout">
               {tabs.map(tab => {
                 const active = tab.id === activeId;
                 return (
-                  <button
+                  <motion.button
                     key={tab.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.12, ease: "easeOut" }}
                     type="button"
                     onClick={() => setActiveId(tab.id)}
                     onDoubleClick={() => tab.exited && restartTab(tab.id)}
@@ -465,9 +511,10 @@ export function TerminalPanel({
                     >
                       <X size={12} weight="bold" />
                     </span>
-                  </button>
+                  </motion.button>
                 );
               })}
+              </AnimatePresence>
             </div>
           )}
 

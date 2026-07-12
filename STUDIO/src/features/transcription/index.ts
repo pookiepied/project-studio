@@ -1,2 +1,2 @@
 export { TranscribePage } from "./pages/TranscribePage";
-export { FasterWhisperStatus } from "./components/FasterWhisperStatus";
+export { ParakeetStatus } from "./components/ParakeetStatus";

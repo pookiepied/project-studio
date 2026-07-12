@@ -40,7 +40,8 @@ export interface FeatureFlags {
   
   // Local AI features
   ollamaIntegration: boolean;
-  fasterWhisper: boolean;
+  parakeet: boolean; // Local speech-to-text via Parakeet-TDT (ONNX)
+  edgeTts: boolean; // Local text-to-speech via Microsoft Edge TTS
   localProviderBridge: boolean; // Daemon for local providers (Ollama, LM Studio)
 
   // File system features
@@ -88,7 +89,8 @@ class FeatureManager {
       
       // Local AI features (Tauri only - require file system access)
       ollamaIntegration: isTauri,
-      fasterWhisper: isTauri,
+      parakeet: isTauri,
+      edgeTts: isTauri,
       localProviderBridge: isTauri,
 
       // File system features (Tauri only)
@@ -197,8 +199,10 @@ export const getDisabledFeatureMessage = (feature: keyof FeatureFlags): string =
   const platform = environmentService.getEnvironment();
   
   switch (feature) {
-    case 'fasterWhisper':
-      return `Faster Whisper is only available in the desktop version. Current platform: ${platform}`;
+    case 'parakeet':
+      return `Local transcription is only available in the desktop version. Current platform: ${platform}`;
+    case 'edgeTts':
+      return `Edge TTS is only available in the desktop version. Current platform: ${platform}`;
     case 'ollamaIntegration':
       return `Ollama integration is only available in the desktop version. Current platform: ${platform}`;
     case 'globalShortcuts':

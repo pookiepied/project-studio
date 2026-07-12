@@ -11,7 +11,7 @@ mod pty;
 mod native_browser;
 use commands::*;
 use daemon::{DaemonHandle};
-use pty::{pty_create, pty_write, pty_close};
+use pty::{pty_close, pty_create, pty_resize, pty_write};
 use native_browser::{
     native_browser_back,
     native_browser_clear_data,
@@ -399,6 +399,12 @@ pub fn run() {
             git_list_branches,
             git_checkout_branch,
             git_create_branch,
+            git_status_summary,
+            git_diff,
+            git_recent_commits,
+            git_stage,
+            git_unstage,
+            git_commit,
             claude_bridge_start,
             claude_bridge_stop,
             execute_pip_with_progress,
@@ -410,6 +416,7 @@ pub fn run() {
             get_home_dir,
             get_studio_home_dir,
             read_text_file,
+            read_text_file_preview,
             list_directory_entries,
             write_text_file,
             create_directory,
@@ -445,6 +452,7 @@ pub fn run() {
             shell_resolve_cwd,
             pty_create,
             pty_write,
+            pty_resize,
             pty_close,
             native_browser_create,
             native_browser_set_bounds,

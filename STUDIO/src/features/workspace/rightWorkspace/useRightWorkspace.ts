@@ -61,7 +61,8 @@ export function useRightWorkspace({
       ? options.browserTabId ?? createBrowserTab?.() ?? id
       : undefined;
     const title = options.title
-      ?? (type === "browser" ? "Browser"
+      ?? (type === "review" ? "Review"
+        : type === "browser" ? "Browser"
         : type === "terminal" ? "Terminal"
         : type === "files" ? "Files"
         : type === "side-chat" ? "Side chat"
@@ -71,7 +72,12 @@ export function useRightWorkspace({
       id,
       type,
       title,
-      state: type === "browser"
+      state: type === "review"
+        ? {
+            rootPath: options.rootPath ?? projectContext?.path ?? null,
+            selectedPath: options.selectedPath ?? null,
+          }
+        : type === "browser"
         ? { browserTabId: browserTabId as string }
         : type === "terminal"
         ? { cwd: options.cwd ?? projectContext?.path ?? null }
@@ -134,11 +140,14 @@ export function useRightWorkspace({
   const openHome = useCallback(() => {
     setVisible(true);
     if (tabs.length === 0) {
-      setActiveTabId(null);
+      createTab(projectContext?.path ? "review" : "files", {
+        rootPath: projectContext?.path ?? null,
+        cwd: projectContext?.path ?? null,
+      });
       return;
     }
     setActiveTabId(tabs[0].id);
-  }, [tabs]);
+  }, [createTab, projectContext?.path, tabs]);
 
   const open = visible || tabs.length > 0 || terminalOpen || browserOpen || artifactsOpen;
 
@@ -147,8 +156,8 @@ export function useRightWorkspace({
       closeAll();
       return;
     }
-    setVisible(true);
-  }, [closeAll, open]);
+    openHome();
+  }, [closeAll, open, openHome]);
 
   const openView = useCallback((type: WorkspaceTabType, options?: WorkspaceTabCreateOptions) => {
     return createTab(type, options);
@@ -182,6 +191,8 @@ export function useRightWorkspace({
       const next = prev.map((tab) => (
         tab.type === "files"
           ? { ...tab, state: { rootPath: null, selectedPath: null, expandedPaths: [] } }
+          : tab.type === "review"
+          ? { ...tab, state: { rootPath: null, selectedPath: null } }
           : tab
       ));
       return next;

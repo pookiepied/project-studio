@@ -1,12 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
   CaretRightIcon as CaretRight,
   FileIcon as File,
+  FileTextIcon as FileText,
   FolderIcon as Folder,
   FolderOpenIcon as FolderOpen,
   ArrowClockwiseIcon as Refresh,
+  CodeIcon as Code,
+  EyeIcon as Eye,
+  SpinnerGapIcon as SpinnerGap,
+  XIcon as X,
 } from "@phosphor-icons/react";
+import MarkdownDocumentPreview from "./MarkdownDocumentPreview";
+import "./filesPanel.css";
+
+const MonacoSourceView = lazy(() => import("./MonacoSourceView"));
 
 interface DirectoryEntry {
   name: string;
@@ -24,11 +33,37 @@ interface FilesPanelProps {
   onStateChange: (state: { selectedPath?: string | null; expandedPaths?: string[] }) => void;
 }
 
+type FileViewMode = "preview" | "raw";
+
 function sortEntries(entries: DirectoryEntry[]) {
   return [...entries].sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
+}
+
+function formatBytes(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function extensionOf(path: string) {
+  const name = path.replace(/\\/g, "/").split("/").pop() ?? path;
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+}
+
+function fileTone(path: string) {
+  const ext = extensionOf(path);
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return "text-secondary";
+  return "text-muted";
+}
+
+function relativePath(rootPath: string, path: string) {
+  const root = rootPath.replace(/\\/g, "/").replace(/\/$/, "");
+  const next = path.replace(/\\/g, "/");
+  return next.startsWith(`${root}/`) ? next.slice(root.length + 1) : next;
 }
 
 function FileTreeNode({
@@ -48,18 +83,20 @@ function FileTreeNode({
 }) {
   const [children, setChildren] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const requestId = useRef(0);
   const expanded = expandedPaths.includes(entry.path);
   const selected = selectedPath === entry.path;
+  const iconClass = entry.isDir ? "text-amber-500" : fileTone(entry.path);
 
   useEffect(() => {
     if (!entry.isDir || !expanded) return;
-    let cancelled = false;
+    const currentRequest = ++requestId.current;
     setLoading(true);
     invoke<DirectoryEntry[]>("list_directory_entries", { path: entry.path })
-      .then((next) => { if (!cancelled) setChildren(sortEntries(next)); })
-      .catch(() => { if (!cancelled) setChildren([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((next) => { if (requestId.current === currentRequest) setChildren(sortEntries(next)); })
+      .catch(() => { if (requestId.current === currentRequest) setChildren([]); })
+      .finally(() => { if (requestId.current === currentRequest) setLoading(false); });
+    return () => { requestId.current += 1; };
   }, [entry.isDir, entry.path, expanded]);
 
   return (
@@ -79,9 +116,9 @@ function FileTreeNode({
           <span className="w-[11px] flex-shrink-0" />
         )}
         {entry.isDir ? (
-          expanded ? <FolderOpen size={14} weight="regular" className="flex-shrink-0 text-muted" /> : <Folder size={14} weight="regular" className="flex-shrink-0 text-muted" />
+          expanded ? <FolderOpen size={14} weight="regular" className={`flex-shrink-0 ${iconClass}`} /> : <Folder size={14} weight="regular" className={`flex-shrink-0 ${iconClass}`} />
         ) : (
-          <File size={14} weight="regular" className="flex-shrink-0 text-muted" />
+          <File size={14} weight="regular" className={`flex-shrink-0 ${iconClass}`} />
         )}
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
         {loading && <span className="h-3 w-3 rounded-full border border-muted border-t-transparent animate-spin" />}
@@ -117,30 +154,67 @@ export function FilesPanel({
   onStateChange,
 }: FilesPanelProps) {
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
+  const [fileContent, setFileContent] = useState("");
+  const [viewMode, setViewMode] = useState<FileViewMode>("preview");
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const rootRequestId = useRef(0);
+  const fileRequestId = useRef(0);
 
   const rootName = useMemo(() => {
     if (!rootPath) return "No project";
     return rootPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? rootPath;
   }, [rootPath]);
+  const selectedExt = selectedPath ? extensionOf(selectedPath) : "";
+  const selectedRelativePath = rootPath && selectedPath ? relativePath(rootPath, selectedPath) : selectedPath ?? "";
+  const canPreviewMarkdown = ["md", "mdx", "markdown"].includes(selectedExt);
+  const canPreviewImage = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"].includes(selectedExt);
 
   const refresh = useCallback(() => {
     if (!rootPath) return;
+    const currentRequest = ++rootRequestId.current;
     setLoading(true);
     setError(null);
     invoke<DirectoryEntry[]>("list_directory_entries", { path: rootPath })
-      .then((next) => setEntries(sortEntries(next)))
+      .then((next) => { if (rootRequestId.current === currentRequest) setEntries(sortEntries(next)); })
       .catch((reason) => {
+        if (rootRequestId.current !== currentRequest) return;
         setEntries([]);
         setError(reason instanceof Error ? reason.message : String(reason));
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (rootRequestId.current === currentRequest) setLoading(false); });
   }, [rootPath]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const currentRequest = ++fileRequestId.current;
+    if (!selectedPath) {
+      setFileContent("");
+      setFileError(null);
+      return;
+    }
+    if (canPreviewImage) {
+      setFileContent("");
+      setFileError(null);
+      setFileLoading(false);
+      return;
+    }
+    setFileLoading(true);
+    setFileError(null);
+    invoke<string>("read_text_file_preview", { path: selectedPath })
+      .then((content) => { if (fileRequestId.current === currentRequest) setFileContent(content); })
+      .catch((reason) => {
+        if (fileRequestId.current !== currentRequest) return;
+        setFileContent("");
+        setFileError(reason instanceof Error ? reason.message : String(reason));
+      })
+      .finally(() => { if (fileRequestId.current === currentRequest) setFileLoading(false); });
+  }, [canPreviewImage, selectedPath]);
 
   const toggle = (path: string) => {
     onStateChange({
@@ -168,8 +242,8 @@ export function FilesPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface-page">
-      <div className="flex h-9 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
-        <FolderOpen size={14} className="text-muted" />
+      <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
+        <FolderOpen size={14} className="text-amber-500" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary">{rootName}</span>
         <button
           type="button"
@@ -185,21 +259,113 @@ export function FilesPanel({
           {error}
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {entries.map((entry) => (
-          <FileTreeNode
-            key={entry.path}
-            entry={entry}
-            depth={0}
-            selectedPath={selectedPath}
-            expandedPaths={expandedPaths}
-            onSelect={(next) => onStateChange({ selectedPath: next.path })}
-            onToggle={toggle}
-          />
-        ))}
-        {!loading && entries.length === 0 && !error && (
-          <p className="px-2 py-6 text-center text-xs text-muted">No files found.</p>
-        )}
+      <div className={`grid min-h-0 flex-1 overflow-hidden ${selectedPath ? "grid-cols-[minmax(210px,0.32fr)_minmax(0,1fr)]" : "grid-cols-1"}`}>
+        <div className={`min-h-0 overflow-y-auto overscroll-contain px-2 py-2 scrollbar-thin ${selectedPath ? "border-r border-surface-divider/70" : ""}`}>
+          {entries.map((entry) => (
+            <FileTreeNode
+              key={entry.path}
+              entry={entry}
+              depth={0}
+              selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
+              onSelect={(next) => onStateChange({ selectedPath: next.path })}
+              onToggle={toggle}
+            />
+          ))}
+          {!loading && entries.length === 0 && !error && (
+            <p className="px-2 py-6 text-center text-xs text-muted">No files found.</p>
+          )}
+          {!selectedPath && entries.length > 0 && (
+            <div className="mx-auto mt-8 max-w-[420px] px-4 py-4 text-center">
+              <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-surface-raised/70">
+                <FileText size={16} className="text-muted" />
+              </div>
+              <p className="text-sm font-medium text-primary">Choose a file to preview</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Markdown opens as a document preview; code and text open as readable source.
+              </p>
+            </div>
+          )}
+        </div>
+        {selectedPath && <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-page">
+          {selectedPath ? (
+            <>
+              <div className="flex min-h-[48px] flex-shrink-0 items-center gap-3 border-b border-surface-divider px-4">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-surface-base">
+                  <FileText size={15} className={fileTone(selectedPath)} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-primary" title={selectedPath}>{selectedRelativePath}</p>
+                  <p className="truncate text-2xs text-muted">{selectedPath}</p>
+                </div>
+                <span className="rounded-md bg-surface-base px-1.5 py-0.5 text-2xs text-muted">{formatBytes(fileContent.length)}</span>
+                <div className="flex h-8 items-center rounded-lg bg-surface-base p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("preview")}
+                    disabled={!canPreviewMarkdown}
+                    title="Preview file"
+                    className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                      viewMode === "preview" ? "bg-surface-selected text-primary" : "text-muted hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                    }`}
+                  >
+                    <Eye size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("raw")}
+                    title="View source"
+                    className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                      viewMode === "raw" ? "bg-surface-selected text-primary" : "text-muted hover:text-primary"
+                    }`}
+                  >
+                    <Code size={14} />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onStateChange({ selectedPath: null })}
+                  title="Close file"
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-hover hover:text-primary"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {fileLoading ? (
+                <div className="flex flex-1 items-center justify-center text-xs text-muted">
+                  <SpinnerGap size={15} className="mr-2 animate-spin" />
+                  Opening file
+                </div>
+              ) : fileError ? (
+                <div className="p-4 text-xs leading-relaxed text-muted">{fileError}</div>
+              ) : canPreviewImage ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-surface-base/40 p-6 scrollbar-thin">
+                  <img src={convertFileSrc(selectedPath)} alt={selectedRelativePath} className="max-h-full max-w-full object-contain" />
+                </div>
+              ) : canPreviewMarkdown && viewMode === "preview" ? (
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <MarkdownDocumentPreview content={fileContent} path={selectedPath} />
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-muted"><SpinnerGap size={15} className="mr-2 animate-spin" />Loading editor</div>}>
+                    <MonacoSourceView content={fileContent} path={selectedPath} />
+                  </Suspense>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex h-full items-center justify-center px-8 text-center">
+              <div className="max-w-[240px]">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-base text-muted">
+                  <FileText size={17} />
+                </div>
+                <p className="text-sm font-medium text-primary">Select a file</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">Open project files here without leaving the chat workspace.</p>
+              </div>
+            </div>
+          )}
+        </div>}
       </div>
     </div>
   );

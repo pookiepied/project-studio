@@ -17,16 +17,12 @@ export function isLocalModel(model: string): boolean {
   );
 }
 
-export function isFasterWhisperModel(model: string): boolean {
-  return model.startsWith("faster-whisper:");
+export function isParakeetModel(model: string): boolean {
+  return model.startsWith("parakeet:");
 }
 
 export function extractLocalModelName(model: string): string {
   return model.replace(/^(local:|ollama:|lmstudio:)/, "");
-}
-
-export function extractFasterWhisperModelName(model: string): string {
-  return model.replace(/^faster-whisper:/, "");
 }
 
 // ---------------------------------------------------------------------------

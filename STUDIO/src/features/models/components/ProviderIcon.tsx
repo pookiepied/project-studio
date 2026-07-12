@@ -64,7 +64,8 @@ const MONOGRAM: Record<string, string> = {
   together:         "Tg",
   zai:              "Z",
   "z-ai":           "Z",
-  "faster-whisper": "FW",
+  parakeet:         "PK",
+  "edge-tts":       "ET",
 };
 
 function getEffectiveProvider(provider: string, modelId?: string): string {
@@ -143,7 +144,8 @@ export function getProviderDisplayName(provider: string): string {
     zai:              "Z.ai",
     "x-ai":           "xAI",
     "z-ai":           "Z.ai",
-    "faster-whisper": "Faster Whisper",
+    parakeet:         "Parakeet-TDT",
+    "edge-tts":       "Edge TTS",
   };
 
   const normalized = provider.toLowerCase();

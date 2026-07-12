@@ -63,3 +63,7 @@ desktop.ini
 # Vendored copies of upstream/3rd-party projects kept locally for reference
 # only — never part of this repo.
 Research/
+
+# ── Python bytecode cache ────────────────────────────────────
+__pycache__/
+*.pyc

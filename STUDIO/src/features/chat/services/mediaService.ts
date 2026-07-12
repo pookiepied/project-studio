@@ -1,16 +1,16 @@
 /**
  * Audio transcription and text-to-speech.
  *
- * Routes to cloud providers (Groq Whisper, etc.) or local Faster Whisper
+ * Routes to cloud providers (Groq Whisper, etc.) or local Parakeet-TDT
  * depending on the model prefix.
  */
 
 import { invoke } from "@tauri-apps/api/core";
 import { apiClient } from "@/lib/api";
 import { APIResponse } from "@/types";
-import * as fasterWhisperService from "@/features/transcription/services/fasterWhisper";
+import * as parakeetService from "@/features/transcription/services/parakeet";
 import { TranscribeResponse } from "./types";
-import { isFasterWhisperModel, extractFasterWhisperModelName } from "./daemonService";
+import { isParakeetModel } from "./daemonService";
 
 // ---------------------------------------------------------------------------
 // Transcription
@@ -20,21 +20,17 @@ export async function transcribe(
   audioFile: File | Blob,
   model = "groq:whisper-large-v3-turbo"
 ): Promise<APIResponse<string>> {
-  if (isFasterWhisperModel(model)) {
-    const modelName = extractFasterWhisperModelName(model);
+  if (isParakeetModel(model)) {
     try {
       const tempPath = await saveAudioToTemp(audioFile);
-      const result = await fasterWhisperService.transcribeWithFasterWhisper(
-        tempPath,
-        { modelName, task: "transcribe" }
-      );
+      const result = await parakeetService.transcribeWithParakeet(tempPath);
       return result.success && result.data
         ? { success: true, data: result.data.text }
         : { success: false, error: result.error };
     } catch (error) {
       return {
         success: false,
-        error: `Faster Whisper transcription failed: ${error}`,
+        error: `Parakeet transcription failed: ${error}`,
       };
     }
   }

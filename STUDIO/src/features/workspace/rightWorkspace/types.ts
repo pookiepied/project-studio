@@ -1,4 +1,5 @@
 export type RightWorkspaceView =
+  | "review"
   | "terminal"
   | "browser"
   | "artifacts"
@@ -21,6 +22,11 @@ export interface FilesWorkspaceState {
   expandedPaths: string[];
 }
 
+export interface ReviewWorkspaceState {
+  rootPath?: string | null;
+  selectedPath?: string | null;
+}
+
 export interface SideChatWorkspaceState {
   conversationId?: string | null;
 }
@@ -33,6 +39,7 @@ export type WorkspaceTabState =
   | BrowserWorkspaceState
   | TerminalWorkspaceState
   | FilesWorkspaceState
+  | ReviewWorkspaceState
   | SideChatWorkspaceState
   | ArtifactWorkspaceState;
 

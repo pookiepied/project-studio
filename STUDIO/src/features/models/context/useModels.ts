@@ -38,7 +38,12 @@ export function useModels(): UseModelsResult {
       const includeDirectOllama = settings.ollamaEnabled && !shouldUseDaemonLocalModels;
 
       // Use direct Ollama discovery only when daemon-local discovery is not active.
-      const response = await fetchModels(forceRefresh, includeDirectOllama);
+      const response = await fetchModels(
+        forceRefresh,
+        includeDirectOllama,
+        settings.parakeetEnabled,
+        settings.edgeTtsEnabled
+      );
 
       if (response.success && response.data) {
         let finalData = response.data;
@@ -131,7 +136,7 @@ export function useModels(): UseModelsResult {
     loadModels(false);
     // loadModels is component-local; reload only on relevant settings/daemonStatus fields
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.ollamaEnabled, settings.lmstudioEnabled, settings.localProviderEnabled, settings.localProviderPort, daemonStatus.running, daemonStatus.port]);
+  }, [settings.ollamaEnabled, settings.lmstudioEnabled, settings.localProviderEnabled, settings.localProviderPort, settings.parakeetEnabled, settings.edgeTtsEnabled, daemonStatus.running, daemonStatus.port]);
 
   return {
     models: data?.models || [],

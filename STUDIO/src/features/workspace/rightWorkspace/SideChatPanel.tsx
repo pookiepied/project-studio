@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   ArrowUpIcon as ArrowUp,
   ChatCircleTextIcon as ChatCircleText,
@@ -6,7 +8,9 @@ import {
   PlusIcon as Plus,
 } from "@phosphor-icons/react";
 import { ChatProvider, useChat } from "@/features/chat/context";
+import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { useConversationsList } from "@/features/chat/hooks/useConversationsList";
+import { markdownComponents } from "@/features/markdown";
 import { formatDate } from "@/lib/formatters";
 
 interface SideChatPanelProps {
@@ -14,8 +18,16 @@ interface SideChatPanelProps {
   onConversationChange?: (conversationId: string | null, title?: string) => void;
 }
 
+const MemoizedMarkdown = memo(({ content }: { content: string }) => (
+  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    {content}
+  </ReactMarkdown>
+));
+
 function SideChatContent({ initialConversationId, onConversationChange }: SideChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const onConversationChangeRef = useRef(onConversationChange);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(!initialConversationId);
@@ -35,6 +47,10 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
   const { conversations, reload } = useConversationsList();
 
   useEffect(() => {
+    onConversationChangeRef.current = onConversationChange;
+  }, [onConversationChange]);
+
+  useEffect(() => {
     if (initialConversationId) {
       loadConversationById(initialConversationId).catch(() => {});
     } else {
@@ -44,12 +60,19 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
   }, [initialConversationId]);
 
   useEffect(() => {
-    onConversationChange?.(conversation?.id ?? null, conversation?.title);
-  }, [conversation?.id, conversation?.title, onConversationChange]);
+    onConversationChangeRef.current?.(conversation?.id ?? null, conversation?.title);
+  }, [conversation?.id, conversation?.title]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [displayedMessages.length, streamingContent]);
+
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 112)}px`;
+  }, [input]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -146,7 +169,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
         </div>
       )}
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4">
         {displayedMessages.length === 0 && !streamingContent ? (
           <div className="flex h-full items-center justify-center text-center">
             <div className="max-w-[220px]">
@@ -160,22 +183,29 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {displayedMessages.map((message) => (
-              <div
-                key={message.id}
-                className={`rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                  message.role === "user"
-                    ? "ml-8 bg-surface-selected text-primary"
-                    : "mr-8 text-secondary"
-                }`}
-              >
-                {message.content}
-              </div>
-            ))}
+          <div className="min-w-0 space-y-4">
+            {displayedMessages.map((message) =>
+              message.role === "user" ? (
+                <div key={message.id} className="flex min-w-0 justify-end pl-8">
+                  <div className="max-w-full whitespace-pre-wrap break-words rounded-lg bg-surface-selected px-3 py-2 text-sm leading-relaxed text-primary [overflow-wrap:anywhere]">
+                    {message.content}
+                  </div>
+                </div>
+              ) : (
+                <div key={message.id} className="min-w-0 max-w-full overflow-hidden text-sm text-secondary">
+                  <div className="prose-chat min-w-0 max-w-full [overflow-wrap:anywhere]">
+                    <MemoizedMarkdown content={message.content} />
+                  </div>
+                </div>
+              ),
+            )}
             {streamingContent && (
-              <div className="mr-8 rounded-xl px-3 py-2 text-sm leading-relaxed text-secondary">
-                {streamingContent}
+              <div className="min-w-0 max-w-full overflow-hidden text-sm text-secondary">
+                <StreamingText
+                  content={streamingContent}
+                  showCursor={isStreaming}
+                  className="prose-chat min-w-0 max-w-full [overflow-wrap:anywhere]"
+                />
               </div>
             )}
           </div>
@@ -183,8 +213,9 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
       </div>
 
       <form onSubmit={submit} className="flex-shrink-0 border-t border-surface-divider bg-surface-page p-3">
-        <div className="flex items-end gap-2 rounded-xl border border-surface-border bg-surface-base px-2.5 py-2">
+        <div className="flex min-w-0 items-end gap-2 rounded-lg border border-surface-border bg-surface-base px-3 py-2 shadow-sm transition-colors focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/15">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -194,13 +225,14 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
               }
             }}
             placeholder="Ask side chat"
+            aria-label="Message side chat"
             rows={1}
-            className="max-h-28 min-h-6 flex-1 resize-none bg-transparent text-sm leading-5 text-primary outline-none placeholder:text-muted"
+            className="max-h-28 min-h-6 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-sm leading-5 text-primary outline-none placeholder:text-muted scrollbar-thin"
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading || isStreaming}
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-on-emphasis transition-opacity disabled:opacity-35"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary text-on-emphasis transition-[opacity,transform] hover:opacity-90 active:scale-95 disabled:pointer-events-none disabled:opacity-35"
             title="Send"
           >
             <ArrowUp size={14} weight="bold" />

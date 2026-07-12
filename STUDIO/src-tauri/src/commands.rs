@@ -9,7 +9,17 @@ use tauri::Emitter;
 use std::sync::{LazyLock, Mutex};
 
 pub mod git;
-pub use git::{git_checkout_branch, git_create_branch, git_list_branches};
+pub use git::{
+    git_checkout_branch,
+    git_commit,
+    git_create_branch,
+    git_diff,
+    git_list_branches,
+    git_recent_commits,
+    git_stage,
+    git_status_summary,
+    git_unstage,
+};
 
 // Store current CSP configuration
 static CURRENT_CSP: Mutex<Option<String>> = Mutex::new(None);
@@ -368,6 +378,21 @@ pub async fn file_exists(path: String) -> Result<bool, String> {
 pub async fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path)
         .map_err(|e| format!("Failed to read file '{}': {}", path, e))
+}
+
+#[tauri::command]
+pub async fn read_text_file_preview(path: String) -> Result<String, String> {
+    const MAX_PREVIEW_BYTES: u64 = 2 * 1024 * 1024;
+    let metadata = fs::metadata(&path)
+        .map_err(|e| format!("Failed to inspect file '{}': {}", path, e))?;
+    if metadata.len() > MAX_PREVIEW_BYTES {
+        return Err(format!(
+            "This file is {:.1} MB. Preview is limited to 2 MB to keep the workspace responsive.",
+            metadata.len() as f64 / 1024.0 / 1024.0
+        ));
+    }
+    fs::read_to_string(&path)
+        .map_err(|_| "This file is binary or is not valid UTF-8 text, so it cannot be shown as source.".to_string())
 }
 
 #[tauri::command]

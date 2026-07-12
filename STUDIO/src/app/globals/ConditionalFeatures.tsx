@@ -69,7 +69,7 @@ export function ConditionalAutostart({ children }: ConditionalFeaturesProps) {
 export function ConditionalLocalModels({ children }: ConditionalFeaturesProps) {
   const { isEnabled } = useFeatures();
 
-  if (!isEnabled('ollamaIntegration') && !isEnabled('fasterWhisper')) {
+  if (!isEnabled('ollamaIntegration') && !isEnabled('parakeet')) {
     return null;
   }
 
