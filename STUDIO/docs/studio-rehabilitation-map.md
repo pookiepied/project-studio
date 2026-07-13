@@ -130,7 +130,7 @@ before splitting.
 | File | Lines | Initial read |
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
-| `src/features/workspace/pages/WorkspacePage.tsx` | 951 | Page likely mixes workflow state, UI sections, and creation forms |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 860 | Page still mixes workflow state and section composition; context lists were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 918 | Provider likely owns too many chat concerns |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 893 | Complex composite UI; split by panels/rows/actions |
 | `src/features/chat/pages/ChatPage.tsx` | 835 | Page composition is heavy |
@@ -394,9 +394,18 @@ Next:
 
 Start with files that are large and actively edited, not generated data.
 
+Completed:
+
+- Extracted Workspace context document/memory list rendering into
+  `src/features/workspace/pages/WorkspaceContextLists.tsx`.
+- Extracted Workspace formatting/category helpers into
+  `src/features/workspace/pages/workspaceFormat.ts`.
+- Reduced `WorkspacePage.tsx` from the original 951-line baseline to 860 lines
+  while keeping data loading and section state in the page for now.
+
 Recommended order:
 
-1. `src/features/workspace/pages/WorkspacePage.tsx`
+1. Continue `src/features/workspace/pages/WorkspacePage.tsx`
 2. `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx`
 3. `src/features/chat/pages/ChatPage.tsx`
 4. `src/features/chat/context/ChatProvider.tsx`

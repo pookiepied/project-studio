@@ -21,14 +21,11 @@ import {
   Spinner,
   Success,
   ArchiveBoxIcon,
-  BrainIcon,
   DatabaseIcon,
-  FileTextIcon,
   GearSixIcon,
   GraphIcon,
   RobotIcon,
   SpinnerGapIcon,
-  TagIcon,
   UploadSimpleIcon,
 } from "@/ui/icons";
 import { EmptyState } from "@/ui/primitives/EmptyState";
@@ -60,19 +57,13 @@ import {
   type UserAgent,
 } from "@/features/workspace/services/agentWorkflowService";
 import { ArtifactLabPanel } from "@/features/artifacts";
+import { DocumentList, MemoryList } from "./WorkspaceContextLists";
+import { CATEGORY_LABELS, formatBytes, formatRelative } from "./workspaceFormat";
 
 type WorkspaceSection = "overview" | "artifacts" | "context" | "automation" | "activity";
 
 const ACCEPTED_TYPES = ".txt,.md,.json,text/plain,text/markdown,text/x-markdown,application/json";
 const STORAGE_LIMIT = 500 * 1024 * 1024;
-
-const CATEGORY_LABELS: Record<string, string> = {
-  identity: "Identity",
-  preference: "Preferences",
-  project: "Projects",
-  event: "Events",
-  knowledge: "Knowledge",
-};
 
 type LocalIconProps = Omit<React.ComponentProps<typeof Icon>, "icon">;
 
@@ -85,7 +76,6 @@ const Database = makeLocalIcon(DatabaseIcon);
 const GearSix = makeLocalIcon(GearSixIcon);
 const Graph = makeLocalIcon(GraphIcon);
 const Robot = makeLocalIcon(RobotIcon);
-const Tag = makeLocalIcon(TagIcon);
 const UploadSimple = makeLocalIcon(UploadSimpleIcon);
 
 const SECTIONS: Array<{ id: WorkspaceSection; label: string; icon: React.ElementType; hint: string }> = [
@@ -95,26 +85,6 @@ const SECTIONS: Array<{ id: WorkspaceSection; label: string; icon: React.Element
   { id: "automation", label: "Automation", icon: Robot, hint: "Agents and routines" },
   { id: "activity", label: "Activity", icon: Graph, hint: "Workspace events" },
 ];
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function formatRelative(ts: number): string {
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return formatDate(ts);
-}
 
 function runStatusIcon(status: AgentRun["status"]) {
   switch (status) {
@@ -161,131 +131,6 @@ function Metric({
       <p className="text-2xs font-medium uppercase tracking-extra-wide text-disabled">{label}</p>
       <p className="mt-1 truncate text-lg font-display text-primary">{value}</p>
       {sub && <p className="mt-0.5 truncate text-xs text-disabled">{sub}</p>}
-    </div>
-  );
-}
-
-function DocumentList({
-  docs,
-  deletingDocId,
-  onDelete,
-}: {
-  docs: KbDocument[];
-  deletingDocId: string | null;
-  onDelete: (id: string, size: number) => void;
-}) {
-  if (docs.length === 0) {
-    return (
-      <EmptyState
-        icon={FileTextIcon}
-        title="No documents yet"
-        body="Add project notes, specs, research, or JSON context that should survive across conversations."
-      />
-    );
-  }
-
-  return (
-    <ul className="divide-y divide-surface-divider">
-      {docs.map((doc) => (
-        <li key={doc.id} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-hover">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-surface-base">
-            <Document size="sm" className="text-muted" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-primary" title={doc.name}>{doc.name}</p>
-            <p className="mt-0.5 text-xs text-disabled">
-              {formatBytes(doc.size)} · {doc.chunkCount} chunks · {formatDate(doc.createdAt)}
-              {doc.truncated && <span className="ml-1.5 text-secondary">truncated</span>}
-            </p>
-          </div>
-          <IconButton
-            aria-label="Delete document"
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(doc.id, doc.size)}
-            disabled={deletingDocId === doc.id}
-            className="flex-shrink-0 rounded-md text-disabled opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
-          >
-            {deletingDocId === doc.id ? <Spinner size="sm" className="animate-spin" /> : <Delete size="sm" />}
-          </IconButton>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function MemoryList({
-  facts,
-  deletingFactId,
-  onDelete,
-}: {
-  facts: MemoryFact[];
-  deletingFactId: string | null;
-  onDelete: (id: string) => void;
-}) {
-  const grouped = useMemo(() => facts.reduce<Record<string, MemoryFact[]>>((acc, fact) => {
-    const key = fact.category ?? "knowledge";
-    (acc[key] ??= []).push(fact);
-    return acc;
-  }, {}), [facts]);
-
-  const categories = Object.keys(grouped).sort();
-
-  if (facts.length === 0) {
-    return (
-      <EmptyState
-        icon={BrainIcon}
-        title="No memories yet"
-        body="Memory facts will appear here as conversations are distilled into reusable user context."
-      />
-    );
-  }
-
-  return (
-    <div className="py-2">
-      {categories.map((cat) => (
-        <section key={cat} className="mb-2">
-          <div className="px-5 py-2">
-            <span className="text-2xs font-semibold uppercase tracking-extra-wide text-disabled">
-              {CATEGORY_LABELS[cat] ?? cat}
-            </span>
-          </div>
-          <ul>
-            {grouped[cat].map((fact) => (
-              <li key={fact.key} className="group flex items-start gap-3 px-5 py-2.5 transition-colors hover:bg-surface-hover">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs leading-relaxed text-secondary">{fact.content}</p>
-                  {fact.tags?.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <Tag size="xs" className="text-disabled" />
-                      {fact.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="rounded bg-surface-base px-1.5 py-0.5 text-2xs text-disabled">{tag}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-shrink-0 items-center gap-2 pt-0.5">
-                  <span
-                    title={`Importance: ${fact.importance}/10`}
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: `hsl(${(fact.importance ?? 5) * 12}, 60%, 55%)` }}
-                  />
-                  <IconButton
-                    aria-label="Delete memory"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(fact.key)}
-                    disabled={deletingFactId === fact.key}
-                    className="rounded-md text-disabled opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
-                  >
-                    {deletingFactId === fact.key ? <Spinner size="sm" className="animate-spin" /> : <Delete size="sm" />}
-                  </IconButton>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
     </div>
   );
 }
@@ -535,8 +380,8 @@ function AgentRow({
                   <li key={run.id} className="flex items-center gap-2 border-t border-surface-divider px-12 py-2">
                     {runStatusIcon(run.status)}
                     <span className="text-xs capitalize text-muted">{run.status}</span>
-                    <span className="text-xs text-disabled">· {formatRelative(run.startedAt)}</span>
-                    {run.durationMs !== null && <span className="text-xs text-disabled">· {(run.durationMs / 1000).toFixed(1)}s</span>}
+                    <span className="text-xs text-disabled">- {formatRelative(run.startedAt)}</span>
+                    {run.durationMs !== null && <span className="text-xs text-disabled">- {(run.durationMs / 1000).toFixed(1)}s</span>}
                     {run.error && <span className="ml-1 truncate text-xs text-secondary">{run.error}</span>}
                   </li>
                 ))}
@@ -613,21 +458,21 @@ export const WorkspacePage = () => {
       id: `doc-${doc.id}`,
       icon: Document,
       title: doc.name,
-      meta: `Document indexed · ${formatBytes(doc.size)}`,
+      meta: `Document indexed - ${formatBytes(doc.size)}`,
       ts: doc.createdAt,
     }));
     const agentEvents = agents.slice(0, 5).map((agent) => ({
       id: `agent-${agent.id}`,
       icon: Robot,
       title: agent.name,
-      meta: `${agent.triggerType === "cron" ? "Scheduled routine" : "Manual routine"} · ${agent.status}`,
+      meta: `${agent.triggerType === "cron" ? "Scheduled routine" : "Manual routine"} - ${agent.status}`,
       ts: agent.updatedAt,
     }));
     const memoryEvents = facts.slice(0, 5).map((fact) => ({
       id: `memory-${fact.key}`,
       icon: Brain,
       title: fact.content,
-      meta: `Memory · ${CATEGORY_LABELS[fact.category] ?? fact.category}`,
+      meta: `Memory - ${CATEGORY_LABELS[fact.category] ?? fact.category}`,
       ts: Date.parse(fact.updatedAt) || Date.now(),
     }));
     return [...docEvents, ...agentEvents, ...memoryEvents].sort((a, b) => b.ts - a.ts).slice(0, 12);
@@ -873,7 +718,7 @@ export const WorkspacePage = () => {
                   <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
                     <div>
                       <p className="text-xs font-medium text-secondary">Knowledge base</p>
-                      <p className="text-xs text-disabled">{docs.length} documents · {formatBytes(totalBytes)}</p>
+                      <p className="text-xs text-disabled">{docs.length} documents - {formatBytes(totalBytes)}</p>
                     </div>
                     <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                       {uploading ? <Spinner size="sm" className="animate-spin" /> : <UploadSimple size="sm" />}
@@ -885,7 +730,7 @@ export const WorkspacePage = () => {
                 <section className="min-h-full">
                   <div className="border-b border-surface-divider px-5 py-3">
                     <p className="text-xs font-medium text-secondary">Memory facts</p>
-                    <p className="text-xs text-disabled">{facts.length} facts · {memoryCategories} categories</p>
+                    <p className="text-xs text-disabled">{facts.length} facts - {memoryCategories} categories</p>
                   </div>
                   {memLoading ? <EmptyState icon={SpinnerGapIcon} title="Loading memory" body="Fetching long-term memory facts." /> : <MemoryList facts={facts} deletingFactId={deletingFactId} onDelete={handleDeleteFact} />}
                 </section>
