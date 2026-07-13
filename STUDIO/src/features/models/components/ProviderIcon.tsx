@@ -1,10 +1,10 @@
 /**
- * ProviderIcon — AI-provider badge for model surfaces.
+ * ProviderIcon: AI-provider badge for model surfaces.
  *
- * Routing layer: resolves provider slug → simple-icons path / monogram, then
+ * Routing layer: resolves provider slug to simple-icons path / monogram, then
  * delegates badge rendering to BrandLogo (the shared primitive). When
  * provider === "openrouter" and a modelId is passed, the badge reflects the
- * upstream provider (e.g. openrouter:openai/gpt-4 → OpenAI mark).
+ * upstream provider (e.g. openrouter:openai/gpt-4 to OpenAI mark).
  *
  * Moves to features/models/ in Phase 4 (T4.5). BrandLogo stays in brand/.
  */
@@ -84,7 +84,7 @@ function getEffectiveProvider(provider: string, modelId?: string): string {
   return normalized;
 }
 
-export type ProviderIconSize = BrandLogoSize;
+type ProviderIconSize = BrandLogoSize;
 
 interface ProviderIconProps {
   provider: string;

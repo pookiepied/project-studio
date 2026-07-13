@@ -1,11 +1,11 @@
 /**
- * Model Filter — single source of truth for model filtering in the frontend.
+ * Model Filter: single source of truth for model filtering in the frontend.
  *
  * The backend fetches and returns ALL models from ALL providers. This module
- * decides what to SHOW in each UI context. Change a preset → behavior changes
+ * decides what to SHOW in each UI context. Change a preset and behavior changes
  * everywhere that preset is used. Nothing is hardcoded inline.
  *
- * ── Usage ────────────────────────────────────────────────────────────────────
+ * Usage:
  *
  *   import { filterModels, MODEL_FILTERS } from "@/features/models/services/modelFilter";
  *
@@ -21,11 +21,11 @@
  *     freeOnly: true,
  *   });
  *
- * ── Adding a new preset ───────────────────────────────────────────────────────
+ * Adding a new preset:
  *   1. Add an entry to MODEL_FILTERS below.
- *   2. Use it in your component — no other changes needed.
+ *   2. Use it in your component. No other changes needed.
  *
- * ── Adding a new filter field ────────────────────────────────────────────────
+ * Adding a new filter field:
  *   1. Add the field to ModelFilter below (optional, all fields are opt-in).
  *   2. Add a corresponding check in filterModels().
  *   3. TypeScript will surface any call sites that need updating.
@@ -33,12 +33,9 @@
 
 import type { Model } from "@/core/models";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ModelFilter — composable filter specification
-//
-// Every field is optional. Omit a field → that dimension is unconstrained.
+// ModelFilter: composable filter specification.
+// Every field is optional. Omit a field and that dimension is unconstrained.
 // Multiple fields are combined with AND logic.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface ModelFilter {
   /**
@@ -97,12 +94,12 @@ export interface ModelFilter {
   freeOnly?: boolean;
 
   /**
-   * Include only models whose input price per 1M tokens is ≤ this value.
+   * Include only models whose input price per 1M tokens is <= this value.
    */
   maxInputPricePer1M?: number;
 
   /**
-   * Include only models whose context window is ≥ this value (tokens).
+   * Include only models whose context window is >= this value (tokens).
    */
   minContextWindow?: number;
 
@@ -114,30 +111,28 @@ export interface ModelFilter {
   search?: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// filterModels — apply a ModelFilter to an array of Model objects
-// ─────────────────────────────────────────────────────────────────────────────
+// Apply a ModelFilter to an array of Model objects.
 
 export function filterModels(models: Model[], filter: ModelFilter): Model[] {
   return models.filter(model => {
-    // ── Type ─────────────────────────────────────────────────────────────────
+    // Type
     if (filter.types?.length && !filter.types.includes(model.type)) {
       return false;
     }
 
-    // ── Capability — all required ─────────────────────────────────────────────
+    // Capability: all required
     if (filter.requireCapabilities?.length) {
       const caps = model.capabilities ?? [];
       if (!filter.requireCapabilities.every(c => caps.includes(c))) return false;
     }
 
-    // ── Capability — at least one ─────────────────────────────────────────────
+    // Capability: at least one
     if (filter.anyCapabilities?.length) {
       const caps = model.capabilities ?? [];
       if (!filter.anyCapabilities.some(c => caps.includes(c))) return false;
     }
 
-    // ── Boolean feature flags ────────────────────────────────────────────────
+    // Boolean feature flags
     if (filter.supportsTools !== undefined && model.supportsTools !== filter.supportsTools) {
       return false;
     }
@@ -151,7 +146,7 @@ export function filterModels(models: Model[], filter: ModelFilter): Model[] {
       return false;
     }
 
-    // ── Provider whitelist / blacklist ────────────────────────────────────────
+    // Provider whitelist / blacklist
     if (filter.providers?.length && !filter.providers.includes(model.provider)) {
       return false;
     }
@@ -159,7 +154,7 @@ export function filterModels(models: Model[], filter: ModelFilter): Model[] {
       return false;
     }
 
-    // ── Price ─────────────────────────────────────────────────────────────────
+    // Price
     if (filter.freeOnly && !model.free) {
       return false;
     }
@@ -170,7 +165,7 @@ export function filterModels(models: Model[], filter: ModelFilter): Model[] {
       return false;
     }
 
-    // ── Context window ────────────────────────────────────────────────────────
+    // Context window
     if (
       filter.minContextWindow !== undefined &&
       (model.contextWindow ?? 0) < filter.minContextWindow
@@ -178,7 +173,7 @@ export function filterModels(models: Model[], filter: ModelFilter): Model[] {
       return false;
     }
 
-    // ── Text search ───────────────────────────────────────────────────────────
+    // Text search
     if (filter.search?.trim()) {
       const q = filter.search.toLowerCase();
       const nameMatch     = model.name.toLowerCase().includes(q);
@@ -190,18 +185,14 @@ export function filterModels(models: Model[], filter: ModelFilter): Model[] {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MODEL_FILTERS — named presets for every UI context
-//
+// MODEL_FILTERS: named presets for every UI context.
 // These are the only place where "what shows in the chat picker" or "what shows
 // in the image picker" is decided. No component should hardcode type logic.
-//
-// Each preset is a plain ModelFilter object — composable and overridable.
-// ─────────────────────────────────────────────────────────────────────────────
+// Each preset is a plain ModelFilter object: composable and overridable.
 
 export const MODEL_FILTERS = {
   /**
-   * Main chat model picker — all text-capable models.
+   * Main chat model picker: all text-capable models.
    * Includes multimodal (vision) models since they can also chat.
    */
   CHAT: {
@@ -236,7 +227,7 @@ export const MODEL_FILTERS = {
   } satisfies ModelFilter,
 
   /**
-   * Image generation model picker (Settings → Image Generation Model).
+   * Image generation model picker (Settings to Image Generation Model).
    * Includes both fal.ai and any OpenRouter image models.
    */
   IMAGE: {
@@ -244,7 +235,7 @@ export const MODEL_FILTERS = {
   } satisfies ModelFilter,
 
   /**
-   * Video generation model picker (Settings → Video Generation Model).
+   * Video generation model picker (Settings to Video Generation Model).
    */
   VIDEO: {
     types: ["video"],
@@ -272,7 +263,7 @@ export const MODEL_FILTERS = {
   } satisfies ModelFilter,
 
   /**
-   * Free models only — chat / multimodal.
+   * Free models only: chat / multimodal.
    * Useful for a "free tier" filter toggle in the UI.
    */
   FREE_CHAT: {
@@ -281,7 +272,7 @@ export const MODEL_FILTERS = {
   } satisfies ModelFilter,
 
   /**
-   * Long-context chat models (≥ 128K tokens).
+   * Long-context chat models (>= 128K tokens).
    * Useful for document analysis contexts.
    */
   LONG_CONTEXT: {
@@ -289,13 +280,3 @@ export const MODEL_FILTERS = {
     minContextWindow: 128_000,
   } satisfies ModelFilter,
 } as const;
-
-/**
- * Type-safe union of MODEL_FILTERS keys.
- * Use this when accepting a preset name as a prop.
- *
- * Example:
- *   interface Props { preset: ModelFilterPreset }
- *   <ModelPicker preset="CHAT" />
- */
-export type ModelFilterPreset = keyof typeof MODEL_FILTERS;

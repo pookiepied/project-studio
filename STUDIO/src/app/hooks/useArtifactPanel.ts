@@ -1,11 +1,9 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import type { ArtifactPanelContextValue } from "../contexts/ArtifactPanelContext";
 
-// ---------------------------------------------------------------------------
-// Tab types — Activity tab removed; Summary panel owns tool activity now
-// ---------------------------------------------------------------------------
+// Tab types. Activity tab removed; Summary panel owns tool activity now.
 
-export interface CodeArtifactTab {
+interface CodeArtifactTab {
   id:       string;
   type:     "code";
   label:    string;
@@ -13,7 +11,7 @@ export interface CodeArtifactTab {
   language: string;
 }
 
-export interface DocumentArtifactTab {
+interface DocumentArtifactTab {
   id:      string;
   type:    "document";
   label:   string;
@@ -21,10 +19,6 @@ export interface DocumentArtifactTab {
 }
 
 export type ArtifactTab = CodeArtifactTab | DocumentArtifactTab;
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 export function useArtifactPanel() {
   const [open,        setOpen]        = useState(false);

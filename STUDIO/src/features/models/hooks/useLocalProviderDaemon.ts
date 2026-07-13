@@ -10,7 +10,7 @@ import { useFeatures } from '@/app/hooks/useFeatures';
 import { useSettings } from '@/app/contexts/SettingsContext';
 import { logger } from '@/core/logging/logger';
 
-export interface DaemonStatus {
+interface DaemonStatus {
   running: boolean;
   port: number;
   error: string | null;
@@ -64,7 +64,7 @@ export function useDaemon(): UseDaemonResult {
     hydrateStatus();
   }, [isAvailable]);
 
-  // All hooks must be called unconditionally — guard is inside each one
+  // All hooks must be called unconditionally; guard is inside each one.
   useEffect(() => {
     if (!isAvailable) return;
 
