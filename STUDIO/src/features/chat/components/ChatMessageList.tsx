@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { ErrorDisplay } from "@/ui/feedback/ErrorDisplay";
@@ -26,7 +26,7 @@ interface ChatMessageListProps {
   messages:           ChatMessage[];
   isLoadingMore:      boolean;
   hasMoreMessages:    boolean;
-  // Scroll refs — provided by useChatScroll
+  // Scroll refs provided by useChatScroll.
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   messagesEndRef:       React.RefObject<HTMLDivElement | null>;
   messagesContentRef:   React.RefObject<HTMLDivElement | null>;
@@ -64,10 +64,10 @@ interface ChatMessageListProps {
   // Error
   error:                string | null;
   onClearError:         () => void;
-  // Floating composer — bottom padding so the last message clears the overlay
+  // Floating composer bottom padding so the last message clears the overlay.
   scrollPaddingBottom?: number;
   // Rendered inline as the last content item (below the answer in normal
-  // flow) instead of docked as a fixed HUD above the composer — see
+  // flow) instead of docked as a fixed HUD above the composer; see
   // ChatPage's comment at the composer overlay for why.
   turnStatus?: TurnStatusData | null;
 }
@@ -275,8 +275,7 @@ export const ChatMessageList = ({
             </motion.div>
           )}
 
-          {/* The bottom status line ("Thinking" / "Responding" / "…is ready for
-              your next task") renders inline here, right after the last message,
+          {/* The bottom status line renders inline here, right after the last message,
               like Claude.ai: on a short answer it sits wherever that lands (not
               glued to the composer); on a long/streaming answer the existing
               auto-scroll pin keeps it hugging the composer as content grows. */}

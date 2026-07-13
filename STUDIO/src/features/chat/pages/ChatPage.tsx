@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+﻿import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence }                   from "framer-motion";
 import { BrowserPanelContext }                       from "@/app/contexts/BrowserPanelContext";
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
@@ -62,10 +62,10 @@ import type { ChatEngine } from "@/cliBridges/types";
 // restart. Also leaves room for the last message's absolute hover action bar.
 const BOTTOM_SCROLL_CLEARANCE = 6;
 
-// Claude-owns-transcript banner — Claude Code brand-warm accent (Anthropic
+// Claude-owns-transcript banner: Claude Code brand-warm accent (Anthropic
 // terracotta family, matches ClaudeCodeIcon #CC785C). Not a neutral surface;
 // no design-token equivalent, so hex is intentional here.
-/* eslint-disable no-restricted-syntax -- §17 brand carve-out: Claude Code warm accent, no neutral-token equivalent */
+/* eslint-disable no-restricted-syntax -- brand carve-out: Claude Code warm accent, no neutral-token equivalent */
 const CLAUDE_TRANSCRIPT_BANNER =
   "mb-2 rounded-xl border border-[#E9D8CF] dark:border-[#3A2A22] bg-[#FFF8F4] dark:bg-[#241B17] px-3 py-2 shadow-sm";
 const CLAUDE_FORK_BUTTON =
@@ -367,7 +367,7 @@ export const ChatPage = () => {
   // Mirror a project's per-folder accessMode onto the global autopilot flag so
   // dependent surfaces (the Claude bridge permission mode, Settings) stay in
   // step when a project is opened or its mode changes. We deliberately do NOT
-  // force a value when no project is active — a global chat owns its own
+  // force a value when no project is active; a global chat owns its own
   // review/autonomous choice via autopilotMode and must not be clobbered here
   // (that was the bug that locked global chats to review).
   useEffect(() => {
@@ -377,7 +377,7 @@ export const ChatPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectContext?.path, projectContext?.accessMode]);
 
-  // Shared by the chat dock and the composer's EnvironmentSelector —
+  // Shared by the chat dock and the composer's EnvironmentSelector.
   // both let the user flip local/cloud scope.
   const handleStorageScopeChange = useCallback(async (scope: ConversationStorageScope) => {
     setConversationListScope(scope);
@@ -439,7 +439,7 @@ export const ChatPage = () => {
     onClaudeEffortLevelChange: setClaudeEffortLevel,
   };
 
-  // Project registry — the canonical list behind the projects/conversations
+  // Project registry: the canonical list behind the projects/conversations
   // switcher. Opening a folder registers it; selecting one makes it this
   // conversation's context.
   const { projects, refresh: refreshProjects, removeProject, deleteProject } = useProjects();
@@ -527,7 +527,7 @@ export const ChatPage = () => {
         onCancel={() => { setIsEditingTitle(false); setTitleInput(""); }}
       />
 
-      {/* Floating top-center dock — project/conversation switcher, title,
+      {/* Floating top-center dock: project/conversation switcher, title,
           branch/context/device controls, workspace panels. Fixed-position
           (does not occupy layout), so it overlays the chat column below. */}
       <ChatFloatingDock
@@ -604,7 +604,7 @@ export const ChatPage = () => {
         onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
       />
 
-      {/* Top-right control cluster — the app-level mirror of the window traffic
+      {/* Top-right control cluster: the app-level mirror of the window traffic
           lights on the left edge: environment selector, project launcher,
           workspace toggle. Fixed (never occupies layout), aligned to the shared
           top-row center line (23px) so it sits level with the dock + lights.
@@ -633,7 +633,7 @@ export const ChatPage = () => {
         {/* -- Chat column -- */}
         <div className="flex-1 flex flex-col overflow-hidden relative" style={{ minWidth: "380px" }}>
 
-          {/* -- MAIN CONTENT: empty-centred ↔ conversation -- */}
+          {/* -- MAIN CONTENT: empty-centered / conversation -- */}
           <AnimatePresence mode="popLayout" initial={false}>
             {isEmptyConversation ? (
 
@@ -711,7 +711,7 @@ export const ChatPage = () => {
                     label: (() => {
                       if (isPreparingTurn) return "Preparing";
                       if (runningTurnTool) return "Working";
-                      if (streamingContent && streamingContent.length > 0) return "Writing";
+                      if (streamingContent && streamingContent.length > 0) return "Responding";
                       return "Thinking";
                     })(),
                     thinking: thinkingContent,
@@ -766,7 +766,7 @@ export const ChatPage = () => {
                   // This overlay is a DOM sibling of the message scroller, not a
                   // descendant, so native wheel scrolling stops working the moment
                   // the cursor is over its pointer-events-auto column (TurnStatus,
-                  // approval cards) — forward the delta manually so scroll/lock
+                  // approval cards); forward the delta manually so scroll/lock
                   // behaves the same everywhere over the conversation.
                   onWheel={(e) => forwardWheel(e.deltaY)}
                 >
@@ -843,7 +843,7 @@ export const ChatPage = () => {
                           answer just sits below its own text wherever that
                           lands, instead of being glued to the composer as a
                           permanent HUD. It only ends up hugging the composer
-                          once real content grows tall enough to reach it —
+                          once real content grows tall enough to reach it;
                           the existing auto-scroll pin handles that for free. */}
 
                       {composerBlock(conversationInputRef)}
