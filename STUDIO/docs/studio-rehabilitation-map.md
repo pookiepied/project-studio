@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 33 unused exports
+- 32 unused exports
 - 46 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -292,6 +292,9 @@ Completed:
 - Privatized chat conversation helpers that were only used inside their owning
   files: Claude tool-name mapping, Claude native ID prefixing, and conversation
   owner resolution.
+- Removed unused legacy chat history helpers for raw conversation
+  import/export and last-response regeneration; the live regenerate flow is
+  handled by conversation actions and the send pipeline.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.

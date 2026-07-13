@@ -1,7 +1,6 @@
 import { ChatConversation, ChatMessage } from "@/types";
 import type { ConversationStorageScope } from "@/core/conversations";
 import { unifiedStorage } from "@/core/storage/unifiedStorageService";
-import { logger } from "@/core/logging/logger";
 import { localConversationStore } from "@/features/chat/conversations/storage/localConversationStore";
 import type { ConversationIndex } from "@/features/chat/conversations/storage/types";
 import { claudeConversationAdapter } from "@/features/chat/conversations/claude/claudeConversationAdapter";
@@ -391,44 +390,6 @@ export async function truncateMessagesAfter(
   await saveConversation(conversation);
 }
 
-/**
- * Regenerate AI response (delete last assistant message and resend)
- */
-export async function regenerateLastResponse(conversationId: string): Promise<ChatMessage[]> {
-  const conversation = await loadConversation(conversationId);
-  if (!conversation) return [];
-  if (isClaudeOwnedConversation(conversation)) return conversation.messages;
-  
-  // Find last assistant message (iterate backwards)
-  let lastAssistantIndex = -1;
-  for (let i = conversation.messages.length - 1; i >= 0; i--) {
-    if (conversation.messages[i].role === "assistant") {
-      lastAssistantIndex = i;
-      break;
-    }
-  }
-  
-  if (lastAssistantIndex === -1) return conversation.messages;
-  
-  // Remove it
-  conversation.messages.splice(lastAssistantIndex, 1);
-  conversation.updatedAt = Date.now();
-  
-  await saveConversation(conversation);
-  
-  return conversation.messages;
-}
-
-/**
- * Export conversation as JSON
- */
-export async function exportConversation(id: string): Promise<string | null> {
-  const conversation = await loadConversation(id);
-  if (!conversation) return null;
-  
-  return JSON.stringify(conversation, null, 2);
-}
-
 export async function forkConversationToStudio(id: string): Promise<ChatConversation | null> {
   const source = await loadConversation(id);
   if (!source) return null;
@@ -468,28 +429,6 @@ export async function forkConversationToStudio(id: string): Promise<ChatConversa
 
   await saveConversation(conversation);
   return conversation;
-}
-
-/**
- * Import conversation from JSON
- */
-export async function importConversation(jsonData: string): Promise<boolean> {
-  try {
-    const conversation: ChatConversation = JSON.parse(jsonData);
-    
-    if (!conversation.id || !conversation.messages || !Array.isArray(conversation.messages)) {
-      return false;
-    }
-    
-    conversation.id = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    conversation.updatedAt = Date.now();
-    
-    await saveConversation(conversation);
-    return true;
-  } catch (error) {
-    logger.error('ChatHistory', 'Failed to import conversation', error);
-    return false;
-  }
 }
 
 /**
