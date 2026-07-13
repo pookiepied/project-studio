@@ -126,17 +126,25 @@ export function TurnStatus({
   // the persisted anchor instead of restarting the clock.
   const [start, setStart] = useState<number | null>(null);
   const prevBusy = useRef(false);
+  const prevLabel = useRef(label);
   useEffect(() => {
     if (busy && !prevBusy.current) {
       const anchor = readAnchor(convId) ?? Date.now();
       writeAnchor(convId, anchor);
       setStart(anchor);
+      prevLabel.current = label;
+    } else if (busy && prevLabel.current !== label) {
+      const anchor = Date.now();
+      writeAnchor(convId, anchor);
+      setStart(anchor);
+      prevLabel.current = label;
     } else if (!busy && prevBusy.current) {
       clearAnchor(convId);
       setStart(null);
+      prevLabel.current = label;
     }
     prevBusy.current = busy;
-  }, [busy, convId]);
+  }, [busy, convId, label]);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

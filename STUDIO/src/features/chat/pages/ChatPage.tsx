@@ -452,7 +452,8 @@ export const ChatPage = () => {
     thinkingContent.trim().length > 0 ||
     harnessSegments.length > 0 ||
     !!runningTurnTool;
-  const isPreparingTurn = isLoading && !hasVisibleTurnActivity;
+  const hasActiveTurn = isLoading || isStreaming || !!streamingMessageId;
+  const isPreparingTurn = hasActiveTurn && !hasVisibleTurnActivity;
 
   const handleSelectProject = useCallback(async (project: ProjectEntry) => {
     setProjectContext({ path: project.path, name: project.name, accessMode: project.accessMode });
