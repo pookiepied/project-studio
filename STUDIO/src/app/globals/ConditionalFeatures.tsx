@@ -38,38 +38,12 @@ export function ConditionalSystemTray({ children }: ConditionalFeaturesProps) {
 }
 
 /**
- * Window Controls (Tauri only)
- */
-export function ConditionalWindowControls({ children }: ConditionalFeaturesProps) {
-  const { isEnabled } = useFeatures();
-
-  if (!isEnabled('windowControls')) {
-    return null;
-  }
-
-  return <>{children}</>;
-}
-
-/**
  * Autostart Features (Tauri only)
  */
 export function ConditionalAutostart({ children }: ConditionalFeaturesProps) {
   const { isEnabled } = useFeatures();
 
   if (!isEnabled('autostart')) {
-    return null;
-  }
-
-  return <>{children}</>;
-}
-
-/**
- * Local Model Features (Tauri only)
- */
-export function ConditionalLocalModels({ children }: ConditionalFeaturesProps) {
-  const { isEnabled } = useFeatures();
-
-  if (!isEnabled('ollamaIntegration') && !isEnabled('parakeet')) {
     return null;
   }
 

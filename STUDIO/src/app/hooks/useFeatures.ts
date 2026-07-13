@@ -37,23 +37,3 @@ export function useFeatures(): UseFeatureResult {
   
   return result;
 }
-
-/**
- * Hook to check if a specific feature is enabled
- */
-export function useFeature(feature: keyof FeatureFlags): boolean {
-  return useMemo(() => isFeatureEnabled(feature), [feature]);
-}
-
-/**
- * Hook to check if multiple features are supported
- */
-export function useRequiredFeatures(features: (keyof FeatureFlags)[]): {
-  supported: boolean;
-  missing: (keyof FeatureFlags)[];
-} {
-  return useMemo(() => ({
-    supported: featureManager.supportsFeatures(features),
-    missing: featureManager.getMissingFeatures(features),
-  }), [features]);
-}

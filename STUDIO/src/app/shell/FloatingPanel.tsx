@@ -39,7 +39,7 @@ interface Category {
   items: NavItem[];
 }
 
-export const FLOATING_PANEL_CATEGORIES: Category[] = [
+const FLOATING_PANEL_CATEGORIES: Category[] = [
   {
     key: "studio",
     label: "Studio",

@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 73 unused exports
+- 68 unused exports
 - 57 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -259,6 +259,8 @@ Completed:
   live shared `chevronRotateTransition`.
 - Removed or privatized unused exports from small `src/lib` helpers while
   preserving their live public functions.
+- Removed or privatized unused app-level convenience exports while preserving
+  the live app shell and settings surfaces.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.
