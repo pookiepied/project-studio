@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 27 unused exports
+- 26 unused exports
 - 45 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -300,6 +300,8 @@ Completed:
   Extensions page surface.
 - Trimmed unused Manage component barrel exports and privatized the model
   registry currency helper that is only used by its formatter module.
+- Removed the unused markdown video processing placeholder while preserving the
+  live video player used by markdown code blocks.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
