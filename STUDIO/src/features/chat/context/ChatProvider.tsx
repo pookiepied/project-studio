@@ -78,6 +78,7 @@ import { useStreamHandlers } from "./useStreamHandlers";
 import { useSendPipeline } from "./useSendPipeline";
 import { useConversationActions } from "./useConversationActions";
 import { useAccessPrompts } from "./useAccessPrompts";
+import { useStreamingLifecycle } from "./useStreamingLifecycle";
 
 import {
   saveConvProjectCtx,
@@ -372,68 +373,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // voice refs live in useVoiceInput hook
   const sendMessageForVoiceRef   = useRef<((text: string, streaming?: boolean) => Promise<void>) | null>(null);
   const conversationCreationRef  = useRef<Promise<ChatConversation> | null>(null);
-  const latestStreamingContentRef = useRef("");
-  const thinkingContentRef       = useRef("");
-  const pendingStreamingFrameRef = useRef<number | null>(null);
-
-  // ── Streaming content throttle (rAF) ───────────────────────────────────
-  const scheduleStreamingContentUpdate = useCallback((next: string) => {
-    latestStreamingContentRef.current = next;
-    if (pendingStreamingFrameRef.current !== null) return;
-    pendingStreamingFrameRef.current = window.requestAnimationFrame(() => {
-      pendingStreamingFrameRef.current = null;
-      setStreamingContent(latestStreamingContentRef.current);
-    });
-  }, []);
-
-  const flushStreamingContentUpdate = useCallback(() => {
-    if (pendingStreamingFrameRef.current !== null) {
-      window.cancelAnimationFrame(pendingStreamingFrameRef.current);
-      pendingStreamingFrameRef.current = null;
-    }
-    setStreamingContent(latestStreamingContentRef.current);
-  }, []);
-
-  useEffect(() => () => {
-    if (pendingStreamingFrameRef.current !== null)
-      window.cancelAnimationFrame(pendingStreamingFrameRef.current);
-  }, []);
-
-  // ── End-of-turn teardown ────────────────────────────────────────────────
-  // Returns the provider to idle once a turn has been fully persisted. Both
-  // completion paths in handleStreamDone (Claude-owned and Studio-owned) end
-  // here, so the reset can never drift between them.
-  const finishStreamingTurn = useCallback(() => {
-    setIsStreaming(false);
-    setStreamingContent("");
-    latestStreamingContentRef.current = "";
-    setStreamingMessageId(null);
-    setActiveToolCalls([]);
-    screenshotUrlsRef.current = [];
-    harnessSegmentsRef.current = [];
-    pendingSegmentTextRef.current = "";
-    setHarnessSegments([]);
-    // Clear live thinking — it has already been captured onto the saved message
-    // (message.thinkingContent). Leaving the live state set made the "thinking"
-    // indicator linger after the turn was done.
-    thinkingContentRef.current = "";
-    setThinkingContent("");
-  }, []);
-
-  // Tears the turn down to idle and surfaces the failure. Used by both Claude
-  // bailout paths (bridge threw / non-zero exit with no content).
-  const failStreamingTurn = useCallback((message: string) => {
-    setError(message);
-    setIsLoading(false);
-    setIsStreaming(false);
-    setStreamingContent("");
-    latestStreamingContentRef.current = "";
-    setStreamingMessageId(null);
-    setActiveToolCalls([]);
-    thinkingContentRef.current = "";
-    setThinkingContent("");
-  }, []);
-
   // ── Sync default model ──────────────────────────────────────────────────
   useEffect(() => {
     if (!conversation && settings.defaultChatModel) setCurrentModel(settings.defaultChatModel);
@@ -551,6 +490,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const screenshotUrlsRef      = useRef<string[]>([]);
   const optimisticAssistantIdRef = useRef<string>("");
   const activeConversationIdRef  = useRef<string>("");
+  const {
+    latestStreamingContentRef,
+    thinkingContentRef,
+    scheduleStreamingContentUpdate,
+    flushStreamingContentUpdate,
+    finishStreamingTurn,
+    failStreamingTurn,
+  } = useStreamingLifecycle({
+    screenshotUrlsRef,
+    harnessSegmentsRef,
+    pendingSegmentTextRef,
+    setError,
+    setIsLoading,
+    setIsStreaming,
+    setStreamingContent,
+    setStreamingMessageId,
+    setActiveToolCalls,
+    setHarnessSegments,
+    setThinkingContent,
+  });
 
   // ── Conversation display helpers ────────────────────────────────────────
   // Defined BEFORE handleStreamDone so the closure captures it correctly.
