@@ -40,7 +40,6 @@ import { useProjects }          from "@/features/chat/hooks/useProjects";
 import { projectRegistry, type ProjectEntry } from "@/core/projects";
 import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
-import { toolPhrase } from "@/features/chat/components/idle/TurnStatus";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import { ComposerApprovalCard } from "@/features/permissions";
 import { AskUserQuestionCard }  from "@/features/chat/components/AskUserQuestionCard";
@@ -710,9 +709,9 @@ export const ChatPage = () => {
                     convId: conversation?.id,
                     generating: isPreparingTurn || hasVisibleTurnActivity,
                     label: (() => {
-                      if (isPreparingTurn) return "Processing";
-                      if (runningTurnTool) return toolPhrase(runningTurnTool.tool);
-                      if (streamingContent && streamingContent.length > 0) return "Responding";
+                      if (isPreparingTurn) return "Preparing";
+                      if (runningTurnTool) return "Working";
+                      if (streamingContent && streamingContent.length > 0) return "Writing";
                       return "Thinking";
                     })(),
                     thinking: thinkingContent,
