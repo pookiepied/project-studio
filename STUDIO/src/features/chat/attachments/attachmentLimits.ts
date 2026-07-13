@@ -4,7 +4,7 @@ import { FileAttachment, estimateAttachmentTokens } from "./fileAttachmentServic
 import { safeGetContextWindow, createFallbackAttachmentLimits, FALLBACK_VALUES } from "@/core/network/fallbackService";
 import { logger } from "@/core/logging/logger";
 
-export function calculateAttachmentLimits(
+function calculateAttachmentLimits(
   models: Model[], 
   modelId: string
 ): AttachmentLimits {

@@ -40,15 +40,3 @@ export async function uploadDocument(file: File, permanent: boolean): Promise<Up
 
   return response.json() as Promise<UploadedDocument>;
 }
-
-/**
- * Remove a previously uploaded document from the server.
- * Safe to call even if the document has already expired or was deleted.
- */
-export async function deleteUploadedDocument(docId: string): Promise<void> {
-  const headers = await createHeaders(true) as Record<string, string>;
-  await fetch(`${API_ENDPOINTS.adapter.base}/upload/document/${docId}`, {
-    method: "DELETE",
-    headers,
-  }).catch(() => {}); // fire-and-forget
-}

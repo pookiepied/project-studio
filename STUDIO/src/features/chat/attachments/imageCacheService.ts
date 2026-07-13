@@ -24,7 +24,7 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-export function cacheKey(name: string, size: number): string {
+function cacheKey(name: string, size: number): string {
   return `${name}::${size}`;
 }
 

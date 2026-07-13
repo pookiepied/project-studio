@@ -5,9 +5,6 @@ import { logger } from "@/core/logging/logger";
 /** Characters of extracted text above which we RAG-index instead of inlining. */
 export const DOC_RAG_THRESHOLD = 100_000; // ~25K tokens
 
-/** Characters we actually send to the index endpoint (hard cap). */
-export const DOC_MAX_INDEX_CHARS = 300_000; // ~75K tokens, ~100 dense pages
-
 export interface DocIndexResult {
   docId: string;
   sessionId: string;
