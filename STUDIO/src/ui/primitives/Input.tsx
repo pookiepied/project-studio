@@ -1,6 +1,6 @@
 import { forwardRef, type InputHTMLAttributes } from "react";
 
-export type FieldSize = "sm" | "md" | "lg";
+type FieldSize = "sm" | "md" | "lg";
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   size?: FieldSize;

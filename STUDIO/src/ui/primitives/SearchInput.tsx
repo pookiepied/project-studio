@@ -1,7 +1,7 @@
 import { forwardRef, type InputHTMLAttributes } from "react";
 import { Search, Close, type IconSize } from "@/ui/icons";
 
-export type SearchSize = "sm" | "md" | "lg";
+type SearchSize = "sm" | "md" | "lg";
 
 interface SearchInputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {

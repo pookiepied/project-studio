@@ -3,8 +3,8 @@ import { motion, type HTMLMotionProps } from "framer-motion";
 import { Spinner } from "@/ui/primitives/Spinner";
 import { cn } from "@/lib/cn";
 
-export type ButtonVariant = "primary" | "ghost" | "outline" | "destructive";
-export type ButtonSize = "sm" | "md" | "lg";
+type ButtonVariant = "primary" | "ghost" | "outline" | "destructive";
+type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
   children: ReactNode;

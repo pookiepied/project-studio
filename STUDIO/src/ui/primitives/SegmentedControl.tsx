@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * SegmentedControl — a small set of mutually-exclusive options rendered as a
+ * SegmentedControl: a small set of mutually-exclusive options rendered as a
  * single inline track (iOS-style segmented picker).
  *
  * Introduced in Phase 4 (C-401) once the "pill toggle" pattern recurred across
@@ -9,14 +9,14 @@ import type { ReactNode } from "react";
  * instead of hand-rolling a row of `<button>`s.
  *
  * Design-system notes:
- *   • Strict-neutral (D-401): selection reads on surface + weight, never hue —
+ *   - Strict-neutral (D-401): selection reads on surface + weight, never hue.
  *     the active segment uses `bg-surface-selected` + `text-primary` (the
  *     sanctioned "selected" treatment), inactive segments are `text-muted`.
- *   • A11y: the track is a `radiogroup`; each segment is a `radio`. Pass a
+ *   - A11y: the track is a `radiogroup`; each segment is a `radio`. Pass a
  *     descriptive `aria-label` for the group.
  */
 
-export interface SegmentedOption<T extends string> {
+interface SegmentedOption<T extends string> {
   value: T;
   label: ReactNode;
   /** Optional leading glyph (use the icon barrel: `<Refresh size="xs" />`). */

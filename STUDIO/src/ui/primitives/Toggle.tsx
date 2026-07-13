@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import type { ButtonHTMLAttributes, MouseEvent } from "react";
 
-export type ToggleSize = "sm" | "md";
+type ToggleSize = "sm" | "md";
 
 interface ToggleProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> {
   checked: boolean;

@@ -219,7 +219,7 @@ export const Wifi = makeIcon(WifiHigh, "Wifi");
 // aliased to `PhosphorIcon`) must instead import `PhosphorIcon` here; the
 // barrel already defines the `Icon` *value* (the wrapper component above), so
 // the Phosphor type is re-exported only under the non-colliding `PhosphorIcon`.
-export type { PhosphorIcon, PhosphorIconProps, IconWeight };
+export type { PhosphorIcon };
 
 // Escape-hatch glyph re-exports
 // Every glyph below is re-exported verbatim so consumption stays within the
