@@ -136,7 +136,6 @@ before splitting.
 | `src/features/chat/pages/ChatPage.tsx` | 835 | Page composition is heavy |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
-| `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx` | 582 | Workspace panel composition candidate |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
 | `src/features/chat/context/useStreamHandlers.ts` | 536 | Streaming protocol/event logic candidate |
 
@@ -404,15 +403,18 @@ Completed:
   `src/features/workspace/pages/WorkspaceAutomation.tsx`.
 - Reduced `WorkspacePage.tsx` from the original 951-line baseline to 578 lines
   while keeping data loading, mutations, and section state in the page for now.
+- Extracted right workspace tab chrome and empty launcher rendering into
+  `src/features/workspace/rightWorkspace/RightWorkspaceChrome.tsx`.
+- Reduced `RightWorkspacePanel.tsx` from the measured 606-line baseline to 284
+  lines while keeping width, resize, and active-panel rendering in the panel.
 
 Recommended order:
 
 1. Continue `src/features/workspace/pages/WorkspacePage.tsx`
-2. `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx`
-3. `src/features/chat/pages/ChatPage.tsx`
-4. `src/features/chat/context/ChatProvider.tsx`
-5. `src/features/chat/components/ChatFloatingDock.tsx`
-6. `src/features/voice/hooks/useAudioRecorder.ts`
+2. `src/features/chat/pages/ChatPage.tsx`
+3. `src/features/chat/context/ChatProvider.tsx`
+4. `src/features/chat/components/ChatFloatingDock.tsx`
+5. `src/features/voice/hooks/useAudioRecorder.ts`
 
 Split rule:
 
