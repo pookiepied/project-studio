@@ -6,6 +6,12 @@ import { reportError } from "@/core/errors/errorReporting";
 import { errorService } from "@/core/errors/errorService";
 import { NotificationService } from "@/core/notifications";
 import { logger } from "@/core/logging/logger";
+import {
+  buildAudioConstraints,
+  createSupportedMediaRecorder,
+  isAPIConfigurationError,
+  setupSpeechAnalyser,
+} from "./audioRecorderSetup";
 
 interface AudioRecorderOptions {
   chunkDuration?: number; // seconds
@@ -173,36 +179,14 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
    */
   const startRecording = useCallback(async (showNotification: boolean = false) => {
     try {
-      // Build audio constraints
-      const audioConstraints: MediaTrackConstraints = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: 16000,
-      };
-
-      // Add device constraint if specific microphone selected
-      if (selectedMicrophone) {
-        audioConstraints.deviceId = { exact: selectedMicrophone };
-      }
-
       // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints,
+        audio: buildAudioConstraints(selectedMicrophone),
       });
 
       // Set up Web Audio API for VAD with error handling
-      let audioContext: AudioContext;
-      let source: MediaStreamAudioSourceNode;
-      let analyser: AnalyserNode;
-      
       try {
-        audioContext = new AudioContext();
-        source = audioContext.createMediaStreamSource(stream);
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.8;
-        source.connect(analyser);
-
+        const { audioContext, analyser } = setupSpeechAnalyser(stream);
         audioContextRef.current = audioContext;
         analyserRef.current = analyser;
       } catch (error) {
@@ -213,25 +197,7 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
       }
 
       // Create MediaRecorder with proper format detection
-      let mediaRecorder: MediaRecorder;
-      
-      // Check for supported MIME types and create MediaRecorder accordingly
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        mediaRecorder = new MediaRecorder(stream, {
-          mimeType: "audio/webm;codecs=opus",
-        });
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        mediaRecorder = new MediaRecorder(stream, {
-          mimeType: "audio/webm",
-        });
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        mediaRecorder = new MediaRecorder(stream, {
-          mimeType: "audio/mp4",
-        });
-      } else {
-        // Fallback to default (browser will choose best available)
-        mediaRecorder = new MediaRecorder(stream);
-      }
+      const mediaRecorder = createSupportedMediaRecorder(stream);
 
       mediaRecorderRef.current = mediaRecorder;
       transcriptionChunksRef.current = [];
@@ -579,25 +545,6 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
     } finally {
       pendingTranscriptionsRef.current = Math.max(0, pendingTranscriptionsRef.current - 1);
     }
-  };
-
-  /**
-   * Check if error is related to API configuration
-   */
-  const isAPIConfigurationError = (error: string): boolean => {
-    const apiErrorKeywords = [
-      'no provider',
-      'api not configured',
-      'unauthorized',
-      'authentication failed',
-      'network error',
-      'fetch failed',
-      'connection refused',
-      'api key'
-    ];
-
-    const lowerError = error.toLowerCase();
-    return apiErrorKeywords.some(keyword => lowerError.includes(keyword));
   };
 
   /**

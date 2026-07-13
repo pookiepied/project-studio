@@ -134,7 +134,7 @@ before splitting.
 | `src/features/chat/context/ChatProvider.tsx` | 752 | Provider still owns many chat concerns; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, and background service effects were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/pages/ChatPage.tsx` | 775 | Page composition remains heavy; composer panels, top chrome, and overlays were extracted |
-| `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
+| `src/features/voice/hooks/useAudioRecorder.ts` | 698 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
 | `src/features/chat/context/useStreamHandlers.ts` | 498 | Streaming protocol/event logic candidate; DSML continuation was extracted |
@@ -457,6 +457,10 @@ Completed:
   into `src/features/chat/context/handleDsmlContinuation.ts`.
 - Reduced `useStreamHandlers.ts` from 588 to 498 lines while keeping the same
   `handleStreamDone` control flow and continuation contract.
+- Extracted voice-recorder browser setup helpers into
+  `src/features/voice/hooks/audioRecorderSetup.ts`.
+- Reduced `useAudioRecorder.ts` from the current 751-line measurement to 698
+  lines while keeping the recording state machine inside the hook.
 
 Recommended order:
 
