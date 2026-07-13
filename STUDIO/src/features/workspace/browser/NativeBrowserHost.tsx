@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import type { BrowserTab } from "./BrowserPanel";
 import { nativeBrowserService, type NativeBrowserBounds } from "./nativeBrowserService";
+import type { BrowserTab } from "./types";
 
 function readBounds(element: HTMLElement): NativeBrowserBounds | null {
   const rect = element.getBoundingClientRect();

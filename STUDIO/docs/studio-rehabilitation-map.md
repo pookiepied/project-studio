@@ -174,15 +174,8 @@ Duplicate exports removed in the duplicate-export proof pass:
 
 ## Dependency Cycle Signal
 
-`npx madge --circular --extensions ts,tsx src` reports one circular dependency:
-
-```text
-features/workspace/browser/BrowserPanel.tsx
-features/workspace/browser/NativeBrowserHost.tsx
-```
-
-This should be an early cleanup task because cycles make later moves and splits
-harder to trust.
+`npx madge --circular --extensions ts,tsx src` reports no circular
+dependencies after the browser cycle removal pass.
 
 ## Naming Concerns
 
@@ -351,16 +344,17 @@ Rules:
 
 ### Phase 2: Cycle removal
 
-Scope:
+Status: complete.
 
-- Break the `BrowserPanel.tsx` and `NativeBrowserHost.tsx` cycle.
+Completed:
 
-Likely approach:
-
-- Extract shared browser host types, constants, or callbacks into a third module
-  inside `src/features/workspace/browser/`.
-- Keep UI ownership obvious.
-- Verify with `npm run ratchet:cycles`.
+- Broke the `BrowserPanel.tsx` and `NativeBrowserHost.tsx` cycle by moving the
+  shared `BrowserTab` contract into `src/features/workspace/browser/types.ts`.
+- Updated browser consumers to import the shared type from that leaf module.
+- Updated `gate/cycles-baseline.json` to lock the circular-import baseline at
+  zero.
+- Verified with `npx madge --circular --extensions ts,tsx src` and
+  `npm run ratchet:cycles`.
 
 ### Phase 3: Feature boundary map
 

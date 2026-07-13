@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useCallback } from "react";
-import type { BrowserTab } from "@/features/workspace/browser/BrowserPanel";
+import type { BrowserTab } from "@/features/workspace/browser/types";
 
 function makeWebLabel(url: string) {
   if (!url) return "New tab";

@@ -20,7 +20,7 @@ import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { ArtifactPanel } from "@/features/artifacts";
 import { BrowserPanel } from "../browser/BrowserPanel";
-import type { BrowserTab } from "../browser/BrowserPanel";
+import type { BrowserTab } from "../browser/types";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import type { ArtifactTab } from "@/app/hooks/useArtifactPanel";
 import { ResizeHandle } from "./ResizeHandle";

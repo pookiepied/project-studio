@@ -21,21 +21,9 @@ import { Input } from "@/ui/primitives/Input";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "../rightWorkspace/types";
+import type { BrowserTab } from "./types";
 import { NativeBrowserHost } from "./NativeBrowserHost";
 import { nativeBrowserService } from "./nativeBrowserService";
-
-export interface BrowserTab {
-  id: string;
-  label: string;
-  mode: "html" | "web";
-  html?: string;
-  url?: string;
-  history?: string[];
-  historyIndex?: number;
-  reloadKey?: number;
-  zoom?: number;
-  deviceToolbar?: boolean;
-}
 
 interface BrowserPanelProps {
   tabs: BrowserTab[];
