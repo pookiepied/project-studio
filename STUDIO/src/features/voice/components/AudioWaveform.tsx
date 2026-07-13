@@ -14,7 +14,7 @@ interface AudioWaveformProps {
   gapPx?: number;
   maxHeightPx?: number;
   minHeightPx?: number;
-  /** Tailwind color class, e.g. "bg-gray-400" */
+  /** Tailwind color class, e.g. "bg-primary" */
   colorClass?: string;
   className?: string;
 }
@@ -27,7 +27,7 @@ export function AudioWaveform({
   gapPx = 3,
   maxHeightPx = 18,
   minHeightPx = 2,
-  colorClass = "bg-gray-400",
+  colorClass = "bg-primary",
   className = "",
 }: AudioWaveformProps) {
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);

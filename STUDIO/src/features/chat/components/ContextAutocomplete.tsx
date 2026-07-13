@@ -108,7 +108,7 @@ export const ContextAutocomplete = ({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.97 }}
         transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed z-50 w-72 bg-white dark:bg-surface-raised rounded-2xl shadow-2xl border border-gray-100 dark:border-surface-border overflow-hidden"
+        className="fixed z-50 w-72 bg-surface-page dark:bg-surface-raised rounded-2xl shadow-2xl border border-surface-border dark:border-surface-border overflow-hidden"
         style={{
           left: Math.min(position.x, window.innerWidth - 288),
           bottom: window.innerHeight - Math.max(position.y, 80),
@@ -116,7 +116,7 @@ export const ContextAutocomplete = ({
         }}
       >
         <div className="overflow-y-auto max-h-[360px] scrollbar-auto-hide py-1.5">
-          <p className="px-3 py-1.5 text-2xs font-semibold text-gray-400 dark:text-gray-600 tracking-wider uppercase">Apps</p>
+          <p className="px-3 py-1.5 text-2xs font-semibold text-disabled dark:text-secondary tracking-wider uppercase">Apps</p>
           {filteredApps.map((app, i) => (
             <Button
               key={app.id}
@@ -124,26 +124,26 @@ export const ContextAutocomplete = ({
               onClick={() => onSelectApp?.(app)}
               className={`h-auto w-full justify-start gap-2.5 px-3 py-2 ${
                 i === selectedIndex
-                  ? 'bg-gray-50 dark:bg-surface-selected'
-                  : 'hover:bg-gray-50 dark:hover:bg-surface-selected'
+                  ? 'bg-surface-page dark:bg-surface-selected'
+                  : 'hover:bg-surface-page dark:hover:bg-surface-selected'
               }`}
             >
               <AppLogo
                 src={app.logo}
                 label={app.name}
                 size="sm"
-                className="!w-7 !h-7 !rounded-lg bg-gray-100 dark:bg-surface-selected border border-gray-200 dark:border-surface-border"
+                className="!w-7 !h-7 !rounded-lg bg-surface-base dark:bg-surface-selected border border-surface-border dark:border-surface-border"
                 fallback={
                   app.type === 'remote' || app.type === 'composio' ? (
-                    <Cloud size="sm" weight="fill" className="text-gray-400 dark:text-gray-500" />
+                    <Cloud size="sm" weight="fill" className="text-disabled dark:text-muted" />
                   ) : (
-                    <Icon icon={PlugIcon} size="sm" className="text-gray-400 dark:text-gray-600" />
+                    <Icon icon={PlugIcon} size="sm" className="text-disabled dark:text-secondary" />
                   )
                 }
               />
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-200 leading-tight truncate">{app.name}</p>
-                <p className="text-2xs text-gray-400 dark:text-gray-600 leading-tight truncate">
+                <p className="text-sm font-medium text-primary dark:text-disabled leading-tight truncate">{app.name}</p>
+                <p className="text-2xs text-disabled dark:text-secondary leading-tight truncate">
                   {app.description
                     ? app.description
                     : app.isRunning ? 'Running' : app.type === 'composio' || app.type === 'remote' ? 'Cloud' : 'Local'}

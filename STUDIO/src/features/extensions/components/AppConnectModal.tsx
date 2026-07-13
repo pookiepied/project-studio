@@ -50,7 +50,7 @@ export const AppConnectModal = ({
   onToggleRef,
 }: AppConnectModalProps) => (
   <motion.div
-    className="fixed inset-0 z-modal flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+    className="fixed inset-0 z-modal flex items-end sm:items-center justify-center bg-scrim backdrop-blur-sm"
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     exit={{ opacity: 0 }}
@@ -70,9 +70,9 @@ export const AppConnectModal = ({
         <IconButton
           aria-label="Close"
           onClick={onClose}
-          className="absolute top-3.5 right-3.5 h-auto w-auto rounded-full bg-white/20 p-1.5 text-white hover:bg-white/30"
+          className="absolute top-3.5 right-3.5 h-auto w-auto rounded-full bg-surface-page/20 p-1.5 text-on-emphasis hover:bg-surface-page/30"
         >
-          <Close size="xs" className="text-white" />
+          <Close size="xs" className="text-on-emphasis" />
         </IconButton>
 
         {/* Dual icons */}
@@ -81,7 +81,7 @@ export const AppConnectModal = ({
             src={config.logo}
             label={config.name}
             size="xl"
-            className="!rounded-xl bg-white shadow-md"
+            className="!rounded-xl bg-surface-page shadow-md"
             fallback={
               config.logoNode ?? (
                 <span className="text-2xl font-bold text-secondary select-none">
@@ -90,27 +90,27 @@ export const AppConnectModal = ({
               )
             }
           />
-          <div className="w-7 h-7 rounded-full bg-white/25 flex items-center justify-center">
-            <Icon icon={Plus} size="xs" className="text-white" />
+          <div className="w-7 h-7 rounded-full bg-surface-page/25 flex items-center justify-center">
+            <Icon icon={Plus} size="xs" className="text-on-emphasis" />
           </div>
           <div className="w-[52px] h-[52px] rounded-xl bg-gradient-to-br from-surface-raised via-surface-raised to-surface-raised shadow-md flex items-center justify-center">
             <StudioMarkIcon size={20} />
           </div>
         </div>
 
-        <h2 className="text-lg font-bold text-white leading-snug mb-2">Add {config.name} to Studio</h2>
-        <p className="text-sm text-white/80 leading-relaxed max-w-[264px]">{config.description}</p>
+        <h2 className="text-lg font-bold text-on-emphasis leading-snug mb-2">Add {config.name} to Studio</h2>
+        <p className="text-sm text-on-emphasis/80 leading-relaxed max-w-[264px]">{config.description}</p>
 
         <div className="mt-5 flex flex-col items-center gap-1.5">
           <Button
             variant="ghost"
             onClick={onPrimary}
             disabled={primaryDisabled || isLoading}
-            className="h-auto px-8 py-2.5 rounded-full bg-white text-secondary font-semibold text-sm shadow-sm hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-auto px-8 py-2.5 rounded-full bg-surface-page text-secondary font-semibold text-sm shadow-sm hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? "Connecting…" : primaryLabel}
           </Button>
-          {primaryNote && <p className="text-2xs text-white/60 mt-0.5">{primaryNote}</p>}
+          {primaryNote && <p className="text-2xs text-on-emphasis/60 mt-0.5">{primaryNote}</p>}
         </div>
       </div>
 

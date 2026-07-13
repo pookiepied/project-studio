@@ -22,7 +22,7 @@ function resolveLocalImage(source: string | undefined, documentPath: string) {
 }
 
 const components: Components = {
-  h1: ({ children }) => <h1 className="mb-5 mt-1 border-b border-surface-divider pb-3 text-2xl font-semibold text-primary">{children}</h1>,
+  h1: ({ children }) => <h1 className="mb-5 mt-1 border-b border-surface-divider pb-3 text-2xl font-display font-normal text-primary">{children}</h1>,
   h2: ({ children }) => <h2 className="mb-3 mt-7 text-lg font-semibold text-primary">{children}</h2>,
   h3: ({ children }) => <h3 className="mb-2 mt-5 text-sm font-semibold text-primary">{children}</h3>,
   p: ({ children }) => <p className="my-3 text-sm leading-6 text-secondary">{children}</p>,

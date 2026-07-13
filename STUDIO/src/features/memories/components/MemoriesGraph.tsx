@@ -116,11 +116,11 @@ export const MemoriesGraph = ({ memories, onNodeClick }: MemoriesGraphProps) => 
       </div>
       <div className="absolute bottom-4 left-4 pointer-events-none flex flex-col gap-2">
         <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-primary shadow-sm border border-white/10"></span>
+            <span className="w-3 h-3 rounded-full bg-primary shadow-sm border border-surface-border"></span>
             <span className="text-xs text-secondary font-medium tracking-wide uppercase">Memory</span>
         </div>
         <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-muted shadow-sm border border-white/10"></span>
+            <span className="w-3 h-3 rounded-full bg-muted shadow-sm border border-surface-border"></span>
             <span className="text-xs text-secondary font-medium tracking-wide uppercase">Tag</span>
         </div>
       </div>

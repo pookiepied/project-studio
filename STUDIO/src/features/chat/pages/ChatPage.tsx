@@ -69,7 +69,7 @@ const BOTTOM_SCROLL_CLEARANCE = 6;
 const CLAUDE_TRANSCRIPT_BANNER =
   "mb-2 rounded-xl border border-[#E9D8CF] dark:border-[#3A2A22] bg-[#FFF8F4] dark:bg-[#241B17] px-3 py-2 shadow-sm";
 const CLAUDE_FORK_BUTTON =
-  "flex-shrink-0 rounded-lg border border-[#E3C8BA] dark:border-[#4A342A] bg-white/80 dark:bg-[#2D211C] px-2.5 py-1 text-2xs font-medium text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-[#352820] transition-colors";
+  "flex-shrink-0 rounded-lg border border-[#E3C8BA] dark:border-[#4A342A] bg-surface-page/80 dark:bg-[#2D211C] px-2.5 py-1 text-2xs font-medium text-secondary dark:text-disabled hover:bg-surface-page dark:hover:bg-[#352820] transition-colors";
 /* eslint-enable no-restricted-syntax */
 
 export const ChatPage = () => {
@@ -782,10 +782,10 @@ export const ChatPage = () => {
                           <div className="flex items-center gap-2">
                             <ClaudeCodeIcon size={16} />
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                              <p className="text-xs font-medium text-primary dark:text-disabled">
                                 Claude Code owns this transcript
                               </p>
-                              <p className="text-2xs text-gray-500 dark:text-gray-500">
+                              <p className="text-2xs text-muted dark:text-muted">
                                 Continue with Claude to keep the native history intact, or fork a Studio-owned copy.
                               </p>
                             </div>

@@ -72,29 +72,24 @@ export function ArtifactPanel({
       <ResizeHandle onMouseDown={onResizeDown} />
 
       {/* Docked window */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0
-                      bg-surface-page
-                      transition-colors duration-300">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-surface-page transition-colors duration-300">
 
         {/* Title bar */}
-        <div className="flex items-center gap-2 px-3 h-10 flex-shrink-0
-                        bg-surface-page
-                        border-b border-gray-100 dark:border-white/[0.06]
-                        transition-colors duration-300">
+        <div className="flex items-center gap-2 px-3 h-10 flex-shrink-0 bg-surface-page border-b border-surface-border dark:border-surface-border transition-colors duration-300">
 
           <IconButton
             aria-label="Close panel"
             title="Close panel"
             onClick={onClose}
-            className="flex !h-7 !w-7 flex-shrink-0 items-center justify-center rounded-lg !text-gray-400 transition-colors duration-150 hover:!bg-gray-100 hover:!text-gray-700 dark:!text-gray-600 dark:hover:!bg-surface-raised dark:hover:!text-gray-300"
+            className="flex !h-7 !w-7 flex-shrink-0 items-center justify-center rounded-lg !text-disabled transition-colors duration-150 hover:!bg-surface-base hover:!text-secondary dark:!text-secondary dark:hover:!bg-surface-raised dark:hover:!text-disabled"
           >
             <Close size="sm" />
           </IconButton>
 
           {/* Active tab icon + label */}
-          <div className="flex items-center gap-1.5 min-w-0 text-gray-400 dark:text-gray-600">
+          <div className="flex items-center gap-1.5 min-w-0 text-disabled dark:text-secondary">
             {activeTab && tabIcon(activeTab, "xs")}
-            <span className="text-xs text-gray-500 dark:text-gray-500 truncate">
+            <span className="text-xs text-muted dark:text-muted truncate">
               {activeTab?.label ?? "Artifacts"}
             </span>
           </div>
@@ -111,8 +106,8 @@ export function ArtifactPanel({
                     onClick={() => onTabChange(tab.id)}
                     className={`group/tab flex items-center !gap-1 !px-2 !h-6 !rounded !text-2xs flex-shrink-0 transition-colors !duration-100
                       ${isActive
-                        ? "!bg-white dark:!bg-surface-raised !text-gray-600 dark:!text-gray-300 shadow-sm"
-                        : "!text-gray-400 dark:!text-gray-600 hover:!text-gray-600 dark:hover:!text-gray-400"
+                        ? "!bg-surface-page dark:!bg-surface-raised !text-secondary dark:!text-disabled shadow-sm"
+                        : "!text-disabled dark:!text-secondary hover:!text-secondary dark:hover:!text-disabled"
                       }`}
                   >
                     <span className="flex-shrink-0">{tabIcon(tab, "xs")}</span>
@@ -120,9 +115,7 @@ export function ArtifactPanel({
                     <span
                       role="button"
                       onClick={ev => { ev.stopPropagation(); onTabClose(tab.id); }}
-                      className="w-3 h-3 flex items-center justify-center rounded ml-0.5
-                                 opacity-0 group-hover/tab:opacity-100 transition-opacity duration-100
-                                 hover:bg-gray-200 dark:hover:bg-surface-border"
+                      className="w-3 h-3 flex items-center justify-center rounded ml-0.5 opacity-0 group-hover/tab:opacity-100 transition-opacity duration-100 hover:bg-surface-raised dark:hover:bg-surface-border"
                     >
                       <Close size="xs" />
                     </span>

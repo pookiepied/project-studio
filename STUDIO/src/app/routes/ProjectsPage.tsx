@@ -24,16 +24,16 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
+    <div className="h-full overflow-hidden bg-surface-page transition-colors duration-300 dark:bg-surface-page">
       <div className="flex h-full flex-col">
         <div className="flex flex-shrink-0 items-center justify-between px-5 py-3">
-          <h1 className="text-xs font-semibold uppercase tracking-extra-wide text-gray-400 transition-colors duration-300 dark:text-gray-600">
+          <span className="text-xs font-semibold uppercase tracking-extra-wide text-disabled transition-colors duration-300 dark:text-secondary">
             Projects
-          </h1>
+          </span>
           <Button
             onClick={openProject}
             variant="outline"
-            className="h-8 gap-2 px-3 text-xs font-medium border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-surface-border dark:text-gray-400 dark:hover:bg-surface-raised"
+            className="h-8 gap-2 px-3 text-xs font-medium border-surface-border text-secondary hover:bg-surface-page dark:border-surface-border dark:text-disabled dark:hover:bg-surface-raised"
           >
             <Add size="sm" weight="regular" />
             Open project
@@ -48,14 +48,14 @@ export function ProjectsPage() {
               transition={{ duration: 0.35, ease: "easeOut" }}
               className="flex w-full max-w-sm flex-col items-center text-center"
             >
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-gray-200 text-gray-300 dark:border-surface-border dark:text-gray-700">
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-surface-border text-disabled dark:border-surface-border dark:text-secondary">
                 <FolderOpen size="lg" weight="regular" />
               </div>
 
-              <p className="text-base font-medium text-gray-700 transition-colors duration-300 dark:text-gray-300">
+              <p className="text-base font-medium text-secondary transition-colors duration-300 dark:text-disabled">
                 No projects yet
               </p>
-              <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-gray-400 transition-colors duration-300 dark:text-gray-600">
+              <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-disabled transition-colors duration-300 dark:text-secondary">
                 Open a folder to start a project. Studio keeps its own data separately — your files stay where they are.
               </p>
             </motion.div>
@@ -65,28 +65,28 @@ export function ProjectsPage() {
             {projects.map((project) => (
               <div
                 key={project.id}
-                className="group mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-surface-raised"
+                className="group mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-page dark:hover:bg-surface-raised"
               >
-                <FolderOpen size="md" weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
+                <FolderOpen size="md" weight="regular" className="flex-shrink-0 text-disabled dark:text-secondary" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-gray-900 dark:text-gray-300">{project.name}</p>
-                  <p className="truncate text-xs text-gray-400 dark:text-gray-600">{project.path}</p>
+                  <p className="truncate text-sm text-primary dark:text-disabled">{project.name}</p>
+                  <p className="truncate text-xs text-disabled dark:text-secondary">{project.path}</p>
                 </div>
-                <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-600">
+                <span className="flex-shrink-0 text-xs text-disabled dark:text-secondary">
                   {formatDate(project.lastOpenedAt)}
                 </span>
                 <div className="flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                   <IconButton
                     aria-label="Remove from list (keeps all files)"
                     onClick={() => { void removeProject(project.id); }}
-                    className="h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
+                    className="h-auto w-auto rounded p-1 text-muted hover:bg-surface-raised dark:text-muted dark:hover:bg-surface-border"
                   >
                     <Icon icon={MinusCircleIcon} size="sm" />
                   </IconButton>
                   <IconButton
                     aria-label="Delete Studio's data for this project (your folder is untouched)"
                     onClick={() => { void deleteProject(project.id); }}
-                    className="h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
+                    className="h-auto w-auto rounded p-1 text-muted hover:bg-surface-raised dark:text-muted dark:hover:bg-surface-border"
                   >
                     <Delete size="sm" />
                   </IconButton>

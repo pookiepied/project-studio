@@ -16,13 +16,13 @@ export const ScreenshotThumbnail = ({ url, idx }: ScreenshotThumbnailProps) => {
 
   if (failed) {
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-surface-raised rounded-xl border border-gray-150 dark:border-surface-border">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="text-gray-400 dark:text-gray-600 flex-shrink-0">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-base dark:bg-surface-raised rounded-xl border border-surface-border dark:border-surface-border">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="text-disabled dark:text-secondary flex-shrink-0">
           <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
           <circle cx="8.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
           <path d="M3 17l5-5 4 4 3-3 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
         </svg>
-        <span className="text-xs text-gray-400 dark:text-gray-600">Screenshot {idx + 1}</span>
+        <span className="text-xs text-disabled dark:text-secondary">Screenshot {idx + 1}</span>
       </div>
     );
   }
@@ -33,7 +33,7 @@ export const ScreenshotThumbnail = ({ url, idx }: ScreenshotThumbnailProps) => {
         aria-label="Click to preview"
         title="Click to preview"
         onClick={() => setLightbox(true)}
-        className="h-auto w-auto shrink-0 overflow-hidden rounded-xl border border-gray-150 dark:border-surface-border hover:border-gray-300 dark:hover:border-surface-border hover:bg-transparent transition-colors cursor-zoom-in group relative"
+        className="h-auto w-auto shrink-0 overflow-hidden rounded-xl border border-surface-border dark:border-surface-border hover:border-surface-border dark:hover:border-surface-border hover:bg-transparent transition-colors cursor-zoom-in group relative"
       >
         <img
           src={url}

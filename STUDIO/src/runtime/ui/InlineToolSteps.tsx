@@ -56,7 +56,7 @@ export function InlineToolSteps({ steps, cycle }: InlineToolStepsProps) {
       <Button
         variant="ghost"
         onClick={toggleCycle}
-        className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors w-full text-left justify-start"
+        className="flex items-center gap-1.5 text-xs text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled transition-colors w-full text-left justify-start"
       >
         <Expand
           size="xs"
@@ -81,7 +81,7 @@ export function InlineToolSteps({ steps, cycle }: InlineToolStepsProps) {
             transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className="mt-1.5 pl-3.5 border-l border-gray-100 dark:border-surface-border space-y-px">
+            <div className="mt-1.5 pl-3.5 border-l border-surface-border dark:border-surface-border space-y-px">
               {currentCycleSteps.map(step => (
                 <StepRow key={step.callId} step={step} />
               ))}
@@ -109,7 +109,7 @@ function StepRow({ step }: { step: ActiveToolCall }) {
         <div
           className="absolute inset-0 pointer-events-none rounded"
           style={{
-            background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 60%, transparent 100%)",
+            background: "linear-gradient(90deg, transparent 0%, var(--surface-hover) 40%, var(--surface-selected) 50%, var(--surface-hover) 60%, transparent 100%)",
             backgroundSize: "200% 100%",
             animation: "shimmer 1.8s ease-in-out infinite",
           }}
@@ -118,7 +118,7 @@ function StepRow({ step }: { step: ActiveToolCall }) {
 
       {/* Status indicator */}
       <div className="flex-shrink-0 w-3 flex items-center justify-center">
-        {isDone && <Check size="xs" className="text-gray-400 dark:text-gray-600" />}
+        {isDone && <Check size="xs" className="text-disabled dark:text-secondary" />}
         {isError && <Close size="xs" className="text-secondary dark:text-secondary" />}
         {isRunning && (
           <span className="w-1.5 h-1.5 rounded-full bg-surface-raised dark:bg-surface-raised animate-pulse block" />
@@ -131,17 +131,17 @@ function StepRow({ step }: { step: ActiveToolCall }) {
       {/* Label */}
       <span className={`text-xs flex-shrink-0 ${
         isRunning
-          ? "text-gray-600 dark:text-gray-400 font-medium"
+          ? "text-secondary dark:text-disabled font-medium"
           : isError
           ? "text-secondary dark:text-secondary"
-          : "text-gray-400 dark:text-gray-600"
+          : "text-disabled dark:text-secondary"
       }`}>
         {label}
       </span>
 
       {/* Preview */}
       {preview && (
-        <span className="text-xs text-gray-400 dark:text-gray-600 truncate max-w-[200px]" title={preview}>
+        <span className="text-xs text-disabled dark:text-secondary truncate max-w-[200px]" title={preview}>
           {preview}
         </span>
       )}

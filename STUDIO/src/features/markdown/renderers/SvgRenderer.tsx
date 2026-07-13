@@ -7,7 +7,7 @@ export function SvgRenderer({ code }: SvgRendererProps) {
 
   if (!isSvg) {
     return (
-      <div className="px-4 py-3 text-xs text-gray-500 dark:text-gray-500 font-mono whitespace-pre-wrap">
+      <div className="px-4 py-3 text-xs text-muted dark:text-muted font-mono whitespace-pre-wrap">
         {code}
       </div>
     );

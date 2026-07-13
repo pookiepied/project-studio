@@ -76,34 +76,34 @@ export class ErrorBoundary extends Component<Props, State> {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.06, ease: [0.16, 1, 0.3, 1] }}
-              className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-surface-raised border border-gray-200 dark:border-surface-border flex items-center justify-center"
+              className="w-10 h-10 rounded-2xl bg-surface-base dark:bg-surface-raised border border-surface-border dark:border-surface-border flex items-center justify-center"
             >
-              <Error size="lg" className="text-gray-400 dark:text-gray-500" />
+              <Error size="lg" className="text-disabled dark:text-muted" />
             </motion.div>
 
             {/* Text */}
             <div className="space-y-1.5">
-              <h1 className="text-base font-semibold text-gray-800 dark:text-gray-200 font-sans tracking-tight">
+              <h1 className="text-xl font-display font-normal text-primary">
                 Something went wrong
               </h1>
-              <p className="text-sm text-gray-400 dark:text-gray-500 leading-relaxed">
+              <p className="text-sm text-disabled dark:text-muted leading-relaxed">
                 An unexpected error occurred. It's been logged and we'll look into it.
               </p>
             </div>
 
             {/* Error chip + copy */}
             {error && (
-              <div className="w-full flex items-start gap-2 px-3 py-2.5 bg-gray-50 dark:bg-surface-base border border-gray-100 dark:border-surface-border rounded-xl text-left">
-                <p className="flex-1 text-xs font-mono text-gray-500 dark:text-gray-500 break-words leading-relaxed">
+              <div className="w-full flex items-start gap-2 px-3 py-2.5 bg-surface-page dark:bg-surface-base border border-surface-border dark:border-surface-border rounded-xl text-left">
+                <p className="flex-1 text-xs font-mono text-muted dark:text-muted break-words leading-relaxed">
                   {error.message}
                 </p>
                 <IconButton
                   onClick={this.handleCopy}
                   aria-label={copied ? "Copied!" : "Copy error details"}
-                  className="shrink-0 mt-0.5 h-auto w-auto p-1 rounded-md text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-border"
+                  className="shrink-0 mt-0.5 h-auto w-auto p-1 rounded-md text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-raised dark:hover:bg-surface-border"
                 >
                   {copied
-                    ? <Check size="xs" className="text-gray-500 dark:text-gray-400" />
+                    ? <Check size="xs" className="text-muted dark:text-disabled" />
                     : <Copy size="xs" />
                   }
                 </IconButton>
@@ -115,16 +115,16 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button
                 onClick={this.handleReset}
                 variant="ghost"
-                className="h-auto gap-1 px-0 py-0 text-gray-500 dark:text-gray-400 hover:bg-transparent hover:text-gray-700 dark:hover:text-gray-200"
+                className="h-auto gap-1 px-0 py-0 text-muted dark:text-disabled hover:bg-transparent hover:text-secondary dark:hover:text-disabled"
               >
                 <Redo size="xs" />
                 Try again
               </Button>
-              <span className="text-gray-200 dark:text-gray-700">·</span>
+              <span className="text-disabled dark:text-secondary">·</span>
               <Button
                 onClick={() => window.location.reload()}
                 variant="ghost"
-                className="h-auto gap-2 px-0 py-0 text-gray-400 dark:text-gray-600 hover:bg-transparent hover:text-gray-600 dark:hover:text-gray-400"
+                className="h-auto gap-2 px-0 py-0 text-disabled dark:text-secondary hover:bg-transparent hover:text-secondary dark:hover:text-disabled"
               >
                 Reload
               </Button>

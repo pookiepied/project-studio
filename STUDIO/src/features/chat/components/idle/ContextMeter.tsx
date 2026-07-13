@@ -15,7 +15,7 @@ export function ContextMeter({ used, limit }: { used?: number; limit?: number })
   if (!used || used <= 0 || !limit || limit <= 0) return null;
   const pct = Math.min(100, Math.round((used / limit) * 100));
   return (
-    <span className="text-sm text-gray-300 dark:text-gray-600 tabular-nums" title="Context window used (real usage)">
+    <span className="text-sm text-disabled dark:text-secondary tabular-nums" title="Context window used (real usage)">
       {fmtK(used)} / {fmtK(limit)} · {pct}%
     </span>
   );

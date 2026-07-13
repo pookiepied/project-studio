@@ -60,12 +60,12 @@ export const AuthCallback = () => {
   }, [login]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="min-h-screen flex items-center justify-center bg-surface-page">
       <div className="text-center">
         {status === 'processing' && (
           <>
             <SplashScreen />
-            <p className="mt-4 text-sm text-gray-600">Completing sign in...</p>
+            <p className="mt-4 text-sm text-secondary">Completing sign in...</p>
           </>
         )}
         
@@ -76,8 +76,8 @@ export const AuthCallback = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-lg font-medium text-gray-900">Sign in successful!</p>
-            <p className="mt-2 text-sm text-gray-600">Redirecting...</p>
+            <p className="text-lg font-medium text-primary">Sign in successful!</p>
+            <p className="mt-2 text-sm text-secondary">Redirecting...</p>
           </>
         )}
         
@@ -88,8 +88,8 @@ export const AuthCallback = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="text-lg font-medium text-gray-900">Sign in failed</p>
-            <p className="mt-2 text-sm text-gray-600">{errorMessage}</p>
+            <p className="text-lg font-medium text-primary">Sign in failed</p>
+            <p className="mt-2 text-sm text-secondary">{errorMessage}</p>
             <Button
               onClick={() => {
                 // Store the error so the login page can surface a toast notification.
@@ -98,7 +98,7 @@ export const AuthCallback = () => {
                 } catch { /* storage unavailable */ }
                 window.location.href = '/';
               }}
-              className="mt-6 h-auto rounded-full px-6 py-2 text-sm bg-black text-white hover:bg-gray-800"
+              className="mt-6 h-auto rounded-full px-6 py-2 text-sm bg-black text-on-emphasis hover:bg-surface-raised"
             >
               Return to home
             </Button>

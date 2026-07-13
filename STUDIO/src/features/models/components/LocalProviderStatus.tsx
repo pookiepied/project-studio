@@ -68,18 +68,18 @@ export const LocalProviderStatus = () => {
     >
       <span
         className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300 ${
-          status.running ? 'bg-surface-raised animate-pulse' : status.error ? 'bg-surface-raised' : 'bg-gray-300 dark:bg-gray-600'
+          status.running ? 'bg-surface-raised animate-pulse' : status.error ? 'bg-surface-raised' : 'bg-surface-selected dark:bg-secondary'
         }`}
       />
-      <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+      <span className="text-xs text-muted dark:text-disabled capitalize">
         {status.running ? 'Bridge Active' : status.error ? 'Bridge Error' : 'Bridge Stopped'}
       </span>
 
       <div className="flex items-center gap-1.5 ml-1">
         {status.running && daemonHealth && (
           <>
-            <span className="text-gray-300 dark:text-gray-600">•</span>
-            <p className="text-2xs text-gray-400 font-normal uppercase tracking-wider">
+            <span className="text-disabled dark:text-secondary">•</span>
+            <p className="text-2xs text-disabled font-normal uppercase tracking-wider">
               Port {status.port}
             </p>
           </>
@@ -98,7 +98,7 @@ export const LocalProviderStatus = () => {
             variant="ghost"
             onClick={handleStop}
             disabled={isStarting}
-            className="text-xs font-medium text-gray-400 hover:text-secondary transition-colors"
+            className="text-xs font-medium text-disabled hover:text-secondary transition-colors"
           >
             Stop
           </Button>
@@ -107,7 +107,7 @@ export const LocalProviderStatus = () => {
             variant="ghost"
             onClick={handleStart}
             disabled={isStarting}
-            className="text-xs font-medium text-gray-400 hover:text-secondary transition-colors"
+            className="text-xs font-medium text-disabled hover:text-secondary transition-colors"
           >
             {isStarting ? <Redo size="sm" className="animate-spin inline" /> : 'Start'}
           </Button>
@@ -119,7 +119,7 @@ export const LocalProviderStatus = () => {
               onClick={() => setIsExpanded(!isExpanded)}
               aria-label="Bridge details"
               title="Bridge Details"
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="text-disabled hover:text-secondary dark:hover:text-disabled transition-colors"
             >
               <Info size="sm" />
             </IconButton>
@@ -131,25 +131,25 @@ export const LocalProviderStatus = () => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-6 z-30 w-64 rounded-xl border border-gray-200 dark:border-surface-border bg-white dark:bg-surface-raised shadow-lg p-3 space-y-2 cursor-auto text-left"
+                  className="absolute right-0 top-6 z-30 w-64 rounded-xl border border-surface-border dark:border-surface-border bg-surface-page dark:bg-surface-raised shadow-lg p-3 space-y-2 cursor-auto text-left"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 tracking-wide">Providers</span>
-                    <IconButton onClick={() => setIsExpanded(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
+                    <span className="text-xs font-semibold text-secondary dark:text-disabled tracking-wide">Providers</span>
+                    <IconButton onClick={() => setIsExpanded(false)} aria-label="Close" className="text-disabled hover:text-secondary dark:text-secondary dark:hover:text-disabled">
                       <Close size="sm" />
                     </IconButton>
                   </div>
 
                   {daemonHealth?.providers?.ollama && (
                      <div className="flex items-center justify-between">
-                       <span className="text-xs text-gray-500 dark:text-gray-400">Ollama</span>
+                       <span className="text-xs text-muted dark:text-disabled">Ollama</span>
                        <span className="text-xs text-secondary">Connected</span>
                      </div>
                   )}
                   {daemonHealth?.providers?.lmstudio && (
                      <div className="flex items-center justify-between">
-                       <span className="text-xs text-gray-500 dark:text-gray-400">LM Studio</span>
+                       <span className="text-xs text-muted dark:text-disabled">LM Studio</span>
                        <span className="text-xs text-secondary">Connected</span>
                      </div>
                   )}

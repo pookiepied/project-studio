@@ -152,11 +152,11 @@ function MainApp() {
   const appContent = error ? (
     <div className="h-screen flex items-center justify-center bg-surface-page transition-colors duration-300">
       <div className="text-center p-8">
-        <h1 className="text-2xl font-bold text-secondary mb-4">Initialization Error</h1>
-        <p className="text-gray-700 dark:text-gray-300 mb-4">{error}</p>
+        <h1 className="text-xl font-display font-normal text-primary mb-4">Initialization Error</h1>
+        <p className="text-secondary dark:text-disabled mb-4">{error}</p>
         <Button
           onClick={() => window.location.reload()}
-          className="h-auto px-4 py-2 bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300"
+          className="h-auto px-4 py-2 bg-primary dark:bg-surface-raised text-on-emphasis dark:text-primary rounded hover:bg-secondary dark:hover:bg-surface-selected"
         >
           Retry
         </Button>

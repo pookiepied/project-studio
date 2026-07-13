@@ -440,16 +440,11 @@ export function TerminalPanel({
       {showResizeHandle && <ResizeHandle onMouseDown={onResizeDown} />}
 
       {/* ── Docked window ── */}
-      <div ref={panelRef} className="flex-1 flex flex-col overflow-hidden min-w-0
-                      bg-surface-page
-                      transition-colors duration-300">
+      <div ref={panelRef} className="flex-1 flex flex-col overflow-hidden min-w-0 bg-surface-page transition-colors duration-300">
 
         {/* ── Window title bar ── */}
         {showChrome && (
-        <div className="flex items-center gap-2.5 px-3 h-10 flex-shrink-0
-                        bg-surface-page
-                        border-b border-gray-100 dark:border-white/[0.06]
-                        transition-colors duration-300">
+        <div className="flex items-center gap-2.5 px-3 h-10 flex-shrink-0 bg-surface-page border-b border-surface-border dark:border-surface-border transition-colors duration-300">
 
           <IconButton
             variant="ghost"
@@ -457,15 +452,15 @@ export function TerminalPanel({
             aria-label="Close terminal"
             title="Close terminal"
             onClick={onClose}
-            className="flex-shrink-0 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            className="flex-shrink-0 text-disabled transition-colors duration-150 hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Close size="sm" />
           </IconButton>
 
           {/* Icon + active tab name + status dot */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <Terminal size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
-            <span className="text-xs text-gray-500 dark:text-gray-500 truncate">
+            <Terminal size="xs" className="text-disabled dark:text-secondary flex-shrink-0" />
+            <span className="text-xs text-muted dark:text-muted truncate">
               {activeTab?.label ?? "terminal"}
             </span>
             <AnimatePresence mode="wait">
@@ -475,7 +470,7 @@ export function TerminalPanel({
               )}
               {activeTab?.exited && (
                 <motion.span key="exited" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gray-300 dark:bg-gray-600" />
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-surface-selected dark:bg-secondary" />
               )}
             </AnimatePresence>
           </div>
@@ -500,18 +495,15 @@ export function TerminalPanel({
                     className={`group/tab flex items-center gap-1 px-2 h-6 text-2xs flex-shrink-0
                       transition-colors duration-100
                       ${active
-                        ? "bg-white dark:bg-surface-raised text-gray-600 dark:text-gray-300 shadow-sm"
-                        : "text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400"
+                        ? "bg-surface-page dark:bg-surface-raised text-secondary dark:text-disabled shadow-sm"
+                        : "text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled"
                       }`}
                   >
                     {tab.label}
                     <span
                       role="button"
                       onClick={ev => closeTab(tab.id, ev)}
-                      className="w-3 h-3 flex items-center justify-center rounded
-                                 opacity-0 group-hover/tab:opacity-100 transition-opacity duration-100
-                                 hover:bg-gray-200 dark:hover:bg-surface-border
-                                 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      className="w-3 h-3 flex items-center justify-center rounded opacity-0 group-hover/tab:opacity-100 transition-opacity duration-100 hover:bg-surface-raised dark:hover:bg-surface-border text-disabled hover:text-secondary dark:hover:text-disabled"
                     >
                       <Close size="xs" />
                     </span>
@@ -529,11 +521,7 @@ export function TerminalPanel({
             aria-label="New terminal tab"
             title="New terminal tab"
             onClick={addTab}
-            className="w-6 h-6 flex-shrink-0
-                       text-gray-400 dark:text-gray-600
-                       hover:bg-gray-200 dark:hover:bg-surface-selected
-                       hover:text-gray-600 dark:hover:text-gray-400
-                       transition-colors duration-100"
+            className="w-6 h-6 flex-shrink-0 text-disabled dark:text-secondary hover:bg-surface-raised dark:hover:bg-surface-selected hover:text-secondary dark:hover:text-disabled transition-colors duration-100"
           >
             <Add size="xs" />
           </IconButton>
@@ -549,7 +537,7 @@ export function TerminalPanel({
                 if (el) containerRefs.current.set(tab.id, el);
                 else    containerRefs.current.delete(tab.id);
               }}
-              className="bg-white dark:bg-surface-page"
+              className="bg-surface-page dark:bg-surface-page"
               style={{
                 position:  "absolute",
                 inset:     0,

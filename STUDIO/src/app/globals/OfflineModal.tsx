@@ -62,8 +62,8 @@ export const OfflineModal = () => {
                 className="relative w-[72px] h-[72px] rounded-full bg-surface-raised border border-surface-border flex items-center justify-center"
               >
                 {/* Eyes — decorative mid-gray dots; no semantic surface maps exactly */}
-                <div className="absolute top-[22px] left-[18px] w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
-                <div className="absolute top-[22px] right-[18px] w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                <div className="absolute top-[22px] left-[18px] w-2 h-2 rounded-full bg-primary dark:bg-secondary" />
+                <div className="absolute top-[22px] right-[18px] w-2 h-2 rounded-full bg-primary dark:bg-secondary" />
                 {/* Sad mouth */}
                 <svg className="absolute bottom-[17px]" width="22" height="10" viewBox="0 0 22 10" fill="none">
                   <path d="M2 2 Q11 10 20 2" style={{ stroke: "var(--text-muted)" }} strokeWidth="2" strokeLinecap="round" />
@@ -84,7 +84,7 @@ export const OfflineModal = () => {
             </div>
 
             <div className="space-y-1.5">
-              <h1 className="text-base font-semibold text-primary font-sans tracking-tight">
+              <h1 className="text-base font-display font-normal text-primary">
                 No internet connection
               </h1>
               <p className="text-sm text-muted leading-relaxed">

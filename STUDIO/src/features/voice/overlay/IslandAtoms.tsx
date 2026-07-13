@@ -40,7 +40,7 @@ export function WaveformBars({ levels }: { levels?: number[] }) {
       {values.map((val, i) => (
         <motion.div
           key={i}
-          className="w-[2.5px] rounded-full bg-gray-500 dark:bg-gray-300"
+          className="w-[2.5px] rounded-full bg-secondary dark:bg-surface-selected"
           style={{ height: "100%", scaleY: Math.max(0.08, val), transformOrigin: "center" }}
           animate={hasRealLevels ? { scaleY: Math.max(0.08, val) } : { scaleY: [val, val + 0.35, val + 0.1, val + 0.5, val] }}
           transition={hasRealLevels
@@ -70,7 +70,7 @@ export function SpeakingBars() {
       {bases.map((base, i) => (
         <motion.div
           key={i}
-          className="w-[2px] rounded-full bg-gray-400 dark:bg-gray-400"
+          className="w-[2px] rounded-full bg-primary dark:bg-primary"
           style={{ height: "100%", scaleY: base, transformOrigin: "center" }}
           animate={{ scaleY: [base, base + 0.3, base + 0.05, base + 0.45, base] }}
           transition={{
@@ -109,12 +109,7 @@ export function LoadingRing() {
     <motion.div
       animate={{ rotate: 360 }}
       transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
-      className="
-        w-[13px] h-[13px] rounded-full flex-shrink-0
-        border-[1.5px]
-        border-gray-300 dark:border-gray-700
-        border-t-gray-600 dark:border-t-gray-300
-      "
+      className="w-[13px] h-[13px] rounded-full flex-shrink-0 border-[1.5px] border-surface-border dark:border-surface-border border-t-secondary dark:border-t-secondary"
     />
   );
 }
@@ -136,7 +131,7 @@ export function PulseMark({ size = 14 }: { size?: number }) {
       viewBox="0 0 28 28"
       fill="none"
       aria-hidden="true"
-      className="text-gray-600 dark:text-gray-400"
+      className="text-secondary dark:text-disabled"
       animate={{ opacity: [0.92, 0.64, 0.92] }}
       transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
       shapeRendering="geometricPrecision"
@@ -173,11 +168,11 @@ export function IdleIcon({ mode }: { mode: IslandMode }) {
       className="flex items-center justify-center"
     >
       {mode === "voice" ? (
-        <Message size="sm" className="text-gray-500 dark:text-gray-500" />
+        <Message size="sm" className="text-muted dark:text-muted" />
       ) : mode === "global" || mode === "artifact" ? (
         <PulseMark size={14} />
       ) : (
-        <Microphone size="sm" className="text-gray-500 dark:text-gray-500" />
+        <Microphone size="sm" className="text-muted dark:text-muted" />
       )}
     </motion.div>
   );
@@ -205,14 +200,7 @@ export function ActionBtn({ icon, label, onClick }: ActionBtnProps) {
       whileHover={{ scale: 1.06 }}
       whileTap={{ scale: 0.94 }}
       transition={{ duration: 0.15 }}
-      className="
-        flex items-center justify-center w-[26px] h-[26px] rounded-full p-0
-        bg-gray-900/[0.05] dark:bg-white/[0.06]
-        hover:bg-gray-900/[0.08] dark:hover:bg-white/[0.10]
-        text-gray-500 dark:text-gray-400
-        transition-colors duration-100
-        no-drag-region
-      "
+      className="flex items-center justify-center w-[26px] h-[26px] rounded-full p-0 bg-primary/[0.05] dark:bg-surface-page/[0.06] hover:bg-primary/[0.08] dark:hover:bg-surface-page/[0.10] text-muted dark:text-disabled transition-colors duration-100 no-drag-region"
     >
       {icon}
     </Button>

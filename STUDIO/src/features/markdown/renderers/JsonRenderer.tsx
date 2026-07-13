@@ -22,13 +22,13 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
     </span>
   ) : null;
 
-  const colon = keyLabel ? <span className="text-gray-500 dark:text-gray-500">: </span> : null;
-  const comma = !isLast ? <span className="text-gray-400 dark:text-gray-600">,</span> : null;
+  const colon = keyLabel ? <span className="text-muted dark:text-muted">: </span> : null;
+  const comma = !isLast ? <span className="text-disabled dark:text-secondary">,</span> : null;
 
   if (data === null) {
     return (
       <div style={{ paddingLeft: indent }} className="leading-5">
-        {keyLabel}{colon}<span className="text-gray-400 dark:text-gray-500">null</span>{comma}
+        {keyLabel}{colon}<span className="text-disabled dark:text-muted">null</span>{comma}
       </div>
     );
   }
@@ -62,18 +62,18 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
     return (
       <div style={{ paddingLeft: indent }}>
         <div
-          className="flex items-center gap-0.5 cursor-pointer select-none leading-5 hover:bg-gray-100 dark:hover:bg-surface-raised rounded"
+          className="flex items-center gap-0.5 cursor-pointer select-none leading-5 hover:bg-surface-base dark:hover:bg-surface-raised rounded"
           onClick={() => !isEmpty && setOpen((o) => !o)}
         >
           {!isEmpty && (
             open
-              ? <Expand size="xs" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-              : <Collapse size="xs" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              ? <Expand size="xs" className="text-disabled dark:text-muted flex-shrink-0" />
+              : <Collapse size="xs" className="text-disabled dark:text-muted flex-shrink-0" />
           )}
           {keyLabel}{colon}
-          <span className="text-gray-500 dark:text-gray-400">{"["}</span>
-          {!open && <span className="text-gray-400 dark:text-gray-600 text-2xs ml-1">{data.length} items</span>}
-          {(isEmpty || !open) && <span className="text-gray-500 dark:text-gray-400">{"]"}</span>}
+          <span className="text-muted dark:text-disabled">{"["}</span>
+          {!open && <span className="text-disabled dark:text-secondary text-2xs ml-1">{data.length} items</span>}
+          {(isEmpty || !open) && <span className="text-muted dark:text-disabled">{"]"}</span>}
           {(isEmpty || !open) && comma}
         </div>
         {open && !isEmpty && (
@@ -82,7 +82,7 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
               <JsonNode key={i} data={item} depth={depth + 1} keyName={i} isLast={i === data.length - 1} />
             ))}
             <div style={{ paddingLeft: 0 }} className="leading-5">
-              <span className="text-gray-500 dark:text-gray-400">{"]"}</span>{comma}
+              <span className="text-muted dark:text-disabled">{"]"}</span>{comma}
             </div>
           </div>
         )}
@@ -96,18 +96,18 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
     return (
       <div style={{ paddingLeft: indent }}>
         <div
-          className="flex items-center gap-0.5 cursor-pointer select-none leading-5 hover:bg-gray-100 dark:hover:bg-surface-raised rounded"
+          className="flex items-center gap-0.5 cursor-pointer select-none leading-5 hover:bg-surface-base dark:hover:bg-surface-raised rounded"
           onClick={() => !isEmpty && setOpen((o) => !o)}
         >
           {!isEmpty && (
             open
-              ? <Expand size="xs" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-              : <Collapse size="xs" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              ? <Expand size="xs" className="text-disabled dark:text-muted flex-shrink-0" />
+              : <Collapse size="xs" className="text-disabled dark:text-muted flex-shrink-0" />
           )}
           {keyLabel}{colon}
-          <span className="text-gray-500 dark:text-gray-400">{"{"}</span>
-          {!open && <span className="text-gray-400 dark:text-gray-600 text-2xs ml-1">{entries.length} keys</span>}
-          {(isEmpty || !open) && <span className="text-gray-500 dark:text-gray-400">{"}"}</span>}
+          <span className="text-muted dark:text-disabled">{"{"}</span>
+          {!open && <span className="text-disabled dark:text-secondary text-2xs ml-1">{entries.length} keys</span>}
+          {(isEmpty || !open) && <span className="text-muted dark:text-disabled">{"}"}</span>}
           {(isEmpty || !open) && comma}
         </div>
         {open && !isEmpty && (
@@ -116,7 +116,7 @@ function JsonNode({ data, depth = 0, keyName, isLast = true }: JsonNodeProps) {
               <JsonNode key={k} data={v} depth={depth + 1} keyName={k} isLast={i === entries.length - 1} />
             ))}
             <div style={{ paddingLeft: 0 }} className="leading-5">
-              <span className="text-gray-500 dark:text-gray-400">{"}"}</span>{comma}
+              <span className="text-muted dark:text-disabled">{"}"}</span>{comma}
             </div>
           </div>
         )}
@@ -139,14 +139,14 @@ export function JsonRenderer({ code }: JsonRendererProps) {
   if (error) {
     // JSON is likely still streaming — show raw text as a neutral fallback
     return (
-      <div className="px-4 py-3 text-xs font-mono text-gray-400 dark:text-gray-500 whitespace-pre-wrap break-all leading-relaxed">
+      <div className="px-4 py-3 text-xs font-mono text-disabled dark:text-muted whitespace-pre-wrap break-all leading-relaxed">
         {code}
       </div>
     );
   }
 
   return (
-    <div className="px-4 py-3 text-xs font-mono overflow-x-auto text-gray-700 dark:text-gray-300">
+    <div className="px-4 py-3 text-xs font-mono overflow-x-auto text-secondary dark:text-disabled">
       <JsonNode data={parsed} />
     </div>
   );

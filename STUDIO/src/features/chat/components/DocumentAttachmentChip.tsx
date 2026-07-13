@@ -16,12 +16,12 @@ interface DocumentAttachmentChipProps {
 }
 
 export const DocumentAttachmentChip = ({ name, extension }: DocumentAttachmentChipProps) => (
-  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-surface-raised rounded-xl border border-gray-200 dark:border-surface-border max-w-[220px]">
-    <div className="w-7 h-7 rounded-lg bg-gray-200 dark:bg-surface-border flex items-center justify-center flex-shrink-0">
-      <span className="text-2xs font-bold font-mono text-gray-600 dark:text-gray-400">
+  <div className="flex items-center gap-2 px-3 py-2 bg-surface-base dark:bg-surface-raised rounded-xl border border-surface-border dark:border-surface-border max-w-[220px]">
+    <div className="w-7 h-7 rounded-lg bg-surface-raised dark:bg-surface-border flex items-center justify-center flex-shrink-0">
+      <span className="text-2xs font-bold font-mono text-secondary dark:text-disabled">
         {getDocLabel(extension)}
       </span>
     </div>
-    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">{name}</span>
+    <span className="text-xs font-medium text-secondary dark:text-disabled truncate">{name}</span>
   </div>
 );

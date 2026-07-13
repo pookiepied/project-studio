@@ -54,9 +54,7 @@ export function CollapsibleUserText({ content }: { content: string }) {
         {overflowing && !expanded && (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-16
-                       bg-gradient-to-t from-gray-100 dark:from-surface-raised to-transparent
-                       backdrop-blur-[1.5px] [mask-image:linear-gradient(to_top,black,transparent)]"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface-base dark:from-surface-raised to-transparent backdrop-blur-[1.5px] [mask-image:linear-gradient(to_top,black,transparent)]"
           />
         )}
       </div>
@@ -66,9 +64,7 @@ export function CollapsibleUserText({ content }: { content: string }) {
         <Button
           variant="ghost"
           onClick={() => setExpanded(v => !v)}
-          className="h-auto self-start mt-1.5 gap-1 text-sm
-                     text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200
-                     transition-colors duration-150"
+          className="h-auto self-start mt-1.5 gap-1 text-sm text-muted dark:text-disabled hover:text-secondary dark:hover:text-disabled transition-colors duration-150"
         >
           {expanded ? "Show less" : "Show more"}
           <Expand

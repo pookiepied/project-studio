@@ -74,7 +74,7 @@ export function toolLabel(name: string): string {
 
 export function getToolIcon(name: string, size: IconSize = "xs") {
   const n = name.toLowerCase();
-  const c = "text-gray-500 dark:text-gray-400 flex-shrink-0";
+  const c = "text-muted dark:text-disabled flex-shrink-0";
 
   // MCP registry — returns branded icon when available
   const service = resolveMcpService(name);

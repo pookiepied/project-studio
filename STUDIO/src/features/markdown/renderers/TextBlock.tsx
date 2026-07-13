@@ -41,8 +41,7 @@ export function TextBlock({ code }: TextBlockProps) {
               onChange={e => setText(e.target.value)}
               onKeyDown={e => { if (e.key === "Escape") handleSave(); }}
               autoFocus
-              className="bg-transparent border-0 px-4 py-3 text-sm
-                         leading-relaxed font-sans"
+              className="bg-transparent border-0 px-4 py-3 text-sm leading-relaxed font-sans"
               rows={Math.max(3, text.split("\n").length + 1)}
             />
             <div className="flex justify-end px-4 pb-3">
@@ -51,11 +50,7 @@ export function TextBlock({ code }: TextBlockProps) {
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
-                           text-gray-600 dark:text-gray-400
-                           bg-gray-100 dark:bg-surface-selected
-                           hover:bg-gray-200 dark:hover:bg-surface-border
-                           rounded-lg transition-colors duration-100"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-secondary dark:text-disabled bg-surface-base dark:bg-surface-selected hover:bg-surface-raised dark:hover:bg-surface-border rounded-lg transition-colors duration-100"
               >
                 <Check size="sm" />
                 Done
@@ -71,7 +66,7 @@ export function TextBlock({ code }: TextBlockProps) {
             transition={{ duration: 0.12 }}
             className="px-4 py-3"
           >
-            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm text-secondary dark:text-disabled leading-relaxed whitespace-pre-wrap">
               {text}
             </p>
           </motion.div>
@@ -88,13 +83,7 @@ export function TextBlock({ code }: TextBlockProps) {
           onClick={() => setEditing(true)}
           aria-label="Edit text"
           title="Edit text"
-          className="absolute top-2 right-2
-                     opacity-0 group-hover/textblock:opacity-100
-                     w-7 h-7 flex items-center justify-center rounded-lg
-                     text-gray-400 dark:text-gray-600
-                     hover:text-gray-600 dark:hover:text-gray-400
-                     hover:bg-gray-100 dark:hover:bg-surface-raised
-                     transition-all duration-100"
+          className="absolute top-2 right-2 opacity-0 group-hover/textblock:opacity-100 w-7 h-7 flex items-center justify-center rounded-lg text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised transition-all duration-100"
         >
           <AnimatePresence mode="wait">
             {saved ? (

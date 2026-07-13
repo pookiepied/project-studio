@@ -117,7 +117,7 @@ function CategoryMenu({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 460, damping: 30, mass: 0.7 }}
-            className="absolute left-0 top-full z-10 mt-2 w-[180px] overflow-hidden rounded-xl border border-surface-border bg-white p-1.5 shadow-lg dark:bg-surface-raised"
+            className="absolute left-0 top-full z-10 mt-2 w-[180px] overflow-hidden rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-lg dark:bg-surface-raised"
           >
             {category.items.map((item) => {
               const active = currentView === item.id;

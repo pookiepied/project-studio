@@ -78,14 +78,14 @@ export function LatexRenderer({ code }: LatexRendererProps) {
     return (
       <div className="px-4 py-3 space-y-1.5">
         <p className="text-xs text-secondary dark:text-secondary font-medium">Formula error: {error}</p>
-        <pre className="text-xs text-gray-400 dark:text-gray-500 font-mono whitespace-pre-wrap">{code}</pre>
+        <pre className="text-xs text-disabled dark:text-muted font-mono whitespace-pre-wrap">{code}</pre>
       </div>
     );
   }
 
   return (
     <div
-      className="flex items-center justify-center px-6 py-5 overflow-x-auto text-gray-800 dark:text-gray-200"
+      className="flex items-center justify-center px-6 py-5 overflow-x-auto text-primary dark:text-disabled"
       dangerouslySetInnerHTML={{ __html: html! }}
     />
   );

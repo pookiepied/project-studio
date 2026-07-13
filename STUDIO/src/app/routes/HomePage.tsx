@@ -99,8 +99,8 @@ export const HomePage = () => {
         "help",
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <p className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-1">Help</p>
-            <p className="text-sm text-gray-400 dark:text-gray-600">Documentation coming soon.</p>
+            <p className="text-base font-semibold text-secondary dark:text-disabled mb-1">Help</p>
+            <p className="text-sm text-disabled dark:text-secondary">Documentation coming soon.</p>
           </div>
         </div>,
         "h-full flex items-center justify-center",

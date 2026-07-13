@@ -58,49 +58,41 @@ function LoginContextMenu({
       exit={{ opacity: 0, scale: 0.95, y: -4 }}
       transition={{ duration: 0.13, ease: "easeOut" }}
       style={{ top: pos.y, left: pos.x }}
-      className="fixed z-context w-52 p-1.5
-        bg-white/96 dark:bg-surface-page/96 backdrop-blur-2xl
-        border border-gray-100 dark:border-white/[0.06]
-        rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)]
-        dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]
-        overflow-hidden font-sans select-none"
+      className="fixed z-context w-52 p-1.5 bg-surface-page/96 dark:bg-surface-page/96 backdrop-blur-2xl border border-surface-border dark:border-surface-border rounded-xl shadow-lg overflow-hidden font-sans select-none"
     >
       {/* Branding header */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 mb-0.5">
         <img src="/logo.png" alt="" className="w-4 h-4 object-contain opacity-70" />
         <div>
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 leading-none">
+          <p className="text-sm font-semibold text-secondary dark:text-disabled leading-none">
             STUDIO
           </p>
-          <p className="text-2xs text-gray-400 dark:text-gray-600 mt-0.5">
+          <p className="text-2xs text-disabled dark:text-secondary mt-0.5">
             v 0.1.4
           </p>
         </div>
       </div>
 
-      <div className="h-px bg-gray-100 dark:bg-white/[0.06] mx-1.5 mb-1" />
+      <div className="h-px bg-surface-base dark:bg-surface-page/[0.06] mx-1.5 mb-1" />
 
       {/* Theme toggle */}
       <Button
         onClick={toggleTheme}
         variant="ghost"
-        className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg
-          text-sm font-medium text-gray-700 dark:text-gray-300
-          hover:bg-gray-100/80 dark:hover:bg-white/[0.06]
-          hover:text-gray-700 dark:hover:text-gray-300"
+        className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-secondary dark:text-disabled hover:bg-surface-base/80 dark:hover:bg-surface-page/[0.06] hover:text-secondary dark:hover:text-disabled"
       >
         {isDark
-          ? <Sun size="sm" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-          : <Moon size="sm" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          ? <Sun size="sm" className="text-disabled dark:text-muted flex-shrink-0" />
+          : <Moon size="sm" className="text-disabled dark:text-muted flex-shrink-0" />
         }
         {isDark ? "Switch to light" : "Switch to dark"}
       </Button>
 
-      <div className="h-px bg-gray-100 dark:bg-white/[0.06] mx-1.5 my-1" />
+      <div className="h-px bg-surface-base dark:bg-surface-page/[0.06] mx-1.5 my-1" />
 
       {/* Ambient tagline */}
       <div className="px-3 py-2">
-        <p className="text-xs text-gray-400/70 dark:text-gray-600 italic leading-relaxed">
+        <p className="text-xs text-disabled/70 dark:text-secondary italic leading-relaxed">
           "Crafted for the obsessive."
         </p>
       </div>
@@ -175,15 +167,15 @@ export const ShaderWelcomePage = () => {
 
   if (checkingAPI) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white dark:bg-surface-page">
-        <div className="w-4 h-4 border-2 border-gray-300 dark:border-surface-border border-t-transparent rounded-full animate-spin" />
+      <div className="h-screen flex items-center justify-center bg-surface-page dark:bg-surface-page">
+        <div className="w-4 h-4 border-2 border-surface-border dark:border-surface-border border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
     /* Tight outer padding — panel nearly fills the whole window */
-    <div className="h-screen w-full bg-white dark:bg-surface-page flex flex-col p-3 overflow-hidden">
+    <div className="h-screen w-full bg-surface-page dark:bg-surface-page flex flex-col p-3 overflow-hidden">
       <AnimatePresence>
         {ctxMenu && (
           <LoginContextMenu pos={ctxMenu} onClose={closeCtxMenu} />
@@ -200,7 +192,7 @@ export const ShaderWelcomePage = () => {
       >
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="STUDIO" className="w-6 h-6 object-contain" />
-          <span className="font-display text-2xs tracking-ultra-wide text-gray-900 dark:text-primary">
+          <span className="font-display text-2xs tracking-ultra-wide text-primary dark:text-primary">
             STUDIO
           </span>
         </div>
@@ -210,14 +202,14 @@ export const ShaderWelcomePage = () => {
             <IconButton
               aria-label="Minimize"
               onClick={handleMinimize}
-              className="h-auto w-auto p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-gray-700 dark:hover:text-muted hover:bg-gray-900/[0.06] dark:hover:bg-white/[0.06]"
+              className="h-auto w-auto p-1.5 rounded-md text-disabled dark:text-secondary hover:text-secondary dark:hover:text-muted hover:bg-primary/[0.06] dark:hover:bg-surface-page/[0.06]"
             >
               <Remove size="sm" />
             </IconButton>
             <IconButton
               aria-label="Close"
               onClick={handleClose}
-              className="h-auto w-auto p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-secondary hover:bg-surface-raised/10"
+              className="h-auto w-auto p-1.5 rounded-md text-disabled dark:text-secondary hover:text-secondary hover:bg-surface-raised/10"
             >
               <Close size="sm" />
             </IconButton>
@@ -230,7 +222,7 @@ export const ShaderWelcomePage = () => {
         initial={{ opacity: 0, y: 16, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full flex-1 relative rounded-2xl overflow-hidden border border-white/25"
+        className="w-full flex-1 relative rounded-2xl overflow-hidden border border-surface-border"
         style={{ background: HERO_GRADIENT }}
       >
 
@@ -238,7 +230,7 @@ export const ShaderWelcomePage = () => {
         <div
           className="absolute inset-0 pointer-events-none opacity-[0.045]"
           style={{
-            backgroundImage: `radial-gradient(circle, rgba(0,0,0,0.65) 1px, transparent 1px)`,
+            backgroundImage: "radial-gradient(circle, var(--text-primary) 1px, transparent 1px)",
             backgroundSize: "22px 22px",
           }}
         />
@@ -247,12 +239,12 @@ export const ShaderWelcomePage = () => {
         <div
           className="absolute bottom-0 inset-x-0 h-[55%] pointer-events-none"
           style={{
-            background: "radial-gradient(ellipse 85% 60% at 50% 100%, rgba(255,255,255,0.45) 0%, transparent 70%)",
+            background: "radial-gradient(ellipse 85% 60% at 50% 100%, var(--surface-raised) 0%, transparent 70%)",
           }}
         />
 
         {/* Top-edge sheen */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-surface-page/90 to-transparent" />
 
         {/* Content — centered */}
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-8">
@@ -263,8 +255,7 @@ export const ShaderWelcomePage = () => {
             transition={{ duration: 0.7, delay: 0.28, ease: [0.4, 0, 0.2, 1] }}
             // fluid responsive clamp() — can't map to static scale token; intentional one-off for shader hero
             // eslint-disable-next-line no-restricted-syntax
-            className="font-display text-[clamp(3.2rem,6.5vw,5.5rem)] text-black
-              leading-[1.04] tracking-[-0.02em] mb-6 max-w-2xl"
+            className="font-display text-[clamp(3.2rem,6.5vw,5.5rem)] text-primary leading-[1.04] tracking-[-0.02em] mb-6 max-w-2xl"
           >
             Your AI workspace,<br />beautifully<br />organized.
           </motion.h1>
@@ -273,7 +264,7 @@ export const ShaderWelcomePage = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.4, ease: [0.4, 0, 0.2, 1] }}
-            className="text-base text-black/55 max-w-xs leading-relaxed mb-10"
+            className="text-base text-primary/55 max-w-xs leading-relaxed mb-10"
           >
             Chat, transcribe, remember — everything your AI needs, in one place.
           </motion.p>
@@ -283,9 +274,7 @@ export const ShaderWelcomePage = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.48 }}
-              className="mb-6 px-4 py-3 rounded-xl w-full max-w-xs text-left
-                bg-surface-raised dark:bg-surface-raised/20
-                border border-surface-border dark:border-surface-border/40"
+              className="mb-6 px-4 py-3 rounded-xl w-full max-w-xs text-left bg-surface-raised dark:bg-surface-raised/20 border border-surface-border dark:border-surface-border/40"
             >
               <p className="text-xs text-secondary dark:text-secondary">
                 <strong>Config missing.</strong>{" "}
@@ -312,7 +301,7 @@ export const ShaderWelcomePage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.65 }}
-            className="mt-3.5 text-xs text-black/35 leading-relaxed"
+            className="mt-3.5 text-xs text-primary/35 leading-relaxed"
           >
             By signing in you agree to our terms and privacy policy.
           </motion.p>

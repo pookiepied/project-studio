@@ -41,8 +41,8 @@ export function RightWorkspaceControls({
         title={open ? "Hide workspace" : "Show workspace"}
         className={`studio-chat-icon-button flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-100 ${
           open
-            ? "bg-gray-100 text-gray-700 dark:bg-surface-raised dark:text-gray-300"
-            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            ? "bg-surface-base text-secondary dark:bg-surface-raised dark:text-disabled"
+            : "text-disabled hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
         }`}
       >
         <NavToggleIcon size={14} open={open} />

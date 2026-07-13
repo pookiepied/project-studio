@@ -11,8 +11,8 @@ export const ImageWithFallback = ({ url, idx }: ImageWithFallbackProps) => {
 
   if (hasError) {
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-surface-raised rounded-xl">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-500">Image sent</span>
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-base dark:bg-surface-raised rounded-xl">
+        <span className="text-xs font-medium text-muted dark:text-muted">Image sent</span>
       </div>
     );
   }

@@ -17,6 +17,8 @@ import {
   Brain,
 } from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
+import { chevronRotateTransition } from "@/design/motion";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import { getAIMode, type AIMode } from "@/core/config/autoMode";
 import { useModes } from "@/features/models/hooks/useModes";
 import { Button } from "@/ui/primitives/Button";
@@ -63,7 +65,7 @@ export function TierSelector({
   reasoning,
   onReasoningChange,
 }: TierSelectorProps) {
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { modes } = useModes();
@@ -82,22 +84,22 @@ export function TierSelector({
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        onClose();
         setReasoningOpen(false);
       }
     };
     if (open) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [onClose, open]);
 
   const handleSelect = (mode: AIMode) => {
     onChange(mode.modelId);
-    setOpen(false);
+    onClose();
     setReasoningOpen(false);
   };
 
   const handleOpenLibrary = () => {
-    setOpen(false);
+    onClose();
     setReasoningOpen(false);
     onOpenLibrary();
   };
@@ -107,13 +109,13 @@ export function TierSelector({
       {/* Trigger */}
       <Button
         variant="ghost"
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => !disabled && onToggle()}
         disabled={disabled}
         whileTap={{ scale: 0.95 }}
         transition={{ duration: 0.1 }}
         className={cx(
           composerPillButton,
-          "gap-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:text-gray-400 dark:hover:bg-surface-raised dark:focus-visible:ring-surface-border",
+          "gap-1 text-muted hover:bg-surface-base disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:text-disabled dark:hover:bg-surface-raised dark:focus-visible:ring-focus",
         )}
       >
         <motion.span
@@ -139,10 +141,10 @@ export function TierSelector({
         )}
         <motion.div
           animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={chevronRotateTransition}
           className="flex-shrink-0"
         >
-          <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
+          <Expand size="xs" className="text-disabled dark:text-secondary" />
         </motion.div>
       </Button>
 
@@ -155,7 +157,7 @@ export function TierSelector({
             exit={{ opacity: 0, scale: 0.96, y: dropUp ? 6 : -6 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
             className={`absolute right-0 w-[260px] z-50
-              bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border
+              bg-surface-page dark:bg-surface-base border border-surface-border dark:border-surface-border
               rounded-xl shadow-xl overflow-hidden transition-colors duration-300
               ${dropUp ? "bottom-full mb-1.5" : "mt-1.5"}`}
           >
@@ -172,19 +174,19 @@ export function TierSelector({
                     transition={{ duration: 0.12, delay: i * 0.03, ease: "easeOut" }}
                     onClick={() => handleSelect(mode)}
                     whileTap={{ scale: 0.98 }}
-                    className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border ${
+                    className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:focus-visible:ring-focus ${
                       isActive
-                        ? "bg-gray-50 dark:bg-surface-raised"
-                        : "hover:bg-gray-50 dark:hover:bg-surface-raised"
+                        ? "bg-surface-page dark:bg-surface-raised"
+                        : "hover:bg-surface-page dark:hover:bg-surface-raised"
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium leading-tight transition-colors duration-300 ${
-                        isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"
+                        isActive ? "text-primary dark:text-primary" : "text-secondary dark:text-disabled"
                       }`}>
                         {mode.label}
                       </p>
-                      <p className="text-2xs text-gray-400 dark:text-gray-600 mt-0.5 leading-tight truncate">
+                      <p className="text-2xs text-disabled dark:text-secondary mt-0.5 leading-tight truncate">
                         {mode.description}
                       </p>
                     </div>
@@ -197,7 +199,7 @@ export function TierSelector({
                           transition={{ duration: 0.15 }}
                           className="mt-0.5 flex-shrink-0"
                         >
-                          <Check size="xs" className="text-gray-500 dark:text-gray-400" />
+                          <Check size="xs" className="text-muted dark:text-disabled" />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -207,7 +209,7 @@ export function TierSelector({
             </div>
 
             {/* Separator */}
-            <div className="mx-3 border-t border-gray-100 dark:border-surface-border" />
+            <div className="mx-3 border-t border-surface-border dark:border-surface-border" />
 
             {/* Browse all */}
             <div className="p-1.5 pt-0">
@@ -215,10 +217,10 @@ export function TierSelector({
                 variant="ghost"
                 onClick={handleOpenLibrary}
                 whileTap={{ scale: 0.98 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-surface-page dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:focus-visible:ring-focus"
               >
-                <Icon icon={BookOpenIcon} size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <Icon icon={BookOpenIcon} size="xs" className="text-disabled dark:text-secondary flex-shrink-0" />
+                <span className="text-sm text-muted dark:text-disabled">
                   Browse all models
                 </span>
               </Button>
@@ -227,21 +229,21 @@ export function TierSelector({
             {/* Reasoning section only renders when onReasoningChange is provided. */}
             {hasReasoning && (
               <>
-                <div className="mx-3 border-t border-gray-100 dark:border-surface-border" />
+                <div className="mx-3 border-t border-surface-border dark:border-surface-border" />
                 <div className="p-1.5">
                   <Button
                     variant="ghost"
                     onClick={() => setReasoningOpen((v) => !v)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-surface-page dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:focus-visible:ring-focus"
                   >
-                    <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
-                      <Brain size="xs" className="text-gray-400 dark:text-gray-600" />
+                    <div className="w-5 h-5 rounded-md bg-surface-base dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
+                      <Brain size="xs" className="text-disabled dark:text-secondary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-tight">
+                      <p className="text-sm font-medium text-secondary dark:text-disabled leading-tight">
                         Reasoning
                       </p>
-                      <p className="text-2xs text-gray-400 dark:text-gray-600 leading-tight">
+                      <p className="text-2xs text-disabled dark:text-secondary leading-tight">
                         {reasoningLabel ?? "Off"}
                       </p>
                     </div>
@@ -250,7 +252,7 @@ export function TierSelector({
                       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                       className="flex-shrink-0"
                     >
-                      <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
+                      <Expand size="xs" className="text-disabled dark:text-secondary" />
                     </motion.div>
                   </Button>
 
@@ -275,15 +277,15 @@ export function TierSelector({
                                 transition={{ duration: 0.1, delay: i * 0.015, ease: "easeOut" }}
                                 onClick={() => {
                                   onReasoningChange!(level.budget);
-                                  setOpen(false);
+                                  onClose();
                                   setReasoningOpen(false);
                                 }}
                                 title={level.title}
                                 whileTap={{ scale: 0.96 }}
-                                className={`h-7 rounded-md text-xs font-medium transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border ${
+                                className={`h-7 rounded-md text-xs font-medium transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:focus-visible:ring-focus ${
                                   isActive
-                                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                                    : "text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-surface-raised"
+                                    ? "bg-primary dark:bg-surface-base text-on-emphasis dark:text-primary"
+                                    : "text-muted dark:text-muted hover:bg-surface-page dark:hover:bg-surface-raised"
                                 }`}
                               >
                                 {level.label}
@@ -303,3 +305,4 @@ export function TierSelector({
     </div>
   );
 }
+

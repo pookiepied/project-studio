@@ -78,11 +78,11 @@ export const MessageActions = ({
       onClick={() => onCopy(message.content, message.id)}
       aria-label="Copy"
       title="Copy"
-      className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
+      className="h-6 w-6 rounded hover:bg-surface-base dark:hover:bg-surface-raised transition-smooth"
     >
       {copiedMessageId === message.id
         ? <Check       size="sm" className="text-secondary" />
-        : <Copy        size="sm" className="text-gray-400 dark:text-gray-600" />}
+        : <Copy        size="sm" className="text-disabled dark:text-secondary" />}
     </IconButton>
 
     {/* Edit */}
@@ -90,9 +90,9 @@ export const MessageActions = ({
       onClick={() => onEdit(message.id, message.content)}
       aria-label="Edit"
       title="Edit"
-      className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
+      className="h-6 w-6 rounded hover:bg-surface-base dark:hover:bg-surface-raised transition-smooth"
     >
-      <Edit size="sm" className="text-gray-400 dark:text-gray-600" />
+      <Edit size="sm" className="text-disabled dark:text-secondary" />
     </IconButton>
 
     {/* Delete */}
@@ -100,9 +100,9 @@ export const MessageActions = ({
       onClick={() => onDelete(message.id)}
       aria-label="Delete"
       title="Delete"
-      className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
+      className="h-6 w-6 rounded hover:bg-surface-base dark:hover:bg-surface-raised transition-smooth"
     >
-      <Delete size="sm" className="text-gray-400 dark:text-gray-600" />
+      <Delete size="sm" className="text-disabled dark:text-secondary" />
     </IconButton>
 
     {/* Read aloud — assistant only */}
@@ -111,14 +111,14 @@ export const MessageActions = ({
         onClick={() => onSpeak(message.id, message.content)}
         aria-label={ttsPlayingId === message.id ? "Stop" : "Read aloud"}
         title={ttsPlayingId === message.id ? "Stop" : "Read aloud"}
-        className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
+        className="h-6 w-6 rounded hover:bg-surface-base dark:hover:bg-surface-raised transition-smooth"
       >
         {ttsLoadingId === message.id ? (
-          <span className="w-3 h-3 border border-gray-400 dark:border-gray-600 border-t-transparent rounded-full animate-spin block flex-shrink-0" />
+          <span className="w-3 h-3 border border-surface-border dark:border-surface-border border-t-transparent rounded-full animate-spin block flex-shrink-0" />
         ) : ttsPlayingId === message.id ? (
-          <Stop        size="sm" weight="fill"  className="text-gray-500 dark:text-gray-500" />
+          <Stop        size="sm" weight="fill"  className="text-muted dark:text-muted" />
         ) : (
-          <Volume size="sm"  className="text-gray-400 dark:text-gray-600" />
+          <Volume size="sm"  className="text-disabled dark:text-secondary" />
         )}
       </IconButton>
     )}
@@ -132,29 +132,29 @@ export const MessageActions = ({
           aria-expanded={ttsMenuId === message.id}
           aria-haspopup="menu"
           title="More actions"
-          className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
+          className="h-6 w-6 rounded hover:bg-surface-base dark:hover:bg-surface-raised transition-smooth"
         >
-          <More size="sm" className="text-gray-400 dark:text-gray-600" />
+          <More size="sm" className="text-disabled dark:text-secondary" />
         </IconButton>
         {ttsMenuId === message.id && (
-          <div role="menu" className="absolute bottom-full right-0 mb-1 bg-white dark:bg-surface-raised border border-gray-100 dark:border-surface-border rounded-lg shadow-lg py-1 min-w-[140px] z-50">
+          <div role="menu" className="absolute bottom-full right-0 mb-1 bg-surface-page dark:bg-surface-raised border border-surface-border dark:border-surface-border rounded-lg shadow-lg py-1 min-w-[140px] z-50">
             {isLastAssistant ? (
               <>
                 <Button variant="ghost" role="menuitem" onClick={() => { onRegenerate(); onSetTtsMenuId(null); }}
-                  className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border"
+                  className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-secondary dark:text-disabled hover:bg-surface-page dark:hover:bg-surface-border"
                 >
                   <Redo size="sm" className="flex-shrink-0" />
                   Regenerate
                 </Button>
                 <Button variant="ghost" role="menuitem" onClick={() => { onContinue(); onSetTtsMenuId(null); }}
-                  className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border"
+                  className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-secondary dark:text-disabled hover:bg-surface-page dark:hover:bg-surface-border"
                 >
                   <Forward size="sm" className="flex-shrink-0" />
                   Continue
                 </Button>
               </>
             ) : (
-              <p className="px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600 italic">No actions</p>
+              <p className="px-3 py-1.5 text-xs text-disabled dark:text-secondary italic">No actions</p>
             )}
           </div>
         )}

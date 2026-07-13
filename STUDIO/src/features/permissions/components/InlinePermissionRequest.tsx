@@ -24,7 +24,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
     <div className="relative bg-surface-raised border border-surface-border rounded-lg p-3 my-2 ml-12">
       {/* AI Avatar indicator */}
       <div className="absolute -left-10 top-3 w-8 h-8 bg-surface-raised rounded-full flex items-center justify-center">
-        <Shield size="md" className="text-white" />
+        <Shield size="md" className="text-on-emphasis" />
       </div>
       
       <div className="flex items-center justify-between">
@@ -53,7 +53,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
           <Button
             variant="primary"
             onClick={onApprove}
-            className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-on-emphasis text-xs rounded transition-colors"
           >
             <Check size="sm" />
             Allow
@@ -62,7 +62,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
           <Button
             variant="primary"
             onClick={onDeny}
-            className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-on-emphasis text-xs rounded transition-colors"
           >
             <Close size="sm" />
             Deny

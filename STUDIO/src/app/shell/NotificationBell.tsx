@@ -8,7 +8,7 @@
  * notification UI so the two shells never drift.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, type IconSize } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
@@ -18,6 +18,7 @@ import {
   broadcastPanelOpen,
   useExclusivePanel,
 } from "@/lib/hooks/useExclusivePanel";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import type {
   AppNotification,
   AgentNotificationStatus,
@@ -37,7 +38,7 @@ const STATUS_DOT: Record<AgentNotificationStatus, string> = {
   running: "bg-surface-raised",
   done: "bg-surface-raised",
   failed: "bg-surface-raised",
-  cancelled: "bg-gray-400",
+  cancelled: "bg-primary",
 };
 
 function NotificationRow({ n }: { n: AppNotification }) {
@@ -99,7 +100,7 @@ function NotificationPanel({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.97 }}
       transition={{ duration: 0.14, ease: "easeOut" }}
-      className={`absolute top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-surface-border bg-white shadow-xl dark:bg-surface-raised ${
+      className={`absolute top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-surface-border bg-surface-page shadow-xl dark:bg-surface-raised ${
         align === "right" ? "right-0" : "left-0"
       }`}
     >
@@ -152,11 +153,11 @@ export function NotificationBell({
   align?: "left" | "right";
   size?: IconSize;
 }) {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, onClose } = useDisclosure();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { unreadCount, markAllRead } = useNotifications();
 
-  useExclusivePanel("notifications", open, () => setOpen(false));
+  useExclusivePanel("notifications", open, onClose);
 
   return (
     <div className="relative" ref={wrapperRef}>
@@ -184,7 +185,7 @@ export function NotificationBell({
           className="text-muted transition-colors group-hover:text-primary"
         />
         {unreadCount > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-surface-raised px-1 text-3xs font-semibold leading-none text-white">
+          <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-surface-raised px-1 text-3xs font-semibold leading-none text-on-emphasis">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -193,7 +194,7 @@ export function NotificationBell({
       <AnimatePresence>
         {open && (
           <NotificationPanel
-            onClose={() => setOpen(false)}
+            onClose={onClose}
             anchorRef={wrapperRef}
             align={align}
           />

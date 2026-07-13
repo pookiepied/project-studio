@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Expand } from "@/ui/icons";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { resolveTheme } from "@/lib/theme";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -120,7 +121,7 @@ function VsCodeIcon({ color }: { color: string }) {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" className="flex-shrink-0">
       <path fill={color} d="M17.5 2.6 7.4 11.7 3.1 8.4 1.5 9.2v5.6l1.6.8 4.3-3.3 10.1 9.1 5-2.1V4.7l-5-2.1Z" />
-      <path fill="#fff" fillOpacity=".22" d="M17.5 7.4v9.2l-6-4.6 6-4.6Z" />
+      <path fill="currentColor" fillOpacity=".22" d="M17.5 7.4v9.2l-6-4.6 6-4.6Z" />
     </svg>
   );
 }
@@ -175,7 +176,7 @@ function ProjectAppIcon({ app, isDark }: { app: ExternalProjectApp; isDark: bool
 export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProps) {
   const { settings } = useSettings();
   const isDark = resolveTheme(settings.theme) === "dark";
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const [availableIds, setAvailableIds] = useState<Set<string>>(
     () => getCachedProjectAppsSync() ?? new Set(["explorer"]),
   );
@@ -183,7 +184,7 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
     () => getSelectedProjectAppSync(),
   );
   const containerRef = useRef<HTMLDivElement>(null);
-  useOnClickOutside(containerRef, () => setOpen(false), open);
+  useOnClickOutside(containerRef, onClose, open);
 
   useEffect(() => {
     if (!isTauri) {
@@ -211,7 +212,7 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
   if (!isTauri || !projectContext?.path || !defaultApp) return null;
 
   const openApp = (app: ExternalProjectApp, remember = false) => {
-    setOpen(false);
+    onClose();
     if (remember) {
       setSelectedAppId(app.id);
       setSelectedProjectAppSync(app.id);
@@ -223,22 +224,22 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
 
   return (
     <div ref={containerRef} className="relative flex items-center">
-      <div className="flex h-7 items-center rounded-lg border border-gray-200 bg-white shadow-sm dark:border-surface-border dark:bg-surface-raised">
+      <div className="flex h-7 items-center rounded-lg border border-surface-border bg-surface-page shadow-sm dark:border-surface-border dark:bg-surface-raised">
         <IconButton
           size="sm"
           onClick={() => openApp(defaultApp)}
           aria-label={`Open project in ${defaultApp.label}`}
           title={`Open project in ${defaultApp.label}`}
-          className="flex h-7 w-7 items-center justify-center rounded-l-lg text-gray-500 transition-colors duration-100 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-surface-selected dark:hover:text-gray-300"
+          className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted transition-colors duration-100 hover:bg-surface-page hover:text-secondary dark:text-muted dark:hover:bg-surface-selected dark:hover:text-disabled"
         >
           <ProjectAppIcon app={defaultApp} isDark={isDark} />
         </IconButton>
         <IconButton
           size="sm"
-          onClick={() => setOpen((v) => !v)}
+          onClick={onToggle}
           aria-label="Choose project app"
           title="Choose project app"
-          className="flex h-7 !w-5 items-center justify-center rounded-r-lg border-l border-gray-100 text-gray-400 transition-colors duration-100 hover:bg-gray-50 hover:text-gray-600 dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-gray-300"
+          className="flex h-7 !w-5 items-center justify-center rounded-r-lg border-l border-surface-border text-disabled transition-colors duration-100 hover:bg-surface-page hover:text-secondary dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-disabled"
         >
           <Expand size="xs" />
         </IconButton>
@@ -252,17 +253,17 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
             exit={{ opacity: 0, scale: 0.97, y: -4 }}
             transition={{ duration: 0.12, ease: "easeOut" }}
             style={{ transformOrigin: "top right" }}
-            className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised"
+            className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised"
           >
             {availableApps.map((app) => (
               <Button
                 key={app.id}
                 variant="ghost"
                 onClick={() => openApp(app, true)}
-                className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left justify-start text-sm transition-colors duration-100 hover:bg-gray-50 dark:hover:bg-surface-selected ${
+                className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left justify-start text-sm transition-colors duration-100 hover:bg-surface-page dark:hover:bg-surface-selected ${
                   app.id === defaultApp.id
-                    ? "bg-gray-50 text-gray-900 dark:bg-surface-selected dark:text-gray-100"
-                    : "text-gray-700 dark:text-gray-300"
+                    ? "bg-surface-page text-primary dark:bg-surface-selected dark:text-primary"
+                    : "text-secondary dark:text-disabled"
                 }`}
               >
                 <ProjectAppIcon app={app} isDark={isDark} />

@@ -17,7 +17,7 @@ function FaviconInitial({ href }: { href: string }) {
   const domain = getDomain(href);
   const initial = domain.charAt(0).toUpperCase();
   return (
-    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-2xs font-semibold text-gray-500 dark:bg-white/[0.07] dark:text-gray-400">
+    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-surface-base text-2xs font-semibold text-muted dark:bg-surface-page/[0.07] dark:text-disabled">
       {initial}
     </div>
   );
@@ -29,25 +29,25 @@ function ResultRow({ item }: { item: ArtifactLink }) {
       href={item.href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+      className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-page dark:hover:bg-surface-page/[0.03]"
     >
       <FaviconInitial href={item.href} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-gray-900 transition-colors group-hover:text-secondary dark:text-gray-100 dark:group-hover:text-secondary">
+        <div className="truncate text-sm font-medium text-primary transition-colors group-hover:text-secondary dark:text-primary dark:group-hover:text-secondary">
           {item.label}
         </div>
-        <div className="mt-0.5 truncate text-2xs text-gray-400 dark:text-gray-500">
+        <div className="mt-0.5 truncate text-2xs text-disabled dark:text-muted">
           {getDomain(item.href)}
         </div>
         {item.description && (
-          <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted dark:text-disabled">
             {item.description}
           </div>
         )}
       </div>
       <ExternalLinkIcon
         size="xs"
-        className="mt-0.5 flex-shrink-0 text-gray-300 transition-colors group-hover:text-secondary dark:text-gray-600"
+        className="mt-0.5 flex-shrink-0 text-disabled transition-colors group-hover:text-secondary dark:text-secondary"
       />
     </a>
   );
@@ -61,33 +61,33 @@ export function WebSearchArtifact({ artifact }: Props) {
     artifact.title.replace(/^Search:\s*/i, "");
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.08] dark:bg-surface-base">
-      <div className="flex items-center gap-2.5 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
-        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.07]">
-          <Search size="sm" className="text-gray-500 dark:text-gray-400" />
+    <div className="overflow-hidden rounded-xl border border-surface-border bg-surface-page dark:border-white/[0.08] dark:bg-surface-base">
+      <div className="flex items-center gap-2.5 border-b border-surface-border px-4 py-3 dark:border-surface-border">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-surface-base dark:bg-surface-page/[0.07]">
+          <Search size="sm" className="text-muted dark:text-disabled" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+          <div className="truncate text-sm font-medium text-primary dark:text-primary">
             {query}
           </div>
-          <div className="text-2xs text-gray-400 dark:text-gray-500">
+          <div className="text-2xs text-disabled dark:text-muted">
             {results.length} result{results.length !== 1 ? "s" : ""}
           </div>
         </div>
       </div>
 
-      <div className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+      <div className="divide-y divide-surface-divider">
         {results.length > 0 ? (
           results.map((item, i) => <ResultRow key={`${item.href}-${i}`} item={item} />)
         ) : (
-          <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
+          <div className="px-4 py-6 text-center text-sm text-disabled dark:text-muted">
             No results found.
           </div>
         )}
       </div>
 
-      <div className="border-t border-gray-100 px-4 py-2.5 dark:border-white/[0.06]">
-        <span className="text-2xs text-gray-400 dark:text-gray-500">
+      <div className="border-t border-surface-border px-4 py-2.5 dark:border-surface-border">
+        <span className="text-2xs text-disabled dark:text-muted">
           via web_search · Studio
         </span>
       </div>

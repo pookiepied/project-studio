@@ -122,7 +122,7 @@ export function TurnStatus({
   const row = (
     <div className="flex items-center gap-2">
       <EngineGlyph engine={engine} state={busy ? "busy" : "idle"} />
-      <span className="text-sm text-gray-400 dark:text-gray-500">
+      <span className="text-sm text-disabled dark:text-muted">
         {showTimer ? (
           <span className="inline-flex items-baseline">
             <span className="relative inline-flex overflow-hidden h-[1.25em] items-baseline">
@@ -149,7 +149,7 @@ export function TurnStatus({
         <motion.span
           animate={{ rotate: expanded ? 90 : 0 }}
           transition={{ duration: 0.14 }}
-          className="flex-shrink-0 text-gray-400 dark:text-gray-600"
+          className="flex-shrink-0 text-disabled dark:text-secondary"
         >
           <Collapse size="xs" />
         </motion.span>
@@ -187,7 +187,7 @@ export function TurnStatus({
             className="overflow-hidden"
           >
             <div className="mt-1 max-h-56 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-              <p className="font-mono text-2xs leading-relaxed whitespace-pre-wrap text-gray-400 dark:text-gray-600">
+              <p className="font-mono text-2xs leading-relaxed whitespace-pre-wrap text-disabled dark:text-secondary">
                 {thinking}
               </p>
             </div>

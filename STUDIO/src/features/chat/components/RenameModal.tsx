@@ -21,7 +21,7 @@ export const RenameModal = ({ isOpen, titleInput, onTitleChange, onSave, onCance
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onClick={onCancel}
-          className="fixed inset-0 z-modal bg-black/25 backdrop-blur-[3px]"
+          className="fixed inset-0 z-modal bg-scrim backdrop-blur-[3px]"
         />
         <motion.div
           key="rename-dialog"
@@ -32,10 +32,10 @@ export const RenameModal = ({ isOpen, titleInput, onTitleChange, onSave, onCance
           className="fixed inset-0 z-modal flex items-center justify-center pointer-events-none"
         >
           <div
-            className="pointer-events-auto w-80 bg-white dark:bg-surface-raised border border-gray-200 dark:border-surface-border rounded-2xl shadow-2xl p-5"
+            className="pointer-events-auto w-80 bg-surface-page dark:bg-surface-raised border border-surface-border dark:border-surface-border rounded-2xl shadow-2xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            <p className="text-sm font-semibold text-secondary dark:text-disabled mb-3">
               Rename chat
             </p>
             <Input
@@ -55,14 +55,14 @@ export const RenameModal = ({ isOpen, titleInput, onTitleChange, onSave, onCance
               <Button
                 variant="ghost"
                 onClick={onCancel}
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border rounded-lg transition-colors duration-150"
+                className="px-3.5 py-1.5 text-sm font-medium text-muted dark:text-disabled hover:bg-surface-base dark:hover:bg-surface-border rounded-lg transition-colors duration-150"
               >
                 Cancel
               </Button>
               <Button
                 variant="ghost"
                 onClick={onSave}
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-surface-border hover:bg-gray-200 dark:hover:bg-surface-border rounded-lg transition-colors duration-150"
+                className="px-3.5 py-1.5 text-sm font-medium text-primary dark:text-disabled bg-surface-base dark:bg-surface-border hover:bg-surface-raised dark:hover:bg-surface-border rounded-lg transition-colors duration-150"
               >
                 Save
               </Button>

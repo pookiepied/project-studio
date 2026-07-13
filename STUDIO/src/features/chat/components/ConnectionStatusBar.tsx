@@ -59,7 +59,7 @@ export function ConnectionStatusBar({ convId }: Props) {
                 <span className={isWsReconnecting ? "text-secondary" : "text-secondary"}>
                   {isWsReconnecting ? RECONNECT_ICON : WARN_ICON}
                 </span>
-                <span className="text-gray-300 flex-1">
+                <span className="text-disabled flex-1">
                   {isWsReconnecting
                     ? `Reconnecting… (attempt ${conversationState?.reconnectAttempt ?? 1})`
                     : conversationState?.lastError ?? "Connection lost"}
@@ -82,13 +82,13 @@ export function ConnectionStatusBar({ convId }: Props) {
                 <span className={srv.status === "restarting" ? "text-secondary" : "text-secondary"}>
                   {srv.status === "restarting" ? RECONNECT_ICON : WARN_ICON}
                 </span>
-                <span className="text-gray-300 flex-1">
+                <span className="text-disabled flex-1">
                   {srv.status === "restarting"
                     ? `Restarting ${srv.name}…`
                     : `${srv.name} crashed`}
                 </span>
                 {srv.restartCount > 0 && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted">
                     {srv.restartCount}× restarted
                   </span>
                 )}

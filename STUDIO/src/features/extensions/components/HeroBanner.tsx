@@ -62,7 +62,7 @@ export const HeroBanner = ({ onTryInChat, composioApps }: HeroBannerProps) => {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: isAnimating ? 0 : 1, y: isAnimating ? -4 : 0 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-sm bg-white/80 backdrop-blur-sm rounded-xl px-4 py-3 shadow-sm flex items-center gap-3"
+          className="w-full max-w-sm bg-surface-page/80 backdrop-blur-sm rounded-xl px-4 py-3 shadow-sm flex items-center gap-3"
         >
           <AppLogo
             src={heroLogo}
@@ -75,7 +75,7 @@ export const HeroBanner = ({ onTryInChat, composioApps }: HeroBannerProps) => {
           />
           <div className="flex-1 min-w-0">
             <span className="font-semibold text-sm" style={{ color: example.iconColor }}>{example.appName}</span>
-            <p className="text-sm text-gray-600 leading-snug truncate">{example.prompt}</p>
+            <p className="text-sm text-secondary leading-snug truncate">{example.prompt}</p>
           </div>
         </motion.div>
 
@@ -83,8 +83,8 @@ export const HeroBanner = ({ onTryInChat, composioApps }: HeroBannerProps) => {
         <Button
           variant="ghost"
           onClick={onTryInChat}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-surface-hover hover:bg-gray-50 dark:hover:bg-surface-border text-gray-800 dark:text-gray-200 text-sm font-semibold rounded-full shadow-sm transition-all hover:shadow-md border border-gray-150 dark:border-surface-active"
-          leftIcon={<Message size="sm" weight="fill" className="text-gray-600 dark:text-gray-400" />}
+          className="flex items-center gap-2 px-5 py-2.5 bg-surface-page dark:bg-surface-hover hover:bg-surface-page dark:hover:bg-surface-border text-primary dark:text-disabled text-sm font-semibold rounded-full shadow-sm transition-all hover:shadow-md border border-surface-border dark:border-surface-active"
+          leftIcon={<Message size="sm" weight="fill" className="text-secondary dark:text-disabled" />}
         >
           Try in chat
         </Button>
@@ -99,8 +99,8 @@ export const HeroBanner = ({ onTryInChat, composioApps }: HeroBannerProps) => {
               onClick={() => setActiveIndex(i)}
               className={`rounded-full transition-all duration-300 ${
                 i === activeIndex
-                  ? "w-4 h-1.5 bg-gray-700 dark:bg-gray-300 hover:bg-gray-700 dark:hover:bg-gray-300"
-                  : "w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
+                  ? "w-4 h-1.5 bg-secondary dark:bg-surface-selected hover:bg-secondary dark:hover:bg-surface-selected"
+                  : "w-1.5 h-1.5 bg-surface-selected dark:bg-secondary hover:bg-primary dark:hover:bg-secondary"
               }`}
             >
               {null}

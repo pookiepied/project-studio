@@ -63,7 +63,7 @@ export function ImageLightbox({
           <Button
             variant="ghost"
             onClick={handleDownload}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:!bg-white/20 !text-white text-xs font-medium transition-colors backdrop-blur-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-page/10 hover:!bg-surface-page/20 !text-on-emphasis text-xs font-medium transition-colors backdrop-blur-sm"
             title="Download image"
           >
             {downloaded ? (
@@ -88,7 +88,7 @@ export function ImageLightbox({
             onClick={onClose}
             aria-label="Close"
             title="Close (Esc)"
-            className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/10 hover:!bg-white/20 !text-white transition-colors backdrop-blur-sm"
+            className="flex items-center justify-center w-8 h-8 rounded-xl bg-surface-page/10 hover:!bg-surface-page/20 !text-on-emphasis transition-colors backdrop-blur-sm"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
@@ -161,7 +161,7 @@ function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
 
   if (isApiImage && !blobUrl && !failed) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-surface-raised rounded-lg text-xs text-gray-400 dark:text-gray-500">
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-surface-base dark:bg-surface-raised rounded-lg text-xs text-disabled dark:text-muted">
         <motion.span animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="text-2xs">▌</motion.span>
         Loading image…
       </span>
@@ -170,7 +170,7 @@ function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
 
   if (failed) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-surface-raised rounded-lg text-xs text-gray-500 dark:text-gray-400">
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-surface-base dark:bg-surface-raised rounded-lg text-xs text-muted dark:text-disabled">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
           <circle cx="8.5" cy="8.5" r="1.5"/>

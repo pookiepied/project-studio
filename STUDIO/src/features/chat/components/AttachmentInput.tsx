@@ -47,7 +47,7 @@ const AttachmentThumbnail = ({ attachment, onRemove }: AttachmentThumbnailProps)
       <div className={`w-14 h-14 rounded-xl overflow-hidden border ${
         attachment.isPDF
           ? 'bg-surface-raised dark:bg-surface-raised/30 border-surface-border dark:border-surface-border/40'
-          : 'bg-gray-100 dark:bg-surface-raised border-gray-200 dark:border-surface-border'
+          : 'bg-surface-base dark:bg-surface-raised border-surface-border dark:border-surface-border'
       }`}>
         {objectUrl ? (
           <img
@@ -60,7 +60,7 @@ const AttachmentThumbnail = ({ attachment, onRemove }: AttachmentThumbnailProps)
             <span className={`text-xs font-bold font-mono leading-none ${
               attachment.isPDF
                 ? 'text-secondary dark:text-secondary'
-                : 'text-gray-500 dark:text-gray-400'
+                : 'text-muted dark:text-disabled'
             }`}>
               {getDocBadge(attachment.extension)}
             </span>
@@ -74,7 +74,7 @@ const AttachmentThumbnail = ({ attachment, onRemove }: AttachmentThumbnailProps)
                 RAG
               </span>
             ) : null}
-            <span className="text-3xs text-gray-400 dark:text-gray-500 w-full text-center leading-none truncate px-0.5">
+            <span className="text-3xs text-disabled dark:text-muted w-full text-center leading-none truncate px-0.5">
               {attachment.name.length > 9 ? attachment.name.slice(0, 8) + '…' : attachment.name}
             </span>
           </div>
@@ -86,9 +86,9 @@ const AttachmentThumbnail = ({ attachment, onRemove }: AttachmentThumbnailProps)
           onClick={onRemove}
           aria-label="Remove"
           title="Remove"
-          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-gray-800 dark:bg-gray-600 transition-opacity"
+          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-surface-raised dark:bg-secondary transition-opacity"
         >
-          <Close size="xs" className="text-white" />
+          <Close size="xs" className="text-on-emphasis" />
         </IconButton>
       )}
     </motion.div>

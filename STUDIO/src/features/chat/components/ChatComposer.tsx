@@ -19,6 +19,7 @@ import { AppLogo } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Spinner } from "@/ui/primitives/Spinner";
+import { Textarea } from "@/ui/primitives/Textarea";
 import { useComposioLogos } from "@/features/extensions/hooks/useComposioLogos";
 import { TierSelector } from "@/features/models/components/TierSelector";
 import { VoiceInput } from "@/features/voice/components/VoiceInput";
@@ -173,7 +174,7 @@ export const ChatComposer = ({
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
-      className="relative flex flex-col bg-white dark:bg-surface-base border border-gray-200/80 dark:border-surface-border rounded-xl shadow-[0_10px_34px_-12px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_36px_-12px_rgba(0,0,0,0.55)] focus-within:border-gray-300 dark:focus-within:border-surface-border focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.04),0_10px_34px_-12px_rgba(0,0,0,0.20)] dark:focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.03),0_12px_36px_-12px_rgba(0,0,0,0.6)] transition-all duration-200"
+      className="relative flex flex-col bg-surface-page dark:bg-surface-base border border-surface-border rounded-xl shadow-md focus-within:border-surface-border focus-within:shadow-lg transition-all duration-200"
     >
       <AnimatePresence>
         {isDragging && (
@@ -182,9 +183,9 @@ export const ChatComposer = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
-            className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/85 dark:bg-surface-base/85 border-2 border-dashed border-gray-400 dark:border-gray-500 pointer-events-none"
+            className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-surface-page/85 dark:bg-surface-base/85 border-2 border-dashed border-surface-border dark:border-surface-border pointer-events-none"
           >
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-300">
+            <span className="text-sm font-medium text-muted dark:text-disabled">
               Drop images or files to attach
             </span>
           </motion.div>
@@ -209,14 +210,14 @@ export const ChatComposer = ({
         )}
       </AnimatePresence>
 
-      <textarea
+      <Textarea
         ref={inputRef}
         value={inputMessage}
         onChange={onInputChange}
         onKeyDown={onKeyDown}
         onPaste={handlePaste}
         placeholder="Do anything..."
-        className="w-full min-h-[54px] resize-none bg-transparent px-3.5 pb-2 pt-3.5 text-sm font-normal leading-[18px] text-gray-900 placeholder-gray-300 scrollbar-thin focus:outline-none disabled:cursor-not-allowed dark:text-gray-100 dark:placeholder-gray-600"
+        className="min-h-[54px] resize-none border-0 bg-transparent px-3.5 pb-2 pt-3.5 text-sm font-normal leading-[18px] text-primary placeholder:text-disabled scrollbar-thin focus-visible:ring-0 disabled:cursor-not-allowed"
         rows={1}
         disabled={isLoading}
       />
@@ -233,8 +234,8 @@ export const ChatComposer = ({
               className={cx(
                 composerRoundIconButton,
                 showAttachMenu
-                  ? "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-300"
-                  : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-border hover:text-gray-600 dark:hover:text-gray-400",
+                  ? "bg-surface-base dark:bg-surface-border text-secondary dark:text-disabled"
+                  : "text-disabled dark:text-secondary hover:bg-surface-base dark:hover:bg-surface-border hover:text-secondary dark:hover:text-disabled",
               )}
             >
               <Add size="sm" />
@@ -249,10 +250,10 @@ export const ChatComposer = ({
                   transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
                   role="menu"
                   style={{ transformOrigin: "bottom left" }}
-                  className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-surface-border bg-surface-base shadow-[0_18px_60px_-24px_rgba(0,0,0,0.28),0_8px_20px_-16px_rgba(0,0,0,0.18)] backdrop-blur-xl dark:shadow-[0_18px_60px_-24px_rgba(0,0,0,0.75)]"
+                  className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-surface-border bg-surface-base shadow-lg backdrop-blur-xl"
                 >
                   <div className="max-h-[316px] overflow-y-auto px-1.5 py-2 scrollbar-thin">
-                    <div className="px-2 pb-1 text-sm leading-none text-gray-400 dark:text-gray-500">
+                    <div className="px-2 pb-1 text-sm leading-none text-disabled dark:text-muted">
                       Add
                     </div>
 
@@ -261,9 +262,9 @@ export const ChatComposer = ({
                       role="menuitem"
                       tabIndex={-1}
                       onClick={() => { onTriggerFileInput(); onToggleAttachMenu(); }}
-                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-secondary transition-colors hover:bg-surface-base/80 dark:text-disabled dark:hover:bg-surface-selected"
                     >
-                      <Files size="sm" className="shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Files size="sm" className="shrink-0 text-muted dark:text-disabled" />
                       <span className="min-w-0 flex-1 truncate">Files and folders</span>
                     </Button>
 
@@ -271,11 +272,11 @@ export const ChatComposer = ({
                       variant="ghost"
                       role="menuitem"
                       tabIndex={-1}
-                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-muted transition-colors hover:bg-surface-base/70 dark:text-disabled dark:hover:bg-surface-selected"
                     >
-                      <Icon icon={TargetIcon} size="sm" className="shrink-0 text-gray-500 dark:text-gray-500" />
-                      <span className="shrink-0 text-gray-700 dark:text-gray-300">Goal</span>
-                      <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
+                      <Icon icon={TargetIcon} size="sm" className="shrink-0 text-muted dark:text-muted" />
+                      <span className="shrink-0 text-secondary dark:text-disabled">Goal</span>
+                      <span className="min-w-0 flex-1 truncate text-disabled dark:text-secondary">
                         Set a goal that Studio will keep working towards
                       </span>
                     </Button>
@@ -284,16 +285,16 @@ export const ChatComposer = ({
                       variant="ghost"
                       role="menuitem"
                       tabIndex={-1}
-                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-muted transition-colors hover:bg-surface-base/70 dark:text-disabled dark:hover:bg-surface-selected"
                     >
-                      <Checklist size="sm" className="shrink-0 text-gray-500 dark:text-gray-500" />
-                      <span className="shrink-0 text-gray-700 dark:text-gray-300">Plan mode</span>
-                      <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
+                      <Checklist size="sm" className="shrink-0 text-muted dark:text-muted" />
+                      <span className="shrink-0 text-secondary dark:text-disabled">Plan mode</span>
+                      <span className="min-w-0 flex-1 truncate text-disabled dark:text-secondary">
                         Turn plan mode on
                       </span>
                     </Button>
 
-                    <div className="px-2 pb-1 pt-3 text-sm leading-none text-gray-400 dark:text-gray-500">
+                    <div className="px-2 pb-1 pt-3 text-sm leading-none text-disabled dark:text-muted">
                       Apps
                     </div>
 
@@ -303,7 +304,7 @@ export const ChatComposer = ({
                         variant="ghost"
                         role="menuitem"
                         tabIndex={-1}
-                        className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
+                        className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-secondary transition-colors hover:bg-surface-base/80 dark:text-disabled dark:hover:bg-surface-selected"
                       >
                         <AppLogo
                           src={composioLogos.get(app.id)}
@@ -315,7 +316,7 @@ export const ChatComposer = ({
                           fallback={app.iconNode ?? app.iconLetter ?? app.name.charAt(0)}
                         />
                         <span className="shrink-0">{app.name}</span>
-                        <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
+                        <span className="min-w-0 flex-1 truncate text-disabled dark:text-secondary">
                           {app.description}
                         </span>
                       </Button>
@@ -326,11 +327,11 @@ export const ChatComposer = ({
                       role="menuitem"
                       tabIndex={-1}
                       onClick={() => { navigateTo("extensions"); onToggleAttachMenu(); }}
-                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
+                      className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-muted transition-colors hover:bg-surface-base/70 dark:text-disabled dark:hover:bg-surface-selected"
                     >
-                      <Grid size="sm" className="shrink-0 text-gray-500 dark:text-gray-500" />
-                      <span className="shrink-0 text-gray-700 dark:text-gray-300">More apps</span>
-                      <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
+                      <Grid size="sm" className="shrink-0 text-muted dark:text-muted" />
+                      <span className="shrink-0 text-secondary dark:text-disabled">More apps</span>
+                      <span className="min-w-0 flex-1 truncate text-disabled dark:text-secondary">
                         Browse connected tools and extensions
                       </span>
                     </Button>
@@ -379,8 +380,8 @@ export const ChatComposer = ({
                   className={cx(
                     composerPillButton,
                     autonomous
-                      ? "bg-gray-100 dark:bg-surface-selected text-gray-600 dark:text-gray-300 hover:bg-gray-150 dark:hover:bg-surface-border"
-                      : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-border hover:text-gray-600 dark:hover:text-gray-400",
+                      ? "bg-surface-base dark:bg-surface-selected text-secondary dark:text-disabled hover:bg-surface-raised dark:hover:bg-surface-border"
+                      : "text-disabled dark:text-secondary hover:bg-surface-base dark:hover:bg-surface-border hover:text-secondary dark:hover:text-disabled",
                   )}
                 >
                   {autonomous
@@ -428,7 +429,7 @@ export const ChatComposer = ({
                 onClick={onAbort}
                 className={cx(
                   composerRoundIconButton,
-                  "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-active",
+                  "bg-surface-base dark:bg-surface-border text-secondary dark:text-disabled hover:bg-surface-raised dark:hover:bg-surface-active",
                 )}
               >
                 <Spinner size="sm" decorative />
@@ -440,7 +441,7 @@ export const ChatComposer = ({
                 onClick={onAbort}
                 className={cx(
                   composerRoundIconButton,
-                  "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-active",
+                  "bg-surface-base dark:bg-surface-border text-secondary dark:text-disabled hover:bg-surface-raised dark:hover:bg-surface-active",
                 )}
               >
                 <Stop size="sm" weight="fill" />
@@ -454,8 +455,8 @@ export const ChatComposer = ({
                 className={cx(
                   composerRoundIconButton,
                   inputMessage.trim() || attachments.length > 0
-                    ? "bg-gray-400 text-white shadow-sm hover:bg-gray-500 dark:bg-gray-500 dark:text-gray-100 dark:hover:bg-gray-400"
-                    : "bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-surface-selected dark:text-gray-700",
+                    ? "bg-primary text-on-emphasis shadow-sm hover:bg-secondary dark:bg-secondary dark:text-primary dark:hover:bg-primary"
+                    : "bg-surface-base text-disabled cursor-not-allowed dark:bg-surface-selected dark:text-secondary",
                 )}
               >
                 <Send size="sm" />

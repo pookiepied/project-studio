@@ -45,7 +45,7 @@ export function Modal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={closeOnBackdrop ? onClose : undefined}
-            className="fixed inset-0 z-modal bg-black/25 backdrop-blur-[3px]"
+            className="fixed inset-0 z-modal bg-scrim backdrop-blur-[3px]"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: -10 }}
@@ -55,7 +55,7 @@ export function Modal({
             className="fixed inset-0 z-modal flex items-center justify-center pointer-events-none p-4"
           >
             <div
-              className={`pointer-events-auto ${sizeClasses[size]} max-h-[90vh] overflow-hidden rounded-2xl bg-white dark:bg-surface-base shadow-2xl ring-1 ring-black/5 dark:ring-white/10 ${className}`}
+              className={`pointer-events-auto ${sizeClasses[size]} max-h-[90vh] overflow-hidden rounded-2xl bg-surface-page dark:bg-surface-base shadow-2xl ring-1 ring-surface-border dark:ring-surface-border ${className}`}
               onClick={(e) => e.stopPropagation()}
             >
               {children}

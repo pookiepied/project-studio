@@ -13,6 +13,7 @@ import {
 } from "@/ui/icons";
 import type { ConversationStorageScope } from "@/core/conversations";
 import { Button } from "@/ui/primitives/Button";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 
 interface EnvironmentSelectorProps {
   scope: ConversationStorageScope;
@@ -23,14 +24,14 @@ interface EnvironmentSelectorProps {
 }
 
 export function EnvironmentSelector({ scope, onScopeChange, disabled, placement = "up" }: EnvironmentSelectorProps) {
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const [dropPos, setDropPos] = useState<{ bottom?: number; top?: number; left: number } | null>(null);
   useEffect(() => {
     if (!open) return;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [open]);
+  }, [onClose, open]);
 
   const scopeGlyph = scope === "cloud" ? CloudCheckIcon : DesktopTowerIcon;
   const label = scope === "cloud" ? "Cloud" : "Local";
@@ -48,7 +49,7 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
               ? { top: rect.bottom + 8, left }
               : { bottom: window.innerHeight - rect.top + 8, left },
           );
-          setOpen(value => !value);
+          onToggle();
         }}
         className="gap-1.5 px-2 h-6 rounded-md text-xs text-secondary hover:bg-surface-hover disabled:opacity-60 disabled:cursor-default"
       >
@@ -65,8 +66,8 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
           <>
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onMouseDown={() => setOpen(false)}
-            className="fixed inset-0 z-[9998]"
+            onMouseDown={onClose}
+            className="fixed inset-0 z-popover"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: -4 }}
@@ -85,14 +86,14 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
               title="Local"
               description="Runs on this machine, full file access"
               active={scope === "local"}
-              onClick={() => { onScopeChange("local"); setOpen(false); }}
+              onClick={() => { onScopeChange("local"); onClose(); }}
             />
             <EnvOption
               icon={<Icon icon={CloudCheckIcon} size="sm" weight={scope === "cloud" ? "fill" : "regular"} />}
               title="Cloud"
               description="Chat and research, no file access"
               active={scope === "cloud"}
-              onClick={() => { onScopeChange("cloud"); setOpen(false); }}
+              onClick={() => { onScopeChange("cloud"); onClose(); }}
             />
             <AddRow icon={<Add size="sm" />} label="Add Cloud Environment" />
 

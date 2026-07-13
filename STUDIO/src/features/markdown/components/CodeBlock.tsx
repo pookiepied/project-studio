@@ -145,15 +145,15 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
     };
 
     return (
-      <div className="group relative my-4 rounded-xl overflow-hidden border border-gray-200 dark:border-surface-border transition-colors duration-300 w-full min-w-0">
-        <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-surface-base border-b border-gray-200 dark:border-surface-border">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-600">{displayName(language)}</span>
+      <div className="group relative my-4 rounded-xl overflow-hidden border border-surface-border dark:border-surface-border transition-colors duration-300 w-full min-w-0">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-surface-page dark:bg-surface-base border-b border-surface-border dark:border-surface-border">
+          <span className="text-xs font-medium text-muted dark:text-secondary">{displayName(language)}</span>
           <Button
             variant="ghost"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-smooth"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised rounded-lg transition-smooth"
             title="Copy source"
           >
             <AnimatePresence mode="wait">
@@ -170,7 +170,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
             </AnimatePresence>
           </Button>
         </div>
-        <div className="bg-white dark:bg-surface-base">
+        <div className="bg-surface-page dark:bg-surface-base">
           {renderBody()}
         </div>
       </div>
@@ -180,7 +180,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
   if (isInline) {
     return (
       <code
-        className="px-1.5 py-0.5 bg-gray-100 dark:bg-surface-raised text-gray-900 dark:text-gray-200 rounded text-sm"
+        className="px-1.5 py-0.5 bg-surface-base dark:bg-surface-raised text-primary dark:text-disabled rounded text-sm"
         style={{ fontFamily: FONT_MONO }}
       >
         {children}
@@ -191,10 +191,10 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
   const highlighterStyle = isDark ? atomOneDark : atomOneLight;
 
   return (
-    <div className="group relative my-4 rounded-xl overflow-hidden border border-gray-200 dark:border-surface-border transition-colors duration-300 w-full min-w-0">
+    <div className="group relative my-4 rounded-xl overflow-hidden border border-surface-border dark:border-surface-border transition-colors duration-300 w-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-surface-base border-b border-gray-200 dark:border-surface-border transition-colors duration-300">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-600 font-sans transition-colors duration-300">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-surface-page dark:bg-surface-base border-b border-surface-border dark:border-surface-border transition-colors duration-300">
+        <span className="text-xs font-medium text-muted dark:text-secondary font-sans transition-colors duration-300">
           {displayName(language)}
         </span>
 
@@ -206,7 +206,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handlePreview}
-              className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-smooth"
+              className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised rounded-lg transition-smooth"
               title="Open preview"
             >
               <AnimatePresence mode="wait">
@@ -249,8 +249,8 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
             title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
             className={`p-1.5 rounded-lg transition-colors ${
               wordWrap
-                ? "text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-surface-raised"
-                : "text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised"
+                ? "text-secondary dark:text-disabled bg-surface-base dark:bg-surface-raised"
+                : "text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised"
             }`}
           >
             <Icon icon={TextAlignLeftIcon} size="sm" />
@@ -265,7 +265,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
               onClick={() => setIsCollapsed((c) => !c)}
               aria-label={isCollapsed ? `Expand ${lineCount} lines` : "Collapse"}
               title={isCollapsed ? `Expand ${lineCount} lines` : "Collapse"}
-              className="p-1.5 text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-colors"
+              className="p-1.5 text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised rounded-lg transition-colors"
             >
               {isCollapsed ? <Expand size="sm" /> : <Icon icon={CaretUpIcon} size="sm" />}
             </Button>
@@ -277,7 +277,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-smooth"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised rounded-lg transition-smooth"
             title="Copy code"
           >
             <AnimatePresence mode="wait">
@@ -362,7 +362,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={() => setIsCollapsed(false)}
-          className="w-full py-3 text-xs text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-raised transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 text-xs text-muted dark:text-secondary hover:text-secondary dark:hover:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised transition-colors flex items-center justify-center gap-2"
         >
           <Expand size="sm" />
           <span>Show {lineCount} lines</span>

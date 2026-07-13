@@ -35,6 +35,7 @@ import { EmptyState } from "@/ui/primitives/EmptyState";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Input } from "@/ui/primitives/Input";
+import { Select } from "@/ui/primitives/Select";
 import { Textarea } from "@/ui/primitives/Textarea";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
@@ -358,23 +359,21 @@ function CreateAgentForm({
         </label>
         <label>
           <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Type</span>
-          <select
+          <Select
             value={agentType}
-            onChange={(event) => setAgentType(event.target.value as AgentType)}
-            className="w-full rounded-md border border-surface-border bg-surface-base px-2.5 py-2 text-xs text-secondary outline-none transition focus:border-primary"
-          >
-            {AGENT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+            onChange={(value) => setAgentType(value as AgentType)}
+            options={AGENT_TYPE_OPTIONS}
+            className="rounded-md px-2.5 py-2 text-xs text-secondary"
+          />
         </label>
         <label>
           <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Trigger</span>
-          <select
+          <Select
             value={triggerType}
-            onChange={(event) => setTriggerType(event.target.value as TriggerType)}
-            className="w-full rounded-md border border-surface-border bg-surface-base px-2.5 py-2 text-xs text-secondary outline-none transition focus:border-primary"
-          >
-            {TRIGGER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+            onChange={(value) => setTriggerType(value as TriggerType)}
+            options={TRIGGER_OPTIONS}
+            className="rounded-md px-2.5 py-2 text-xs text-secondary"
+          />
         </label>
       </div>
       <label className="mt-3 block">

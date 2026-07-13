@@ -52,28 +52,28 @@ export function WorkspacePlaceholderPanel({
     <div className="flex h-full transition-colors duration-300" style={{ width, minWidth: width }}>
       <ResizeHandle onMouseDown={onResizeDown} />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
-        <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-page transition-colors duration-300 dark:bg-surface-page">
+        <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-surface-border bg-surface-page px-3 transition-colors duration-300 dark:border-surface-border dark:bg-surface-page">
           <IconButton
             size="sm"
             onClick={onClose}
             aria-label={`Close ${title.toLowerCase()}`}
             title={`Close ${title.toLowerCase()}`}
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-disabled transition-colors duration-150 hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Close size="sm" />
           </IconButton>
-          <Icon size="sm" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
-          <span className="truncate text-xs text-gray-500 dark:text-gray-500">{title}</span>
+          <Icon size="sm" className="flex-shrink-0 text-disabled dark:text-secondary" />
+          <span className="truncate text-xs text-muted dark:text-muted">{title}</span>
         </div>
 
         <div className="flex flex-1 items-center justify-center px-8 text-center">
           <div className="max-w-[220px]">
-            <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 dark:border-surface-border dark:bg-surface-raised dark:text-gray-500">
+            <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-surface-border bg-surface-page text-disabled dark:border-surface-border dark:bg-surface-raised dark:text-muted">
               <Icon size="md" />
             </div>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-gray-400 dark:text-gray-600">
+            <p className="text-sm font-medium text-secondary dark:text-disabled">{title}</p>
+            <p className="mt-1 text-xs leading-relaxed text-disabled dark:text-secondary">
               Nothing here yet.
             </p>
           </div>

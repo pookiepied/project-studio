@@ -24,7 +24,7 @@ import { ActionBtn } from "./IslandAtoms";
 
 /** Leading icon whose shape reflects the type of card being shown. */
 export function CardIcon({ type }: { type: PulseCardType }) {
-  const cls = "text-gray-500 dark:text-gray-400 flex-shrink-0";
+  const cls = "text-muted dark:text-disabled flex-shrink-0";
   switch (type) {
     case "price-lookup":
       return <Icon icon={CurrencyCircleDollarIcon} size="sm" className={cls} />;
@@ -71,22 +71,22 @@ export function PulseCardContent({ card, onAction }: PulseCardContentProps) {
       <div className="flex flex-col min-w-0 flex-1" style={{ gap: 1 }}>
         {card.title && (
           <span
-            className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate leading-tight font-sans"
+            className="text-sm font-semibold text-secondary dark:text-disabled truncate leading-tight font-sans"
           >
             {card.title}
           </span>
         )}
         {card.text && (
           <span
-            className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight font-sans"
+            className="text-xs text-muted dark:text-disabled truncate leading-tight font-sans"
           >
             {card.text.length > 55 ? card.text.slice(0, 52) + "…" : card.text}
           </span>
         )}
         {hasProgress && (
-          <div className="w-full h-[2px] rounded-full bg-gray-200 dark:bg-gray-700 mt-0.5 overflow-hidden">
+          <div className="w-full h-[2px] rounded-full bg-surface-raised dark:bg-secondary mt-0.5 overflow-hidden">
             <motion.div
-              className="h-full rounded-full bg-gray-500 dark:bg-gray-300"
+              className="h-full rounded-full bg-secondary dark:bg-surface-selected"
               animate={{ width: `${card.progress}%` }}
               transition={{ duration: 0.3, ease: "easeOut" }}
             />
@@ -96,7 +96,7 @@ export function PulseCardContent({ card, onAction }: PulseCardContentProps) {
 
       {card.subtext && (
         <span
-          className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 whitespace-nowrap font-sans"
+          className="text-xs text-disabled dark:text-muted flex-shrink-0 whitespace-nowrap font-sans"
         >
           {card.subtext}
         </span>

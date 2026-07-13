@@ -34,7 +34,7 @@ export function EngineGlyph({
       {engine === "claude" ? (
         <ClaudeCodeIcon size={size} busy={busy} />
       ) : (
-        <StudioMark size={size} busy={busy} className="text-gray-500 dark:text-gray-400" />
+        <StudioMark size={size} busy={busy} className="text-muted dark:text-disabled" />
       )}
     </span>
   );

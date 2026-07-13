@@ -43,7 +43,7 @@ export function CsvTable({ code }: CsvTableProps) {
             {headers.map((h, i) => (
               <th
                 key={i}
-                className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-surface-divider border border-gray-200 dark:border-surface-border first:rounded-tl-lg last:rounded-tr-lg"
+                className="px-3 py-2 text-left font-semibold text-secondary dark:text-disabled bg-surface-base dark:bg-surface-divider border border-surface-border dark:border-surface-border first:rounded-tl-lg last:rounded-tr-lg"
               >
                 {h}
               </th>
@@ -54,12 +54,12 @@ export function CsvTable({ code }: CsvTableProps) {
           {body.map((row, ri) => (
             <tr
               key={ri}
-              className="even:bg-gray-50 dark:even:bg-surface-raised hover:bg-gray-100 dark:hover:bg-surface-raised transition-colors"
+              className="even:bg-surface-page dark:even:bg-surface-raised hover:bg-surface-base dark:hover:bg-surface-raised transition-colors"
             >
               {row.map((cell, ci) => (
                 <td
                   key={ci}
-                  className="px-3 py-2 text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-surface-selected"
+                  className="px-3 py-2 text-secondary dark:text-disabled border border-surface-border dark:border-surface-selected"
                 >
                   {cell}
                 </td>

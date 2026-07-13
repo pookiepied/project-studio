@@ -146,15 +146,15 @@ export function ModelPicker({
           variant="ghost"
           onClick={() => open(!isOpen)}
           disabled={disabled}
-          className="flex items-center gap-1 px-2 h-6 rounded-md hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth disabled:opacity-40"
+          className="flex items-center gap-1 px-2 h-6 rounded-md hover:bg-surface-base dark:hover:bg-surface-raised transition-smooth disabled:opacity-40"
         >
-          {isAutoSelected && <Eco size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />}
-          <span className="text-xs text-gray-500 dark:text-gray-400 max-w-[150px] truncate transition-colors duration-300">
+          {isAutoSelected && <Eco size="xs" className="text-disabled dark:text-secondary flex-shrink-0" />}
+          <span className="text-xs text-muted dark:text-disabled max-w-[150px] truncate transition-colors duration-300">
             {triggerText}
           </span>
           <Expand
             size="xs"
-            className={`text-gray-400 dark:text-gray-600 flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            className={`text-disabled dark:text-secondary flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </Button>
       ) : (
@@ -162,15 +162,15 @@ export function ModelPicker({
           variant="ghost"
           onClick={() => open(!isOpen)}
           disabled={disabled}
-          className="w-full px-3 py-1.5 text-sm text-left bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-md hover:bg-gray-50 dark:hover:bg-surface-raised transition-smooth focus-visible:ring-2 focus-visible:ring-focus flex items-center justify-between disabled:opacity-50"
+          className="w-full px-3 py-1.5 text-sm text-left bg-surface-page dark:bg-surface-base border border-surface-border dark:border-surface-border rounded-md hover:bg-surface-page dark:hover:bg-surface-raised transition-smooth focus-visible:ring-2 focus-visible:ring-focus flex items-center justify-between disabled:opacity-50"
         >
-          <span className="flex items-center gap-1.5 text-gray-900 dark:text-gray-200 font-normal truncate transition-colors duration-300">
-            {isAutoSelected && <Eco size="sm" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />}
+          <span className="flex items-center gap-1.5 text-primary dark:text-disabled font-normal truncate transition-colors duration-300">
+            {isAutoSelected && <Eco size="sm" className="text-disabled dark:text-secondary flex-shrink-0" />}
             {triggerText}
           </span>
           <Expand
             size="sm"
-            className={`text-gray-400 dark:text-gray-600 flex-shrink-0 ml-2 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            className={`text-disabled dark:text-secondary flex-shrink-0 ml-2 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </Button>
       )}
@@ -183,7 +183,7 @@ export function ModelPicker({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12, ease: "easeOut" }}
-            className={`bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-md shadow-xl overflow-hidden transition-colors duration-300 ${
+            className={`bg-surface-page dark:bg-surface-base border border-surface-border dark:border-surface-border rounded-md shadow-xl overflow-hidden transition-colors duration-300 ${
               isCompact
                 ? "absolute z-50 mt-1.5 right-0 w-[280px]"
                 : `absolute z-50 mt-1.5 w-full ${align === "right" ? "right-0" : "left-0"}`
@@ -191,7 +191,7 @@ export function ModelPicker({
           >
 
             {/* Search */}
-            <div className="px-3 pt-2.5 pb-2 border-b border-gray-100 dark:border-surface-border">
+            <div className="px-3 pt-2.5 pb-2 border-b border-surface-border dark:border-surface-border">
               <SearchInput
                 ref={searchRef}
                 value={search}
@@ -207,22 +207,22 @@ export function ModelPicker({
             <div className={`overflow-y-auto scrollbar-auto-hide ${isCompact ? "max-h-[240px]" : "max-h-64"}`}>
               {/* Auto option — always at top for chat type */}
               {showAutoOption && (
-                <div className="border-b border-gray-100 dark:border-surface-border pb-1 mb-0.5">
+                <div className="border-b border-surface-border dark:border-surface-border pb-1 mb-0.5">
                   <Button
                     variant="ghost"
                     onClick={() => handleSelect(autoMode.id)}
                     title={autoMode.description}
                     className={`w-full flex items-center text-left px-3 py-1.5 transition-colors duration-100 ${
-                      isAutoSelected ? "bg-gray-50 dark:bg-surface-raised" : "hover:bg-gray-50 dark:hover:bg-surface-raised"
+                      isAutoSelected ? "bg-surface-page dark:bg-surface-raised" : "hover:bg-surface-page dark:hover:bg-surface-raised"
                     }`}
                   >
-                    <Eco size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0 mr-2" />
-                    <span className={`flex-1 min-w-0 text-sm truncate transition-colors duration-300 ${isAutoSelected ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"}`}>
+                    <Eco size="xs" className="text-disabled dark:text-secondary flex-shrink-0 mr-2" />
+                    <span className={`flex-1 min-w-0 text-sm truncate transition-colors duration-300 ${isAutoSelected ? "text-primary dark:text-primary" : "text-secondary dark:text-disabled"}`}>
                       {autoMode.label}
                     </span>
                     <div className="flex items-center flex-shrink-0 ml-2">
                       {isAutoSelected && (
-                        <Check size="xs" className="text-gray-500 dark:text-gray-400" />
+                        <Check size="xs" className="text-muted dark:text-disabled" />
                       )}
                     </div>
                   </Button>
@@ -230,7 +230,7 @@ export function ModelPicker({
               )}
 
               {sortedProviders.length === 0 && !showAutoOption ? (
-                <p className="px-3 py-6 text-xs text-gray-400 dark:text-gray-600 text-center">
+                <p className="px-3 py-6 text-xs text-disabled dark:text-secondary text-center">
                   {search ? "No models match" : "No models available"}
                 </p>
               ) : (
@@ -240,7 +240,7 @@ export function ModelPicker({
                     {/* Provider separator */}
                     <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
                       <ProviderIcon provider={provider} size="xs" />
-                      <span className="text-3xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                      <span className="text-3xs font-medium text-disabled dark:text-muted uppercase tracking-widest">
                         {getProviderDisplayName(provider)}
                       </span>
                     </div>
@@ -266,15 +266,15 @@ export function ModelPicker({
                           ].filter(Boolean).join(" · ") || undefined}
                           className={`w-full flex items-center text-left px-3 py-1.5 transition-colors duration-100 ${
                             isSelected
-                              ? "bg-gray-50 dark:bg-surface-raised"
-                              : "hover:bg-gray-50 dark:hover:bg-surface-raised"
+                              ? "bg-surface-page dark:bg-surface-raised"
+                              : "hover:bg-surface-page dark:hover:bg-surface-raised"
                           }`}
                         >
                           {/* Name — min-w-0 lets it shrink below content width so icons reach the right edge */}
                           <span className={`flex-1 min-w-0 text-sm truncate transition-colors duration-300 ${
                             isSelected
-                              ? "text-gray-900 dark:text-gray-100"
-                              : "text-gray-700 dark:text-gray-300"
+                              ? "text-primary dark:text-primary"
+                              : "text-secondary dark:text-disabled"
                           }`}>
                             {model.name}
                           </span>
@@ -282,16 +282,16 @@ export function ModelPicker({
                           {/* Icons — packed together, always at the right edge */}
                           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                             {hasVision && (
-                              <Eye size="xs" className="text-gray-300 dark:text-gray-600" />
+                              <Eye size="xs" className="text-disabled dark:text-secondary" />
                             )}
                             {isFree && model.provider !== "local" && (
                               <span className="w-1 h-1 rounded-full bg-surface-raised flex-shrink-0" />
                             )}
                             {model.provider === "local" && (
-                              <span className="text-3xs text-gray-300 dark:text-gray-600">L</span>
+                              <span className="text-3xs text-disabled dark:text-secondary">L</span>
                             )}
                             {isSelected && (
-                              <Check size="xs" className="text-gray-500 dark:text-gray-400 transition-colors duration-300" />
+                              <Check size="xs" className="text-muted dark:text-disabled transition-colors duration-300" />
                             )}
                           </div>
                         </Button>

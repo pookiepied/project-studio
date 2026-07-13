@@ -59,13 +59,13 @@ export function ContextWindowButton({
         title="Context window"
         className={cx(
           variant === "meta"
-            ? "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full box-border leading-none text-gray-400 transition-colors dark:text-gray-600 [&>svg]:block"
+            ? "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full box-border leading-none text-disabled transition-colors dark:text-secondary [&>svg]:block"
             : variant === "header"
             // Ring alone was unreadable at this size — pair it with the number.
-            ? "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium leading-none text-gray-400 transition-colors dark:text-gray-600"
+            ? "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium leading-none text-disabled transition-colors dark:text-secondary"
             : composerRoundIconButton,
-          variant === "toolbar" && "relative justify-end pr-0.5 text-gray-400",
-          "hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400",
+          variant === "toolbar" && "relative justify-end pr-0.5 text-disabled",
+          "hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled",
         )}
       >
         <TokenRing
@@ -86,33 +86,33 @@ export function ContextWindowButton({
             exit={{ opacity: 0, scale: 0.96, y: placement === "down" ? -6 : 6 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
             className={cx(
-              "absolute right-0 w-56 z-50 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-surface-border dark:bg-surface-base",
+              "absolute right-0 w-56 z-50 rounded-xl border border-surface-border bg-surface-page p-3 shadow-xl dark:border-surface-border dark:bg-surface-base",
               placement === "down" ? "top-full mt-1.5" : "bottom-full mb-1.5",
             )}
           >
-            <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
+            <p className="mb-2 text-xs font-semibold text-muted dark:text-disabled">
               Context window
             </p>
-            <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-surface-border">
+            <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-surface-base dark:bg-surface-border">
               <div
                 className={`h-full rounded-full ${
                   percentage >= 0.9
                     ? "bg-surface-raised"
                     : percentage >= 0.7
                     ? "bg-surface-raised"
-                    : "bg-gray-500 dark:bg-gray-400"
+                    : "bg-secondary dark:bg-primary"
                 }`}
                 style={{ width: `${Math.round(percentage * 100)}%`, transition: "width 0.5s ease" }}
               />
             </div>
-            <p className="text-2xs text-gray-400 dark:text-gray-500">
+            <p className="text-2xs text-disabled dark:text-muted">
               {formatTokenCount(usedTokens)} / {formatTokenCount(maxTokens)} tokens - {Math.round(percentage * 100)}%
             </p>
             {isSummarizing && (
-              <p className="mt-1 text-2xs text-gray-400 dark:text-gray-500">Compacting context...</p>
+              <p className="mt-1 text-2xs text-disabled dark:text-muted">Compacting context...</p>
             )}
             {hasContextSummary && !isSummarizing && (
-              <p className="mt-1 text-2xs text-gray-400 dark:text-gray-500">Context was summarized</p>
+              <p className="mt-1 text-2xs text-disabled dark:text-muted">Context was summarized</p>
             )}
           </motion.div>
         )}

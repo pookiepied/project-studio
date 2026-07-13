@@ -10,6 +10,7 @@ import { Badge } from "@/ui/primitives/Badge";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { EmptyState } from "@/ui/primitives/EmptyState";
 import { Spinner } from "@/ui/primitives/Spinner";
+import { InlineToast } from "@/ui/feedback/InlineToast";
 import type { WhitelistedUser, FetchState, ActionState } from "../types";
 import { Avatar } from "./Avatar";
 import { fmtRelative } from "../helpers";
@@ -209,10 +210,11 @@ export const WhitelistView = ({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-raised border border-surface-border text-primary text-xs px-3 py-2 rounded-lg shadow-lg z-toast"
         >
-          <Warning size="xs" weight="fill" className="text-primary flex-shrink-0" />
-          {removeError}
+          <InlineToast>
+            <Warning size="xs" weight="fill" className="text-primary flex-shrink-0" />
+            {removeError}
+          </InlineToast>
         </motion.div>
       )}
     </AnimatePresence>

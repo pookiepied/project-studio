@@ -62,7 +62,7 @@ export function WindowTrafficLights() {
           key={kind}
           onClick={() => handleClick(kind)}
           aria-label={label}
-          className="rounded-full ring-1 ring-black/5 transition-opacity hover:opacity-80 active:opacity-60"
+          className="rounded-full ring-1 ring-surface-border transition-opacity hover:opacity-80 active:opacity-60"
           style={{
             width: DOT_SIZE,
             height: DOT_SIZE,

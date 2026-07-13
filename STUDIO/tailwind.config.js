@@ -85,6 +85,7 @@ export default {
         muted:          'var(--text-muted)',       // muted / placeholder
         disabled:       'var(--text-disabled)',    // disabled text
         'on-emphasis':  'var(--text-on-emphasis)', // text on filled near-black/graphite
+        scrim:          'var(--scrim)',            // modal/backdrop scrim
         // State channels that are NOT fills.
         focus:  'var(--focus-ring)', // ring-focus / outline-focus — neutral focus ring
         marker: 'var(--marker)',     // structural selected marker (2px edge bar / inset)

@@ -295,7 +295,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                   whileTap={{ scale: 0.95 }}
                   onClick={endSession}
                   aria-label="End voice session"
-                  className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-surface-border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus "
+                  className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-surface-border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <Icon icon={PhoneXIcon} size="md" />
                 </Button>
@@ -333,7 +333,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                 exit={{ opacity: 0 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => { endSession(); setTimeout(startSession, 80); }}
-                className="px-5 py-2.5 rounded-full border border-surface-border text-sm font-mono tracking-wide transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus "
+                className="px-5 py-2.5 rounded-full border border-surface-border text-sm font-mono tracking-wide transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 Retry
               </Button>

@@ -7,6 +7,7 @@ import {
 } from "@/ui/icons";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { Button } from "@/ui/primitives/Button";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 
 interface AccountMenuProps {
   expanded?: boolean;
@@ -23,7 +24,7 @@ function getInitials(name: string) {
 }
 
 export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuProps) {
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const [panelPos, setPanelPos] = useState<{ left: number; bottom: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -53,7 +54,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
       ) {
         return;
       }
-      setOpen(false);
+      onClose();
     };
     window.addEventListener("resize", updatePanelPosition);
     window.addEventListener("scroll", updatePanelPosition, true);
@@ -63,14 +64,14 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
       window.removeEventListener("scroll", updatePanelPosition, true);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [open]);
+  }, [onClose, open]);
 
   const avatar = (
-    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 dark:bg-surface-raised">
+    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-raised dark:bg-surface-raised">
       {user?.picture ? (
         <img src={user.picture} alt={displayName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
       ) : (
-        <span className="text-2xs font-semibold text-gray-600 dark:text-gray-400">{initials}</span>
+        <span className="text-2xs font-semibold text-secondary dark:text-disabled">{initials}</span>
       )}
     </span>
   );
@@ -78,7 +79,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
   return (
     <div ref={wrapperRef} className="relative">
       <Button
-        onClick={() => setOpen((value) => !value)}
+        onClick={onToggle}
         variant="ghost"
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -116,11 +117,11 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
             className="fixed z-50 w-64 overflow-hidden rounded-xl border border-surface-border bg-surface-base shadow-xl"
           >
             <div className="flex items-center gap-3 border-b border-surface-divider px-4 py-3.5">
-              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 dark:bg-surface-raised">
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-raised dark:bg-surface-raised">
                 {user?.picture ? (
                   <img src={user.picture} alt={displayName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">{initials}</span>
+                  <span className="text-sm font-semibold text-secondary dark:text-disabled">{initials}</span>
                 )}
               </span>
               <span className="min-w-0">
@@ -132,7 +133,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
             <div className="p-1.5">
               <Button
                 onClick={() => {
-                  setOpen(false);
+                  onClose();
                   onManageAccount?.();
                 }}
                 variant="ghost"
@@ -146,7 +147,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
                 <Button
                   onClick={() => {
                     logout();
-                    setOpen(false);
+                    onClose();
                   }}
                   variant="ghost"
                   className="w-full gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised dark:hover:bg-surface-raised/[0.06]"

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { chevronRotateTransition } from "@/design/motion";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import {
   Expand,
   Check,
@@ -34,20 +36,20 @@ export function ClaudeModelSelector({
   onModelChange,
   onEffortChange,
 }: ClaudeModelSelectorProps) {
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const [effortOpen, setEffortOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        onClose();
         setEffortOpen(false);
       }
     };
     if (open) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [onClose, open]);
 
   const activeModel = CLAUDE_MODELS.find((m) => m.id === model);
   const triggerLabel = activeModel?.label ?? model;
@@ -58,11 +60,11 @@ export function ClaudeModelSelector({
       {/* Trigger */}
       <Button
         variant="ghost"
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => !disabled && onToggle()}
         disabled={disabled}
         className={cx(
           composerPillButton,
-          "gap-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-surface-raised",
+          "gap-1 text-muted hover:bg-surface-base disabled:opacity-40 dark:text-disabled dark:hover:bg-surface-raised",
         )}
       >
         <span className={cx(composerPillLabel, "max-w-[110px] truncate")}>
@@ -75,10 +77,10 @@ export function ClaudeModelSelector({
         )}
         <motion.div
           animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={chevronRotateTransition}
           className="flex-shrink-0"
         >
-          <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
+          <Expand size="xs" className="text-disabled dark:text-secondary" />
         </motion.div>
       </Button>
 
@@ -90,9 +92,7 @@ export function ClaudeModelSelector({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute right-0 bottom-full mb-1.5 w-[260px] z-50
-              bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border
-              rounded-xl shadow-xl overflow-hidden"
+            className="absolute right-0 bottom-full mb-1.5 w-[260px] z-50 bg-surface-page dark:bg-surface-base border border-surface-border dark:border-surface-border rounded-xl shadow-xl overflow-hidden"
           >
             {/* Model items */}
             <div className="p-1.5 space-y-0.5">
@@ -102,23 +102,23 @@ export function ClaudeModelSelector({
                   <Button
                     key={m.id}
                     variant="ghost"
-                    onClick={() => { onModelChange(m.id); setOpen(false); setEffortOpen(false); }}
-                    className={`h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left text-gray-700 dark:text-gray-300 transition-colors duration-100 ${
-                      isActive ? "bg-gray-50 dark:bg-surface-raised" : "hover:bg-gray-50 dark:hover:bg-surface-raised"
+                    onClick={() => { onModelChange(m.id); onClose(); setEffortOpen(false); }}
+                    className={`h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left text-secondary dark:text-disabled transition-colors duration-100 ${
+                      isActive ? "bg-surface-page dark:bg-surface-raised" : "hover:bg-surface-page dark:hover:bg-surface-raised"
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium leading-tight ${
-                        isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"
+                        isActive ? "text-primary dark:text-primary" : "text-secondary dark:text-disabled"
                       }`}>
                         {m.label}
                       </p>
-                      <p className="text-2xs text-gray-400 dark:text-gray-600 mt-0.5 leading-tight truncate">
+                      <p className="text-2xs text-disabled dark:text-secondary mt-0.5 leading-tight truncate">
                         {m.description}
                       </p>
                     </div>
                     {isActive && (
-                      <Check size="xs" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Check size="xs" className="mt-0.5 flex-shrink-0 text-muted dark:text-disabled" />
                     )}
                   </Button>
                 );
@@ -126,23 +126,23 @@ export function ClaudeModelSelector({
             </div>
 
             {/* Separator */}
-            <div className="mx-3 border-t border-gray-100 dark:border-surface-border" />
+            <div className="mx-3 border-t border-surface-border dark:border-surface-border" />
 
             {/* Effort section mirrors Studio's Reasoning section. */}
             <div className="p-1.5">
               <Button
                 variant="ghost"
                 onClick={() => setEffortOpen((v) => !v)}
-                className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100"
+                className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-surface-page dark:hover:bg-surface-raised transition-colors duration-100"
               >
-                <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
-                  <Icon icon={GaugeIcon} size="xs" className="text-gray-400 dark:text-gray-600" />
+                <div className="w-5 h-5 rounded-md bg-surface-base dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
+                  <Icon icon={GaugeIcon} size="xs" className="text-disabled dark:text-secondary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-tight">
+                  <p className="text-sm font-medium text-secondary dark:text-disabled leading-tight">
                     Effort
                   </p>
-                  <p className="text-2xs text-gray-400 dark:text-gray-600 leading-tight">
+                  <p className="text-2xs text-disabled dark:text-secondary leading-tight">
                     {effortLabel ?? "Medium"}
                   </p>
                 </div>
@@ -151,7 +151,7 @@ export function ClaudeModelSelector({
                   transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                   className="flex-shrink-0"
                 >
-                  <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
+                  <Expand size="xs" className="text-disabled dark:text-secondary" />
                 </motion.div>
               </Button>
 
@@ -171,12 +171,12 @@ export function ClaudeModelSelector({
                           <Button
                             key={level.id}
                             variant="ghost"
-                            onClick={() => { onEffortChange(level.id); setOpen(false); setEffortOpen(false); }}
+                            onClick={() => { onEffortChange(level.id); onClose(); setEffortOpen(false); }}
                             title={level.title}
                             className={`h-7 rounded-md text-xs transition-colors duration-100 ${
                               isActive
-                                ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                                : "text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-surface-raised"
+                                ? "bg-primary dark:bg-surface-base text-on-emphasis dark:text-primary"
+                                : "text-muted dark:text-muted hover:bg-surface-page dark:hover:bg-surface-raised"
                             }`}
                           >
                             {level.label}

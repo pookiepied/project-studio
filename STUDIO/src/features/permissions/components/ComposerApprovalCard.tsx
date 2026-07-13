@@ -169,24 +169,24 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -4, scale: 0.99 }}
         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-xl border border-gray-200 dark:border-surface-border bg-white dark:bg-surface-base overflow-hidden shadow-sm transition-colors"
+        className="rounded-xl border border-surface-border dark:border-surface-border bg-surface-page dark:bg-surface-base overflow-hidden shadow-sm transition-colors"
       >
         {/* Header strip */}
         <div className="flex items-center gap-2 px-3.5 pt-3 pb-2.5">
-          <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-selected border border-gray-200 dark:border-surface-border flex items-center justify-center flex-shrink-0">
-            <Lock size="xs" weight="fill" className="text-gray-400 dark:text-gray-500" />
+          <div className="w-5 h-5 rounded-md bg-surface-base dark:bg-surface-selected border border-surface-border dark:border-surface-border flex items-center justify-center flex-shrink-0">
+            <Lock size="xs" weight="fill" className="text-disabled dark:text-muted" />
           </div>
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+          <span className="text-xs font-medium text-muted dark:text-disabled tracking-wide">
             Permission required
           </span>
           {riskLabel && (
-            <span className="ml-auto text-2xs font-medium px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-surface-selected text-gray-500 dark:text-gray-400">
+            <span className="ml-auto text-2xs font-medium px-1.5 py-0.5 rounded-md bg-surface-base dark:bg-surface-selected text-muted dark:text-disabled">
               {riskLabel}
             </span>
           )}
         </div>
 
-        <div className="h-px bg-gray-100 dark:bg-surface-divider" />
+        <div className="h-px bg-surface-base dark:bg-surface-divider" />
 
         {/* Body */}
         <div className="px-3.5 py-3 space-y-2.5">
@@ -194,8 +194,8 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
           <div className="flex items-center gap-2">
             <span className="flex-shrink-0">{icon}</span>
             <div className="flex items-baseline gap-1.5 min-w-0 flex-wrap">
-              <span className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{label}</span>
-              <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+              <span className="text-xs font-medium text-primary dark:text-disabled truncate">{label}</span>
+              <span className="text-xs text-disabled dark:text-muted flex-shrink-0">
                 - AI wants to {action}
               </span>
             </div>
@@ -203,10 +203,10 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
 
           {/* Target preview - file path / shell command / code snippet */}
           {summary && (
-            <pre className="text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-all bg-gray-50 dark:bg-surface-deep rounded-lg px-3 py-2 border border-gray-100 dark:border-surface-selected leading-relaxed max-h-[80px] overflow-y-auto">
+            <pre className="text-xs font-mono text-secondary dark:text-disabled whitespace-pre-wrap break-all bg-surface-page dark:bg-surface-deep rounded-lg px-3 py-2 border border-surface-border dark:border-surface-selected leading-relaxed max-h-[80px] overflow-y-auto">
               {filePreview && filePreview.length > 0 ? (
                 <>
-                  <span className="text-gray-400 dark:text-gray-600">{basename(filePreview) === filePreview ? "" : `${filePreview.length > 100 ? filePreview.slice(0, 100) + "..." : filePreview}\n`}</span>
+                  <span className="text-disabled dark:text-secondary">{basename(filePreview) === filePreview ? "" : `${filePreview.length > 100 ? filePreview.slice(0, 100) + "..." : filePreview}\n`}</span>
                   {summary}
                 </>
               ) : (
@@ -217,7 +217,7 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
 
           {/* Reason from the engine */}
           {reason && (
-            <p className="text-xs text-gray-500 dark:text-gray-500 leading-relaxed">{reason}</p>
+            <p className="text-xs text-muted dark:text-muted leading-relaxed">{reason}</p>
           )}
 
           {/* Action buttons - first button (broadest always) is the focused/primary */}
@@ -230,8 +230,8 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
                 onClick={() => onDecision(scope)}
                 className={
                   i === 0
-                    ? "px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
-                    : "px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 dark:border-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-selected active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-1"
+                    ? "px-3 py-1.5 rounded-lg text-xs font-medium bg-primary dark:bg-surface-raised text-on-emphasis dark:text-primary hover:bg-secondary dark:hover:bg-surface-selected active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-focus "
+                    : "px-3 py-1.5 rounded-lg text-xs font-medium border border-surface-border dark:border-surface-border text-secondary dark:text-disabled hover:bg-surface-page dark:hover:bg-surface-selected active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-focus "
                 }
               >
                 {SCOPE_LABELS[scope]}
@@ -240,7 +240,7 @@ export function ComposerApprovalCard({ toolCall, onDecision }: ComposerApprovalC
             <Button
               variant="ghost"
               onClick={() => onDecision("deny")}
-              className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-selected hover:text-secondary dark:hover:text-secondary active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-1"
+              className="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium text-disabled dark:text-muted hover:bg-surface-base dark:hover:bg-surface-selected hover:text-secondary dark:hover:text-secondary active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Deny
             </Button>

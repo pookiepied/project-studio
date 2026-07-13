@@ -107,18 +107,18 @@ export const AssistantMessage = ({
                 onClick={onSaveEdit}
                 disabled={!editingContent.trim()}
                 variant="primary"
-                className="h-auto gap-1.5 px-3 py-1.5 text-xs bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40"
+                className="h-auto gap-1.5 px-3 py-1.5 text-xs bg-primary dark:bg-surface-raised text-on-emphasis dark:text-primary rounded hover:bg-secondary dark:hover:bg-surface-selected disabled:opacity-40"
               >
                 Save
               </Button>
               <Button
                 onClick={onCancelEdit}
                 variant="ghost"
-                className="h-auto px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400"
+                className="h-auto px-3 py-1.5 text-xs text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled"
               >
                 Cancel
               </Button>
-              <span className="text-2xs text-gray-300 dark:text-gray-700 ml-auto">⌘ Enter · Esc to cancel</span>
+              <span className="text-2xs text-disabled dark:text-secondary ml-auto">⌘ Enter · Esc to cancel</span>
             </div>
           </motion.div>
         )}
@@ -242,26 +242,26 @@ export const AssistantMessage = ({
 
 function InlineQuestionAnswer({ question, answer }: { question: string; answer?: string }) {
   return (
-    <div className="my-2 w-full max-w-xl rounded-xl border border-gray-200 bg-gray-50/70 px-3.5 py-3 dark:border-surface-border dark:bg-surface-base">
+    <div className="my-2 w-full max-w-xl rounded-xl border border-surface-border bg-surface-page/70 px-3.5 py-3 dark:border-surface-border dark:bg-surface-base">
       <div>
-        <div className="text-2xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+        <div className="text-2xs font-medium uppercase tracking-[0.18em] text-disabled dark:text-muted">
           Question
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+        <p className="mt-1 text-sm leading-relaxed text-secondary dark:text-disabled">
           {question}
         </p>
       </div>
       {answer ? (
-        <div className="mt-3 border-t border-gray-200 pt-3 dark:border-surface-border">
-          <div className="text-2xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+        <div className="mt-3 border-t border-surface-border pt-3 dark:border-surface-border">
+          <div className="text-2xs font-medium uppercase tracking-[0.18em] text-disabled dark:text-muted">
             Your answer
           </div>
-          <p className="mt-1 text-sm font-medium leading-relaxed text-gray-900 dark:text-gray-100">
+          <p className="mt-1 text-sm font-medium leading-relaxed text-primary dark:text-primary">
             {answer}
           </p>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-gray-400 dark:text-gray-500">
+        <p className="mt-3 text-sm text-disabled dark:text-muted">
           Waiting for your answer...
         </p>
       )}

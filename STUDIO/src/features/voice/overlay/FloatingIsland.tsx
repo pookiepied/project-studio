@@ -103,8 +103,8 @@ function VoiceCaptionLine({
             const isActive = caption && absoluteIndex === wordIndex;
             const isPast = caption && absoluteIndex < wordIndex;
             const tone = isActive || isPast
-              ? "text-gray-800 dark:text-gray-100"
-              : "text-gray-400 dark:text-gray-600";
+              ? "text-primary dark:text-primary"
+              : "text-disabled dark:text-secondary";
 
             return (
               <motion.span
@@ -222,8 +222,8 @@ export function FloatingIsland({
           rounded-full overflow-hidden select-none
           drag-region
           ${hasShellChrome
-            ? `bg-white dark:bg-surface-page
-               border border-gray-900/[0.07] dark:border-white/[0.07]
+            ? `bg-surface-page dark:bg-surface-page
+               border border-primary/[0.07] dark:border-white/[0.07]
                backdrop-blur-2xl
                shadow-lg`
             : "bg-transparent border border-transparent shadow-none"}
@@ -263,7 +263,7 @@ export function FloatingIsland({
               >
                 <PulseMark size={16} />
               </IconButton>
-              <div className="w-px h-4 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-0.5" />
+              <div className="w-px h-4 bg-primary/[0.07] dark:bg-surface-page/[0.07] mx-0.5" />
               <ActionBtn
                 icon={<Icon icon={UserSoundIcon} size="sm" />}
                 label="Start live agent"
@@ -292,7 +292,7 @@ export function FloatingIsland({
               <RecDot />
               <WaveformBars levels={audioLevels} />
               <span
-                className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap font-sans"
+                className="text-sm font-medium text-secondary dark:text-disabled whitespace-nowrap font-sans"
               >
                 {activeModeLabel}
               </span>
@@ -315,7 +315,7 @@ export function FloatingIsland({
             >
               <LoadingRing />
               <span
-                className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap font-sans"
+                className="text-sm font-medium text-secondary dark:text-disabled whitespace-nowrap font-sans"
               >
                 {statusLabel}
               </span>
@@ -341,7 +341,7 @@ export function FloatingIsland({
               className="flex items-center gap-2 px-3.5 h-[40px] max-w-[380px] no-drag-region"
             >
               <span
-                className="text-sm text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate font-sans"
+                className="text-sm text-muted dark:text-disabled flex-1 min-w-0 truncate font-sans"
               >
                 {truncated || "Done"}
               </span>
@@ -370,7 +370,7 @@ export function FloatingIsland({
             >
               <Volume
                 size="sm"
-                className="text-gray-500 dark:text-gray-400 flex-shrink-0"
+                className="text-muted dark:text-disabled flex-shrink-0"
               />
               <SpeakingBars />
               <VoiceCaptionLine caption={voiceCaption} fallbackText={aiText} />
@@ -394,11 +394,11 @@ export function FloatingIsland({
                 className="text-secondary flex-shrink-0"
               />
               <span
-                className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap font-sans"
+                className="text-sm font-medium text-secondary dark:text-disabled whitespace-nowrap font-sans"
               >
                 Something went wrong
               </span>
-              <div className="w-px h-3.5 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-1" />
+              <div className="w-px h-3.5 bg-primary/[0.07] dark:bg-surface-page/[0.07] mx-1" />
               <ActionBtn
                 icon={<Close size="xs" />}
                 label="Dismiss"

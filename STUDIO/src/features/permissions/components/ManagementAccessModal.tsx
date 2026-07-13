@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { StudioMark } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";
+import { PermissionActionButton, PermissionModalShell } from "./PermissionModalShell";
 import type { ManagementKind } from "@/core/permissions";
 
 /** The user's choice on a management-permission gate. */
@@ -73,7 +74,7 @@ export function ManagementAccessModal({ kind, onResolve }: ManagementAccessModal
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.24 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-md z-50"
+            className="fixed inset-0 bg-scrim backdrop-blur-md z-50"
           />
 
           <motion.div
@@ -83,7 +84,7 @@ export function ManagementAccessModal({ kind, onResolve }: ManagementAccessModal
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none"
           >
-            <div className="pointer-events-auto flex w-full max-w-[820px] h-[480px] max-h-[90vh] overflow-hidden rounded-2xl bg-white dark:bg-surface-base shadow-2xl ring-1 ring-black/5 dark:ring-white/10">
+            <PermissionModalShell>
               {/* Left — imagery */}
               <div className="relative hidden sm:block w-[42%] flex-shrink-0 overflow-hidden">
                 <img
@@ -95,17 +96,17 @@ export function ManagementAccessModal({ kind, onResolve }: ManagementAccessModal
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
 
                 <div className="relative flex h-full flex-col justify-between p-7">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <StudioMark size={20} className="text-white" />
-                    <span className="text-xs font-medium uppercase tracking-[0.28em] text-white/85">
+                  <div className="flex items-center gap-2.5 text-on-emphasis">
+                    <StudioMark size={20} className="text-on-emphasis" />
+                    <span className="text-xs font-medium uppercase tracking-[0.28em] text-on-emphasis/85">
                       Studio
                     </span>
                   </div>
                   <div>
-                    <p className="text-3xl leading-[1.15] font-semibold text-white drop-shadow-sm whitespace-pre-line">
+                    <p className="text-3xl leading-[1.15] font-semibold text-on-emphasis drop-shadow-sm whitespace-pre-line">
                       {copy.side.title}
                     </p>
-                    <p className="mt-2 text-sm leading-relaxed text-white/75 max-w-[220px]">
+                    <p className="mt-2 text-sm leading-relaxed text-on-emphasis/75 max-w-[220px]">
                       {copy.side.body}
                     </p>
                   </div>
@@ -114,19 +115,19 @@ export function ManagementAccessModal({ kind, onResolve }: ManagementAccessModal
 
               {/* Right — the decision */}
               <div className="flex flex-1 flex-col justify-center p-8 sm:p-10 overflow-y-auto">
-                <span className="text-xs font-medium uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
+                <span className="text-xs font-medium uppercase tracking-[0.22em] text-disabled dark:text-muted">
                   {copy.eyebrow}
                 </span>
 
-                <h2 className="mt-3 text-3xl leading-tight font-semibold tracking-[-0.01em] text-gray-900 dark:text-gray-50">
+                <h2 className="mt-3 text-3xl leading-tight font-semibold tracking-[-0.01em] text-primary dark:text-primary">
                   {copy.heading}
                 </h2>
 
-                <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                <p className="mt-3 text-base leading-relaxed text-muted dark:text-disabled">
                   {copy.body}
                 </p>
 
-                <p className="mt-4 text-sm leading-relaxed text-gray-400 dark:text-gray-500">
+                <p className="mt-4 text-sm leading-relaxed text-disabled dark:text-muted">
                   {copy.hint}
                 </p>
 
@@ -135,29 +136,27 @@ export function ManagementAccessModal({ kind, onResolve }: ManagementAccessModal
                     <Button
                       variant="outline"
                       onClick={() => onResolve("session")}
-                      className="flex-1 py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-200 dark:border-surface-border rounded-2xl transition-colors"
+                      className="flex-1 py-2.5 text-base font-medium text-secondary dark:text-disabled hover:text-primary dark:hover:text-primary border border-surface-border dark:border-surface-border rounded-2xl transition-colors"
                     >
                       Allow for this chat
                     </Button>
-                    <Button
-                      variant="primary"
+                    <PermissionActionButton
                       onClick={() => onResolve("global")}
-                      className="flex-1 py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl transition-colors"
                     >
                       {copy.grant}
-                    </Button>
+                    </PermissionActionButton>
                   </div>
                   <Button
                     variant="ghost"
                     type="button"
                     onClick={() => onResolve("deny")}
-                    className="mx-auto mt-1 text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    className="mx-auto mt-1 text-sm font-medium text-disabled dark:text-muted hover:text-secondary dark:hover:text-disabled transition-colors"
                   >
                     Not now
                   </Button>
                 </div>
               </div>
-            </div>
+            </PermissionModalShell>
           </motion.div>
         </>
       )}

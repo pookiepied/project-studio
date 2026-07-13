@@ -37,12 +37,12 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
     <div className="flex flex-col">
       {/* Main Settings Row */}
       <div 
-        className="flex items-center justify-between py-3 hover:bg-gray-50 dark:hover:bg-surface-base transition-smooth px-3 -mx-3 rounded-lg group cursor-pointer"
+        className="flex items-center justify-between py-3 hover:bg-surface-page dark:hover:bg-surface-base transition-smooth px-3 -mx-3 rounded-lg group cursor-pointer"
         onClick={handleRowClick}
       >
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 dark:text-gray-300 font-normal transition-colors duration-300 pointer-events-none">
+            <label className="text-sm text-secondary dark:text-disabled font-normal transition-colors duration-300 pointer-events-none">
               Enable Ollama
             </label>
             
@@ -54,7 +54,7 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
             )}
           </div>
           
-          <p className="text-xs text-gray-500 dark:text-gray-600 mt-0.5 transition-colors duration-300 flex items-center gap-2 pointer-events-none">
+          <p className="text-xs text-muted dark:text-secondary mt-0.5 transition-colors duration-300 flex items-center gap-2 pointer-events-none">
             {enabled && status.isRunning ? (
               <>
                 <span>{localModels.length} local models</span>
@@ -74,7 +74,7 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
               disabled={isChecking}
               aria-label="Refresh models"
               title="Refresh Models"
-              className="text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-300 p-1"
+              className="text-disabled hover:text-primary dark:hover:text-disabled transition-colors duration-300 p-1"
             >
               <Redo size="md" className={isChecking ? 'animate-spin' : ''} />
             </IconButton>
@@ -86,7 +86,7 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
             <IconButton
               onClick={() => setIsExpanded(!isExpanded)}
               aria-label="Toggle models"
-              className="text-gray-400 p-1 transition-transform duration-300"
+              className="text-disabled p-1 transition-transform duration-300"
             >
               <Expand
                 size="md"
@@ -111,16 +111,16 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
               {/* Local Models */}
               {localModels.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-600 tracking-wider transition-colors duration-300">
+                  <h3 className="text-xs font-semibold text-muted dark:text-secondary tracking-wider transition-colors duration-300">
                     LOCAL MODELS
                   </h3>
                   <div className="space-y-3">
                     {localModels.map((model) => (
                       <div key={model.name} className="flex items-center justify-between group">
-                        <span className="text-sm text-gray-800 dark:text-gray-200 transition-colors duration-300">
+                        <span className="text-sm text-primary dark:text-disabled transition-colors duration-300">
                           {model.name}
                         </span>
-                        <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500 transition-colors duration-300">
+                        <div className="flex items-center gap-3 text-xs text-disabled dark:text-muted transition-colors duration-300">
                           <span>{model.details.parameter_size || 'Unknown'}</span>
                           <span className="opacity-40">•</span>
                           <span>{(model.size / 1024 / 1024 / 1024).toFixed(1)} GB</span>
@@ -134,16 +134,16 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
               {/* Cloud Models */}
               {cloudModels.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-600 tracking-wider transition-colors duration-300">
+                  <h3 className="text-xs font-semibold text-muted dark:text-secondary tracking-wider transition-colors duration-300">
                     CLOUD MODELS
                   </h3>
                   <div className="space-y-3">
                     {cloudModels.map((model) => (
                       <div key={model.name} className="flex items-center justify-between opacity-60 group">
-                        <span className="text-sm text-gray-700 dark:text-gray-300 transition-colors duration-300">
+                        <span className="text-sm text-secondary dark:text-disabled transition-colors duration-300">
                           {model.name}
                         </span>
-                        <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500 transition-colors duration-300">
+                        <div className="flex items-center gap-3 text-xs text-disabled dark:text-muted transition-colors duration-300">
                           <span>Remote</span>
                         </div>
                       </div>

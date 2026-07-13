@@ -379,7 +379,7 @@ export const ActivityPage = () => {
                             metric={metric}
                           />
                         )}
-                        cursor={{ fill: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)" }}
+                        cursor={{ fill: "var(--surface-hover)" }}
                       />
                       <Bar dataKey={metric} fill={chartBarColor} radius={[3, 3, 0, 0]} maxBarSize={28} />
                     </BarChart>

@@ -97,49 +97,49 @@ function BrowserMenu({
   const canUsePageTools = !!activeTab && (activeTab.mode === "html" || !!activeTab.url);
 
   return (
-    <div className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
+    <div className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
       <Button
         variant="ghost"
         onClick={() => { onNewTab(); onClose(); }}
-        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-page dark:text-disabled dark:hover:bg-surface-selected"
       >
         New tab
       </Button>
-      <div className="my-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
+      <div className="my-1 h-px bg-surface-base dark:bg-surface-page/[0.06]" />
       <Button
         variant="ghost"
         onClick={() => { onReload(); onClose(); }}
         disabled={!canUsePageTools}
-        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-page disabled:opacity-40 dark:text-disabled dark:hover:bg-surface-selected"
       >
         Force reload
       </Button>
       <Button
         variant="ghost"
         disabled={!canUsePageTools}
-        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-page disabled:opacity-40 dark:text-disabled dark:hover:bg-surface-selected"
       >
         Find in page
       </Button>
-      <div className="my-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
-      <div className="flex h-8 items-center gap-2 px-2.5 text-sm text-gray-700 dark:text-gray-300">
+      <div className="my-1 h-px bg-surface-base dark:bg-surface-page/[0.06]" />
+      <div className="flex h-8 items-center gap-2 px-2.5 text-sm text-secondary dark:text-disabled">
         <span className="min-w-0 flex-1">Zoom</span>
         <IconButton
           aria-label="Zoom out"
           variant="ghost"
           onClick={() => onZoom(zoom - 0.1)}
           disabled={!canUsePageTools}
-          className="h-6 w-6 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+          className="h-6 w-6 rounded text-secondary hover:bg-surface-base disabled:opacity-40 dark:text-disabled dark:hover:bg-surface-selected"
         >
           <Remove size="xs" />
         </IconButton>
-        <span className="w-9 text-center text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
+        <span className="w-9 text-center text-xs text-muted">{Math.round(zoom * 100)}%</span>
         <IconButton
           aria-label="Zoom in"
           variant="ghost"
           onClick={() => onZoom(zoom + 0.1)}
           disabled={!canUsePageTools}
-          className="h-6 w-6 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+          className="h-6 w-6 rounded text-secondary hover:bg-surface-base disabled:opacity-40 dark:text-disabled dark:hover:bg-surface-selected"
         >
           <Add size="xs" />
         </IconButton>
@@ -148,15 +148,15 @@ function BrowserMenu({
         variant="ghost"
         onClick={() => { onToggleDeviceToolbar(); onClose(); }}
         disabled={!canUsePageTools}
-        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-page disabled:opacity-40 dark:text-disabled dark:hover:bg-surface-selected"
       >
         Show device toolbar
       </Button>
-      <div className="my-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
+      <div className="my-1 h-px bg-surface-base dark:bg-surface-page/[0.06]" />
       <Button
         variant="ghost"
         onClick={() => { onClearBrowsingData(); onClose(); }}
-        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
+        className="w-full justify-start gap-2 px-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-page dark:text-disabled dark:hover:bg-surface-selected"
       >
         Clear cookies and cache
       </Button>
@@ -179,15 +179,15 @@ function SidePanelMenu({
   ];
 
   return (
-    <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
+    <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
       {items.map(({ view, label, SidePanelIcon }) => (
         <Button
           key={view}
           variant="ghost"
           onClick={() => { onOpenWorkspaceView(view); onClose(); }}
-          className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
+          className="w-full justify-start gap-2 px-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-page dark:text-disabled dark:hover:bg-surface-selected"
         >
-          <SidePanelIcon size="sm" className="text-gray-500" />
+          <SidePanelIcon size="sm" className="text-muted" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
         </Button>
       ))}
@@ -302,9 +302,9 @@ export function BrowserPanel({
     <div className="flex h-full transition-colors duration-300" style={{ width, minWidth: width }}>
       {showResizeHandle && <ResizeHandle onMouseDown={onResizeDown} />}
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-page transition-colors duration-300 dark:bg-surface-page">
         {showChrome && (
-        <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
+        <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-surface-border bg-surface-page px-3 transition-colors duration-300 dark:border-surface-border dark:bg-surface-page">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <div className="flex min-w-0 items-center gap-1">
               {tabs.map(tab => {
@@ -316,8 +316,8 @@ export function BrowserPanel({
                     onClick={() => onTabChange(tab.id)}
                     className={`group/tab h-7 min-w-0 max-w-[120px] items-center justify-start gap-1.5 rounded-lg px-2 text-sm transition-colors ${
                       active
-                        ? "bg-gray-100 text-gray-800 dark:bg-surface-raised dark:text-gray-200"
-                        : "text-gray-500 hover:bg-gray-50 dark:text-gray-500 dark:hover:bg-surface-raised"
+                        ? "bg-surface-base text-primary dark:bg-surface-raised dark:text-disabled"
+                        : "text-muted hover:bg-surface-page dark:text-muted dark:hover:bg-surface-raised"
                     }`}
                   >
                     <Globe size="sm" className="flex-shrink-0" />
@@ -325,7 +325,7 @@ export function BrowserPanel({
                     <span
                       role="button"
                       onClick={(ev) => { ev.stopPropagation(); onTabClose(tab.id); }}
-                      className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-gray-200 dark:hover:bg-surface-border"
+                      className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-surface-raised dark:hover:bg-surface-border"
                     >
                       <Close size="xs" />
                     </span>
@@ -340,7 +340,7 @@ export function BrowserPanel({
                 variant="ghost"
                 size="sm"
                 onClick={() => setSideMenuOpen((v) => !v)}
-                className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+                className="text-disabled hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
               >
                 <Add size="sm" />
               </IconButton>
@@ -358,21 +358,21 @@ export function BrowserPanel({
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="flex-shrink-0 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            className="flex-shrink-0 text-disabled hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Close size="sm" />
           </IconButton>
         </div>
         )}
 
-        <div className="flex h-9 flex-shrink-0 items-center gap-1.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
+        <div className="flex h-9 flex-shrink-0 items-center gap-1.5 border-b border-surface-border bg-surface-page px-3 transition-colors duration-300 dark:border-surface-border dark:bg-surface-page">
           <IconButton
             aria-label="Back"
             variant="ghost"
             size="sm"
             onClick={() => handleHistory(-1)}
             disabled={!canGoBack}
-            className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            className="text-disabled hover:bg-surface-base hover:text-secondary disabled:opacity-35 dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Back size="sm" />
           </IconButton>
@@ -382,7 +382,7 @@ export function BrowserPanel({
             size="sm"
             onClick={() => handleHistory(1)}
             disabled={!canGoForward}
-            className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            className="text-disabled hover:bg-surface-base hover:text-secondary disabled:opacity-35 dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Forward size="sm" />
           </IconButton>
@@ -392,13 +392,13 @@ export function BrowserPanel({
             size="sm"
             onClick={handleReload}
             disabled={!canReload}
-            className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+            className="text-disabled hover:bg-surface-base hover:text-secondary disabled:opacity-35 dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Redo size="sm" />
           </IconButton>
 
           <form onSubmit={submitAddress} className="relative mx-auto min-w-[180px] flex-[0_1_420px]">
-            <Search size="sm" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
+            <Search size="sm" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-disabled dark:text-secondary" />
             <Input
               size="sm"
               value={addressValue}
@@ -414,7 +414,7 @@ export function BrowserPanel({
               variant="ghost"
               size="sm"
               onClick={() => setMenuOpen((v) => !v)}
-              className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
+              className="text-disabled hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
             >
               <Icon icon={DotsThreeVerticalIcon} size="md" />
             </IconButton>
@@ -436,16 +436,16 @@ export function BrowserPanel({
           {!activeTab || (activeTab.mode === "web" && !activeTab.url) ? (
             <div className="flex h-full items-center justify-center px-8 text-center">
               <div>
-                <Globe size="xl" className="mx-auto mb-6 text-gray-400 dark:text-gray-600" />
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Start browsing</p>
-                <p className="mt-3 text-sm text-gray-400 dark:text-gray-600">Enter a URL to open a page</p>
+                <Globe size="xl" className="mx-auto mb-6 text-disabled dark:text-secondary" />
+                <p className="text-sm font-semibold text-primary dark:text-disabled">Start browsing</p>
+                <p className="mt-3 text-sm text-disabled dark:text-secondary">Enter a URL to open a page</p>
               </div>
             </div>
           ) : (
             <div className="flex h-full items-stretch justify-center overflow-hidden bg-surface-page">
               <div
                 className={`h-full min-w-0 overflow-hidden transition-all ${
-                  activeTab.deviceToolbar ? "my-4 max-w-[390px] rounded-xl border border-gray-200 shadow-sm dark:border-white/[0.08]" : "w-full"
+                  activeTab.deviceToolbar ? "my-4 max-w-[390px] rounded-xl border border-surface-border shadow-sm dark:border-white/[0.08]" : "w-full"
                 }`}
                 style={{ width: activeTab.deviceToolbar ? "390px" : "100%" }}
               >

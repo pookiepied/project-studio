@@ -46,20 +46,20 @@ function ProfileTile({ entry, onOpen }: { entry: ProfileEntry; onOpen: (view: Vi
     <Button
       onClick={() => onOpen(entry.view)}
       variant="ghost"
-      className="group w-full gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+      className="group w-full gap-3 rounded-xl px-3 py-3 text-left hover:bg-surface-page dark:hover:bg-surface-page/[0.03]"
     >
-      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-surface-raised dark:text-gray-600">
+      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-surface-base text-disabled dark:bg-surface-raised dark:text-secondary">
         <Icon size="sm" weight="regular" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-gray-700 transition-colors group-hover:text-gray-950 dark:text-gray-300 dark:group-hover:text-gray-50">
+        <span className="block text-sm font-medium text-secondary transition-colors group-hover:text-primary dark:text-disabled dark:group-hover:text-primary">
           {entry.title}
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-gray-400 dark:text-gray-600">
+        <span className="mt-0.5 block text-xs leading-relaxed text-disabled dark:text-secondary">
           {entry.subtitle}
         </span>
       </span>
-      <Forward size="sm" className="flex-shrink-0 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-gray-700" />
+      <Forward size="sm" className="flex-shrink-0 text-disabled opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-secondary" />
     </Button>
   );
 }
@@ -69,7 +69,7 @@ export function ProfilePage() {
   const { navigateTo } = useNavigation();
 
   return (
-    <div className="h-full overflow-hidden bg-white text-gray-900 transition-colors duration-300 dark:bg-surface-page dark:text-gray-100">
+    <div className="h-full overflow-hidden bg-surface-page text-primary transition-colors duration-300 dark:bg-surface-page dark:text-primary">
       <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-6 py-8">
         <motion.header
           initial={{ opacity: 0, y: 8 }}
@@ -77,13 +77,13 @@ export function ProfilePage() {
           transition={{ duration: 0.28, ease: "easeOut" }}
           className="mb-8"
         >
-          <p className="text-2xs font-semibold uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">
+          <p className="text-2xs font-semibold uppercase tracking-extra-wide text-disabled dark:text-secondary">
             Profile
           </p>
           <h1 className="mt-2 font-display text-xl font-normal text-primary">
             Personal context
           </h1>
-          <p className="mt-1 max-w-xl text-xs leading-relaxed text-gray-400 dark:text-gray-600">
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-disabled dark:text-secondary">
             Account identity, memory, and personal activity live here instead of being scattered through the launcher.
           </p>
         </motion.header>
@@ -92,21 +92,21 @@ export function ProfilePage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.32, delay: 0.04, ease: "easeOut" }}
-          className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-surface-border dark:bg-surface-base"
+          className="mb-5 rounded-2xl border border-surface-border bg-surface-page p-4 shadow-sm dark:border-surface-border dark:bg-surface-base"
         >
           <div className="flex items-center gap-3">
             {isAuthenticated && user?.picture ? (
               <img src={user.picture} alt={user.name} className="h-11 w-11 rounded-full" referrerPolicy="no-referrer" />
             ) : (
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-raised dark:text-gray-600">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-base text-disabled dark:bg-surface-raised dark:text-secondary">
                 <User size="lg" weight="regular" />
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+              <p className="truncate text-sm font-medium text-primary dark:text-disabled">
                 {isAuthenticated && user ? user.name : "Not signed in"}
               </p>
-              <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-600">
+              <p className="mt-0.5 truncate text-xs text-disabled dark:text-secondary">
                 {isAuthenticated && user ? user.email : "Sign in from Settings to sync your profile."}
               </p>
             </div>
@@ -117,7 +117,7 @@ export function ProfilePage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.32, delay: 0.08, ease: "easeOut" }}
-          className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-surface-border dark:bg-surface-base"
+          className="overflow-hidden rounded-2xl border border-surface-border bg-surface-page shadow-sm dark:border-surface-border dark:bg-surface-base"
         >
           {PROFILE_ENTRIES.map((entry) => (
             <ProfileTile key={entry.view} entry={entry} onOpen={navigateTo} />

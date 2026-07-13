@@ -28,8 +28,8 @@ export function TokenRing({
     : percentage >= 0.7
     ? "var(--text-secondary)"
     : active
-    ? "rgba(75,85,99,0.72)"
-    : "rgba(156,163,175,0.48)";
+    ? "var(--text-secondary)"
+    : "var(--text-muted)";
 
   const usedK = usedTokens >= 1000 ? `${(usedTokens / 1000).toFixed(1)}K` : `${usedTokens}`;
   const maxK  = maxTokens  >= 1000 ? `${(maxTokens  / 1000).toFixed(0)}K` : `${maxTokens}`;
@@ -43,7 +43,7 @@ export function TokenRing({
       role="img"
       aria-label={`Context: ${usedK} of ${maxK} tokens`}
     >
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(156,163,175,0.18)" strokeWidth={stroke} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--text-disabled)" strokeWidth={stroke} />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
         stroke={progressStroke}

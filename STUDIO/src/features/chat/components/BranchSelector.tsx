@@ -11,6 +11,7 @@ import {
 } from "@/ui/icons";
 import { gitService, type GitBranch as Branch } from "@/core/git/gitService";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import { Button } from "@/ui/primitives/Button";
 import { Input, SearchInput } from "@/ui/primitives";
 
@@ -24,7 +25,7 @@ interface Props {
 }
 
 export function BranchSelector({ projectContext, setProjectContext, placement = "up" }: Props) {
-  const [open, setOpen] = useState(false);
+  const { open, onOpen, onClose } = useDisclosure();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
@@ -33,7 +34,7 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
   const [error, setError] = useState<string | null>(null);
   const [position, setPosition] = useState<{ bottom?: number; top?: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  useOnClickOutside(menuRef, () => setOpen(false), open);
+  useOnClickOutside(menuRef, onClose, open);
 
   const currentBranch = branches.find(branch => branch.current);
   const current = currentBranch?.name ?? "Branch";
@@ -63,7 +64,7 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
         ? { top: rect.bottom + 8, left }
         : { bottom: window.innerHeight - rect.top + 8, left },
     );
-    setOpen(true);
+    onOpen();
     setError(null);
     try { await refresh(); }
     catch (reason) { setError(String(reason)); }
@@ -76,7 +77,7 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
     try {
       const result = await gitService.checkoutBranch(projectContext.path, branch.name);
       setProjectContext({ ...projectContext, path: result.path });
-      setOpen(false);
+      onClose();
     } catch (reason) { setError(String(reason)); }
     finally { setBusy(false); }
   };
@@ -89,7 +90,7 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
       const result = await gitService.createBranch(projectContext.path, branchName);
       setProjectContext({ ...projectContext, path: result.path });
       setBranchName("");
-      setOpen(false);
+      onClose();
     } catch (reason) { setError(String(reason)); }
     finally { setBusy(false); }
   };

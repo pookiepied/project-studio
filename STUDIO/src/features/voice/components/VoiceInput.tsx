@@ -40,7 +40,7 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
         disabled
         aria-label="Transcribing..."
         title="Transcribing..."
-        className={cx(composerRoundIconButton, "flex-shrink-0 text-gray-400 opacity-60 cursor-not-allowed")}
+        className={cx(composerRoundIconButton, "flex-shrink-0 text-disabled opacity-60 cursor-not-allowed")}
       >
         <div className="h-[16px] w-[16px] border-2 border-current border-t-transparent rounded-full animate-spin" />
       </IconButton>
@@ -58,8 +58,8 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
         composerRoundIconButton,
         "flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed",
         isRecording
-          ? "text-gray-500"
-          : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-border",
+          ? "text-muted"
+          : "text-disabled hover:bg-surface-base hover:text-secondary dark:hover:bg-surface-border",
       )}
     >
       {isRecording ? (
@@ -72,7 +72,7 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
             gapPx={2}
             maxHeightPx={16}
             minHeightPx={3}
-            colorClass="bg-gray-500"
+            colorClass="bg-secondary"
           />
         </span>
       ) : (

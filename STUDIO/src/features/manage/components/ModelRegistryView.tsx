@@ -22,6 +22,7 @@ import { Input } from "@/ui/primitives/Input";
 import { Select } from "@/ui/primitives/Select";
 import { Spinner } from "@/ui/primitives/Spinner";
 import { Toggle } from "@/ui/primitives/Toggle";
+import { InlineToast } from "@/ui/feedback/InlineToast";
 import { ProviderIcon } from "@/features/models/components/ProviderIcon";
 import { categoryLabel, formatNumber, formatPricing, modelSearchText } from "../modelRegistry/formatters";
 import { deleteRegistryModel, loadRegistryModels, loadRegistrySchema, saveRegistryModel, updateRegistryModel } from "../modelRegistry/service";
@@ -417,10 +418,11 @@ export const ModelRegistryView = ({ onBack }: Props) => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="fixed bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-raised border border-surface-border text-primary text-xs px-3 py-2 rounded-lg shadow-lg z-toast"
           >
-            {saveState === "error" ? <Warning size="xs" weight="fill" /> : <Success size="xs" />}
-            {saveMessage}
+            <InlineToast>
+              {saveState === "error" ? <Warning size="xs" weight="fill" /> : <Success size="xs" />}
+              {saveMessage}
+            </InlineToast>
           </motion.div>
         )}
       </AnimatePresence>

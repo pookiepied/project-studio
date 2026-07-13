@@ -40,8 +40,8 @@ export function VideoPlayer({ videoUrl, aspectRatio, duration, resolution, mode 
         className="w-full block"
         style={{ aspectRatio: cssAspectRatio, maxHeight: "480px", objectFit: "contain" }}
       />
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-900/80">
-        <span className="text-xs text-gray-400 tabular-nums">
+      <div className="flex items-center justify-between px-3 py-2 bg-primary/80">
+        <span className="text-xs text-disabled tabular-nums">
           {[mode, resolution, duration ? `${duration}s` : null, aspectRatio]
             .filter(Boolean)
             .join(" · ")}
@@ -49,7 +49,7 @@ export function VideoPlayer({ videoUrl, aspectRatio, duration, resolution, mode 
         <Button
           variant="ghost"
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:!bg-white/20 !text-white text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-page/10 hover:!bg-surface-page/20 !text-on-emphasis text-xs font-medium transition-colors"
         >
           {downloaded ? (
             <>
@@ -85,17 +85,17 @@ interface VideoProcessingProps {
 
 export function VideoProcessing({ jobId, message }: VideoProcessingProps) {
   return (
-    <div className="flex flex-col gap-1.5 px-3 py-2.5 rounded-xl bg-gray-100 dark:bg-surface-raised max-w-2xl">
-      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+    <div className="flex flex-col gap-1.5 px-3 py-2.5 rounded-xl bg-surface-base dark:bg-surface-raised max-w-2xl">
+      <div className="flex items-center gap-2 text-xs text-muted dark:text-disabled">
         <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
         </svg>
         Video rendering…
       </div>
       {message && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 leading-snug">{message}</p>
+        <p className="text-xs text-disabled dark:text-muted leading-snug">{message}</p>
       )}
-      <p className="text-2xs text-gray-400 dark:text-gray-600 font-mono">job: {jobId}</p>
+      <p className="text-2xs text-disabled dark:text-secondary font-mono">job: {jobId}</p>
     </div>
   );
 }

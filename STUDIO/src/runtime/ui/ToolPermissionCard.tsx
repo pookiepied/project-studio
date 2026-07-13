@@ -23,15 +23,15 @@ export function ToolPermissionCard({ tool, onAllow, onDeny }: ToolPermissionCard
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-gray-200 dark:border-surface-border bg-white dark:bg-surface-base px-4 py-3.5 space-y-3 transition-colors duration-300"
+      className="rounded-xl border border-surface-border dark:border-surface-border bg-surface-page dark:bg-surface-base px-4 py-3.5 space-y-3 transition-colors duration-300"
     >
       <div>
-        <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+        <p className="text-xs font-medium text-primary dark:text-disabled">
           Permission required
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+        <p className="text-xs text-muted dark:text-disabled mt-0.5">
           The agent wants to{" "}
-          <span className="text-gray-700 dark:text-gray-300">{description}</span>
+          <span className="text-secondary dark:text-disabled">{description}</span>
         </p>
       </div>
 
@@ -39,14 +39,14 @@ export function ToolPermissionCard({ tool, onAllow, onDeny }: ToolPermissionCard
         <Button
           variant="primary"
           onClick={onAllow}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300 transition-colors"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary dark:bg-surface-raised text-on-emphasis dark:text-primary hover:bg-secondary dark:hover:bg-surface-selected transition-colors"
         >
           Allow for this chat
         </Button>
         <Button
           variant="ghost"
           onClick={onDeny}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-raised transition-colors"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted dark:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised transition-colors"
         >
           Deny
         </Button>

@@ -153,7 +153,7 @@ export function ModelLibraryPanel({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             onClick={onClose}
-            className="absolute inset-0 bg-white/70 dark:bg-black/55"
+            className="absolute inset-0 bg-surface-page/70 dark:bg-black/55"
             style={{ backdropFilter: "blur(10px)" }}
           />
 
@@ -162,9 +162,7 @@ export function ModelLibraryPanel({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-10 w-[calc(100vw-32px)] max-w-[1120px] h-[calc(100vh-32px)] max-h-[760px]
-              bg-surface-base border border-surface-border
-              rounded-2xl shadow-2xl overflow-hidden grid grid-rows-[auto_1fr]"
+            className="relative z-10 w-[calc(100vw-32px)] max-w-[1120px] h-[calc(100vh-32px)] max-h-[760px] bg-surface-base border border-surface-border rounded-2xl shadow-2xl overflow-hidden grid grid-rows-[auto_1fr]"
           >
             <header className="flex items-center justify-between gap-4 px-5 py-4 border-b border-surface-border">
               <div className="min-w-0">

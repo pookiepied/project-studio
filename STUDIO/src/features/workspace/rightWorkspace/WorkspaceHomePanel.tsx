@@ -65,18 +65,18 @@ export function WorkspaceHomePanel({
     <div className="flex h-full transition-colors duration-300" style={{ width, minWidth: width }}>
       <ResizeHandle onMouseDown={onResizeDown} />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-colors duration-300 dark:bg-surface-page">
-        <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-gray-100 bg-white px-3 transition-colors duration-300 dark:border-white/[0.06] dark:bg-surface-page">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-page transition-colors duration-300 dark:bg-surface-page">
+        <div className="flex h-10 flex-shrink-0 items-center gap-2.5 border-b border-surface-border bg-surface-page px-3 transition-colors duration-300 dark:border-surface-border dark:bg-surface-page">
           <IconButton
             size="sm"
             onClick={onClose}
             aria-label="Close workspace"
             title="Close workspace"
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-disabled transition-colors duration-150 hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled"
           >
             <Close size="sm" />
           </IconButton>
-          <span className="truncate text-xs text-gray-500 dark:text-gray-500">Workspace</span>
+          <span className="truncate text-xs text-muted dark:text-muted">Workspace</span>
         </div>
 
         <div className="mt-auto mb-auto px-6">
@@ -86,12 +86,12 @@ export function WorkspaceHomePanel({
                 key={view}
                 variant="ghost"
                 onClick={() => onOpenView(view)}
-                className="flex h-10 w-full items-center gap-3 rounded-md bg-gray-100 px-3 text-left justify-start text-sm text-gray-700 transition-colors duration-100 hover:bg-gray-200/70 dark:bg-surface-raised dark:text-gray-300 dark:hover:bg-surface-selected"
+                className="flex h-10 w-full items-center gap-3 rounded-md bg-surface-base px-3 text-left justify-start text-sm text-secondary transition-colors duration-100 hover:bg-surface-raised/70 dark:bg-surface-raised dark:text-disabled dark:hover:bg-surface-selected"
               >
-                <Icon size="sm" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
+                <Icon size="sm" className="flex-shrink-0 text-muted dark:text-muted" />
                 <span className="min-w-0 flex-1 truncate">{label}</span>
                 {shortcut && (
-                  <kbd className="flex-shrink-0 rounded bg-white/80 px-1.5 py-0.5 text-2xs text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+                  <kbd className="flex-shrink-0 rounded bg-surface-page/80 px-1.5 py-0.5 text-2xs text-disabled dark:bg-surface-page/[0.06] dark:text-muted">
                     {shortcut}
                   </kbd>
                 )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Redo,
@@ -10,6 +10,7 @@ import type { ClaudeAccountStatus } from "@/cliBridges";
 import type { ClaudeRateLimitInfo } from "@/types";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 
 interface ClaudeUsageBadgeProps {
   status: ClaudeAccountStatus | null;
@@ -84,19 +85,19 @@ export function ClaudeUsageBadge({
   onRefresh,
   compact = false,
 }: ClaudeUsageBadgeProps) {
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (event: MouseEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
+        onClose();
       }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [onClose, open]);
 
   const subscriptionLabel = capitalize(status?.subscriptionType) ?? "Claude";
   const utilizationPct = toPercent(rateLimit?.utilization);
@@ -123,13 +124,13 @@ export function ClaudeUsageBadge({
     <div className="relative flex-shrink-0" ref={containerRef}>
       <Button
         variant="ghost"
-        onClick={() => setOpen((value) => !value)}
+        onClick={onToggle}
         className={`gap-1.5 rounded-md ${
           compact ? "h-8 w-8 px-0" : "h-7 px-2"
         } ${
           healthTone === "warning"
             ? "text-secondary dark:text-secondary hover:bg-surface-raised dark:hover:bg-surface-raised/30"
-            : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-raised"
+            : "text-muted dark:text-disabled hover:bg-surface-base dark:hover:bg-surface-raised"
         }`}
         title="Claude usage and subscription status"
       >
@@ -152,14 +153,14 @@ export function ClaudeUsageBadge({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute right-0 top-full mt-1.5 w-[280px] z-50 rounded-xl border border-gray-200 dark:border-surface-border bg-white dark:bg-surface-base shadow-xl overflow-hidden"
+            className="absolute right-0 top-full mt-1.5 w-[280px] z-50 rounded-xl border border-surface-border dark:border-surface-border bg-surface-page dark:bg-surface-base shadow-xl overflow-hidden"
           >
-            <div className="px-3 py-2.5 border-b border-gray-100 dark:border-surface-border flex items-center justify-between gap-3">
+            <div className="px-3 py-2.5 border-b border-surface-border dark:border-surface-border flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                <p className="text-sm font-medium text-primary dark:text-primary truncate">
                   Claude account
                 </p>
-                <p className="text-2xs text-gray-400 dark:text-gray-500 truncate">
+                <p className="text-2xs text-disabled dark:text-muted truncate">
                   {status?.email ?? status?.detail ?? "Bridge status"}
                 </p>
               </div>
@@ -167,7 +168,7 @@ export function ClaudeUsageBadge({
                 onClick={() => void onRefresh()}
                 aria-label="Refresh Claude status"
                 title="Refresh Claude status"
-                className="h-7 w-7 rounded-md text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-raised hover:text-gray-600 dark:hover:text-gray-300"
+                className="h-7 w-7 rounded-md text-disabled dark:text-muted hover:bg-surface-base dark:hover:bg-surface-raised hover:text-secondary dark:hover:text-disabled"
               >
                 <Redo size="sm" className={loading ? "animate-spin" : ""} />
               </IconButton>
@@ -175,30 +176,30 @@ export function ClaudeUsageBadge({
 
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between gap-3 text-xs">
-                <span className="text-gray-500 dark:text-gray-400">Plan</span>
-                <span className="font-medium text-gray-800 dark:text-gray-100">
+                <span className="text-muted dark:text-disabled">Plan</span>
+                <span className="font-medium text-primary dark:text-primary">
                   {subscriptionLabel}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-3 text-xs">
-                <span className="text-gray-500 dark:text-gray-400">Auth</span>
-                <span className="font-medium text-gray-800 dark:text-gray-100">
+                <span className="text-muted dark:text-disabled">Auth</span>
+                <span className="font-medium text-primary dark:text-primary">
                   {status?.loggedIn ? capitalize(status.authMethod) ?? "Connected" : "Signed out"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-3 text-xs">
-                <span className="text-gray-500 dark:text-gray-400">{rateLimitLabel}</span>
-                <span className="font-medium text-gray-800 dark:text-gray-100">
+                <span className="text-muted dark:text-disabled">{rateLimitLabel}</span>
+                <span className="font-medium text-primary dark:text-primary">
                   {utilizationPct != null ? `${Math.round(utilizationPct)}% used` : "Waiting for live usage"}
                 </span>
               </div>
 
               {resetsAt && (
                 <div className="flex items-center justify-between gap-3 text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">Resets</span>
-                  <span className="font-medium text-gray-800 dark:text-gray-100">
+                  <span className="text-muted dark:text-disabled">Resets</span>
+                  <span className="font-medium text-primary dark:text-primary">
                     {new Date(resetsAt).toLocaleString([], {
                       month: "short",
                       day: "numeric",
@@ -210,7 +211,7 @@ export function ClaudeUsageBadge({
               )}
 
               {(rateLimit?.isUsingOverage || rateLimit?.surpassedThreshold || rateLimit?.status) && (
-                <div className="rounded-lg bg-gray-50 dark:bg-surface-raised px-2.5 py-2 text-2xs text-gray-500 dark:text-gray-400">
+                <div className="rounded-lg bg-surface-page dark:bg-surface-raised px-2.5 py-2 text-2xs text-muted dark:text-disabled">
                   {rateLimitStatus ?? "Claude reported elevated usage for this subscription window."}
                   {rateLimit?.isUsingOverage ? " Overage is active." : ""}
                   {thresholdPct != null ? ` Warning threshold: ${Math.round(thresholdPct)}%.` : ""}
@@ -218,7 +219,7 @@ export function ClaudeUsageBadge({
               )}
 
               {updatedAtLabel && (
-                <div className="flex items-center gap-1.5 text-2xs text-gray-400 dark:text-gray-500 pt-0.5">
+                <div className="flex items-center gap-1.5 text-2xs text-disabled dark:text-muted pt-0.5">
                   <Clock size="xs" />
                   <span>{updatedAtLabel}</span>
                 </div>

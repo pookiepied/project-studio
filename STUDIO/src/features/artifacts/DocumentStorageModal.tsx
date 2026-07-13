@@ -54,7 +54,7 @@ export function DocumentStorageModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-sm px-4"
           onClick={isUploading ? undefined : onCancel}
         >
           <motion.div
@@ -62,20 +62,20 @@ export function DocumentStorageModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.94, opacity: 0, y: 12 }}
             transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-            className="w-full max-w-sm bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-3xl shadow-2xl overflow-hidden"
+            className="w-full max-w-sm bg-surface-page dark:bg-surface-base border border-surface-border dark:border-surface-border rounded-3xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-surface-selected flex items-center justify-center flex-shrink-0">
-                  <Files size="md" className="text-gray-500 dark:text-gray-400" />
+                <div className="w-9 h-9 rounded-xl bg-surface-base dark:bg-surface-selected flex items-center justify-center flex-shrink-0">
+                  <Files size="md" className="text-muted dark:text-disabled" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <h2 className="text-sm font-semibold text-primary dark:text-primary">
                     Store this document?
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 truncate max-w-[180px]">
+                  <p className="text-xs text-muted dark:text-muted mt-0.5 truncate max-w-[180px]">
                     {label} · {formatBytes(totalBytes)}
                   </p>
                 </div>
@@ -84,14 +84,14 @@ export function DocumentStorageModal({
                 <IconButton
                   aria-label="Close"
                   onClick={onCancel}
-                  className="p-1.5 !h-auto !w-auto rounded-lg !text-gray-400 hover:!text-gray-600 dark:hover:!text-gray-400 hover:!bg-gray-100 dark:hover:!bg-surface-selected transition-colors flex-shrink-0"
+                  className="p-1.5 !h-auto !w-auto rounded-lg !text-disabled hover:!text-secondary dark:hover:!text-disabled hover:!bg-surface-base dark:hover:!bg-surface-selected transition-colors flex-shrink-0"
                 >
                   <Close size="sm" />
                 </IconButton>
               )}
             </div>
 
-            <div className="h-px bg-gray-100 dark:bg-surface-border" />
+            <div className="h-px bg-surface-base dark:bg-surface-border" />
 
             {/* Options */}
             <div className="p-3 space-y-2">
@@ -100,14 +100,14 @@ export function DocumentStorageModal({
                 variant="ghost"
                 onClick={onPermanent}
                 disabled={isUploading}
-                className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-gray-50 dark:hover:!bg-surface-selected hover:!border-gray-200 dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
+                className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-surface-page dark:hover:!bg-surface-selected hover:!border-surface-border dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
                   <Icon icon={CloudArrowUpIcon} size="md" className="text-secondary dark:text-secondary" />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">Keep forever</div>
-                  <div className="text-2xs text-gray-400 dark:text-gray-600 mt-0.5">
+                  <div className="text-xs font-semibold text-primary dark:text-disabled">Keep forever</div>
+                  <div className="text-2xs text-disabled dark:text-secondary mt-0.5">
                     Stored permanently — accessible across conversations
                   </div>
                 </div>
@@ -118,28 +118,28 @@ export function DocumentStorageModal({
                 variant="ghost"
                 onClick={onTemporary}
                 disabled={isUploading}
-                className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-gray-50 dark:hover:!bg-surface-selected hover:!border-gray-200 dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
+                className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-surface-page dark:hover:!bg-surface-selected hover:!border-surface-border dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
                   <Clock size="md" className="text-secondary dark:text-secondary" />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">Just for today</div>
-                  <div className="text-2xs text-gray-400 dark:text-gray-600 mt-0.5">
+                  <div className="text-xs font-semibold text-primary dark:text-disabled">Just for today</div>
+                  <div className="text-2xs text-disabled dark:text-secondary mt-0.5">
                     Deleted after 24 hours automatically
                   </div>
                 </div>
               </Button>
             </div>
 
-            <div className="h-px bg-gray-100 dark:bg-surface-border" />
+            <div className="h-px bg-surface-base dark:bg-surface-border" />
 
             {/* Footer */}
             <div className="px-5 py-3 flex items-center justify-between">
               {isUploading ? (
-                <span className="text-xs text-gray-400 dark:text-gray-600 animate-pulse">Uploading…</span>
+                <span className="text-xs text-disabled dark:text-secondary animate-pulse">Uploading…</span>
               ) : (
-                <span className="text-2xs text-gray-400 dark:text-gray-600">
+                <span className="text-2xs text-disabled dark:text-secondary">
                   The file will also be attached to this message
                 </span>
               )}
@@ -147,7 +147,7 @@ export function DocumentStorageModal({
                 variant="ghost"
                 onClick={onSkip}
                 disabled={isUploading}
-                className="!h-auto !px-0 !py-0 !rounded-none text-xs !text-gray-400 dark:!text-gray-600 hover:!text-gray-600 dark:hover:!text-gray-400 hover:bg-transparent transition-colors disabled:opacity-40"
+                className="!h-auto !px-0 !py-0 !rounded-none text-xs !text-disabled dark:!text-secondary hover:!text-secondary dark:hover:!text-disabled hover:bg-transparent transition-colors disabled:opacity-40"
               >
                 Skip
               </Button>

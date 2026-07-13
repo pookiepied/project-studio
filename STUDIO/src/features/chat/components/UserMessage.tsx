@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
+import { Textarea } from "@/ui/primitives/Textarea";
 import type { ChatMessage } from "@/types";
 import { DocumentAttachmentChip } from "./DocumentAttachmentChip";
 import { ImageWithFallback } from "./ImageWithFallback";
@@ -62,11 +63,11 @@ export const UserMessage = ({
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           className="flex flex-col gap-2 w-full max-w-2xl"
         >
-          <textarea
+          <Textarea
             ref={editTextareaRef}
             value={editingContent}
             onChange={(e) => onEditChange(e.target.value)}
-            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-xl resize-none focus:outline-none focus:border-gray-300 dark:focus:border-surface-border text-sm font-normal text-gray-800 dark:text-gray-200 transition-colors duration-200 leading-relaxed scrollbar-thin"
+            className="resize-none rounded-xl bg-surface-base px-3 py-2.5 text-sm font-normal leading-relaxed text-primary scrollbar-thin focus-visible:ring-0"
             rows={3}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSaveEdit();
@@ -78,7 +79,7 @@ export const UserMessage = ({
               variant="ghost"
               onClick={onSaveEdit}
               disabled={!editingContent.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary dark:bg-surface-raised text-on-emphasis dark:text-primary rounded hover:bg-secondary dark:hover:bg-surface-selected disabled:opacity-40 transition-colors"
             >
               <Check size="xs" />
               Save &amp; Send
@@ -86,11 +87,11 @@ export const UserMessage = ({
             <Button
               variant="ghost"
               onClick={onCancelEdit}
-              className="px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-disabled dark:text-secondary hover:text-secondary dark:hover:text-disabled transition-colors"
             >
               Cancel
             </Button>
-            <span className="text-2xs text-gray-300 dark:text-gray-700 ml-auto">⌘ Enter · Esc to cancel</span>
+            <span className="text-2xs text-disabled dark:text-secondary ml-auto">⌘ Enter · Esc to cancel</span>
           </div>
         </motion.div>
       )}
@@ -118,7 +119,7 @@ export const UserMessage = ({
         {/* Text bubble — only if there's text. Long text collapses with a
             fade + "Show more"/"Show less" toggle. */}
         {message.content && (
-          <div className="bg-gray-100 dark:bg-surface-raised text-gray-800 dark:text-gray-300 rounded-2xl px-4 py-3 transition-colors duration-300">
+          <div className="bg-surface-base dark:bg-surface-raised text-primary dark:text-disabled rounded-2xl px-4 py-3 transition-colors duration-300">
             <CollapsibleUserText content={message.content} />
           </div>
         )}

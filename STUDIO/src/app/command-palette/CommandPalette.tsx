@@ -100,12 +100,12 @@ export function CommandPalette() {
     <AnimatePresence>
       {open && (
         <>
-          {/* Lighter-than-modal scrim — intentionally bg-black/30, not full --scrim */}
+          {/* Lighter-than-modal scrim — intentionally bg-scrim, not full --scrim */}
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-modal"
+            className="fixed inset-0 bg-scrim backdrop-blur-sm z-modal"
           />
           <div className="fixed inset-0 z-modal flex items-start justify-center pt-[16vh] px-4 pointer-events-none">
           <motion.div

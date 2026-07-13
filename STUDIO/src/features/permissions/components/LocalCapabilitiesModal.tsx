@@ -2,6 +2,7 @@ import { useState, type ReactElement } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StudioMark } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";
+import { PermissionActionButton, PermissionModalShell } from "./PermissionModalShell";
 import type { LocalPermissionGrants } from "@/runtime";
 
 interface LocalCapabilitiesModalProps {
@@ -88,7 +89,7 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.24 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-md z-50"
+            className="fixed inset-0 bg-scrim backdrop-blur-md z-50"
           />
 
           <motion.div
@@ -98,7 +99,7 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="pointer-events-auto flex w-full max-w-[820px] h-[480px] max-h-[90vh] overflow-hidden rounded-2xl bg-white dark:bg-surface-base shadow-2xl ring-1 ring-black/5 dark:ring-white/10">
+            <PermissionModalShell>
               {/* Left — imagery */}
               <div className="relative hidden sm:block w-[42%] flex-shrink-0 overflow-hidden">
                 <img
@@ -110,19 +111,19 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
 
                 <div className="relative flex h-full flex-col justify-between p-7">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <StudioMark size={20} className="text-white" />
-                    <span className="text-xs font-medium uppercase tracking-[0.28em] text-white/85">
+                  <div className="flex items-center gap-2.5 text-on-emphasis">
+                    <StudioMark size={20} className="text-on-emphasis" />
+                    <span className="text-xs font-medium uppercase tracking-[0.28em] text-on-emphasis/85">
                       Studio
                     </span>
                   </div>
                   <div>
-                    <p className="text-3xl leading-[1.15] font-semibold text-white drop-shadow-sm">
+                    <p className="text-3xl leading-[1.15] font-semibold text-on-emphasis drop-shadow-sm">
                       Your machine,
                       <br />
                       your studio.
                     </p>
-                    <p className="mt-2 text-sm leading-relaxed text-white/75 max-w-[220px]">
+                    <p className="mt-2 text-sm leading-relaxed text-on-emphasis/75 max-w-[220px]">
                       Switch on the local powers that let Studio build and act
                       right beside you.
                     </p>
@@ -132,15 +133,15 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
 
               {/* Right — the decision */}
               <div className="flex flex-1 flex-col justify-center p-8 sm:p-10 overflow-y-auto">
-                <span className="text-xs font-medium uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
+                <span className="text-xs font-medium uppercase tracking-[0.22em] text-disabled dark:text-muted">
                   Local capabilities
                 </span>
 
-                <h2 className="mt-3 text-3xl leading-tight font-semibold tracking-[-0.01em] text-gray-900 dark:text-gray-50">
+                <h2 className="mt-3 text-3xl leading-tight font-semibold tracking-[-0.01em] text-primary dark:text-primary">
                   Bring Studio to your machine
                 </h2>
 
-                <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                <p className="mt-3 text-base leading-relaxed text-muted dark:text-disabled">
                   Choose what Studio can reach locally. You're always in control,
                   and can change either of these anytime in Settings.
                 </p>
@@ -162,21 +163,20 @@ export function LocalCapabilitiesModal({ open, onAllow, onDeny }: LocalCapabilit
                   <Button
                     variant="outline"
                     onClick={onDeny}
-                    className="flex-1 py-2.5 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-200 dark:border-surface-border rounded-2xl transition-colors"
+                    className="flex-1 py-2.5 text-base font-medium text-secondary dark:text-disabled hover:text-primary dark:hover:text-primary border border-surface-border dark:border-surface-border rounded-2xl transition-colors"
                   >
                     Not now
                   </Button>
-                  <Button
-                    variant="primary"
+                  <PermissionActionButton
                     onClick={() => onAllow(grants)}
                     disabled={!anyEnabled}
-                    className="flex-1 py-2.5 text-base font-semibold text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Continue
-                  </Button>
+                  </PermissionActionButton>
                 </div>
               </div>
-            </div>
+            </PermissionModalShell>
           </motion.div>
         </>
       )}
@@ -199,23 +199,23 @@ function CapabilityRow({ title, caption, enabled, Icon, onToggle }: CapabilityRo
       onClick={onToggle}
       className={`flex w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors duration-200 ${
         enabled
-          ? "border-gray-300/70 dark:border-white/15 bg-gray-50 dark:bg-white/[0.05]"
-          : "border-gray-200 dark:border-white/10 hover:bg-gray-50/70 dark:hover:bg-white/[0.03]"
+          ? "border-surface-border/70 dark:border-white/15 bg-surface-page dark:bg-surface-page/[0.05]"
+          : "border-surface-border dark:border-surface-border hover:bg-surface-page/70 dark:hover:bg-surface-page/[0.03]"
       }`}
     >
       <div
         className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
           enabled
-            ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-            : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
+            ? "bg-primary text-on-emphasis dark:bg-surface-base dark:text-primary"
+            : "bg-surface-base text-muted dark:bg-surface-page/[0.06] dark:text-disabled"
         }`}
       >
         <Icon className="h-[18px] w-[18px]" />
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</div>
-        <p className="mt-0.5 text-sm leading-relaxed text-gray-500 dark:text-gray-500">{caption}</p>
+        <div className="text-base font-semibold text-primary dark:text-primary">{title}</div>
+        <p className="mt-0.5 text-sm leading-relaxed text-muted dark:text-muted">{caption}</p>
       </div>
 
       <Toggle on={enabled} />
@@ -229,14 +229,14 @@ function Toggle({ on }: { on: boolean }) {
       whileTap={{ scale: 0.94 }}
       aria-hidden="true"
       className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full px-0.5 transition-colors duration-200 ${
-        on ? "bg-gray-900 dark:bg-gray-100" : "bg-gray-200 dark:bg-white/20"
+        on ? "bg-primary dark:bg-surface-base" : "bg-surface-raised dark:bg-surface-page/20"
       }`}
     >
       <motion.span
         initial={false}
         animate={{ x: on ? 20 : 0 }}
         transition={{ type: "spring", stiffness: 500, damping: 32 }}
-        className={`h-5 w-5 rounded-full bg-white shadow-sm ${on ? "dark:bg-gray-900" : "dark:bg-gray-200"}`}
+        className={`h-5 w-5 rounded-full bg-surface-page shadow-sm ${on ? "dark:bg-primary" : "dark:bg-surface-raised"}`}
       />
     </motion.span>
   );

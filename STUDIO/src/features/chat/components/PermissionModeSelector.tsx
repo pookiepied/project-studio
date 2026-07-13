@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { chevronRotateTransition } from "@/design/motion";
+import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import {
   Eye,
   Edit,
@@ -38,18 +40,18 @@ interface PermissionModeSelectorProps {
  * AI and Claude (and any future CLI bridge).
  */
 export const PermissionModeSelector = ({ engine, value, disabled, onChange }: PermissionModeSelectorProps) => {
-  const [open, setOpen] = useState(false);
+  const { open, onClose, onToggle } = useDisclosure();
   const ref = useRef<HTMLDivElement>(null);
   const modes = getPermissionModesForEngine(engine);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [onClose, open]);
 
   const active = modes.find((m) => m.id === value) ?? modes[0];
   if (!active) return null;
@@ -59,19 +61,19 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
       <Button
         variant="ghost"
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         title={active.description}
         className={cx(
           composerPillButton,
           "gap-1 disabled:opacity-40",
           open
-            ? "bg-gray-100 dark:bg-surface-selected text-gray-700 dark:text-gray-200"
-            : "text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-border hover:text-gray-700 dark:hover:text-gray-300",
+            ? "bg-surface-base dark:bg-surface-selected text-secondary dark:text-disabled"
+            : "text-muted dark:text-muted hover:bg-surface-base dark:hover:bg-surface-border hover:text-secondary dark:hover:text-disabled",
         )}
       >
         <PermIcon icon={active.icon} />
         <span className={composerPillLabel}>{active.label}</span>
-        <motion.div className="inline-flex items-center" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
+        <motion.div className="inline-flex items-center" animate={{ rotate: open ? 180 : 0 }} transition={chevronRotateTransition}>
           <Expand size="xs" className="opacity-50" />
         </motion.div>
       </Button>
@@ -83,9 +85,9 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 6 }}
             transition={{ duration: 0.13 }}
-            className="absolute bottom-full left-0 mb-2 w-60 bg-white dark:bg-surface-raised border border-gray-200 dark:border-surface-border rounded-xl shadow-xl overflow-hidden z-50 p-1.5 space-y-0.5"
+            className="absolute bottom-full left-0 mb-2 w-60 bg-surface-page dark:bg-surface-raised border border-surface-border dark:border-surface-border rounded-xl shadow-xl overflow-hidden z-50 p-1.5 space-y-0.5"
           >
-            <p className="px-2 pt-1 pb-1 text-3xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">
+            <p className="px-2 pt-1 pb-1 text-3xs font-semibold uppercase tracking-wider text-disabled dark:text-secondary">
               Permission mode
             </p>
             {modes.map((mode) => {
@@ -94,26 +96,26 @@ export const PermissionModeSelector = ({ engine, value, disabled, onChange }: Pe
                 <Button
                   key={mode.id}
                   variant="ghost"
-                  onClick={() => { onChange(mode.id); setOpen(false); }}
+                  onClick={() => { onChange(mode.id); onClose(); }}
                   className={`h-auto w-full items-start justify-start gap-2.5 px-2.5 py-1.5 rounded-lg text-left ${
-                    isActive ? "bg-gray-50 dark:bg-surface-selected" : "hover:bg-gray-50 dark:hover:bg-surface-border"
+                    isActive ? "bg-surface-page dark:bg-surface-selected" : "hover:bg-surface-page dark:hover:bg-surface-border"
                   }`}
                 >
-                  <div className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400">
+                  <div className="mt-0.5 flex-shrink-0 text-muted dark:text-disabled">
                     <PermIcon icon={mode.icon} size="sm" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium leading-tight ${
-                      isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"
+                      isActive ? "text-primary dark:text-primary" : "text-secondary dark:text-disabled"
                     }`}>
                       {mode.label}
                     </p>
-                    <p className="text-2xs text-gray-400 dark:text-gray-600 mt-0.5 leading-tight">
+                    <p className="text-2xs text-disabled dark:text-secondary mt-0.5 leading-tight">
                       {mode.description}
                     </p>
                   </div>
                   {isActive && (
-                    <Check size="xs" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                    <Check size="xs" className="mt-0.5 flex-shrink-0 text-muted dark:text-disabled" />
                   )}
                 </Button>
               );

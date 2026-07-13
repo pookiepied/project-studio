@@ -32,7 +32,7 @@ function DiagramError({ code }: { code: string }) {
       <p className="text-xs text-secondary dark:text-secondary font-medium">
         Diagram syntax error — model produced invalid mermaid
       </p>
-      <pre className="text-xs text-gray-400 dark:text-gray-500 font-mono whitespace-pre-wrap">{code}</pre>
+      <pre className="text-xs text-disabled dark:text-muted font-mono whitespace-pre-wrap">{code}</pre>
     </div>
   );
 }

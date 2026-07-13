@@ -321,7 +321,7 @@ export const ExtensionsPage = () => {
       {/* Custom server modal */}
       <AnimatePresence>
         {showCustomModal && (
-          <div className="fixed inset-0 z-modal flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          <div className="fixed inset-0 z-modal flex items-end sm:items-center justify-center bg-scrim backdrop-blur-sm"
             onClick={() => setShowCustomModal(false)}>
             <div className="w-full max-w-md mx-4 mb-4 sm:mb-0 bg-surface-base border border-surface-border rounded-3xl shadow-2xl overflow-hidden"
               onClick={e => e.stopPropagation()}>

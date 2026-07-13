@@ -213,8 +213,8 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             whileHover={{ scale: hasAPIConfigured ? 1.02 : 1 }}
             className={`flex items-center !gap-3 !px-8 py-3 !rounded-full font-sans text-xs !transition-all !duration-200 backdrop-blur-sm tracking-wide ${
               hasAPIConfigured
-                ? "!bg-black hover:!bg-gray-800 !text-white cursor-pointer shadow-lg hover:shadow-xl"
-                : "!bg-gray-200 !text-gray-500 cursor-not-allowed"
+                ? "!bg-black hover:!bg-surface-raised !text-on-emphasis cursor-pointer shadow-lg hover:shadow-xl"
+                : "!bg-surface-raised !text-muted cursor-not-allowed"
             } disabled:opacity-50`}
           >
             {/* Google "G" — official 4-colour brand mark; brand hex required, no neutral-token equivalent (§17 brand-logo carve-out) */}
@@ -249,7 +249,7 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             }}
             disabled={isLoading || !googleReady || checkingAPI}
             whileHover={{ scale: 1.02 }}
-            className="flex items-center !gap-3 !px-8 py-3 !rounded-full font-sans text-xs !transition-all !duration-200 backdrop-blur-sm !bg-black hover:!bg-gray-800 !text-white cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-50 tracking-wide"
+            className="flex items-center !gap-3 !px-8 py-3 !rounded-full font-sans text-xs !transition-all !duration-200 backdrop-blur-sm !bg-black hover:!bg-surface-raised !text-on-emphasis cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-50 tracking-wide"
           >
             {/* Google "G" — official 4-colour brand mark; brand hex required, no neutral-token equivalent (§17 brand-logo carve-out) */}
             {/* eslint-disable no-restricted-syntax */}
@@ -271,9 +271,9 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 rounded-full"
+              className="absolute inset-0 flex items-center justify-center bg-surface-page bg-opacity-80 rounded-full"
             >
-              <div className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-surface-border border-t-black rounded-full animate-spin" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -306,7 +306,7 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="text-sm text-gray-600 font-light"
+            className="text-sm text-secondary font-light"
           >
             Signing in...
           </motion.p>
