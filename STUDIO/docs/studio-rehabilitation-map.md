@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 48 unused exports
+- 46 unused exports
 - 50 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -276,6 +276,8 @@ Completed:
   notification store, service, and agent-result adapter.
 - Removed unused local MCP registry wrapper exports while preserving and
   reformatting the live startup registry sync path.
+- Privatized the activity health-card status indicator while preserving the
+  live `HealthCard` component surface.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.

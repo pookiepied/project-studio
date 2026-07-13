@@ -14,7 +14,7 @@ function statusTone(status: string): StatusTone {
   return "alert";
 }
 
-export const StatusDot = ({ status }: { status: string }) => {
+const StatusDot = ({ status }: { status: string }) => {
   const tone = statusTone(status);
   if (tone === "alert") {
     return <Warning size="xs" weight="fill" className="text-primary flex-shrink-0" />;
