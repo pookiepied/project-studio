@@ -137,7 +137,7 @@ before splitting.
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
-| `src/features/chat/context/useStreamHandlers.ts` | 588 | Streaming protocol/event logic candidate |
+| `src/features/chat/context/useStreamHandlers.ts` | 498 | Streaming protocol/event logic candidate; DSML continuation was extracted |
 
 ## Dead-Code Signals
 
@@ -453,6 +453,10 @@ Completed:
   into `src/features/chat/context/useChatBackgroundServices.ts`.
 - Reduced `ChatProvider.tsx` from 771 to 752 lines while preserving the
   existing background service side effects.
+- Extracted the Studio stream handler's inline DSML tool-call continuation path
+  into `src/features/chat/context/handleDsmlContinuation.ts`.
+- Reduced `useStreamHandlers.ts` from 588 to 498 lines while keeping the same
+  `handleStreamDone` control flow and continuation contract.
 
 Recommended order:
 

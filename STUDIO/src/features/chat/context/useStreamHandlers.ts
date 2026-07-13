@@ -17,8 +17,6 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import {
-  buildChatBody,
-  getMcpServers,
   executeLocalTools,
   classifyToolDisplay,
   useAgentChat,
@@ -28,17 +26,16 @@ import { memorySystem } from "@/core/storage/memorySystem";
 import { recordAgentToolResult } from "@/core/notifications";
 import { parseChatResponse } from "@/lib/chatParser";
 import { buildHarnessEvent } from "@/lib/harnessEventUtils";
-import { hasDSML, parseDSML, stripDSMLForStreaming } from "@/lib/dsmlParser";
+import { hasDSML, stripDSMLForStreaming } from "@/lib/dsmlParser";
 import {
   loadConversation,
   addMessage,
-  getContextMessages,
 } from "@/features/chat/conversations/chatHistoryService";
 import type { ConversationStorageScope } from "@/core/conversations";
 import { isClaudeOwnedConversation } from "@/features/chat/conversations/ownership/conversationOwnership";
-import { pruneContextByTokens, applyAllSystemMessages } from "./messageBuilder";
 import { buildToolExecutionCallbacks } from "./toolExecutionCallbacks";
-import { MESSAGES_PER_PAGE, MAX_CONTEXT_MESSAGES } from "./constants";
+import { MESSAGES_PER_PAGE } from "./constants";
+import { handleDsmlContinuation } from "./handleDsmlContinuation";
 import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "./types";
 import type { ProjectCtx } from "./projectContextStorage";
 import type { PermissionDecision, ManagementKind } from "@/core/permissions";
@@ -48,7 +45,6 @@ import type {
   MessageSegment,
 } from "@/types";
 import type {
-  APIChatMessage,
   AutoRoutedInfo,
   ToolResultItem,
 } from "@/types/chat";
@@ -406,123 +402,37 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
     // structured tool_use API blocks. The DO streams this as plain text.
     // We detect it here, execute the tools locally, then auto-continue the
     // turn so the model gets the results and can give a real answer.
-    if (hasDSML(content)) {
-      const { cleaned, toolCalls } = parseDSML(content);
-
-      if (toolCalls.length > 0) {
-        // 1. Show the text portion (before the DSML block, if any)
-        if (cleaned.trim()) {
-          harnessSegmentsRef.current = [
-            ...harnessSegmentsRef.current,
-            { type: "text", content: cleaned },
-          ];
-        }
-        pendingSegmentTextRef.current  = "";
-        latestStreamingContentRef.current = "";
-        setStreamingContent("");
-
-        // 2. Add a "running" harness card for each tool call
-        for (const tc of toolCalls) {
-          harnessSegmentsRef.current = [
-            ...harnessSegmentsRef.current,
-            { type: "harness_event", event: buildHarnessEvent(tc.callId, tc.tool, tc.args, "running") },
-          ];
-        }
-        setHarnessSegments([...harnessSegmentsRef.current]);
-
-        // 3. Execute the tools via the standard local pipeline
-        const { toolResultItems } = await executeLocalTools(
-          toolCalls,
-          buildToolExecutionCallbacks({
-            setActiveToolCalls,
-            setSessionTasks,
-            waitForAnswer: waitForQuestionAnswer,
-            evaluatePermission,
-            requestGlobalAccess,
-            requestManagementAccess,
-            pendingApprovalResolveRef,
-            screenshotUrls: screenshotUrlsRef.current,
-            workspaceRoot: projectContext?.path ?? null,
-            convId: conversation?.id,
-          })
-        );
-
-        // 4. Update the harness cards to "complete"
-        harnessSegmentsRef.current = harnessSegmentsRef.current.map((seg) => {
-          if (seg.type !== "harness_event") return seg;
-          const tc = toolCalls.find((t) => t.callId === seg.event.callId);
-          if (!tc) return seg;
-          const ri = toolResultItems.find((r) => r.call_id === tc.callId);
-          return {
-            type: "harness_event" as const,
-            event: buildHarnessEvent(tc.callId, tc.tool, tc.args, "complete", ri?.content),
-          };
-        });
-        setHarnessSegments([...harnessSegmentsRef.current]);
-
-        // 5. Build the continuation context:
-        //    [conversation history] + [synthetic assistant tool_use] + [tool results]
-        const runningMcpServers = await getMcpServers(conversationStorageScope);
-
-        const ctxMsgs = await getContextMessages(convId, MAX_CONTEXT_MESSAGES);
-        const apiMessages: APIChatMessage[] = ctxMsgs.map((m) => ({
-          role: m.role, content: m.content,
-        }));
-
-        // Synthetic assistant message carrying the tool_calls
-        apiMessages.push({
-          role: "assistant",
-          content: cleaned || "",
-          tool_calls: toolCalls.map((tc) => ({
-            id: tc.callId,
-            type: "function" as const,
-            function: { name: tc.tool, arguments: JSON.stringify(tc.args) },
-          })),
-        } as APIChatMessage);
-
-        // Tool result messages
-        for (const r of toolResultItems) {
-          apiMessages.push({
-            role:         "tool",
-            content:      r.content,
-            tool_call_id: r.call_id,
-            name:         r.name,
-          } as APIChatMessage);
-        }
-
-        // Apply system prompts + prune to model context limit
-        const enhanced = applyAllSystemMessages(
-          apiMessages, runningMcpServers,
-          settings.imageModel, settings.videoModel, projectContext
-        );
-        const prunedMessages = pruneContextByTokens(enhanced, getContextLimit(currentModel));
-
-        // 6. Re-use the same optimistic assistant slot for the continuation response
-        //    (replaces the blank placeholder rather than adding a second bubble)
-        const continuationId = `ai-dsml-${Date.now()}`;
-        optimisticAssistantIdRef.current = continuationId;
-        fullContentRef.current           = "";
-        pendingSegmentTextRef.current    = "";
-        latestStreamingContentRef.current = "";
-        setStreamingContent("");
-        setStreamingMessageId(continuationId);
-        setDisplayedMessages((prev) =>
-          prev.map((m) => m.id === optId ? { ...m, id: continuationId, content: "" } : m)
-        );
-
-        // 7. Start the continuation turn — handleStreamDone fires again when done
-        agentChat.startTurn(buildChatBody({
-          messages: prunedMessages,
-          model: currentModel,
-          runningMcpServers,
-          storageScope: conversationStorageScope,
-          reasoningBudget,
-        }), convId);
-
-        return; // normal handleStreamDone path runs after the continuation finishes
-      }
-    }
-    // ── End DSML interception ────────────────────────────────────────────────
+    const handledDsml = await handleDsmlContinuation({
+      content,
+      convId,
+      optimisticAssistantId: optId,
+      agentChat,
+      conversationId: conversation?.id,
+      conversationStorageScope,
+      projectContext,
+      currentModel,
+      reasoningBudget,
+      settings,
+      fullContentRef,
+      screenshotUrlsRef,
+      optimisticAssistantIdRef,
+      latestStreamingContentRef,
+      harnessSegmentsRef,
+      pendingSegmentTextRef,
+      pendingApprovalResolveRef,
+      setDisplayedMessages,
+      setActiveToolCalls,
+      setSessionTasks,
+      setHarnessSegments,
+      setStreamingContent,
+      setStreamingMessageId,
+      waitForQuestionAnswer,
+      evaluatePermission,
+      requestGlobalAccess,
+      requestManagementAccess,
+      getContextLimit,
+    });
+    if (handledDsml) return;
 
     const parsed = parseChatResponse(content);
     const finalContent = parsed?.trim() ? parsed : content.trim();
