@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 50 unused exports
-- 52 unused exported types
+- 49 unused exports
+- 51 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -272,6 +272,8 @@ Completed:
   surfaces.
 - Removed unused permission grant and barrel exports while preserving the live
   permission engine, runtime scoping, and Settings permissions surface.
+- Removed unused notification barrel exports while preserving the live
+  notification store, service, and agent-result adapter.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.

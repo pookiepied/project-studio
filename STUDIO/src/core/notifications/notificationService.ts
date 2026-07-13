@@ -106,7 +106,7 @@ export class NotificationService {
 
   static showPermissionNeeded(conversationTitle: string) {
     this.showNative(
-      "STUDIO — Permission Required",
+      "STUDIO - Permission Required",
       `"${conversationTitle}" is waiting for your approval. Click to view.`,
       { tag: `permission-${Date.now()}`, silent: false }
     );

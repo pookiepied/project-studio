@@ -2,12 +2,12 @@
  * In-app notification store.
  *
  * A singleton pub/sub (same shape as backgroundSessionTracker) that holds an
- * account-visible history of notifications — currently sub-agent lifecycle
+ * account-visible history of notifications: currently sub-agent lifecycle
  * (research agent running / done / failed / cancelled). Entries persist to
  * localStorage so they survive an app restart, and a terminal outcome also
  * fires an OS toast (via NotificationService) when the window is unfocused.
  *
- * Fed from ChatProvider via recordAgentToolResult() — the spawn_agent /
+ * Fed from ChatProvider via recordAgentToolResult(): the spawn_agent /
  * await_agents tool results already stream in over the chat WebSocket, so no
  * extra backend channel is needed. The TitleBar bell subscribes for the live
  * list + unread badge.
@@ -18,7 +18,7 @@ import { NotificationService } from "./notificationService";
 export type AgentNotificationStatus = "running" | "done" | "failed" | "cancelled";
 
 export interface AppNotification {
-  /** Stable key — the agent's runId, so running → done updates one entry. */
+  /** Stable key: the agent's runId, so running to done updates one entry. */
   id:              string;
   kind:            "agent";
   status:          AgentNotificationStatus;
@@ -51,7 +51,7 @@ class NotificationStore {
     this.load();
   }
 
-  // ── persistence ───────────────────────────────────────────────────────────
+  // Persistence
 
   private load(): void {
     try {
@@ -61,7 +61,7 @@ class NotificationStore {
         if (Array.isArray(parsed)) this.items = parsed.slice(0, MAX_ITEMS);
       }
     } catch {
-      // Corrupt / unavailable storage — start empty.
+      // Corrupt or unavailable storage; start empty.
     }
   }
 
@@ -69,13 +69,13 @@ class NotificationStore {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.items.slice(0, MAX_ITEMS)));
     } catch {
-      // Non-fatal — persistence is best-effort.
+      // Non-fatal; persistence is best-effort.
     }
   }
 
-  // ── mutations ─────────────────────────────────────────────────────────────
+  // Mutations
 
-  /** Upsert an agent notification by id. running → done updates one entry. */
+  /** Upsert an agent notification by id. running to done updates one entry. */
   upsertAgent(n: {
     id:              string;
     status:          AgentNotificationStatus;
@@ -86,7 +86,7 @@ class NotificationStore {
     const now      = Date.now();
     const existing = this.items.find((i) => i.id === n.id);
 
-    // Immutable updates — a fresh array reference each change so
+    // Immutable updates: a fresh array reference each change so
     // useSyncExternalStore detects it (and stays stable between changes).
     let next: AppNotification[];
     if (existing) {
@@ -140,10 +140,10 @@ class NotificationStore {
     this.notify();
   }
 
-  // ── reads ─────────────────────────────────────────────────────────────────
+  // Reads
 
   /**
-   * Stable snapshot for useSyncExternalStore — the SAME array reference is
+   * Stable snapshot for useSyncExternalStore: the SAME array reference is
    * returned until a mutation replaces it, so React does not loop.
    */
   getSnapshot(): AppNotification[] {
@@ -159,7 +159,7 @@ class NotificationStore {
     return () => this.listeners.delete(listener);
   }
 
-  // ── internals ─────────────────────────────────────────────────────────────
+  // Internals
 
   private notify(): void {
     for (const l of this.listeners) l(this.items);
@@ -177,7 +177,7 @@ class NotificationStore {
       if (!unfocused) return;
 
       await NotificationService.requestPermission();
-      const summary = body ? ` — ${body.slice(0, 80)}` : "";
+      const summary = body ? ` - ${body.slice(0, 80)}` : "";
       await NotificationService.showNative("STUDIO", `${title} ${statusLabel(status)}${summary}`, {
         tag: `agent-${Date.now()}`,
       });
@@ -190,7 +190,7 @@ class NotificationStore {
 export const notificationStore = new NotificationStore();
 
 // ---------------------------------------------------------------------------
-// Adapter — turn spawn_agent / await_agents tool results into notifications.
+// Adapter: turn spawn_agent / await_agents tool results into notifications.
 // Kept here (not inline in ChatProvider) so the parsing lives with the store.
 // ---------------------------------------------------------------------------
 
@@ -218,7 +218,7 @@ function mapOutcome(status: string | undefined): AgentNotificationStatus {
 
 /**
  * Feed the store from a completed spawn_agent / await_agents tool call.
- * Safe to call with any result shape — unrecognized shapes are ignored.
+ * Safe to call with any result shape; unrecognized shapes are ignored.
  */
 export function recordAgentToolResult(
   tool:           string,
