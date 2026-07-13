@@ -358,17 +358,37 @@ Completed:
 
 ### Phase 3: Feature boundary map
 
-Scope:
+Status: in progress.
 
-- `chat`
-- `workspace`
-- `manage`
-- `models`
+Current boundary map:
 
-Deliverable:
+| Feature | Owns | Current consumers | Boundary notes |
+| --- | --- | --- | --- |
+| `chat` | Conversation UX, composer/message surfaces, chat provider state, send/stream pipeline, conversation storage, attachments, Claude bridge integration, chat-local project context, conversation search/statuses | `app`, `workspace`, `voice`, `transcription`, `extensions`, `permissions`, `models`, `types` | This is currently both a product feature and a shared AI/conversation service surface. Future splits should separate UI composition, provider state, attachment processing, conversation persistence, and AI transport more clearly before renaming. |
+| `workspace` | Workspace page, right workspace tabs, browser/terminal/files/review side panels, project launcher/app detection, agent workflow service | `app`, `chat`, `artifacts`, workspace internals | The top-level feature is mostly a side-surface/tooling area. `rightWorkspace/` is a layout region and may deserve a clearer name after monolith splits. Browser types now live in `browser/types.ts` to keep host/panel dependencies acyclic. |
+| `manage` | Management page, model registry administration views, whitelist/AI model management views, registry snapshot/service/formatting | `app`, `models` | `manage` should remain an admin/configuration surface. It may consume model/provider primitives from `models`, but model discovery, filtering, provider icons, and model picker behavior should not move into `manage`. `curatedRegistrySnapshot.ts` is snapshot-like data and should be treated as generated or data-owned before editing. |
+| `models` | Shared model/provider catalog access, model filtering, model picker/library components, provider icons, local provider status/hooks, Ollama/LM Studio status, model context provider | `app`, `chat`, `manage`, `settings`, `activity`, `core diagnostics` | This is the shared model capability layer. It may expose stable UI primitives and service functions to other features, but it should not own chat conversation behavior or manage/admin workflows. |
 
-- A short README or section per major feature that states what the feature owns,
-  what it imports from shared layers, and what should not live there.
+Import direction guidance:
+
+1. `manage` may import from `models`; `models` should not import from `manage`.
+2. `chat` may import model selection/context APIs from `models`; `models`
+   should not import chat UI. Existing `models -> chat` imports are limited to
+   shared composer styles and local usage name extraction and should be retired
+   during later boundary cleanup.
+3. `workspace` may embed chat side-panel UX through the public chat context and
+   components, but workspace-specific state should stay in `workspace`.
+4. Shared cross-layer DTOs belong in neutral leaf modules such as `src/types/`
+   or feature-local `types.ts` only when the type is not needed across layers.
+5. Snapshot/generated registry data should be marked as data, not treated as a
+   monolith to split by hand.
+
+Next:
+
+- Add short feature-local README files or expand this map after the first
+  monolith split confirms the practical ownership boundaries.
+- Retire the remaining awkward cross-feature imports in small, verified slices
+  after the large files are easier to reason about.
 
 ### Phase 4: Monolith splits
 
