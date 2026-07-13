@@ -42,7 +42,7 @@ export async function registerGlobalShortcut(keys: string[]): Promise<boolean> {
   }
 
   if (!keys || keys.length === 0) {
-    logger.warn("GlobalShortcut", "Empty keys array — skipping registration");
+    logger.warn("GlobalShortcut", "Empty keys array - skipping registration");
     return false;
   }
 
@@ -63,7 +63,7 @@ export async function registerGlobalShortcut(keys: string[]): Promise<boolean> {
         try {
           await unregister(currentShortcut);
         } catch {
-          // Already gone — that's fine
+          // Already gone; that's fine
         }
         currentShortcut = null;
       }
@@ -73,12 +73,12 @@ export async function registerGlobalShortcut(keys: string[]): Promise<boolean> {
       try {
         await unregister(shortcut);
       } catch {
-        // Not registered — that's fine
+        // Not registered; that's fine
       }
 
       await register(shortcut, async (event) => {
         // Tauri v2 fires on both Pressed (keydown) and Released (keyup).
-        // Ignore keyup so one tap = one trigger, not start→immediate-stop.
+        // Ignore keyup so one tap = one trigger, not start-then-immediate-stop.
         if (event.state === "Released") return;
         logger.debug("GlobalShortcut", `Triggered: ${shortcut}`);
         await emit("global-shortcut-triggered", { shortcut });
@@ -127,7 +127,7 @@ export async function registerVoiceShortcut(keys: string[]): Promise<boolean> {
     return false;
   }
 
-  // Empty array = voice shortcut disabled — unregister any leftover and bail
+  // Empty array = voice shortcut disabled; unregister any leftover and bail
   if (!keys || keys.length === 0) {
     await unregisterVoiceShortcut();
     return true;
@@ -154,7 +154,7 @@ export async function registerVoiceShortcut(keys: string[]): Promise<boolean> {
       try { await unregister(shortcut); } catch { /* not registered */ }
 
       await register(shortcut, async (event) => {
-        // Tauri v2 fires on both Pressed AND Released — ignore keyup
+        // Tauri v2 fires on both Pressed AND Released; ignore keyup
         if (event.state === "Released") return;
         logger.debug("GlobalShortcut", `Voice triggered: ${shortcut}`);
         await emit("voice-shortcut-triggered", { shortcut });

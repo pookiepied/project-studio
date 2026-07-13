@@ -1,20 +1,20 @@
 /**
- * overlayService — manages the always-on floating island overlay window.
+ * overlayService manages the always-on floating island overlay window.
  *
  * Architecture:
  *   - Creates ONE frameless transparent Tauri window at app startup (init())
- *   - Window stays alive for the entire app session — no create/destroy per use
+ *   - Window stays alive for the entire app session; no create/destroy per use
  *   - Communicates exclusively via cross-webview Tauri events:
- *       main → overlay : "studio:overlay-update"  (IslandPayload)
- *       overlay → main : "studio:overlay-action"  (OverlayAction)
+ *       main to overlay: "studio:overlay-update" (IslandPayload)
+ *       overlay to main: "studio:overlay-action" (OverlayAction)
  *
  * States:
- *   IDLE      — tiny breathing pill (opacity = user's overlayOpacity setting)
- *   RECORDING — expanded, waveform visible
- *   PROCESSING/TRANSCRIBING/REPHRASING — expanded, spinner
- *   COMPLETE  — expanded, transcript + action buttons
- *   ERROR     — expanded, error indicator
- *   HIDDEN    — island is slid above the screen (fully out of view)
+ *   IDLE: tiny breathing pill (opacity = user's overlayOpacity setting)
+ *   RECORDING: expanded, waveform visible
+ *   PROCESSING/TRANSCRIBING/REPHRASING: expanded, spinner
+ *   COMPLETE: expanded, transcript + action buttons
+ *   ERROR: expanded, error indicator
+ *   HIDDEN: island is slid above the screen (fully out of view)
  */
 
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -25,15 +25,15 @@ import type { VoiceCaptionState } from "@/core/platform/voiceCaptionTypes";
 import { featureManager } from "./featureManager";
 import { logger } from "../logging/logger";
 
-// ─── Public types ────────────────────────────────────────────────────────────
+// Public types
 
 export type IslandMode = "global" | "voice" | "transcription" | "artifact";
 
 export interface OverlayPayload {
   state: RecordingState;
   /**
-   * "transcription" (default) — hotkey recording flow, paste to cursor.
-   * "voice" — live voice session; COMPLETE state shows AI response text.
+   * "transcription" (default): hotkey recording flow, paste to cursor.
+   * "voice": live voice session; COMPLETE state shows AI response text.
    */
   mode?: IslandMode;
   transcript?: string;
@@ -43,9 +43,9 @@ export interface OverlayPayload {
   aiText?: string;
   /** Current spoken sentence and approximate word index during live TTS playback. */
   voiceCaption?: VoiceCaptionState;
-  /** Island idle-state opacity 0–100. Forwarded from user settings. */
+  /** Island idle-state opacity 0-100. Forwarded from user settings. */
   opacity?: number;
-  /** Real microphone levels (5 values 0–1) for live waveform visualization. */
+  /** Real microphone levels (5 values 0-1) for live waveform visualization. */
   audioLevels?: number[];
   /**
    * Pulse card payload. When set and state=COMPLETE, the card view is rendered
@@ -69,11 +69,11 @@ export interface OverlayAction {
   text?: string;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// Constants
 
 const OVERLAY_LABEL = "overlay";
 
-// Fixed window size — wide enough for the complete state, tall enough for
+// Fixed window size: wide enough for the complete state, tall enough for
 // the slide-in animation. The window background is transparent so the extra
 // space is invisible.
 const WIN_WIDTH = 440;
@@ -83,7 +83,7 @@ const WIN_HEIGHT = 8 + CAPSULE_H + 8;
 /** Extra ms to let React mount before sending the first event */
 const MOUNT_DELAY_MS = 200;
 
-// ─── Service ─────────────────────────────────────────────────────────────────
+// Service
 
 class OverlayService {
   private win: WebviewWindow | null = null;
@@ -94,7 +94,7 @@ class OverlayService {
   /** When false, all show/update calls are no-ops and the island is hidden. */
   private islandEnabled: boolean = true;
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // Public API
 
   /**
    * Enable or disable the Pulse island.
@@ -109,10 +109,10 @@ class OverlayService {
 
   /**
    * Create or re-attach to the overlay window at app startup and reset to idle.
-   * Safe to call multiple times — re-uses the existing window but always sends
+   * Safe to call multiple times. Reuses the existing window but always sends
    * the idle state so the island reflects the current opacity/mode setting.
    *
-   * @param idleOpacity  0–100 idle-pill opacity
+   * @param idleOpacity  0-100 idle-pill opacity
    * @param isDark       When provided, syncs the app theme to the overlay right
    *                     after the window is confirmed ready. This fixes the race
    *                     where the regular studio:overlay-theme event fires before
@@ -123,7 +123,7 @@ class OverlayService {
     if (!this.islandEnabled) return;
     if (this.creating) return;
 
-    // Window already exists — skip creation, just update idle state + theme.
+    // Window already exists: skip creation, just update idle state + theme.
     // This handles re-init from settings changes (opacity / enabled toggle) without
     // risking a second window. The creating guard above covers the concurrent-call race.
     if (this.win) {
@@ -142,7 +142,7 @@ class OverlayService {
       try {
         await emitTo(OVERLAY_LABEL, "studio:overlay-theme", { dark: isDark });
       } catch {
-        // Window already gone — not fatal
+        // Window already gone; not fatal
       }
     }
   }
@@ -182,7 +182,7 @@ class OverlayService {
 
   /**
    * Transition island to IDLE state (tiny pill, no dismiss).
-   * Does NOT close the window — the island stays on screen as the idle dot.
+   * Does NOT close the window. The island stays on screen as the idle dot.
    * Uses the last known opacity if none is provided (safe from stale closures).
    */
   async returnToIdle(opacity?: number, mode: IslandMode = "global"): Promise<void> {
@@ -210,7 +210,7 @@ class OverlayService {
 
   /**
    * Slide the island above the screen (fully hidden).
-   * The window stays alive — call show() / init() to bring it back.
+   * The window stays alive. Call show() or init() to bring it back.
    */
   async hide(): Promise<void> {
     // Slide island above screen by sending opacity=0 with IDLE state
@@ -232,7 +232,7 @@ class OverlayService {
     return this.win !== null;
   }
 
-  // ── Private helpers ────────────────────────────────────────────────────────
+  // Private helpers
 
   private async _getOrCreateWindow(): Promise<void> {
     // Set creating=true SYNCHRONOUSLY before any await so that concurrent
@@ -255,7 +255,7 @@ class OverlayService {
         return;
       }
     } catch {
-      // getByLabel may throw on some Tauri versions — treat as not found
+      // getByLabel may throw on some Tauri versions; treat as not found
     }
 
     try {
@@ -273,7 +273,7 @@ class OverlayService {
         resizable: false,
         focus: false,
         shadow: false,
-        // Hidden until OverlayPage positions and reveals it — eliminates the
+        // Hidden until OverlayPage positions and reveals it, which eliminates the
         // "full-window flash at (0,0)" artifact seen on every app launch.
         visible: false,
       });

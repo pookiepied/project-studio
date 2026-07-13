@@ -270,6 +270,9 @@ Completed:
 - Removed or privatized unused core network, platform, and storage convenience
   exports while preserving live diagnostics, overlay, shortcut, and settings
   surfaces.
+- Removed separator-art and unnecessary Unicode punctuation from the platform
+  overlay and global-shortcut services as the first comment-artifact cleanup
+  pass.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.
