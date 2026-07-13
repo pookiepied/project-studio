@@ -15,8 +15,8 @@ interface GlobalAccessModalProps {
 /**
  * Machine-wide file-access gate, shown when a chat that isn't tied to a project
  * asks to touch files anywhere on the machine. This is the global counterpart
- * to the workspace trust/working-style modal in `ProjectContextPicker`: a
- * project scopes access to its root, whereas a global chat has no root, so
+ * to project-scoped workspace access: a project scopes access to its root,
+ * whereas a global chat has no root, so
  * operating on files requires this explicit, once-per-machine grant.
  *
  * Presented as a wide, split-panel card behind a blurred backdrop - an image

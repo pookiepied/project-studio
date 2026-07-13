@@ -231,9 +231,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [conversation, conversationStorageScope]);
 
   // ── Workspace trust ──────────────────────────────────────────────────────
-  // Trust is recorded by ProjectContextPicker when a folder is first opened (it
-  // owns the trust/working-style modal). Here we only *read* it, below, to gate
-  // mutating tool calls via the permission engine.
+  // Trust is recorded when a project folder is selected. Here we only *read* it,
+  // below, to gate mutating tool calls via the permission engine.
 
   // ── Global machine-access gate ────────────────────────────────────────────
   // Shown when a global (no-project) chat needs to reach files outside any

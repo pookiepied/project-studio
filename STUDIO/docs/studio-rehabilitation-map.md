@@ -37,9 +37,9 @@ Top-level areas:
 | `gate/` | Quality gate data | Preserve unless replacing gate process |
 | `dist/` | Build output | Ignore for architecture work |
 
-Current file counts from the first map:
+Current file counts after the first dead-code proof pass:
 
-- `src`: 494 files
+- `src`: 490 files
 - `library`: 192 files
 - `src-tauri`: 85 files
 - `daemon`: 16 files
@@ -79,12 +79,12 @@ Current `src/` top-level areas:
 
 | Area | Files | Notes |
 | --- | ---: | --- |
-| `features/` | 277 | Dominant app code; already feature-oriented |
+| `features/` | 274 | Dominant app code; already feature-oriented |
 | `core/` | 71 | Shared infrastructure, but broad naming |
 | `app/` | 45 | App composition, routes, shell, globals |
 | `ui/` | 28 | Brand, feedback, icons, primitives |
 | `runtime/` | 27 | Runtime transport/execution/server integration |
-| `lib/` | 25 | Mixed utilities and hooks |
+| `lib/` | 24 | Mixed utilities and hooks |
 | `design/` | 7 | Tokens, CSS systems, motion/font constants |
 | `types/` | 6 | Shared types, some overlap with feature types |
 | `cliBridges/` | 5 | Claude CLI bridge |
@@ -94,9 +94,9 @@ Largest feature clusters:
 
 | Feature | Files | Lines |
 | --- | ---: | ---: |
-| `chat` | 95 | 14287 |
+| `chat` | 94 | 13811 |
 | `manage` | 14 | 13253 |
-| `workspace` | 25 | 5254 |
+| `workspace` | 23 | 5078 |
 | `models` | 24 | 3242 |
 | `voice` | 16 | 2931 |
 | `settings` | 15 | 2089 |
@@ -144,24 +144,26 @@ before splitting.
 
 `npx knip --reporter compact` currently reports:
 
-- 4 unused files
+- 0 unused files after the first proof pass
 - 81 unused exports
 - 57 unused exported types
 - 4 duplicate exports
 
-Unused files reported:
+Unused files removed in the first proof pass:
 
 - `src/features/chat/components/ProjectContextPicker.tsx`
 - `src/features/workspace/rightWorkspace/WorkspaceHomePanel.tsx`
 - `src/features/workspace/rightWorkspace/WorkspacePlaceholderPanel.tsx`
 - `src/lib/hooks/useFetchState.ts`
 
-These are candidates, not automatic deletion targets. Before removal:
+Removal evidence:
 
-1. Confirm no dynamic import, route registry, string-based lookup, or external
-   documentation expects them.
-2. Check whether they are newly orphaned by the checkpoint commit.
-3. Delete in a dedicated dead-code pass with typecheck afterward.
+1. `knip` reported each file as unused.
+2. Name and path searches found no live imports, route references, or public
+   barrel exports.
+3. Remaining references were stale prompts, lint baseline entries, this map, or
+   comments.
+4. TypeScript verification passed after removal.
 
 Duplicate exports reported:
 
@@ -245,9 +247,20 @@ Next:
 
 ### Phase 1: Dead-code proof pass
 
-Scope:
+Status: in progress.
 
-- Review the 4 unused files from `knip`.
+Completed:
+
+- Removed the 4 unused files reported by `knip`.
+- Updated stale live comments that referenced deleted code.
+- Updated `gate/lint-baseline.json` with the project ratchet command after the
+  deleted files made old baseline entries stale.
+- Verified no unused files remain in the `knip` report.
+- Verified `npm run typecheck`.
+
+Remaining scope:
+
+- Continue with duplicate exports and unused exports.
 - Review duplicate exports.
 - Review unused exports in small groups by subsystem.
 
@@ -354,6 +367,3 @@ For structural changes, prefer:
   user-installable marketplace assets?
 - Should `web/` remain a separate entry variant, or is it a distribution target
   for the same app shell?
-- Should the lint baseline be updated now that the ratchet reports 100 improved
-  files?
-
