@@ -2,8 +2,6 @@
 import { motion, AnimatePresence }                   from "framer-motion";
 import { BrowserPanelContext }                       from "@/app/contexts/BrowserPanelContext";
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
-import { ModelLibraryPanel }                         from "@/features/models";
-import { ContextAutocomplete }                       from "@/features/chat/components/ContextAutocomplete";
 import { environmentService }                        from "@/core/platform/environmentService";
 import { openConversationWindow }                    from "@/core/platform/conversationWindowService";
 import { useRightPanelWidth }                         from "@/app/shell/workspaceLayoutStore";
@@ -32,19 +30,18 @@ import type { ConversationStorageScope }             from "@/core/conversations"
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
-import { RenameModal }          from "@/features/chat/components/RenameModal";
 import { useProjects }          from "@/features/chat/hooks/useProjects";
 import { projectRegistry, type ProjectEntry } from "@/core/projects";
 import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
-import { DocumentStorageModal } from "@/features/artifacts";
 import {
   RightWorkspacePanel,
   useRightWorkspace,
 } from "@/features/workspace";
 import type { ChatEngine } from "@/cliBridges/types";
 import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatComposerPanels";
+import { ChatPageOverlays } from "./ChatPageOverlays";
 import { ChatTopChrome } from "./ChatTopChrome";
 
 // ---------------------------------------------------------------------------
@@ -474,40 +471,28 @@ export const ChatPage = () => {
     <ArtifactPanelContext.Provider value={artifactContextValue}>
     <div className="h-full flex flex-col relative bg-surface-page transition-colors duration-300">
 
-      {/* Stable file input - outside animations so ref is always valid */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.markdown,.csv,.log,.json,.xml,.yaml,.yml,.toml,.html,.htm,.js,.ts,.jsx,.tsx,.py,.go,.rs,.java,.c,.cpp,.cs,.rb,.php,.sh"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-
-      {/* Document storage modal - appears when a non-image file is selected */}
-      <DocumentStorageModal
-        files={pendingFiles}
-        isOpen={pendingFiles.length > 0}
-        isUploading={isDocUploading}
-        onPermanent={() => confirmDocUpload(true)}
-        onTemporary={() => confirmDocUpload(false)}
-        onSkip={() => confirmDocUpload(null)}
-        onCancel={cancelDocUpload}
-      />
-
-      <ModelLibraryPanel
-        isOpen={libraryOpen}
-        onClose={() => setLibraryOpen(false)}
+      <ChatPageOverlays
+        fileInputRef={fileInputRef}
+        onFileSelect={handleFileSelect}
+        pendingFiles={pendingFiles}
+        isDocUploading={isDocUploading}
+        onConfirmDocUpload={confirmDocUpload}
+        onCancelDocUpload={cancelDocUpload}
+        libraryOpen={libraryOpen}
+        onCloseLibrary={() => setLibraryOpen(false)}
         onSelectModel={(id) => { setModel(id); setLibraryOpen(false); }}
         selectedModel={currentModel}
-      />
-
-      <RenameModal
-        isOpen={isEditingTitle}
+        renameOpen={isEditingTitle}
         titleInput={titleInput}
         onTitleChange={setTitleInput}
-        onSave={handleSaveTitle}
-        onCancel={() => { setIsEditingTitle(false); setTitleInput(""); }}
+        onSaveTitle={handleSaveTitle}
+        onCancelRename={() => { setIsEditingTitle(false); setTitleInput(""); }}
+        atMentionVisible={atMentionVisible}
+        closeAtMention={closeAtMention}
+        atMentionQuery={atMentionQuery}
+        atMentionPos={atMentionPos}
+        availableApps={availableApps}
+        onSelectApp={(app) => handleSelectApp(app, inputMessage, setInputMessage, activeInputRef)}
       />
 
       <ChatTopChrome
@@ -782,16 +767,6 @@ export const ChatPage = () => {
 
 
       </div>{/* end flex row */}
-
-      {/* @ app mention popup */}
-      <ContextAutocomplete
-        isVisible={atMentionVisible}
-        onClose={closeAtMention}
-        searchQuery={atMentionQuery}
-        position={atMentionPos}
-        apps={availableApps}
-        onSelectApp={(app) => handleSelectApp(app, inputMessage, setInputMessage, activeInputRef)}
-      />
 
     </div>
     </ArtifactPanelContext.Provider>

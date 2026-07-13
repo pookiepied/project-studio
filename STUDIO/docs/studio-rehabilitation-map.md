@@ -131,9 +131,9 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
-| `src/features/chat/context/ChatProvider.tsx` | 918 | Provider likely owns too many chat concerns |
-| `src/features/chat/components/ChatFloatingDock.tsx` | 893 | Complex composite UI; split by panels/rows/actions |
-| `src/features/chat/pages/ChatPage.tsx` | 800 | Page composition remains heavy; composer panels and top chrome were extracted |
+| `src/features/chat/context/ChatProvider.tsx` | 987 | Provider likely owns too many chat concerns |
+| `src/features/chat/components/ChatFloatingDock.tsx` | 937 | Complex composite UI; split by panels/rows/actions |
+| `src/features/chat/pages/ChatPage.tsx` | 775 | Page composition remains heavy; composer panels, top chrome, and overlays were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
@@ -415,6 +415,11 @@ Completed:
   `src/features/chat/pages/ChatTopChrome.tsx`.
 - Reduced `ChatPage.tsx` from 842 to 800 lines while keeping dock callbacks and
   workspace state transitions owned by the page.
+- Extracted ChatPage file input, document storage modal, model library modal,
+  rename modal, and at-mention popup into
+  `src/features/chat/pages/ChatPageOverlays.tsx`.
+- Reduced `ChatPage.tsx` from 800 to 775 lines while keeping overlay state and
+  callbacks owned by the page.
 
 Recommended order:
 
