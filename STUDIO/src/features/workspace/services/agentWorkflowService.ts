@@ -99,21 +99,6 @@ export async function createAgent(userId: string, draft: CreateAgentDraft): Prom
   return data.agent;
 }
 
-export async function updateAgent(userId: string, agentId: string, patch: UpdateAgentPatch): Promise<UserAgent> {
-  const base = await getBase();
-  const res  = await fetch(`${base}/agent-workflows/${encodeURIComponent(agentId)}`, {
-    method:  "PUT",
-    headers: await headers(userId),
-    body:    JSON.stringify(patch),
-  });
-  if (!res.ok) {
-    const msg = await res.text().catch(() => `HTTP ${res.status}`);
-    throw new Error(msg);
-  }
-  const data = await res.json() as { agent: UserAgent };
-  return data.agent;
-}
-
 export async function deleteAgent(userId: string, agentId: string): Promise<void> {
   const base = await getBase();
   const res  = await fetch(`${base}/agent-workflows/${encodeURIComponent(agentId)}`, {

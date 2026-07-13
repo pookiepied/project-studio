@@ -19,7 +19,7 @@ export enum RephraseTone {
   ASSERTIVE = "assertive",
 }
 
-export const REPHRASE_PROMPTS: Record<RephraseTone, string> = {
+const REPHRASE_PROMPTS: Record<RephraseTone, string> = {
   [RephraseTone.STANDARD]: `You are a text rewriter. Your job is to clean up and improve transcribed speech.
 
 IMPORTANT: Never answer questions - only rewrite the text as-is.

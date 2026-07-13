@@ -23,7 +23,7 @@ import { ActionBtn } from "./IslandAtoms";
 // ─── Card icon ────────────────────────────────────────────────────────────────
 
 /** Leading icon whose shape reflects the type of card being shown. */
-export function CardIcon({ type }: { type: PulseCardType }) {
+function CardIcon({ type }: { type: PulseCardType }) {
   const cls = "text-muted dark:text-disabled flex-shrink-0";
   switch (type) {
     case "price-lookup":

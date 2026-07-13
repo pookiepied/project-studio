@@ -114,7 +114,3 @@ export function getAvailableProjectApps(isTauri: boolean): Promise<Set<string>> 
   if (!detection) detection = detect(isTauri);
   return detection;
 }
-
-export function warmProjectAppsDetection(isTauri: boolean): void {
-  if (isTauri) void getAvailableProjectApps(true);
-}
