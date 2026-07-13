@@ -1,31 +1,28 @@
 /*
- * ───────────────────────────────────────────────────────────────────────────
- * Semantic icon barrel — the SINGLE import surface for UI glyphs.
- * ───────────────────────────────────────────────────────────────────────────
+ * Semantic icon barrel: the single import surface for UI glyphs.
  *
- * Rules (frontend-revamp/01-AUDIT.md §17 + Appendix E):
- *   • One library — Phosphor — imported ONLY here. Consumers import the
- *     concept (`Close`, `Send`, …), never the raw glyph.
- *   • One resting weight: `regular`. `weight="fill"` ONLY for active/selected.
+ * Rules (frontend-revamp/01-AUDIT.md section 17 + Appendix E):
+ *   - One library: Phosphor, imported only here. Consumers import the
+ *     concept (`Close`, `Send`, etc.), never the raw glyph.
+ *   - One resting weight: `regular`. `weight="fill"` only for active/selected.
  *     `thin` / `duotone` / default-`bold` are banned.
- *   • One size scale (`xs`/`sm`/`md`/`lg`/`xl`) via the `<Icon>` wrapper — no
+ *   - One size scale (`xs`/`sm`/`md`/`lg`/`xl`) via the `<Icon>` wrapper; no
  *     raw `size={n}`.
- *   • `currentColor` for all monochrome marks (Phosphor already does this).
- *     Multi-color brand logos are a separate category — see `components/brand`.
+ *   - `currentColor` for all monochrome marks (Phosphor already does this).
+ *     Multi-color brand logos are a separate category; see `components/brand`.
  *
- * Canonical concept → glyph mapping (retire all duplicates as features migrate):
- *   Close=X · Back=ArrowLeft · Send=ArrowUp · Refresh=ArrowsClockwise
- *   Settings=Gear · Manage=SlidersHorizontal · Delete=Trash · Copy=Copy
- *   Success=CheckCircle · Warning=Warning
- *   Expand=CaretDown · Collapse=CaretRight · Edit=PencilSimple · Search=MagnifyingGlass
+ * Canonical concept to glyph mapping:
+ *   Close=X, Back=ArrowLeft, Send=ArrowUp, Refresh=ArrowsClockwise
+ *   Settings=Gear, Manage=SlidersHorizontal, Delete=Trash, Copy=Copy
+ *   Success=CheckCircle, Warning=Warning
+ *   Expand=CaretDown, Collapse=CaretRight, Edit=PencilSimple, Search=MagnifyingGlass
  *
- * Adding a concept: import its glyph below and add a `makeIcon` line — do NOT
+ * Adding a concept: import its glyph below and add a `makeIcon` line. Do not
  * import Phosphor directly in feature code.
  */
 import { forwardRef } from "react";
 import {
   ArrowClockwise,
-  ArrowCounterClockwise,
   ArrowLeft,
   ArrowRight,
   ArrowSquareOut,
@@ -57,7 +54,6 @@ import {
   FolderOpen as FolderOpenGlyph,
   Gear,
   Globe as GlobeGlyph,
-  HardDrives,
   Info as InfoGlyph,
   Keyboard as KeyboardGlyph,
   Leaf,
@@ -100,12 +96,12 @@ import {
   type IconWeight,
 } from "@phosphor-icons/react";
 
-/** Icon size scale — aligned with the type scale (src/design/typography.css).
- *   xs (12px) → pairs with text-xs (11px)   — secondary text, captions
- *   sm (14px) → pairs with text-sm (12px)   — UI body, toolbar
- *   md (16px) → pairs with text-lg (15px)   — standard interactive
- *   lg (20px) → pairs with text-2xl (20px)  — empty states, hero
- *   xl (24px) → pairs with text-3xl (26px)  — large display
+/** Icon size scale, aligned with the type scale (src/design/typography.css).
+ *   xs (12px): pairs with text-xs (11px), secondary text and captions
+ *   sm (14px): pairs with text-sm (12px), UI body and toolbar
+ *   md (16px): pairs with text-lg (15px), standard interactive
+ *   lg (20px): pairs with text-2xl (20px), empty states and hero
+ *   xl (24px): pairs with text-3xl (26px), large display
  * No raw numbers in consumers. */
 const iconSize = { xs: 12, sm: 14, md: 16, lg: 20, xl: 24 } as const;
 export type IconSize = keyof typeof iconSize;
@@ -118,13 +114,13 @@ interface IconProps extends Omit<PhosphorIconProps, "size" | "weight"> {
 }
 
 interface IconWrapperProps extends IconProps {
-  /** A raw Phosphor glyph — the escape hatch for concepts not yet in the barrel. */
+  /** A raw Phosphor glyph; the escape hatch for concepts not yet in the barrel. */
   icon: PhosphorIcon;
 }
 
 /**
  * Base wrapper that enforces the size scale + default weight. Prefer the
- * semantic concept exports below; use `<Icon icon={…} />` only for one-offs
+ * semantic concept exports below; use `<Icon icon={...} />` only for one-offs
  * during feature migration (then promote them to a concept here).
  */
 export const Icon = forwardRef<SVGSVGElement, IconWrapperProps>(
@@ -142,7 +138,7 @@ function makeIcon(glyph: PhosphorIcon, name: string) {
   return Concept;
 }
 
-// ── Canonical semantic concepts ─────────────────────────────────────────────
+// Canonical semantic concepts
 export const Close = makeIcon(X, "Close");
 export const Back = makeIcon(ArrowLeft, "Back");
 export const Send = makeIcon(ArrowUp, "Send");
@@ -158,10 +154,10 @@ export const Collapse = makeIcon(CaretRight, "Collapse");
 export const Edit = makeIcon(PencilSimple, "Edit");
 export const Search = makeIcon(MagnifyingGlass, "Search");
 
-// ── Extended semantic concepts ───────────────────────────────────────────────
+// Extended semantic concepts
 // Promoted from the raw escape-hatch set: each covers a glyph used across 3+
-// consumer files (see migration guide §Common icons). Consumers should now use
-// these concept names — not the raw `*Icon` re-exports lower in this file.
+// consumer files (see migration guide, common icons). Consumers should now use
+// these concept names, not the raw `*Icon` re-exports lower in this file.
 export const Add = makeIcon(Plus, "Add");
 export const Check = makeIcon(CheckGlyph, "Check");
 export const Remove = makeIcon(Minus, "Remove");
@@ -174,7 +170,6 @@ export const Terminal = makeIcon(TerminalGlyph, "Terminal");
 export const Play = makeIcon(PlayGlyph, "Play");
 export const Stop = makeIcon(StopGlyph, "Stop");
 export const Forward = makeIcon(ArrowRight, "Forward");
-export const Undo = makeIcon(ArrowCounterClockwise, "Undo");
 export const Error = makeIcon(WarningCircle, "Error");
 export const WifiOff = makeIcon(WifiSlash, "WifiOff");
 export const Keyboard = makeIcon(KeyboardGlyph, "Keyboard");
@@ -198,7 +193,6 @@ export const Files = makeIcon(FilesGlyph, "Files");
 export const Code = makeIcon(CodeGlyph, "Code");
 export const Grid = makeIcon(SquaresFour, "Grid");
 export const Spinner = makeIcon(SpinnerGap, "Spinner");
-export const Storage = makeIcon(HardDrives, "Storage");
 export const UserCircle = makeIcon(UserCircleGlyph, "UserCircle");
 export const User = makeIcon(UserGlyph, "User");
 export const Cpu = makeIcon(CpuGlyph, "Cpu");
@@ -220,17 +214,17 @@ export const Calendar = makeIcon(CalendarGlyph, "Calendar");
 export const Email = makeIcon(EmailGlyph, "Email");
 export const Wifi = makeIcon(WifiHigh, "Wifi");
 
-// ── Type re-exports (consumers must not import phosphor types) ───────────────
+// Type re-exports (consumers must not import phosphor types)
 // Consumers that previously imported Phosphor's `Icon` type (as a bare type or
-// aliased to `PhosphorIcon`) must instead import `PhosphorIcon` here — the
+// aliased to `PhosphorIcon`) must instead import `PhosphorIcon` here; the
 // barrel already defines the `Icon` *value* (the wrapper component above), so
 // the Phosphor type is re-exported only under the non-colliding `PhosphorIcon`.
 export type { PhosphorIcon, PhosphorIconProps, IconWeight };
 
-// ── Escape-hatch glyph re-exports ────────────────────────────────────────────
+// Escape-hatch glyph re-exports
 // Every glyph below is re-exported verbatim so consumption stays within the
 // barrel. Concepts (above) remain the preferred surface; these raw glyphs are
-// the `<Icon icon={Glyph} … />` escape hatch and are also used directly where a
+// the `<Icon icon={Glyph} ... />` escape hatch and are also used directly where a
 // numeric pixel size is still required (e.g. numeric-size brand resolvers).
 export {
   ArchiveBoxIcon,
@@ -249,7 +243,6 @@ export {
   CaretLeftIcon,
   CaretUpIcon,
   ChartLineUp,
-  ChatCircle,
   ChatCircleIcon,
   ChatsCircleIcon,
   CircleDashedIcon,

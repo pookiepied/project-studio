@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 5 unused exports
-- 39 unused exported types
+- 0 unused exports
+- 35 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -313,6 +313,9 @@ Completed:
   live public APIs.
 - Removed an unused runtime v2 local relay and privatized runtime constants,
   manifest sync helpers, and back-compat re-exports that had no live callers.
+- Trimmed unused UI icon and primitive barrel exports, removed three unused
+  primitive shell/modal components, and converted the icon barrel comments to
+  plain ASCII.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
