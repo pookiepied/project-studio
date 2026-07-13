@@ -72,20 +72,6 @@ function remove(key: string): void {
   }
 }
 
-/** All `perm:`-namespaced storage keys, with the namespace stripped. */
-function namespacedKeys(): string[] {
-  const keys: string[] = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(NS)) keys.push(k.slice(NS.length));
-    }
-  } catch {
-    /* storage unavailable */
-  }
-  return keys;
-}
-
 // ---------------------------------------------------------------------------
 // Workspace trust
 // ---------------------------------------------------------------------------
@@ -247,86 +233,4 @@ export function buildGrantLookupForConversation(
       workspaceSet.has(toolName) ||
       globalSet.has(toolName),
   };
-}
-
-// ---------------------------------------------------------------------------
-// Management / inspection (Settings > Permissions panel)
-// ---------------------------------------------------------------------------
-//
-// The panel needs to *enumerate* and *revoke* what the write-side functions
-// above record. These read the same `perm:` namespace so the two views can
-// never drift. All are fail-safe: a storage error yields an empty result.
-
-/** A trusted / distrusted workspace remembered across sessions. */
-export interface WorkspaceTrustEntry {
-  /** Normalised workspace id (also its stored root path, lower-cased). */
-  id: string;
-  trust: WorkspaceTrust;
-}
-
-/** Every workspace with a persisted trust decision. */
-export function listWorkspaceTrust(): WorkspaceTrustEntry[] {
-  const entries: WorkspaceTrustEntry[] = [];
-  for (const key of namespacedKeys()) {
-    if (!key.startsWith("trust:")) continue;
-    const v = read(key);
-    const trust: WorkspaceTrust =
-      v === "trusted" ? "trusted" : v === "untrusted" ? "untrusted" : "unknown";
-    if (trust !== "unknown") entries.push({ id: key.slice("trust:".length), trust });
-  }
-  return entries.sort((a, b) => a.id.localeCompare(b.id));
-}
-
-/** Forget a workspace's trust decision (it will re-prompt next time it opens). */
-export function revokeWorkspaceTrust(id: string): void {
-  remove(`trust:${id}`);
-}
-
-/** Tools the user has approved for all workspaces (`global` grant scope). */
-export function listGlobalToolGrants(): string[] {
-  return readJsonArray("grants:global").sort();
-}
-
-export interface GlobalMachineGrantEntry {
-  conversationId: string;
-}
-
-export function listGlobalMachineGrants(): GlobalMachineGrantEntry[] {
-  return namespacedKeys()
-    .filter((key) => key.startsWith("globalGrant:conv:") && read(key) === "1")
-    .map((key) => ({ conversationId: key.slice("globalGrant:conv:".length) }))
-    .sort((a, b) => a.conversationId.localeCompare(b.conversationId));
-}
-
-export function revokeGlobalMachineGrant(conversationId: string): void {
-  remove(`globalGrant:conv:${conversationId}`);
-}
-
-/** Per-workspace tool approvals (`workspace` grant scope). */
-export function listWorkspaceToolGrants(): { workspaceId: string; tools: string[] }[] {
-  const out: { workspaceId: string; tools: string[] }[] = [];
-  for (const key of namespacedKeys()) {
-    if (!key.startsWith("grants:ws:")) continue;
-    const tools = readJsonArray(key).sort();
-    if (tools.length > 0) out.push({ workspaceId: key.slice("grants:ws:".length), tools });
-  }
-  return out.sort((a, b) => a.workspaceId.localeCompare(b.workspaceId));
-}
-
-/**
- * Revoke a single persisted tool grant. `root` targets a workspace grant; omit
- * it (or pass null) to revoke the global grant for that tool.
- */
-export function revokeToolGrant(toolName: string, root: string | null): void {
-  const key = root ? `grants:ws:${workspaceId(root)}` : "grants:global";
-  const next = readJsonArray(key).filter((t) => t !== toolName);
-  if (next.length > 0) write(key, JSON.stringify(next));
-  else remove(key);
-}
-
-/** Revoke every persisted grant + trust + the global machine grant at once. */
-export function clearAllPermissions(): void {
-  for (const key of namespacedKeys()) remove(key);
-  sessionGrants.clear();
-  sessionManagementGrants.clear();
 }

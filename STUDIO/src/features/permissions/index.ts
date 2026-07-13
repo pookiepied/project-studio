@@ -9,8 +9,7 @@
  * Public surface:
  *   - {@link ComposerApprovalCard}   - slide-in card above the composer
  *   - {@link LocalCapabilitiesModal} - one-time local capability gate
- *   - {@link usePermissionNotifications} - fires OS toast when the window is
- *     unfocused and a tool is awaiting approval
+ *   - {@link PermissionLayerHost}     - global host for approval surfaces
  *
  * Why a separate feature (rather than permissions/) - the engine module stays
  * free of React + UI deps, importable from anywhere; the feature folder owns
@@ -20,7 +19,4 @@
 
 export { ComposerApprovalCard } from "./components/ComposerApprovalCard";
 export { LocalCapabilitiesModal } from "./components/LocalCapabilitiesModal";
-export { ManagementAccessModal } from "./components/ManagementAccessModal";
-export type { ManagementDecision } from "./components/ManagementAccessModal";
-export { usePermissionNotifications } from "./hooks/usePermissionNotifications";
 export { PermissionLayerHost } from "./PermissionLayerHost";

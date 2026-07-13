@@ -1,11 +1,8 @@
-export { SettingsRow } from "./SettingsRow";
 export { SectionLabel } from "./SectionLabel";
 export { NavTile } from "./NavTile";
 export { InterfaceView } from "./InterfaceView";
 export { ShortcutsView } from "./ShortcutsView";
-export { ShortcutRecorder } from "./ShortcutRecorder";
 export { IntelligenceView } from "./IntelligenceView";
 export { LocalServicesView } from "./LocalServicesView";
-export { PermissionsView } from "./PermissionsView";
 export { AudioView } from "./AudioView";
 export { SettingsDebugPanel } from "./SettingsDebugPanel";

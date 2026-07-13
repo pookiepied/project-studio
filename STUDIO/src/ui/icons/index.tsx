@@ -274,7 +274,6 @@ export {
   FilmStripIcon,
   FlaskIcon,
   FloppyDiskIcon,
-  FolderIcon,
   FunctionIcon,
   GaugeIcon,
   GearSixIcon,
