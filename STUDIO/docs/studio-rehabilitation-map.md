@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 38 unused exports
-- 48 unused exported types
+- 36 unused exports
+- 47 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -286,6 +286,9 @@ Completed:
   attachment barrel to the live compression/base64 utility surface.
 - Removed unused chat composer style constants while preserving the shared
   composer controls still used across chat, voice, and model selection.
+- Trimmed the chat context barrel to the live `ChatProvider` and `useChat`
+  surface, and removed stale chat-local tool classification constants now owned
+  by the runtime UI classifier.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
