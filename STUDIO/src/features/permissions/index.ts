@@ -20,5 +20,7 @@
 
 export { ComposerApprovalCard } from "./components/ComposerApprovalCard";
 export { LocalCapabilitiesModal } from "./components/LocalCapabilitiesModal";
+export { ManagementAccessModal } from "./components/ManagementAccessModal";
+export type { ManagementDecision } from "./components/ManagementAccessModal";
 export { usePermissionNotifications } from "./hooks/usePermissionNotifications";
 export { PermissionLayerHost } from "./PermissionLayerHost";

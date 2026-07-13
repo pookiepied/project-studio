@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, Shield } from '@phosphor-icons/react';
+import { Check, Close, Shield } from '@/ui/icons';
 import { Button } from '@/ui/primitives/Button';
 
 interface InlinePermissionRequestProps {
@@ -24,7 +24,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
     <div className="relative bg-surface-raised border border-surface-border rounded-lg p-3 my-2 ml-12">
       {/* AI Avatar indicator */}
       <div className="absolute -left-10 top-3 w-8 h-8 bg-surface-raised rounded-full flex items-center justify-center">
-        <Shield size={16} className="text-white" />
+        <Shield size="md" className="text-white" />
       </div>
       
       <div className="flex items-center justify-between">
@@ -55,7 +55,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
             onClick={onApprove}
             className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
           >
-            <Check size={14} />
+            <Check size="sm" />
             Allow
           </Button>
 
@@ -64,7 +64,7 @@ export const InlinePermissionRequest: React.FC<InlinePermissionRequestProps> = (
             onClick={onDeny}
             className="flex items-center gap-1 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised text-white text-xs rounded transition-colors"
           >
-            <X size={14} />
+            <Close size="sm" />
             Deny
           </Button>
         </div>

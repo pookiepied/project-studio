@@ -62,7 +62,7 @@ import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/
 import { chat } from "@/features/chat/services/chatService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
 import { getClaudeContextWindowTokens } from "@/cliBridges";
-import type { PermissionModeId, PermissionDecision, ActionMode } from "@/core/permissions";
+import type { PermissionModeId, PermissionDecision, ActionMode, ManagementKind } from "@/core/permissions";
 import {
   evaluateToolCall,
   chatModeFromStorageScope,
@@ -70,10 +70,13 @@ import {
   getWorkspaceTrust,
   hasGlobalGrant,
   setGlobalGrant,
+  hasManagementGrant,
+  recordManagementGrant,
   buildGrantLookupForConversation,
 } from "@/core/permissions";
 import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
 import { GlobalAccessModal } from "@/features/permissions/components/GlobalAccessModal";
+import { ManagementAccessModal, type ManagementDecision } from "@/features/permissions/components/ManagementAccessModal";
 import type { ToolApprovalDecision } from "./types";
 import { runClaudeTurn as runClaudeTurnDriver } from "./runClaudeTurn";
 import { useStreamHandlers } from "./useStreamHandlers";
@@ -251,6 +254,28 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setGlobalAccessPrompt({ toolName });
     return new Promise<boolean>((resolve) => { pendingGlobalAccessResolveRef.current = resolve; });
   }, []);
+
+  // ── System-management permission gate (install MCP / author skills) ──────
+  // Category-wide grant: one approval covers every operation of a kind. Mirrors
+  // the machine-access gate — a full-screen modal, resolved via a ref. Requests
+  // short-circuit when the grant already exists, so no modal flashes on repeats.
+  const [managementPrompt, setManagementPrompt] = useState<{ kind: ManagementKind } | null>(null);
+  const pendingManagementResolveRef = useRef<((granted: boolean) => void) | null>(null);
+
+  const resolveManagementAccess = useCallback((decision: ManagementDecision) => {
+    if (managementPrompt && decision !== "deny") {
+      recordManagementGrant(managementPrompt.kind, decision, conversation?.id ?? null);
+    }
+    setManagementPrompt(null);
+    pendingManagementResolveRef.current?.(decision !== "deny");
+    pendingManagementResolveRef.current = null;
+  }, [managementPrompt, conversation?.id]);
+
+  const requestManagementAccess = useCallback((kind: ManagementKind): Promise<boolean> => {
+    if (hasManagementGrant(kind, conversation?.id ?? null)) return Promise.resolve(true);
+    setManagementPrompt({ kind });
+    return new Promise<boolean>((resolve) => { pendingManagementResolveRef.current = resolve; });
+  }, [conversation?.id]);
 
   // ── Action-mode freeze (review ↔ autonomous) ────────────────────────────
   // The effective mode is SNAPSHOT at task start and held for the entire task
@@ -650,6 +675,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     getContextLimit,
     evaluatePermission,
     requestGlobalAccess,
+    requestManagementAccess,
   });
 
   // ── Conversation helpers ────────────────────────────────────────────────
@@ -952,6 +978,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         open={globalAccessPrompt !== null}
         toolName={globalAccessPrompt?.toolName}
         onResolve={resolveGlobalAccess}
+      />
+      <ManagementAccessModal
+        kind={managementPrompt?.kind ?? null}
+        onResolve={resolveManagementAccess}
       />
     </ChatContext.Provider>
   );

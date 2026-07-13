@@ -13,7 +13,7 @@
 
 import type { APIChatMessage, ToolResultItem } from "@/types/chat";
 import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "@/types/tools";
-import type { PermissionDecision, GrantScope } from "@/core/permissions";
+import type { PermissionDecision, GrantScope, ManagementKind } from "@/core/permissions";
 
 export interface ToolExecutionCallbacks {
   /** React state setter for active tool cards. */
@@ -44,6 +44,13 @@ export interface ToolExecutionCallbacks {
    * (the caller persists the global grant), `false` if declined.
    */
   requestGlobalAccess: (toolName: string) => Promise<boolean>;
+  /**
+   * Prompt for a system-management grant (installing MCP servers / authoring
+   * skills) via the full-screen management gate. Resolves `true` if the user
+   * grants it (the caller persists the category grant) or already has, `false`
+   * if declined. One grant covers every operation of that {@link ManagementKind}.
+   */
+  requestManagementAccess: (kind: ManagementKind) => Promise<boolean>;
   /** Persist an approval at the chosen scope so later calls don't re-prompt. */
   recordGrant: (toolName: string, scope: GrantScope) => void;
   /** Open project root for defaulting pathless Studio Harness calls. */

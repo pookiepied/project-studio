@@ -4,10 +4,13 @@ export type { ToolRiskClass } from "./toolRisk";
 export { RISK_CLASS_META } from "./toolRisk";
 
 // -- Enforcement engine (runtime permission decisions) ----------------------
-export type { ActionMode, GrantScope, PermissionDecision } from "./model";
+export type { ActionMode, GrantScope, ManagementKind, PermissionDecision } from "./model";
 export { evaluateToolCall } from "./engine";
 export {
   isLocalMcpServer,
+  isSystemManagedMcpServer,
+  managementKindFor,
+  setLocalMcpServerNames,
   chatModeFromStorageScope,
   deriveLocalContext,
 } from "./scope";
@@ -27,5 +30,9 @@ export {
   listGlobalToolGrants,
   listWorkspaceToolGrants,
   revokeToolGrant,
+  hasManagementGrant,
+  recordManagementGrant,
+  listManagementGrants,
+  revokeManagementGrant,
   clearAllPermissions,
 } from "./grants";

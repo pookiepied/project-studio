@@ -16,7 +16,7 @@
  * reload. All reads fail safe: unknown -> most restrictive.
  */
 
-import type { GrantLookup, GrantScope, WorkspaceTrust } from "./model";
+import type { GrantLookup, GrantScope, ManagementKind, WorkspaceTrust } from "./model";
 
 const NS = "perm:";
 
@@ -129,6 +129,60 @@ export function setGlobalGrant(
 }
 
 // ---------------------------------------------------------------------------
+// Management-permission grants (MCP install / skill authoring)
+// ---------------------------------------------------------------------------
+//
+// A category-wide grant (see ManagementKind): one approval covers every
+// operation of that kind. Two lifetimes, mirroring the machine-access grant:
+//   - "session" → in-memory, per conversation, cleared on reload
+//   - "global"  → persisted under `mgmtGrant:global:<kind>`, applies everywhere
+// Reads fail safe (unknown → not granted).
+
+/** In-memory management grants for the current run: conversationId → kinds. */
+const sessionManagementGrants = new Map<string, Set<ManagementKind>>();
+
+/** True if the user has approved this management category (session or global). */
+export function hasManagementGrant(
+  kind: ManagementKind,
+  conversationId: string | null | undefined
+): boolean {
+  if (read(`mgmtGrant:global:${kind}`) === "1") return true;
+  return sessionManagementGrants.get(conversationGrantKey(conversationId))?.has(kind) ?? false;
+}
+
+/**
+ * Record a management-category approval.
+ *   - "session" → this conversation only (in-memory)
+ *   - "global"  → persisted, every conversation
+ */
+export function recordManagementGrant(
+  kind: ManagementKind,
+  scope: "session" | "global",
+  conversationId: string | null | undefined
+): void {
+  if (scope === "global") {
+    write(`mgmtGrant:global:${kind}`, "1");
+    return;
+  }
+  const key = conversationGrantKey(conversationId);
+  const kinds = sessionManagementGrants.get(key) ?? new Set<ManagementKind>();
+  kinds.add(kind);
+  sessionManagementGrants.set(key, kinds);
+}
+
+/** Every persisted (global) management grant, for the Settings > Permissions panel. */
+export function listManagementGrants(): ManagementKind[] {
+  return (["mcp", "skill"] as ManagementKind[]).filter(
+    (kind) => read(`mgmtGrant:global:${kind}`) === "1"
+  );
+}
+
+/** Revoke a persisted (global) management grant. */
+export function revokeManagementGrant(kind: ManagementKind): void {
+  remove(`mgmtGrant:global:${kind}`);
+}
+
+// ---------------------------------------------------------------------------
 // Per-tool grants (session / workspace / global)
 // ---------------------------------------------------------------------------
 
@@ -142,6 +196,7 @@ function conversationGrantKey(conversationId: string | null | undefined): string
 /** Clear all session grants (e.g. when the user starts a fresh conversation). */
 export function clearSessionGrants(): void {
   sessionGrants.clear();
+  sessionManagementGrants.clear();
 }
 
 /**
@@ -290,4 +345,5 @@ export function revokeToolGrant(toolName: string, root: string | null): void {
 export function clearAllPermissions(): void {
   for (const key of namespacedKeys()) remove(key);
   sessionGrants.clear();
+  sessionManagementGrants.clear();
 }

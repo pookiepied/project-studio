@@ -41,7 +41,7 @@ import { buildToolExecutionCallbacks } from "./toolExecutionCallbacks";
 import { MESSAGES_PER_PAGE, MAX_CONTEXT_MESSAGES } from "./constants";
 import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "./types";
 import type { ProjectCtx } from "./projectContextStorage";
-import type { PermissionDecision } from "@/core/permissions";
+import type { PermissionDecision, ManagementKind } from "@/core/permissions";
 import type {
   ChatConversation,
   ChatMessage,
@@ -106,6 +106,7 @@ export interface StreamHandlerDeps {
     args: Record<string, unknown>
   ) => PermissionDecision;
   requestGlobalAccess: (toolName: string) => Promise<boolean>;
+  requestManagementAccess: (kind: ManagementKind) => Promise<boolean>;
 }
 
 export interface StreamHandlers {
@@ -158,7 +159,24 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
     getContextLimit,
     evaluatePermission,
     requestGlobalAccess,
+    requestManagementAccess,
   } = deps;
+  const needsTextBoundaryAfterThinkingRef = useRef(false);
+
+  const flushPendingTextSegment = useCallback(() => {
+    const pendingText = pendingSegmentTextRef.current;
+    if (!pendingText.trim()) return false;
+
+    harnessSegmentsRef.current = [
+      ...harnessSegmentsRef.current,
+      { type: "text", content: pendingText },
+    ];
+    pendingSegmentTextRef.current = "";
+    latestStreamingContentRef.current = "";
+    setStreamingContent("");
+    setHarnessSegments([...harnessSegmentsRef.current]);
+    return true;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const waitForQuestionAnswer = useCallback((question: string) => {
     const segmentId = `question-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -175,6 +193,12 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
 
   const agentChat = useAgentChat(conversation?.id ?? null, {
     onChunk(text) {
+      if (needsTextBoundaryAfterThinkingRef.current && text.trim()) {
+        if (!/\n\s*$/.test(fullContentRef.current) && !/^\s/.test(text)) {
+          fullContentRef.current += "\n\n";
+        }
+        needsTextBoundaryAfterThinkingRef.current = false;
+      }
       fullContentRef.current += text;
       pendingSegmentTextRef.current += text;
       // Strip DSML markup before showing — some models emit tool calls as raw
@@ -209,10 +233,15 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
     },
 
     onThinking() {
-      // isStreaming already set; loading indicator handles this
+      if (flushPendingTextSegment()) {
+        needsTextBoundaryAfterThinkingRef.current = true;
+      }
     },
 
     onThinkingDelta(chunk) {
+      if (flushPendingTextSegment()) {
+        needsTextBoundaryAfterThinkingRef.current = true;
+      }
       thinkingContentRef.current += chunk;
       setThinkingContent(thinkingContentRef.current);
     },
@@ -239,16 +268,8 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
 
       // Harness tools: flush pending text and insert a running segment
       if (dc === "stream") {
-        const pendingText = pendingSegmentTextRef.current;
-        if (pendingText) {
-          harnessSegmentsRef.current = [
-            ...harnessSegmentsRef.current,
-            { type: "text", content: pendingText },
-          ];
-          pendingSegmentTextRef.current = "";
-          latestStreamingContentRef.current = "";
-          setStreamingContent("");
-        }
+        flushPendingTextSegment();
+        needsTextBoundaryAfterThinkingRef.current = false;
         harnessSegmentsRef.current = [
           ...harnessSegmentsRef.current,
           { type: "harness_event", event: buildHarnessEvent(callId, tool, args, "running") },
@@ -303,6 +324,7 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
           waitForAnswer: waitForQuestionAnswer,
           evaluatePermission,
           requestGlobalAccess,
+          requestManagementAccess,
           pendingApprovalResolveRef,
           screenshotUrls: screenshotUrlsRef.current,
           workspaceRoot: projectContext?.path ?? null,
@@ -417,6 +439,7 @@ export function useStreamHandlers(deps: StreamHandlerDeps): StreamHandlers {
             waitForAnswer: waitForQuestionAnswer,
             evaluatePermission,
             requestGlobalAccess,
+            requestManagementAccess,
             pendingApprovalResolveRef,
             screenshotUrls: screenshotUrlsRef.current,
             workspaceRoot: projectContext?.path ?? null,

@@ -26,7 +26,7 @@ import { logger } from "@/core/logging/logger";
 import { connectionManager } from "@/core/connection";
 import type { APIChatMessage, LocalToolCall, ToolResultItem } from "@/types/chat";
 import type { ToolApprovalDecision } from "@/types/tools";
-import { isLocalMcpServer } from "@/core/permissions";
+import { isLocalMcpServer, isSystemManagedMcpServer, managementKindFor } from "@/core/permissions";
 import { applyWorkspaceDefaults } from "./workspaceDefaults";
 import { executeBuiltinTool } from "./builtinTools";
 import { notifyPermissionRequired } from "./notifications";
@@ -158,7 +158,58 @@ async function executeMcpTool(
   // not governed by the local permission engine.
   const effectiveArgs = applyWorkspaceDefaults(tc.server, toolName, tc.args ?? {}, cb.workspaceRoot ?? null);
 
-  if (isLocalMcpServer(tc.server)) {
+  // -- System-management gate (first-party mcp/skill management servers) --
+  // These are gated by a category-wide management permission (install MCP /
+  // author skills) rather than the per-tool file/computer risk engine — one
+  // grant covers every operation of that kind. skill-execution is system-managed
+  // but needs no grant (managementKindFor → null): reading/running skills is
+  // ordinary usage and runs ungated. All three stay stripped from cloud
+  // conversations via isLocalMcpServer (see buildChatBody / scope.ts).
+  if (isSystemManagedMcpServer(tc.server)) {
+    const kind = managementKindFor(tc.server);
+    if (kind) {
+      const approvalKind = kind === "mcp" ? "mcp_management" : "skill_management";
+      const category = kind === "mcp" ? "install and configure MCP servers" : "create and modify skills";
+      cb.setActiveToolCalls((prev) =>
+        prev.map((t) =>
+          t.callId === tc.callId
+            ? {
+                ...t,
+                status:         "pending_approval",
+                approvalKind,
+                approvalReason: `${toolName} needs permission to ${category} on your machine.`,
+              }
+            : t
+        )
+      );
+      await notifyPermissionRequired(`AI wants to ${category}: ${toolName}`);
+
+      let mgmtTimedOut = false;
+      const granted = await Promise.race([
+        cb.requestManagementAccess(kind),
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => {
+            mgmtTimedOut = true;
+            connectionManager.emit({ type: "tool:approval_timeout", timestamp: Date.now(), convId: cb.convId, toolName });
+            resolve(false);
+          }, GLOBAL_ACCESS_TIMEOUT_MS)
+        ),
+      ]);
+
+      if (!granted) {
+        const result = {
+          error: mgmtTimedOut
+            ? `Management-permission request for '${toolName}' timed out after 5 minutes. Ask the user to retry.`
+            : `User declined ${kind === "mcp" ? "MCP-management" : "skill-management"} permission for ${toolName}.`,
+        };
+        cb.setActiveToolCalls((prev) =>
+          prev.map((t) => (t.callId === tc.callId ? { ...t, status: "error", result } : t))
+        );
+        return result;
+      }
+    }
+    // Grant present (or ungated skill-execution) — fall through to execute.
+  } else if (isLocalMcpServer(tc.server)) {
     let decision = cb.evaluatePermission(tc.server, toolName, effectiveArgs);
     logger.info(
       "toolExecutor",

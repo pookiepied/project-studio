@@ -10,7 +10,7 @@
 import type { ToolExecutionCallbacks } from "@/runtime";
 import { recordGrant as recordToolGrant } from "@/core/permissions";
 import type { ActiveToolCall, TaskItem, ToolApprovalDecision } from "./types";
-import type { PermissionDecision } from "@/core/permissions";
+import type { PermissionDecision, ManagementKind } from "@/core/permissions";
 
 export interface ToolExecutionCallbackDeps {
   setActiveToolCalls: React.Dispatch<React.SetStateAction<ActiveToolCall[]>>;
@@ -22,6 +22,7 @@ export interface ToolExecutionCallbackDeps {
     args: Record<string, unknown>
   ) => PermissionDecision;
   requestGlobalAccess: (toolName: string) => Promise<boolean>;
+  requestManagementAccess: (kind: ManagementKind) => Promise<boolean>;
   /** Resolver slot for the in-flight approval prompt; settled by the UI. */
   pendingApprovalResolveRef: React.MutableRefObject<
     ((decision: ToolApprovalDecision) => void) | null
@@ -41,6 +42,7 @@ export function buildToolExecutionCallbacks(
     waitForAnswer,
     evaluatePermission,
     requestGlobalAccess,
+    requestManagementAccess,
     pendingApprovalResolveRef,
     screenshotUrls,
     workspaceRoot,
@@ -57,6 +59,7 @@ export function buildToolExecutionCallbacks(
         pendingApprovalResolveRef.current = resolve;
       }),
     requestGlobalAccess,
+    requestManagementAccess,
     recordGrant: (tool, scope) =>
       recordToolGrant(tool, scope, workspaceRoot, convId ?? null),
     workspaceRoot,

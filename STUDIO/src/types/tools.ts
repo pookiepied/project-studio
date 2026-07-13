@@ -54,7 +54,7 @@ export interface ActiveToolCall {
   /** Grant scopes the user may choose from in the approval prompt. */
   offeredScopes?: GrantScope[];
   /** Which resolver owns this pending approval card. */
-  approvalKind?: "tool" | "global_access";
+  approvalKind?: "tool" | "global_access" | "mcp_management" | "skill_management";
   /** True when this card represents a delegated sub-agent. */
   type?: "sub_agent";
   /** callId of the spawn_agent that created this sub-agent. */

@@ -99,21 +99,22 @@ function decide(ctx: PermissionContext): PermissionDecision {
       .filter(({ resolved }) => !isPathWithinRoots(resolved, ctx.grantedRoots));
 
     if (outside.length > 0) {
-      // A global (no-project) chat has no workspace to be "inside": the user is
-      // intentionally working machine-wide. Offer a one-time global-access grant
-      // rather than a hard block. A bounded project, by contrast, must never
-      // silently reach outside its root - that stays a deny.
-      if (ctx.localContext === "global") {
-        return prompt(
-          "global_access_required",
-          `This chat isn't tied to a project, so ${ctx.toolName} needs machine-wide file access. ` +
-            `Ask the user to grant global access, or open a project folder to scope the work.`
-        );
-      }
-      return deny(
-        "out_of_roots",
-        `Path "${outside[0].raw}" is outside the granted workspace. ` +
-          `Operate within the open project, or ask the user to grant broader access.`
+      // Reaching outside the granted root(s) — offer a machine-wide grant rather
+      // than a hard block, in BOTH contexts:
+      //   - A global (no-project) chat has no workspace to be "inside": the user
+      //     is intentionally working machine-wide.
+      //   - A project chat that needs to touch something outside its folder (e.g.
+      //     clone a repo elsewhere) previously hit a dead-end deny with no way to
+      //     grant. It now surfaces the same full-screen machine-wide grant gate;
+      //     the model cannot self-escalate (the grant is an explicit user action),
+      //     and once granted this rule is skipped (hasGlobalGrant short-circuit).
+      return prompt(
+        "global_access_required",
+        ctx.localContext === "global"
+          ? `This chat isn't tied to a project, so ${ctx.toolName} needs machine-wide file access. ` +
+              `Ask the user to grant global access, or open a project folder to scope the work.`
+          : `Path "${outside[0].raw}" is outside the open project, so ${ctx.toolName} needs machine-wide ` +
+              `access to reach it. Ask the user to grant machine-wide access, or keep the work inside the project.`
       );
     }
   }
@@ -154,12 +155,30 @@ function decide(ctx: PermissionContext): PermissionDecision {
 // ---------------------------------------------------------------------------
 
 /**
- * Servers whose tools operate on the local filesystem and must respect
- * workspace roots. Computer Use acts on the OS/screen, not project files, so it
- * is governed by enablement + risk + action mode rather than path boundaries.
+ * Local servers that do NOT operate on project files, so they are governed by
+ * enablement + risk + action mode rather than workspace-path boundaries:
+ *   - computer-use     — acts on the OS/screen, not the filesystem
+ *   - mcp-management    ┐ first-party control-server tools that manage MCP/skill
+ *   - skill-management  │ configuration, not arbitrary project files
+ *   - skill-execution  ┘
+ */
+const NON_ROOT_BOUNDED_LOCAL_SERVERS: ReadonlySet<string> = new Set([
+  "computer-use",
+  "mcp-management",
+  "skill-management",
+  "skill-execution",
+]);
+
+/**
+ * Servers whose tools must respect workspace roots. Any machine-bound server is
+ * root-bounded unless it is a known non-filesystem server (above). This means a
+ * third-party local MCP of unknown capability fails safe to being confined to
+ * the workspace, rather than silently reaching anywhere on disk — the boundary
+ * check itself is a no-op unless a tool actually carries a path argument
+ * (see extractTargetPaths), so exempting nothing here is cheap and safe.
  */
 function isRootBoundedServer(server: string): boolean {
-  return server === "studio-harness";
+  return isLocalMcpServer(server) && !NON_ROOT_BOUNDED_LOCAL_SERVERS.has(server);
 }
 
 function requiresGlobalMachineGrant(toolName: string): boolean {

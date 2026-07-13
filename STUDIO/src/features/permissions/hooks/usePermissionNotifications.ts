@@ -30,6 +30,12 @@ function buildToastBody(toolCall: ActiveToolCall): string {
   if (toolCall.approvalKind === "global_access") {
     return `${toolLabel(toolCall.tool)} needs machine-wide access for this chat.`;
   }
+  if (toolCall.approvalKind === "mcp_management") {
+    return `manage MCP servers (${toolLabel(toolCall.tool)}).`;
+  }
+  if (toolCall.approvalKind === "skill_management") {
+    return `manage skills (${toolLabel(toolCall.tool)}).`;
+  }
 
   const name = toolLabel(toolCall.tool);
   const riskMeta = toolCall.riskClass ? RISK_CLASS_META[toolCall.riskClass] : undefined;
@@ -114,6 +120,17 @@ export function usePermissionNotifications({
             if (actionId === ACTION_ALLOW_ONCE || actionId === ACTION_ALLOW_CHAT) {
               onGlobalAccessDecisionRef.current(true);
             }
+            return;
+          }
+
+          // Management grants are a scope choice (this chat / always), not the
+          // once/chat/deny quick-actions — so the toast only refocuses the window
+          // and the user decides in the full-screen management gate.
+          if (
+            pending.approvalKind === "mcp_management" ||
+            pending.approvalKind === "skill_management"
+          ) {
+            await getCurrentWindow().setFocus();
             return;
           }
 

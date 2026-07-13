@@ -47,6 +47,15 @@ export type ActionMode = "review" | "autonomous";
 /** How long / how widely a user approval persists. */
 export type GrantScope = "once" | "session" | "workspace" | "global";
 
+/**
+ * A management-permission category. Distinct from per-tool risk: gates whole
+ * classes of first-party system action rather than an individual file/computer
+ * tool. One grant covers every operation in the category.
+ *   - "mcp"   - install / configure MCP servers (the mcp-management server)
+ *   - "skill" - create / modify skills (the skill-management server)
+ */
+export type ManagementKind = "mcp" | "skill";
+
 // ---------------------------------------------------------------------------
 // Decision result
 // ---------------------------------------------------------------------------
@@ -57,8 +66,9 @@ type PermissionOutcome = "allow" | "prompt" | "deny";
 export type PermissionDenyCode =
   | "cloud_scope"          // local tool requested inside a cloud conversation
   | "mcp_disabled"         // the owning MCP server is not enabled
-  | "out_of_roots"         // target path escapes the granted workspace root(s)
   | "untrusted_workspace"; // mutating action inside an untrusted workspace
+// Note: a path escaping the granted root(s) no longer denies — it escalates to a
+// machine-wide grant prompt (global_access_required). See engine.ts rule 3.
 
 /** Machine-readable reason a call needs interactive approval. */
 export type PermissionPromptCode =
