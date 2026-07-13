@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence }                   from "framer-motion";
 import { BrowserPanelContext }                       from "@/app/contexts/BrowserPanelContext";
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
@@ -44,6 +44,7 @@ import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatCompo
 import { ChatPageOverlays } from "./ChatPageOverlays";
 import { ChatTopChrome } from "./ChatTopChrome";
 import { useComposerDockHeight } from "./useComposerDockHeight";
+import { useChatComposerInput } from "./useChatComposerInput";
 
 // ---------------------------------------------------------------------------
 
@@ -241,21 +242,7 @@ export const ChatPage = () => {
     composerDockHeight: composerDockH,
   } = useComposerDockHeight(conversation?.id);
 
-  // -- Input handlers ----------------------------------------------------------
   const isEmptyConversation = messages.length === 0;
-  const emptyInputRef = useRef<HTMLTextAreaElement>(null);
-  const conversationInputRef = useRef<HTMLTextAreaElement>(null);
-  const activeInputRef = isEmptyConversation ? emptyInputRef : conversationInputRef;
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.currentTarget.value;
-    setInputMessage(value);
-    handleAtMentionInput(value, e.currentTarget.selectionStart ?? value.length, { current: e.currentTarget });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
-  };
 
   const handleSendMessage = async () => {
     const hasAttachments = attachments.length > 0;
@@ -280,29 +267,19 @@ export const ChatPage = () => {
     await sendMessage(msg, true, atts);
   };
 
-  useEffect(() => {
-    if (!conversation) return;
-    const raf = requestAnimationFrame(() => activeInputRef.current?.focus());
-    return () => cancelAnimationFrame(raf);
-    // focus on conversation id change only; conversation object would re-fire on every metadata mutation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id, activeInputRef]);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const text = (e as CustomEvent<{ text: string }>).detail?.text;
-      if (text) { setInputMessage(text); setTimeout(() => activeInputRef.current?.focus(), 50); }
-    };
-    const focusHandler = () => {
-      setTimeout(() => activeInputRef.current?.focus(), 50);
-    };
-    window.addEventListener("inject-chat-text", handler);
-    window.addEventListener("focus-chat-input", focusHandler);
-    return () => {
-      window.removeEventListener("inject-chat-text", handler);
-      window.removeEventListener("focus-chat-input", focusHandler);
-    };
-  }, [activeInputRef, setInputMessage]);
+  const {
+    emptyInputRef,
+    conversationInputRef,
+    activeInputRef,
+    handleInputChange,
+    handleKeyDown,
+  } = useChatComposerInput({
+    conversationId: conversation?.id,
+    isEmptyConversation,
+    setInputMessage,
+    handleAtMentionInput,
+    onSend: handleSendMessage,
+  });
 
   const customModelName = useMemo(
     () => models.find(m => m.id === currentModel)?.name,
