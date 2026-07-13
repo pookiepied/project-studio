@@ -98,11 +98,6 @@ export function getWorkspaceTrust(root: string | null): WorkspaceTrust {
   return "unknown";
 }
 
-export function setWorkspaceTrust(root: string, trust: WorkspaceTrust): void {
-  if (trust === "unknown") return;
-  write(`trust:${workspaceId(root)}`, trust);
-}
-
 // Action mode (review / autonomous) is NOT stored here - it lives on the
 // conversation's `projectContext.accessMode` (per-project) with the global
 // autopilot setting as the fallback, so there is a single source of truth the
@@ -168,18 +163,6 @@ export function recordManagementGrant(
   const kinds = sessionManagementGrants.get(key) ?? new Set<ManagementKind>();
   kinds.add(kind);
   sessionManagementGrants.set(key, kinds);
-}
-
-/** Every persisted (global) management grant, for the Settings > Permissions panel. */
-export function listManagementGrants(): ManagementKind[] {
-  return (["mcp", "skill"] as ManagementKind[]).filter(
-    (kind) => read(`mgmtGrant:global:${kind}`) === "1"
-  );
-}
-
-/** Revoke a persisted (global) management grant. */
-export function revokeManagementGrant(kind: ManagementKind): void {
-  remove(`mgmtGrant:global:${kind}`);
 }
 
 // ---------------------------------------------------------------------------

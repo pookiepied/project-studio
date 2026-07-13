@@ -10,14 +10,12 @@ export {
   isLocalMcpServer,
   isSystemManagedMcpServer,
   managementKindFor,
-  setLocalMcpServerNames,
   chatModeFromStorageScope,
   deriveLocalContext,
 } from "./scope";
 export { extractTargetPaths } from "./paths";
 export {
   getWorkspaceTrust,
-  setWorkspaceTrust,
   hasGlobalGrant,
   setGlobalGrant,
   clearSessionGrants,
@@ -32,7 +30,5 @@ export {
   revokeToolGrant,
   hasManagementGrant,
   recordManagementGrant,
-  listManagementGrants,
-  revokeManagementGrant,
   clearAllPermissions,
 } from "./grants";
