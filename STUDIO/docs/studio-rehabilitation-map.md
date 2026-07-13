@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 79 unused exports
+- 78 unused exports
 - 57 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -255,6 +255,8 @@ Completed:
 - Removed the 4 duplicate export pairs reported by `knip`.
 - Removed `FONT_DISPLAY` after the duplicate-export cleanup revealed it had no
   live consumers.
+- Removed 8 unused animation exports from `src/design/motion.ts`; kept the
+  live shared `chevronRotateTransition`.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.
