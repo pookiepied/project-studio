@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 46 unused exports
+- 45 unused exports
 - 50 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -278,6 +278,8 @@ Completed:
   reformatting the live startup registry sync path.
 - Privatized the activity health-card status indicator while preserving the
   live `HealthCard` component surface.
+- Removed the unused artifact example markdown export while preserving the live
+  artifact example data used by the artifact lab.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.

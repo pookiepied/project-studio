@@ -1,5 +1,4 @@
 import type { Artifact } from "@/types/artifacts";
-import { artifactToMarkdown } from "@/lib/artifact";
 
 export const ARTIFACT_EXAMPLES: Artifact[] = [
   {
@@ -98,5 +97,3 @@ export const ARTIFACT_EXAMPLES: Artifact[] = [
     ],
   },
 ];
-
-export const ARTIFACT_EXAMPLE_MARKDOWN = ARTIFACT_EXAMPLES.map(artifactToMarkdown).join("\n\n");
