@@ -6,21 +6,9 @@
  * Capitalize first letter of a string
  * @example capitalize("hello") => "Hello"
  */
-export function capitalize(str: string): string {
+function capitalize(str: string): string {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-/**
- * Format file size for display
- * @example formatFileSize(1024) => "1.0 KB"
- * @example formatFileSize(1048576) => "1.0 MB"
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 /**
@@ -34,28 +22,6 @@ export function formatPrice(price: number): string {
   if (price < 0.001) return `$${price.toFixed(4)}`;
   if (price < 0.01) return `$${price.toFixed(3)}`;
   return `$${price.toFixed(2)}`;
-}
-
-/**
- * Truncate string with ellipsis
- * @example truncate("Hello World", 5) => "Hello..."
- */
-export function truncate(str: string, maxLength: number): string {
-  if (!str || str.length <= maxLength) return str;
-  return str.slice(0, maxLength) + "...";
-}
-
-/**
- * Convert string to title case
- * @example toTitleCase("hello world") => "Hello World"
- */
-export function toTitleCase(str: string): string {
-  if (!str) return "";
-  return str
-    .toLowerCase()
-    .split(" ")
-    .map((word) => capitalize(word))
-    .join(" ");
 }
 
 /**

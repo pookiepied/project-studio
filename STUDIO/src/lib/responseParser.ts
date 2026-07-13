@@ -28,7 +28,7 @@ const FLUFF_PATTERNS = [
 /**
  * Clean AI response by removing common fluff patterns
  */
-export function parseAIResponse(text: string): string {
+function parseAIResponse(text: string): string {
   if (!text) return "";
   
   let cleaned = text.trim();
@@ -54,7 +54,7 @@ export function parseAIResponse(text: string): string {
  * Extract the main content from AI response
  * Handles cases where AI wraps content in quotes or adds extra formatting
  */
-export function extractMainContent(text: string): string {
+function extractMainContent(text: string): string {
   if (!text) return "";
   
   let content = text.trim();
@@ -108,25 +108,4 @@ export function isValidResponse(text: string): boolean {
   if (/^[.,!?;:\s]+$/.test(cleaned)) return false;
   
   return true;
-}
-
-/**
- * Split response into sentences for better processing
- */
-export function splitIntoSentences(text: string): string[] {
-  if (!text) return [];
-  
-  // Split on sentence boundaries
-  const sentences = text
-    .split(/([.!?]+\s+)/)
-    .filter((s) => s.trim().length > 0)
-    .reduce((acc: string[], curr, i, arr) => {
-      if (i % 2 === 0) {
-        const sentence = curr + (arr[i + 1] || "");
-        acc.push(sentence.trim());
-      }
-      return acc;
-    }, []);
-  
-  return sentences;
 }

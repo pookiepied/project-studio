@@ -39,22 +39,6 @@ export function parseChatResponse(text: string): string {
 }
 
 /**
- * Format chat message for display
- * Handles code blocks, lists, and other markdown-like formatting
- */
-export function formatChatMessage(text: string): string {
-  if (!text) return "";
-  
-  let formatted = parseChatResponse(text);
-  
-  // Ensure proper spacing around code blocks
-  formatted = formatted.replace(/```(\w+)?\n/g, "```$1\n");
-  formatted = formatted.replace(/\n```/g, "\n```");
-  
-  return formatted;
-}
-
-/**
  * Validate chat response
  */
 export function isValidChatResponse(text: string): boolean {
@@ -66,22 +50,4 @@ export function isValidChatResponse(text: string): boolean {
   if (cleaned.length < 1) return false;
   
   return true;
-}
-
-/**
- * Extract code blocks from chat response
- */
-export function extractCodeBlocks(text: string): Array<{ language: string; code: string }> {
-  const codeBlocks: Array<{ language: string; code: string }> = [];
-  const regex = /```(\w+)?\n([\s\S]*?)```/g;
-  
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    codeBlocks.push({
-      language: match[1] || "text",
-      code: match[2].trim(),
-    });
-  }
-  
-  return codeBlocks;
 }

@@ -20,11 +20,3 @@ export function formatShortcutKeys(keys: string[]): string[] {
     return key.toUpperCase();
   });
 }
-
-/**
- * Convert shortcut keys to readable string
- * e.g., ["ctrl", "shift", "r"] -> "CTRL+SHIFT+R"
- */
-export function formatShortcutString(keys: string[]): string {
-  return formatShortcutKeys(keys).join("+");
-}

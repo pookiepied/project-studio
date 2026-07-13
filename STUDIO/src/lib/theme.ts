@@ -6,7 +6,7 @@ export function isThemePreference(value: unknown): value is ThemePreference {
   return value === "system" || value === "light" || value === "dark";
 }
 
-export function getSystemTheme(): ResolvedTheme {
+function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined" || !window.matchMedia) {
     return "light";
   }
