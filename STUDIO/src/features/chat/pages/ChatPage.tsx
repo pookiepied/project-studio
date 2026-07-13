@@ -43,6 +43,7 @@ import type { ChatEngine } from "@/cliBridges/types";
 import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatComposerPanels";
 import { ChatPageOverlays } from "./ChatPageOverlays";
 import { ChatTopChrome } from "./ChatTopChrome";
+import { useComposerDockHeight } from "./useComposerDockHeight";
 
 // ---------------------------------------------------------------------------
 
@@ -235,31 +236,10 @@ export const ChatPage = () => {
   // -- Permission prompt -------------------------------------------------------
   const { pendingPermission, setPendingPermission } = usePermissionPrompt(activeToolCalls);
 
-  // -- Floating composer dock height -------------------------------------------
-  // Measured so the message list gets matching bottom padding - the last message
-  // can scroll clear of the floating composer instead of being trapped behind it.
-  const composerDockRef = useRef<HTMLDivElement>(null);
-  const [composerDockH, setComposerDockH] = useState(132);
-  useEffect(() => {
-    const el = composerDockRef.current;
-    if (!el) return;
-    let raf = 0;
-    const measure = () => {
-      const h = el.offsetHeight;
-      // Only update on a real change - prevents a setState storm / update-depth
-      // loop while the textarea height animates during paste/typing.
-      setComposerDockH(prev => (Math.abs(prev - h) > 1 ? h : prev));
-    };
-    const ro = new ResizeObserver(() => {
-      // Defer to one measurement per frame instead of running synchronously
-      // inside the observer callback (which forces reflow and can loop).
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(measure);
-    });
-    ro.observe(el);
-    measure();
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [conversation?.id]);
+  const {
+    composerDockRef,
+    composerDockHeight: composerDockH,
+  } = useComposerDockHeight(conversation?.id);
 
   // -- Input handlers ----------------------------------------------------------
   const isEmptyConversation = messages.length === 0;

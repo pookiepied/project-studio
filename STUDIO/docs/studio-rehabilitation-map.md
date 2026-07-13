@@ -133,7 +133,7 @@ before splitting.
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 752 | Provider still owns many chat concerns; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, and background service effects were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
-| `src/features/chat/pages/ChatPage.tsx` | 775 | Page composition remains heavy; composer panels, top chrome, and overlays were extracted |
+| `src/features/chat/pages/ChatPage.tsx` | 755 | Page composition remains heavy; composer panels, top chrome, overlays, and composer dock measurement were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 698 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
@@ -420,6 +420,10 @@ Completed:
   `src/features/chat/pages/ChatPageOverlays.tsx`.
 - Reduced `ChatPage.tsx` from 800 to 775 lines while keeping overlay state and
   callbacks owned by the page.
+- Extracted ChatPage floating composer dock height measurement into
+  `src/features/chat/pages/useComposerDockHeight.ts`.
+- Reduced `ChatPage.tsx` from 775 to 755 lines while preserving the existing
+  composer overlay layout and scroll padding behavior.
 - Extracted ChatFloatingDock browser conversation/project rows and conversation
   action menu into `src/features/chat/components/ChatFloatingDockRows.tsx`.
 - Reduced `ChatFloatingDock.tsx` from the measured 937-line baseline to 627
