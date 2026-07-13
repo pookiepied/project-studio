@@ -145,9 +145,9 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 81 unused exports
+- 79 unused exports
 - 57 unused exported types
-- 4 duplicate exports
+- 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
 
@@ -165,12 +165,12 @@ Removal evidence:
    comments.
 4. TypeScript verification passed after removal.
 
-Duplicate exports reported:
+Duplicate exports removed in the duplicate-export proof pass:
 
-- `src/core/config/tauriConfig.ts`: `TAURI_CONFIG`, `default`
-- `src/design/fonts.ts`: `FONT_MONO`, `FONT_MONO_STACK`
-- `src/design/fonts.ts`: `FONT_DISPLAY`, `FONT_DISPLAY_STACK`
-- `src/design/fonts.ts`: `FONT_SANS`, `FONT_SANS_STACK`
+- `src/core/config/tauriConfig.ts`: removed unused default export; kept
+  canonical named `TAURI_CONFIG`.
+- `src/design/fonts.ts`: removed unused `*_STACK` aliases; kept canonical
+  `FONT_SANS` and `FONT_MONO`.
 
 ## Dependency Cycle Signal
 
@@ -252,6 +252,9 @@ Status: in progress.
 Completed:
 
 - Removed the 4 unused files reported by `knip`.
+- Removed the 4 duplicate export pairs reported by `knip`.
+- Removed `FONT_DISPLAY` after the duplicate-export cleanup revealed it had no
+  live consumers.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.
@@ -260,8 +263,7 @@ Completed:
 
 Remaining scope:
 
-- Continue with duplicate exports and unused exports.
-- Review duplicate exports.
+- Continue with unused exports.
 - Review unused exports in small groups by subsystem.
 
 Rules:

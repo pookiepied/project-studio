@@ -66,5 +66,3 @@ export const API_ENDPOINTS = {
   health: `${TAURI_CONFIG.API_BASE_URL}/health`,
   status: `${TAURI_CONFIG.API_BASE_URL}/system/status`,
 } as const;
-
-export default TAURI_CONFIG;
