@@ -69,7 +69,7 @@ export function setLocalMcpPermission(server: LocalMcpServerDef, granted: boolea
 }
 
 /** Shared env injected into every local MCP subprocess (Studio Harness API). */
-export const HARNESS_API_URL = "https://api.pookiepied.dev";
+const HARNESS_API_URL = "https://api.pookiepied.dev";
 export const HARNESS_ENV = Object.freeze({
   STUDIO_API_URL: HARNESS_API_URL,
   STUDIO_API_PREFIX: "/adapters/openai/v1",

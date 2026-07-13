@@ -15,10 +15,6 @@ import {
 import { startManifestResyncOnReconnect } from "./manifestSync";
 import { startLocalRegistrySync } from "@/core/mcpRegistry/localRegistry";
 
-// Back-compat re-exports (canonical home is ./lifecycle.ts).
-export { HARNESS_PERMISSION_KEY, COMPUTER_USE_PERMISSION_KEY } from "./lifecycle";
-export type { LocalPermissionGrants } from "./lifecycle";
-
 export interface HarnessInitState {
   /** Whether the one-time permission modal should be shown */
   showModal: boolean;

@@ -33,7 +33,6 @@ export { useAgentChat } from "./transport/useAgentChat";
 
 // execution — local tool executor + permission gate
 export { executeLocalTools, type ToolExecutionCallbacks } from "./execution/executeLocalTools";
-export { resolveV2LocalTool, type ExternalToolRequest } from "./execution/v2LocalRelay";
 
 // capabilities — what's running + turn body builder
 export { checkLocalCapabilities } from "./capabilities/capabilityService";

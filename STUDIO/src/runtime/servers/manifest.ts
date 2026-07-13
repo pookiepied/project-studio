@@ -56,7 +56,7 @@ export async function stopLocalMcp(name: string): Promise<void> {
  * The push itself — retries, de-duplication, and the deferred-retry queue that
  * survives a failed sync (audit B5) — lives in ./manifestSync.ts.
  */
-export async function syncLocalMcpManifest(server: LocalMcpServerDef): Promise<void> {
+async function syncLocalMcpManifest(server: LocalMcpServerDef): Promise<void> {
   try {
     const manifest = await invoke<{ tools?: ManifestTool[] }>(
       "mcp_get_tools",

@@ -36,13 +36,13 @@ import { logger } from "@/core/logging/logger";
  * (currently 120 s). A value shorter than the tool ceiling creates false
  * timeouts for legitimate long-running commands.
  */
-export const MCP_INVOKE_TIMEOUT_MS = 300_000;
+const MCP_INVOKE_TIMEOUT_MS = 300_000;
 
 /**
  * Maximum characters of MCP tool output forwarded to the LLM.
  * Prevents context flooding on large outputs (e.g. grep across a huge codebase).
  */
-export const MAX_MCP_OUTPUT_CHARS = 50_000;
+const MAX_MCP_OUTPUT_CHARS = 50_000;
 
 // ---------------------------------------------------------------------------
 // Core invocation — invokeMcpTool

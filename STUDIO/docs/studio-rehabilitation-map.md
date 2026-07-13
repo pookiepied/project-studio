@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 12 unused exports
-- 42 unused exported types
+- 5 unused exports
+- 39 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -311,6 +311,8 @@ Completed:
 - Privatized or removed unused voice overlay, workspace app-detection,
   agent-workflow, and rephrase-prompt helper exports while preserving their
   live public APIs.
+- Removed an unused runtime v2 local relay and privatized runtime constants,
+  manifest sync helpers, and back-compat re-exports that had no live callers.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.

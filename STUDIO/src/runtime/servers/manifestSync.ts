@@ -177,18 +177,11 @@ export async function pushServerManifest(
  * no-op when nothing is deferred, and `pushServerManifest` skips any server
  * whose version stamp already matches.
  */
-export async function resyncPendingManifests(): Promise<void> {
+async function resyncPendingManifests(): Promise<void> {
   if (deferred.size === 0) return;
   const pending = [...deferred.values()];
   logger.warn("LocalMcp", `Re-syncing ${pending.length} deferred manifest(s)`);
   await Promise.all(pending.map(({ server, tools }) => pushServerManifest(server, tools)));
-}
-
-/** Forget cached sync state so the next push always re-sends. Used on teardown. */
-export function resetManifestSyncState(): void {
-  syncedVersions.clear();
-  deferred.clear();
-  inFlight.clear();
 }
 
 // ---------------------------------------------------------------------------
