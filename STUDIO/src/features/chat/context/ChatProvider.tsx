@@ -60,26 +60,24 @@ import { applyCatchUp }                               from "./catchUp";
 import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/services/pendingCompletion";
 import { chat } from "@/features/chat/services/chatService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import type { PermissionModeId, PermissionDecision, ActionMode, ManagementKind } from "@/core/permissions";
+import type { PermissionModeId, PermissionDecision, ActionMode } from "@/core/permissions";
 import {
   evaluateToolCall,
   chatModeFromStorageScope,
   deriveLocalContext,
   getWorkspaceTrust,
   hasGlobalGrant,
-  setGlobalGrant,
-  hasManagementGrant,
-  recordManagementGrant,
   buildGrantLookupForConversation,
 } from "@/core/permissions";
 import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
 import { GlobalAccessModal } from "@/features/permissions/components/GlobalAccessModal";
-import { ManagementAccessModal, type ManagementDecision } from "@/features/permissions/components/ManagementAccessModal";
+import { ManagementAccessModal } from "@/features/permissions/components/ManagementAccessModal";
 import type { ToolApprovalDecision } from "./types";
 import { runClaudeTurn as runClaudeTurnDriver } from "./runClaudeTurn";
 import { useStreamHandlers } from "./useStreamHandlers";
 import { useSendPipeline } from "./useSendPipeline";
 import { useConversationActions } from "./useConversationActions";
+import { useAccessPrompts } from "./useAccessPrompts";
 
 import {
   saveConvProjectCtx,
@@ -206,59 +204,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Trust is recorded when a project folder is selected. Here we only *read* it,
   // below, to gate mutating tool calls via the permission engine.
 
-  // ── Global machine-access gate ────────────────────────────────────────────
-  // Shown when a global (no-project) chat needs to reach files outside any
-  // workspace. Granting persists a durable machine-wide grant; declining blocks
-  // the call. Fires lazily from the tool executor, resolved via a ref like the
-  // per-action approval prompt.
-  const [globalAccessPrompt, setGlobalAccessPrompt] = useState<{ toolName: string } | null>(null);
-  const pendingGlobalAccessResolveRef = useRef<((granted: boolean) => void) | null>(null);
+  // Global machine-access and system-management prompts are resolved lazily
+  // from tool execution, while the hook owns their modal state and grants.
+  const {
+    globalAccessPrompt,
+    managementPrompt,
+    resolveGlobalAccess,
+    requestGlobalAccess,
+    resolveManagementAccess,
+    requestManagementAccess,
+  } = useAccessPrompts(conversation?.id ?? null);
 
-  const resolveGlobalAccess = useCallback((granted: boolean) => {
-    if (granted) setGlobalGrant(true, conversation?.id ?? null);
-    setGlobalAccessPrompt(null);
-    pendingGlobalAccessResolveRef.current?.(granted);
-    pendingGlobalAccessResolveRef.current = null;
-  }, [conversation?.id]);
-
-  const requestGlobalAccess = useCallback((toolName: string): Promise<boolean> => {
-    setGlobalAccessPrompt({ toolName });
-    return new Promise<boolean>((resolve) => { pendingGlobalAccessResolveRef.current = resolve; });
-  }, []);
-
-  // ── System-management permission gate (install MCP / author skills) ──────
-  // Category-wide grant: one approval covers every operation of a kind. Mirrors
-  // the machine-access gate — a full-screen modal, resolved via a ref. Requests
-  // short-circuit when the grant already exists, so no modal flashes on repeats.
-  const [managementPrompt, setManagementPrompt] = useState<{ kind: ManagementKind } | null>(null);
-  const pendingManagementResolveRef = useRef<((granted: boolean) => void) | null>(null);
-
-  const resolveManagementAccess = useCallback((decision: ManagementDecision) => {
-    if (managementPrompt && decision !== "deny") {
-      recordManagementGrant(managementPrompt.kind, decision, conversation?.id ?? null);
-    }
-    setManagementPrompt(null);
-    pendingManagementResolveRef.current?.(decision !== "deny");
-    pendingManagementResolveRef.current = null;
-  }, [managementPrompt, conversation?.id]);
-
-  const requestManagementAccess = useCallback((kind: ManagementKind): Promise<boolean> => {
-    if (hasManagementGrant(kind, conversation?.id ?? null)) return Promise.resolve(true);
-    setManagementPrompt({ kind });
-    return new Promise<boolean>((resolve) => { pendingManagementResolveRef.current = resolve; });
-  }, [conversation?.id]);
-
-  // ── Action-mode freeze (review ↔ autonomous) ────────────────────────────
-  // The effective mode is SNAPSHOT at task start and held for the entire task
-  // — including every tool-loop continuation — so a mid-run toggle can never
-  // flip enforcement partway through a response. The user may toggle as often
-  // as they like while a turn runs; the change lands on the NEXT task.
+  // The effective mode is snapshotted at task start and held for the entire
+  // task, including tool-loop continuations. A mid-run toggle lands on the next
+  // task instead of changing enforcement partway through a response.
   //
-  // `liveActionModeRef` always mirrors the current (desired) mode; the freeze
-  // effect copies it on the isStreaming rising edge and clears it when the
-  // assistant returns to idle (normal completion, error, or abort all drive
-  // isStreaming→false). Reading the live value via a ref avoids a stale
-  // closure while keeping [isStreaming] as the only trigger.
+  // liveActionModeRef mirrors the current desired mode; the freeze effect copies
+  // it on the isStreaming rising edge and clears it when the assistant returns
+  // to idle. Reading the live value via a ref avoids a stale closure while
+  // keeping isStreaming as the only trigger.
   const liveActionModeRef = useRef<ActionMode>("review");
   liveActionModeRef.current =
     projectContext?.accessMode ?? (settings.autopilotMode ? "autonomous" : "review");

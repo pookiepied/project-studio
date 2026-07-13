@@ -131,7 +131,7 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
-| `src/features/chat/context/ChatProvider.tsx` | 957 | Provider still owns many chat concerns; model/context helpers were extracted |
+| `src/features/chat/context/ChatProvider.tsx` | 921 | Provider still owns many chat concerns; model/context helpers and access prompts were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/pages/ChatPage.tsx` | 775 | Page composition remains heavy; composer panels, top chrome, and overlays were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
@@ -428,6 +428,10 @@ Completed:
   into `src/features/chat/context/ChatProviderModelHelpers.ts`.
 - Reduced `ChatProvider.tsx` from the measured 987-line baseline to 957 lines
   while keeping provider state ownership unchanged.
+- Extracted ChatProvider global machine-access and system-management prompt
+  state into `src/features/chat/context/useAccessPrompts.ts`.
+- Reduced `ChatProvider.tsx` from 957 to 921 lines while keeping permission
+  evaluation and provider public API unchanged.
 
 Recommended order:
 
