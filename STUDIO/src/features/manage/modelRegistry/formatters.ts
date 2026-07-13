@@ -16,7 +16,7 @@ export function formatPricing(pricing: RegistryPricing): string {
   return `${money(pricing.price)} / ${pricing.billingUnit.split("_").join(" ")}`;
 }
 
-export function money(value: number | null | undefined): string {
+function money(value: number | null | undefined): string {
   if (value === null || value === undefined) return "N/A";
   return `$${formatNumber(value)}`;
 }
