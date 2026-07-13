@@ -24,7 +24,7 @@ import type { ChatConversation, ClaudeSessionMetadata, MessageSegment } from "@/
 import type { ActiveToolCall } from "./types";
 
 /** Maps Claude Code's tool names onto the runtime's tool-card vocabulary. */
-export function mapClaudeToolName(tool: string): string {
+function mapClaudeToolName(tool: string): string {
   const lowered = tool.toLowerCase();
   if (lowered === "bash") return "bash";
   if (lowered === "powershell") return "powershell";

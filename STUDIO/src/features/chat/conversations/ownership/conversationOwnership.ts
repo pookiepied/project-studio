@@ -1,9 +1,9 @@
 import type { ChatConversation, ConversationMetadata } from "@/types";
 import type { ChatEngine } from "@/cliBridges/types";
 
-export type ConversationOwner = "studio" | "claude";
+type ConversationOwner = "studio" | "claude";
 
-export function getConversationOwner(metadata?: ConversationMetadata): ConversationOwner {
+function getConversationOwner(metadata?: ConversationMetadata): ConversationOwner {
   if (metadata?.owner) return metadata.owner;
   return "studio";
 }

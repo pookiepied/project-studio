@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 const CLAUDE_DIR = ".claude";
 const PROJECTS_DIR = "projects";
-export const CLAUDE_NATIVE_ID_PREFIX = "claude-native:";
+const CLAUDE_NATIVE_ID_PREFIX = "claude-native:";
 
 function joinPath(...parts: string[]): string {
   return parts
