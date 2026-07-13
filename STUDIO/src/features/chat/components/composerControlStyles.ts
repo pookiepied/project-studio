@@ -4,9 +4,6 @@ export function cx(...classes: Array<string | false | null | undefined>): string
 
 export const composerToolbarGroup = "flex h-6 min-w-0 items-center gap-1";
 
-export const composerIconButton =
-  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md box-border p-0 leading-none transition-colors [&>svg]:block";
-
 export const composerRoundIconButton =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full box-border p-0 leading-none transition-colors [&>svg]:block";
 
@@ -15,6 +12,3 @@ export const composerPillButton =
 
 export const composerPillLabel =
   "inline-flex h-full min-w-0 items-center leading-none";
-
-export const composerDropdownPanel =
-  "absolute bottom-full mb-2 bg-white dark:bg-surface-raised border border-gray-200 dark:border-surface-border rounded-xl shadow-xl overflow-hidden z-50";

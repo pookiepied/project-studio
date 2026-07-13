@@ -145,7 +145,7 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 39 unused exports
+- 38 unused exports
 - 48 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
@@ -284,6 +284,8 @@ Completed:
   live validation, document indexing, uploads, and cache restoration.
 - Removed the unused high-level image vision service and trimmed the image
   attachment barrel to the live compression/base64 utility surface.
+- Removed unused chat composer style constants while preserving the shared
+  composer controls still used across chat, voice, and model selection.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
