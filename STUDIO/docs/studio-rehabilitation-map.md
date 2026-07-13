@@ -130,7 +130,7 @@ before splitting.
 | File | Lines | Initial read |
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
-| `src/features/workspace/pages/WorkspacePage.tsx` | 860 | Page still mixes workflow state and section composition; context lists were extracted |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 918 | Provider likely owns too many chat concerns |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 893 | Complex composite UI; split by panels/rows/actions |
 | `src/features/chat/pages/ChatPage.tsx` | 835 | Page composition is heavy |
@@ -400,8 +400,10 @@ Completed:
   `src/features/workspace/pages/WorkspaceContextLists.tsx`.
 - Extracted Workspace formatting/category helpers into
   `src/features/workspace/pages/workspaceFormat.ts`.
-- Reduced `WorkspacePage.tsx` from the original 951-line baseline to 860 lines
-  while keeping data loading and section state in the page for now.
+- Extracted Workspace automation routine form and run-history row rendering into
+  `src/features/workspace/pages/WorkspaceAutomation.tsx`.
+- Reduced `WorkspacePage.tsx` from the original 951-line baseline to 578 lines
+  while keeping data loading, mutations, and section state in the page for now.
 
 Recommended order:
 
