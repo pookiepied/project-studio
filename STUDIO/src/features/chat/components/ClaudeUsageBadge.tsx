@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  ClockIcon as Clock,
-  UserCircleIcon as UserCircle,
-  WarningCircleIcon as WarningCircle,
-} from "@phosphor-icons/react";
+  Redo,
+  Clock,
+  UserCircle,
+  Error,
+} from "@/ui/icons";
 import type { ClaudeAccountStatus } from "@/cliBridges";
 import type { ClaudeRateLimitInfo } from "@/types";
 import { Button } from "@/ui/primitives/Button";
@@ -134,9 +134,9 @@ export function ClaudeUsageBadge({
         title="Claude usage and subscription status"
       >
         {healthTone === "warning" ? (
-          <WarningCircle size={compact ? 15 : 11} weight="fill" />
+          <Error size={compact ? "md" : "xs"} weight="fill" />
         ) : (
-          <UserCircle size={compact ? 16 : 12} weight="regular" />
+          <UserCircle size={compact ? "md" : "xs"} />
         )}
         {!compact && (
           <span className="text-xs font-medium leading-none max-w-[110px] truncate">
@@ -169,7 +169,7 @@ export function ClaudeUsageBadge({
                 title="Refresh Claude status"
                 className="h-7 w-7 rounded-md text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-surface-raised hover:text-gray-600 dark:hover:text-gray-300"
               >
-                <ArrowClockwise size={14} weight="bold" className={loading ? "animate-spin" : ""} />
+                <Redo size="sm" className={loading ? "animate-spin" : ""} />
               </IconButton>
             </div>
 
@@ -219,7 +219,7 @@ export function ClaudeUsageBadge({
 
               {updatedAtLabel && (
                 <div className="flex items-center gap-1.5 text-2xs text-gray-400 dark:text-gray-500 pt-0.5">
-                  <Clock size={12} weight="regular" />
+                  <Clock size="xs" />
                   <span>{updatedAtLabel}</span>
                 </div>
               )}

@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CaretDownIcon as CaretDown,
-  CheckIcon as Check,
-  CloudCheckIcon as CloudCheck,
-  DesktopTowerIcon as DesktopTower,
-  TerminalIcon as TerminalWindow,
-  PlusIcon as Plus,
-  BroadcastIcon as Broadcast,
-} from "@phosphor-icons/react";
+  Expand,
+  Check,
+  Icon,
+  CloudCheckIcon,
+  DesktopTowerIcon,
+  Terminal,
+  Add,
+  BroadcastIcon,
+} from "@/ui/icons";
 import type { ConversationStorageScope } from "@/core/conversations";
 import { Button } from "@/ui/primitives/Button";
 
@@ -31,7 +32,7 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [open]);
 
-  const Icon = scope === "cloud" ? CloudCheck : DesktopTower;
+  const scopeGlyph = scope === "cloud" ? CloudCheckIcon : DesktopTowerIcon;
   const label = scope === "cloud" ? "Cloud" : "Local";
 
   return (
@@ -51,10 +52,10 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
         }}
         className="gap-1.5 px-2 h-6 rounded-md text-xs text-secondary hover:bg-surface-hover disabled:opacity-60 disabled:cursor-default"
       >
-        <Icon size={14} weight={open ? "fill" : "regular"} />
+        <Icon icon={scopeGlyph} size="sm" weight={open ? "fill" : "regular"} />
         <span>{label}</span>
         {!disabled && (
-          <CaretDown size={12} weight="bold" className={`opacity-50 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+          <Expand size="xs" className={`opacity-50 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
         )}
       </Button>
 
@@ -80,34 +81,34 @@ export function EnvironmentSelector({ scope, onScopeChange, disabled, placement 
             </p>
 
             <EnvOption
-              icon={<DesktopTower size={14} weight={scope === "local" ? "fill" : "regular"} />}
+              icon={<Icon icon={DesktopTowerIcon} size="sm" weight={scope === "local" ? "fill" : "regular"} />}
               title="Local"
               description="Runs on this machine, full file access"
               active={scope === "local"}
               onClick={() => { onScopeChange("local"); setOpen(false); }}
             />
             <EnvOption
-              icon={<CloudCheck size={14} weight={scope === "cloud" ? "fill" : "regular"} />}
+              icon={<Icon icon={CloudCheckIcon} size="sm" weight={scope === "cloud" ? "fill" : "regular"} />}
               title="Cloud"
               description="Chat and research, no file access"
               active={scope === "cloud"}
               onClick={() => { onScopeChange("cloud"); setOpen(false); }}
             />
-            <AddRow icon={<Plus size={14} weight="bold" />} label="Add Cloud Environment" />
+            <AddRow icon={<Add size="sm" />} label="Add Cloud Environment" />
 
             <div className="my-1.5 mx-2 h-px bg-surface-divider" />
 
             <p className="px-2 pt-0.5 pb-1.5 text-2xs font-semibold tracking-wide text-muted">
               REMOTE CONTROL
             </p>
-            <AddRow icon={<Broadcast size={14} weight="regular" />} label="Setup Remote Control" />
+            <AddRow icon={<Icon icon={BroadcastIcon} size="sm" />} label="Setup Remote Control" />
 
             <div className="my-1.5 mx-2 h-px bg-surface-divider" />
 
             <p className="px-2 pt-0.5 pb-1.5 text-2xs font-semibold tracking-wide text-muted">
               SSH
             </p>
-            <AddRow icon={<TerminalWindow size={14} weight="regular" />} label="Add SSH Host" />
+            <AddRow icon={<Terminal size="sm" />} label="Add SSH Host" />
           </motion.div>
           </>
         )}
@@ -134,7 +135,7 @@ function EnvOption({
         <p className="text-xs font-medium leading-tight text-primary">{title}</p>
         <p className="text-2xs text-muted mt-0.5 leading-tight">{description}</p>
       </div>
-      {active && <Check size={12} weight="bold" className="flex-shrink-0 text-secondary" />}
+      {active && <Check size="xs" className="flex-shrink-0 text-secondary" />}
     </Button>
   );
 }

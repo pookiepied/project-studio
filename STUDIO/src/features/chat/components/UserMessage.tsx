@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckIcon as Check } from "@phosphor-icons/react";
+import { Check } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import type { ChatMessage } from "@/types";
 import { DocumentAttachmentChip } from "./DocumentAttachmentChip";
@@ -80,7 +80,7 @@ export const UserMessage = ({
               disabled={!editingContent.trim()}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 rounded hover:bg-gray-700 dark:hover:bg-gray-300 disabled:opacity-40 transition-colors"
             >
-              <Check size={12} weight="bold" />
+              <Check size="xs" />
               Save &amp; Send
             </Button>
             <Button

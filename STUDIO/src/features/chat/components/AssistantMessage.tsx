@@ -12,6 +12,7 @@ import type { ChatMessage, MessageSegment } from "@/types";
 import type { ActiveToolCall } from "@/features/chat/context/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
+import { Textarea } from "@/ui/primitives/Textarea";
 
 // Memoised markdown to avoid re-renders on unrelated state changes.
 const MemoizedMarkdown = memo(({ content }: { content: string }) => (
@@ -90,11 +91,11 @@ export const AssistantMessage = ({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col gap-2 w-full max-w-2xl"
           >
-            <textarea
+            <Textarea
               ref={editTextareaRef}
               value={editingContent}
               onChange={(e) => onEditChange(e.target.value)}
-              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-xl resize-none focus:outline-none focus:border-gray-300 dark:focus:border-surface-border text-sm font-normal text-gray-800 dark:text-gray-200 transition-colors duration-200 leading-relaxed scrollbar-thin"
+              className="px-3 py-2.5 rounded-xl resize-none text-sm font-normal leading-relaxed scrollbar-thin"
               rows={3}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSaveEdit();

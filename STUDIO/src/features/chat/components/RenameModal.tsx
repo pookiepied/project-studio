@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
+import { Input } from "@/ui/primitives/Input";
 
 interface RenameModalProps {
   isOpen:       boolean;
@@ -37,15 +38,16 @@ export const RenameModal = ({ isOpen, titleInput, onTitleChange, onSave, onCance
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               Rename chat
             </p>
-            <input
+            <Input
               type="text"
+              size="md"
               value={titleInput}
               onChange={(e) => onTitleChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") onSave();
                 if (e.key === "Escape") onCancel();
               }}
-              className="w-full px-3 py-2 text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-surface-selected border border-gray-200 dark:border-surface-border rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-surface-border transition-all duration-150"
+              className="rounded-xl text-sm dark:bg-surface-selected"
               autoFocus
               placeholder="Chat name…"
             />

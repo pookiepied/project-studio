@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
-import { CaretRightIcon as CaretRight } from "@phosphor-icons/react";
+import { Collapse } from "@/ui/icons";
 import type { HarnessEvent } from "@/types";
 import { getToolIcon } from "./toolCardUtils";
 
@@ -118,7 +118,7 @@ export function RuntimeStepCard({ event }: HarnessStepCardProps) {
 
         {/* Tool icon */}
         <span className="flex-shrink-0 opacity-50">
-          {getToolIcon(event.tool, 11)}
+          {getToolIcon(event.tool, "xs")}
         </span>
 
         {/* Verb */}
@@ -164,9 +164,8 @@ export function RuntimeStepCard({ event }: HarnessStepCardProps) {
 
         {/* Expand chevron */}
         {canExpand && (
-          <CaretRight
-            size={12}
-            weight="bold"
+          <Collapse
+            size="xs"
             className={`flex-shrink-0 ml-auto text-gray-400 dark:text-gray-600 transition-transform duration-150 ${
               expanded ? "rotate-90" : ""
             }`}

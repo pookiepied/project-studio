@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { XIcon as X } from "@phosphor-icons/react";
+import { Close } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
 import type { PendingMessage } from "@/features/chat/context/types";
 
@@ -44,7 +44,7 @@ export const PendingMessageQueue = ({ messages, onCancel }: PendingMessageQueueP
                 title="Cancel"
                 className="flex-shrink-0 h-4 w-4 rounded opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-surface-border transition-smooth"
               >
-                <X size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
+                <Close size="xs" className="text-gray-400 dark:text-gray-600" />
               </IconButton>
             </motion.div>
           ))}

@@ -23,7 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CaretRightIcon as CaretRight } from "@phosphor-icons/react";
+import { Collapse } from "@/ui/icons";
 import type { ChatEngine } from "@/cliBridges/types";
 import { EngineGlyph } from "./EngineGlyph";
 import { ContextMeter } from "./ContextMeter";
@@ -193,7 +193,7 @@ export function TurnStatus({
           transition={{ duration: 0.14 }}
           className="flex-shrink-0 text-gray-400 dark:text-gray-600"
         >
-          <CaretRight size={12} weight="bold" />
+          <Collapse size="xs" />
         </motion.span>
       )}
       <ContextMeter used={contextUsed} limit={contextLimit} />

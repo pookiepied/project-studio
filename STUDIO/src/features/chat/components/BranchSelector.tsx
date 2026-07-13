@@ -2,18 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CaretDownIcon as CaretDown,
-  CheckIcon as Check,
-  GitBranchIcon as GitBranch,
-  MagnifyingGlassIcon as Search,
-  PlusIcon as Plus,
-  TreeStructureIcon as TreeStructure,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Expand,
+  Check,
+  Icon,
+  GitBranchIcon,
+  Add,
+  TreeStructureIcon,
+} from "@/ui/icons";
 import { gitService, type GitBranch as Branch } from "@/core/git/gitService";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { Button } from "@/ui/primitives/Button";
-import { IconButton } from "@/ui/primitives/IconButton";
+import { Input, SearchInput } from "@/ui/primitives";
 
 type ProjectCtx = { path: string; name: string; accessMode?: "review" | "autonomous" };
 
@@ -103,15 +102,15 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
         title={inWorktree ? `${current} — checked out in worktree ${currentBranch?.worktreePath}` : current}
         className="h-6 gap-1.5 rounded-md px-2 text-xs text-secondary"
       >
-        <GitBranch size={14} />
+        <Icon icon={GitBranchIcon} size="sm" />
         <span className="max-w-28 truncate">{current}</span>
         {inWorktree && (
           <span className="flex items-center gap-1 rounded border border-surface-border px-1 text-2xs font-medium text-muted">
-            <TreeStructure size={12} weight="bold" />
+            <Icon icon={TreeStructureIcon} size="xs" />
             worktree
           </span>
         )}
-        <CaretDown size={12} weight="bold" className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
+        <Expand size="xs" className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`} />
       </Button>
 
       {createPortal(
@@ -127,19 +126,15 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
             >
               {!creating ? (
                 <>
-                  <div className="flex items-center gap-2 px-2 py-1.5 text-muted">
-                    <Search size={14} />
-                    <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search branches" className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted" />
-                    {query && (
-                      <IconButton
-                        aria-label="Clear search"
-                        onClick={() => setQuery("")}
-                        className="h-4 w-4"
-                      >
-                        <X size={12} />
-                      </IconButton>
-                    )}
-                  </div>
+                  <SearchInput
+                    autoFocus
+                    value={query}
+                    onValueChange={setQuery}
+                    aria-label="Search branches"
+                    placeholder="Search branches"
+                    size="sm"
+                    className="border-transparent bg-transparent text-xs"
+                  />
                   <div className="my-1 h-px bg-surface-divider" />
                   <div className="max-h-52 overflow-y-auto">
                     {filtered.map(branch => (
@@ -150,10 +145,10 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
                         onClick={() => checkout(branch)}
                         className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-primary hover:bg-surface-hover disabled:opacity-50"
                       >
-                        <GitBranch size={14} className="text-secondary" />
+                        <Icon icon={GitBranchIcon} size="sm" className="text-secondary" />
                         <span className="min-w-0 flex-1 truncate">{branch.name}</span>
                         {branch.worktreePath && !branch.current && <span className="text-2xs text-muted">Worktree</span>}
-                        {branch.current && <Check size={12} weight="bold" />}
+                        {branch.current && <Check size="xs" />}
                       </Button>
                     ))}
                     {!filtered.length && !error && <p className="px-2.5 py-3 text-xs text-muted">No branches found</p>}
@@ -164,14 +159,14 @@ export function BranchSelector({ projectContext, setProjectContext, placement = 
                     onClick={() => { setCreating(true); setError(null); }}
                     className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover"
                   >
-                    <Plus size={14} weight="bold" /> Create and check out new branch
+                    <Add size="sm" /> Create and check out new branch
                   </Button>
                 </>
               ) : (
                 <div className="p-1">
                   <p className="px-1 pb-2 text-xs font-medium text-primary">Create and check out branch</p>
                   <div className="flex gap-1.5">
-                    <input autoFocus value={branchName} onChange={event => setBranchName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void createBranch(); if (event.key === "Escape") setCreating(false); }} placeholder="Branch name" className="min-w-0 flex-1 rounded-lg border border-surface-border bg-surface-page px-2 py-1.5 text-xs text-primary outline-none focus:ring-1 focus:ring-focus" />
+                    <Input autoFocus size="sm" value={branchName} onChange={event => setBranchName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void createBranch(); if (event.key === "Escape") setCreating(false); }} placeholder="Branch name" className="min-w-0 flex-1 bg-surface-page text-xs" />
                     <Button
                       variant="primary"
                       disabled={!branchName.trim() || busy}

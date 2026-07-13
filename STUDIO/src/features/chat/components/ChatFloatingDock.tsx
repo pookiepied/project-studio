@@ -2,27 +2,29 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CaretDownIcon as CaretDown,
-  CaretRightIcon as CaretRight,
-  ChatCircleIcon as ChatCircle,
-  CheckCircleIcon as CheckCircle,
-  DotsThreeIcon as DotsThree,
-  FolderOpenIcon as FolderOpen,
-  MagnifyingGlassIcon as Search,
-  PencilSimpleIcon as PencilSimple,
-  PlusIcon as Plus,
-  SidebarSimpleIcon as SidebarSimple,
-  StackIcon as Stack,
-  TrashIcon as Trash,
-  WarningCircleIcon as WarningCircle,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Add,
+  Close,
+  Collapse,
+  Delete,
+  Edit,
+  Error,
+  Expand,
+  FolderOpen,
+  Icon,
+  Message,
+  More,
+  SidebarSimpleIcon,
+  StackIcon,
+  Success,
+} from "@/ui/icons";
 import {
   FloatingPanelFrame,
   FloatingPanelNavigation,
 } from "@/app/shell/FloatingPanel";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Input } from "@/ui/primitives/Input";
+import { SearchInput } from "@/ui/primitives";
 import { formatDate } from "@/lib/formatters";
 import { useNavigation } from "@/app/contexts/NavigationContext";
 import { ClaudeCodeIcon, StudioMark } from "@/ui/brand";
@@ -188,12 +190,12 @@ export function ChatFloatingDock({
                 <div className="relative flex h-7 w-[300px] items-center justify-center gap-1.5 rounded-full pl-2.5 pr-7 text-xs font-medium">
                   {hasProject ? (
                     <>
-                      <FolderOpen size={14} weight="fill" className="flex-shrink-0 text-secondary" />
+                      <FolderOpen size="sm" weight="fill" className="flex-shrink-0 text-secondary" />
                       <span className="max-w-[110px] flex-shrink-0 truncate text-secondary">{projectName}</span>
                       <span className="flex-shrink-0 text-muted">/</span>
                     </>
                   ) : (
-                    <ChatCircle size={14} weight={currentConvId ? "fill" : "regular"} className="flex-shrink-0 text-secondary" />
+                    <Message size="sm" weight={currentConvId ? "fill" : undefined} className="flex-shrink-0 text-secondary" />
                   )}
                   <span className="min-w-0 truncate text-primary">{conversationTitle ?? "New chat"}</span>
                   {hasActivity && <span className="absolute left-1 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />}
@@ -206,7 +208,7 @@ export function ChatFloatingDock({
                       browserOpen ? "bg-surface-selected text-primary" : "text-muted hover:bg-surface-hover hover:text-primary"
                     }`}
                   >
-                    <CaretDown size={12} weight="bold" className={`transition-transform ${browserOpen ? "rotate-180" : ""}`} />
+                    <Expand size="xs" className={`transition-transform ${browserOpen ? "rotate-180" : ""}`} />
                   </IconButton>
                 </div>
 
@@ -249,7 +251,7 @@ export function ChatFloatingDock({
                     browserOpen ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary"
                   }`}
                 >
-                  <ChatCircle size={14} weight={currentConvId ? "fill" : "regular"} />
+                  <Message size="sm" weight={currentConvId ? "fill" : undefined} />
                   {hasActivity && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />}
                 </IconButton>
               </motion.div>
@@ -469,21 +471,22 @@ function UnifiedBrowser({
       {/* Header: search row + dual action buttons */}
       <div className="border-b border-surface-divider p-2">
         <div className="flex items-center gap-1">
-          <label className="flex h-8 flex-1 items-center gap-2 rounded-xl border border-surface-border bg-surface-page px-3 text-muted">
-            <Search size={14} />
-            <input
+          <div className="flex-1">
+            <SearchInput
               value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
+              onValueChange={onQueryChange}
+              aria-label="Search conversations and projects"
               placeholder="Search conversations and projects"
-              className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted"
+              size="md"
+              className="rounded-xl bg-surface-page text-xs"
             />
-          </label>
+          </div>
           <IconButton
             aria-label="Close"
             onClick={onClose}
             className="flex-shrink-0 rounded-full text-muted hover:bg-surface-hover hover:text-primary"
           >
-            <X size={14} weight="bold" />
+            <Close size="sm" />
           </IconButton>
         </div>
         {/* Two distinct entry points: start a conversation vs open a project folder */}
@@ -493,7 +496,7 @@ function UnifiedBrowser({
             onClick={onNewConversation}
             className="flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-page py-2 text-xs font-medium text-primary hover:bg-surface-hover"
           >
-            <ChatCircle size={14} weight="bold" />
+            <Message size="sm" />
             New conversation
           </Button>
           <Button
@@ -503,7 +506,7 @@ function UnifiedBrowser({
             title={projectEnabled ? "Open a folder as a project" : "Switch to Local to open a project"}
             className="flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-page py-2 text-xs font-medium text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <FolderOpen size={14} weight="bold" />
+            <FolderOpen size="sm" />
             Open project
           </Button>
         </div>
@@ -591,7 +594,7 @@ function UnifiedBrowser({
                   }}
                   className="mx-3 my-1 w-[calc(100%-1.5rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-primary"
                 >
-                  <Plus size={12} weight="bold" />
+                  <Add size="xs" />
                   Start conversation in this project
                 </Button>
               ) : (
@@ -678,15 +681,16 @@ function ConversationRow({
     >
       {editingConvId === conv.id ? (
         <div className="p-2">
-          <input
+          <Input
             autoFocus
+            size="sm"
             value={editingConvTitle}
             onChange={(event) => onEditTitleChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") onSaveConvTitle(conv.id);
               if (event.key === "Escape") onCancelConvEdit();
             }}
-            className="w-full rounded-lg border border-surface-border bg-surface-page px-2 py-1.5 text-xs text-primary outline-none"
+            className="bg-surface-page text-xs"
           />
         </div>
       ) : (
@@ -699,14 +703,14 @@ function ConversationRow({
             {isClaudeOwned ? (
               <ClaudeCodeIcon size={13} />
             ) : (
-              <ChatCircle size={13} weight={current ? "fill" : "regular"} className="text-secondary" />
+              <Message size="xs" weight={current ? "fill" : undefined} className="text-secondary" />
             )}
             <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary">{conv.title}</span>
             {status === "streaming" && (
               <span className="h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             )}
-            {status === "done_unread" && <CheckCircle size={13} weight="fill" className="text-secondary" />}
-            {status === "permission_needed" && <WarningCircle size={13} weight="fill" className="text-secondary" />}
+            {status === "done_unread" && <Success size="xs" weight="fill" className="text-secondary" />}
+            {status === "permission_needed" && <Error size="xs" weight="fill" className="text-secondary" />}
           </div>
           <p className="mt-0.5 truncate pl-5 text-2xs text-muted">
             {conv.messageCount} messages · {formatDate(conv.updatedAt)}
@@ -758,7 +762,7 @@ function ProjectRow({
           onClick={onToggle}
           className="h-7 w-6 flex-shrink-0 rounded-l-xl text-muted hover:text-primary"
         >
-          <CaretRight size={12} weight="bold" className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
+          <Collapse size="xs" className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
         </IconButton>
         <Button
           variant="ghost"
@@ -766,7 +770,7 @@ function ProjectRow({
           disabled={!projectEnabled || !hasRegisteredProject}
           className="min-w-0 flex-1 items-center gap-2 py-2 pr-16 text-left disabled:opacity-60"
         >
-          <FolderOpen size={13} weight={isCurrent ? "fill" : "regular"} className="flex-shrink-0 text-secondary" />
+          <FolderOpen size="xs" weight={isCurrent ? "fill" : undefined} className="flex-shrink-0 text-secondary" />
           <span className="min-w-0 flex-1 truncate text-xs font-semibold text-primary">{name}</span>
           {conversationCount > 0 && (
             <span className="rounded-full bg-surface-page px-1.5 py-0.5 text-2xs font-medium text-muted">
@@ -785,7 +789,7 @@ function ProjectRow({
             onClick={(event) => { event.stopPropagation(); onOpenFolder(); }}
             className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
           >
-            <FolderOpen size={11} weight="bold" />
+            <FolderOpen size="xs" />
           </IconButton>
           <IconButton
             aria-label="Remove from list"
@@ -793,7 +797,7 @@ function ProjectRow({
             onClick={(event) => { event.stopPropagation(); onRemove(); }}
             className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
           >
-            <X size={11} weight="bold" />
+            <Close size="xs" />
           </IconButton>
           <IconButton
             aria-label="Delete Studio project data"
@@ -801,7 +805,7 @@ function ProjectRow({
             onClick={(event) => { event.stopPropagation(); onDelete(); }}
             className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
           >
-            <Trash size={11} weight="bold" />
+            <Delete size="xs" />
           </IconButton>
         </div>
       )}
@@ -831,7 +835,7 @@ function ConversationActionsButton({
       }}
       className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
     >
-      <DotsThree size={14} weight="bold" />
+      <More size="sm" />
     </IconButton>
   );
 }
@@ -884,7 +888,7 @@ function ConversationActionsMenu({
             }}
             className={itemClass}
           >
-            <ChatCircle size={14} /> Open
+            <Message size="sm" /> Open
           </Button>
         )}
         <Button
@@ -895,7 +899,7 @@ function ConversationActionsMenu({
           }}
           className={itemClass}
         >
-          <SidebarSimple size={14} /> Open in Side Chat
+          <Icon icon={SidebarSimpleIcon} size="sm" /> Open in Side Chat
         </Button>
         <Button
           variant="ghost"
@@ -905,7 +909,7 @@ function ConversationActionsMenu({
           }}
           className={itemClass}
         >
-          <Stack size={14} /> Open in New Window
+          <Icon icon={StackIcon} size="sm" /> Open in New Window
         </Button>
         {!isClaudeOwned && (
           <>
@@ -915,14 +919,14 @@ function ConversationActionsMenu({
               onClick={(event) => { onStartEditTitle(conv.id, conv.title, event); onClose(); }}
               className={itemClass}
             >
-              <PencilSimple size={14} /> Rename
+              <Edit size="sm" /> Rename
             </Button>
             <Button
               variant="ghost"
               onClick={(event) => { onDeleteConversation(conv.id, event); onClose(); }}
               className={itemClass}
             >
-              <Trash size={14} /> Delete
+              <Delete size="sm" /> Delete
             </Button>
           </>
         )}

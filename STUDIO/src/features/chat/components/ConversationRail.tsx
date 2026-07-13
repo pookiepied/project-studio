@@ -171,6 +171,7 @@ export const ConversationRail = ({ messages, containerRef, bottomInset = 0 }: Pr
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.1 }}
+                className="shadow-md"
                 style={{
                   position:        "fixed",
                   left:            22,
@@ -182,16 +183,15 @@ export const ConversationRail = ({ messages, containerRef, bottomInset = 0 }: Pr
                   border:          "1px solid var(--surface-border)",
                   borderRadius:    5,
                   padding:         "4px 9px",
-                  fontSize:        11,
+                  fontSize:        "var(--text-xs)",
                   maxWidth:        220,
                   whiteSpace:      "nowrap",
                   overflow:        "hidden",
                   textOverflow:    "ellipsis",
-                  boxShadow:       "0 2px 10px rgba(0,0,0,0.12)",
                   color:           "var(--text-secondary)",
                 }}
               >
-                <span style={{ color: "var(--text-muted)", marginRight: 5, fontSize: 10 }}>
+                <span style={{ color: "var(--text-muted)", marginRight: 5, fontSize: "var(--text-2xs)" }}>
                   {hoveredIdx + 1}
                 </span>
                 {getLabel(hoveredIdx)}

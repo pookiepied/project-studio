@@ -2,13 +2,13 @@ import React, { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FolderOpenIcon as FolderOpen,
-  XIcon as X,
-  PlusIcon as Plus,
-  CaretDownIcon as CaretDown,
-  EyeIcon as Eye,
-  LightningIcon as Lightning,
-} from "@phosphor-icons/react";
+  FolderOpen,
+  Close,
+  Add,
+  Expand,
+  Eye,
+  Lightning,
+} from "@/ui/icons";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { mkdir } from "@tauri-apps/plugin-fs";
 import { documentDir } from "@tauri-apps/api/path";
@@ -17,6 +17,7 @@ import { setWorkspaceTrust } from "@/core/permissions";
 import { StudioMark } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Input } from "@/ui/primitives/Input";
 
 type AccessMode = "review" | "autonomous";
 type ProjectCtx  = { path: string; name: string; accessMode?: AccessMode };
@@ -118,8 +119,9 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
       <div className={isBar ? "flex items-center gap-1" : "mt-2 flex items-center gap-1.5"}>
         {showForm ? (
           <>
-            <input
+            <Input
               type="text"
+              size="sm"
               value={formName}
               onChange={e => setFormName(e.target.value)}
               onKeyDown={e => {
@@ -128,7 +130,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
               }}
               placeholder="Project name…"
               autoFocus
-              className="px-2.5 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-surface-border bg-transparent text-xs text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-gray-400 dark:focus:border-surface-border transition-colors min-w-0 w-36"
+              className="border-dashed bg-transparent text-xs outline-none min-w-0 w-36"
             />
             <Button
               variant="ghost"
@@ -143,7 +145,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
               onClick={() => { setShowForm(false); setFormName(""); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border transition-colors"
             >
-              <X size={12} weight="bold" />
+              <Close size="xs" />
             </IconButton>
           </>
         ) : (
@@ -165,9 +167,9 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                     }`
               }
             >
-              <FolderOpen size={14} weight={projectContext ? "duotone" : "regular"} />
+              <FolderOpen size="sm" />
               <span>{projectContext ? projectContext.name : "Work in a project"}</span>
-              <CaretDown size={12} weight="bold" className={`transition-transform duration-150 ${showMenu ? "rotate-180" : ""}`} />
+              <Expand size="xs" className={`transition-transform duration-150 ${showMenu ? "rotate-180" : ""}`} />
             </Button>
 
             {projectContext && (
@@ -177,7 +179,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                 title="Clear project"
                 className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-border transition-colors"
               >
-                <X size={12} weight="bold" />
+                <Close size="xs" />
               </IconButton>
             )}
           </>
@@ -220,7 +222,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                     onClick={() => { setShowMenu(false); setShowForm(true); }}
                     className="flex items-center gap-2.5 h-auto w-full px-3 py-2.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
                   >
-                    <Plus size={14} weight="bold" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                    <Add size="sm" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Start from scratch</span>
                   </Button>
                   <div className="mx-3 h-px bg-gray-100 dark:bg-surface-border" />
@@ -231,7 +233,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                     onClick={handleSelectFolder}
                     className="flex items-center gap-2.5 h-auto w-full px-3 py-2.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-surface-selected transition-colors"
                   >
-                    <FolderOpen size={14} weight="duotone" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                    <FolderOpen size="sm" className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Use an existing folder</span>
                   </Button>
                 </motion.div>
@@ -318,7 +320,7 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
                               Do you trust this folder?
                             </h2>
                             <div className="mt-3 flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                              <FolderOpen size={16} weight="duotone" className="flex-shrink-0" />
+                              <FolderOpen size="md" className="flex-shrink-0" />
                               <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                                 {pendingName}
                               </span>
@@ -353,14 +355,14 @@ export function ProjectContextPicker({ projectContext, setProjectContext, varian
 
                             <div className="mt-5 space-y-2.5">
                               <ModeOption
-                                icon={<Eye size={18} weight="duotone" />}
+                                icon={<Eye size="lg" />}
                                 title="Review"
                                 description="Ask before each sensitive action — edits, commands, git."
                                 selected={mode === "review"}
                                 onClick={() => setMode("review")}
                               />
                               <ModeOption
-                                icon={<Lightning size={18} weight="fill" />}
+                                icon={<Lightning size="lg" weight="fill" />}
                                 title="Autonomous"
                                 description="Act without prompts, pausing only for high-risk actions."
                                 selected={mode === "autonomous"}

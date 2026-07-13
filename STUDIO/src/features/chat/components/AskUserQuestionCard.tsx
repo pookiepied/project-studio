@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from "react";
 import { motion } from "framer-motion";
-import { ArrowRightIcon as ArrowRight } from "@phosphor-icons/react";
+import { Forward } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 
@@ -89,7 +89,7 @@ export function AskUserQuestionCard({
             aria-label="Send answer"
             className="mb-1 h-8 w-8 bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:disabled:bg-surface-selected dark:disabled:text-gray-600 focus-visible:ring-gray-400 focus-visible:ring-offset-white dark:focus-visible:ring-gray-600 dark:focus-visible:ring-offset-surface-base"
           >
-            <ArrowRight size={14} weight="bold" />
+            <Forward size="sm" />
           </IconButton>
         </div>
       </div>

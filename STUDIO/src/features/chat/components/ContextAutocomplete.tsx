@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlugIcon as Plug, CloudIcon as Cloud } from '@phosphor-icons/react';
+import { Cloud, Icon, PlugIcon } from '@/ui/icons';
 import { AppLogo } from '@/ui/brand';
 import { Button } from '@/ui/primitives/Button';
 
@@ -132,12 +132,12 @@ export const ContextAutocomplete = ({
                 src={app.logo}
                 label={app.name}
                 size="sm"
-                className="!w-7 !h-7 !rounded-lg bg-gray-100 dark:bg-surface-selected border border-gray-200 dark:border-[#333]"
+                className="!w-7 !h-7 !rounded-lg bg-gray-100 dark:bg-surface-selected border border-gray-200 dark:border-surface-border"
                 fallback={
                   app.type === 'remote' || app.type === 'composio' ? (
-                    <Cloud size={14} weight="fill" className="text-gray-400 dark:text-gray-500" />
+                    <Cloud size="sm" weight="fill" className="text-gray-400 dark:text-gray-500" />
                   ) : (
-                    <Plug size={14} weight="regular" className="text-gray-400 dark:text-gray-600" />
+                    <Icon icon={PlugIcon} size="sm" className="text-gray-400 dark:text-gray-600" />
                   )
                 }
               />

@@ -1,15 +1,15 @@
 import { motion } from "framer-motion";
 import {
-  TrashIcon as Trash,
-  PencilSimpleIcon as PencilSimple,
-  ArrowClockwiseIcon as ArrowClockwise,
-  ArrowRightIcon as ArrowRight,
-  DotsThreeIcon as DotsThree,
-  SpeakerHighIcon as SpeakerHigh,
-  StopIcon as Stop,
-  CheckIcon as Check,
-  CopyIcon as Copy,
-} from "@phosphor-icons/react";
+  Delete,
+  Edit,
+  Redo,
+  Forward,
+  More,
+  Volume,
+  Stop,
+  Check,
+  Copy,
+} from "@/ui/icons";
 import type { ChatMessage } from "@/types";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -81,8 +81,8 @@ export const MessageActions = ({
       className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
     >
       {copiedMessageId === message.id
-        ? <Check       size={14} weight="bold" className="text-secondary" />
-        : <Copy        size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />}
+        ? <Check       size="sm" className="text-secondary" />
+        : <Copy        size="sm" className="text-gray-400 dark:text-gray-600" />}
     </IconButton>
 
     {/* Edit */}
@@ -92,7 +92,7 @@ export const MessageActions = ({
       title="Edit"
       className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
     >
-      <PencilSimple size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />
+      <Edit size="sm" className="text-gray-400 dark:text-gray-600" />
     </IconButton>
 
     {/* Delete */}
@@ -102,7 +102,7 @@ export const MessageActions = ({
       title="Delete"
       className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
     >
-      <Trash size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />
+      <Delete size="sm" className="text-gray-400 dark:text-gray-600" />
     </IconButton>
 
     {/* Read aloud — assistant only */}
@@ -116,9 +116,9 @@ export const MessageActions = ({
         {ttsLoadingId === message.id ? (
           <span className="w-3 h-3 border border-gray-400 dark:border-gray-600 border-t-transparent rounded-full animate-spin block flex-shrink-0" />
         ) : ttsPlayingId === message.id ? (
-          <Stop        size={14} weight="fill"  className="text-gray-500 dark:text-gray-500" />
+          <Stop        size="sm" weight="fill"  className="text-gray-500 dark:text-gray-500" />
         ) : (
-          <SpeakerHigh size={14} weight="bold"  className="text-gray-400 dark:text-gray-600" />
+          <Volume size="sm"  className="text-gray-400 dark:text-gray-600" />
         )}
       </IconButton>
     )}
@@ -134,7 +134,7 @@ export const MessageActions = ({
           title="More actions"
           className="h-6 w-6 rounded hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth"
         >
-          <DotsThree size={14} weight="bold" className="text-gray-400 dark:text-gray-600" />
+          <More size="sm" className="text-gray-400 dark:text-gray-600" />
         </IconButton>
         {ttsMenuId === message.id && (
           <div role="menu" className="absolute bottom-full right-0 mb-1 bg-white dark:bg-surface-raised border border-gray-100 dark:border-surface-border rounded-lg shadow-lg py-1 min-w-[140px] z-50">
@@ -143,13 +143,13 @@ export const MessageActions = ({
                 <Button variant="ghost" role="menuitem" onClick={() => { onRegenerate(); onSetTtsMenuId(null); }}
                   className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border"
                 >
-                  <ArrowClockwise size={14} weight="bold" className="flex-shrink-0" />
+                  <Redo size="sm" className="flex-shrink-0" />
                   Regenerate
                 </Button>
                 <Button variant="ghost" role="menuitem" onClick={() => { onContinue(); onSetTtsMenuId(null); }}
                   className="h-auto w-full justify-start gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-border"
                 >
-                  <ArrowRight size={14} weight="bold" className="flex-shrink-0" />
+                  <Forward size="sm" className="flex-shrink-0" />
                   Continue
                 </Button>
               </>

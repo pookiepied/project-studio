@@ -444,6 +444,14 @@ export const ChatPage = () => {
   // switcher. Opening a folder registers it; selecting one makes it this
   // conversation's context.
   const { projects, refresh: refreshProjects, removeProject, deleteProject } = useProjects();
+  const runningTurnTool = activeToolCalls.find(
+    (tc) => tc.status === "running" && !tc.parentCallId
+  );
+  const hasVisibleTurnActivity =
+    streamingContent.trim().length > 0 ||
+    thinkingContent.trim().length > 0 ||
+    harnessSegments.length > 0 ||
+    !!runningTurnTool;
 
   const handleSelectProject = useCallback(async (project: ProjectEntry) => {
     setProjectContext({ path: project.path, name: project.name, accessMode: project.accessMode });
@@ -653,7 +661,9 @@ export const ChatPage = () => {
                       toolCall={
                         activeToolCalls.find((tc) =>
                           tc.status === "pending_approval" &&
-                          tc.approvalKind !== "global_access"
+                          tc.approvalKind !== "global_access" &&
+                          tc.approvalKind !== "mcp_management" &&
+                          tc.approvalKind !== "skill_management"
                         ) ?? null
                       }
                       onDecision={resolveToolApproval}
@@ -696,12 +706,9 @@ export const ChatPage = () => {
                   turnStatus={messages.length > 0 && !pendingPermission ? {
                     engine: chatEngine,
                     convId: conversation?.id,
-                    generating: isLoading || isStreaming || !!streamingMessageId,
+                    generating: hasVisibleTurnActivity,
                     label: (() => {
-                      const runningTool = activeToolCalls.find(
-                        (tc) => tc.status === "running" && !tc.parentCallId
-                      );
-                      if (runningTool) return toolPhrase(runningTool.tool);
+                      if (runningTurnTool) return toolPhrase(runningTurnTool.tool);
                       if (streamingContent && streamingContent.length > 0) return "Responding";
                       return "Thinking";
                     })(),
@@ -809,7 +816,9 @@ export const ChatPage = () => {
                           toolCall={
                             activeToolCalls.find((tc) =>
                               tc.status === "pending_approval" &&
-                              tc.approvalKind !== "global_access"
+                              tc.approvalKind !== "global_access" &&
+                              tc.approvalKind !== "mcp_management" &&
+                              tc.approvalKind !== "skill_management"
                             ) ?? null
                           }
                           onDecision={resolveToolApproval}

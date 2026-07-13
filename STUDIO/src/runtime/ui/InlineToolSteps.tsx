@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
-import { CheckIcon as Check, XIcon as X, CaretDownIcon as CaretDown } from "@phosphor-icons/react";
+import { Check, Close, Expand } from "@/ui/icons";
 import type { ActiveToolCall } from "@/types/tools";
 import { getToolIcon, toolLabel, argsPreview } from "./toolCardUtils";
 
@@ -58,9 +58,8 @@ export function InlineToolSteps({ steps, cycle }: InlineToolStepsProps) {
         onClick={toggleCycle}
         className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors w-full text-left justify-start"
       >
-        <CaretDown
-          size={12}
-          weight="bold"
+        <Expand
+          size="xs"
           className={`flex-shrink-0 transition-transform duration-150 ${isCollapsed ? "-rotate-90" : ""}`}
         />
         <span className="font-medium">
@@ -101,7 +100,7 @@ function StepRow({ step }: { step: ActiveToolCall }) {
   const isDone = step.status === "complete";
   const preview = argsPreview(step.args);
   const label = toolLabel(step.tool);
-  const icon = getToolIcon(step.tool, 11);
+  const icon = getToolIcon(step.tool, "xs");
 
   return (
     <div className={`flex items-center gap-1.5 py-0.5 relative overflow-hidden ${isRunning ? "rounded" : ""}`}>
@@ -119,8 +118,8 @@ function StepRow({ step }: { step: ActiveToolCall }) {
 
       {/* Status indicator */}
       <div className="flex-shrink-0 w-3 flex items-center justify-center">
-        {isDone && <Check size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />}
-        {isError && <X size={12} weight="bold" className="text-secondary dark:text-secondary" />}
+        {isDone && <Check size="xs" className="text-gray-400 dark:text-gray-600" />}
+        {isError && <Close size="xs" className="text-secondary dark:text-secondary" />}
         {isRunning && (
           <span className="w-1.5 h-1.5 rounded-full bg-surface-raised dark:bg-surface-raised animate-pulse block" />
         )}

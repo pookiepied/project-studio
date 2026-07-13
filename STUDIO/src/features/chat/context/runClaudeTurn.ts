@@ -118,11 +118,27 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
   const cwd = projectContextPath || claudeSession?.cwd || undefined;
   const resume = claudeSession?.sessionId || undefined;
   const seenTextDeltas = { current: false };
+  let needsTextBoundaryAfterThinking = false;
   let finalExitCode = 0;
 
   activeConversationIdRef.current = activeConversation.id;
   optimisticAssistantIdRef.current = optimisticAssistantId;
   resetStreamingState(optimisticAssistantId);
+
+  const flushPendingTextSegment = () => {
+    const pendingText = pendingSegmentTextRef.current;
+    if (!pendingText.trim()) return false;
+
+    harnessSegmentsRef.current = [
+      ...harnessSegmentsRef.current,
+      { type: "text", content: pendingText },
+    ];
+    pendingSegmentTextRef.current = "";
+    setStreamingContent("");
+    latestStreamingContentRef.current = "";
+    setHarnessSegments([...harnessSegmentsRef.current]);
+    return true;
+  };
 
   const completeClaudeTool = (toolUseId: string, rawResult: unknown) => {
     setActiveToolCalls((prev) =>
@@ -159,6 +175,12 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
           const delta = event.event?.delta;
           if (delta?.type === "text_delta" && typeof delta.text === "string") {
             seenTextDeltas.current = true;
+            if (needsTextBoundaryAfterThinking && delta.text.trim()) {
+              if (!/\n\s*$/.test(fullContentRef.current) && !/^\s/.test(delta.text)) {
+                fullContentRef.current += "\n\n";
+              }
+              needsTextBoundaryAfterThinking = false;
+            }
             fullContentRef.current += delta.text;
             pendingSegmentTextRef.current += delta.text;
             scheduleStreamingContentUpdate(pendingSegmentTextRef.current);
@@ -211,6 +233,9 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
           // missing / appear out of order.
           for (const block of event.message.content) {
             if (block?.type === "thinking" && typeof block.thinking === "string") {
+              if (flushPendingTextSegment()) {
+                needsTextBoundaryAfterThinking = true;
+              }
               thinkingContentRef.current = block.thinking;
               setThinkingContent(block.thinking);
               continue;
@@ -232,16 +257,8 @@ export async function runClaudeTurn(deps: ClaudeTurnDeps): Promise<void> {
               ]);
 
               if (displayClass === "stream") {
-                const pendingText = pendingSegmentTextRef.current;
-                if (pendingText) {
-                  harnessSegmentsRef.current = [
-                    ...harnessSegmentsRef.current,
-                    { type: "text", content: pendingText },
-                  ];
-                  pendingSegmentTextRef.current = "";
-                  setStreamingContent("");
-                  latestStreamingContentRef.current = "";
-                }
+                flushPendingTextSegment();
+                needsTextBoundaryAfterThinking = false;
                 harnessSegmentsRef.current = [
                   ...harnessSegmentsRef.current,
                   { type: "harness_event", event: buildHarnessEvent(block.id, toolName, args, "running") },

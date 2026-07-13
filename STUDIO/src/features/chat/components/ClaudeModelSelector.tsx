@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CaretDownIcon as CaretDown,
-  CheckIcon as Check,
-  GaugeIcon as Gauge,
-} from "@phosphor-icons/react";
+  Expand,
+  Check,
+  Icon,
+  GaugeIcon,
+} from "@/ui/icons";
 import { CLAUDE_MODELS, CLAUDE_EFFORT_LEVELS } from "@/cliBridges";
 import type { ClaudeEffortLevel } from "@/cliBridges/types";
 import { Button } from "@/ui/primitives/Button";
@@ -53,7 +54,7 @@ export function ClaudeModelSelector({
   const effortLabel = CLAUDE_EFFORT_LEVELS.find((e) => e.id === effort)?.label ?? null;
 
   return (
-    <div className="relative flex h-7 shrink-0 items-center" ref={containerRef}>
+    <div className="relative flex h-6 shrink-0 items-center" ref={containerRef}>
       {/* Trigger */}
       <Button
         variant="ghost"
@@ -77,7 +78,7 @@ export function ClaudeModelSelector({
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="flex-shrink-0"
         >
-          <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
+          <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
         </motion.div>
       </Button>
 
@@ -117,7 +118,7 @@ export function ClaudeModelSelector({
                       </p>
                     </div>
                     {isActive && (
-                      <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Check size="xs" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                     )}
                   </Button>
                 );
@@ -135,7 +136,7 @@ export function ClaudeModelSelector({
                 className="h-auto w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100"
               >
                 <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
-                  <Gauge size={12} weight="regular" className="text-gray-400 dark:text-gray-600" />
+                  <Icon icon={GaugeIcon} size="xs" className="text-gray-400 dark:text-gray-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-tight">
@@ -150,7 +151,7 @@ export function ClaudeModelSelector({
                   transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                   className="flex-shrink-0"
                 >
-                  <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
+                  <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
                 </motion.div>
               </Button>
 

@@ -24,9 +24,9 @@ export function TokenRing({
   const circumference = 2 * Math.PI * r;
   const dashOffset = circumference * (1 - percentage);
   const progressStroke = percentage >= 0.9
-    ? "rgba(239,68,68,0.85)"
+    ? "var(--marker)"
     : percentage >= 0.7
-    ? "rgba(245,158,11,0.85)"
+    ? "var(--text-secondary)"
     : active
     ? "rgba(75,85,99,0.72)"
     : "rgba(156,163,175,0.48)";

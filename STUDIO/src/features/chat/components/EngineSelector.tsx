@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CaretDownIcon as CaretDown, CheckIcon as Check } from "@phosphor-icons/react";
+import { Expand, Check } from "@/ui/icons";
 import { ClaudeCodeIcon, StudioIcon } from "@/ui/brand";
 import { composerPillButton, composerPillLabel, cx } from "./composerControlStyles";
 import { Button } from "@/ui/primitives/Button";
@@ -52,7 +52,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
   const canOpen = !disabled && engines.length > 1;
 
   return (
-    <div ref={ref} className="relative flex h-7 flex-shrink-0 items-center">
+    <div ref={ref} className="relative flex h-6 flex-shrink-0 items-center">
       <Button
         variant="ghost"
         disabled={disabled}
@@ -72,7 +72,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
         <span className={composerPillLabel}>{active.label}</span>
         {canOpen && (
           <motion.div className="inline-flex items-center" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
-            <CaretDown size={12} weight="bold" className="opacity-50" />
+            <Expand size="xs" className="opacity-50" />
           </motion.div>
         )}
       </Button>
@@ -117,7 +117,7 @@ export const EngineSelector = ({ value, disabled, availableEngines, onChange }: 
                     </p>
                   </div>
                   {isActive && (
-                    <Check size={12} weight="bold" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                    <Check size="xs" className="mt-0.5 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                   )}
                 </Button>
               );

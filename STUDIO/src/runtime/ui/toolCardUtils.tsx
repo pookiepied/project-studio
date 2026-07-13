@@ -1,23 +1,25 @@
 import {
-  MagnifyingGlassIcon as MagnifyingGlass,
-  LinkIcon as Link,
-  BrainIcon as Brain,
-  DatabaseIcon as Database,
-  PencilSimpleIcon as PencilSimple,
-  FolderOpenIcon as FolderOpen,
-  ImageSquareIcon as ImageSquare,
-  FilmStripIcon as FilmStrip,
-  ClockIcon as Clock,
-  GithubLogoIcon as GithubLogo,
-  EnvelopeSimpleIcon as EnvelopeSimple,
-  CalendarBlankIcon as CalendarBlank,
-  BrowsersIcon as Browsers,
-  CodeIcon as Code,
-  LightningIcon as Lightning,
-  WrenchIcon as Wrench,
-  TerminalIcon as Terminal,
-  FileTextIcon as FileText,
-} from "@phosphor-icons/react";
+  BrowsersIcon,
+  Brain,
+  Clock,
+  Code,
+  DatabaseIcon,
+  Document,
+  Edit,
+  Email,
+  GithubLogoIcon,
+  Icon,
+  type IconSize,
+  FilmStripIcon,
+  FolderOpen,
+  ImageSquareIcon,
+  Lightning,
+  Calendar,
+  LinkIcon,
+  Search,
+  Terminal,
+  WrenchIcon,
+} from "@/ui/icons";
 import { formatLabel } from "@/lib/formatters";
 import { resolveMcpService, getMcpActionLabel } from "./toolCardRegistry";
 
@@ -70,37 +72,36 @@ export function toolLabel(name: string): string {
   return formatLabel(name);
 }
 
-export function getToolIcon(name: string, iconSize = 16) {
+export function getToolIcon(name: string, size: IconSize = "xs") {
   const n = name.toLowerCase();
   const c = "text-gray-500 dark:text-gray-400 flex-shrink-0";
-  const s = iconSize;
 
   // MCP registry — returns branded icon when available
   const service = resolveMcpService(name);
-  if (service) return service.getIcon(s, c);
+  if (service) return service.getIcon(size, c);
 
   // Core tool icons
-  if (n.includes("search") || n.includes("web_search")) return <MagnifyingGlass size={s} weight="bold" className={c} />;
-  if (n.includes("http") || n.includes("fetch")) return <Link size={s} weight="bold" className={c} />;
-  if (n.includes("think") || n.includes("thinking")) return <Brain size={s} weight="fill" className={c} />;
-  if (n.includes("bash") || n.includes("repl") || n.includes("powershell") || n.includes("cmd") || n.includes("command")) return <Terminal size={s} weight="bold" className={c} />;
-  if (n.includes("read_file") || n.includes("cat")) return <FileText size={s} weight="bold" className={c} />;
-  if (n.includes("write_file") || n.includes("edit_file") || n.includes("modify") || n.includes("write")) return <PencilSimple size={s} weight="bold" className={c} />;
-  if (n.includes("ls") || n.includes("glob") || n.includes("list_dir")) return <FolderOpen size={s} weight="fill" className={c} />;
-  if (n.includes("memory") || n.includes("store")) return <Database size={s} weight="bold" className={c} />;
-  if (n === "video_generate" || n.includes("video")) return <FilmStrip size={s} weight="bold" className={c} />;
-  if (n.includes("image") || n.includes("generate")) return <ImageSquare size={s} weight="bold" className={c} />;
-  if (n.includes("time") || n.includes("sleep")) return <Clock size={s} weight="bold" className={c} />;
-  if (n.includes("github") || n.includes("git")) return <GithubLogo size={s} weight="fill" className={c} />;
-  if (n.includes("gmail") || n.includes("email")) return <EnvelopeSimple size={s} weight="bold" className={c} />;
-  if (n.includes("calendar")) return <CalendarBlank size={s} weight="bold" className={c} />;
-  if (n.includes("browser")) return <Browsers size={s} weight="bold" className={c} />;
+  if (n.includes("search") || n.includes("web_search")) return <Search size={size} className={c} />;
+  if (n.includes("http") || n.includes("fetch")) return <Icon icon={LinkIcon} size={size} className={c} />;
+  if (n.includes("think") || n.includes("thinking")) return <Brain size={size} weight="fill" className={c} />;
+  if (n.includes("bash") || n.includes("repl") || n.includes("powershell") || n.includes("cmd") || n.includes("command")) return <Terminal size={size} className={c} />;
+  if (n.includes("read_file") || n.includes("cat")) return <Document size={size} className={c} />;
+  if (n.includes("write_file") || n.includes("edit_file") || n.includes("modify") || n.includes("write")) return <Edit size={size} className={c} />;
+  if (n.includes("ls") || n.includes("glob") || n.includes("list_dir")) return <FolderOpen size={size} weight="fill" className={c} />;
+  if (n.includes("memory") || n.includes("store")) return <Icon icon={DatabaseIcon} size={size} className={c} />;
+  if (n === "video_generate" || n.includes("video")) return <Icon icon={FilmStripIcon} size={size} className={c} />;
+  if (n.includes("image") || n.includes("generate")) return <Icon icon={ImageSquareIcon} size={size} className={c} />;
+  if (n.includes("time") || n.includes("sleep")) return <Clock size={size} className={c} />;
+  if (n.includes("github") || n.includes("git")) return <Icon icon={GithubLogoIcon} size={size} weight="fill" className={c} />;
+  if (n.includes("gmail") || n.includes("email")) return <Email size={size} className={c} />;
+  if (n.includes("calendar")) return <Calendar size={size} className={c} />;
+  if (n.includes("browser")) return <Icon icon={BrowsersIcon} size={size} className={c} />;
   // Generic MCP / studio-harness tool: infer from action part of the name
-  if (n.startsWith("mcp_")) return <Lightning size={s} weight="fill" className={c} />;
-  if (n.includes("studio") || n.includes("local") || n.includes("reaper")) return <Code size={s} weight="bold" className={c} />;
-  if (n.includes("skill") || n.includes("knowledge")) return <Lightning size={s} weight="fill" className={c} />;
+  if (n.startsWith("mcp_")) return <Lightning size={size} weight="fill" className={c} />;
+  if (n.includes("studio") || n.includes("local") || n.includes("reaper")) return <Code size={size} className={c} />;
+  if (n.includes("skill") || n.includes("knowledge")) return <Lightning size={size} weight="fill" className={c} />;
 
-  return <Wrench size={s} weight="bold" className={c} />;
+  return <Icon icon={WrenchIcon} size={size} className={c} />;
 }
 
 export function argsPreview(args: Record<string, unknown>): string {

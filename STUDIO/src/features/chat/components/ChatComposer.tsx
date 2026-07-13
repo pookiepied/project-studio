@@ -3,20 +3,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAutoResizeTextarea } from "@/lib/hooks/useAutoResizeTextarea";
 import { useNavigation } from "@/app/contexts/NavigationContext";
 import {
-  PlusIcon as Plus,
-  FilesIcon as Files,
-  TargetIcon as Target,
-  ListChecksIcon as ListChecks,
-  SquaresFourIcon as SquaresFour,
-  EyeIcon as Eye,
-  BrainIcon as Brain,
-  StopIcon as Stop,
-  ArrowUpIcon as ArrowUp,
-} from "@phosphor-icons/react";
+  Add,
+  Files,
+  Icon,
+  TargetIcon,
+  Checklist,
+  Grid,
+  Eye,
+  Brain,
+  Stop,
+  Send,
+} from "@/ui/icons";
 import { FEATURED_APPS } from "@/features/extensions/components/ComposioCards";
 import { AppLogo } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Spinner } from "@/ui/primitives/Spinner";
 import { useComposioLogos } from "@/features/extensions/hooks/useComposioLogos";
 import { TierSelector } from "@/features/models/components/TierSelector";
 import { VoiceInput } from "@/features/voice/components/VoiceInput";
@@ -122,6 +124,7 @@ export const ChatComposer = ({
   const isClaude = chatEngine === "claude";
   const addMenuApps = FEATURED_APPS.slice(0, 6);
   const composioLogos = useComposioLogos();
+  const isPreparingResponse = isLoading && !isStreaming;
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -234,7 +237,7 @@ export const ChatComposer = ({
                   : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-border hover:text-gray-600 dark:hover:text-gray-400",
               )}
             >
-              <Plus size={14} weight="regular" />
+              <Add size="sm" />
             </IconButton>
 
             <AnimatePresence>
@@ -260,7 +263,7 @@ export const ChatComposer = ({
                       onClick={() => { onTriggerFileInput(); onToggleAttachMenu(); }}
                       className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-700 transition-colors hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-surface-selected"
                     >
-                      <Files size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Files size="sm" className="shrink-0 text-gray-500 dark:text-gray-400" />
                       <span className="min-w-0 flex-1 truncate">Files and folders</span>
                     </Button>
 
@@ -270,7 +273,7 @@ export const ChatComposer = ({
                       tabIndex={-1}
                       className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
                     >
-                      <Target size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-500" />
+                      <Icon icon={TargetIcon} size="sm" className="shrink-0 text-gray-500 dark:text-gray-500" />
                       <span className="shrink-0 text-gray-700 dark:text-gray-300">Goal</span>
                       <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                         Set a goal that Studio will keep working towards
@@ -283,7 +286,7 @@ export const ChatComposer = ({
                       tabIndex={-1}
                       className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
                     >
-                      <ListChecks size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-500" />
+                      <Checklist size="sm" className="shrink-0 text-gray-500 dark:text-gray-500" />
                       <span className="shrink-0 text-gray-700 dark:text-gray-300">Plan mode</span>
                       <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                         Turn plan mode on
@@ -325,7 +328,7 @@ export const ChatComposer = ({
                       onClick={() => { navigateTo("extensions"); onToggleAttachMenu(); }}
                       className="group flex h-auto w-full items-center gap-2 justify-start rounded-lg px-2 text-left text-sm leading-none text-gray-500 transition-colors hover:bg-gray-100/70 dark:text-gray-400 dark:hover:bg-surface-selected"
                     >
-                      <SquaresFour size={14} weight="regular" className="shrink-0 text-gray-500 dark:text-gray-500" />
+                      <Grid size="sm" className="shrink-0 text-gray-500 dark:text-gray-500" />
                       <span className="shrink-0 text-gray-700 dark:text-gray-300">More apps</span>
                       <span className="min-w-0 flex-1 truncate text-gray-400 dark:text-gray-600">
                         Browse connected tools and extensions
@@ -381,8 +384,8 @@ export const ChatComposer = ({
                   )}
                 >
                   {autonomous
-                    ? <Brain size={12} weight="fill" />
-                    : <Eye size={12} weight="regular" />}
+? <Brain size="xs" weight="fill" />
+            : <Eye size="xs" />}
                   <span className={composerPillLabel}>{autonomous ? "Autonomous" : "Review"}</span>
                 </Button>
               );
@@ -418,7 +421,19 @@ export const ChatComposer = ({
           />
 
           <div className="relative flex-shrink-0">
-            {isStreaming || isLoading ? (
+            {isPreparingResponse ? (
+              <IconButton
+                aria-label="Preparing response"
+                title="Preparing response"
+                onClick={onAbort}
+                className={cx(
+                  composerRoundIconButton,
+                  "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-active",
+                )}
+              >
+                <Spinner size="sm" decorative />
+              </IconButton>
+            ) : isStreaming ? (
               <IconButton
                 aria-label="Stop generation"
                 title="Stop generation"
@@ -428,7 +443,7 @@ export const ChatComposer = ({
                   "bg-gray-100 dark:bg-surface-border text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-active",
                 )}
               >
-                <Stop size={14} weight="fill" />
+                <Stop size="sm" weight="fill" />
               </IconButton>
             ) : (
               <IconButton
@@ -443,7 +458,7 @@ export const ChatComposer = ({
                     : "bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-surface-selected dark:text-gray-700",
                 )}
               >
-                <ArrowUp size={14} weight="bold" />
+                <Send size="sm" />
               </IconButton>
             )}
           </div>

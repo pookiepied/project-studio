@@ -1,13 +1,15 @@
 import React from "react";
 import {
-  EnvelopeSimpleIcon as EnvelopeSimple,
-  CalendarBlankIcon as CalendarBlank,
-  CloudIcon as Cloud,
-  GithubLogoIcon as GithubLogo,
-  CodeIcon as Code,
-  LightningIcon as Lightning,
-  DatabaseIcon as Database,
-} from "@phosphor-icons/react";
+  Code,
+  Cloud,
+  DatabaseIcon,
+  Email,
+  Icon,
+  type IconSize,
+  Lightning,
+  Calendar,
+  GithubLogoIcon,
+} from "@/ui/icons";
 
 function Context7RegistryIcon({ size, className }: { size: number; className?: string }) {
   return (
@@ -23,7 +25,7 @@ function Context7RegistryIcon({ size, className }: { size: number; className?: s
 export interface McpServiceInfo {
   displayName: string;
   /** Returns an icon element sized to `size` with `className`. */
-  getIcon: (size: number, className: string) => React.ReactNode;
+  getIcon: (size: IconSize, className: string) => React.ReactNode;
 }
 
 // ── Minimal SVG brand icons ──────────────────────────────────────────────────
@@ -90,51 +92,51 @@ function GoogleTasksIcon({ size, className }: { size: number; className?: string
 const SERVICE_MAP: Record<string, McpServiceInfo> = {
   gmail: {
     displayName: "Gmail",
-    getIcon: (s, c) => <GmailIcon size={s} className={c} />,
+    getIcon: (s, c) => <GmailIcon size={iconSizeOf(s)} className={c} />,
   },
   googlecalendar: {
     displayName: "Google Calendar",
-    getIcon: (s, c) => <GoogleCalendarIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleCalendarIcon size={iconSizeOf(s)} className={c} />,
   },
   google_calendar: {
     displayName: "Google Calendar",
-    getIcon: (s, c) => <GoogleCalendarIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleCalendarIcon size={iconSizeOf(s)} className={c} />,
   },
   googledrive: {
     displayName: "Google Drive",
-    getIcon: (s, c) => <GoogleDriveIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleDriveIcon size={iconSizeOf(s)} className={c} />,
   },
   google_drive: {
     displayName: "Google Drive",
-    getIcon: (s, c) => <GoogleDriveIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleDriveIcon size={iconSizeOf(s)} className={c} />,
   },
   googlesheets: {
     displayName: "Google Sheets",
-    getIcon: (s, c) => <GoogleSheetsIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleSheetsIcon size={iconSizeOf(s)} className={c} />,
   },
   google_sheets: {
     displayName: "Google Sheets",
-    getIcon: (s, c) => <GoogleSheetsIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleSheetsIcon size={iconSizeOf(s)} className={c} />,
   },
   googletasks: {
     displayName: "Google Tasks",
-    getIcon: (s, c) => <GoogleTasksIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleTasksIcon size={iconSizeOf(s)} className={c} />,
   },
   google_tasks: {
     displayName: "Google Tasks",
-    getIcon: (s, c) => <GoogleTasksIcon size={s} className={c} />,
+    getIcon: (s, c) => <GoogleTasksIcon size={iconSizeOf(s)} className={c} />,
   },
   github: {
     displayName: "GitHub",
-    getIcon: (s, c) => <GithubLogo size={s} weight="fill" className={c} />,
+    getIcon: (s, c) => <Icon icon={GithubLogoIcon} size={s} weight="fill" className={c} />,
   },
   context7: {
     displayName: "Context7",
-    getIcon: (s, c) => <Context7RegistryIcon size={s} className={c} />,
+    getIcon: (s, c) => <Context7RegistryIcon size={iconSizeOf(s)} className={c} />,
   },
   studio: {
     displayName: "Studio",
-    getIcon: (s, c) => <Code size={s} weight="bold" className={c} />,
+    getIcon: (s, c) => <Code size={s} className={c} />,
   },
   local: {
     displayName: "Local",
@@ -142,21 +144,32 @@ const SERVICE_MAP: Record<string, McpServiceInfo> = {
   },
   email: {
     displayName: "Email",
-    getIcon: (s, c) => <EnvelopeSimple size={s} weight="bold" className={c} />,
+    getIcon: (s, c) => <Email size={s} className={c} />,
   },
   calendar: {
     displayName: "Calendar",
-    getIcon: (s, c) => <CalendarBlank size={s} weight="bold" className={c} />,
+    getIcon: (s, c) => <Calendar size={s} className={c} />,
   },
   drive: {
     displayName: "Drive",
-    getIcon: (s, c) => <Cloud size={s} weight="bold" className={c} />,
+    getIcon: (s, c) => <Cloud size={s} className={c} />,
   },
   sheets: {
     displayName: "Sheets",
-    getIcon: (s, c) => <Database size={s} weight="bold" className={c} />,
+    getIcon: (s, c) => <Icon icon={DatabaseIcon} size={s} className={c} />,
   },
 };
+
+/** Map an IconSize keyword back to a pixel value for hand-rolled SVG brand marks. */
+function iconSizeOf(s: IconSize): number {
+  switch (s) {
+    case "xs": return 12;
+    case "sm": return 14;
+    case "md": return 16;
+    case "lg": return 20;
+    case "xl": return 24;
+  }
+}
 
 // ── Public API ───────────────────────────────────────────────────────────────
 

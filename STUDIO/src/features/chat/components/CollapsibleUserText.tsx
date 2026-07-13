@@ -1,5 +1,5 @@
 import { useRef, useState, useLayoutEffect } from "react";
-import { CaretDownIcon as CaretDown } from "@phosphor-icons/react";
+import { Expand } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 
 const COLLAPSED_MAX = 200; // px — height cap while collapsed (~9 lines)
@@ -71,9 +71,8 @@ export function CollapsibleUserText({ content }: { content: string }) {
                      transition-colors duration-150"
         >
           {expanded ? "Show less" : "Show more"}
-          <CaretDown
-            size={12}
-            weight="bold"
+          <Expand
+            size="xs"
             className="transition-transform duration-200"
             style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
           />
