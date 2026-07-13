@@ -12,8 +12,6 @@
 
 export {
   CURATED_EDGE_TTS_VOICES,
-  getVoiceLabel,
-  type EdgeTtsVoice,
 } from './voices';
 
 export {
@@ -23,7 +21,6 @@ export {
 
 export {
   detectPython,
-  type EdgeTtsSystemInfo,
 } from './systemDetection';
 
 export {
@@ -36,7 +33,6 @@ export {
   isEdgeTtsModel,
   voiceIdFromModel,
   modelFromVoiceId,
-  EDGE_TTS_PREFIX,
 } from './synthesisService';
 
 export { chunkTextForSpeech } from './textChunker';

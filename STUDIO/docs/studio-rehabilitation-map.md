@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 19 unused exports
-- 43 unused exported types
+- 16 unused exports
+- 42 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -306,6 +306,8 @@ Completed:
   model-helper surfaces that are only used inside their owning modules.
 - Removed the unused Settings permissions management view and the permission
   grant inspection helpers that only supported that dead surface.
+- Trimmed unused Edge TTS local exports while preserving the live voice list,
+  install/config detection, synthesis, model-id helpers, and chunking surface.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.

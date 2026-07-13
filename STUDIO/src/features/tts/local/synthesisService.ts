@@ -64,7 +64,7 @@ export async function synthesizeSpeech(
 }
 
 /** model id format used across settings.ttsModel: "edge-tts:<voiceId>" */
-export const EDGE_TTS_PREFIX = 'edge-tts:';
+const EDGE_TTS_PREFIX = 'edge-tts:';
 
 export function isEdgeTtsModel(model: string | undefined | null): boolean {
   return !!model && model.startsWith(EDGE_TTS_PREFIX);

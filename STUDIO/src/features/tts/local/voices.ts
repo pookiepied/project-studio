@@ -28,7 +28,3 @@ export const CURATED_EDGE_TTS_VOICES: EdgeTtsVoice[] = [
   { id: "es-ES-AlvaroNeural", label: "Álvaro (Spanish, Male)", locale: "es-ES" },
   { id: "fr-FR-DeniseNeural", label: "Denise (French, Female)", locale: "fr-FR" },
 ];
-
-export function getVoiceLabel(voiceId: string): string {
-  return CURATED_EDGE_TTS_VOICES.find((v) => v.id === voiceId)?.label ?? voiceId;
-}
