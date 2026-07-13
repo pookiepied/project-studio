@@ -10,8 +10,8 @@ export type RegistryCategory =
   | "reranking"
   | "specialized";
 
-export type RegistryPricingStatus = "verified" | "unknown" | "not_applicable" | "estimated" | "provider_variable";
-export type RegistryPricingKind = "token" | "image" | "video" | "audio" | "embedding" | "rerank" | "runtime" | "custom";
+type RegistryPricingStatus = "verified" | "unknown" | "not_applicable" | "estimated" | "provider_variable";
+type RegistryPricingKind = "token" | "image" | "video" | "audio" | "embedding" | "rerank" | "runtime" | "custom";
 export type RegistryPricingUnit =
   | "one_million_tokens"
   | "image"
@@ -27,7 +27,7 @@ export type RegistryPricingUnit =
   | "request"
   | "not_applicable";
 
-export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 export interface RegistryPricing {
   kind: RegistryPricingKind;
@@ -48,7 +48,7 @@ export interface RegistryPricing {
   notes?: string;
 }
 
-export interface RegistryReasoning {
+interface RegistryReasoning {
   supported: boolean;
   alwaysOn: boolean;
   canDisable: boolean;

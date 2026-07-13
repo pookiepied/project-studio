@@ -64,11 +64,6 @@ export type OverlayActionType =
   | "startTranscription"
   | "openChat";
 
-export interface OverlayAction {
-  action: OverlayActionType;
-  text?: string;
-}
-
 // Constants
 
 const OVERLAY_LABEL = "overlay";

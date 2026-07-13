@@ -5,9 +5,6 @@ import { WebStorageBackend } from './backends/web';
 import { CloudStorageBackend } from './backends/cloud';
 import type { StorageBackend } from './backends/types';
 
-export type { SystemLocation } from './backends/types';
-export type { StorageBackend } from './backends/types';
-
 class UnifiedStorageManager {
   private backend: StorageBackend | null = null;
   private cloudBackend: CloudStorageBackend | null = null;
@@ -147,7 +144,7 @@ class UnifiedStorageManager {
   disableCloudStorage(): void {
     if (!this.cloudBackend) return;
     this.cloudBackend = null;
-    logger.info('Storage', 'Cloud storage disabled — local backend active for all paths');
+    logger.info('Storage', 'Cloud storage disabled; local backend active for all paths');
   }
 
   async isUsingTauriFS(): Promise<boolean> {

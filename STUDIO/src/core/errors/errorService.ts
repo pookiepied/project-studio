@@ -8,7 +8,7 @@
 import { reportError as logError } from "./errorReporting";
 import { logger } from "../logging/logger";
 
-export type ErrorCategory = 
+type ErrorCategory =
   | "payment"
   | "rate_limit"
   | "auth"
@@ -18,7 +18,7 @@ export type ErrorCategory =
   | "server"
   | "unknown";
 
-export type RateLimitType = 
+type RateLimitType =
   | "rpm"      // Requests per minute
   | "rpd"      // Requests per day
   | "tpm"      // Tokens per minute
@@ -26,9 +26,7 @@ export type RateLimitType =
   | "audio"    // Audio seconds (transcription)
   | "unknown"; // Generic rate limit
 
-export type ErrorDisplay = "toast" | "inline";
-
-export interface CategorizedError {
+interface CategorizedError {
   category: ErrorCategory;
   userMessage: string;
   technicalMessage: string;

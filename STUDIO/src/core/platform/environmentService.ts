@@ -9,7 +9,7 @@ declare global {
   const __TAURI__: boolean | undefined;
 }
 
-export type Environment = 'tauri' | 'web';
+type Environment = 'tauri' | 'web';
 
 class EnvironmentService {
   private _environment: Environment | null = null;

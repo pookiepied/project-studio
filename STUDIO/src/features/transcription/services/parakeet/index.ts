@@ -2,7 +2,7 @@
  * Parakeet-TDT Service
  * Local speech-to-text via NVIDIA's Parakeet-TDT 0.6B v2 (ONNX export, run
  * through the `onnx-asr` Python package). English + ~25 European languages,
- * notably resistant to hallucinating text on silence — the failure mode that
+ * notably resistant to hallucinating text on silence; the failure mode that
  * made both local Faster Whisper and cloud Groq Whisper unreliable for us.
  *
  * This barrel is the module's public surface: only what callers outside
@@ -17,7 +17,6 @@ export {
 
 export {
   detectSystemCapabilities,
-  type ParakeetSystemInfo,
 } from './systemDetection';
 
 export {

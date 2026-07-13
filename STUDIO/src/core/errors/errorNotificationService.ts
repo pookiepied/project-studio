@@ -1,13 +1,13 @@
 import { toast } from 'sonner';
 
-export interface ErrorNotification {
+interface ErrorNotification {
   title: string;
   message: string;
   type: 'error' | 'warning' | 'info';
   category?: 'network' | 'storage' | 'api' | 'encryption' | 'general';
 }
 
-export interface ErrorContext {
+interface ErrorContext {
   component?: string;
   operation?: string;
   userId?: string;

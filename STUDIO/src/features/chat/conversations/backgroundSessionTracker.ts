@@ -1,5 +1,5 @@
 /**
- * backgroundSessionTracker — maps background conversation statuses for the UI.
+ * backgroundSessionTracker maps background conversation statuses for the UI.
  *
  * Subscribes to wsPool real-time status events so no polling is needed.
  * Only tracks conversations that are running in the background (handlers
@@ -7,16 +7,15 @@
  * status is not shown in the sidebar.
  *
  * Status lifecycle:
- *   streaming        → AI is generating a response
- *   permission_needed → AI paused waiting for a local tool approval
- *   done_unread      → response complete, user hasn't returned yet
- *   error            → something went wrong
+ *   streaming: AI is generating a response
+ *   permission_needed: AI paused waiting for a local tool approval
+ *   done_unread: response complete, user hasn't returned yet
+ *   error: something went wrong
  *
  * Statuses are cleared when the user navigates back (acknowledge()).
  */
 
 import { wsPool } from "@/runtime";
-import type { NotificationService as NS } from "@/core/notifications/notificationService";
 
 export type ConversationSessionStatus =
   | "streaming"
@@ -25,8 +24,8 @@ export type ConversationSessionStatus =
   | "error";
 
 type StatusListener = (statuses: Map<string, ConversationSessionStatus>) => void;
-export type CompletionCallback = (convId: string, title: string) => void;
-export type PermissionCallback = (convId: string, title: string) => void;
+type CompletionCallback = (convId: string, title: string) => void;
+type PermissionCallback = (convId: string, title: string) => void;
 
 // Subset of PoolConnectionStatus values we surface in the UI
 const SURFACED: Record<string, ConversationSessionStatus> = {
@@ -44,11 +43,11 @@ class BackgroundSessionTracker {
   private onPermission?: PermissionCallback;
 
   constructor() {
-    // Subscribe to wsPool status events — no polling needed
+    // Subscribe to wsPool status events; no polling needed.
     wsPool.subscribe((convId, poolStatus) => {
       const mapped = SURFACED[poolStatus];
       if (!mapped) {
-        // idle / connecting / closed → remove from visible statuses
+        // idle / connecting / closed: remove from visible statuses
         if (this.statuses.has(convId)) {
           this.statuses.delete(convId);
           this.notify();
@@ -76,7 +75,7 @@ class BackgroundSessionTracker {
     this.titles.set(convId, title);
   }
 
-  /** Called when the user navigates back to a conversation — clears its badge. */
+  /** Called when the user navigates back to a conversation; clears its badge. */
   acknowledge(convId: string): void {
     if (this.statuses.has(convId)) {
       this.statuses.delete(convId);
@@ -108,6 +107,3 @@ class BackgroundSessionTracker {
 }
 
 export const backgroundSessionTracker = new BackgroundSessionTracker();
-
-// Satisfy the type import used in ChatProvider
-export type { NS };

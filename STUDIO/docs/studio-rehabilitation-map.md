@@ -146,7 +146,7 @@ before splitting.
 
 - 0 unused files after the first proof pass
 - 0 unused exports
-- 13 unused exported types
+- 0 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -230,7 +230,7 @@ Use these rules before moving files:
 
 ### Phase 0: Baseline and map
 
-Status: in progress.
+Status: complete for the current `knip` dead-code proof pass.
 
 Completed:
 
@@ -324,19 +324,23 @@ Completed:
   chat type re-exports, and cleaned touched chat type comments.
 - Trimmed unused workspace barrel type exports and privatized workspace/runtime
   helper types.
+- Privatized the remaining core/service helper types, trimmed stale project,
+  storage, Parakeet, and tool type surfaces, and removed the last deprecated
+  unused type alias.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.
-- Verified no unused files remain in the `knip` report.
+- Verified no unused files, unused exports, unused exported types, or duplicate
+  exports remain in the `knip` report.
 - Verified `npm run typecheck`.
 
 Remaining scope:
 
-- Continue with unused exports.
-- Review unused exports in small groups by subsystem.
+- Move to the cycle-removal phase.
+- Continue broader stale-comment and naming cleanup as separate scoped passes.
 
 Rules:
 

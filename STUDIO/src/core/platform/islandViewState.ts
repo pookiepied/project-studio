@@ -1,7 +1,7 @@
 import { RecordingState } from "@/types";
 import type { IslandMode, OverlayPayload } from "./overlayService";
 
-export type IslandViewKind =
+type IslandViewKind =
   | "hidden"
   | "idle"
   | "idleExpanded"

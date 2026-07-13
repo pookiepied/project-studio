@@ -24,7 +24,7 @@ export interface LocalModel {
   details?: Record<string, any>;
 }
 
-export interface DaemonModelsResponse {
+interface DaemonModelsResponse {
   data: LocalModel[];
   object: string;
   count: number;

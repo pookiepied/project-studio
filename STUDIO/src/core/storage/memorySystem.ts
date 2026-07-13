@@ -8,7 +8,7 @@ import { ChatMessage, ChatConversation } from "@/types";
 import { logger } from "../logging/logger";
 
 // Memory Types
-export interface MemoryEntry {
+interface MemoryEntry {
   id: string;
   type: "short-term" | "mid-term" | "long-term";
   category: "personal" | "event" | "preference" | "fact" | "conversation";
@@ -23,7 +23,7 @@ export interface MemoryEntry {
   relatedEntries?: string[]; // IDs of related memories
 }
 
-export interface PersonalProfile {
+interface PersonalProfile {
   preferences: Record<string, any>;
   habits: string[];
   interests: string[];
@@ -34,7 +34,7 @@ export interface PersonalProfile {
   last_updated: number;
 }
 
-export interface ConversationMemory {
+interface ConversationMemory {
   conversationId: string;
   isShared: boolean; // Can other conversations access this memory?
   summary: string;

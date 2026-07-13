@@ -1,2 +1,2 @@
 export { projectRegistry } from "./projectRegistry";
-export type { ProjectEntry, ProjectRegistry, ProjectAccessMode } from "./types";
+export type { ProjectEntry } from "./types";

@@ -3,7 +3,7 @@
  *
  * Neutral leaf module: shared by both the desktop-backend `runtime/` layer and
  * the `features/chat` UI layer. Depends only on `@/core/permissions` (downward),
- * never on any `@/features/**` module — keeping it a valid dependency for both.
+ * never on any `@/features/**` module, keeping it a valid dependency for both.
  *
  * Historically these types lived in `features/chat/context/types.ts`; they are
  * tool-execution domain types, so they were relocated here (their canonical
@@ -24,9 +24,6 @@ export interface TaskItem {
   activeForm: string;
   status: "pending" | "in_progress" | "completed";
 }
-
-/** @deprecated Use TaskItem */
-export type TodoItem = TaskItem;
 
 // ---------------------------------------------------------------------------
 // Tool call cards
