@@ -35,8 +35,7 @@ import { memorySystem }                                from "@/core/storage/memo
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
 import {
-  createConversation, saveConversation, loadConversation,
-  updateConversationTitle, getAllConversations,
+  createConversation, saveConversation, loadConversation, updateConversationTitle,
 } from "@/features/chat/conversations/chatHistoryService";
 import type { ConversationStorageScope } from "@/core/conversations";
 import {
@@ -55,9 +54,6 @@ import { usePermittedTools }                           from "@/features/chat/hoo
 import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
 import { DEFAULT_MAX_CONTEXT_TOKENS } from "./constants";
-import { maybeCompact }                                from "./contextCompactor";
-import { applyCatchUp }                               from "./catchUp";
-import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/services/pendingCompletion";
 import { chat } from "@/features/chat/services/chatService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
 import type { PermissionModeId, PermissionDecision, ActionMode } from "@/core/permissions";
@@ -80,6 +76,7 @@ import { useConversationActions } from "./useConversationActions";
 import { useAccessPrompts } from "./useAccessPrompts";
 import { useStreamingLifecycle } from "./useStreamingLifecycle";
 import { useConversationDisplay } from "./useConversationDisplay";
+import { useConversationBootstrap } from "./useConversationBootstrap";
 
 import {
   saveConvProjectCtx,
@@ -452,43 +449,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const { permittedTools, grantToolPermission, revokeToolPermission, resetPermittedTools } = usePermittedTools();
 
   // ── Load most recent conversation on mount ──────────────────────────────
-  const conversationLoadedRef = useRef(false);
-
-  const loadMostRecentConversation = useCallback(async () => {
-    if (conversationLoadedRef.current) return;
-    const all = await getAllConversations();
-    if (all.length > 0) {
-      const conv = await loadConversation(all[0].id);
-      if (conv) {
-        conversationLoadedRef.current = true;
-        setConversation(conv);
-        setCurrentModel(conv.model);
-        await loadInitialMessages(conv.id, conv.messages.length);
-        maybeCompact(conv, conv.model, getContextLimit, isSummarizingRef, setIsSummarizing, setConversation).catch(() => {});
-
-        const lastMsg = conv.messages[conv.messages.length - 1];
-        if (lastMsg?.role === "user") {
-          fetchPendingCompletion(conv.id).then(async (content) => {
-            if (!content) return;
-            await applyCatchUp(conv.id, content, setConversation, appendToDisplayedMessages);
-            clearPendingCompletion(conv.id).catch(() => {});
-          }).catch(() => {});
-        }
-      }
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    loadMostRecentConversation();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Re-run when cloud storage becomes available (fires after AuthContext enables it)
-  useEffect(() => {
-    const handler = () => loadMostRecentConversation();
-    window.addEventListener('studio:storage-ready', handler);
-    return () => window.removeEventListener('studio:storage-ready', handler);
-  }, [loadMostRecentConversation]);
-
+  useConversationBootstrap({
+    loadInitialMessages,
+    appendToDisplayedMessages,
+    getContextLimit,
+    isSummarizingRef,
+    setConversation,
+    setCurrentModel,
+    setIsSummarizing,
+  });
   // ── WebSocket chat hook ─────────────────────────────────────────────────
   // A single persistent connection per conversation. The hook handles
   // reconnection and the tool-relay protocol internally.

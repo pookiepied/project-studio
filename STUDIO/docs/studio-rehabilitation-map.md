@@ -131,7 +131,7 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
-| `src/features/chat/context/ChatProvider.tsx` | 851 | Provider still owns many chat concerns; model/context helpers, access prompts, streaming lifecycle, and conversation display pagination were extracted |
+| `src/features/chat/context/ChatProvider.tsx` | 820 | Provider still owns many chat concerns; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, and conversation bootstrap were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/pages/ChatPage.tsx` | 775 | Page composition remains heavy; composer panels, top chrome, and overlays were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
@@ -440,6 +440,11 @@ Completed:
   `src/features/chat/context/useConversationDisplay.ts`.
 - Reduced `ChatProvider.tsx` from 880 to 851 lines while preserving the
   existing stream and conversation-action hook contracts.
+- Extracted ChatProvider initial conversation loading, storage-ready reload, and
+  pending-completion catch-up into
+  `src/features/chat/context/useConversationBootstrap.ts`.
+- Reduced `ChatProvider.tsx` from 851 to 820 lines while keeping the existing
+  startup behavior wired through the display helpers and compaction path.
 
 Recommended order:
 
