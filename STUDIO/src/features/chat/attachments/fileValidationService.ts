@@ -3,7 +3,7 @@
  * Comprehensive file validation and security checks
  */
 
-export interface FileValidationResult {
+interface FileValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
@@ -13,7 +13,7 @@ export interface FileValidationResult {
   isSuspicious?: boolean;
 }
 
-export interface FileValidationOptions {
+interface FileValidationOptions {
   maxSize?: number;
   allowedTypes?: string[];
   allowedExtensions?: string[];

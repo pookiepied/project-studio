@@ -1,8 +1,6 @@
-// Chat domain types — moved from src/types/index.ts per T5.5 (D-527 shim pattern).
+// Chat domain types moved from src/types/index.ts per T5.5 (D-527 shim pattern).
 
-// ---------------------------------------------------------------------------
 // Harness execution events (Studio Harness inline cards)
-// ---------------------------------------------------------------------------
 
 export interface HarnessEvent {
   callId: string;
@@ -16,21 +14,19 @@ export interface HarnessEvent {
   target: string;
   /** Diff stats for file-edit operations */
   diffStats?: { added: number; removed: number };
-  /** Line range for read operations, e.g. "38–97" */
+  /** Line range for read operations, e.g. "38-97" */
   lineRange?: string;
   /** Truncated output/diff for the expanded preview pane */
   preview?: string;
 }
 
-/** A slice of an assistant message — either a prose block or a harness step card. */
+/** A slice of an assistant message: either a prose block or a harness step card. */
 export type MessageSegment =
   | { type: "text"; content: string }
   | { type: "harness_event"; event: HarnessEvent }
   | { type: "user_question"; id: string; question: string; answer?: string };
 
-// ---------------------------------------------------------------------------
 // Chat types
-// ---------------------------------------------------------------------------
 
 export interface ChatMessage {
   id: string;
@@ -81,7 +77,7 @@ export interface ClaudeSessionMetadata {
   lastCostUsd?: number;
   lastDurationMs?: number;
   /** Real token usage the CLI reported for the most recent turn (from the
-   *  `result` event's `usage`). Ground truth — counts the system prompt, skills,
+   *  `result` event's `usage`). Ground truth: counts the system prompt, skills,
    *  tool schemas, and every file-read result, not just the visible chat. Sum of
    *  the input fields is the current context-window occupancy. */
   lastInputTokens?: number;
@@ -115,17 +111,6 @@ export interface ConversationMetadata {
     cwd?: string;
   };
   claude?: ClaudeSessionMetadata;
-}
-
-export interface MessageOptions {
-  type?: 'permission-request' | 'normal';
-  operation?: {
-    type: string;
-    path: string;
-    content?: string;
-  };
-  onApprove?: () => void;
-  onDeny?: () => void;
 }
 
 export interface ChatConversation {

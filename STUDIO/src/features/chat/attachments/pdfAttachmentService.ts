@@ -6,9 +6,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString();
 
-export type PDFProcessType = 'text' | 'images';
+type PDFProcessType = 'text' | 'images';
 
-export interface PDFProcessResult {
+interface PDFProcessResult {
   type: PDFProcessType;
   text?: string;        // populated when type === 'text'
   pageImages?: string[]; // base64 JPEG strings (no data: prefix) when type === 'images'
@@ -16,7 +16,7 @@ export interface PDFProcessResult {
   fileName: string;
 }
 
-export interface PDFProcessError {
+interface PDFProcessError {
   code: 'empty' | 'too_large' | 'password_protected' | 'corrupted' | 'unknown';
   message: string;
 }
@@ -28,7 +28,7 @@ export type PDFProcessOutcome =
 const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB
 const MAX_PAGES = 20;                    // cap for both text and image extraction
 const MIN_TEXT_CHARS = 100;             // below this we consider the PDF scanned
-const RENDER_SCALE = 1.5;              // 108 dpi — good OCR quality, reasonable size
+const RENDER_SCALE = 1.5;              // 108 dpi, good OCR quality and reasonable size
 
 /**
  * Process a PDF File object for use as a chat attachment.
@@ -40,7 +40,7 @@ const RENDER_SCALE = 1.5;              // 108 dpi — good OCR quality, reasonab
  *     it is inlined in the message like any other document. All LLMs can read it.
  *  4. If text is sparse (scanned PDF): render each page to a JPEG canvas and
  *     return the base64 strings. These are forwarded through the vision pipeline
- *     (R2 presigned URLs → image_url parts) so vision-capable models can OCR them.
+ *     (R2 presigned URLs to image_url parts) so vision-capable models can OCR them.
  */
 export async function processPDF(file: File): Promise<PDFProcessOutcome> {
   if (file.size === 0) {
@@ -78,7 +78,7 @@ export async function processPDF(file: File): Promise<PDFProcessOutcome> {
     const totalPages = pdf.numPages;
     const pagesToProcess = Math.min(totalPages, MAX_PAGES);
 
-    // ── Pass 1: text extraction ───────────────────────────────────────────────
+    // Pass 1: text extraction
     let fullText = '';
     for (let p = 1; p <= pagesToProcess; p++) {
       const page = await pdf.getPage(p);
@@ -103,7 +103,7 @@ export async function processPDF(file: File): Promise<PDFProcessOutcome> {
       };
     }
 
-    // ── Pass 2: render scanned pages to JPEG images ───────────────────────────
+    // Pass 2: render scanned pages to JPEG images
     const pageImages: string[] = [];
     for (let p = 1; p <= pagesToProcess; p++) {
       const page = await pdf.getPage(p);
@@ -114,7 +114,7 @@ export async function processPDF(file: File): Promise<PDFProcessOutcome> {
       const ctx = canvas.getContext('2d')!;
       // pdfjs-dist v5 requires `canvas` in addition to `canvasContext`
       await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-      // Strip "data:image/jpeg;base64," — vision.ts pipeline expects raw base64
+      // Strip "data:image/jpeg;base64,"; vision.ts pipeline expects raw base64
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       pageImages.push(dataUrl.split(',')[1]);
     }

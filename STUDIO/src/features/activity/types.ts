@@ -1,4 +1,4 @@
-export interface ComponentHealth {
+interface ComponentHealth {
   status: "operational" | "degraded" | "down";
   message?: string;
   lastCheck?: string;
@@ -26,7 +26,7 @@ export interface AuthHealth {
   version: string;
 }
 
-export interface ProviderStat {
+interface ProviderStat {
   provider: string;
   requests: number;
   cost_usd: number | null;

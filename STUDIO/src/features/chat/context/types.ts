@@ -24,9 +24,7 @@ import type { PermissionModeId } from "@/core/permissions";
 export type {
   ActiveToolCall,
   TaskItem,
-  TodoItem,
   ToolApprovalDecision,
-  ToolDisplayClass,
 } from "@/types/tools";
 
 import type {

@@ -146,7 +146,7 @@ before splitting.
 
 - 0 unused files after the first proof pass
 - 0 unused exports
-- 24 unused exported types
+- 18 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -320,6 +320,8 @@ Completed:
   removed unused icon type re-exports.
 - Privatized app/model-local helper types and removed stale model filter preset
   type exports while cleaning touched comment artifacts.
+- Privatized feature-local activity/chat attachment helper types, removed stale
+  chat type re-exports, and cleaned touched chat type comments.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
