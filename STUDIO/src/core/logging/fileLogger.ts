@@ -8,7 +8,7 @@
 
 import { unifiedStorage } from "../storage/unifiedStorageService";
 
-export enum LogLevel {
+enum LogLevel {
   DEBUG = "DEBUG",
   INFO = "INFO",
   WARN = "WARN",
@@ -193,43 +193,4 @@ class FileLogger {
   }
 }
 
-// Export singleton instance
 export const fileLogger = new FileLogger();
-
-/**
- * Initialize file logging (call this in main.tsx)
- */
-export function initFileLogging(): void {
-  // Log app start
-  fileLogger.info("Application started", {
-    version: "0.1.4",
-    environment: import.meta.env.MODE,
-    userAgent: navigator.userAgent,
-  });
-
-  // Intercept console methods in production
-  if (import.meta.env.PROD) {
-    const originalConsoleError = console.error;
-    const originalConsoleWarn = console.warn;
-    const originalConsoleLog = console.log;
-
-    console.error = (...args: any[]) => {
-      originalConsoleError(...args);
-      fileLogger.error(args.join(" "));
-    };
-
-    console.warn = (...args: any[]) => {
-      originalConsoleWarn(...args);
-      fileLogger.warn(args.join(" "));
-    };
-
-    console.log = (...args: any[]) => {
-      originalConsoleLog(...args);
-      if (import.meta.env.DEV) {
-        fileLogger.debug(args.join(" "));
-      }
-    };
-  }
-
-  // Initialization complete
-}

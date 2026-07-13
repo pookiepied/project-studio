@@ -57,44 +57,6 @@ export function reportError(error: Error, context?: ErrorContext): void {
 }
 
 /**
- * Report a custom message (not an Error object)
- */
-export function reportMessage(
-  message: string,
-  level: "info" | "warning" | "error" = "error",
-  context?: ErrorContext
-): void {
-  const report = {
-    message,
-    level,
-    timestamp: Date.now(),
-    context,
-    userAgent: navigator.userAgent,
-    url: window.location.href,
-    environment: import.meta.env.MODE,
-  };
-
-  // Log through centralized logger
-  switch (level) {
-    case 'info':
-      logger.info('ErrorReporting', message, context);
-      break;
-    case 'warning':
-      logger.warn('ErrorReporting', message, context);
-      break;
-    case 'error':
-      logger.error('ErrorReporting', message, context);
-      break;
-  }
-
-  if (import.meta.env.PROD) {
-    sendToErrorAPI(report).catch((err) => {
-      logger.error('ErrorReporting', 'Failed to send message report', err);
-    });
-  }
-}
-
-/**
  * Send error report to custom API endpoint
  */
 async function sendToErrorAPI(report: any): Promise<void> {
@@ -163,45 +125,4 @@ export async function getStoredErrors(): Promise<ErrorReport[]> {
     logger.error('ErrorReporting', 'Failed to retrieve stored errors', error);
     return [];
   }
-}
-
-/**
- * Clear stored errors from unified storage
- */
-export async function clearStoredErrors(): Promise<void> {
-  try {
-    const ERROR_LOG_PATH = "errors.json";
-    await unifiedStorage.remove(ERROR_LOG_PATH);
-    logger.info('ErrorReporting', 'Stored errors cleared');
-  } catch (error) {
-    logger.error('ErrorReporting', 'Failed to clear stored errors', error);
-  }
-}
-
-/**
- * Initialize error reporting (call this in main.tsx)
- */
-export function initErrorReporting(): void {
-  // Global error handler for unhandled errors
-  window.addEventListener("error", (event) => {
-    reportError(event.error || new Error(event.message), {
-      type: "unhandled_error",
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-    });
-  });
-
-  // Global handler for unhandled promise rejections
-  window.addEventListener("unhandledrejection", (event) => {
-    const error = event.reason instanceof Error 
-      ? event.reason 
-      : new Error(String(event.reason));
-
-    reportError(error, {
-      type: "unhandled_rejection",
-    });
-  });
-
-  logger.info('ErrorReporting', 'Error reporting initialized');
 }
