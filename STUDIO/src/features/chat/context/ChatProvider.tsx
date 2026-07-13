@@ -56,16 +56,7 @@ import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
 import { DEFAULT_MAX_CONTEXT_TOKENS } from "./constants";
 import { chat } from "@/features/chat/services/chatService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import type { PermissionModeId, PermissionDecision, ActionMode } from "@/core/permissions";
-import {
-  evaluateToolCall,
-  chatModeFromStorageScope,
-  deriveLocalContext,
-  getWorkspaceTrust,
-  hasGlobalGrant,
-  buildGrantLookupForConversation,
-} from "@/core/permissions";
-import { readLocalMcpPermission, getLocalMcpServer } from "@/runtime";
+import type { PermissionModeId } from "@/core/permissions";
 import { GlobalAccessModal } from "@/features/permissions/components/GlobalAccessModal";
 import { ManagementAccessModal } from "@/features/permissions/components/ManagementAccessModal";
 import type { ToolApprovalDecision } from "./types";
@@ -77,6 +68,7 @@ import { useAccessPrompts } from "./useAccessPrompts";
 import { useStreamingLifecycle } from "./useStreamingLifecycle";
 import { useConversationDisplay } from "./useConversationDisplay";
 import { useConversationBootstrap } from "./useConversationBootstrap";
+import { useToolPermissionEvaluator } from "./useToolPermissionEvaluator";
 
 import {
   saveConvProjectCtx,
@@ -221,54 +213,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     requestManagementAccess,
   } = useAccessPrompts(conversation?.id ?? null);
 
-  // The effective mode is snapshotted at task start and held for the entire
-  // task, including tool-loop continuations. A mid-run toggle lands on the next
-  // task instead of changing enforcement partway through a response.
-  //
-  // liveActionModeRef mirrors the current desired mode; the freeze effect copies
-  // it on the isStreaming rising edge and clears it when the assistant returns
-  // to idle. Reading the live value via a ref avoids a stale closure while
-  // keeping isStreaming as the only trigger.
-  const liveActionModeRef = useRef<ActionMode>("review");
-  liveActionModeRef.current =
-    projectContext?.accessMode ?? (settings.autopilotMode ? "autonomous" : "review");
-  const frozenActionModeRef = useRef<ActionMode | null>(null);
-  useEffect(() => {
-    if (isStreaming) {
-      if (frozenActionModeRef.current === null) {
-        frozenActionModeRef.current = liveActionModeRef.current;
-      }
-    } else {
-      frozenActionModeRef.current = null;
-    }
-  }, [isStreaming]);
-
-  // ── Permission engine — assemble trusted context for a local tool call ───
-  const evaluatePermission = useCallback(
-    (server: string, toolName: string, args: Record<string, unknown>): PermissionDecision => {
-      const workspaceRoot = projectContext?.path ?? null;
-      // Frozen mode wins while a task is in flight; otherwise use the live mode.
-      const actionMode: ActionMode =
-        frozenActionModeRef.current ?? liveActionModeRef.current;
-      const def = getLocalMcpServer(server);
-      return evaluateToolCall({
-        chatMode:       chatModeFromStorageScope(conversationStorageScope),
-        localContext:   deriveLocalContext(conversationStorageScope, !!projectContext),
-        server,
-        toolName,
-        args,
-        mcpEnabled:     def ? readLocalMcpPermission(def) === true : false,
-        workspaceRoot,
-        workspaceTrust: getWorkspaceTrust(workspaceRoot),
-        grantedRoots:   workspaceRoot ? [workspaceRoot] : [],
-        hasGlobalGrant: hasGlobalGrant(conversation?.id ?? null),
-        actionMode,
-        existingGrants: buildGrantLookupForConversation(workspaceRoot, conversation?.id ?? null),
-      });
-    },
-    [conversationStorageScope, conversation?.id, projectContext]
-  );
-
+  const evaluatePermission = useToolPermissionEvaluator({
+    conversationId: conversation?.id ?? null,
+    conversationStorageScope,
+    projectContext,
+    autopilotMode: !!settings.autopilotMode,
+    isStreaming,
+  });
   const persistConversationMetadata = useCallback(async (
     conv: ChatConversation,
     provider: ChatEngine,
