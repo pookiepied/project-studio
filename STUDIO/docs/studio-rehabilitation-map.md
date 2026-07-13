@@ -132,7 +132,7 @@ before splitting.
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 987 | Provider likely owns too many chat concerns |
-| `src/features/chat/components/ChatFloatingDock.tsx` | 937 | Complex composite UI; split by panels/rows/actions |
+| `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/pages/ChatPage.tsx` | 775 | Page composition remains heavy; composer panels, top chrome, and overlays were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
@@ -420,6 +420,10 @@ Completed:
   `src/features/chat/pages/ChatPageOverlays.tsx`.
 - Reduced `ChatPage.tsx` from 800 to 775 lines while keeping overlay state and
   callbacks owned by the page.
+- Extracted ChatFloatingDock browser conversation/project rows and conversation
+  action menu into `src/features/chat/components/ChatFloatingDockRows.tsx`.
+- Reduced `ChatFloatingDock.tsx` from the measured 937-line baseline to 627
+  lines and normalized moved row text/separator comments to ASCII.
 
 Recommended order:
 
