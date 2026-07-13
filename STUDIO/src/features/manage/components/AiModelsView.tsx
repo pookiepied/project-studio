@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "@phosphor-icons/react";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Back, Refresh, Success, Warning, Icon } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";

@@ -10,11 +10,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  CaretDownIcon as CaretDown,
-  BookOpenIcon as BookOpen,
-  CheckIcon as Check,
-  BrainIcon as Brain,
-} from "@phosphor-icons/react";
+  Expand,
+  Icon,
+  BookOpenIcon,
+  Check,
+  Brain,
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAIMode, type AIMode } from "@/core/config/autoMode";
 import { useModes } from "@/features/models/hooks/useModes";
@@ -102,7 +103,7 @@ export function TierSelector({
   };
 
   return (
-    <div className="relative flex h-7 shrink-0 items-center" ref={containerRef}>
+    <div className="relative flex h-6 shrink-0 items-center" ref={containerRef}>
       {/* Trigger */}
       <Button
         variant="ghost"
@@ -141,7 +142,7 @@ export function TierSelector({
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="flex-shrink-0"
         >
-          <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
+          <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
         </motion.div>
       </Button>
 
@@ -196,7 +197,7 @@ export function TierSelector({
                           transition={{ duration: 0.15 }}
                           className="mt-0.5 flex-shrink-0"
                         >
-                          <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400" />
+                          <Check size="xs" className="text-gray-500 dark:text-gray-400" />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -216,7 +217,7 @@ export function TierSelector({
                 whileTap={{ scale: 0.98 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border"
               >
-                <BookOpen size={12} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
+                <Icon icon={BookOpenIcon} size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Browse all models
                 </span>
@@ -234,7 +235,7 @@ export function TierSelector({
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-surface-border"
                   >
                     <div className="w-5 h-5 rounded-md bg-gray-100 dark:bg-surface-raised flex items-center justify-center flex-shrink-0">
-                      <Brain size={12} weight="regular" className="text-gray-400 dark:text-gray-600" />
+                      <Brain size="xs" className="text-gray-400 dark:text-gray-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-tight">
@@ -249,7 +250,7 @@ export function TierSelector({
                       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                       className="flex-shrink-0"
                     >
-                      <CaretDown size={12} weight="bold" className="text-gray-400 dark:text-gray-600" />
+                      <Expand size="xs" className="text-gray-400 dark:text-gray-600" />
                     </motion.div>
                   </Button>
 

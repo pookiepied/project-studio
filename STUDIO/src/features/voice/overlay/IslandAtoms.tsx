@@ -7,9 +7,9 @@
 
 import { motion } from "framer-motion";
 import {
-  MicrophoneIcon as Microphone,
-  ChatCircleIcon as ChatCircle,
-} from "@phosphor-icons/react";
+  Microphone,
+  Message,
+} from "@/ui/icons";
 import { RecordingState } from "@/types";
 import type { IslandMode } from "@/core/platform/overlayService";
 import { Button } from "@/ui/primitives/Button";
@@ -173,11 +173,11 @@ export function IdleIcon({ mode }: { mode: IslandMode }) {
       className="flex items-center justify-center"
     >
       {mode === "voice" ? (
-        <ChatCircle size={14} weight="regular" className="text-gray-500 dark:text-gray-500" />
+        <Message size="sm" className="text-gray-500 dark:text-gray-500" />
       ) : mode === "global" || mode === "artifact" ? (
         <PulseMark size={14} />
       ) : (
-        <Microphone size={14} weight="regular" className="text-gray-500 dark:text-gray-500" />
+        <Microphone size="sm" className="text-gray-500 dark:text-gray-500" />
       )}
     </motion.div>
   );
@@ -211,8 +211,8 @@ export function ActionBtn({ icon, label, onClick }: ActionBtnProps) {
         hover:bg-gray-900/[0.08] dark:hover:bg-white/[0.10]
         text-gray-500 dark:text-gray-400
         transition-colors duration-100
+        no-drag-region
       "
-      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
     >
       {icon}
     </Button>

@@ -1,8 +1,4 @@
-import {
-  DesktopIcon as Desktop,
-  SunIcon as Sun,
-  MoonIcon as Moon,
-} from "@phosphor-icons/react";
+import { Monitor, Sun, Moon } from "@/ui/icons";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { ConditionalAutostart, ConditionalSystemTray } from "@/app/globals/ConditionalFeatures";
@@ -16,9 +12,9 @@ interface Props {
 }
 
 const themeOptions = [
-  { value: "system" as const, label: "System", icon: <Desktop size={14} weight="regular" /> },
-  { value: "light" as const,  label: "Light",  icon: <Sun size={14} weight="regular" /> },
-  { value: "dark" as const,   label: "Dark",   icon: <Moon size={14} weight="regular" /> },
+  { value: "system" as const, label: "System", icon: <Monitor size="sm" /> },
+  { value: "light" as const,  label: "Light",  icon: <Sun size="sm" /> },
+  { value: "dark" as const,   label: "Dark",   icon: <Moon size="sm" /> },
 ];
 
 export const InterfaceView = ({ updateSetting, onThemeChange }: Props) => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CaretDownIcon as CaretDown } from "@phosphor-icons/react";
+import { Expand } from "@/ui/icons";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { resolveTheme } from "@/lib/theme";
@@ -240,7 +240,7 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
           title="Choose project app"
           className="flex h-7 !w-5 items-center justify-center rounded-r-lg border-l border-gray-100 text-gray-400 transition-colors duration-100 hover:bg-gray-50 hover:text-gray-600 dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-gray-300"
         >
-          <CaretDown size={12} weight="bold" />
+          <Expand size="xs" />
         </IconButton>
       </div>
 

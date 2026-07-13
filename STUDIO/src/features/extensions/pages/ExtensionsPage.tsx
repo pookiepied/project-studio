@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { PlusIcon as Plus } from "@phosphor-icons/react";
-import { Warning, Close, Search, Manage, Refresh, Expand, Icon } from "@/ui/icons";
+import { PlusIcon as Plus } from "@/ui/icons";
+import { Warning, Close, Manage, Refresh, Expand, Icon } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Button } from "@/ui/primitives/Button";
+import { SearchInput } from "@/ui/primitives";
 import { useNavigation } from "@/app/contexts/NavigationContext";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useChat } from "@/features/chat/context";
@@ -135,18 +136,14 @@ export const ExtensionsPage = () => {
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-display font-normal text-primary">Apps</h1>
           <div className="flex items-center gap-1.5 ml-auto">
-            <div className="relative">
-              <Search size="xs" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-              <input
-                type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
-                className="w-36 pl-7 pr-6 py-1.5 text-xs bg-surface-raised border border-transparent rounded-full text-secondary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
-              />
-              {search && (
-                <IconButton variant="ghost" size="sm" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:bg-transparent">
-                  <Close size="xs" />
-                </IconButton>
-              )}
-            </div>
+            <SearchInput
+              value={search}
+              onValueChange={setSearch}
+              aria-label="Search apps"
+              placeholder="Search…"
+              size="sm"
+              className="w-36 rounded-full border-transparent bg-surface-raised text-secondary text-xs"
+            />
             <Button variant="ghost" onClick={() => setShowManagePanel(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium h-auto bg-surface-raised rounded-full flex-shrink-0"
               leftIcon={<Manage size="xs" />}>

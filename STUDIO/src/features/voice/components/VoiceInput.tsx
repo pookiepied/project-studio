@@ -1,4 +1,4 @@
-import { MicrophoneIcon as Microphone } from "@phosphor-icons/react";
+import { Microphone } from "@/ui/icons";
 import { useAudioRecorder } from "@/features/voice/hooks/useAudioRecorder";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { AudioWaveform } from "./AudioWaveform";
@@ -76,7 +76,7 @@ export function VoiceInput({ onTranscript, disabled = false }: VoiceInputProps) 
           />
         </span>
       ) : (
-        <Microphone size={14} weight="regular" />
+        <Microphone size="sm" />
       )}
     </IconButton>
   );

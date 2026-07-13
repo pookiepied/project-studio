@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { PlusIcon as Plus } from "@phosphor-icons/react";
+import { PlusIcon as Plus } from "@/ui/icons";
 import { Close, Icon } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";

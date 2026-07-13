@@ -6,10 +6,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  InfoIcon as Info,
-  XIcon as X,
-} from '@phosphor-icons/react';
+  Redo,
+  Info,
+  Close,
+} from '@/ui/icons';
 import { useDaemon } from '@/features/models/hooks/useLocalProviderDaemon';
 import { createDaemonClient } from '@/core/daemon/daemonClient';
 import { Button } from '@/ui/primitives/Button';
@@ -109,7 +109,7 @@ export const LocalProviderStatus = () => {
             disabled={isStarting}
             className="text-xs font-medium text-gray-400 hover:text-secondary transition-colors"
           >
-            {isStarting ? <ArrowClockwise size={14} className="animate-spin inline" /> : 'Start'}
+            {isStarting ? <Redo size="sm" className="animate-spin inline" /> : 'Start'}
           </Button>
         )}
 
@@ -121,7 +121,7 @@ export const LocalProviderStatus = () => {
               title="Bridge Details"
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
-              <Info size={14} weight="regular" />
+              <Info size="sm" />
             </IconButton>
 
             <AnimatePresence>
@@ -137,7 +137,7 @@ export const LocalProviderStatus = () => {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 tracking-wide">Providers</span>
                     <IconButton onClick={() => setIsExpanded(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
-                      <X size={14} weight="bold" />
+                      <Close size="sm" />
                     </IconButton>
                   </div>
 

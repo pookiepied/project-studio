@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
 import {
-  FolderOpenIcon as FolderOpen,
-  MinusCircleIcon as MinusCircle,
-  PlusIcon as Plus,
-  TrashIcon as Trash,
-} from "@phosphor-icons/react";
+  Add,
+  Delete,
+  FolderOpen,
+  Icon,
+  MinusCircleIcon,
+} from "@/ui/icons";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { projectRegistry } from "@/core/projects";
 import { useProjects } from "@/features/chat/hooks/useProjects";
@@ -34,7 +35,7 @@ export function ProjectsPage() {
             variant="outline"
             className="h-8 gap-2 px-3 text-xs font-medium border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-surface-border dark:text-gray-400 dark:hover:bg-surface-raised"
           >
-            <Plus size={14} weight="regular" />
+            <Add size="sm" weight="regular" />
             Open project
           </Button>
         </div>
@@ -48,7 +49,7 @@ export function ProjectsPage() {
               className="flex w-full max-w-sm flex-col items-center text-center"
             >
               <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-gray-200 text-gray-300 dark:border-surface-border dark:text-gray-700">
-                <FolderOpen size={18} weight="regular" />
+                <FolderOpen size="lg" weight="regular" />
               </div>
 
               <p className="text-base font-medium text-gray-700 transition-colors duration-300 dark:text-gray-300">
@@ -66,7 +67,7 @@ export function ProjectsPage() {
                 key={project.id}
                 className="group mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-surface-raised"
               >
-                <FolderOpen size={16} weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
+                <FolderOpen size="md" weight="regular" className="flex-shrink-0 text-gray-400 dark:text-gray-600" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-gray-900 dark:text-gray-300">{project.name}</p>
                   <p className="truncate text-xs text-gray-400 dark:text-gray-600">{project.path}</p>
@@ -80,14 +81,14 @@ export function ProjectsPage() {
                     onClick={() => { void removeProject(project.id); }}
                     className="h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
                   >
-                    <MinusCircle size={14} weight="bold" />
+                    <Icon icon={MinusCircleIcon} size="sm" />
                   </IconButton>
                   <IconButton
                     aria-label="Delete Studio's data for this project (your folder is untouched)"
                     onClick={() => { void deleteProject(project.id); }}
                     className="h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-surface-border"
                   >
-                    <Trash size={14} weight="bold" />
+                    <Delete size="sm" />
                   </IconButton>
                 </div>
               </div>

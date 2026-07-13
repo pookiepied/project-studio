@@ -2,8 +2,8 @@ import {
   BrainIcon as Brain,
   CpuIcon as Cpu,
   CloudCheckIcon as CloudCheck,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react";
+  type PhosphorIcon,
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Spinner } from "@/ui/primitives/Spinner";

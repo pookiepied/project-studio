@@ -4,7 +4,7 @@ import {
   WrenchIcon as Wrench,
   HardDrivesIcon as HardDrives,
   LeafIcon as Leaf,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { Icon } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { ProviderIcon, getProviderDisplayName } from "@/features/models/components/ProviderIcon";

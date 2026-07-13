@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { Command } from "cmdk";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MagnifyingGlassIcon as Search,
-  PlusIcon as Plus,
-  ChatCircleIcon as Chat,
-  ArrowRightIcon as ArrowRight,
-} from "@phosphor-icons/react";
+  Search,
+  Add,
+  Message,
+  Forward,
+} from "@/ui/icons";
 import { useCommandPalette } from "@/app/contexts/CommandPaletteContext";
 import { useNavigation } from "@/app/contexts/NavigationContext";
 import { useChat } from "@/features/chat/context";
@@ -56,12 +56,12 @@ export function CommandPalette() {
 
   const actions: ActionItem[] = useMemo(() => {
     const nav = (label: string, view: View, keywords = "") => ({
-      id: `go-${view}`, label, keywords, icon: <ArrowRight size={16} />,
+      id: `go-${view}`, label, keywords, icon: <Forward size="md" />,
       run: () => navigateTo(view),
     });
     return [
       { id: "new-chat", label: "New chat", keywords: "new conversation create start",
-        icon: <Plus size={16} weight="regular" />,
+        icon: <Add size="md" weight="regular" />,
         run: () => { createNewConversation(); navigateTo("chat"); } },
       nav("Go to Chat",       "chat",       "conversation"),
       nav("Open Live",        "voice",      "voice realtime talk"),
@@ -121,7 +121,7 @@ export function CommandPalette() {
               className="bg-surface-raised border border-surface-border rounded-xl shadow-xl overflow-hidden"
             >
               <div className="flex items-center gap-2 px-3 border-b border-surface-border">
-                <Search size={16} className="text-muted flex-shrink-0" />
+                <Search size="md" className="text-muted flex-shrink-0" />
                 <Command.Input
                   autoFocus
                   value={query}
@@ -154,7 +154,7 @@ export function CommandPalette() {
                     <div className={headingCls}>Conversations</div>
                     {filteredConversations.map(c => (
                       <Command.Item key={c.id} value={`conv-${c.id}`} onSelect={() => goConversation(c.id)} className={itemCls}>
-                        <Chat size={16} className="text-muted flex-shrink-0" />
+                        <Message size="md" className="text-muted flex-shrink-0" />
                         <span className="truncate">{c.title || "Untitled"}</span>
                       </Command.Item>
                     ))}
@@ -171,7 +171,7 @@ export function CommandPalette() {
                         onSelect={() => goConversation(h.conversationId)}
                         className={itemCls + " items-start"}
                       >
-                        <Search size={14} className="text-muted flex-shrink-0 mt-0.5" />
+                        <Search size="sm" className="text-muted flex-shrink-0 mt-0.5" />
                         <span className="flex flex-col min-w-0">
                           <span className="truncate text-secondary">{h.snippet}</span>
                           <span className="truncate text-xs text-muted">

@@ -1,4 +1,4 @@
-import { CloudIcon as Cloud } from "@phosphor-icons/react";
+import { CloudIcon as Cloud } from "@/ui/icons";
 import { Icon } from "@/ui/icons";
 import { Badge } from "@/ui/primitives/Badge";
 
@@ -53,5 +53,5 @@ export const GithubLetterIcon = ({ size = 16 }: { size?: number }) => (
 
 // ─── Shared form styling (tokenised) ────────────────────────────────────────────
 export const inputCls =
-  "w-full px-3.5 py-2.5 text-xs bg-surface-base border border-surface-border rounded-xl text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page";
+  "w-full px-3.5 py-2.5 text-xs bg-surface-base border border-surface-border rounded-xl text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ";
 export const labelCls = "text-2xs font-semibold text-muted uppercase tracking-widest";

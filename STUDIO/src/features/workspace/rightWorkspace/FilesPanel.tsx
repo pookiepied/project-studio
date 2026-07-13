@@ -1,19 +1,19 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
-  CaretRightIcon as CaretRight,
-  FileIcon as File,
-  FileTextIcon as FileText,
-  FolderIcon as Folder,
-  FolderOpenIcon as FolderOpen,
-  ArrowClockwiseIcon as Refresh,
-  CodeIcon as Code,
-  EyeIcon as Eye,
-  SpinnerGapIcon as SpinnerGap,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Icon,
+  FileIcon,
+  Folder,
+  FolderOpen,
+  Document,
+  Redo,
+  Code,
+  Eye,
+  Spinner,
+  Close,
+  Collapse,
+} from "@/ui/icons";
 import MarkdownDocumentPreview from "./MarkdownDocumentPreview";
-import "./filesPanel.css";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 
@@ -113,14 +113,14 @@ function FileTreeNode({
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         {entry.isDir ? (
-          <CaretRight size={12} weight="bold" className={`flex-shrink-0 text-muted transition-transform ${expanded ? "rotate-90" : ""}`} />
+          <Collapse size="xs" className={`flex-shrink-0 text-muted transition-transform ${expanded ? "rotate-90" : ""}`} />
         ) : (
           <span className="w-[11px] flex-shrink-0" />
         )}
         {entry.isDir ? (
-          expanded ? <FolderOpen size={14} weight="regular" className={`flex-shrink-0 ${iconClass}`} /> : <Folder size={14} weight="regular" className={`flex-shrink-0 ${iconClass}`} />
+          expanded ? <FolderOpen size="sm" className={`flex-shrink-0 ${iconClass}`} /> : <Folder size="sm" className={`flex-shrink-0 ${iconClass}`} />
         ) : (
-          <File size={14} weight="regular" className={`flex-shrink-0 ${iconClass}`} />
+          <Icon icon={FileIcon} size="sm" className={`flex-shrink-0 ${iconClass}`} />
         )}
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
         {loading && <span className="h-3 w-3 rounded-full border border-muted border-t-transparent animate-spin" />}
@@ -231,7 +231,7 @@ export function FilesPanel({
       <div className="flex h-full items-center justify-center px-8 text-center">
         <div className="max-w-[260px]">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-base text-muted">
-            <Folder size={18} />
+            <Folder size="lg" />
           </div>
           <p className="text-sm font-semibold text-primary">No local project open</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -245,7 +245,7 @@ export function FilesPanel({
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface-page">
       <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
-        <FolderOpen size={14} className="text-amber-500" />
+        <FolderOpen size="sm" className="text-amber-500" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary">{rootName}</span>
         <IconButton
           size="sm"
@@ -254,7 +254,7 @@ export function FilesPanel({
           title="Refresh files"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
         >
-          <Refresh size={14} className={loading ? "animate-spin" : ""} />
+          <Redo size="sm" className={loading ? "animate-spin" : ""} />
         </IconButton>
       </div>
       {error && (
@@ -281,7 +281,7 @@ export function FilesPanel({
           {!selectedPath && entries.length > 0 && (
             <div className="mx-auto mt-8 max-w-[420px] px-4 py-4 text-center">
               <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-surface-raised/70">
-                <FileText size={16} className="text-muted" />
+                <Document size="md" className="text-muted" />
               </div>
               <p className="text-sm font-medium text-primary">Choose a file to preview</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -295,7 +295,7 @@ export function FilesPanel({
             <>
               <div className="flex min-h-[48px] flex-shrink-0 items-center gap-3 border-b border-surface-divider px-4">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-surface-base">
-                  <FileText size={15} className={fileTone(selectedPath)} />
+                  <Document size="sm" className={fileTone(selectedPath)} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-primary" title={selectedPath}>{selectedRelativePath}</p>
@@ -313,7 +313,7 @@ export function FilesPanel({
                       viewMode === "preview" ? "bg-surface-selected text-primary" : "text-muted hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
                     }`}
                   >
-                    <Eye size={14} />
+                    <Eye size="sm" />
                   </IconButton>
                   <IconButton
                     size="sm"
@@ -324,7 +324,7 @@ export function FilesPanel({
                       viewMode === "raw" ? "bg-surface-selected text-primary" : "text-muted hover:text-primary"
                     }`}
                   >
-                    <Code size={14} />
+                    <Code size="sm" />
                   </IconButton>
                 </div>
                 <IconButton
@@ -334,12 +334,12 @@ export function FilesPanel({
                   title="Close file"
                   className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-hover hover:text-primary"
                 >
-                  <X size={14} />
+                  <Close size="sm" />
                 </IconButton>
               </div>
               {fileLoading ? (
                 <div className="flex flex-1 items-center justify-center text-xs text-muted">
-                  <SpinnerGap size={15} className="mr-2 animate-spin" />
+                  <Spinner size="sm" className="mr-2 animate-spin" />
                   Opening file
                 </div>
               ) : fileError ? (
@@ -354,7 +354,7 @@ export function FilesPanel({
                 </div>
               ) : (
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-muted"><SpinnerGap size={15} className="mr-2 animate-spin" />Loading editor</div>}>
+                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-muted"><Spinner size="sm" className="mr-2 animate-spin" />Loading editor</div>}>
                     <MonacoSourceView content={fileContent} path={selectedPath} />
                   </Suspense>
                 </div>
@@ -364,7 +364,7 @@ export function FilesPanel({
             <div className="flex h-full items-center justify-center px-8 text-center">
               <div className="max-w-[240px]">
                 <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-base text-muted">
-                  <FileText size={17} />
+                  <Document size="md" />
                 </div>
                 <p className="text-sm font-medium text-primary">Select a file</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted">Open project files here without leaving the chat workspace.</p>

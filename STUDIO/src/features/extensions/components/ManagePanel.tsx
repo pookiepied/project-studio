@@ -7,7 +7,7 @@ import {
   PlayIcon as Play,
   StopIcon as Stop,
   TerminalIcon as Terminal,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { motion } from "framer-motion";
 import { Back, Delete, Icon } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";

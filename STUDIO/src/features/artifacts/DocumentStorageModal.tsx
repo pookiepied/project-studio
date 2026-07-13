@@ -1,10 +1,11 @@
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FilesIcon as Files,
-  CloudArrowUpIcon as CloudUp,
-  ClockIcon as Clock,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Files,
+  Clock,
+  Close,
+  Icon,
+  CloudArrowUpIcon,
+} from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 
@@ -68,7 +69,7 @@ export function DocumentStorageModal({
             <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-surface-selected flex items-center justify-center flex-shrink-0">
-                  <Files size={16} weight="duotone" className="text-gray-500 dark:text-gray-400" />
+                  <Files size="md" className="text-gray-500 dark:text-gray-400" />
                 </div>
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -85,7 +86,7 @@ export function DocumentStorageModal({
                   onClick={onCancel}
                   className="p-1.5 !h-auto !w-auto rounded-lg !text-gray-400 hover:!text-gray-600 dark:hover:!text-gray-400 hover:!bg-gray-100 dark:hover:!bg-surface-selected transition-colors flex-shrink-0"
                 >
-                  <X size={14} />
+                  <Close size="sm" />
                 </IconButton>
               )}
             </div>
@@ -102,7 +103,7 @@ export function DocumentStorageModal({
                 className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-gray-50 dark:hover:!bg-surface-selected hover:!border-gray-200 dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
-                  <CloudUp size={16} weight="duotone" className="text-secondary dark:text-secondary" />
+                  <Icon icon={CloudArrowUpIcon} size="md" className="text-secondary dark:text-secondary" />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">Keep forever</div>
@@ -120,7 +121,7 @@ export function DocumentStorageModal({
                 className="w-full !h-auto flex items-center !gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:!bg-gray-50 dark:hover:!bg-surface-selected hover:!border-gray-200 dark:hover:!border-surface-border transition-all text-left disabled:opacity-50"
               >
                 <div className="w-8 h-8 rounded-lg bg-surface-raised dark:bg-surface-raised/30 flex items-center justify-center flex-shrink-0">
-                  <Clock size={16} weight="duotone" className="text-secondary dark:text-secondary" />
+                  <Clock size="md" className="text-secondary dark:text-secondary" />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-gray-800 dark:text-gray-200">Just for today</div>

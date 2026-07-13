@@ -1,4 +1,4 @@
-import { MagnifyingGlassIcon as Search } from "@phosphor-icons/react";
+import { Search } from "@/ui/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCommandPalette } from "@/app/contexts/CommandPaletteContext";
 import { logger } from "@/core/logging/logger";
@@ -69,7 +69,7 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
         aria-label="Search or jump to (Ctrl+K)"
         className="absolute left-1/2 -translate-x-1/2 h-6 w-[430px] max-w-[50vw] gap-1.5 rounded-full bg-gray-900/[0.04] px-3 text-gray-400 hover:bg-gray-900/[0.07] dark:bg-white/[0.04] dark:text-gray-500 dark:hover:bg-white/[0.07]"
       >
-        <Search size={14} className="flex-shrink-0" />
+        <Search size="sm" className="flex-shrink-0" />
         <span className="flex-1 truncate text-left text-xs">Search or jump to...</span>
         <kbd className="flex items-center gap-0.5 rounded border border-gray-300/60 px-1.5 py-0.5 font-sans text-3xs dark:border-white/10">
           <CommandIcon size={12} />
@@ -94,7 +94,7 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
       </div>
 
       <div className="flex items-center gap-1">
-        <NotificationBell align="right" size={14} />
+        <NotificationBell align="right" size="sm" />
 
         {showWindowControls && (
           <div className="flex items-center" style={{ gap: 8 }}>
@@ -110,12 +110,11 @@ export const TitleBar = ({ onToggle, navOpen = false }: TitleBarProps) => {
                 key={label}
                 onClick={action}
                 aria-label={label}
-                className="rounded-full transition-opacity hover:opacity-80 active:opacity-60"
+                className="rounded-full ring-1 ring-black/5 transition-opacity hover:opacity-80 active:opacity-60"
                 style={{
                   width: 12,
                   height: 12,
                   backgroundColor: color,
-                  boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.18)",
                 }}
               >
                 {null}

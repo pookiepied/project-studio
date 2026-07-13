@@ -6,7 +6,7 @@
  *   "full"     — full-width trigger button (settings page)
  */
 import { useState, useRef, useEffect, useMemo } from "react";
-import { CaretDownIcon as CaretDown, CheckIcon as Check, EyeIcon as Eye, LeafIcon as Leaf } from "@phosphor-icons/react";
+import { Expand, Check, Eye, Eco } from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   groupModelsByProvider,
@@ -22,6 +22,7 @@ import {
 import { isVisionModel } from "@/lib/modelUtils";
 import { ProviderIcon, getProviderDisplayName } from "./ProviderIcon";
 import { Button } from "@/ui/primitives/Button";
+import { SearchInput } from "@/ui/primitives";
 import { AI_MODES } from "@/core/config/autoMode";
 
 export interface ModelPickerProps {
@@ -147,13 +148,12 @@ export function ModelPicker({
           disabled={disabled}
           className="flex items-center gap-1 px-2 h-6 rounded-md hover:bg-gray-100 dark:hover:bg-surface-raised transition-smooth disabled:opacity-40"
         >
-          {isAutoSelected && <Leaf size={12} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />}
+          {isAutoSelected && <Eco size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />}
           <span className="text-xs text-gray-500 dark:text-gray-400 max-w-[150px] truncate transition-colors duration-300">
             {triggerText}
           </span>
-          <CaretDown
-            size={12}
-            weight="bold"
+          <Expand
+            size="xs"
             className={`text-gray-400 dark:text-gray-600 flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </Button>
@@ -162,15 +162,14 @@ export function ModelPicker({
           variant="ghost"
           onClick={() => open(!isOpen)}
           disabled={disabled}
-          className="w-full px-3 py-1.5 text-sm text-left bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-md hover:bg-gray-50 dark:hover:bg-surface-raised transition-smooth focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 flex items-center justify-between disabled:opacity-50"
+          className="w-full px-3 py-1.5 text-sm text-left bg-white dark:bg-surface-base border border-gray-200 dark:border-surface-border rounded-md hover:bg-gray-50 dark:hover:bg-surface-raised transition-smooth focus-visible:ring-2 focus-visible:ring-focus flex items-center justify-between disabled:opacity-50"
         >
           <span className="flex items-center gap-1.5 text-gray-900 dark:text-gray-200 font-normal truncate transition-colors duration-300">
-            {isAutoSelected && <Leaf size={14} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />}
+            {isAutoSelected && <Eco size="sm" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />}
             {triggerText}
           </span>
-          <CaretDown
-            size={14}
-            weight="bold"
+          <Expand
+            size="sm"
             className={`text-gray-400 dark:text-gray-600 flex-shrink-0 ml-2 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </Button>
@@ -193,13 +192,14 @@ export function ModelPicker({
 
             {/* Search */}
             <div className="px-3 pt-2.5 pb-2 border-b border-gray-100 dark:border-surface-border">
-              <input
+              <SearchInput
                 ref={searchRef}
-                type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onValueChange={setSearch}
+                aria-label="Search models"
                 placeholder="Search…"
-                className="w-full text-xs bg-transparent outline-none text-gray-700 dark:text-gray-300 placeholder-gray-300 dark:placeholder-gray-600 transition-colors duration-300"
+                size="sm"
+                className="border-transparent bg-transparent text-xs"
               />
             </div>
 
@@ -216,13 +216,13 @@ export function ModelPicker({
                       isAutoSelected ? "bg-gray-50 dark:bg-surface-raised" : "hover:bg-gray-50 dark:hover:bg-surface-raised"
                     }`}
                   >
-                    <Leaf size={12} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0 mr-2" />
+                    <Eco size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0 mr-2" />
                     <span className={`flex-1 min-w-0 text-sm truncate transition-colors duration-300 ${isAutoSelected ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300"}`}>
                       {autoMode.label}
                     </span>
                     <div className="flex items-center flex-shrink-0 ml-2">
                       {isAutoSelected && (
-                        <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400" />
+                        <Check size="xs" className="text-gray-500 dark:text-gray-400" />
                       )}
                     </div>
                   </Button>
@@ -282,7 +282,7 @@ export function ModelPicker({
                           {/* Icons — packed together, always at the right edge */}
                           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                             {hasVision && (
-                              <Eye size={12} weight="regular" className="text-gray-300 dark:text-gray-600" />
+                              <Eye size="xs" className="text-gray-300 dark:text-gray-600" />
                             )}
                             {isFree && model.provider !== "local" && (
                               <span className="w-1 h-1 rounded-full bg-surface-raised flex-shrink-0" />
@@ -291,7 +291,7 @@ export function ModelPicker({
                               <span className="text-3xs text-gray-300 dark:text-gray-600">L</span>
                             )}
                             {isSelected && (
-                              <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400 transition-colors duration-300" />
+                              <Check size="xs" className="text-gray-500 dark:text-gray-400 transition-colors duration-300" />
                             )}
                           </div>
                         </Button>

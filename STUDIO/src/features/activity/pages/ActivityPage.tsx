@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChartLineUp, TerminalWindow, Robot } from "@phosphor-icons/react";
+import { ChartLineUp, TerminalWindow, Robot } from "@/ui/icons";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -13,6 +13,7 @@ import { useSettings } from "@/app/contexts/SettingsContext";
 import { isResolvedDark } from "@/lib/theme";
 import { logger } from "@/core/logging/logger";
 import { prefetchProfiles } from "@/core/network/userProfileCache";
+import { LOG_GRID_TEMPLATE } from "@/design/constants";
 
 import type {
   SystemStatus, AuthHealth, SummaryData, UsageRow, LogEntry,
@@ -502,7 +503,7 @@ export const ActivityPage = () => {
               </div>
               <div
                 className="grid items-center gap-x-2 px-3 py-1 mb-0.5"
-                style={{ gridTemplateColumns: "20px minmax(0, 1fr) minmax(0, 1fr) 80px 70px 14px" }}
+                style={{ gridTemplateColumns: LOG_GRID_TEMPLATE }}
               >
                 <span />
                 <span className="text-2xs text-muted uppercase tracking-wider">Time / Provider</span>

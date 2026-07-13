@@ -5,7 +5,7 @@
  * brand-logo carve-out and are kept. Card chrome, status, and toggles are
  * strict-neutral (D-401).
  */
-import { PlusIcon as Plus } from "@phosphor-icons/react";
+import { PlusIcon as Plus } from "@/ui/icons";
 import { Success, Icon } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";
 import { Toggle } from "@/ui/primitives/Toggle";

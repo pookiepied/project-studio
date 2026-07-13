@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BellIcon as Bell } from "@phosphor-icons/react";
+import { Bell, type IconSize } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { useNotifications } from "@/app/hooks/useNotifications";
@@ -119,7 +119,7 @@ function NotificationPanel({
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface-hover">
-            <Bell size={20} className="text-muted" />
+            <Bell size="lg" className="text-muted" />
           </div>
           <p className="mb-1 text-sm font-semibold text-secondary">
             You're all caught up!
@@ -143,14 +143,14 @@ function NotificationPanel({
 
 /**
  * @param align  which edge the dropdown aligns to (default "right")
- * @param size   bell icon size in px (default 14)
+ * @param size   bell icon size keyword (default "sm")
  */
 export function NotificationBell({
   align = "right",
-  size = 14,
+  size = "sm",
 }: {
   align?: "left" | "right";
-  size?: number;
+  size?: IconSize;
 }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);

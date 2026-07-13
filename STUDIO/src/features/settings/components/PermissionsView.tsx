@@ -3,8 +3,8 @@ import {
   HardDrivesIcon as HardDrives,
   FolderIcon as Folder,
   WrenchIcon as Wrench,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react";
+  type PhosphorIcon,
+} from "@/ui/icons";
 import { Icon } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import {

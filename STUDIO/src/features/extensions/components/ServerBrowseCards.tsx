@@ -6,7 +6,7 @@
  * Card chrome, status, and controls are strict-neutral (D-401); the bundled
  * server marks are monochrome (no brand colour).
  */
-import { PlayIcon as Play, StopIcon as Stop } from "@phosphor-icons/react";
+import { PlayIcon as Play, StopIcon as Stop } from "@/ui/icons";
 import { Icon } from "@/ui/icons";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { Button } from "@/ui/primitives/Button";

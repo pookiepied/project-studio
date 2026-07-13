@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowSquareOutIcon as ArrowSquareOut, GlobeIcon as Globe, ArrowUpRightIcon as ArrowUpRight } from "@phosphor-icons/react";
+import { ExternalLink as ExternalLinkIcon, Globe, Icon, ArrowUpRightIcon } from "@/ui/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { environmentService } from "@/core/platform/environmentService";
 import { Button } from "@/ui/primitives/Button";
@@ -103,7 +103,7 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
         title={href}
       >
         {children}
-        <ArrowSquareOut size={12} className="inline opacity-50 ml-0.5" />
+        <ExternalLinkIcon size="xs" className="inline opacity-50 ml-0.5" />
       </a>
 
       {showPopover && createPortal(
@@ -121,7 +121,7 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
               transformOrigin: "top left",
             }}
           >
-            <Globe size={14} className="text-muted flex-shrink-0" />
+            <Globe size="sm" className="text-muted flex-shrink-0" />
             <span className="text-xs text-muted font-mono max-w-[180px] truncate">
               {displayUrl}
             </span>
@@ -131,7 +131,7 @@ const ExternalLink = ({ href, children }: ExternalLinkProps) => {
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap"
             >
               Open
-              <ArrowUpRight size={12} weight="regular" />
+              <Icon icon={ArrowUpRightIcon} size="xs" />
             </Button>
           </motion.div>
         </AnimatePresence>,

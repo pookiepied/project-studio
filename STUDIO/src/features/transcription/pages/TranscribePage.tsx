@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MicrophoneIcon as Microphone } from "@phosphor-icons/react";
+import { MicrophoneIcon as Microphone } from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioWaveform } from "@/features/voice/components/AudioWaveform";
 import { Send, Copy, Success, Refresh, Icon } from "@/ui/icons";
@@ -134,7 +134,7 @@ export const TranscribePage = () => {
       <div className="h-full flex flex-col bg-surface-page transition-colors duration-normal overflow-hidden">
 
         <div className="flex-shrink-0 px-6 pt-6 pb-1">
-          <h1 className="text-2xs font-medium tracking-[0.2em] text-muted uppercase">
+          <h1 className="text-xl font-display font-normal text-primary">
             Transcribe
           </h1>
         </div>

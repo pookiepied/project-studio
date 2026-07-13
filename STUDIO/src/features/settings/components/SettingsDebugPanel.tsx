@@ -4,12 +4,15 @@ import {
   FlaskIcon as Flask,
   FileArrowDownIcon as FileArrowDown,
   DownloadIcon as Download,
-  WifiHighIcon as WifiHigh,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react";
+  Icon,
+  Refresh,
+  Warning,
+  Close,
+  Wifi,
+  type PhosphorIcon,
+} from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Button } from "@/ui/primitives/Button";
-import { Icon, Refresh, Warning, Close } from "@/ui/icons";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { configService } from "@/core/storage/configService";
 import { comprehensiveDiagnostics, type DiagnosticTest, type DiagnosticReport } from "@/core/errors/comprehensiveDiagnostics";
@@ -393,7 +396,7 @@ export const SettingsDebugPanel = () => {
 
           {!apiHealth && !apiHealthError && (
             <div className="flex items-center gap-1.5 text-3xs text-muted">
-              <WifiHigh size={12} className="text-disabled" />
+              <Wifi size="xs" className="text-disabled" />
               <span>Checking…</span>
             </div>
           )}

@@ -1,9 +1,10 @@
 import React, { useRef } from "react";
 import {
-  XIcon as X,
-  CodeIcon as Code,
-  FileTextIcon as FileText,
-} from "@phosphor-icons/react";
+  Close,
+  Code,
+  Document,
+  type IconSize,
+} from "@/ui/icons";
 import type { ArtifactTab } from "@/app/hooks/useArtifactPanel";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -25,10 +26,10 @@ interface ArtifactPanelProps {
 
 // ---------------------------------------------------------------------------
 
-function tabIcon(tab: ArtifactTab, size = 11) {
+function tabIcon(tab: ArtifactTab, size: IconSize = "xs") {
   switch (tab.type) {
-    case "code":     return <Code     size={size} weight="regular" />;
-    case "document": return <FileText size={size} weight="regular" />;
+    case "code":     return <Code     size={size} />;
+    case "document": return <Document size={size} />;
   }
 }
 
@@ -87,12 +88,12 @@ export function ArtifactPanel({
             onClick={onClose}
             className="flex !h-7 !w-7 flex-shrink-0 items-center justify-center rounded-lg !text-gray-400 transition-colors duration-150 hover:!bg-gray-100 hover:!text-gray-700 dark:!text-gray-600 dark:hover:!bg-surface-raised dark:hover:!text-gray-300"
           >
-            <X size={14} weight="bold" />
+            <Close size="sm" />
           </IconButton>
 
           {/* Active tab icon + label */}
           <div className="flex items-center gap-1.5 min-w-0 text-gray-400 dark:text-gray-600">
-            {activeTab && tabIcon(activeTab, 11)}
+            {activeTab && tabIcon(activeTab, "xs")}
             <span className="text-xs text-gray-500 dark:text-gray-500 truncate">
               {activeTab?.label ?? "Artifacts"}
             </span>
@@ -114,7 +115,7 @@ export function ArtifactPanel({
                         : "!text-gray-400 dark:!text-gray-600 hover:!text-gray-600 dark:hover:!text-gray-400"
                       }`}
                   >
-                    <span className="flex-shrink-0">{tabIcon(tab, 9)}</span>
+                    <span className="flex-shrink-0">{tabIcon(tab, "xs")}</span>
                     <span className="truncate max-w-[80px]">{tab.label}</span>
                     <span
                       role="button"
@@ -123,7 +124,7 @@ export function ArtifactPanel({
                                  opacity-0 group-hover/tab:opacity-100 transition-opacity duration-100
                                  hover:bg-gray-200 dark:hover:bg-surface-border"
                     >
-                      <X size={12} weight="bold" />
+                      <Close size="xs" />
                     </span>
                   </Button>
                 );

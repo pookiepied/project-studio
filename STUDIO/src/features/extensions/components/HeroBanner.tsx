@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChatCircleIcon as ChatCircle } from "@phosphor-icons/react";
+import { Message } from "@/ui/icons";
 import { AppLogo } from "@/ui/brand";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import type { ComposioApp } from "@/features/extensions/services/composioService";
+import { HERO_GRADIENT } from "@/design/constants";
 import { GithubLetterIcon } from "./ExtensionIcons";
 
 // NOTE: The hero gradient + the rotating brand-coloured prompt card are an
@@ -18,8 +19,7 @@ const HERO_EXAMPLES = [
   { appName: "Browser",  appId: "",               prompt: "Open LinkedIn and find my latest job applications",  iconColor: "#2563EB", iconBg: "#eff6ff", iconLetter: "B" },
   { appName: "Calendar", appId: "googlecalendar", prompt: "Schedule a team sync for next Tuesday",             iconColor: "#0F9D58", iconBg: "#f0fdf4", iconLetter: "C" },
 ];
-// Decorative hero gradient — same D-408 marketing carve-out (used in the style prop below).
-const HERO_GRADIENT = "linear-gradient(135deg, #ede9fe 0%, #dbeafe 55%, #bae6fd 100%)";
+// HERO_GRADIENT is imported from @/design/constants (D-408 marketing carve-out).
 /* eslint-enable no-restricted-syntax */
 
 interface HeroBannerProps {
@@ -84,7 +84,7 @@ export const HeroBanner = ({ onTryInChat, composioApps }: HeroBannerProps) => {
           variant="ghost"
           onClick={onTryInChat}
           className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-surface-hover hover:bg-gray-50 dark:hover:bg-surface-border text-gray-800 dark:text-gray-200 text-sm font-semibold rounded-full shadow-sm transition-all hover:shadow-md border border-gray-150 dark:border-surface-active"
-          leftIcon={<ChatCircle size={14} weight="fill" className="text-gray-600 dark:text-gray-400" />}
+          leftIcon={<Message size="sm" weight="fill" className="text-gray-600 dark:text-gray-400" />}
         >
           Try in chat
         </Button>

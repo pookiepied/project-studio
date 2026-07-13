@@ -1,7 +1,7 @@
 import {
   PlusIcon as Plus,
   UserCircleIcon as UserCircle,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Back, Refresh, Delete, Success, Warning, Icon } from "@/ui/icons";
 import { Input } from "@/ui/primitives/Input";

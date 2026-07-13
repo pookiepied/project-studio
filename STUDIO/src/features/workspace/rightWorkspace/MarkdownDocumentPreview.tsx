@@ -2,6 +2,7 @@ import { memo, type ComponentPropsWithoutRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import "./filesPanel.css";
 
 function resolveLocalImage(source: string | undefined, documentPath: string) {
   if (!source || /^(?:https?:|data:|blob:|\/\/|#)/i.test(source)) return source;

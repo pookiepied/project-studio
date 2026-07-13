@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@/ui/primitives/Button";
 
-/** Filter toggle chip. Active = sanctioned inverted-emphasis (bg-primary, #1A1A1A). */
+/** Filter toggle chip. Active = sanctioned inverted-emphasis (bg-primary, var(--text-primary)). */
 export function FilterButton({
   active,
   children,

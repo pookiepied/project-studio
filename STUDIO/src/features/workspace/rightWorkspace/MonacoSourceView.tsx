@@ -58,7 +58,7 @@ export default function MonacoSourceView({ content, path }: { content: string; p
         renderLineHighlight: "line",
         scrollBeyondLastLine: false,
         smoothScrolling: true,
-        fontFamily: "'Cascadia Code Variable', 'Cascadia Code', monospace",
+        fontFamily: "var(--font-mono)",
         fontSize: 12,
         lineHeight: 20,
         padding: { top: 12, bottom: 12 },

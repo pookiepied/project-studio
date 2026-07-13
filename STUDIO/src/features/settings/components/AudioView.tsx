@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Select } from "@/ui/primitives/Select";
+import { Slider } from "@/ui/primitives/Slider";
 import { Toggle } from "@/ui/primitives/Toggle";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { logger } from "@/core/logging/logger";
@@ -64,20 +65,20 @@ export const AudioView = ({ updateSetting }: Props) => {
           description="Lower = more sensitive — scroll or drag to adjust"
           control={
             <div className="w-full sm:w-64 flex items-center gap-3">
-              <input
-                type="range"
-                min="0"
-                max="255"
-                step="1"
-                value={settings.vadSilenceThreshold}
-                onChange={(e) => updateSetting("vadSilenceThreshold", parseInt(e.target.value))}
-                onWheel={(e) => {
-                  e.preventDefault();
-                  const delta = e.deltaY < 0 ? 1 : -1;
-                  updateSetting("vadSilenceThreshold", Math.max(0, Math.min(255, settings.vadSilenceThreshold + delta)));
-                }}
-                className="flex-1 h-1.5 bg-surface-raised rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-secondary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:motion-safe:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
-              />
+              <div className="flex-1 min-w-0">
+                <Slider
+                  min={0}
+                  max={255}
+                  step={1}
+                  value={settings.vadSilenceThreshold}
+                  onChange={(e) => updateSetting("vadSilenceThreshold", parseInt(e.target.value))}
+                  onWheel={(e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY < 0 ? 1 : -1;
+                    updateSetting("vadSilenceThreshold", Math.max(0, Math.min(255, settings.vadSilenceThreshold + delta)));
+                  }}
+                />
+              </div>
               <span className="text-xs text-muted w-8 text-right tabular-nums">
                 {settings.vadSilenceThreshold}
               </span>

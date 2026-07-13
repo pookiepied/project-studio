@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CopyIcon as Copy, CheckIcon as Check } from "@phosphor-icons/react";
+import { Copy, Check } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 
 interface DocumentViewProps {
@@ -25,8 +25,8 @@ export function DocumentView({ content }: DocumentViewProps) {
         className="absolute top-3 right-3 z-10 flex items-center !gap-1.5 !px-2 !h-6 !rounded !text-2xs font-medium !bg-gray-100/80 dark:!bg-surface-raised/80 border !border-gray-200/60 dark:!border-surface-border/60 !text-gray-500 dark:!text-gray-400 hover:!text-gray-700 dark:hover:!text-gray-200 backdrop-blur-sm transition-colors !duration-100"
       >
         {copied
-          ? <><Check size={12} weight="bold" className="text-secondary" /> Copied</>
-          : <><Copy size={12} weight="regular" /> Copy</>
+          ? <><Check size="xs" className="text-secondary" /> Copied</>
+          : <><Copy size="xs" /> Copy</>
         }
       </Button>
 

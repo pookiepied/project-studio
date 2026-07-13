@@ -1,18 +1,20 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  ChatCircleTextIcon as ChatCircleText,
-  FilesIcon as Files,
-  GitBranchIcon as GitBranch,
-  GlobeIcon as Globe,
-  PlusIcon as Plus,
-  TerminalIcon as Terminal,
-  XIcon as X,
-  CaretLeftIcon as CaretLeft,
-  CaretRightIcon as CaretRight,
-  ListIcon as List,
-} from "@phosphor-icons/react";
+  Icon,
+  Add,
+  Close,
+  Collapse,
+  Conversation,
+  Files,
+  GitBranchIcon,
+  CaretLeftIcon,
+  Globe,
+  List,
+  Terminal,
+} from "@/ui/icons";
 import { setRightPanelWidth } from "@/app/shell/workspaceLayoutStore";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -37,6 +39,13 @@ import type {
   WorkspaceTabState,
   WorkspaceTabType,
 } from "./types";
+
+// GitBranch has no barrel concept yet — wrap the raw glyph via the `<Icon>`
+// escape-hatch so it obeys the same size scale + resting weight as concepts.
+const GitBranch = forwardRef<SVGSVGElement, ComponentPropsWithoutRef<typeof Close>>(
+  (props, ref) => <Icon ref={ref} icon={GitBranchIcon} {...props} />,
+);
+GitBranch.displayName = "GitBranch";
 
 interface RightWorkspacePanelProps {
   open: boolean;
@@ -70,14 +79,14 @@ const WORKSPACE_TYPES: Array<{ type: WorkspaceTabType; label: string; descriptio
   { type: "browser", label: "Browser", description: "Web pages and live previews", Icon: Globe },
   { type: "terminal", label: "Terminal", description: "Run a shell in your project", Icon: Terminal },
   { type: "files", label: "Files", description: "Browse and open project files", Icon: Files },
-  { type: "side-chat", label: "Side chat", description: "A second conversation alongside chat", Icon: ChatCircleText },
+  { type: "side-chat", label: "Side chat", description: "A second conversation alongside chat", Icon: Conversation },
 ];
 
 function iconFor(type: WorkspaceTabType) {
   if (type === "review") return GitBranch;
   if (type === "terminal") return Terminal;
   if (type === "files") return Files;
-  if (type === "side-chat") return ChatCircleText;
+  if (type === "side-chat") return Conversation;
   return Globe;
 }
 
@@ -123,7 +132,7 @@ function WorkspaceCreateMenu({
       tabIndex={-1}
       role="menu"
       style={{ top: position.top, right: position.right }}
-      className="fixed z-popover w-64 overflow-hidden rounded-xl border border-surface-border/80 bg-surface-base p-1.5 shadow-xl dark:shadow-[0_18px_44px_rgba(0,0,0,0.45)]"
+      className="fixed z-popover w-64 overflow-hidden rounded-xl border border-surface-border/80 bg-surface-base p-1.5 shadow-xl"
     >
       {WORKSPACE_TYPES.map(({ type, label, description, Icon }, itemIndex) => (
         <Button
@@ -135,7 +144,7 @@ function WorkspaceCreateMenu({
             index === itemIndex ? "bg-surface-hover" : ""
           }`}
         >
-          <Icon size={14} className="flex-shrink-0 text-muted" />
+          <Icon size="sm" className="flex-shrink-0 text-muted" />
           <span className="min-w-0 flex-1">
             <span className="block text-xs font-medium text-primary">{label}</span>
             <span className="block truncate text-2xs text-muted">{description}</span>
@@ -197,8 +206,8 @@ function WorkspaceHeader({
 
   return (
     <div className="flex h-10 flex-shrink-0 items-center border-b border-surface-divider bg-surface-page px-1.5">
-      <IconButton aria-label="Previous tab" variant="ghost" size="sm" onClick={() => moveTab(-1)} disabled={tabs.length < 2} className="flex-shrink-0 text-muted disabled:opacity-25"><CaretLeft size={14} /></IconButton>
-      <IconButton aria-label="Next tab" variant="ghost" size="sm" onClick={() => moveTab(1)} disabled={tabs.length < 2} className="flex-shrink-0 text-muted disabled:opacity-25"><CaretRight size={14} /></IconButton>
+      <IconButton aria-label="Previous tab" variant="ghost" size="sm" onClick={() => moveTab(-1)} disabled={tabs.length < 2} className="flex-shrink-0 text-muted disabled:opacity-25"><Icon icon={CaretLeftIcon} size="sm" /></IconButton>
+      <IconButton aria-label="Next tab" variant="ghost" size="sm" onClick={() => moveTab(1)} disabled={tabs.length < 2} className="flex-shrink-0 text-muted disabled:opacity-25"><Collapse size="sm" /></IconButton>
       <div ref={tabStripRef} role="tablist" className="scrollbar-hide min-w-0 flex-1 overflow-x-auto overflow-y-hidden" onWheel={(event) => {
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) event.currentTarget.scrollLeft += event.deltaY;
       }}>
@@ -237,7 +246,7 @@ function WorkspaceHeader({
                   }}
                   className="flex min-w-0 flex-1 items-center gap-1.5 justify-start px-0 py-0 h-auto w-full rounded-none text-xs outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus hover:bg-transparent"
                 >
-                  <Icon size={14} className="flex-shrink-0 text-muted" />
+                  <Icon size="sm" className="flex-shrink-0 text-muted" />
                   <span className="min-w-0 flex-1 truncate">{tab.title}</span>
                 </Button>
                 <IconButton
@@ -246,7 +255,7 @@ function WorkspaceHeader({
                   onClick={() => onCloseTab(tab.id)}
                   className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded transition-opacity hover:bg-surface-border focus-visible:opacity-100 ${active ? "opacity-60" : "opacity-0 group-hover/tab:opacity-60"}`}
                 >
-                  <X size={12} weight="bold" />
+                  <Close size="xs" />
                 </IconButton>
               </motion.div>
             );
@@ -266,14 +275,14 @@ function WorkspaceHeader({
           setMenuOpen(false);
         }}
         className="flex-shrink-0 text-muted"
-      ><List size={14} /></IconButton>
+      ><List size="sm" /></IconButton>
       {createPortal(
         <AnimatePresence>
           {tabListOpen && (
             <motion.div role="menu" tabIndex={-1} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} style={{ top: tabListPosition.top, right: tabListPosition.right }} className="fixed z-popover max-h-72 w-64 overflow-y-auto rounded-lg border border-surface-border bg-surface-base p-1 shadow-xl scrollbar-auto-hide">
               {tabs.map((tab) => {
                 const Icon = iconFor(tab.type);
-                return <Button key={tab.id} variant="ghost" role="menuitem" onClick={() => { onActivateTab(tab.id); setTabListOpen(false); }} className={`flex h-8 w-full items-center justify-start gap-2 rounded-md px-2 text-left text-xs ${tab.id === activeTabId ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover"}`}><Icon size={14} /><span className="min-w-0 flex-1 truncate">{tab.title}</span></Button>;
+                return <Button key={tab.id} variant="ghost" role="menuitem" onClick={() => { onActivateTab(tab.id); setTabListOpen(false); }} className={`flex h-8 w-full items-center justify-start gap-2 rounded-md px-2 text-left text-xs ${tab.id === activeTabId ? "bg-surface-selected text-primary" : "text-secondary hover:bg-surface-hover"}`}><Icon size="sm" /><span className="min-w-0 flex-1 truncate">{tab.title}</span></Button>;
               })}
             </motion.div>
           )}
@@ -291,7 +300,7 @@ function WorkspaceHeader({
           }}
           className="text-muted"
         >
-          <Plus size={14} weight="bold" />
+          <Add size="sm" />
         </IconButton>
         {createPortal(
           <AnimatePresence>
@@ -316,7 +325,7 @@ function WorkspaceHeader({
         onClick={onClose}
         className="flex-shrink-0 text-muted"
       >
-        <X size={14} weight="bold" />
+        <Close size="sm" />
       </IconButton>
     </div>
   );
@@ -350,7 +359,7 @@ function WorkspaceLauncher({ onCreateTab }: { onCreateTab: (type: WorkspaceTabTy
               className="group flex flex-col items-start gap-3 rounded-xl border border-surface-border bg-surface-base p-3.5 text-left transition-colors duration-fast hover:bg-surface-hover"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-surface-divider bg-surface-raised">
-                <Icon size={16} weight="regular" className="text-secondary" />
+                <Icon size="md" className="text-secondary" />
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-primary">{label}</span>

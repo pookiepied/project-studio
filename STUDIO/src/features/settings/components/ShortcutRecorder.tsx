@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { KeyboardIcon as Keyboard } from "@phosphor-icons/react";
+import { Keyboard } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 
@@ -127,7 +127,7 @@ export const ShortcutRecorder = ({
             onClick={handleCancelRecording}
             className="shrink-0"
           >
-            <Keyboard size={16} weight="regular" />
+            <Keyboard size="md" />
           </IconButton>
         </>
       ) : (

@@ -11,12 +11,12 @@
 
 import { motion } from "framer-motion";
 import {
-  Monitor,
+  MonitorIcon,
   CursorClick,
-  Eye,
+  EyeIcon,
   ListChecks,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react";
+  type PhosphorIcon,
+} from "@/ui/icons";
 import { Icon } from "@/ui/icons";
 
 // ── Entrance variants (subtle stagger; reduced-motion → opacity-only via MotionConfig) ──
@@ -29,7 +29,7 @@ const TRANSITION = { duration: 0.35, ease: "easeOut" as const };
 
 const PREVIEW_ITEMS: Array<{ icon: PhosphorIcon; title: string; body: string }> = [
   {
-    icon: Eye,
+    icon: EyeIcon,
     title: "Vision",
     body: "Reads your screen after every action to plan the next step.",
   },
@@ -62,7 +62,7 @@ export const ComputerUsePage = () => {
           className="relative mx-auto mb-7 flex h-16 w-16 items-center justify-center"
         >
           <div className="flex h-full w-full items-center justify-center rounded-2xl border border-surface-border bg-surface-raised shadow-lg">
-            <Icon icon={Monitor} size="xl" className="text-primary" />
+            <Icon icon={MonitorIcon} size="xl" className="text-primary" />
           </div>
           <span
             aria-hidden="true"

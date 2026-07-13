@@ -1,4 +1,4 @@
-import { CheckCircleIcon as CheckCircle, ClockIcon as Clock, WarningCircleIcon as WarningCircle, XCircleIcon as XCircle, ArrowSquareOutIcon as ArrowSquareOut } from "@phosphor-icons/react";
+import { Success, Clock, Error, Reject, ExternalLink } from "@/ui/icons";
 import type {
   Artifact,
   ArtifactAction,
@@ -21,26 +21,26 @@ function statusTone(status: Artifact["status"]) {
   switch (status) {
     case "success":
       return {
-        icon: <CheckCircle size={14} weight="fill" className="text-secondary" />,
+        icon: <Success size="sm" weight="fill" className="text-secondary" />,
         label: "Success",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
     case "partial":
       return {
-        icon: <WarningCircle size={14} weight="fill" className="text-secondary" />,
+        icon: <Error size="sm" weight="fill" className="text-secondary" />,
         label: "Partial",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
     case "error":
       return {
-        icon: <XCircle size={14} weight="fill" className="text-secondary" />,
+        icon: <Reject size="sm" weight="fill" className="text-secondary" />,
         label: "Error",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
     case "pending":
     default:
       return {
-        icon: <Clock size={14} weight="fill" className="text-secondary" />,
+        icon: <Clock size="sm" weight="fill" className="text-secondary" />,
         label: "Pending",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
@@ -63,7 +63,7 @@ function ArtifactActionLink({ action }: { action: ArtifactAction }) {
       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-surface-border text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-raised transition-colors"
     >
       <span>{action.label}</span>
-      <ArrowSquareOut size={14} weight="bold" />
+        <ExternalLink size="sm" />
     </a>
   );
 }
@@ -127,7 +127,7 @@ function ArtifactLinks({ items }: { items: ArtifactLink[] }) {
               <div className="text-sm font-medium text-secondary dark:text-secondary truncate">{item.label}</div>
               {item.description && <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{item.description}</div>}
             </div>
-            <ArrowSquareOut size={14} weight="bold" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <ExternalLink size="sm" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
           </div>
         </a>
       ))}

@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Expand, Collapse } from "@/ui/icons";
 import { getProviderDisplayName } from "@/features/models/components/ProviderIcon";
 import { getCachedProfile } from "@/core/network/userProfileCache";
+import { LOG_GRID_TEMPLATE } from "@/design/constants";
 import { fmtTokens, fmtCost, fmtLatency, fmtRelative } from "../formatters";
 import type { LogEntry } from "../types";
 
@@ -53,7 +54,7 @@ export const LogRow = ({
       <div
         onClick={onToggle}
         className="grid items-center gap-x-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-surface-hover transition-colors duration-fast"
-        style={{ gridTemplateColumns: "20px minmax(0, 1fr) minmax(0, 1fr) 80px 70px 14px" }}
+        style={{ gridTemplateColumns: LOG_GRID_TEMPLATE }}
       >
         <div className="relative flex-shrink-0 w-5 h-5">
           {avatarPicture ? (

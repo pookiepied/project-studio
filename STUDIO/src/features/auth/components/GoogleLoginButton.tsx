@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { Button } from "@/ui/primitives/Button";
-import { WarningCircleIcon as WarningCircle } from "@phosphor-icons/react";
+import { Error } from "@/ui/icons";
 import { apiManager } from "@/core/network/apiManager";
 import { environmentService } from "@/core/platform/environmentService";
 import { googleSDK } from "@/features/auth/services/googleSDK";
@@ -290,7 +290,7 @@ export const GoogleLoginButton = ({ onSuccess, onError }: GoogleLoginButtonProps
             className="p-4 bg-surface-raised border border-surface-border rounded-2xl max-w-sm shadow-sm"
           >
             <div className="flex items-start gap-3">
-              <WarningCircle size={16} className="text-secondary flex-shrink-0 mt-0.5" />
+              <Error size="md" className="text-secondary flex-shrink-0 mt-0.5" />
               <p className="text-sm text-secondary leading-relaxed">
                 {error}
               </p>

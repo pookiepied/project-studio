@@ -1,10 +1,10 @@
 import {
-  ArrowRightIcon as ArrowRight,
-  BrainIcon as Brain,
-  ChartLineUpIcon as ChartLineUp,
-  GearIcon as Gear,
-  UserIcon as User,
-} from "@phosphor-icons/react";
+  Forward,
+  Brain,
+  Activity,
+  Settings,
+  User,
+} from "@/ui/icons";
 import { motion } from "framer-motion";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useNavigation } from "../contexts/NavigationContext";
@@ -29,13 +29,13 @@ const PROFILE_ENTRIES: ProfileEntry[] = [
     title: "Activity",
     subtitle: "Inspect usage and runtime activity while we split personal and system views.",
     view: "activity",
-    icon: ChartLineUp,
+    icon: Activity,
   },
   {
     title: "Settings",
     subtitle: "Account, interface, audio, models, shortcuts, and local services.",
     view: "settings",
-    icon: Gear,
+    icon: Settings,
   },
 ];
 
@@ -49,7 +49,7 @@ function ProfileTile({ entry, onOpen }: { entry: ProfileEntry; onOpen: (view: Vi
       className="group w-full gap-3 rounded-xl px-3 py-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.03]"
     >
       <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-surface-raised dark:text-gray-600">
-        <Icon size={14} weight="regular" />
+        <Icon size="sm" weight="regular" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-gray-700 transition-colors group-hover:text-gray-950 dark:text-gray-300 dark:group-hover:text-gray-50">
@@ -59,7 +59,7 @@ function ProfileTile({ entry, onOpen }: { entry: ProfileEntry; onOpen: (view: Vi
           {entry.subtitle}
         </span>
       </span>
-      <ArrowRight size={14} className="flex-shrink-0 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-gray-700" />
+      <Forward size="sm" className="flex-shrink-0 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-gray-700" />
     </Button>
   );
 }
@@ -80,7 +80,7 @@ export function ProfilePage() {
           <p className="text-2xs font-semibold uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">
             Profile
           </p>
-          <h1 className="mt-2 font-display text-2xl font-normal tracking-tight text-gray-950 dark:text-gray-50">
+          <h1 className="mt-2 font-display text-xl font-normal text-primary">
             Personal context
           </h1>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-gray-400 dark:text-gray-600">
@@ -99,7 +99,7 @@ export function ProfilePage() {
               <img src={user.picture} alt={user.name} className="h-11 w-11 rounded-full" referrerPolicy="no-referrer" />
             ) : (
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-raised dark:text-gray-600">
-                <User size={18} weight="regular" />
+                <User size="lg" weight="regular" />
               </span>
             )}
             <div className="min-w-0 flex-1">

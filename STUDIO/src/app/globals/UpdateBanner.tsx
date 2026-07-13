@@ -7,11 +7,12 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowCircleUpIcon as ArrowCircleUp,
-  SpinnerIcon as Spinner,
-  CheckCircleIcon as CheckCircle,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  ArrowCircleUpIcon,
+  Close,
+  Icon,
+  SpinnerIcon,
+  Success,
+} from "@/ui/icons";
 import { useAppUpdater } from "@/app/hooks/useAppUpdater";
 import { environmentService } from "@/core/platform/environmentService";
 import { Button } from "@/ui/primitives/Button";
@@ -45,7 +46,7 @@ export const UpdateBanner = () => {
                 <>
                   <div className="flex items-start gap-3">
                     <div className="w-7 h-7 rounded-xl bg-surface-hover border border-surface-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <ArrowCircleUp size={16} weight="fill" className="text-primary" />
+                      <Icon icon={ArrowCircleUpIcon} size="md" weight="fill" className="text-primary" />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -62,7 +63,7 @@ export const UpdateBanner = () => {
                       aria-label="Dismiss"
                       className="h-auto w-auto shrink-0 mt-0.5 text-disabled hover:bg-transparent hover:text-muted"
                     >
-                      <X size={14} weight="regular" />
+                      <Close size="sm" />
                     </IconButton>
                   </div>
 
@@ -85,7 +86,7 @@ export const UpdateBanner = () => {
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-xl bg-surface-hover border border-surface-border flex items-center justify-center flex-shrink-0">
-                      <Spinner size={14} weight="regular" className="text-secondary animate-spin" />
+                      <Icon icon={SpinnerIcon} size="sm" weight="regular" className="text-secondary animate-spin" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-primary leading-tight">
@@ -112,7 +113,7 @@ export const UpdateBanner = () => {
               {state.status === "ready" && (
                 <div className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-xl bg-surface-hover border border-surface-border flex items-center justify-center flex-shrink-0">
-                    <CheckCircle size={16} weight="fill" className="text-primary" />
+                    <Success size="md" weight="fill" className="text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-primary leading-tight">

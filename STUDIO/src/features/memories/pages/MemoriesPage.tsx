@@ -4,9 +4,9 @@ import {
   TagIcon as Tag,
   ListIcon as List,
   ShareNetworkIcon as ShareNetwork,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
-import { Edit, Delete, Close, Success, Warning, Search, Icon } from "@/ui/icons";
+import { Edit, Delete, Close, Success, Warning, Icon } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Badge } from "@/ui/primitives/Badge";
@@ -14,6 +14,7 @@ import { Textarea } from "@/ui/primitives/Textarea";
 import { Spinner } from "@/ui/primitives/Spinner";
 import { EmptyState } from "@/ui/primitives/EmptyState";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
+import { SearchInput } from "@/ui/primitives";
 import { createHeaders } from "@/lib/api";
 import { apiManager } from "@/core/network/apiManager";
 import { logger } from "@/core/logging/logger";
@@ -153,7 +154,7 @@ export const MemoriesPage = () => {
       <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-surface-border">
         <div className="flex items-center gap-3 mb-4">
           <Icon icon={Brain} size="lg" className="text-secondary" />
-          <h1 className="text-2xl font-display font-normal text-primary">
+          <h1 className="text-xl font-display font-normal text-primary">
             Memories
           </h1>
           {!loading && (
@@ -176,30 +177,14 @@ export const MemoriesPage = () => {
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search
-            size="sm"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by key, content, or tag..."
-            className="w-full pl-8 pr-9 h-9 text-sm rounded-lg bg-surface-base border border-surface-border text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
-          />
-          {search && (
-            <IconButton
-              variant="ghost"
-              size="sm"
-              onClick={() => setSearch("")}
-              aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-muted hover:text-primary transition-colors duration-fast"
-            >
-              <Close size="xs" />
-            </IconButton>
-          )}
-        </div>
+        <SearchInput
+          value={search}
+          onValueChange={setSearch}
+          aria-label="Search memories"
+          placeholder="Search by key, content, or tag..."
+          size="md"
+          className="text-sm"
+        />
       </div>
 
       {/* Content */}

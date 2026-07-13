@@ -1,10 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  SpeakerHighIcon as SpeakerHigh,
-  PauseIcon as Pause,
-  PlayIcon as Play,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Volume,
+  Pause,
+  Play,
+  Close,
+} from "@/ui/icons";
 import { useTTSContext } from "@/features/voice/context/TTSContext";
 import { IconButton } from "@/ui/primitives/IconButton";
 
@@ -37,7 +37,7 @@ export function ReadAloudMiniPlayer() {
             {isLoading ? (
               <span className="h-3.5 w-3.5 flex-shrink-0 animate-spin rounded-full border-2 border-muted border-t-transparent" />
             ) : (
-              <SpeakerHigh size={14} weight="bold" className="flex-shrink-0 text-secondary" />
+              <Volume size="sm" className="flex-shrink-0 text-secondary" />
             )}
 
             <span className="min-w-0 flex-1 truncate text-xs text-secondary">
@@ -51,7 +51,7 @@ export function ReadAloudMiniPlayer() {
               title={isPaused ? "Resume" : "Pause"}
               className="h-6 w-6 rounded-full disabled:opacity-40"
             >
-              {isPaused ? <Play size={12} weight="fill" /> : <Pause size={12} weight="fill" />}
+              {isPaused ? <Play size="xs" weight="fill" /> : <Pause size="xs" weight="fill" />}
             </IconButton>
 
             <IconButton
@@ -60,7 +60,7 @@ export function ReadAloudMiniPlayer() {
               title="Stop reading"
               className="h-6 w-6 rounded-full"
             >
-              <X size={12} weight="bold" />
+              <Close size="xs" />
             </IconButton>
           </div>
         </motion.div>

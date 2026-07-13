@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  BracketsCurlyIcon as BracketsCurly,
-  BroomIcon as Broom,
-  ChatCircleTextIcon as ChatCircleText,
-  CopyIcon as Copy,
-  EyeIcon as Eye,
-  LayoutIcon as Layout,
-  PlusIcon as Plus,
-  StackIcon as Stack,
-  WarningCircleIcon as WarningCircle,
-} from "@phosphor-icons/react";
+  Icon,
+  Redo,
+  Copy,
+  Eye,
+  Add,
+  Error,
+  Conversation,
+  BracketsCurlyIcon,
+  BroomIcon,
+  LayoutIcon,
+  StackIcon,
+} from "@/ui/icons";
 import { ArtifactRenderer } from "@/features/markdown";
 import { Button } from "@/ui/primitives/Button";
+import { Textarea } from "@/ui/primitives/Textarea";
 import { ARTIFACT_EXAMPLES } from "@/features/artifacts/examples";
 import type { Artifact, ArtifactSurface } from "@/types/artifacts";
 import { artifactToMarkdown, parseArtifact } from "@/lib/artifact";
@@ -48,7 +50,7 @@ function SurfaceStage({
 
   if (surface === "overview") {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white/80 p-3 shadow-[0_18px_60px_-34px_rgba(15,23,42,0.28)] dark:border-surface-border dark:bg-surface-base/90">
+      <div className="rounded-2xl border border-gray-200 bg-white/80 p-3 shadow-xl dark:border-surface-border dark:bg-surface-base/90">
         <div className="mb-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-surface-divider dark:bg-surface-raised/50">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -71,9 +73,9 @@ function SurfaceStage({
 
   if (surface === "panel") {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100/80 p-4 shadow-[0_24px_70px_-38px_rgba(15,23,42,0.35)] dark:border-surface-border dark:from-surface-base dark:via-surface-base dark:to-surface-raised">
+      <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100/80 p-4 shadow-xl dark:border-surface-border dark:from-surface-base dark:via-surface-base dark:to-surface-raised">
         <div className="mb-3 flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-          <Layout size={14} />
+          <Icon icon={LayoutIcon} size="sm" />
           Panel surface
         </div>
         <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-surface-border">
@@ -84,13 +86,13 @@ function SurfaceStage({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-surface-deep to-surface-raised p-4 shadow-[0_30px_90px_-44px_rgba(15,23,42,0.35)] dark:border-surface-border dark:from-surface-page dark:to-surface-base">
+    <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-surface-deep to-surface-raised p-4 shadow-xl dark:border-surface-border dark:from-surface-page dark:to-surface-base">
       <div className="mb-4 flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-        <ChatCircleText size={14} />
+        <Conversation size="sm" />
         Chat surface
       </div>
       <div className="flex justify-start">
-        <div className="max-w-[680px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_16px_40px_-28px_rgba(15,23,42,0.35)] dark:border-surface-border dark:bg-surface-base">
+        <div className="max-w-[680px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-border dark:bg-surface-base">
           <ArtifactRenderer code={JSON.stringify(artifact, null, 2)} />
         </div>
       </div>
@@ -171,7 +173,7 @@ export function ArtifactLabPanel() {
 
         <div className="mt-5">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            <Stack size={14} />
+            <Icon icon={StackIcon} size="sm" />
             Example library
           </div>
           <div className="space-y-2">
@@ -210,7 +212,7 @@ export function ArtifactLabPanel() {
 
         <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-3 dark:border-surface-border dark:bg-surface-base">
           <div className="mb-3 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            <Layout size={14} />
+            <Icon icon={LayoutIcon} size="sm" />
             Canvas surfaces
           </div>
           <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
@@ -240,7 +242,7 @@ export function ArtifactLabPanel() {
               disabled={!activeArtifact}
               className="inline-flex items-center !gap-1.5 rounded-xl !bg-gray-900 px-3 py-2 text-xs font-medium !text-white transition hover:!bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:!bg-white dark:!text-gray-900 dark:hover:!bg-gray-100"
             >
-              <Plus size={14} weight="bold" />
+              <Add size="sm" />
               Spawn artifact
             </Button>
             <Button
@@ -248,7 +250,7 @@ export function ArtifactLabPanel() {
               onClick={() => setCanvasItems([])}
               className="inline-flex items-center !gap-1.5 rounded-xl border !border-gray-200 !bg-white px-3 py-2 text-xs font-medium !text-gray-700 transition hover:!bg-gray-50 dark:!border-surface-border dark:!bg-surface-base dark:!text-gray-300 dark:hover:!bg-surface-raised"
             >
-              <Broom size={14} />
+              <Icon icon={BroomIcon} size="sm" />
               Clear canvas
             </Button>
           </div>
@@ -258,7 +260,7 @@ export function ArtifactLabPanel() {
           {canvasItems.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-white/70 px-6 py-12 text-center dark:border-surface-divider dark:bg-surface-base/50">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 dark:bg-surface-raised">
-                <Eye size={18} className="text-gray-400 dark:text-gray-500" />
+                <Eye size="lg" className="text-gray-400 dark:text-gray-500" />
               </div>
               <p className="mt-4 text-sm font-medium text-gray-800 dark:text-gray-200">No artifacts on the canvas yet</p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Load an example or edit the JSON, then spawn it into this stage.</p>
@@ -286,7 +288,7 @@ export function ArtifactLabPanel() {
             onClick={handleReset}
             className="inline-flex items-center !gap-1.5 rounded-xl border !border-gray-200 !bg-white px-3 py-2 text-xs font-medium !text-gray-700 transition hover:!bg-gray-50 dark:!border-surface-border dark:!bg-surface-base dark:!text-gray-300 dark:hover:!bg-surface-raised"
           >
-            <ArrowClockwise size={14} />
+            <Redo size="sm" />
             Reset example
           </Button>
           <Button
@@ -295,7 +297,7 @@ export function ArtifactLabPanel() {
             disabled={!activeArtifact}
             className="inline-flex items-center !gap-1.5 rounded-xl border !border-gray-200 !bg-white px-3 py-2 text-xs font-medium !text-gray-700 transition hover:!bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:!border-surface-border dark:!bg-surface-base dark:!text-gray-300 dark:hover:!bg-surface-raised"
           >
-            <Copy size={14} />
+            <Copy size="sm" />
             Copy `artifact` fence
           </Button>
         </div>
@@ -303,7 +305,7 @@ export function ArtifactLabPanel() {
         {parsed.error && (
           <div className="mb-3 rounded-2xl border border-surface-border bg-surface-raised px-3 py-2 text-xs text-secondary dark:border-surface-border/40 dark:bg-surface-raised/20 dark:text-secondary">
             <div className="flex items-center gap-2 font-medium">
-              <WarningCircle size={14} weight="fill" />
+              <Error size="sm" weight="fill" />
               Artifact validation
             </div>
             <p className="mt-1 leading-relaxed">{parsed.error}</p>
@@ -312,14 +314,14 @@ export function ArtifactLabPanel() {
 
         <label className="block">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-            <BracketsCurly size={14} />
+            <Icon icon={BracketsCurlyIcon} size="sm" />
             JSON payload
           </div>
-          <textarea
+          <Textarea
             value={editorValue}
             onChange={(event) => setEditorValue(event.target.value)}
             spellCheck={false}
-            className="min-h-[430px] w-full resize-y rounded-2xl border border-gray-200 bg-surface-deep px-4 py-4 font-mono text-xs leading-6 text-gray-800 outline-none transition focus:border-gray-900 dark:border-surface-border dark:bg-surface-page dark:text-gray-200 dark:focus:border-gray-200"
+            className="min-h-[430px] resize-y rounded-2xl bg-surface-deep dark:bg-surface-page px-4 py-4 font-mono text-xs leading-6"
           />
         </label>
 

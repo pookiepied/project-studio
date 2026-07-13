@@ -3,7 +3,7 @@ import {
   WrenchIcon as Wrench,
   HardDrivesIcon as HardDrives,
   LeafIcon as Leaf,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { Success, Icon } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { ProviderIcon } from "@/features/models/components/ProviderIcon";

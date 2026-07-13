@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { WifiSlash } from "@phosphor-icons/react";
+import { WifiOff } from "@/ui/icons";
 import { useOffline } from "../contexts/OfflineContext";
 
 export const OfflineIndicator = () => {
@@ -23,7 +23,7 @@ export const OfflineIndicator = () => {
         >
           <div className="max-w-7xl mx-auto px-4 py-2">
             <div className="flex items-center gap-2 text-xs text-gray-600">
-              <WifiSlash size={14} />
+              <WifiOff size="sm" />
               <span className="font-medium tracking-wide">Offline Mode</span>
               <span className="text-gray-500">|</span>
               <span className="text-gray-500">

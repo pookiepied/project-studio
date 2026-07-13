@@ -4,8 +4,8 @@ import {
   WaveformIcon as Waveform,
   SpeakerHighIcon as SpeakerHigh,
   TerminalIcon as Terminal,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react";
+  type PhosphorIcon,
+} from "@/ui/icons";
 import { Icon } from "@/ui/icons";
 import { Input } from "@/ui/primitives/Input";
 import { Toggle } from "@/ui/primitives/Toggle";

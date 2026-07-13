@@ -1,21 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  ArrowLeftIcon as ArrowLeft,
-  ArrowRightIcon as ArrowRight,
-  ChatCircleTextIcon as ChatCircleText,
-  DotsThreeVerticalIcon as DotsThreeVertical,
-  FilesIcon as Files,
-  GlobeIcon as Globe,
-  MagnifyingGlassIcon as MagnifyingGlass,
-  MinusIcon as Minus,
-  PlusIcon as Plus,
-  TerminalIcon as Terminal,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Add,
+  Back,
+  Close,
+  Conversation,
+  DotsThreeVerticalIcon,
+  Files,
+  Forward,
+  Globe,
+  Icon,
+  Redo,
+  Remove,
+  Search,
+  Terminal,
+} from "@/ui/icons";
 import { FONT_SANS } from "@/design/fonts";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Input } from "@/ui/primitives/Input";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "../rightWorkspace/types";
@@ -129,7 +131,7 @@ function BrowserMenu({
           disabled={!canUsePageTools}
           className="h-6 w-6 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
-          <Minus size={12} />
+          <Remove size="xs" />
         </IconButton>
         <span className="w-9 text-center text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
         <IconButton
@@ -139,7 +141,7 @@ function BrowserMenu({
           disabled={!canUsePageTools}
           className="h-6 w-6 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
-          <Plus size={12} />
+          <Add size="xs" />
         </IconButton>
       </div>
       <Button
@@ -169,23 +171,23 @@ function SidePanelMenu({
   onOpenWorkspaceView: (view: RightWorkspaceView) => void;
   onClose: () => void;
 }) {
-  const items: Array<{ view: RightWorkspaceView; label: string; Icon: typeof Globe }> = [
-    { view: "browser", label: "Browser", Icon: Globe },
-    { view: "terminal", label: "Terminal", Icon: Terminal },
-    { view: "files", label: "Files", Icon: Files },
-    { view: "side-chat", label: "Side chat", Icon: ChatCircleText },
+  const items: Array<{ view: RightWorkspaceView; label: string; SidePanelIcon: typeof Globe }> = [
+    { view: "browser", label: "Browser", SidePanelIcon: Globe },
+    { view: "terminal", label: "Terminal", SidePanelIcon: Terminal },
+    { view: "files", label: "Files", SidePanelIcon: Files },
+    { view: "side-chat", label: "Side chat", SidePanelIcon: Conversation },
   ];
 
   return (
     <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-surface-border dark:bg-surface-raised">
-      {items.map(({ view, label, Icon }) => (
+      {items.map(({ view, label, SidePanelIcon }) => (
         <Button
           key={view}
           variant="ghost"
           onClick={() => { onOpenWorkspaceView(view); onClose(); }}
           className="w-full justify-start gap-2 px-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-selected"
         >
-          <Icon size={14} weight="regular" className="text-gray-500" />
+          <SidePanelIcon size="sm" className="text-gray-500" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
         </Button>
       ))}
@@ -318,14 +320,14 @@ export function BrowserPanel({
                         : "text-gray-500 hover:bg-gray-50 dark:text-gray-500 dark:hover:bg-surface-raised"
                     }`}
                   >
-                    <Globe size={14} weight="regular" className="flex-shrink-0" />
+                    <Globe size="sm" className="flex-shrink-0" />
                     <span className="truncate">{tab.label}</span>
                     <span
                       role="button"
                       onClick={(ev) => { ev.stopPropagation(); onTabClose(tab.id); }}
                       className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-gray-200 dark:hover:bg-surface-border"
                     >
-                      <X size={12} weight="bold" />
+                      <Close size="xs" />
                     </span>
                   </Button>
                 );
@@ -340,7 +342,7 @@ export function BrowserPanel({
                 onClick={() => setSideMenuOpen((v) => !v)}
                 className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
               >
-                <Plus size={14} weight="regular" />
+                <Add size="sm" />
               </IconButton>
               {sideMenuOpen && (
                 <SidePanelMenu
@@ -358,7 +360,7 @@ export function BrowserPanel({
             onClick={onClose}
             className="flex-shrink-0 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={14} weight="bold" />
+            <Close size="sm" />
           </IconButton>
         </div>
         )}
@@ -372,7 +374,7 @@ export function BrowserPanel({
             disabled={!canGoBack}
             className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
           >
-            <ArrowLeft size={14} />
+            <Back size="sm" />
           </IconButton>
           <IconButton
             aria-label="Forward"
@@ -382,7 +384,7 @@ export function BrowserPanel({
             disabled={!canGoForward}
             className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
           >
-            <ArrowRight size={14} />
+            <Forward size="sm" />
           </IconButton>
           <IconButton
             aria-label="Reload"
@@ -392,16 +394,17 @@ export function BrowserPanel({
             disabled={!canReload}
             className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-35 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
           >
-            <ArrowClockwise size={14} />
+            <Redo size="sm" />
           </IconButton>
 
           <form onSubmit={submitAddress} className="relative mx-auto min-w-[180px] flex-[0_1_420px]">
-            <MagnifyingGlass size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
-            <input
+            <Search size="sm" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
+            <Input
+              size="sm"
               value={addressValue}
               onChange={(event) => setAddressValue(event.target.value)}
               placeholder="Enter a URL"
-              className="h-7 w-full rounded-lg border-0 bg-transparent px-8 text-center text-sm text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:bg-gray-50 focus:text-left dark:text-gray-300 dark:placeholder:text-gray-600 dark:focus:bg-surface-raised"
+              className="border-0 bg-transparent px-8 text-center outline-none focus:bg-surface-hover focus:text-left focus-visible:ring-transparent dark:focus:bg-surface-raised"
             />
           </form>
 
@@ -413,7 +416,7 @@ export function BrowserPanel({
               onClick={() => setMenuOpen((v) => !v)}
               className="text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-400"
             >
-              <DotsThreeVertical size={16} weight="bold" />
+              <Icon icon={DotsThreeVerticalIcon} size="md" />
             </IconButton>
             {menuOpen && (
               <BrowserMenu
@@ -433,7 +436,7 @@ export function BrowserPanel({
           {!activeTab || (activeTab.mode === "web" && !activeTab.url) ? (
             <div className="flex h-full items-center justify-center px-8 text-center">
               <div>
-                <Globe size={56} weight="regular" className="mx-auto mb-6 text-gray-400 dark:text-gray-600" />
+                <Globe size="xl" className="mx-auto mb-6 text-gray-400 dark:text-gray-600" />
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Start browsing</p>
                 <p className="mt-3 text-sm text-gray-400 dark:text-gray-600">Enter a URL to open a page</p>
               </div>

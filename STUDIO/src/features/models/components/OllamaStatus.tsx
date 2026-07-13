@@ -6,9 +6,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowClockwiseIcon as ArrowClockwise,
-  CaretDownIcon as CaretDown,
-} from '@phosphor-icons/react';
+  Redo,
+  Expand,
+} from '@/ui/icons';
 import { useOllama } from '@/features/models/hooks/useOllama';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { IconButton } from '@/ui/primitives/IconButton';
@@ -76,7 +76,7 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
               title="Refresh Models"
               className="text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-300 p-1"
             >
-              <ArrowClockwise size={16} className={isChecking ? 'animate-spin' : ''} />
+              <Redo size="md" className={isChecking ? 'animate-spin' : ''} />
             </IconButton>
           )}
 
@@ -88,8 +88,8 @@ export const OllamaStatus = ({ enabled, onToggle }: OllamaStatusProps) => {
               aria-label="Toggle models"
               className="text-gray-400 p-1 transition-transform duration-300"
             >
-              <CaretDown 
-                size={16} 
+              <Expand
+                size="md"
                 className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
               />
             </IconButton>

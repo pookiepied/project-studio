@@ -2,8 +2,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Warning } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
+import { Input } from "@/ui/primitives/Input";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
-import { inputCls, labelCls } from "./ExtensionIcons";
+import { Textarea } from "@/ui/primitives/Textarea";
+import { labelCls } from "./ExtensionIcons";
 import type { AddFormState } from "../types";
 
 export type { AddFormState };
@@ -53,14 +55,14 @@ export const AddServerForm = ({ isTauri, onInstall, onCancel, loading, error }: 
         <div className="grid grid-cols-2 gap-2.5">
           <div className="space-y-1.5">
             <p className="text-2xs text-muted">Identifier</p>
-            <input type="text" value={form.name} onChange={set("name")}
-              placeholder={form.type === "remote" ? "github" : "my-server"} className={inputCls} />
+            <Input type="text" size="sm" value={form.name} onChange={set("name")}
+              placeholder={form.type === "remote" ? "github" : "my-server"} className="px-3.5 text-xs rounded-xl" />
             <p className="text-3xs text-muted">lowercase · hyphens only</p>
           </div>
           <div className="space-y-1.5">
             <p className="text-2xs text-muted">Display name</p>
-            <input type="text" value={form.displayName} onChange={set("displayName")}
-              placeholder={form.type === "remote" ? "GitHub" : "My Server"} className={inputCls} />
+            <Input type="text" size="sm" value={form.displayName} onChange={set("displayName")}
+              placeholder={form.type === "remote" ? "GitHub" : "My Server"} className="px-3.5 text-xs rounded-xl" />
           </div>
         </div>
       </div>
@@ -72,16 +74,16 @@ export const AddServerForm = ({ isTauri, onInstall, onCancel, loading, error }: 
           <div className="space-y-2.5">
             <div className="space-y-1.5">
               <p className="text-2xs text-muted">Endpoint URL</p>
-              <input type="url" value={form.endpointUrl} onChange={set("endpointUrl")}
-                placeholder="https://api.example.com/mcp/" className={inputCls} />
+              <Input type="url" size="sm" value={form.endpointUrl} onChange={set("endpointUrl")}
+                placeholder="https://api.example.com/mcp/" className="px-3.5 text-xs rounded-xl" />
               <p className="text-3xs text-muted">MCP-compatible HTTP endpoint</p>
             </div>
             <div className="space-y-1.5">
               <p className="text-2xs text-muted">
                 Auth token <span className="text-disabled">(optional)</span>
               </p>
-              <input type="password" value={form.authToken} onChange={set("authToken")}
-                placeholder="Bearer token or API key" className={inputCls} />
+              <Input type="password" size="sm" value={form.authToken} onChange={set("authToken")}
+                placeholder="Bearer token or API key" className="px-3.5 text-xs rounded-xl" />
             </div>
           </div>
         </div>
@@ -94,21 +96,22 @@ export const AddServerForm = ({ isTauri, onInstall, onCancel, loading, error }: 
           <div className="grid grid-cols-2 gap-2.5">
             <div className="space-y-1.5">
               <p className="text-2xs text-muted">Executable</p>
-              <input type="text" value={form.command} onChange={set("command")} placeholder="npx" className={inputCls} />
+              <Input type="text" size="sm" value={form.command} onChange={set("command")} placeholder="npx" className="px-3.5 text-xs rounded-xl" />
             </div>
             <div className="space-y-1.5">
               <p className="text-2xs text-muted">Arguments</p>
-              <input type="text" value={form.args} onChange={set("args")}
-                placeholder="-y @scope/server-name" className={inputCls} />
+              <Input type="text" size="sm" value={form.args} onChange={set("args")}
+                placeholder="-y @scope/server-name" className="px-3.5 text-xs rounded-xl" />
               <p className="text-3xs text-muted">space-separated</p>
             </div>
           </div>
           <div className="space-y-3">
             <p className={labelCls}>Environment</p>
             <div className="space-y-1.5">
-              <textarea value={form.envVars} onChange={set("envVars")} rows={3}
+              <Textarea value={form.envVars} onChange={set("envVars")} rows={3}
+                size="sm"
                 placeholder={"GITHUB_TOKEN=ghp_xxxx\nANOTHER_KEY=value"}
-                className={`${inputCls} resize-none font-mono leading-relaxed`} />
+                className="resize-none font-mono leading-relaxed" />
               <p className="text-3xs text-muted">KEY=value · one per line</p>
             </div>
           </div>

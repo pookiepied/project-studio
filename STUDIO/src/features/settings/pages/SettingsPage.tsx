@@ -1,20 +1,22 @@
 import { useState } from "react";
 import {
-  MicrophoneIcon       as Microphone,
-  BrainIcon             as Brain,
-  DesktopIcon           as Desktop,
+  Icon,
+  Back,
+  Manage,
+  Microphone,
+  Brain,
+  Monitor,
   UserIcon,
-  SquaresFourIcon       as SquaresFour,
-  CpuIcon               as Cpu,
-  KeyboardIcon          as Keyboard,
-  SignOutIcon           as SignOut,
-  type Icon as PhosphorIcon,
-} from "@phosphor-icons/react";
+  Grid,
+  Cpu,
+  Keyboard,
+  Logout,
+  type PhosphorIcon,
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { SearchInput } from "@/ui/primitives/SearchInput";
-import { Icon, Back, Manage } from "@/ui/icons";
 import { environmentService } from "@/core/platform/environmentService";
 import {
   HARNESS_PERMISSION_KEY,
@@ -168,7 +170,7 @@ export const SettingsPage = () => {
       variant="ghost"
       size="sm"
       onClick={goBack}
-      leftIcon={<Back size="sm" weight="regular" />}
+      leftIcon={<Back size="sm" />}
       className="mb-6 -ml-0.5"
     >
       {label}
@@ -194,7 +196,7 @@ export const SettingsPage = () => {
           <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full flex-shrink-0" referrerPolicy="no-referrer" />
         ) : (
           <div className="w-9 h-9 rounded-full bg-surface-raised flex items-center justify-center flex-shrink-0">
-            <UserIcon size={18} weight="regular" className="text-muted" />
+            <Icon icon={UserIcon} size="lg" className="text-muted" />
           </div>
         )}
         <div className="flex-1 min-w-0">
@@ -208,13 +210,13 @@ export const SettingsPage = () => {
           onClick={logout}
           className="flex-shrink-0"
         >
-          <Icon icon={SignOut as unknown as PhosphorIcon} size="sm" weight="regular" />
+          <Icon icon={Logout as unknown as PhosphorIcon} size="sm" />
         </IconButton>
       </div>
     ) : (
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-full bg-surface-raised flex items-center justify-center flex-shrink-0">
-          <UserIcon size={18} weight="regular" className="text-muted" />
+          <Icon icon={UserIcon} size="lg" className="text-muted" />
         </div>
         <div className="flex-1">
           <p className="text-sm text-muted">Not signed in</p>
@@ -251,25 +253,25 @@ export const SettingsPage = () => {
       <div className="space-y-10">
         {showAccount && (
           <section className="space-y-4">
-            <SectionLabel icon={<UserIcon size={16} weight="regular" />} title="ACCOUNT" />
+            <SectionLabel icon={<Icon icon={UserIcon} size="md" />} title="ACCOUNT" />
             {renderAccountBlock()}
           </section>
         )}
         {showAiModels && (
           <section className="space-y-6">
-            <SectionLabel icon={<Brain size={16} weight="regular" />} title="MODELS" />
+            <SectionLabel icon={<Brain size="md" />} title="MODELS" />
             <IntelligenceView updateSetting={updateSetting} onNavigateToLocalServices={() => { setSearchQuery(""); navigateToView("local_services"); }} />
           </section>
         )}
         {showAudio && (
           <section className="space-y-4">
-            <SectionLabel icon={<Microphone size={16} weight="regular" />} title="AUDIO" />
+            <SectionLabel icon={<Microphone size="md" />} title="AUDIO" />
             <AudioView updateSetting={updateSetting} />
           </section>
         )}
         {showLocalAi && (
           <section className="space-y-4">
-            <SectionLabel icon={<Cpu size={16} weight="regular" />} title="LOCAL AI" />
+            <SectionLabel icon={<Cpu size="md" />} title="LOCAL AI" />
             <LocalServicesView
               updateSetting={updateSetting}
               isTauri={isTauri}
@@ -282,21 +284,21 @@ export const SettingsPage = () => {
         )}
         {showInterface && (
           <section className="space-y-4">
-            <SectionLabel icon={<Desktop size={16} weight="regular" />} title="APPEARANCE" />
+            <SectionLabel icon={<Monitor size="md" />} title="APPEARANCE" />
             <InterfaceView updateSetting={updateSetting} onThemeChange={handleThemeChange} />
           </section>
         )}
         {showShortcuts && (
           <section className="space-y-4">
-            <SectionLabel icon={<Keyboard size={16} weight="regular" />} title="SHORTCUTS & PULSE" />
+            <SectionLabel icon={<Keyboard size="md" />} title="SHORTCUTS & PULSE" />
             <ShortcutsView updateSetting={updateSetting} />
           </section>
         )}
         {showExtensions && (
           <section className="space-y-4">
-            <SectionLabel icon={<SquaresFour size={16} weight="regular" />} title="APPS" />
+            <SectionLabel icon={<Grid size="md" />} title="APPS" />
             <NavTile
-              icon={<SquaresFour size={14} weight="regular" />}
+              icon={<Grid size="sm" />}
               title="Apps"
               subtitle="Connect apps and tools to your AI"
               onClick={() => navigateTo("extensions")}
@@ -305,9 +307,9 @@ export const SettingsPage = () => {
         )}
         {showAdmin && (
           <section className="space-y-4">
-            <SectionLabel icon={<Manage size="md" weight="regular" />} title="ADMIN" />
+            <SectionLabel icon={<Manage size="md" />} title="ADMIN" />
             <NavTile
-              icon={<Manage size="sm" weight="regular" />}
+              icon={<Manage size="sm" />}
               title="Manage"
               subtitle="Whitelist, admin modes, and router defaults"
               onClick={() => navigateTo("manage")}
@@ -322,8 +324,8 @@ export const SettingsPage = () => {
 
   const settingsHeader = (
     <div>
-      <h1 className="text-base font-display tracking-ultra-wide text-primary mb-1">
-        SETTINGS
+      <h1 className="text-xl font-display font-normal text-primary mb-1">
+        Settings
       </h1>
       <p className="text-sm text-muted">
         Configure your STUDIO experience
@@ -367,43 +369,43 @@ export const SettingsPage = () => {
 
               <section className="space-y-1">
                 <NavTile
-                  icon={<Brain size={16} weight="regular" />}
+                  icon={<Brain size="md" />}
                   title="AI Models"
                   subtitle={modelsLoading ? "Loading…" : `${Object.keys(providers).length} providers · ${uniqueModels} models`}
                   onClick={() => navigateToView("ai_models")}
                 />
                 <NavTile
-                  icon={<Microphone size={16} weight="regular" />}
+                  icon={<Microphone size="md" />}
                   title="Voice & Audio"
                   subtitle="Microphone, voice detection, transcription pipeline"
                   onClick={() => navigateToView("audio")}
                 />
                 <NavTile
-                  icon={<Desktop size={16} weight="regular" />}
+                  icon={<Monitor size="md" />}
                   title="Appearance"
                   subtitle="Theme, notifications, tray, and startup"
                   onClick={() => navigateToView("interface")}
                 />
                 <NavTile
-                  icon={<Keyboard size={16} weight="regular" />}
+                  icon={<Keyboard size="md" />}
                   title="Shortcuts & Pulse"
                   subtitle="Hotkeys, voice volume, and floating overlay"
                   onClick={() => navigateToView("shortcuts")}
                 />
                 <NavTile
-                  icon={<Cpu size={16} weight="regular" />}
+                  icon={<Cpu size="md" />}
                   title="Local AI"
                   subtitle="Ollama, LM Studio, Faster Whisper, system access"
                   onClick={() => navigateToView("local_services")}
                 />
                 <NavTile
-                  icon={<SquaresFour size={16} weight="regular" />}
+                  icon={<Grid size="md" />}
                   title="Apps & Extensions"
                   subtitle="Connect apps and tools to your AI"
                   onClick={() => navigateTo("extensions")}
                 />
                 <NavTile
-                  icon={<Manage size="md" weight="regular" />}
+                  icon={<Manage size="md" />}
                   title="Manage"
                   subtitle="Admin whitelist, modes, and router controls"
                   onClick={() => navigateTo("manage")}
@@ -417,8 +419,8 @@ export const SettingsPage = () => {
               {renderBackNav()}
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h1 className="text-base font-display tracking-ultra-wide text-primary mb-1">
-                    AI MODELS
+                  <h1 className="text-xl font-display font-normal text-primary mb-1">
+                    AI Models
                   </h1>
                   <p className="text-sm text-muted">
                     Providers, model selection, and local AI services
@@ -432,7 +434,7 @@ export const SettingsPage = () => {
             /* VOICE & AUDIO */
             <motion.div key="audio" {...pageAnim}>
               {renderBackNav()}
-              <h1 className="text-base font-display tracking-ultra-wide text-primary mb-1">VOICE & AUDIO</h1>
+              <h1 className="text-xl font-display font-normal text-primary mb-1">Voice &amp; Audio</h1>
               <p className="text-sm text-muted mb-8">
                 Microphone, voice detection, and transcription pipeline
               </p>
@@ -443,7 +445,7 @@ export const SettingsPage = () => {
             /* APPEARANCE */
             <motion.div key="interface" {...pageAnim}>
               {renderBackNav()}
-              <h1 className="text-base font-display tracking-ultra-wide text-primary mb-1">APPEARANCE</h1>
+              <h1 className="text-xl font-display font-normal text-primary mb-1">Appearance</h1>
               <p className="text-sm text-muted mb-8">
                 Theme, notifications, system tray, and startup behavior
               </p>
@@ -454,7 +456,7 @@ export const SettingsPage = () => {
             /* SHORTCUTS & PULSE */
             <motion.div key="shortcuts" {...pageAnim}>
               {renderBackNav()}
-              <h1 className="text-base font-display tracking-ultra-wide text-primary mb-1">SHORTCUTS & PULSE</h1>
+              <h1 className="text-xl font-display font-normal text-primary mb-1">Shortcuts &amp; Pulse</h1>
               <p className="text-sm text-muted mb-8">
                 Global hotkeys, voice volume, and floating AI status overlay
               </p>
@@ -466,7 +468,7 @@ export const SettingsPage = () => {
             <motion.div key="local_services" {...pageAnim}>
               {renderBackNav(prevView === "ai_models" ? "AI Models" : "Settings")}
               <div className="mb-8">
-                <h1 className="text-base font-display tracking-ultra-wide text-primary mb-1">LOCAL AI</h1>
+                <h1 className="text-xl font-display font-normal text-primary mb-1">Local AI</h1>
                 <p className="text-sm text-muted">
                   Local model providers, transcription engines, and system integration
                 </p>

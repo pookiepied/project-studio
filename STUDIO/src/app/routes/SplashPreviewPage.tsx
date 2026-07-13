@@ -22,7 +22,7 @@ export function SplashPreviewPage() {
           initial={{ opacity: 0, y: -8, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-center gap-1 rounded-xl border border-gray-900/[0.08] bg-white/[0.82] p-1 shadow-[0_12px_36px_rgba(0,0,0,0.10)] backdrop-blur-2xl dark:border-white/[0.08] dark:bg-surface-page/[0.78] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45)]"
+          className="flex items-center gap-1 rounded-xl border border-gray-900/[0.08] bg-white/[0.82] p-1 shadow-lg backdrop-blur-2xl dark:border-white/[0.08] dark:bg-surface-page/[0.78]"
         >
           <div className="h-8 rounded-lg bg-gray-950 px-3 text-sm leading-8 text-white dark:bg-gray-100 dark:text-gray-950">
             Brand Mark

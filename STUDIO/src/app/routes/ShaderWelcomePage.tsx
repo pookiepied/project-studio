@@ -6,22 +6,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { environmentService } from "@/core/platform/environmentService";
 import {
-  XIcon      as X,
-  MinusIcon  as Minus,
-  MoonIcon   as Moon,
-  SunIcon    as Sun,
-} from "@phosphor-icons/react";
+  Close,
+  Remove,
+  Moon,
+  Sun,
+} from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { HERO_GRADIENT } from "@/design/constants";
 
 const SESSION_AUTH_ERROR_KEY = "studio_auth_error";
-
-// Welcome/login hero gradient — intentional marketing surface (user-confirmed,
-// D-408). The shader-vs-image direction is still open; kept deliberately exempt
-// from the strict-neutral palette until that decision is made.
-/* eslint-disable no-restricted-syntax -- D-408 marketing-surface carve-out: welcome hero gradient, no neutral-token equivalent */
-const WELCOME_HERO_GRADIENT = "linear-gradient(135deg, #ede9fe 0%, #dbeafe 55%, #bae6fd 100%)";
-/* eslint-enable no-restricted-syntax */
 
 // ── Easter-egg context menu ────────────────────────────────────────────────────
 
@@ -96,8 +90,8 @@ function LoginContextMenu({
           hover:text-gray-700 dark:hover:text-gray-300"
       >
         {isDark
-          ? <Sun size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-          : <Moon size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          ? <Sun size="sm" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          : <Moon size="sm" className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
         }
         {isDark ? "Switch to light" : "Switch to dark"}
       </Button>
@@ -218,14 +212,14 @@ export const ShaderWelcomePage = () => {
               onClick={handleMinimize}
               className="h-auto w-auto p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-gray-700 dark:hover:text-muted hover:bg-gray-900/[0.06] dark:hover:bg-white/[0.06]"
             >
-              <Minus size={14} weight="bold" />
+              <Remove size="sm" />
             </IconButton>
             <IconButton
               aria-label="Close"
               onClick={handleClose}
               className="h-auto w-auto p-1.5 rounded-md text-gray-400 dark:text-secondary hover:text-secondary hover:bg-surface-raised/10"
             >
-              <X size={14} weight="bold" />
+              <Close size="sm" />
             </IconButton>
           </div>
         )}
@@ -237,7 +231,7 @@ export const ShaderWelcomePage = () => {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
         className="w-full flex-1 relative rounded-2xl overflow-hidden border border-white/25"
-        style={{ background: WELCOME_HERO_GRADIENT }}
+        style={{ background: HERO_GRADIENT }}
       >
 
         {/* Dot grid */}

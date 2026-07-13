@@ -27,7 +27,7 @@ import React, {
   useCallback,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { TerminalIcon as Terminal, XIcon as X, PlusIcon as Plus } from "@phosphor-icons/react";
+import { Terminal, Close, Add } from "@/ui/icons";
 import { Terminal as XTerm, ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -459,12 +459,12 @@ export function TerminalPanel({
             onClick={onClose}
             className="flex-shrink-0 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={14} weight="bold" />
+            <Close size="sm" />
           </IconButton>
 
           {/* Icon + active tab name + status dot */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <Terminal size={12} weight="regular" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
+            <Terminal size="xs" className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
             <span className="text-xs text-gray-500 dark:text-gray-500 truncate">
               {activeTab?.label ?? "terminal"}
             </span>
@@ -513,7 +513,7 @@ export function TerminalPanel({
                                  hover:bg-gray-200 dark:hover:bg-surface-border
                                  text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     >
-                      <X size={12} weight="bold" />
+                      <Close size="xs" />
                     </span>
                   </Button>
                 );
@@ -535,7 +535,7 @@ export function TerminalPanel({
                        hover:text-gray-600 dark:hover:text-gray-400
                        transition-colors duration-100"
           >
-            <Plus size={12} weight="regular" />
+            <Add size="xs" />
           </IconButton>
         </div>
         )}

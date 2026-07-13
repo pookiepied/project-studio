@@ -1,6 +1,14 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowsClockwise, ChatCircle, Waveform, CopySimple, SelectionAll, ArrowBendUpRight } from "@phosphor-icons/react";
+import {
+  ArrowBendUpRight,
+  CopySimple,
+  Icon,
+  Message,
+  Refresh,
+  SelectionAll,
+  Waveform,
+} from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 
 type MenuMode = "default" | "selection";
@@ -148,19 +156,19 @@ export function ContextMenu() {
               </div>
 
               <Button role="menuitem" tabIndex={-1} onClick={handleCopy} variant="ghost" className={itemClass}>
-                <CopySimple size={14} className="text-muted" />
+                <Icon icon={CopySimple} size="sm" className="text-muted" />
                 Copy
               </Button>
 
               <Button role="menuitem" tabIndex={-1} onClick={handleSelectAll} variant="ghost" className={itemClass}>
-                <SelectionAll size={14} className="text-muted" />
+                <Icon icon={SelectionAll} size="sm" className="text-muted" />
                 Select All
               </Button>
 
               <div className="h-px bg-surface-divider my-1 mx-2" />
 
               <Button role="menuitem" tabIndex={-1} onClick={handleChatAboutThis} variant="ghost" className={itemClass}>
-                <ArrowBendUpRight size={14} className="text-muted" />
+                <Icon icon={ArrowBendUpRight} size="sm" className="text-muted" />
                 Chat about this
               </Button>
             </>
@@ -173,7 +181,7 @@ export function ContextMenu() {
                 onClick={() => { window.dispatchEvent(new CustomEvent("new-chat")); setIsOpen(false); }}
                 className={itemClass}
               >
-                <ChatCircle size={14} className="text-muted" />
+                <Message size="sm" className="text-muted" />
                 New Chat
               </Button>
 
@@ -184,14 +192,14 @@ export function ContextMenu() {
                 onClick={() => { window.dispatchEvent(new CustomEvent("start-live-session")); setIsOpen(false); }}
                 className={itemClass}
               >
-                <Waveform size={14} className="text-muted" />
+                <Waveform size="sm" className="text-muted" />
                 Live Agent
               </Button>
 
               <div className="h-px bg-surface-divider my-1 mx-2" />
 
               <Button role="menuitem" tabIndex={-1} variant="ghost" onClick={handleReloadApp} className={itemClass}>
-                <ArrowsClockwise size={14} className="text-muted" />
+                <Refresh size="sm" className="text-muted" />
                 Reload App
               </Button>
             </>

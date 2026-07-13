@@ -12,7 +12,7 @@ import {
   TrashIcon as Trash,
   VideoCameraIcon as VideoCamera,
   WaveformIcon as Waveform,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Back, Refresh, Success, Warning, Icon } from "@/ui/icons";
 import { Badge } from "@/ui/primitives/Badge";
@@ -300,7 +300,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
 
                 <div className="grid grid-cols-[1.1fr_0.9fr] gap-4">
                   <section className="rounded-lg border border-surface-border bg-surface-base">
-                    <SectionTitle icon={<Database size={14} />} label="Identity" />
+                    <SectionTitle icon={<Icon icon={Database} size="sm" />} label="Identity" />
                     <div className="p-4 grid grid-cols-2 gap-3">
                       <EditorInput label="Gateway ID" value={activeDraft.id} disabled={!draft || Boolean(draftSourceId)} onChange={(value) => updateDraft((model) => { model.id = value; })} />
                       <EditorInput label="Provider model ID" value={activeDraft.providerModelId} disabled={!draft} onChange={(value) => updateDraft((model) => { model.providerModelId = value; })} />
@@ -318,7 +318,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                   </section>
 
                   <section className="rounded-lg border border-surface-border bg-surface-base">
-                    <SectionTitle icon={<Brain size={14} />} label="Reasoning" />
+                    <SectionTitle icon={<Icon icon={Brain} size="sm" />} label="Reasoning" />
                     <div className="p-4 space-y-3">
                       <ToggleRow label="Thinking" checked={Boolean(activeDraft.registry.reasoning?.supported)} disabled={!draft} onChange={(checked) => updateDraft((model) => {
                         const current = model.registry.reasoning;
@@ -374,7 +374,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                   </section>
 
                   <section className="rounded-lg border border-surface-border bg-surface-base">
-                    <SectionTitle icon={<CurrencyDollar size={14} />} label="Pricing" />
+                    <SectionTitle icon={<Icon icon={CurrencyDollar} size="sm" />} label="Pricing" />
                     <div className="p-4 grid grid-cols-2 gap-3">
                       <EditorSelect label="Pricing kind" value={activeDraft.registry.pricing.kind} disabled={!draft} options={schema.pricing.kinds} onChange={(value) => updateDraft((model) => { model.registry.pricing.kind = value as typeof model.registry.pricing.kind; })} />
                       <EditorSelect label="Status" value={activeDraft.registry.pricing.status} disabled={!draft} options={schema.pricing.statuses} onChange={(value) => updateDraft((model) => { model.registry.pricing.status = value as typeof model.registry.pricing.status; })} />
@@ -388,7 +388,7 @@ export const ModelRegistryView = ({ onBack }: Props) => {
                   </section>
 
                   <section className="rounded-lg border border-surface-border bg-surface-base">
-                    <SectionTitle icon={<FunctionGlyph size={14} />} label="Capabilities" />
+                    <SectionTitle icon={<Icon icon={FunctionGlyph} size="sm" />} label="Capabilities" />
                     <div className="p-4 space-y-2">
                       <ToggleRow label="Vision" checked={Boolean(activeDraft.capabilities.chat?.vision)} disabled={!draft || !activeDraft.capabilities.chat} onChange={(checked) => updateDraft((model) => { if (model.capabilities.chat) model.capabilities.chat.vision = checked; })} />
                       <ToggleRow label="Tools" checked={Boolean(activeDraft.capabilities.chat?.tools)} disabled={!draft || !activeDraft.capabilities.chat} onChange={(checked) => updateDraft((model) => { if (model.capabilities.chat) model.capabilities.chat.tools = checked; })} />

@@ -28,7 +28,7 @@ export const NavTile = ({
   <Button
     variant="ghost"
     onClick={onClick}
-    className={`w-full flex items-center justify-between py-3.5 px-3 -mx-3 rounded-xl hover:bg-surface-hover transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page group ${className}`}
+    className={`w-full flex items-center justify-between py-3.5 px-3 -mx-3 rounded-xl hover:bg-surface-hover transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus group ${className}`}
   >
     <div className="flex items-center gap-3.5">
       <span className="text-muted flex-shrink-0">{icon}</span>

@@ -1,28 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  ArrowClockwiseIcon as Refresh,
-  ArrowsSplitIcon as Split,
-  CopyIcon as Copy,
-  FileCodeIcon as FileCode,
-  GitBranchIcon as GitBranch,
-  GitCommitIcon as GitCommit,
-  SidebarSimpleIcon as SidebarSimple,
-  SpinnerGapIcon as SpinnerGap,
-  TextAlignLeftIcon as WordWrap,
-  FilePlusIcon as FilePlus,
-  PencilSimpleIcon as Modified,
-  CheckCircleIcon as Staged,
-  ArrowsClockwiseIcon as Mixed,
-  WarningCircleIcon as Warning,
-  UploadSimpleIcon as StageIcon,
-  DownloadSimpleIcon as UnstageIcon,
-  ArrowRightIcon as ArrowRight,
-} from "@phosphor-icons/react";
+  Icon,
+  Redo,
+  Refresh,
+  Copy,
+  Spinner,
+  Edit,
+  Success,
+  Error,
+  Forward,
+  ArrowsSplitIcon,
+  FileCodeIcon,
+  GitBranchIcon,
+  GitCommitIcon,
+  SidebarSimpleIcon,
+  TextAlignLeftIcon,
+  FilePlusIcon,
+  UploadSimpleIcon,
+  DownloadSimpleIcon,
+} from "@/ui/icons";
 import { Select } from "@/ui/primitives/Select";
 import { SegmentedControl } from "@/ui/primitives/SegmentedControl";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Textarea } from "@/ui/primitives/Textarea";
 import { createSplitRows, parseUnifiedDiff, type DiffLine } from "./unifiedDiff";
 
 interface GitChangedFile {
@@ -81,10 +83,10 @@ function statusLabel(file: GitChangedFile) {
 }
 
 function statusBadge(file: GitChangedFile) {
-  if (file.untracked) return { Icon: FilePlus, className: "text-amber-600 dark:text-amber-300" };
-  if (file.staged && file.unstaged) return { Icon: Mixed, className: "text-amber-600 dark:text-amber-300" };
-  if (file.staged) return { Icon: Staged, className: "text-emerald-600 dark:text-emerald-300" };
-  return { Icon: Modified, className: "text-sky-600 dark:text-sky-300" };
+  if (file.untracked) return { icon: <Icon icon={FilePlusIcon} size="sm" />, className: "text-amber-600 dark:text-amber-300" };
+  if (file.staged && file.unstaged) return { icon: <Refresh size="sm" />, className: "text-amber-600 dark:text-amber-300" };
+  if (file.staged) return { icon: <Success size="sm" />, className: "text-emerald-600 dark:text-emerald-300" };
+  return { icon: <Edit size="sm" />, className: "text-sky-600 dark:text-sky-300" };
 }
 
 function ControlButton({
@@ -172,7 +174,7 @@ export function ReviewPanel({
           onStateChange({ selectedPath: nextSummary.files[0].path });
         }
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+      .catch((reason: unknown) => setError(reason instanceof globalThis.Error ? reason.message : String(reason)))
       .finally(() => setLoading(false));
   }, [onStateChange, rootPath, selectedPath]);
 
@@ -195,7 +197,7 @@ export function ReviewPanel({
       ignoreWhitespace,
     })
       .then((nextDiff) => { if (request === diffRequest.current) setDiff(nextDiff); })
-      .catch((reason) => { if (request === diffRequest.current) setDiff(reason instanceof Error ? reason.message : String(reason)); })
+      .catch((reason: unknown) => { if (request === diffRequest.current) setDiff(reason instanceof globalThis.Error ? reason.message : String(reason)); })
       .finally(() => { if (request === diffRequest.current) setDiffLoading(false); });
   }, [ignoreWhitespace, rootPath, selectedPath, stagedDiff, summary?.hasRepo]);
 
@@ -226,9 +228,9 @@ export function ReviewPanel({
     setPendingBranch(null);
     invoke("git_checkout_branch", { path: rootPath, branch })
       .then(load)
-      .catch((reason) => {
+      .catch((reason: unknown) => {
         setPendingBranch(branch);
-        setError(reason instanceof Error ? reason.message : String(reason));
+        setError(reason instanceof globalThis.Error ? reason.message : String(reason));
       })
       .finally(() => setLoading(false));
   };
@@ -242,7 +244,7 @@ export function ReviewPanel({
         setPendingBranch(null);
         load();
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+      .catch((reason: unknown) => setError(reason instanceof globalThis.Error ? reason.message : String(reason)))
       .finally(() => setLoading(false));
   };
 
@@ -260,7 +262,7 @@ export function ReviewPanel({
         if (action === "commit") setCommitMessage("");
         load();
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+      .catch((reason: unknown) => setError(reason instanceof globalThis.Error ? reason.message : String(reason)))
       .finally(() => setActionBusy(null));
   };
 
@@ -269,7 +271,7 @@ export function ReviewPanel({
       <div className="flex h-full items-center justify-center px-8 text-center">
         <div className="max-w-[280px]">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-surface-border bg-surface-base text-muted">
-            <GitBranch size={18} />
+            <Icon icon={GitBranchIcon} size="lg" />
           </div>
           <p className="text-sm font-semibold text-primary">No local project selected</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">Choose a local project to review changes, branches, and diffs here.</p>
@@ -283,7 +285,7 @@ export function ReviewPanel({
       <div className="flex h-full items-center justify-center px-8 text-center">
         <div className="max-w-[300px]">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-surface-border bg-surface-base text-muted">
-            <FileCode size={18} />
+            <Icon icon={FileCodeIcon} size="lg" />
           </div>
           <p className="text-sm font-semibold text-primary">Files are primary here</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -304,7 +306,7 @@ export function ReviewPanel({
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface-page">
       <div className="flex min-h-[52px] flex-shrink-0 items-center gap-3 bg-surface-page px-3">
-        <GitBranch size={14} className="text-muted" />
+        <Icon icon={GitBranchIcon} size="sm" className="text-muted" />
         <Select
           value={currentBranch}
           onChange={checkoutBranch}
@@ -315,19 +317,19 @@ export function ReviewPanel({
         <span className="hidden min-w-0 flex-1 truncate text-2xs text-muted md:block">{projectName(rootPath)} - {changedCount} changed</span>
         <div className="ml-auto flex items-center gap-2">
           <div className="hidden items-center gap-0.5 rounded-lg bg-surface-base p-0.5 md:flex">
-            <ControlButton title="Enable word wrap" active={wordWrap} onClick={() => setWordWrap((value) => !value)}><WordWrap size={14} /></ControlButton>
-            <ControlButton title="Switch to split diff" active={splitDiff} onClick={() => setSplitDiff((value) => !value)}><Split size={14} /></ControlButton>
+            <ControlButton title="Enable word wrap" active={wordWrap} onClick={() => setWordWrap((value) => !value)}><Icon icon={TextAlignLeftIcon} size="sm" /></ControlButton>
+            <ControlButton title="Switch to split diff" active={splitDiff} onClick={() => setSplitDiff((value) => !value)}><Icon icon={ArrowsSplitIcon} size="sm" /></ControlButton>
             <ControlButton title="Ignore whitespace" active={ignoreWhitespace} onClick={() => setIgnoreWhitespace((value) => !value)}><span className="text-2xs font-semibold">WS</span></ControlButton>
           </div>
-          <ControlButton title="Show files" active={showFiles} onClick={() => setShowFiles((value) => !value)}><SidebarSimple size={14} /></ControlButton>
-          <ControlButton title="Refresh changes" onClick={load}><Refresh size={14} className={loading ? "animate-spin" : ""} /></ControlButton>
-          <ControlButton title="Copy git apply command" onClick={() => navigator.clipboard?.writeText(`git -C "${rootPath}" apply`)}><Copy size={14} /></ControlButton>
+          <ControlButton title="Show files" active={showFiles} onClick={() => setShowFiles((value) => !value)}><Icon icon={SidebarSimpleIcon} size="sm" /></ControlButton>
+          <ControlButton title="Refresh changes" onClick={load}><Redo size="sm" className={loading ? "animate-spin" : ""} /></ControlButton>
+          <ControlButton title="Copy git apply command" onClick={() => navigator.clipboard?.writeText(`git -C "${rootPath}" apply`)}><Copy size="sm" /></ControlButton>
         </div>
       </div>
 
       {error && (
         <div role="alert" className="mx-3 mb-2 flex items-start gap-2 rounded-lg bg-rose-500/[0.08] px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
-          <Warning size={15} className="mt-0.5 flex-shrink-0" />
+          <Error size="sm" className="mt-0.5 flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="font-medium">{pendingBranch ? `Branch switch blocked: ${pendingBranch}` : "Git action failed"}</p>
             {pendingBranch && <p className="mt-0.5 text-2xs opacity-90">Your working changes were left untouched. Stash them only if you want to retry the switch.</p>}
@@ -361,7 +363,6 @@ export function ReviewPanel({
               {files.map((file) => (
                 (() => {
                   const badge = statusBadge(file);
-                  const StatusIcon = badge.Icon;
                   return (
                     <Button
                       key={`${file.status}-${file.path}`}
@@ -372,7 +373,7 @@ export function ReviewPanel({
                       }`}
                     >
                       <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-surface-raised ${badge.className}`} title={statusLabel(file)}>
-                        <StatusIcon size={14} weight="duotone" />
+                        {badge.icon}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs text-primary">{file.path}</span>
@@ -386,7 +387,7 @@ export function ReviewPanel({
             </div>
             <div className="max-h-32 flex-shrink-0 overflow-y-auto border-t border-surface-divider p-2">
               <div className="mb-1 flex items-center gap-1.5 px-1 text-2xs font-medium uppercase tracking-extra-wide text-muted">
-                <GitCommit size={12} />
+                <Icon icon={GitCommitIcon} size="xs" />
                 Commits
               </div>
               {commits.map((commit) => (
@@ -414,7 +415,7 @@ export function ReviewPanel({
           </div>
           {diffLoading ? (
             <div className="flex h-full items-center justify-center text-xs text-muted">
-              <SpinnerGap size={15} className="mr-2 animate-spin" />
+              <Spinner size="sm" className="mr-2 animate-spin" />
               Loading diff
             </div>
           ) : splitDiff ? (
@@ -448,16 +449,16 @@ export function ReviewPanel({
       <div className="flex flex-shrink-0 items-end gap-2 border-t border-surface-divider/70 bg-surface-base/35 p-2">
         <div className="min-w-[180px] flex-1">
         <div className="mb-1 flex min-w-0 items-center gap-2">
-          <GitCommit size={15} className="flex-shrink-0 text-muted" />
+          <Icon icon={GitCommitIcon} size="sm" className="flex-shrink-0 text-muted" />
           <span className="text-xs font-medium text-primary">Commit changes</span>
           <span className="truncate text-2xs text-muted">{stagedCount} staged {stagedCount === 1 ? "file" : "files"}</span>
         </div>
-        <textarea
+        <Textarea
           value={commitMessage}
           onChange={(event) => setCommitMessage(event.target.value)}
           placeholder="Commit message"
           rows={1}
-          className="h-8 w-full resize-none rounded-md border border-surface-border/80 bg-surface-page px-2.5 py-1.5 text-xs leading-4 text-primary outline-none transition focus:border-focus focus:ring-1 focus:ring-focus/20 placeholder:text-muted"
+          className="h-8 resize-none rounded-md border-surface-border/80 bg-surface-page px-2.5 py-1.5 text-xs leading-4"
         />
         </div>
           <div className="flex flex-shrink-0 items-center gap-1">
@@ -467,7 +468,7 @@ export function ReviewPanel({
               disabled={actionBusy !== null || !selectedPath}
               className="h-8 gap-1 rounded-md bg-surface-page px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40"
             >
-              <StageIcon size={13} />
+              <Icon icon={UploadSimpleIcon} size="xs" />
               Stage file
             </Button>
             <Button
@@ -478,7 +479,7 @@ export function ReviewPanel({
             >
               Stage all
             </Button>
-            <Button variant="outline" onClick={() => runGitAction("unstage", "file")} disabled={actionBusy !== null || !selectedPath} className="h-8 gap-1 rounded-md bg-surface-page px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40"><UnstageIcon size={13} />Unstage file</Button>
+            <Button variant="outline" onClick={() => runGitAction("unstage", "file")} disabled={actionBusy !== null || !selectedPath} className="h-8 gap-1 rounded-md bg-surface-page px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40"><Icon icon={DownloadSimpleIcon} size="xs" />Unstage file</Button>
             <Button variant="ghost" onClick={() => runGitAction("unstage", "all")} disabled={actionBusy !== null} className="h-8 rounded-md px-2 text-2xs font-medium hover:bg-surface-hover disabled:opacity-40">Unstage all</Button>
           </div>
           <Button
@@ -488,7 +489,7 @@ export function ReviewPanel({
             className="h-8 flex-shrink-0 gap-1.5 rounded-md bg-surface-page px-3 text-xs font-semibold text-primary transition hover:bg-surface-hover disabled:opacity-40"
           >
             {actionBusy === "commit" ? "Committing..." : "Commit"}
-            {actionBusy !== "commit" && <ArrowRight size={13} weight="bold" />}
+            {actionBusy !== "commit" && <Forward size="xs" />}
           </Button>
       </div>
     </div>

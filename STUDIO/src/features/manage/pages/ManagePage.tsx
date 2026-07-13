@@ -4,7 +4,7 @@ import {
   UsersIcon as Users,
   CpuIcon as Cpu,
   DatabaseIcon as Database,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Manage, Collapse, Icon } from "@/ui/icons";
 import { Badge } from "@/ui/primitives/Badge";

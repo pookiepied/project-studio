@@ -12,18 +12,18 @@
 import { useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  ChatCircleIcon       as ChatCircle,
-  WaveformIcon         as Waveform,
-  MicrophoneIcon       as Microphone,
-  BrainIcon            as Brain,
-  SquaresFourIcon      as SquaresFour,
-  BriefcaseIcon        as Briefcase,
-  UserIcon             as User,
-  MonitorIcon          as Monitor,
-  ChartLineUpIcon      as ChartLineUp,
-  GearIcon             as Gear,
-  QuestionIcon         as Question,
-} from "@phosphor-icons/react";
+  Activity,
+  Brain,
+  Grid,
+  Message,
+  Microphone,
+  Monitor,
+  Project,
+  Question,
+  Settings,
+  User,
+  Waveform,
+} from "@/ui/icons";
 import { AccountMenu } from "./AccountMenu";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -36,15 +36,15 @@ const SECTIONS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Studio",
     items: [
-      { id: "chat",  label: "Chat", Icon: ChatCircle },
+      { id: "chat",  label: "Chat", Icon: Message },
       { id: "voice", label: "Live", Icon: Waveform   },
     ],
   },
   {
     label: "Spaces",
     items: [
-      { id: "workspace",  label: "Workspace", Icon: Briefcase   },
-      { id: "extensions", label: "Apps",      Icon: SquaresFour },
+      { id: "workspace",  label: "Workspace", Icon: Project   },
+      { id: "extensions", label: "Apps",      Icon: Grid },
     ],
   },
   {
@@ -57,7 +57,7 @@ const SECTIONS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Account",
     items: [
-      { id: "activity", label: "Activity", Icon: ChartLineUp },
+      { id: "activity", label: "Activity", Icon: Activity },
       { id: "memories", label: "Memories", Icon: Brain       },
       { id: "profile",  label: "Profile",  Icon: User        },
     ],
@@ -65,7 +65,7 @@ const SECTIONS: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 const BOTTOM: NavItem[] = [
-  { id: "settings", label: "Settings", Icon: Gear     },
+  { id: "settings", label: "Settings", Icon: Settings     },
   { id: "help",     label: "Help",     Icon: Question },
 ];
 
@@ -90,7 +90,7 @@ function NavRow({
     >
       <div className="flex-shrink-0 w-[18px] h-[18px] flex items-center justify-center">
         <item.Icon
-          size={14}
+          size="sm"
           weight={active ? "fill" : "regular"}
           className={`transition-colors duration-fast ${
             active ? "text-primary" : "text-muted group-hover:text-primary"
@@ -229,7 +229,7 @@ export function NavPopup({
                   : "text-secondary hover:bg-surface-hover hover:text-primary"
               }`}
             >
-              <item.Icon size={14} weight={currentView === item.id ? "fill" : "regular"} />
+              <item.Icon size="sm" weight={currentView === item.id ? "fill" : "regular"} />
             </IconButton>
           ))}
         </div>

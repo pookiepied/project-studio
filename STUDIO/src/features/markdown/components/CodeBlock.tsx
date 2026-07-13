@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FONT_MONO } from "@/design/fonts";
-import { CopyIcon as Copy, CheckIcon as Check, CaretDownIcon as CaretDown, CaretUpIcon as CaretUp, TextAlignLeftIcon as TextAlignLeft, EyeIcon as Eye } from "@phosphor-icons/react";
+import { Copy, Check, Expand, Icon, CaretUpIcon, TextAlignLeftIcon, Eye } from "@/ui/icons";
 import { useBrowserPanel } from "@/app/contexts/BrowserPanelContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
@@ -159,12 +159,12 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
             <AnimatePresence mode="wait">
               {copied ? (
                 <motion.div key="check" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.15 }} className="flex items-center gap-1">
-                  <Check size={14} weight="bold" className="text-secondary" />
+                  <Check size="sm" className="text-secondary" />
                   <span className="text-secondary">Copied</span>
                 </motion.div>
               ) : (
                 <motion.div key="copy" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.15 }}>
-                  <Copy size={14} weight="regular" />
+                  <Copy size="sm" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -219,7 +219,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                     transition={{ duration: 0.15 }}
                     className="flex items-center gap-1"
                   >
-                    <Check size={14} weight="bold" className="text-secondary" />
+                    <Check size="sm" className="text-secondary" />
                     <span className="text-secondary">Opened</span>
                   </motion.div>
                 ) : (
@@ -231,7 +231,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                     transition={{ duration: 0.15 }}
                     className="flex items-center gap-1"
                   >
-                    <Eye size={14} weight="regular" />
+                    <Eye size="sm" />
                     <span>Preview</span>
                   </motion.div>
                 )}
@@ -253,7 +253,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                 : "text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised"
             }`}
           >
-            <TextAlignLeft size={14} weight="regular" />
+            <Icon icon={TextAlignLeftIcon} size="sm" />
           </Button>
 
           {/* Expand/collapse for long blocks */}
@@ -267,7 +267,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
               title={isCollapsed ? `Expand ${lineCount} lines` : "Collapse"}
               className="p-1.5 text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-raised rounded-lg transition-colors"
             >
-              {isCollapsed ? <CaretDown size={14} weight="regular" /> : <CaretUp size={14} weight="regular" />}
+              {isCollapsed ? <Expand size="sm" /> : <Icon icon={CaretUpIcon} size="sm" />}
             </Button>
           )}
 
@@ -290,7 +290,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                   transition={{ duration: 0.15 }}
                   className="flex items-center gap-1"
                 >
-                  <Check size={14} weight="bold" className="text-secondary" />
+                  <Check size="sm" className="text-secondary" />
                   <span className="text-secondary">Copied</span>
                 </motion.div>
               ) : (
@@ -301,7 +301,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                   exit={{ scale: 0.8, opacity: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <Copy size={14} weight="regular" />
+                  <Copy size="sm" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -329,7 +329,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                 customStyle={{
                   margin: 0,
                   padding: "1rem 1.25rem",
-                  fontSize: "0.8125rem",
+                  fontSize: "var(--text-sm)",
                   lineHeight: "1.6",
                   background: "var(--surface-base)",
                   fontFamily: FONT_MONO,
@@ -337,9 +337,9 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
                 lineNumberStyle={{
                   minWidth: "2.5em",
                   paddingRight: "1em",
-                  color: "#bbb",
+                  color: "var(--text-disabled)",
                   userSelect: "none",
-                  fontSize: "0.75rem",
+                  fontSize: "var(--text-xs)",
                 }}
                 codeTagProps={{
                   style: {
@@ -364,7 +364,7 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => {
           onClick={() => setIsCollapsed(false)}
           className="w-full py-3 text-xs text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-raised transition-colors flex items-center justify-center gap-2"
         >
-          <CaretDown size={14} weight="bold" />
+          <Expand size="sm" />
           <span>Show {lineCount} lines</span>
         </Button>
       )}

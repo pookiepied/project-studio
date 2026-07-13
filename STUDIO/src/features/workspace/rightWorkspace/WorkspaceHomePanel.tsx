@@ -1,11 +1,11 @@
 import { useRef, type MouseEvent as ReactMouseEvent } from "react";
 import {
-  ChatCircleTextIcon as ChatCircleText,
-  FilesIcon as Files,
-  GlobeIcon as Globe,
-  TerminalIcon as Terminal,
-  XIcon as X,
-} from "@phosphor-icons/react";
+  Conversation,
+  Files,
+  Globe,
+  Terminal,
+  Close,
+} from "@/ui/icons";
 import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
 import type { RightWorkspaceView } from "./types";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -26,7 +26,7 @@ const ITEMS: Array<{
 }> = [
   { view: "browser", label: "Browser", shortcut: "Ctrl+T", Icon: Globe },
   { view: "terminal", label: "Terminal", Icon: Terminal },
-  { view: "side-chat", label: "Side chat", shortcut: "Ctrl+Alt+S", Icon: ChatCircleText },
+  { view: "side-chat", label: "Side chat", shortcut: "Ctrl+Alt+S", Icon: Conversation },
   { view: "files", label: "Files", shortcut: "Ctrl+P", Icon: Files },
 ];
 
@@ -74,7 +74,7 @@ export function WorkspaceHomePanel({
             title="Close workspace"
             className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-600 dark:hover:bg-surface-raised dark:hover:text-gray-300"
           >
-            <X size={14} weight="bold" />
+            <Close size="sm" />
           </IconButton>
           <span className="truncate text-xs text-gray-500 dark:text-gray-500">Workspace</span>
         </div>
@@ -88,7 +88,7 @@ export function WorkspaceHomePanel({
                 onClick={() => onOpenView(view)}
                 className="flex h-10 w-full items-center gap-3 rounded-md bg-gray-100 px-3 text-left justify-start text-sm text-gray-700 transition-colors duration-100 hover:bg-gray-200/70 dark:bg-surface-raised dark:text-gray-300 dark:hover:bg-surface-selected"
               >
-                <Icon size={14} weight="regular" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
+                <Icon size="sm" className="flex-shrink-0 text-gray-500 dark:text-gray-500" />
                 <span className="min-w-0 flex-1 truncate">{label}</span>
                 {shortcut && (
                   <kbd className="flex-shrink-0 rounded bg-white/80 px-1.5 py-0.5 text-2xs text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">

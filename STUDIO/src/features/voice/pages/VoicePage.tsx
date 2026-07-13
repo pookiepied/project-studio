@@ -20,7 +20,7 @@ import {
   PhoneXIcon,
   SpeakerHighIcon,
   SpeakerSlashIcon,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { SessionState } from "@/features/voice/hooks/useLiveSession";
 import { useLiveSessionContext } from "@/features/voice/context/LiveSessionContext";
 import { IconButton } from "@/ui/primitives/IconButton";
@@ -273,7 +273,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                   whileTap={{ scale: 0.95 }}
                   onClick={handleToggleMic}
                   aria-label={isMicMuted ? "Unmute microphone" : "Mute microphone"}
-                  className={`flex items-center justify-center w-11 h-11 rounded-full border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page ${
+                  className={`flex items-center justify-center w-11 h-11 rounded-full border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                     isMicMuted
                       ? "bg-surface-selected border-surface-border text-primary"
                       : "bg-surface-base border-surface-border text-secondary hover:bg-surface-hover hover:text-primary"
@@ -295,7 +295,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                   whileTap={{ scale: 0.95 }}
                   onClick={endSession}
                   aria-label="End voice session"
-                  className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-surface-border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+                  className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-surface-border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus "
                 >
                   <Icon icon={PhoneXIcon} size="md" />
                 </Button>
@@ -309,7 +309,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                   whileTap={{ scale: 0.95 }}
                   onClick={handleToggleSpeaker}
                   aria-label={isSpeakerMuted ? "Unmute speaker" : "Mute speaker"}
-                  className={`flex items-center justify-center w-11 h-11 rounded-full border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page ${
+                  className={`flex items-center justify-center w-11 h-11 rounded-full border transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                     isSpeakerMuted
                       ? "bg-surface-selected border-surface-border text-primary"
                       : "bg-surface-base border-surface-border text-secondary hover:bg-surface-hover hover:text-primary"
@@ -333,7 +333,7 @@ export const VoicePage = ({ onNavigateSettings }: { onNavigateSettings?: () => v
                 exit={{ opacity: 0 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => { endSession(); setTimeout(startSession, 80); }}
-                className="px-5 py-2.5 rounded-full border border-surface-border text-sm font-mono tracking-wide transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+                className="px-5 py-2.5 rounded-full border border-surface-border text-sm font-mono tracking-wide transition-colors duration-normal ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus "
               >
                 Retry
               </Button>

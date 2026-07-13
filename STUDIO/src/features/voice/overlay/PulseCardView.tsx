@@ -7,15 +7,15 @@
 
 import { motion } from "framer-motion";
 import {
-  CheckCircleIcon as CheckCircle,
-  XIcon as X,
-  CurrencyCircleDollarIcon as CurrencyDollar,
-  MagnifyingGlassIcon as MagnifyingGlass,
+  Success,
+  Close,
+  Icon,
+  CurrencyCircleDollarIcon,
+  Search,
   ImageIcon,
-  BrainIcon as Brain,
-  TerminalIcon as Terminal,
-} from "@phosphor-icons/react";
-import { FONT_SANS } from "@/design/fonts";
+  Brain,
+  Terminal,
+} from "@/ui/icons";
 import type { PulseCard, PulseCardType } from "@/types/pulse";
 import type { OverlayActionType } from "@/core/platform/overlayService";
 import { ActionBtn } from "./IslandAtoms";
@@ -27,19 +27,19 @@ export function CardIcon({ type }: { type: PulseCardType }) {
   const cls = "text-gray-500 dark:text-gray-400 flex-shrink-0";
   switch (type) {
     case "price-lookup":
-      return <CurrencyDollar size={14} weight="regular" className={cls} />;
+      return <Icon icon={CurrencyCircleDollarIcon} size="sm" className={cls} />;
     case "web-search":
-      return <MagnifyingGlass size={14} weight="regular" className={cls} />;
+      return <Search size="sm" className={cls} />;
     case "image-generation":
     case "video-generation":
-      return <ImageIcon size={14} weight="regular" className={cls} />;
+      return <Icon icon={ImageIcon} size="sm" className={cls} />;
     case "memory":
-      return <Brain size={14} weight="regular" className={cls} />;
+      return <Brain size="sm" className={cls} />;
     case "computer-use":
     case "ocr":
-      return <Terminal size={14} weight="regular" className={cls} />;
+      return <Terminal size="sm" className={cls} />;
     default:
-      return <CheckCircle size={14} weight="regular" className={cls} />;
+      return <Success size="sm" className={cls} />;
   }
 }
 
@@ -64,24 +64,21 @@ export function PulseCardContent({ card, onAction }: PulseCardContentProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
-      className="flex items-center gap-2.5 px-3.5 h-[46px] max-w-[420px]"
-      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      className="flex items-center gap-2.5 px-3.5 h-[46px] max-w-[420px] no-drag-region"
     >
       <CardIcon type={card.type} />
 
       <div className="flex flex-col min-w-0 flex-1" style={{ gap: 1 }}>
         {card.title && (
           <span
-            className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate leading-tight"
-            style={{ fontFamily: FONT_SANS }}
+            className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate leading-tight font-sans"
           >
             {card.title}
           </span>
         )}
         {card.text && (
           <span
-            className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight"
-            style={{ fontFamily: FONT_SANS }}
+            className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight font-sans"
           >
             {card.text.length > 55 ? card.text.slice(0, 52) + "…" : card.text}
           </span>
@@ -99,15 +96,14 @@ export function PulseCardContent({ card, onAction }: PulseCardContentProps) {
 
       {card.subtext && (
         <span
-          className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 whitespace-nowrap"
-          style={{ fontFamily: FONT_SANS }}
+          className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 whitespace-nowrap font-sans"
         >
           {card.subtext}
         </span>
       )}
 
       <ActionBtn
-        icon={<X size={12} weight="regular" />}
+         icon={<Close size="xs" />}
         label="Dismiss"
         onClick={() => onAction("dismiss")}
       />

@@ -8,15 +8,15 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FONT_SANS } from "@/design/fonts";
 import {
-  ArrowSquareOutIcon as ArrowsOut,
-  XIcon as X,
-  WarningCircleIcon as WarningCircle,
-  SpeakerHighIcon as SpeakerHigh,
-  UserSoundIcon as UserSound,
-  ChatsCircleIcon as ChatsCircle,
-} from "@phosphor-icons/react";
+  Close,
+  ExternalLink,
+  Error,
+  Volume,
+  Icon,
+  UserSoundIcon,
+  ChatsCircleIcon,
+} from "@/ui/icons";
 
 import type { OverlayPayload, OverlayActionType } from "@/core/platform/overlayService";
 import { deriveIslandViewState, getIslandVisualSize } from "@/core/platform/islandViewState";
@@ -96,8 +96,7 @@ function VoiceCaptionLine({
           animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
           exit={{ y: -9, opacity: 0, filter: "blur(2px)" }}
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute inset-0 flex min-w-0 items-center gap-[3px] whitespace-nowrap"
-          style={{ fontFamily: FONT_SANS }}
+          className="absolute inset-0 flex min-w-0 items-center gap-[3px] whitespace-nowrap font-sans"
         >
           {lineWords.map((word, index) => {
             const absoluteIndex = lineStart + index;
@@ -221,18 +220,15 @@ export function FloatingIsland({
           pointer-events-auto
           flex items-center justify-center
           rounded-full overflow-hidden select-none
+          drag-region
           ${hasShellChrome
             ? `bg-white dark:bg-surface-page
                border border-gray-900/[0.07] dark:border-white/[0.07]
                backdrop-blur-2xl
-               shadow-[0_8px_40px_rgba(0,0,0,0.13),0_2px_8px_rgba(0,0,0,0.07)]
-               dark:shadow-[0_8px_48px_rgba(0,0,0,0.65),0_2px_8px_rgba(0,0,0,0.4)]`
+               shadow-lg`
             : "bg-transparent border border-transparent shadow-none"}
         `}
-        style={{
-          WebkitAppRegion: "drag",
-          willChange: "width, height, transform, opacity",
-        } as React.CSSProperties}
+        style={{ willChange: "width, height, transform, opacity" }}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {view.kind === "idle" && (
@@ -244,8 +240,7 @@ export function FloatingIsland({
               onClick={toggleIdleMenu}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="flex items-center justify-center px-4 h-7 cursor-pointer"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="flex items-center justify-center px-4 h-7 cursor-pointer no-drag-region"
               title="Pulse"
               aria-label="Pulse"
             >
@@ -258,8 +253,7 @@ export function FloatingIsland({
               key="idle-expanded"
               layout
               {...CONTENT_ANIM}
-              className="flex w-full items-center justify-center gap-1.5 px-2 h-[38px]"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="flex w-full items-center justify-center gap-1.5 px-2 h-[38px] no-drag-region"
             >
               <IconButton
                 onClick={toggleIdleMenu}
@@ -271,17 +265,17 @@ export function FloatingIsland({
               </IconButton>
               <div className="w-px h-4 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-0.5" />
               <ActionBtn
-                icon={<UserSound size={14} weight="regular" />}
+                icon={<Icon icon={UserSoundIcon} size="sm" />}
                 label="Start live agent"
                 onClick={() => runAction("startVoice")}
               />
               <ActionBtn
-                icon={<ChatsCircle size={14} weight="regular" />}
+                icon={<Icon icon={ChatsCircleIcon} size="sm" />}
                 label="Open chat"
                 onClick={() => runAction("openChat")}
               />
               <ActionBtn
-                icon={<ArrowsOut size={14} weight="regular" />}
+                icon={<ExternalLink size="sm" />}
                 label="Open Studio"
                 onClick={() => runAction("focus")}
               />
@@ -293,20 +287,18 @@ export function FloatingIsland({
               key="recording"
               layout
               {...TEXT_CONTENT_ANIM}
-              className="flex items-center gap-2.5 px-4 h-[46px]"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="flex items-center gap-2.5 px-4 h-[46px] no-drag-region"
             >
               <RecDot />
               <WaveformBars levels={audioLevels} />
               <span
-                className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap"
-                style={{ fontFamily: FONT_SANS }}
+                className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap font-sans"
               >
                 {activeModeLabel}
               </span>
               {view.isVoice && (
                 <ActionBtn
-                  icon={<X size={12} weight="regular" />}
+                  icon={<Close size="xs" />}
                   label="End live agent"
                   onClick={() => onAction("dismiss")}
                 />
@@ -319,19 +311,17 @@ export function FloatingIsland({
               key={`processing-${state}`}
               layout
               {...TEXT_CONTENT_ANIM}
-              className={`flex items-center gap-2.5 px-4 ${view.isVoice ? "h-[42px]" : "h-[46px]"}`}
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className={`flex items-center gap-2.5 px-4 ${view.isVoice ? "h-[42px]" : "h-[46px]"} no-drag-region`}
             >
               <LoadingRing />
               <span
-                className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap"
-                style={{ fontFamily: FONT_SANS }}
+                className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap font-sans"
               >
                 {statusLabel}
               </span>
               {view.isVoice && (
                 <ActionBtn
-                  icon={<X size={12} weight="regular" />}
+                  icon={<Close size="xs" />}
                   label="End live agent"
                   onClick={() => onAction("dismiss")}
                 />
@@ -348,24 +338,22 @@ export function FloatingIsland({
               key="complete-transcription"
               layout
               {...TEXT_CONTENT_ANIM}
-              className="flex items-center gap-2 px-3.5 h-[40px] max-w-[380px]"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="flex items-center gap-2 px-3.5 h-[40px] max-w-[380px] no-drag-region"
             >
               <span
-                className="text-sm text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate"
-                style={{ fontFamily: FONT_SANS }}
+                className="text-sm text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate font-sans"
               >
                 {truncated || "Done"}
               </span>
 
               <div className="flex items-center gap-1 flex-shrink-0">
                 <ActionBtn
-                  icon={<ArrowsOut size={12} weight="regular" />}
+                  icon={<ExternalLink size="xs" />}
                   label="Expand in Studio"
                   onClick={() => onAction("expand")}
                 />
                 <ActionBtn
-                  icon={<X size={12} weight="regular" />}
+                  icon={<Close size="xs" />}
                   label="Dismiss"
                   onClick={() => onAction("dismiss")}
                 />
@@ -378,18 +366,16 @@ export function FloatingIsland({
               key="complete-voice"
               layout
               {...TEXT_CONTENT_ANIM}
-              className="flex items-center gap-2.5 px-4 h-[46px] max-w-[350px]"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="flex items-center gap-2.5 px-4 h-[46px] max-w-[350px] no-drag-region"
             >
-              <SpeakerHigh
-                size={14}
-                weight="regular"
+              <Volume
+                size="sm"
                 className="text-gray-500 dark:text-gray-400 flex-shrink-0"
               />
               <SpeakingBars />
               <VoiceCaptionLine caption={voiceCaption} fallbackText={aiText} />
               <ActionBtn
-                icon={<X size={12} weight="regular" />}
+                icon={<Close size="xs" />}
                 label="End live agent"
                 onClick={() => onAction("dismiss")}
               />
@@ -401,23 +387,20 @@ export function FloatingIsland({
               key="error"
               layout
               {...CONTENT_ANIM}
-              className="flex items-center gap-2.5 px-4 h-[46px]"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="flex items-center gap-2.5 px-4 h-[46px] no-drag-region"
             >
-              <WarningCircle
-                size={14}
-                weight="regular"
+              <Error
+                size="sm"
                 className="text-secondary flex-shrink-0"
               />
               <span
-                className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap"
-                style={{ fontFamily: FONT_SANS }}
+                className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap font-sans"
               >
                 Something went wrong
               </span>
               <div className="w-px h-3.5 bg-gray-900/[0.07] dark:bg-white/[0.07] mx-1" />
               <ActionBtn
-                icon={<X size={12} weight="regular" />}
+                icon={<Close size="xs" />}
                 label="Dismiss"
                 onClick={() => onAction("dismiss")}
               />

@@ -9,9 +9,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Refresh, Close, Search } from "@/ui/icons";
+import { Refresh, Close } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { Spinner } from "@/ui/primitives/Spinner";
+import { SearchInput } from "@/ui/primitives";
 import { useModelsContext as useModels } from "@/features/models/context";
 import { sortModels, sortProvidersByFree, groupModelsByProvider } from "@/features/models/services/modelService";
 import { AUTO_DISPLAY_MODEL } from "@/core/config/autoMode";
@@ -198,28 +199,15 @@ export function ModelLibraryPanel({
 
               <main className="min-w-0 min-h-0 grid grid-rows-[auto_1fr] bg-surface-base">
                 <div className="border-b border-surface-border p-4">
-                  <div className="flex items-center gap-2 rounded-lg border border-surface-border px-3 h-10">
-                    <Search size="sm" className="text-muted flex-shrink-0" />
-                    <input
-                      ref={searchRef}
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search models, providers, capabilities..."
-                      className="flex-1 min-w-0 bg-transparent outline-none text-sm text-primary placeholder:text-muted"
-                    />
-                    {search && (
-                      <IconButton
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSearch("")}
-                        aria-label="Clear search"
-                        className="text-muted hover:text-primary transition-colors"
-                      >
-                        <Close size="xs" />
-                      </IconButton>
-                    )}
-                  </div>
+                  <SearchInput
+                    ref={searchRef}
+                    value={search}
+                    onValueChange={setSearch}
+                    aria-label="Search models"
+                    placeholder="Search models, providers, capabilities..."
+                    size="lg"
+                    className="text-sm"
+                  />
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {TYPE_FILTERS.map((filter) => (

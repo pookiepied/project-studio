@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  SignOutIcon as SignOut,
-  UserCircleIcon as UserCircle,
-} from "@phosphor-icons/react";
+  Logout,
+  UserCircle,
+} from "@/ui/icons";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { Button } from "@/ui/primitives/Button";
 
@@ -138,7 +138,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
                 variant="ghost"
                 className="w-full gap-2.5 rounded-lg px-3 py-2 text-left text-sm"
               >
-                <UserCircle size={14} weight="regular" />
+                <UserCircle size="sm" />
                 Manage account
               </Button>
 
@@ -151,7 +151,7 @@ export function AccountMenu({ expanded = true, onManageAccount }: AccountMenuPro
                   variant="ghost"
                   className="w-full gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised dark:hover:bg-surface-raised/[0.06]"
                 >
-                  <SignOut size={14} weight="regular" />
+                  <Logout size="sm" />
                   Sign out
                 </Button>
               )}

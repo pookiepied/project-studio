@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { PencilSimpleIcon as PencilSimple, CheckIcon as Check } from "@phosphor-icons/react";
+import { Edit, Check } from "@/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/ui/primitives/Button";
+import { Textarea } from "@/ui/primitives/Textarea";
 
 interface TextBlockProps {
   code: string;
@@ -35,13 +36,12 @@ export function TextBlock({ code }: TextBlockProps) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
           >
-            <textarea
+            <Textarea
               value={text}
               onChange={e => setText(e.target.value)}
               onKeyDown={e => { if (e.key === "Escape") handleSave(); }}
               autoFocus
-              className="w-full px-4 py-3 text-sm text-gray-800 dark:text-gray-200
-                         bg-transparent border-0 outline-none resize-none
+              className="bg-transparent border-0 px-4 py-3 text-sm
                          leading-relaxed font-sans"
               rows={Math.max(3, text.split("\n").length + 1)}
             />
@@ -57,7 +57,7 @@ export function TextBlock({ code }: TextBlockProps) {
                            hover:bg-gray-200 dark:hover:bg-surface-border
                            rounded-lg transition-colors duration-100"
               >
-                <Check size={14} weight="bold" />
+                <Check size="sm" />
                 Done
               </Button>
             </div>
@@ -99,11 +99,11 @@ export function TextBlock({ code }: TextBlockProps) {
           <AnimatePresence mode="wait">
             {saved ? (
               <motion.div key="saved" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.12 }}>
-                <Check size={14} weight="bold" className="text-secondary" />
+                <Check size="sm" className="text-secondary" />
               </motion.div>
             ) : (
               <motion.div key="edit" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.12 }}>
-                <PencilSimple size={14} weight="regular" />
+                <Edit size="sm" />
               </motion.div>
             )}
           </AnimatePresence>

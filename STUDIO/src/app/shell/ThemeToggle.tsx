@@ -1,4 +1,4 @@
-import { MoonIcon as Moon, SunIcon as Sun } from "@phosphor-icons/react";
+import { Moon, Sun } from "@/ui/icons";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { resolveTheme } from "@/lib/theme";
@@ -21,7 +21,7 @@ export function ThemeToggle() {
       className="group rounded-full"
     >
       <Icon
-        size={14}
+        size="sm"
         weight="regular"
         className="text-muted transition-colors group-hover:text-primary"
       />

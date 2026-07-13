@@ -1,34 +1,41 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArchiveBoxIcon as ArchiveBox,
-  BrainIcon as Brain,
-  BriefcaseIcon as Briefcase,
-  CaretRightIcon as CaretRight,
-  CheckCircleIcon as CheckCircle,
-  ClockIcon as Clock,
-  DatabaseIcon as Database,
-  FileTextIcon as FileText,
-  FolderOpenIcon as FolderOpen,
-  GearSixIcon as GearSix,
-  GraphIcon as Graph,
-  LightningIcon as Lightning,
-  ListChecksIcon as ListChecks,
-  PauseIcon as Pause,
-  PlayIcon as Play,
-  PlusIcon as Plus,
-  RobotIcon as Robot,
-  ShieldCheckIcon as ShieldCheck,
-  SpinnerGapIcon as SpinnerGap,
-  TagIcon as Tag,
-  TrashIcon as Trash,
-  UploadSimpleIcon as UploadSimple,
-  WarningCircleIcon as WarningCircle,
-  XCircleIcon as XCircle,
-} from "@phosphor-icons/react";
+  Icon,
+  type PhosphorIcon,
+  Add,
+  Brain,
+  Checklist,
+  Clock,
+  Collapse,
+  Delete,
+  Document,
+  Error,
+  FolderOpen,
+  Lightning,
+  Pause,
+  Play,
+  Project,
+  Reject,
+  ShieldCheck,
+  Spinner,
+  Success,
+  ArchiveBoxIcon,
+  BrainIcon,
+  DatabaseIcon,
+  FileTextIcon,
+  GearSixIcon,
+  GraphIcon,
+  RobotIcon,
+  SpinnerGapIcon,
+  TagIcon,
+  UploadSimpleIcon,
+} from "@/ui/icons";
 import { EmptyState } from "@/ui/primitives/EmptyState";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { Input } from "@/ui/primitives/Input";
+import { Textarea } from "@/ui/primitives/Textarea";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   deleteKbDoc,
@@ -66,8 +73,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   knowledge: "Knowledge",
 };
 
+type LocalIconProps = Omit<React.ComponentProps<typeof Icon>, "icon">;
+
+const makeLocalIcon = (glyph: PhosphorIcon) =>
+  forwardRef<SVGSVGElement, LocalIconProps>((props, ref) => (
+    <Icon ref={ref} icon={glyph} {...props} />
+  ));
+
+const Database = makeLocalIcon(DatabaseIcon);
+const GearSix = makeLocalIcon(GearSixIcon);
+const Graph = makeLocalIcon(GraphIcon);
+const Robot = makeLocalIcon(RobotIcon);
+const Tag = makeLocalIcon(TagIcon);
+const UploadSimple = makeLocalIcon(UploadSimpleIcon);
+
 const SECTIONS: Array<{ id: WorkspaceSection; label: string; icon: React.ElementType; hint: string }> = [
-  { id: "overview", label: "Overview", icon: Briefcase, hint: "Current state" },
+  { id: "overview", label: "Overview", icon: Project, hint: "Current state" },
   { id: "artifacts", label: "Artifacts", icon: Lightning, hint: "Universal lab" },
   { id: "context", label: "Context", icon: Database, hint: "Docs and memory" },
   { id: "automation", label: "Automation", icon: Robot, hint: "Agents and routines" },
@@ -96,11 +117,11 @@ function formatRelative(ts: number): string {
 
 function runStatusIcon(status: AgentRun["status"]) {
   switch (status) {
-    case "completed": return <CheckCircle size={14} weight="fill" className="text-secondary" />;
-    case "failed": return <XCircle size={14} weight="fill" className="text-secondary" />;
-    case "running": return <SpinnerGap size={14} className="animate-spin text-secondary" />;
-    case "queued": return <Clock size={14} className="text-gray-400" />;
-    case "cancelled": return <Pause size={14} weight="fill" className="text-gray-400" />;
+    case "completed": return <Success size="sm" weight="fill" className="text-secondary" />;
+    case "failed": return <Reject size="sm" weight="fill" className="text-secondary" />;
+    case "running": return <Spinner size="sm" className="animate-spin text-secondary" />;
+    case "queued": return <Clock size="sm" className="text-disabled" />;
+    case "cancelled": return <Pause size="sm" weight="fill" className="text-disabled" />;
   }
 }
 
@@ -118,7 +139,7 @@ function ToolbarButton({
       variant="primary"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 h-auto text-xs font-medium text-white transition-colors duration-150 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+      className="inline-flex gap-1.5 rounded-md bg-primary px-3 py-1.5 h-auto text-xs font-medium text-on-emphasis transition-colors duration-150 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </Button>
@@ -135,10 +156,10 @@ function Metric({
   sub?: string;
 }) {
   return (
-    <div className="min-w-0 border-r border-gray-100 px-5 py-4 last:border-r-0 dark:border-surface-divider">
-      <p className="text-2xs font-medium uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">{label}</p>
-      <p className="mt-1 truncate text-lg font-display text-gray-900 dark:text-gray-100">{value}</p>
-      {sub && <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-600">{sub}</p>}
+    <div className="min-w-0 border-r border-surface-divider px-5 py-4 last:border-r-0">
+      <p className="text-2xs font-medium uppercase tracking-extra-wide text-disabled">{label}</p>
+      <p className="mt-1 truncate text-lg font-display text-primary">{value}</p>
+      {sub && <p className="mt-0.5 truncate text-xs text-disabled">{sub}</p>}
     </div>
   );
 }
@@ -155,7 +176,7 @@ function DocumentList({
   if (docs.length === 0) {
     return (
       <EmptyState
-        icon={FileText}
+        icon={FileTextIcon}
         title="No documents yet"
         body="Add project notes, specs, research, or JSON context that should survive across conversations."
       />
@@ -163,15 +184,15 @@ function DocumentList({
   }
 
   return (
-    <ul className="divide-y divide-gray-50 dark:divide-surface-divider">
+    <ul className="divide-y divide-surface-divider">
       {docs.map((doc) => (
-        <li key={doc.id} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-gray-100 dark:bg-surface-raised">
-            <FileText size={14} weight="duotone" className="text-gray-400 dark:text-gray-500" />
+        <li key={doc.id} className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-hover">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-surface-base">
+            <Document size="sm" className="text-muted" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-200" title={doc.name}>{doc.name}</p>
-            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-600">
+            <p className="truncate text-xs font-medium text-primary" title={doc.name}>{doc.name}</p>
+            <p className="mt-0.5 text-xs text-disabled">
               {formatBytes(doc.size)} · {doc.chunkCount} chunks · {formatDate(doc.createdAt)}
               {doc.truncated && <span className="ml-1.5 text-secondary">truncated</span>}
             </p>
@@ -182,9 +203,9 @@ function DocumentList({
             size="sm"
             onClick={() => onDelete(doc.id, doc.size)}
             disabled={deletingDocId === doc.id}
-            className="flex-shrink-0 rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+            className="flex-shrink-0 rounded-md text-disabled opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
-            {deletingDocId === doc.id ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
+            {deletingDocId === doc.id ? <Spinner size="sm" className="animate-spin" /> : <Delete size="sm" />}
           </IconButton>
         </li>
       ))}
@@ -212,7 +233,7 @@ function MemoryList({
   if (facts.length === 0) {
     return (
       <EmptyState
-        icon={Brain}
+        icon={BrainIcon}
         title="No memories yet"
         body="Memory facts will appear here as conversations are distilled into reusable user context."
       />
@@ -224,20 +245,20 @@ function MemoryList({
       {categories.map((cat) => (
         <section key={cat} className="mb-2">
           <div className="px-5 py-2">
-            <span className="text-2xs font-semibold uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">
+            <span className="text-2xs font-semibold uppercase tracking-extra-wide text-disabled">
               {CATEGORY_LABELS[cat] ?? cat}
             </span>
           </div>
           <ul>
             {grouped[cat].map((fact) => (
-              <li key={fact.key} className="group flex items-start gap-3 px-5 py-2.5 transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+              <li key={fact.key} className="group flex items-start gap-3 px-5 py-2.5 transition-colors hover:bg-surface-hover">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs leading-relaxed text-gray-700 dark:text-gray-300">{fact.content}</p>
+                  <p className="text-xs leading-relaxed text-secondary">{fact.content}</p>
                   {fact.tags?.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <Tag size={12} className="text-gray-300 dark:text-gray-700" />
+                      <Tag size="xs" className="text-disabled" />
                       {fact.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="rounded bg-gray-100/80 px-1.5 py-0.5 text-2xs text-gray-400 dark:bg-surface-raised dark:text-gray-600">{tag}</span>
+                        <span key={tag} className="rounded bg-surface-base px-1.5 py-0.5 text-2xs text-disabled">{tag}</span>
                       ))}
                     </div>
                   )}
@@ -254,9 +275,9 @@ function MemoryList({
                     size="sm"
                     onClick={() => onDelete(fact.key)}
                     disabled={deletingFactId === fact.key}
-                    className="rounded-md text-gray-300 opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:text-gray-700 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+                    className="rounded-md text-disabled opacity-0 transition-all hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
                   >
-                    {deletingFactId === fact.key ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
+                    {deletingFactId === fact.key ? <Spinner size="sm" className="animate-spin" /> : <Delete size="sm" />}
                   </IconButton>
                 </div>
               </li>
@@ -318,70 +339,72 @@ function CreateAgentForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-b border-gray-100 bg-gray-50/50 px-5 py-4 dark:border-surface-divider dark:bg-white/[0.015]">
+    <form onSubmit={handleSubmit} className="border-b border-surface-divider bg-surface-base/50 px-5 py-4">
       {error && (
         <div className="mb-3 flex items-center gap-2 text-xs text-secondary">
-          <WarningCircle size={14} /> {error}
+          <Error size="sm" /> {error}
         </div>
       )}
       <div className="grid grid-cols-[1fr_112px_132px] gap-3">
         <label className="min-w-0">
-          <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-gray-500 dark:text-gray-500">Name</span>
-          <input
+          <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Name</span>
+          <Input
+            size="md"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Weekly research digest"
-            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 outline-none transition focus:border-gray-900 dark:border-surface-border dark:bg-surface-raised dark:text-gray-200 dark:focus:border-gray-200"
+            className="rounded-md text-xs dark:bg-surface-raised"
           />
         </label>
         <label>
-          <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-gray-500 dark:text-gray-500">Type</span>
+          <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Type</span>
           <select
             value={agentType}
             onChange={(event) => setAgentType(event.target.value as AgentType)}
-            className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-700 outline-none transition focus:border-gray-900 dark:border-surface-border dark:bg-surface-raised dark:text-gray-300 dark:focus:border-gray-200"
+            className="w-full rounded-md border border-surface-border bg-surface-base px-2.5 py-2 text-xs text-secondary outline-none transition focus:border-primary"
           >
             {AGENT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         <label>
-          <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-gray-500 dark:text-gray-500">Trigger</span>
+          <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Trigger</span>
           <select
             value={triggerType}
             onChange={(event) => setTriggerType(event.target.value as TriggerType)}
-            className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-700 outline-none transition focus:border-gray-900 dark:border-surface-border dark:bg-surface-raised dark:text-gray-300 dark:focus:border-gray-200"
+            className="w-full rounded-md border border-surface-border bg-surface-base px-2.5 py-2 text-xs text-secondary outline-none transition focus:border-primary"
           >
             {TRIGGER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
       </div>
       <label className="mt-3 block">
-        <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-gray-500 dark:text-gray-500">Goal</span>
-        <textarea
+        <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Goal</span>
+        <Textarea
           value={goal}
           onChange={(event) => setGoal(event.target.value)}
           placeholder="Track model releases, summarize what matters, and produce a short report."
           rows={3}
-          className="w-full resize-none rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 outline-none transition focus:border-gray-900 dark:border-surface-border dark:bg-surface-raised dark:text-gray-200 dark:focus:border-gray-200"
+          className="resize-none text-xs"
         />
       </label>
       <div className="mt-3 flex items-end gap-3">
         {triggerType === "cron" && (
           <label className="w-48">
-            <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-gray-500 dark:text-gray-500">Cron UTC</span>
-            <input
+            <span className="mb-1 block text-2xs font-medium uppercase tracking-extra-wide text-muted">Cron UTC</span>
+            <Input
+              size="md"
               value={cronExpr}
               onChange={(event) => setCronExpr(event.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-800 outline-none transition focus:border-gray-900 dark:border-surface-border dark:bg-surface-raised dark:text-gray-200 dark:focus:border-gray-200"
+              className="rounded-md font-mono text-xs dark:bg-surface-raised"
             />
           </label>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" onClick={onCancel} className="px-3 py-1.5 h-auto justify-start text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-surface-raised">
+          <Button variant="ghost" onClick={onCancel} className="px-3 py-1.5 h-auto justify-start text-xs text-muted transition-colors hover:bg-surface-hover">
             Cancel
           </Button>
           <ToolbarButton disabled={saving}>
-            {saving && <SpinnerGap size={14} className="animate-spin" />}
+            {saving && <Spinner size="sm" className="animate-spin" />}
             Save routine
           </ToolbarButton>
         </div>
@@ -451,24 +474,24 @@ function AgentRow({
   };
 
   return (
-    <div className="border-b border-gray-50 last:border-b-0 dark:border-surface-divider">
+    <div className="border-b border-surface-divider last:border-b-0">
       <Button
         variant="ghost"
         onClick={handleExpand}
-        className="group w-full items-start justify-start gap-3 px-5 py-3.5 h-auto text-left transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02]"
+        className="group w-full items-start justify-start gap-3 px-5 py-3.5 h-auto text-left transition-colors hover:bg-surface-hover"
       >
-        <CaretRight size={14} className={`mt-1 flex-shrink-0 text-gray-300 transition-transform dark:text-gray-700 ${expanded ? "rotate-90" : ""}`} />
+        <Collapse size="sm" className={`mt-1 flex-shrink-0 text-disabled transition-transform ${expanded ? "rotate-90" : ""}`} />
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-2">
-            <span className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium text-gray-500 dark:bg-surface-raised dark:text-gray-500">{agent.agentType}</span>
+            <span className="truncate text-xs font-medium text-primary">{agent.name}</span>
+            <span className="rounded bg-surface-base px-1.5 py-0.5 text-2xs font-medium text-muted">{agent.agentType}</span>
             {agent.triggerType === "cron" && agent.cronExpr && (
-              <span className="flex items-center gap-1 text-2xs text-gray-400 dark:text-gray-600">
-                <Clock size={12} /> {agent.cronExpr}
+              <span className="flex items-center gap-1 text-2xs text-disabled">
+                <Clock size="xs" /> {agent.cronExpr}
               </span>
             )}
           </div>
-          <p className="line-clamp-2 text-xs leading-relaxed text-gray-400 dark:text-gray-600">{agent.goal}</p>
+          <p className="line-clamp-2 text-xs leading-relaxed text-disabled">{agent.goal}</p>
           {error && <p className="mt-1 text-xs text-secondary">{error}</p>}
         </div>
         <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -478,9 +501,9 @@ function AgentRow({
             size="sm"
             onClick={handleRun}
             disabled={busy !== null}
-            className="rounded-md text-gray-400 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+            className="rounded-md text-disabled transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
-            {busy === "run" ? <SpinnerGap size={14} className="animate-spin" /> : <Play size={14} weight="fill" />}
+            {busy === "run" ? <Spinner size="sm" className="animate-spin" /> : <Play size="sm" weight="fill" />}
           </IconButton>
           <IconButton
             aria-label="Delete routine"
@@ -488,9 +511,9 @@ function AgentRow({
             size="sm"
             onClick={handleDelete}
             disabled={busy !== null}
-            className="rounded-md text-gray-300 transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
+            className="rounded-md text-disabled transition hover:bg-surface-raised hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30 dark:opacity-100 dark:hover:bg-surface-raised/30 dark:hover:text-secondary"
           >
-            {busy === "delete" ? <SpinnerGap size={14} className="animate-spin" /> : <Trash size={14} />}
+            {busy === "delete" ? <Spinner size="sm" className="animate-spin" /> : <Delete size="sm" />}
           </IconButton>
         </div>
       </Button>
@@ -504,17 +527,17 @@ function AgentRow({
             className="overflow-hidden"
           >
             {runs.length === 0 ? (
-              <div className="border-t border-gray-50 px-12 py-3 text-xs text-gray-400 dark:border-surface-divider dark:text-gray-600">
+              <div className="border-t border-surface-divider px-12 py-3 text-xs text-disabled">
                 No run history yet.
               </div>
             ) : (
               <ul>
                 {runs.map((run) => (
-                  <li key={run.id} className="flex items-center gap-2 border-t border-gray-50 px-12 py-2 dark:border-surface-divider">
+                  <li key={run.id} className="flex items-center gap-2 border-t border-surface-divider px-12 py-2">
                     {runStatusIcon(run.status)}
-                    <span className="text-xs capitalize text-gray-500 dark:text-gray-400">{run.status}</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-600">· {formatRelative(run.startedAt)}</span>
-                    {run.durationMs !== null && <span className="text-xs text-gray-400 dark:text-gray-600">· {(run.durationMs / 1000).toFixed(1)}s</span>}
+                    <span className="text-xs capitalize text-muted">{run.status}</span>
+                    <span className="text-xs text-disabled">· {formatRelative(run.startedAt)}</span>
+                    {run.durationMs !== null && <span className="text-xs text-disabled">· {(run.durationMs / 1000).toFixed(1)}s</span>}
                     {run.error && <span className="ml-1 truncate text-xs text-secondary">{run.error}</span>}
                   </li>
                 ))}
@@ -589,7 +612,7 @@ export const WorkspacePage = () => {
   const timeline = useMemo(() => {
     const docEvents = docs.slice(0, 5).map((doc) => ({
       id: `doc-${doc.id}`,
-      icon: FileText,
+      icon: Document,
       title: doc.name,
       meta: `Document indexed · ${formatBytes(doc.size)}`,
       ts: doc.createdAt,
@@ -680,23 +703,23 @@ export const WorkspacePage = () => {
   };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-white text-gray-900 transition-colors duration-300 dark:bg-surface-page dark:text-gray-100">
-      <header className="flex-shrink-0 border-b border-gray-100 px-6 pt-5 dark:border-surface-divider">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-surface-page text-primary transition-colors duration-300">
+      <header className="flex-shrink-0 border-b border-surface-divider px-6 pt-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-2xl font-normal tracking-tight text-gray-950 dark:text-gray-50">Workspace</h1>
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">Persistent context, working material, and automation for your AI environment.</p>
+            <h1 className="text-xl font-display font-normal text-primary">Workspace</h1>
+            <p className="mt-1 text-xs text-disabled">Persistent context, working material, and automation for your AI environment.</p>
           </div>
           <div className="flex items-center gap-2">
             <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-              {uploading ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />}
+              {uploading ? <Spinner size="sm" className="animate-spin" /> : <UploadSimple size="sm" />}
               {uploading ? "Indexing" : "Add context"}
             </ToolbarButton>
             <input ref={fileInputRef} type="file" accept={ACCEPTED_TYPES} className="hidden" onChange={handleFileChange} />
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-4 border-t border-gray-50 dark:border-surface-divider">
+        <div className="mt-5 grid grid-cols-4 border-t border-surface-divider">
           <Metric label="Documents" value={kbLoading ? "..." : String(docs.length)} sub={`${formatBytes(totalBytes)} indexed`} />
           <Metric label="Memory" value={memLoading ? "..." : String(facts.length)} sub={`${memoryCategories} categories`} />
           <Metric label="Routines" value={agentsLoading ? "..." : String(agents.length)} sub={`${scheduledAgents} scheduled`} />
@@ -706,50 +729,50 @@ export const WorkspacePage = () => {
 
       {(kbError || memError || agentsError || uploadError) && (
         <div className="flex flex-shrink-0 items-center gap-2 border-b border-surface-border bg-surface-raised px-6 py-2.5 text-xs text-secondary dark:border-surface-border/40 dark:bg-surface-raised/30 dark:text-secondary">
-          <WarningCircle size={14} />
+          <Error size="sm" />
           <span>{uploadError ?? kbError ?? memError ?? agentsError}</span>
         </div>
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[230px_1fr_300px]">
-        <aside className="border-r border-gray-100 bg-gray-50/40 p-3 dark:border-surface-divider dark:bg-white/[0.01]">
-          <div className="mb-3 px-2 text-2xs font-medium uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">Workspace OS</div>
+        <aside className="border-r border-surface-divider bg-surface-base/40 p-3">
+          <div className="mb-3 px-2 text-2xs font-medium uppercase tracking-extra-wide text-disabled">Workspace OS</div>
           <nav className="space-y-1">
-            {SECTIONS.map(({ id, label, icon: Icon, hint }) => (
+            {SECTIONS.map(({ id, label, icon: SectionIcon, hint }) => (
               <Button
                 key={id}
                 variant="ghost"
                 onClick={() => setSection(id)}
                 className={`group w-full items-center gap-3 rounded-md px-2.5 py-2 h-auto justify-start text-left transition-colors ${
                   section === id
-                    ? "bg-white shadow-sm dark:bg-surface-base"
-                    : "hover:bg-white/80 dark:hover:bg-white/[0.03]"
+                    ? "bg-surface-page shadow-sm"
+                    : "hover:bg-surface-hover"
                 }`}
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 dark:bg-surface-raised">
-                  <Icon size={14} weight={section === id ? "duotone" : "regular"} className="text-gray-500 dark:text-gray-400" />
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-base">
+                  <SectionIcon size="sm" weight={section === id ? "fill" : undefined} className="text-muted" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">{label}</span>
-                  <span className="block truncate text-2xs text-gray-400 dark:text-gray-600">{hint}</span>
+                  <span className="block text-xs font-medium text-secondary">{label}</span>
+                  <span className="block truncate text-2xs text-disabled">{hint}</span>
                 </span>
               </Button>
             ))}
           </nav>
 
-          <div className="mt-5 border-t border-gray-100 pt-4 dark:border-surface-divider">
-            <div className="mb-2 px-2 text-2xs font-medium uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">Status</div>
+          <div className="mt-5 border-t border-surface-divider pt-4">
+            <div className="mb-2 px-2 text-2xs font-medium uppercase tracking-extra-wide text-disabled">Status</div>
             <div className="space-y-2 px-2">
-              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
+              <div className="flex items-center justify-between text-xs text-muted">
                 <span>Context index</span>
-                <span className="text-gray-800 dark:text-gray-300">Ready</span>
+                <span className="text-secondary">Ready</span>
               </div>
-              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
+              <div className="flex items-center justify-between text-xs text-muted">
                 <span>Agent runtime</span>
                 <span className="text-secondary">Disabled</span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-raised">
-                <div className="h-full rounded-full bg-gray-700 dark:bg-gray-300" style={{ width: `${storagePct}%` }} />
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-base">
+                <div className="h-full rounded-full bg-primary" style={{ width: `${storagePct}%` }} />
               </div>
             </div>
           </div>
@@ -760,78 +783,78 @@ export const WorkspacePage = () => {
             {section === "overview" && (
               <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="p-6">
                 <div className="mb-6">
-                  <p className="text-2xs font-medium uppercase tracking-extra-wide text-gray-400 dark:text-gray-600">Now</p>
-                  <h2 className="mt-1 font-display text-xl text-gray-900 dark:text-gray-100">Workspace state</h2>
+                  <p className="text-2xs font-medium uppercase tracking-extra-wide text-disabled">Now</p>
+                  <h2 className="mt-1 font-display text-xl text-primary">Workspace state</h2>
                 </div>
-                <div className="grid grid-cols-3 border border-gray-100 dark:border-surface-divider">
+                <div className="grid grid-cols-3 border border-surface-divider">
                   <div className="p-5">
-                    <FolderOpen size={18} className="mb-4 text-gray-400" />
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{docs.length} documents</p>
-                    <p className="mt-1 text-xs leading-relaxed text-gray-400 dark:text-gray-600">Permanent knowledge currently available to chat and future agents.</p>
+                    <FolderOpen size="lg" className="mb-4 text-muted" />
+                    <p className="text-sm font-medium text-primary">{docs.length} documents</p>
+                    <p className="mt-1 text-xs leading-relaxed text-disabled">Permanent knowledge currently available to chat and future agents.</p>
                   </div>
-                  <div className="border-l border-gray-100 p-5 dark:border-surface-divider">
-                    <Brain size={18} className="mb-4 text-gray-400" />
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{facts.length} memory facts</p>
-                    <p className="mt-1 text-xs leading-relaxed text-gray-400 dark:text-gray-600">Distilled user and project context extracted from conversations.</p>
+                  <div className="border-l border-surface-divider p-5">
+                    <Brain size="lg" className="mb-4 text-muted" />
+                    <p className="text-sm font-medium text-primary">{facts.length} memory facts</p>
+                    <p className="mt-1 text-xs leading-relaxed text-disabled">Distilled user and project context extracted from conversations.</p>
                   </div>
-                  <div className="border-l border-gray-100 p-5 dark:border-surface-divider">
-                    <Robot size={18} className="mb-4 text-gray-400" />
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{agents.length} routines</p>
-                    <p className="mt-1 text-xs leading-relaxed text-gray-400 dark:text-gray-600">Saved automation definitions. Execution is waiting on the redesigned runtime.</p>
+                  <div className="border-l border-surface-divider p-5">
+                    <Robot size="lg" className="mb-4 text-muted" />
+                    <p className="text-sm font-medium text-primary">{agents.length} routines</p>
+                    <p className="mt-1 text-xs leading-relaxed text-disabled">Saved automation definitions. Execution is waiting on the redesigned runtime.</p>
                   </div>
                 </div>
 
                 <div className="mt-6 grid grid-cols-[1.2fr_0.8fr] gap-6">
-                  <section className="border border-gray-100 dark:border-surface-divider">
-                    <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-surface-divider">
+                  <section className="border border-surface-divider">
+                    <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
                       <div>
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Recent workspace events</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-600">Documents, memory, and routines in one operational feed.</p>
+                        <p className="text-xs font-medium text-secondary">Recent workspace events</p>
+                        <p className="text-xs text-disabled">Documents, memory, and routines in one operational feed.</p>
                       </div>
                     </div>
                     {timeline.length === 0 ? (
-                      <EmptyState icon={ArchiveBox} title="No events yet" body="Add context, build memory, or create routines to populate the workspace timeline." />
+                      <EmptyState icon={ArchiveBoxIcon} title="No events yet" body="Add context, build memory, or create routines to populate the workspace timeline." />
                     ) : (
-                      <ul className="divide-y divide-gray-50 dark:divide-surface-divider">
+                      <ul className="divide-y divide-surface-divider">
                         {timeline.slice(0, 6).map((event) => (
                           <li key={event.id} className="flex items-center gap-3 px-5 py-3">
-                            <event.icon size={14} className="flex-shrink-0 text-gray-400" />
+                            <event.icon size="sm" className="flex-shrink-0 text-muted" />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-300">{event.title}</p>
-                              <p className="text-xs text-gray-400 dark:text-gray-600">{event.meta}</p>
+                              <p className="truncate text-xs font-medium text-secondary">{event.title}</p>
+                              <p className="text-xs text-disabled">{event.meta}</p>
                             </div>
-                            <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-600">{formatRelative(event.ts)}</span>
+                            <span className="flex-shrink-0 text-xs text-disabled">{formatRelative(event.ts)}</span>
                           </li>
                         ))}
                       </ul>
                     )}
                   </section>
 
-                  <section className="border border-gray-100 dark:border-surface-divider">
-                    <div className="border-b border-gray-100 px-5 py-3 dark:border-surface-divider">
-                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Next controls</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-600">Fast paths into the real workspace objects.</p>
+                  <section className="border border-surface-divider">
+                    <div className="border-b border-surface-divider px-5 py-3">
+                      <p className="text-xs font-medium text-secondary">Next controls</p>
+                      <p className="text-xs text-disabled">Fast paths into the real workspace objects.</p>
                     </div>
-                    <div className="divide-y divide-gray-50 dark:divide-surface-divider">
-                      <Button variant="ghost" onClick={() => setSection("context")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <Database size={14} className="text-gray-400" />
-                        <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Review context package</span>
-                        <CaretRight size={14} className="text-gray-300" />
+                    <div className="divide-y divide-surface-divider">
+                      <Button variant="ghost" onClick={() => setSection("context")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
+                        <Database size="sm" className="text-muted" />
+                        <span className="flex-1 text-xs text-secondary">Review context package</span>
+                        <Collapse size="sm" className="text-disabled" />
                       </Button>
-                      <Button variant="ghost" onClick={() => setSection("automation")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <Lightning size={14} className="text-gray-400" />
-                        <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Create automation routine</span>
-                        <CaretRight size={14} className="text-gray-300" />
+                      <Button variant="ghost" onClick={() => setSection("automation")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
+                        <Lightning size="sm" className="text-muted" />
+                        <span className="flex-1 text-xs text-secondary">Create automation routine</span>
+                        <Collapse size="sm" className="text-disabled" />
                       </Button>
-                      <Button variant="ghost" onClick={() => setSection("activity")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <Graph size={14} className="text-gray-400" />
-                        <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Inspect timeline</span>
-                        <CaretRight size={14} className="text-gray-300" />
+                      <Button variant="ghost" onClick={() => setSection("activity")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
+                        <Graph size="sm" className="text-muted" />
+                        <span className="flex-1 text-xs text-secondary">Inspect timeline</span>
+                        <Collapse size="sm" className="text-disabled" />
                       </Button>
-                      <Button variant="ghost" onClick={() => setSection("artifacts")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <Lightning size={14} className="text-gray-400" />
-                        <span className="flex-1 text-xs text-gray-700 dark:text-gray-300">Open artifact lab</span>
-                        <CaretRight size={14} className="text-gray-300" />
+                      <Button variant="ghost" onClick={() => setSection("artifacts")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
+                        <Lightning size="sm" className="text-muted" />
+                        <span className="flex-1 text-xs text-secondary">Open artifact lab</span>
+                        <Collapse size="sm" className="text-disabled" />
                       </Button>
                     </div>
                   </section>
@@ -847,38 +870,38 @@ export const WorkspacePage = () => {
 
             {section === "context" && (
               <motion.div key="context" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="grid grid-cols-2 gap-0">
-                <section className="min-h-full border-r border-gray-100 dark:border-surface-divider">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-surface-divider">
+                <section className="min-h-full border-r border-surface-divider">
+                  <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
                     <div>
-                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Knowledge base</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-600">{docs.length} documents · {formatBytes(totalBytes)}</p>
+                      <p className="text-xs font-medium text-secondary">Knowledge base</p>
+                      <p className="text-xs text-disabled">{docs.length} documents · {formatBytes(totalBytes)}</p>
                     </div>
                     <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                      {uploading ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                      {uploading ? <Spinner size="sm" className="animate-spin" /> : <UploadSimple size="sm" />}
                       Add
                     </ToolbarButton>
                   </div>
-                  {kbLoading ? <EmptyState icon={SpinnerGap} title="Loading documents" body="Fetching indexed workspace context." /> : <DocumentList docs={docs} deletingDocId={deletingDocId} onDelete={handleDeleteDoc} />}
+                  {kbLoading ? <EmptyState icon={SpinnerGapIcon} title="Loading documents" body="Fetching indexed workspace context." /> : <DocumentList docs={docs} deletingDocId={deletingDocId} onDelete={handleDeleteDoc} />}
                 </section>
                 <section className="min-h-full">
-                  <div className="border-b border-gray-100 px-5 py-3 dark:border-surface-divider">
-                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Memory facts</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-600">{facts.length} facts · {memoryCategories} categories</p>
+                  <div className="border-b border-surface-divider px-5 py-3">
+                    <p className="text-xs font-medium text-secondary">Memory facts</p>
+                    <p className="text-xs text-disabled">{facts.length} facts · {memoryCategories} categories</p>
                   </div>
-                  {memLoading ? <EmptyState icon={SpinnerGap} title="Loading memory" body="Fetching long-term memory facts." /> : <MemoryList facts={facts} deletingFactId={deletingFactId} onDelete={handleDeleteFact} />}
+                  {memLoading ? <EmptyState icon={SpinnerGapIcon} title="Loading memory" body="Fetching long-term memory facts." /> : <MemoryList facts={facts} deletingFactId={deletingFactId} onDelete={handleDeleteFact} />}
                 </section>
               </motion.div>
             )}
 
             {section === "automation" && (
               <motion.div key="automation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
-                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3 dark:border-surface-divider">
+                <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
                   <div>
-                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Automation routines</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-600">Saved agent definitions, schedules, and run history.</p>
+                    <p className="text-xs font-medium text-secondary">Automation routines</p>
+                    <p className="text-xs text-disabled">Saved agent definitions, schedules, and run history.</p>
                   </div>
                   <ToolbarButton onClick={() => setShowCreateAgent((prev) => !prev)}>
-                    <Plus size={14} weight="bold" />
+                    <Add size="sm" />
                     New routine
                   </ToolbarButton>
                 </div>
@@ -886,9 +909,9 @@ export const WorkspacePage = () => {
                   {showCreateAgent && <CreateAgentForm onSave={handleSaveAgent} onCancel={() => setShowCreateAgent(false)} />}
                 </AnimatePresence>
                 {agentsLoading ? (
-                  <EmptyState icon={SpinnerGap} title="Loading routines" body="Fetching saved automation definitions." />
+                  <EmptyState icon={SpinnerGapIcon} title="Loading routines" body="Fetching saved automation definitions." />
                 ) : agents.length === 0 && !showCreateAgent ? (
-                  <EmptyState icon={Robot} title="No routines yet" body="Create a saved agent with a goal and trigger. Runtime execution will activate when the new agent worker is wired." />
+                  <EmptyState icon={RobotIcon} title="No routines yet" body="Create a saved agent with a goal and trigger. Runtime execution will activate when the new agent worker is wired." />
                 ) : (
                   <div>
                     {agents.map((agent) => (
@@ -901,22 +924,22 @@ export const WorkspacePage = () => {
 
             {section === "activity" && (
               <motion.div key="activity" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
-                <div className="border-b border-gray-100 px-5 py-3 dark:border-surface-divider">
-                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Workspace timeline</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-600">A local operational feed assembled from current workspace objects.</p>
+                <div className="border-b border-surface-divider px-5 py-3">
+                  <p className="text-xs font-medium text-secondary">Workspace timeline</p>
+                  <p className="text-xs text-disabled">A local operational feed assembled from current workspace objects.</p>
                 </div>
                 {timeline.length === 0 ? (
-                  <EmptyState icon={ArchiveBox} title="No activity yet" body="Events appear after documents, memories, and routines exist." />
+                  <EmptyState icon={ArchiveBoxIcon} title="No activity yet" body="Events appear after documents, memories, and routines exist." />
                 ) : (
-                  <ul className="divide-y divide-gray-50 dark:divide-surface-divider">
+                  <ul className="divide-y divide-surface-divider">
                     {timeline.map((event) => (
                       <li key={event.id} className="flex items-center gap-3 px-5 py-3">
-                        <event.icon size={14} className="flex-shrink-0 text-gray-400" />
+                        <event.icon size="sm" className="flex-shrink-0 text-muted" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-300">{event.title}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-600">{event.meta}</p>
+                          <p className="truncate text-xs font-medium text-secondary">{event.title}</p>
+                          <p className="text-xs text-disabled">{event.meta}</p>
                         </div>
-                        <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-600">{formatRelative(event.ts)}</span>
+                        <span className="flex-shrink-0 text-xs text-disabled">{formatRelative(event.ts)}</span>
                       </li>
                     ))}
                   </ul>
@@ -926,63 +949,63 @@ export const WorkspacePage = () => {
           </AnimatePresence>
         </main>
 
-        <aside className="border-l border-gray-100 bg-gray-50/30 p-5 dark:border-surface-divider dark:bg-white/[0.01]">
+        <aside className="border-l border-surface-divider bg-surface-base/30 p-5">
           <section className="mb-6">
             <div className="mb-3 flex items-center gap-2">
-              <ListChecks size={14} className="text-gray-400" />
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Context package</p>
+              <Checklist size="sm" className="text-muted" />
+              <p className="text-xs font-medium text-secondary">Context package</p>
             </div>
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Persistent docs</span>
-                <span className="text-gray-800 dark:text-gray-300">{docs.length}</span>
+                <span className="text-muted">Persistent docs</span>
+                <span className="text-primary">{docs.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Memory facts</span>
-                <span className="text-gray-800 dark:text-gray-300">{facts.length}</span>
+                <span className="text-muted">Memory facts</span>
+                <span className="text-primary">{facts.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Automation routines</span>
-                <span className="text-gray-800 dark:text-gray-300">{agents.length}</span>
+                <span className="text-muted">Automation routines</span>
+                <span className="text-primary">{agents.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Local project map</span>
-                <span className="text-gray-400 dark:text-gray-600">planned</span>
+                <span className="text-muted">Local project map</span>
+                <span className="text-disabled">planned</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Artifact lab</span>
-                <span className="text-gray-800 dark:text-gray-300">ready</span>
+                <span className="text-muted">Artifact lab</span>
+                <span className="text-primary">ready</span>
               </div>
             </div>
           </section>
 
-          <section className="mb-6 border-t border-gray-100 pt-5 dark:border-surface-divider">
+          <section className="mb-6 border-t border-surface-divider pt-5">
             <div className="mb-3 flex items-center gap-2">
-              <ShieldCheck size={14} className="text-gray-400" />
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Workspace policy</p>
+              <ShieldCheck size="sm" className="text-muted" />
+              <p className="text-xs font-medium text-secondary">Workspace policy</p>
             </div>
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Memory injection</span>
-                <span className="text-gray-800 dark:text-gray-300">On</span>
+                <span className="text-muted">Memory injection</span>
+                <span className="text-primary">On</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Agent autonomy</span>
+                <span className="text-muted">Agent autonomy</span>
                 <span className="text-secondary">approval</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-500">Desktop control</span>
-                <span className="text-gray-400 dark:text-gray-600">separate mode</span>
+                <span className="text-muted">Desktop control</span>
+                <span className="text-disabled">separate mode</span>
               </div>
             </div>
           </section>
 
-          <section className="border-t border-gray-100 pt-5 dark:border-surface-divider">
+          <section className="border-t border-surface-divider pt-5">
             <div className="mb-3 flex items-center gap-2">
-              <GearSix size={14} className="text-gray-400" />
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Build notes</p>
+              <GearSix size="sm" className="text-muted" />
+              <p className="text-xs font-medium text-secondary">Build notes</p>
             </div>
-            <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-600">
+            <p className="text-xs leading-relaxed text-disabled">
               This page uses existing KB, memory, workflow APIs, and a local artifact lab for previewing universal artifact payloads. Project maps, permissions, and real agent execution can be wired in as those backend surfaces land.
             </p>
           </section>

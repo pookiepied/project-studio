@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { WifiSlashIcon as WifiSlash, ArrowsClockwiseIcon as ArrowsClockwise } from "@phosphor-icons/react";
+import { WifiOff, Refresh } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { useOffline } from "@/app/contexts/OfflineContext";
 
@@ -79,7 +79,7 @@ export const OfflineModal = () => {
                 transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                 className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-surface-border border border-surface-border flex items-center justify-center"
               >
-                <WifiSlash size={12} weight="regular" className="text-muted" />
+                <WifiOff size="xs" weight="regular" className="text-muted" />
               </motion.div>
             </div>
 
@@ -97,7 +97,7 @@ export const OfflineModal = () => {
               variant="ghost"
               className="h-auto gap-1 px-0 py-0 text-sm text-muted hover:bg-transparent hover:text-secondary"
             >
-              <ArrowsClockwise size={12} weight="regular" />
+              <Refresh size="xs" weight="regular" />
               Try again
             </Button>
           </motion.div>

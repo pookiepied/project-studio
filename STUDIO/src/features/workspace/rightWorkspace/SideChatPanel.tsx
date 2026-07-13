@@ -2,11 +2,10 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  ArrowUpIcon as ArrowUp,
-  ChatCircleTextIcon as ChatCircleText,
-  MagnifyingGlassIcon as Search,
-  PlusIcon as Plus,
-} from "@phosphor-icons/react";
+  Send,
+  Conversation,
+  Add,
+} from "@/ui/icons";
 import { ChatProvider, useChat } from "@/features/chat/context";
 import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { useConversationsList } from "@/features/chat/hooks/useConversationsList";
@@ -14,6 +13,8 @@ import { markdownComponents } from "@/features/markdown";
 import { formatDate } from "@/lib/formatters";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { SearchInput } from "@/ui/primitives";
+import { Textarea } from "@/ui/primitives/Textarea";
 
 interface SideChatPanelProps {
   initialConversationId?: string | null;
@@ -101,7 +102,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface-page">
       <div className="flex h-9 flex-shrink-0 items-center gap-2 border-b border-surface-divider px-3">
-        <ChatCircleText size={14} className="text-muted" />
+        <Conversation size="sm" className="text-muted" />
         <Button
           variant="ghost"
           onClick={() => setSelectorOpen((value) => !value)}
@@ -116,24 +117,23 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
           onClick={startNew}
           className="text-muted"
         >
-          <Plus size={14} weight="bold" />
+          <Add size="sm" />
         </IconButton>
       </div>
 
       {selectorOpen && (
         <div className="flex-shrink-0 border-b border-surface-divider p-2">
-          <label className="mb-2 flex h-8 items-center gap-2 rounded-xl border border-surface-border bg-surface-base px-3 text-muted">
-            <Search size={14} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search conversations"
-              className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-muted"
-            />
-          </label>
+          <SearchInput
+            value={query}
+            onValueChange={setQuery}
+            aria-label="Search conversations"
+            placeholder="Search conversations"
+            size="md"
+            className="mb-2 rounded-xl text-xs"
+          />
           <Button
             variant="ghost"
-            leftIcon={<Plus size={14} weight="bold" />}
+            leftIcon={<Add size="sm" />}
             onClick={startNew}
             className="mb-1 w-full h-8 justify-start px-2.5 text-left text-xs text-primary hover:bg-surface-hover"
           >
@@ -177,7 +177,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
           <div className="flex h-full items-center justify-center text-center">
             <div className="max-w-[220px]">
               <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-base text-muted">
-                <ChatCircleText size={18} />
+                <Conversation size="lg" />
               </div>
               <p className="text-sm font-semibold text-primary">Independent side chat</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -217,7 +217,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
 
       <form onSubmit={submit} className="flex-shrink-0 border-t border-surface-divider bg-surface-page p-3">
         <div className="flex min-w-0 items-end gap-2 rounded-lg border border-surface-border bg-surface-base px-3 py-2 shadow-sm transition-colors focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/15">
-          <textarea
+          <Textarea
             ref={inputRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
@@ -230,7 +230,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
             placeholder="Ask side chat"
             aria-label="Message side chat"
             rows={1}
-            className="max-h-28 min-h-6 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-sm leading-5 text-primary outline-none placeholder:text-muted scrollbar-thin"
+            className="w-auto max-h-28 min-h-6 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent py-0.5 text-sm leading-5 scrollbar-thin"
           />
           <IconButton
             type="submit"
@@ -240,7 +240,7 @@ function SideChatContent({ initialConversationId, onConversationChange }: SideCh
             disabled={!input.trim() || isLoading || isStreaming}
             className="flex-shrink-0 rounded-md transition-[opacity,transform] hover:bg-primary hover:opacity-90 active:scale-95 disabled:pointer-events-none disabled:opacity-35"
           >
-            <ArrowUp size={14} weight="bold" />
+            <Send size="sm" />
           </IconButton>
         </div>
       </form>

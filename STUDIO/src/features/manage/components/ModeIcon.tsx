@@ -3,7 +3,7 @@ import {
   LightningIcon as Lightning,
   StarIcon as Star,
   SparkleIcon as Sparkle,
-} from "@phosphor-icons/react";
+} from "@/ui/icons";
 import { Icon, type IconSize } from "@/ui/icons";
 
 /**
