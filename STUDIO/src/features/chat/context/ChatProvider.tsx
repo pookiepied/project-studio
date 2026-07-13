@@ -69,11 +69,9 @@ import { useConversationDisplay } from "./useConversationDisplay";
 import { useConversationBootstrap } from "./useConversationBootstrap";
 import { useToolPermissionEvaluator } from "./useToolPermissionEvaluator";
 import { useChatBackgroundServices } from "./useChatBackgroundServices";
+import { useProjectContextState } from "./useProjectContextState";
 
-import {
-  saveConvProjectCtx,
-  type ProjectCtx,
-} from "./projectContextStorage";
+import { saveConvProjectCtx } from "./projectContextStorage";
 import type { PendingMessage } from "./types";
 import type { ClaudeSessionMetadata } from "@/types";
 import { resolveContextLimit, supportsVisionForModel } from "./ChatProviderModelHelpers";
@@ -167,35 +165,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // ── Project context ─────────────────────────────────────────────────────
   // Per-conversation: each conversation stores its own folder.
-  // New chats always start empty; loading a conversation restores its saved folder.
-  const [projectContext, setProjectContextState] = useState<ProjectCtx | null>(null);
-  // Holds the folder chosen in a new chat before the first message creates a conversation ID.
-  const pendingProjectContextRef = useRef<ProjectCtx | null>(null);
-
-  const setProjectContext = useCallback((ctx: ProjectCtx | null) => {
-    if (conversationStorageScope === "cloud" && ctx) return;
-    setProjectContextState(ctx);
-    if (conversation?.id) {
-      saveConvProjectCtx(conversation.id, ctx);
-      if (!isClaudeOwnedConversation(conversation)) {
-        const updatedConversation: ChatConversation = {
-          ...conversation,
-          updatedAt: Date.now(),
-          metadata: {
-            ...(conversation.metadata ?? {}),
-            ...(ctx ? { project: ctx } : { project: undefined }),
-          },
-        };
-        saveConversation(updatedConversation).catch(() => {});
-        setConversation(updatedConversation);
-      }
-    } else {
-      // No conversation yet — keep pending; it will be persisted when the
-      // conversation is created on first message send.
-      pendingProjectContextRef.current = ctx;
-    }
-  }, [conversation, conversationStorageScope]);
-
+  const {
+    projectContext,
+    setProjectContext,
+    setProjectContextState,
+    pendingProjectContextRef,
+  } = useProjectContextState({
+    conversation,
+    conversationStorageScope,
+    setConversation,
+  });
   // ── Workspace trust ──────────────────────────────────────────────────────
   // Trust is recorded when a project folder is selected. Here we only *read* it,
   // below, to gate mutating tool calls via the permission engine.
