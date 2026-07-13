@@ -41,7 +41,7 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+$/g, "");
 }
 
-export function projectNameFromPath(path: string): string {
+function projectNameFromPath(path: string): string {
   const parts = normalizePath(path).split("/").filter(Boolean);
   return parts[parts.length - 1] ?? path;
 }
@@ -50,7 +50,7 @@ export function projectNameFromPath(path: string): string {
  * Derive a stable id from the folder path (FNV-1a, case-insensitive) so that
  * removing and re-adding the same folder lands on the same project data dir.
  */
-export function projectIdForPath(path: string): string {
+function projectIdForPath(path: string): string {
   const key = normalizePath(path).toLowerCase();
   let hash = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {

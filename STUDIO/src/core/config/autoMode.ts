@@ -20,7 +20,7 @@ export interface AIMode {
 }
 
 /** Sent to the API when the user picks Auto mode */
-export const AUTO_MODEL_ID = "auto";
+const AUTO_MODEL_ID = "auto";
 
 /**
  * Model shown visually next to "Auto".
@@ -60,17 +60,7 @@ export const AI_MODES: AIMode[] = [
   },
 ];
 
-/** Check if a model ID corresponds to any named tier */
-export function isAIMode(modelId: string): boolean {
-  return AI_MODES.some((m) => m.modelId === modelId || m.id === modelId);
-}
-
 /** Get tier by model ID or tier ID */
 export function getAIMode(modelId: string): AIMode | undefined {
   return AI_MODES.find((m) => m.modelId === modelId || m.id === modelId);
-}
-
-/** Get tier by its short ID (e.g. "fast", "standard") */
-export function getAIModeById(id: string): AIMode | undefined {
-  return AI_MODES.find((m) => m.id === id);
 }
