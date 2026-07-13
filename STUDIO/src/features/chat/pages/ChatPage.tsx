@@ -452,6 +452,7 @@ export const ChatPage = () => {
     thinkingContent.trim().length > 0 ||
     harnessSegments.length > 0 ||
     !!runningTurnTool;
+  const isPreparingTurn = isLoading && !hasVisibleTurnActivity;
 
   const handleSelectProject = useCallback(async (project: ProjectEntry) => {
     setProjectContext({ path: project.path, name: project.name, accessMode: project.accessMode });
@@ -706,8 +707,9 @@ export const ChatPage = () => {
                   turnStatus={messages.length > 0 && !pendingPermission ? {
                     engine: chatEngine,
                     convId: conversation?.id,
-                    generating: hasVisibleTurnActivity,
+                    generating: isPreparingTurn || hasVisibleTurnActivity,
                     label: (() => {
+                      if (isPreparingTurn) return "Processing";
                       if (runningTurnTool) return toolPhrase(runningTurnTool.tool);
                       if (streamingContent && streamingContent.length > 0) return "Responding";
                       return "Thinking";
