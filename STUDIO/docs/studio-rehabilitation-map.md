@@ -133,7 +133,7 @@ before splitting.
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 918 | Provider likely owns too many chat concerns |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 893 | Complex composite UI; split by panels/rows/actions |
-| `src/features/chat/pages/ChatPage.tsx` | 842 | Page composition remains heavy; composer-adjacent panels were extracted |
+| `src/features/chat/pages/ChatPage.tsx` | 800 | Page composition remains heavy; composer panels and top chrome were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 668 | Hook likely mixes device, recording, state, and error handling |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
@@ -411,6 +411,10 @@ Completed:
   into `src/features/chat/pages/ChatComposerPanels.tsx`.
 - Reduced `ChatPage.tsx` from the measured 912-line baseline to 842 lines while
   keeping chat state, hooks, and page composition in place for now.
+- Extracted ChatPage floating dock and top-right workspace controls into
+  `src/features/chat/pages/ChatTopChrome.tsx`.
+- Reduced `ChatPage.tsx` from 842 to 800 lines while keeping dock callbacks and
+  workspace state transitions owned by the page.
 
 Recommended order:
 

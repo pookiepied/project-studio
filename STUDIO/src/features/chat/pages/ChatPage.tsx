@@ -29,27 +29,23 @@ import { useLocalCapabilities }                      from "@/features/chat/hooks
 import { useClaudeAccountStatus }                    from "@/features/chat/hooks/useClaudeAccountStatus";
 import type { ConversationStorageScope }             from "@/core/conversations";
 
-import { ChatFloatingDock }     from "@/features/chat/components/ChatFloatingDock";
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
 import { RenameModal }          from "@/features/chat/components/RenameModal";
-import { ContextWindowButton }  from "@/features/chat/components/ContextWindowButton";
-import { BranchSelector }       from "@/features/chat/components/BranchSelector";
 import { useProjects }          from "@/features/chat/hooks/useProjects";
 import { projectRegistry, type ProjectEntry } from "@/core/projects";
 import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import { DocumentStorageModal } from "@/features/artifacts";
-import { ClaudeUsageBadge }     from "@/features/chat/components/ClaudeUsageBadge";
 import {
-  RightWorkspaceControls,
   RightWorkspacePanel,
   useRightWorkspace,
 } from "@/features/workspace";
 import type { ChatEngine } from "@/cliBridges/types";
 import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatComposerPanels";
+import { ChatTopChrome } from "./ChatTopChrome";
 
 // ---------------------------------------------------------------------------
 
@@ -514,10 +510,7 @@ export const ChatPage = () => {
         onCancel={() => { setIsEditingTitle(false); setTitleInput(""); }}
       />
 
-      {/* Floating top-center dock: project/conversation switcher, title,
-          branch/context/device controls, workspace panels. Fixed-position
-          (does not occupy layout), so it overlays the chat column below. */}
-      <ChatFloatingDock
+      <ChatTopChrome
         active={hasStartedConversation}
         conversationTitle={conversation?.title}
         projectName={conversationStorageScope === "local" ? projectContext?.name : undefined}
@@ -528,38 +521,19 @@ export const ChatPage = () => {
         conversations={conversations}
         currentConvId={conversation?.id}
         conversationStatuses={conversationStatuses}
-        contextControls={
-          <>
-            {projectContext && conversationStorageScope === "local" && (
-              <BranchSelector
-                projectContext={projectContext}
-                setProjectContext={setProjectContext}
-                placement="down"
-              />
-            )}
-            {!isEmptyConversation && (
-              <ContextWindowButton
-                usedTokens={usageContextTokens > 0 ? usageContextTokens : contextTokens}
-                maxTokens={contextLimit}
-                isSummarizing={isSummarizing}
-                hasContextSummary={!!conversation?.contextSummary}
-                variant="header"
-                placement="down"
-              />
-            )}
-          </>
-        }
-        accountControl={
-          conversationStorageScope === "local" && chatEngine === "claude" ? (
-            <ClaudeUsageBadge
-              status={claudeAccountStatus}
-              loading={claudeAccountLoading}
-              rateLimit={claudeSession?.rateLimit}
-              onRefresh={() => refreshClaudeAccountStatus(true)}
-              compact
-            />
-          ) : null
-        }
+        projectContext={projectContext}
+        setProjectContext={setProjectContext}
+        isEmptyConversation={isEmptyConversation}
+        usageContextTokens={usageContextTokens}
+        contextTokens={contextTokens}
+        contextLimit={contextLimit}
+        isSummarizing={isSummarizing}
+        hasContextSummary={!!conversation?.contextSummary}
+        chatEngine={chatEngine}
+        claudeAccountStatus={claudeAccountStatus}
+        claudeAccountLoading={claudeAccountLoading}
+        claudeRateLimit={claudeSession?.rateLimit}
+        onRefreshClaudeAccount={() => refreshClaudeAccountStatus(true)}
         onSelectProject={handleSelectProject}
         onOpenProjectFolder={handleOpenProjectFolder}
         onRemoveProject={(id) => { void removeProject(id); }}
@@ -589,30 +563,14 @@ export const ChatPage = () => {
             .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
         }
         onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
+        rightPanelWidth={rightPanelWidth}
+        isTauri={isTauri}
+        workspaceOpen={rightWorkspace.open}
+        onToggleWorkspace={() => {
+          if (!rightWorkspace.open) broadcastPanelOpen("tools");
+          rightWorkspace.toggleOpen();
+        }}
       />
-
-      {/* Top-right control cluster: the app-level mirror of the window traffic
-          lights on the left edge: environment selector, project launcher,
-          workspace toggle. Fixed (never occupies layout), aligned to the shared
-          top-row center line (23px) so it sits level with the dock + lights.
-          Rides the workspace panel's edge: `right` = panel width + inset, so it
-          slides left (animated) as the panel opens or is resized. */}
-      <div
-        className="pointer-events-auto fixed top-[9px] z-toast transition-[right] duration-300 ease-standard"
-        style={{ right: rightPanelWidth + 14 }}
-      >
-        <RightWorkspaceControls
-          isTauri={isTauri}
-          projectContext={projectContext}
-          open={rightWorkspace.open}
-          onToggleOpen={() => {
-            if (!rightWorkspace.open) broadcastPanelOpen("tools");
-            rightWorkspace.toggleOpen();
-          }}
-          scope={conversationStorageScope}
-          onScopeChange={handleStorageScopeChange}
-        />
-      </div>
 
       {/* -- SPLIT VIEW: chat column + side panels -- */}
       <div className="flex-1 flex overflow-hidden min-h-0">
