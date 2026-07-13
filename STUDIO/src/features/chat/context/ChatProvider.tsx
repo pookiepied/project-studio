@@ -31,7 +31,6 @@ import {
 } from "react";
 import type { ChatConversation }                       from "@/types";
 import type { AutoRoutedInfo } from "@/types/chat";
-import { memorySystem }                                from "@/core/storage/memorySystem";
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
 import {
@@ -69,13 +68,12 @@ import { useStreamingLifecycle } from "./useStreamingLifecycle";
 import { useConversationDisplay } from "./useConversationDisplay";
 import { useConversationBootstrap } from "./useConversationBootstrap";
 import { useToolPermissionEvaluator } from "./useToolPermissionEvaluator";
+import { useChatBackgroundServices } from "./useChatBackgroundServices";
 
 import {
   saveConvProjectCtx,
   type ProjectCtx,
 } from "./projectContextStorage";
-import { backgroundSessionTracker } from "@/features/chat/conversations/backgroundSessionTracker";
-import { NotificationService } from "@/core/notifications";
 import type { PendingMessage } from "./types";
 import type { ClaudeSessionMetadata } from "@/types";
 import { resolveContextLimit, supportsVisionForModel } from "./ChatProviderModelHelpers";
@@ -372,27 +370,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [conversation?.id]);
 
-  // ── Memory init ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    memorySystem.initialize().catch(() => {});
-  }, []);
-
-  // ── Sync notification preference into background tracker ─────────────────
-  useEffect(() => {
-    if (!settings.showNotifications || !settings.notifyConversationDone) {
-      backgroundSessionTracker.setCompletionCallback(() => {});
-      return;
-    }
-    // Ensure permission is granted so notifications can fire when conversations finish
-    NotificationService.requestPermission().catch(() => {});
-    backgroundSessionTracker.setCompletionCallback((_convId, title) => {
-      NotificationService.showConversationDone(title);
-    });
-    backgroundSessionTracker.setPermissionCallback((_convId, title) => {
-      NotificationService.showPermissionNeeded(title);
-    });
-  }, [settings.showNotifications, settings.notifyConversationDone]);
-
+  useChatBackgroundServices({
+    showNotifications: !!settings.showNotifications,
+    notifyConversationDone: !!settings.notifyConversationDone,
+  });
   // ── Model capabilities ──────────────────────────────────────────────────
   const currentModelSupportsVision = supportsVisionForModel(models, currentModel);
 
