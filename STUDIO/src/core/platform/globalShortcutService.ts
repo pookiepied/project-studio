@@ -117,14 +117,6 @@ export async function unregisterGlobalShortcut(): Promise<void> {
   }
 }
 
-export function getCurrentShortcut(): string | null {
-  return currentShortcut;
-}
-
-export function hasRegisteredShortcut(): boolean {
-  return currentShortcut !== null;
-}
-
 /**
  * Register the voice-mode global shortcut.
  * Emits "voice-shortcut-triggered" when fired (separate from recording shortcut).

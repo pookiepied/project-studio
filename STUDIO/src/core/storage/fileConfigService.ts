@@ -364,25 +364,3 @@ export async function exportSettings(): Promise<string> {
   const settings = await loadSettingsFromFile();
   return settingsToConf(settings);
 }
-
-/**
- * Import settings from text.
- *
- * Currently has no caller: settings can be exported from the debug panel but
- * never imported back, so this is the unwired half of a round-trip. Kept
- * deliberately pending a product decision (RT-022), not because it is reachable.
- */
-export async function importSettings(content: string): Promise<boolean> {
-  try {
-    const parsed = confToSettings(content);
-    const settings: AppSettings = {
-      ...DEFAULT_SETTINGS,
-      ...parsed,
-    };
-    await saveSettingsToFile(settings);
-    return true;
-  } catch (error) {
-    logger.error('Settings', 'Failed to import settings', error);
-    return false;
-  }
-}

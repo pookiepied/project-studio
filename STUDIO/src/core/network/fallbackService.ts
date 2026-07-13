@@ -25,7 +25,7 @@ export const FALLBACK_VALUES = {
 /**
  * Create fallback model when model data is unavailable
  */
-export function createFallbackModel(modelId: string): Model {
+function createFallbackModel(modelId: string): Model {
   const isLocal = modelId.startsWith("local:");
   const isVision = /vision|llava|moondream|gpt-4o|claude-3|gemini.*vision/i.test(modelId);
   const isTools = /gpt-4|claude-3|gemini|llama-3\.[1-9]|qwen2\.[5-9]/i.test(modelId);
@@ -72,7 +72,7 @@ export function createFallbackAttachmentLimits(): AttachmentLimits {
 /**
  * Safe model lookup with fallback
  */
-export function safeGetModel(models: Model[], modelId: string): Model {
+function safeGetModel(models: Model[], modelId: string): Model {
   const model = models.find(m => m.id === modelId);
   if (model) return model;
   
@@ -124,33 +124,4 @@ export function handleNetworkFailure(error: any): { isNetworkError: boolean; use
     isNetworkError: false,
     userMessage: errorService.getUserMessage(error)
   };
-}
-
-/**
- * Retry mechanism with exponential backoff
- */
-export async function retryWithBackoff<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> {
-  let lastError: any;
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      
-      if (attempt === maxRetries) {
-        break;
-      }
-      
-      const delay = baseDelay * Math.pow(2, attempt);
-      logger.warn('Retry', `Attempt ${attempt + 1} failed, retrying in ${delay}ms`, error);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  throw lastError;
 }

@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 59 unused exports
-- 53 unused exported types
+- 52 unused exports
+- 52 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -267,6 +267,9 @@ Completed:
   preserving the live model-tier and project-registry surfaces.
 - Removed or privatized unused core logging/error-reporting exports while
   preserving the live logger and stored-error surfaces.
+- Removed or privatized unused core network, platform, and storage convenience
+  exports while preserving live diagnostics, overlay, shortcut, and settings
+  surfaces.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.

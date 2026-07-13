@@ -77,7 +77,6 @@ const OVERLAY_LABEL = "overlay";
 // the slide-in animation. The window background is transparent so the extra
 // space is invisible.
 const WIN_WIDTH = 440;
-const WIN_ABOVE_SCREEN = 0;   // legacy export; overlay is now positioned on-screen
 const CAPSULE_H = 68;         // tallest state (complete)
 const WIN_HEIGHT = 8 + CAPSULE_H + 8;
 
@@ -332,7 +331,3 @@ class OverlayService {
 }
 
 export const overlayService = new OverlayService();
-// Expose window sizing for OverlayPage (must match)
-export const OVERLAY_WIN_WIDTH = WIN_WIDTH;
-export const OVERLAY_WIN_HEIGHT = WIN_HEIGHT;
-export const OVERLAY_WIN_ABOVE_SCREEN = WIN_ABOVE_SCREEN;

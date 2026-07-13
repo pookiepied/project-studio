@@ -3,10 +3,9 @@
  * Handles connectivity monitoring and graceful degradation
  */
 
-import React from "react";
 import { logger } from '../logging/logger';
 
-export interface NetworkState {
+interface NetworkState {
   isOnline: boolean;
   isConnecting: boolean;
   lastConnected: number | null;
@@ -15,7 +14,7 @@ export interface NetworkState {
   maxRetries: number;
 }
 
-export interface NetworkStateListener {
+interface NetworkStateListener {
   onStateChange: (state: NetworkState) => void;
   onConnectionLost: () => void;
   onConnectionRestored: () => void;
@@ -349,37 +348,4 @@ class NetworkStateManager {
   }
 }
 
-// Export singleton instance
 export const networkStateManager = new NetworkStateManager();
-
-/**
- * React hook for network state
- */
-export function useNetworkState(): NetworkState & {
-  forceCheck: () => Promise<boolean>;
-  canMakeRequests: () => boolean;
-  shouldUseOfflineMode: () => boolean;
-} {
-  const [state, setState] = React.useState(networkStateManager.getState());
-  
-  React.useEffect(() => {
-    const unsubscribe = networkStateManager.addListener({
-      onStateChange: setState,
-      onConnectionLost: () => {
-        logger.debug('Network', 'Connection lost');
-      },
-      onConnectionRestored: () => {
-        logger.debug('Network', 'Connection restored');
-      }
-    });
-    
-    return unsubscribe;
-  }, []);
-  
-  return {
-    ...state,
-    forceCheck: networkStateManager.forceCheck.bind(networkStateManager),
-    canMakeRequests: networkStateManager.canMakeRequests.bind(networkStateManager),
-    shouldUseOfflineMode: networkStateManager.shouldUseOfflineMode.bind(networkStateManager)
-  };
-}
