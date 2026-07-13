@@ -1,4 +1,4 @@
-export type LocalCapabilityId = "claude-cli";
+type LocalCapabilityId = "claude-cli";
 
 export interface LocalCapabilityStatus {
   id: LocalCapabilityId;

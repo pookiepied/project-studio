@@ -3,8 +3,8 @@ import { createHeaders } from "@/lib/api";
 
 export type AgentType    = "omni" | "coding";
 export type TriggerType  = "manual" | "cron";
-export type AgentStatus  = "active" | "paused" | "deleted";
-export type RunStatus    = "queued" | "running" | "completed" | "failed" | "cancelled";
+type AgentStatus  = "active" | "paused" | "deleted";
+type RunStatus    = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 export interface UserAgent {
   id:           string;
@@ -46,21 +46,6 @@ export interface CreateAgentDraft {
   toolsAllowed?: string[];
 }
 
-export interface UpdateAgentPatch {
-  name?:         string;
-  description?:  string | null;
-  goal?:         string;
-  agentType?:    AgentType;
-  triggerType?:  TriggerType;
-  cronExpr?:     string | null;
-  toolsAllowed?: string[] | null;
-  status?:       "active" | "paused";
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 async function getBase(): Promise<string> {
   const endpoints = await apiManager.getEndpoints();
   return endpoints.models.replace(/\/models$/, "");
@@ -71,10 +56,6 @@ async function headers(userId: string, json = true): Promise<Record<string, stri
   h["X-User-Id"] = userId;
   return h;
 }
-
-// ---------------------------------------------------------------------------
-// Agent CRUD
-// ---------------------------------------------------------------------------
 
 export async function listAgents(userId: string): Promise<UserAgent[]> {
   const base = await getBase();
@@ -107,10 +88,6 @@ export async function deleteAgent(userId: string, agentId: string): Promise<void
   });
   if (res.status !== 204 && !res.ok) throw new Error(`Delete failed (${res.status})`);
 }
-
-// ---------------------------------------------------------------------------
-// Runs
-// ---------------------------------------------------------------------------
 
 export async function runAgent(userId: string, agentId: string): Promise<AgentRun> {
   const base = await getBase();

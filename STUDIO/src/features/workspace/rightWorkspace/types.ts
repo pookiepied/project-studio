@@ -31,7 +31,7 @@ export interface SideChatWorkspaceState {
   conversationId?: string | null;
 }
 
-export interface ArtifactWorkspaceState {
+interface ArtifactWorkspaceState {
   artifactTabId?: string | null;
 }
 
