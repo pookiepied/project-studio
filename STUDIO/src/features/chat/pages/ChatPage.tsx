@@ -41,11 +41,7 @@ import { projectRegistry, type ProjectEntry } from "@/core/projects";
 import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
-import { ComposerApprovalCard } from "@/features/permissions";
-import { AskUserQuestionCard }  from "@/features/chat/components/AskUserQuestionCard";
 import { DocumentStorageModal } from "@/features/artifacts";
-import { ClaudeCodeIcon }       from "@/ui/brand";
-import { Button } from "@/ui/primitives/Button";
 import { ClaudeUsageBadge }     from "@/features/chat/components/ClaudeUsageBadge";
 import {
   RightWorkspaceControls,
@@ -53,6 +49,7 @@ import {
   useRightWorkspace,
 } from "@/features/workspace";
 import type { ChatEngine } from "@/cliBridges/types";
+import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatComposerPanels";
 
 // ---------------------------------------------------------------------------
 
@@ -61,16 +58,6 @@ import type { ChatEngine } from "@/cliBridges/types";
 // every scenario including landing at the bottom of an old conversation after a
 // restart. Also leaves room for the last message's absolute hover action bar.
 const BOTTOM_SCROLL_CLEARANCE = 6;
-
-// Claude-owns-transcript banner: Claude Code brand-warm accent (Anthropic
-// terracotta family, matches ClaudeCodeIcon #CC785C). Not a neutral surface;
-// no design-token equivalent, so hex is intentional here.
-/* eslint-disable no-restricted-syntax -- brand carve-out: Claude Code warm accent, no neutral-token equivalent */
-const CLAUDE_TRANSCRIPT_BANNER =
-  "mb-2 rounded-xl border border-[#E9D8CF] dark:border-[#3A2A22] bg-[#FFF8F4] dark:bg-[#241B17] px-3 py-2 shadow-sm";
-const CLAUDE_FORK_BUTTON =
-  "flex-shrink-0 rounded-lg border border-[#E3C8BA] dark:border-[#4A342A] bg-surface-page/80 dark:bg-[#2D211C] px-2.5 py-1 text-2xs font-medium text-secondary dark:text-disabled hover:bg-surface-page dark:hover:bg-[#352820] transition-colors";
-/* eslint-enable no-restricted-syntax */
 
 export const ChatPage = () => {
   const {
@@ -657,30 +644,11 @@ export const ChatPage = () => {
                   <ConnectionStatusBar convId={conversation?.id} />
                   {/* Review-mode permission slide-in - surfaces the first
                       pending_approval tool call right above the composer. */}
-                  <div className="[&:not(:empty)]:mb-2">
-                    <ComposerApprovalCard
-                      toolCall={
-                        activeToolCalls.find((tc) =>
-                          tc.status === "pending_approval" &&
-                          tc.approvalKind !== "global_access" &&
-                          tc.approvalKind !== "mcp_management" &&
-                          tc.approvalKind !== "skill_management"
-                        ) ?? null
-                      }
-                      onDecision={resolveToolApproval}
-                    />
-                    {(() => {
-                      const q = activeToolCalls.find((tc) => tc.status === "pending_question");
-                      return q ? (
-                        <AskUserQuestionCard
-                          key={q.callId}
-                          question={q.args.question as string}
-                          suggestions={q.args.suggestions as string[] | undefined}
-                          onAnswer={answerPendingQuestion}
-                        />
-                      ) : null;
-                    })()}
-                  </div>
+                  <PendingComposerInteractions
+                    activeToolCalls={activeToolCalls}
+                    onApprovalDecision={resolveToolApproval}
+                    onQuestionAnswer={answerPendingQuestion}
+                  />
                   {composerBlock(emptyInputRef)}
                 </div>
               </motion.div>
@@ -778,26 +746,7 @@ export const ChatPage = () => {
                   <div className="relative px-5 pt-3 pb-5">
                     <div className="max-w-2xl mx-auto relative pointer-events-auto">
                       {isClaudeOwnedConversation && (
-                        <div className={CLAUDE_TRANSCRIPT_BANNER}>
-                          <div className="flex items-center gap-2">
-                            <ClaudeCodeIcon size={16} />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-primary dark:text-disabled">
-                                Claude Code owns this transcript
-                              </p>
-                              <p className="text-2xs text-muted dark:text-muted">
-                                Continue with Claude to keep the native history intact, or fork a Studio-owned copy.
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              onClick={forkConversationToStudio}
-                              className={CLAUDE_FORK_BUTTON}
-                            >
-                              Fork to Studio
-                            </Button>
-                          </div>
-                        </div>
+                        <ClaudeTranscriptNotice onFork={forkConversationToStudio} />
                       )}
 
                       <PendingMessageQueue
@@ -813,30 +762,11 @@ export const ChatPage = () => {
                           pendingApprovalResolveRef keeps waiting while the
                           user navigates to another view; the card re-renders
                           from activeToolCalls the moment chat comes back. */}
-                      <div className="[&:not(:empty)]:mb-2">
-                        <ComposerApprovalCard
-                          toolCall={
-                            activeToolCalls.find((tc) =>
-                              tc.status === "pending_approval" &&
-                              tc.approvalKind !== "global_access" &&
-                              tc.approvalKind !== "mcp_management" &&
-                              tc.approvalKind !== "skill_management"
-                            ) ?? null
-                          }
-                          onDecision={resolveToolApproval}
-                        />
-                        {(() => {
-                          const q = activeToolCalls.find((tc) => tc.status === "pending_question");
-                          return q ? (
-                            <AskUserQuestionCard
-                              key={q.callId}
-                              question={q.args.question as string}
-                              suggestions={q.args.suggestions as string[] | undefined}
-                              onAnswer={answerPendingQuestion}
-                            />
-                          ) : null;
-                        })()}
-                      </div>
+                      <PendingComposerInteractions
+                        activeToolCalls={activeToolCalls}
+                        onApprovalDecision={resolveToolApproval}
+                        onQuestionAnswer={answerPendingQuestion}
+                      />
 
                       {/* Turn status now renders inline in the scroll flow (see
                           ChatMessageList's `turnStatus` prop below) so a short
