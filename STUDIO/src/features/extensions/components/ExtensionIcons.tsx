@@ -1,33 +1,17 @@
-import { CloudIcon as Cloud } from "@/ui/icons";
-import { Icon } from "@/ui/icons";
-import { Badge } from "@/ui/primitives/Badge";
-
-// ─── Status dot ───────────────────────────────────────────────────────────────
-// Strict-neutral (D-401): state reads on shade, not hue. Running = strong dot,
-// every idle/off state = faint dot (loading additionally pulses).
 export type DotState = "running" | "stopped" | "disabled" | "disconnected" | "loading";
 
-export const STATUS_COLORS: Record<DotState, string> = {
-  running:      "bg-primary",
-  stopped:      "bg-muted",
-  disabled:     "bg-muted",
+const STATUS_COLORS: Record<DotState, string> = {
+  running: "bg-primary",
+  stopped: "bg-muted",
+  disabled: "bg-muted",
   disconnected: "bg-muted",
-  loading:      "bg-muted animate-pulse",
+  loading: "bg-muted animate-pulse",
 };
 
 export const StatusDot = ({ state }: { state: DotState }) => (
   <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_COLORS[state]}`} />
 );
 
-// ─── Cloud badge ──────────────────────────────────────────────────────────────
-export const CloudBadge = () => (
-  <Badge tone="default" size="sm">
-    <Icon icon={Cloud} size="xs" weight="fill" />
-    Remote
-  </Badge>
-);
-
-// ─── App icon components (brand logos — §17 multi-colour brand carve-out) ───────
 export const Context7Icon = ({ size = 18, className }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 28 28" fill="none" className={className}>
     <path d="M10.5724 15.2565C10.5724 17.5025 9.6613 19.3778 8.17805 21.1047H11.6319L11.6319 22.7786H6.33459V21.1895C7.95557 19.3566 8.58065 17.8628 8.58065 15.2565L10.5724 15.2565Z" fill="currentColor" />
@@ -51,7 +35,4 @@ export const GithubLetterIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-// ─── Shared form styling (tokenised) ────────────────────────────────────────────
-export const inputCls =
-  "w-full px-3.5 py-2.5 text-xs bg-surface-base border border-surface-border rounded-xl text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ";
 export const labelCls = "text-2xs font-semibold text-muted uppercase tracking-widest";

@@ -8,9 +8,7 @@ import { Textarea } from "@/ui/primitives/Textarea";
 import { labelCls } from "./ExtensionIcons";
 import type { AddFormState } from "../types";
 
-export type { AddFormState };
-
-export const emptyForm: AddFormState = {
+const emptyForm: AddFormState = {
   name: "", displayName: "", type: "local",
   command: "", args: "", envVars: "",
   endpointUrl: "", authToken: "",

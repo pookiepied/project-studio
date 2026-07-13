@@ -255,7 +255,6 @@ export {
   CircleDashedIcon,
   CloudArrowUpIcon,
   CloudCheckIcon,
-  CloudIcon,
   CopySimple,
   CpuIcon,
   CurrencyCircleDollarIcon,

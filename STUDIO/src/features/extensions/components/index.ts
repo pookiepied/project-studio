@@ -1,10 +1,8 @@
 export * from "./ExtensionIcons";
 export { HeroBanner } from "./HeroBanner";
 export { FeaturedCard, ComposioAppBrowseCard, FEATURED_APPS } from "./ComposioCards";
-export type { FeaturedAppDef } from "./ComposioCards";
 export { Context7BrowseCard } from "./ServerBrowseCards";
 export { AppConnectModal } from "./AppConnectModal";
 export type { AppConnectModalConfig } from "./AppConnectModal";
-export { AddServerForm, emptyForm } from "./AddServerForm";
-export type { AddFormState } from "./AddServerForm";
+export { AddServerForm } from "./AddServerForm";
 export { ManagePanel } from "./ManagePanel";

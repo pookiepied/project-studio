@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 32 unused exports
-- 46 unused exported types
+- 29 unused exports
+- 45 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -295,6 +295,9 @@ Completed:
 - Removed unused legacy chat history helpers for raw conversation
   import/export and last-response regeneration; the live regenerate flow is
   handled by conversation actions and the send pipeline.
+- Trimmed unused extensions component exports and removed stale decorative
+  separator comments from the extension icon helpers while preserving the live
+  Extensions page surface.
 - Removed separator-art and unnecessary Unicode punctuation from the platform
   overlay and global-shortcut services as the first comment-artifact cleanup
   pass.
