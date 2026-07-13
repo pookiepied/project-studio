@@ -66,7 +66,7 @@ export function SegmentedControl<T extends string>({
             aria-label={opt.ariaLabel}
             disabled={disabled}
             onClick={() => onChange(opt.value)}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-surface-base disabled:cursor-not-allowed disabled:opacity-40 ${sizeClasses[size]} ${
+            className={`inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-40 ${sizeClasses[size]} ${
               isActive
                 ? "bg-surface-selected text-primary"
                 : "text-muted hover:text-secondary"

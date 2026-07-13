@@ -1,11 +1,11 @@
 import { Component, ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
-  WarningCircleIcon as WarningCircle,
-  ArrowClockwiseIcon as ArrowClockwise,
-  CopyIcon as Copy,
-  CheckIcon as Check,
-} from "@phosphor-icons/react";
+  Check,
+  Copy,
+  Error,
+  Redo,
+} from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { reportError } from "../core/errors/errorReporting";
@@ -78,7 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
               transition={{ duration: 0.3, delay: 0.06, ease: [0.16, 1, 0.3, 1] }}
               className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-surface-raised border border-gray-200 dark:border-surface-border flex items-center justify-center"
             >
-              <WarningCircle size={18} weight="regular" className="text-gray-400 dark:text-gray-500" />
+              <Error size="lg" className="text-gray-400 dark:text-gray-500" />
             </motion.div>
 
             {/* Text */}
@@ -103,8 +103,8 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="shrink-0 mt-0.5 h-auto w-auto p-1 rounded-md text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-200 dark:hover:bg-surface-border"
                 >
                   {copied
-                    ? <Check size={12} weight="bold" className="text-gray-500 dark:text-gray-400" />
-                    : <Copy size={12} />
+                    ? <Check size="xs" className="text-gray-500 dark:text-gray-400" />
+                    : <Copy size="xs" />
                   }
                 </IconButton>
               </div>
@@ -117,7 +117,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 variant="ghost"
                 className="h-auto gap-1 px-0 py-0 text-gray-500 dark:text-gray-400 hover:bg-transparent hover:text-gray-700 dark:hover:text-gray-200"
               >
-                <ArrowClockwise size={12} weight="bold" />
+                <Redo size="xs" />
                 Try again
               </Button>
               <span className="text-gray-200 dark:text-gray-700">·</span>

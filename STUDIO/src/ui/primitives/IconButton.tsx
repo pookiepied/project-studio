@@ -46,7 +46,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         type={type}
         disabled={disabled}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-lg transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page",
+          "inline-flex shrink-0 items-center justify-center rounded-lg transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
           variantClasses[variant],
           sizeClasses[size],
           disabledClasses,

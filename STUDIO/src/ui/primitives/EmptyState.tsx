@@ -1,10 +1,10 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import type { Icon } from "@phosphor-icons/react";
+import { Icon, type PhosphorIcon } from "@/ui/icons";
 
 type EmptyStateSize = "sm" | "md";
 
 interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
-  icon?: Icon;
+  icon?: PhosphorIcon;
   title: ReactNode;
   body?: ReactNode;
   action?: ReactNode;
@@ -40,7 +40,7 @@ export function EmptyState({
           className={`flex items-center justify-center rounded-lg border border-surface-border bg-surface-base ${iconBoxClasses[size]}`}
           aria-hidden="true"
         >
-          <IconComponent size={18} weight="regular" className="text-muted" />
+          <Icon icon={IconComponent} size="lg" weight="regular" className="text-muted" />
         </div>
       )}
       <p className="mb-1 text-sm font-medium text-secondary">{title}</p>

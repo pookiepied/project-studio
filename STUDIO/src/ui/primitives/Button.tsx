@@ -3,10 +3,13 @@ import { motion, type HTMLMotionProps } from "framer-motion";
 import { Spinner } from "@/ui/primitives/Spinner";
 import { cn } from "@/lib/cn";
 
-interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
+export type ButtonVariant = "primary" | "ghost" | "outline" | "destructive";
+export type ButtonSize = "sm" | "md" | "lg";
+
+export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
   children: ReactNode;
-  variant?: "primary" | "ghost" | "outline" | "destructive";
-  size?: "sm" | "md" | "lg";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   /** Icon rendered before the label. */
   leftIcon?: ReactNode;
   /** Icon rendered after the label. */
@@ -30,7 +33,7 @@ export const Button = ({
   const isDisabled = disabled || loading;
 
   const baseStyles =
-    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page";
+    "inline-flex items-center transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 
   const variantStyles = {
     primary:
@@ -44,9 +47,9 @@ export const Button = ({
   };
 
   const sizeStyles = {
-    sm: "px-2.5 py-1.5 text-sm h-7",
-    md: "px-3 py-1.5 text-base h-8",
-    lg: "px-4 py-2 text-lg h-10",
+    sm: "px-2.5 py-1.5 text-sm rounded-lg gap-1.5",
+    md: "px-3 py-1.5 text-base rounded-lg gap-2",
+    lg: "px-4 py-2 text-lg rounded-lg gap-2",
   };
 
   const disabledStyles = isDisabled ? "opacity-50 cursor-not-allowed" : "";

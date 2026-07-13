@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
 import type { ButtonHTMLAttributes, MouseEvent } from "react";
 
+export type ToggleSize = "sm" | "md";
+
 interface ToggleProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
-  size?: "sm" | "md";
+  size?: ToggleSize;
 }
 
 export const Toggle = ({
@@ -35,7 +37,7 @@ export const Toggle = ({
       aria-checked={checked}
       disabled={disabled}
       onClick={handleClick}
-      className={`relative inline-flex ${sm ? "h-4 w-7" : "h-5 w-9"} items-center rounded-full transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page ${
+      className={`relative inline-flex ${sm ? "h-4 w-7" : "h-5 w-9"} items-center rounded-full transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
         checked ? "bg-primary" : "bg-surface-selected"
       } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${className}`}
     >

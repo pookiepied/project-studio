@@ -1,4 +1,5 @@
 import { forwardRef, type TextareaHTMLAttributes } from "react";
+import { cn } from "@/lib/cn";
 
 type FieldSize = "sm" | "md" | "lg";
 
@@ -22,7 +23,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       <textarea
         ref={ref}
         disabled={disabled}
-        className={`w-full resize-y rounded-lg border border-surface-border bg-surface-base text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page ${sizeClasses[size]} ${disabledClasses} ${className}`}
+        className={cn(
+          "w-full resize-y rounded-lg border border-surface-border bg-surface-base text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-0",
+          sizeClasses[size],
+          disabledClasses,
+          className,
+        )}
         {...props}
       />
     );

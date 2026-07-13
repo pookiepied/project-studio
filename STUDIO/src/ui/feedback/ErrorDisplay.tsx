@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { XIcon as X, WarningCircleIcon as WarningCircle } from "@phosphor-icons/react";
+import { Close, Error } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 
@@ -23,7 +23,7 @@ export const ErrorDisplay = ({ message, onDismiss, actionable }: ErrorDisplayPro
         className="flex items-start gap-3 px-4 py-3 bg-surface-raised border border-surface-border rounded-lg transition-colors duration-fast"
       >
         <div className="flex-shrink-0 mt-0.5">
-          <WarningCircle size={18} weight="fill" className="text-muted" />
+          <Error size="lg" weight="fill" className="text-muted" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -47,7 +47,7 @@ export const ErrorDisplay = ({ message, onDismiss, actionable }: ErrorDisplayPro
           aria-label="Dismiss error"
           className="h-auto w-auto shrink-0 text-muted hover:bg-transparent hover:text-secondary"
         >
-          <X size={16} weight="regular" />
+          <Close size="md" />
         </IconButton>
       </motion.div>
     </AnimatePresence>

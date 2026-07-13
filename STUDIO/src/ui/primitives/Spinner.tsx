@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-type SpinnerSize = "sm" | "md" | "lg";
+export type SpinnerSize = "sm" | "md" | "lg";
 
 interface SpinnerProps extends HTMLAttributes<HTMLSpanElement> {
   size?: SpinnerSize;

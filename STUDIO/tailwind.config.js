@@ -8,8 +8,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // References CSS variables defined in src/styles/typography.css.
-        // Changing a font requires only updating that file + src/styles/fonts.ts.
+        // CSS variables defined in src/design/typography.css — change there.
         sans:    ['var(--font-sans)'],
         display: ['var(--font-display)'],
         serif:   ['var(--font-display)'],
@@ -25,24 +24,19 @@ export default {
         bold: '700',
       },
       fontSize: {
-        // Minimalist scale (2026-07-12 trim): default UI text is `sm` (12px) /
-        // `xs` (11px); the sub-10px steps are reserved for rare micro-labels only.
-        // Every text-* utility in the app routes through these tokens — there
-        // are no arbitrary `text-[Npx]` call sites (verified via grep) — so
-        // changing a value here is the single place that reflows the whole UI.
-        '3xs': ['9px', { lineHeight: '12px' }],
-        '2xs': ['10px', { lineHeight: '13px' }],
-        'xs': ['11px', { lineHeight: '15px' }],
-        'sm': ['12px', { lineHeight: '16px' }],
-        'base': ['13px', { lineHeight: '18px' }],
-        // Editorial reading size for chat message copy (assistant + user body).
-        // Still a step above UI chrome, but trimmed with the rest of the scale;
-        // pairs with the .prose-chat base font-size (src/index.css).
-        'body': ['14px', { lineHeight: '1.6' }],
-        'lg': ['15px', { lineHeight: '22px' }],
-        'xl': ['17px', { lineHeight: '24px' }],
-        '2xl': ['20px', { lineHeight: '28px' }],
-        '3xl': ['26px', { lineHeight: '34px' }],
+        // Unified type scale — bridged from CSS variables (src/design/typography.css).
+        // Changing a var there is the single place that reflows the whole UI +
+        // the .prose-chat cascade + inline styles. Each step is visually distinct.
+        '3xs':  ['var(--text-3xs)',  { lineHeight: 'var(--text-3xs--lh)' }],
+        '2xs':  ['var(--text-2xs)',  { lineHeight: 'var(--text-2xs--lh)' }],
+        'xs':   ['var(--text-xs)',   { lineHeight: 'var(--text-xs--lh)' }],
+        'sm':   ['var(--text-sm)',   { lineHeight: 'var(--text-sm--lh)' }],
+        'base': ['var(--text-base)', { lineHeight: 'var(--text-base--lh)' }],
+        'body': ['var(--text-body)', { lineHeight: 'var(--text-body--lh)' }],
+        'lg':   ['var(--text-lg)',   { lineHeight: 'var(--text-lg--lh)' }],
+        'xl':   ['var(--text-xl)',   { lineHeight: 'var(--text-xl--lh)' }],
+        '2xl':  ['var(--text-2xl)',  { lineHeight: 'var(--text-2xl--lh)' }],
+        '3xl':  ['var(--text-3xl)',  { lineHeight: 'var(--text-3xl--lh)' }],
       },
       colors: {
         gray: {
@@ -68,7 +62,7 @@ export default {
         // / `text-*` / `border-surface-border` (auto-switching tokens; no `dark:` prefix
         // needed for the migrated call-sites per the §11.2 auto-switch design).
         // Semantic surface tokens — auto-switch via CSS custom properties
-        // (defined in src/tokens/tokens.css). Use as bg-surface-base,
+        // (defined in src/design/tokens.css). Use as bg-surface-base,
         // border-surface-border, etc. No dark: prefix needed.
         surface: {
           page:     'var(--surface-page)',     // page/root background
@@ -100,15 +94,15 @@ export default {
         // Status in the neutral system is icon + weight + neutral surface (§11.3), never hue.
       },
       spacing: {
-        '18': '72px',
-        '22': '88px',
+        '18': 'var(--space-18)',
+        '22': 'var(--space-22)',
       },
       borderRadius: {
-        'sm': '4px',
-        'md': '8px',
-        'lg': '12px',
-        'xl': '16px',
-        '2xl': '24px',
+        'sm':  'var(--radius-sm)',
+        'md':  'var(--radius-md)',
+        'lg':  'var(--radius-lg)',
+        'xl':  'var(--radius-xl)',
+        '2xl': 'var(--radius-2xl)',
       },
       boxShadow: {
         // Auto-switching soft elevation — values come from --shadow-* tokens
@@ -123,30 +117,30 @@ export default {
         // the --shadow-* CSS vars; no `dark:` shadow variant is needed.
       },
       zIndex: {
-        // Single layering scale — retire the ad-hoc z-[9999] zoo (DOC §12).
-        'overlay': '40',
-        'modal':   '50',
-        'popover': '60',
-        'toast':   '70',
-        'context': '80',
+        // Single layering scale — bridged from CSS vars (tokens.css).
+        'overlay': 'var(--z-overlay)',
+        'modal':   'var(--z-modal)',
+        'popover': 'var(--z-popover)',
+        'toast':   'var(--z-toast)',
+        'context': 'var(--z-context)',
       },
       transitionDuration: {
-        'fast': '150ms',
-        'normal': '250ms',
-        'slow': '350ms',
-        'slower': '500ms',
+        'fast':   'var(--duration-fast)',
+        'normal': 'var(--duration-normal)',
+        'slow':   'var(--duration-slow)',
+        'slower': 'var(--duration-slower)',
       },
       transitionTimingFunction: {
-        'standard': 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-        'decelerate': 'cubic-bezier(0.0, 0.0, 0.2, 1)',
-        'accelerate': 'cubic-bezier(0.4, 0.0, 1, 1)',
-        'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'standard':  'var(--ease-standard)',
+        'decelerate': 'var(--ease-decelerate)',
+        'accelerate': 'var(--ease-accelerate)',
+        'spring':     'var(--ease-spring)',
       },
       // CSS-keyframe animations. Most motion goes through framer-motion via
       // src/constants/animations.ts; these are the few pure-CSS ones still in use.
       animation: {
-        'scale-in': 'scaleIn 250ms cubic-bezier(0.0, 0.0, 0.2, 1)', // Select.tsx open
-        'shimmer': 'shimmer 1.8s ease-in-out infinite',             // skeleton shimmer
+        'scale-in': 'scaleIn var(--duration-normal) var(--ease-decelerate)',
+        'shimmer': 'shimmer 1.8s ease-in-out infinite',
       },
       keyframes: {
         scaleIn: {
@@ -159,11 +153,9 @@ export default {
         },
       },
       letterSpacing: {
-        // Single source for these tokens. Values match what the app actually rendered
-        // before Phase 1 (the hand-written .tracking-*-wide rules in index.css used to
-        // win the cascade); those duplicate CSS rules were removed to end the collision.
-        'ultra-wide': '0.08em',
-        'extra-wide': '0.06em',
+        // Bridged from CSS vars in typography.css.
+        'ultra-wide':  'var(--tracking-ui-label)',
+        'extra-wide':  'var(--tracking-extra-wide)',
       },
       maxHeight: {
         '37.5': '150px',

@@ -1,6 +1,6 @@
 import { forwardRef, type InputHTMLAttributes } from "react";
 
-type FieldSize = "sm" | "md" | "lg";
+export type FieldSize = "sm" | "md" | "lg";
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   size?: FieldSize;
@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         type={type}
         disabled={disabled}
-        className={`w-full rounded-lg border border-surface-border bg-surface-base text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page ${sizeClasses[size]} ${disabledClasses} ${className}`}
+        className={`w-full rounded-lg border border-surface-border bg-surface-base text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${sizeClasses[size]} ${disabledClasses} ${className}`}
         {...props}
       />
     );

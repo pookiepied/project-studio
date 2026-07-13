@@ -1,7 +1,7 @@
 import { forwardRef, type InputHTMLAttributes } from "react";
 import { Search, Close, type IconSize } from "@/ui/icons";
 
-type SearchSize = "sm" | "md" | "lg";
+export type SearchSize = "sm" | "md" | "lg";
 
 interface SearchInputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {
@@ -65,7 +65,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             onChange?.(e);
             onValueChange(e.currentTarget.value);
           }}
-          className={`w-full rounded-lg border border-surface-border bg-surface-base text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:cursor-not-allowed disabled:bg-surface-raised disabled:text-disabled ${containerClasses[size]} ${className}`}
+          className={`w-full rounded-lg border border-surface-border bg-surface-base text-primary placeholder:text-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:bg-surface-raised disabled:text-disabled ${containerClasses[size]} ${className}`}
           {...props}
         />
         {value && !disabled && (
@@ -74,7 +74,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             type="button"
             onClick={() => onValueChange("")}
             aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted transition-colors duration-fast ease-standard hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted transition-colors duration-fast ease-standard hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <Close size="xs" weight="regular" />
           </button>

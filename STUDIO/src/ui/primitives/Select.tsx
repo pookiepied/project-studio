@@ -1,5 +1,5 @@
 import * as RadixSelect from "@radix-ui/react-select";
-import { CaretDownIcon as CaretDown, CheckIcon as Check } from "@phosphor-icons/react";
+import { Check, Expand } from "@/ui/icons";
 import type { ComponentPropsWithoutRef } from "react";
 
 interface SelectOption {
@@ -31,15 +31,15 @@ export const Select = ({
   return (
     <RadixSelect.Root value={value} onValueChange={onChange} disabled={disabled}>
       <RadixSelect.Trigger
-        className={`group flex w-full items-center justify-between rounded-lg border border-surface-border bg-surface-base px-3 py-1.5 text-left text-sm text-primary transition-colors duration-fast ease-standard hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`group flex w-full items-center justify-between rounded-lg border border-surface-border bg-surface-base px-3 py-1.5 text-left text-sm text-primary transition-colors duration-fast ease-standard hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         {...triggerProps}
       >
         <span className={selectedOption ? "text-primary" : "text-muted"}>
           <RadixSelect.Value placeholder={placeholder} />
         </span>
         <RadixSelect.Icon>
-          <CaretDown
-            size={14}
+          <Expand
+            size="sm"
             weight="regular"
             className="text-muted transition-transform duration-fast ease-standard group-data-[state=open]:rotate-180"
           />
@@ -63,7 +63,7 @@ export const Select = ({
                   <span>{option.label}</span>
                 </RadixSelect.ItemText>
                 <RadixSelect.ItemIndicator>
-                  <Check size={14} weight="regular" className="text-primary" />
+                  <Check size="sm" weight="regular" className="text-primary" />
                 </RadixSelect.ItemIndicator>
               </RadixSelect.Item>
             ))}

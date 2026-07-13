@@ -5,10 +5,11 @@ import { isWorkspaceShell, WORKSPACE_SHELL } from "./app/shell/shellConfig";
 import { isThemePreference, resolveTheme } from "./lib/theme";
 
 // Self-hosted fonts (bundled via @fontsource — no network requests).
-// Direction: Inter (body/UI/display) · Cascadia Code (code/terminal).
+// Direction: Inter (body/UI/display) · Newsreader (editorial display/headings) · Cascadia Code (code/terminal).
 // These register the font-families that design/typography.css references, so they
 // must load before the typography variables and the rest of the app styles.
 import "@fontsource-variable/inter/index.css";
+import "@fontsource-variable/newsreader/index.css";
 import "@fontsource/cascadia-code/400.css";
 import "@fontsource/cascadia-code/600.css";
 // Typography variables (--font-sans/-display/-mono) consume the families above.
@@ -17,6 +18,9 @@ import "./design/typography.css";
 // every global rule can read the CSS variables they define.
 import "./design/tokens.css";
 import "./index.css";
+// Syntax highlighting theme + prose-chat cascade (consumers of tokens above).
+import "./design/syntax.css";
+import "./design/prose-chat.css";
 // Workspace-shell styles (scoped to .zen-* classes; inert unless used).
 import "./app/shell/workspaceShell.css";
 import { logger } from "./core/logging/logger";

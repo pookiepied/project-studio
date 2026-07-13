@@ -1,13 +1,73 @@
-/* Typography system: single source of truth for font families.
-   Two families only — trim any fallback beyond one system font + a generic. */
+/*
+ * ───────────────────────────────────────────────────────────────────────────
+ * STUDIO typography system — single source of truth.
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * Three font families, one type scale.
+ *
+ *   Inter Variable    — body, UI, labels, code-block text (sans)
+ *   Newsreader Var.   — display, headings, page titles, chat markdown h1-h6 (serif)
+ *   Cascadia Code     — code, terminal, monospace
+ *
+ * The type scale lives as CSS variables below.  Tailwind's fontSize config
+ * references them (tailwind.config.js), so every `text-*` utility in the app
+ * resolves to these values at runtime.  The .prose-chat cascade and any
+ * inline `fontSize` styles also consume them — one change reflows everything.
+ *
+ * Design principles:
+ *   - Each step is visually distinct (no two sizes 1px apart).
+ *   - `body` (14px) is one step above `base` (13px) — used for chat message
+ *     copy that needs editorial readability without looking "2x bigger" than
+ *     the surrounding chrome at `sm` (12px).
+ *   - Display headings use Newsreader (editorial serif); body and UI use Inter.
+ */
 
 :root {
-  /* Body & UI — Inter: modern app/dev-tool sans, sharp at small sizes. */
-  --font-sans: "Inter Variable", "Segoe UI", sans-serif;
+  /* ── Font families ────────────────────────────────────────────────────── */
+  --font-sans:    "Inter Variable", "Segoe UI", sans-serif;
+  --font-display: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --font-mono:    "Cascadia Code", Consolas, ui-monospace, monospace;
 
-  /* Display / headings / hero — same Inter family (unified look, weight does the work). */
-  --font-display: "Inter Variable", "Segoe UI", sans-serif;
+  /* ── Type scale ──────────────────────────────────────────────────────────
+   *   var(--text-<token>)        → font-size
+   *   var(--text-<token>--lh)    → line-height
+   *
+   *   3xs  9px   micro labels (badge counters, fine print)
+   *   2xs  10px  captions, timestamps, secondary labels
+   *   xs   11px  section headers, secondary text
+   *   sm   12px  UI body, composer, toolbar text          ← default chrome
+   *   base 13px  standard body, settings labels
+   *   body 14px  chat message copy, editorial reading    ← one step up
+   *   lg   15px  emphasis, card titles
+   *   xl   17px  page titles (Newsreader serif)
+   *   2xl  20px  section headings, hero subtitles
+   *   3xl  26px  hero text (chat greeting, shader welcome)
+   * ─────────────────────────────────────────────────────────────────────── */
+  --text-3xs:        9px;
+  --text-3xs--lh:    12px;
+  --text-2xs:       10px;
+  --text-2xs--lh:   13px;
+  --text-xs:        11px;
+  --text-xs--lh:    15px;
+  --text-sm:        12px;
+  --text-sm--lh:    16px;
+  --text-base:      13px;
+  --text-base--lh:  18px;
+  --text-body:      14px;
+  --text-body--lh:  1.55;
+  --text-lg:        15px;
+  --text-lg--lh:    22px;
+  --text-xl:        17px;
+  --text-xl--lh:    24px;
+  --text-2xl:       20px;
+  --text-2xl--lh:   28px;
+  --text-3xl:       26px;
+  --text-3xl--lh:   34px;
 
-  /* Code / mono — Cascadia Code (VS Code's default), Consolas as the Windows fallback. */
-  --font-mono: "Cascadia Code", Consolas, ui-monospace, monospace;
+  /* ── Display letter-spacing ──────────────────────────────────────────────
+   *   Newsreader is a serif — it needs tighter tracking than Inter.
+   *   Inter display headings use a hair of positive tracking. */
+  --tracking-display:   0em;       /* serif headings: zero tracking */
+  --tracking-ui-label:  0.08em;   /* uppercase section headers (ultra-wide) */
+  --tracking-extra-wide: 0.06em;  /* medium-wide labels */
 }
