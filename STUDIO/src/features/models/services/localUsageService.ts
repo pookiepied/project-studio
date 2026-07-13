@@ -27,7 +27,7 @@ export interface LocalUsage {
 }
 
 /** Derive the engine from a prefixed model id (lmstudio: / ollama: / local:). */
-export function engineFromModel(model: string): LocalEngine {
+function engineFromModel(model: string): LocalEngine {
   if (model.startsWith("ollama:"))   return "ollama";
   if (model.startsWith("lmstudio:")) return "lmstudio";
   return "local";

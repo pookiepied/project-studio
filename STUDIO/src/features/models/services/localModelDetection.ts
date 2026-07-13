@@ -68,7 +68,7 @@ const KNOWN_MODEL_CAPABILITIES: Record<string, Partial<LocalModelCapabilities>> 
 /**
  * Detect model capabilities from model name and metadata
  */
-export function detectLocalModelCapabilities(ollamaModel: OllamaModel): LocalModelCapabilities {
+function detectLocalModelCapabilities(ollamaModel: OllamaModel): LocalModelCapabilities {
   const modelName = ollamaModel.name.toLowerCase();
   const baseModel = modelName.split(':')[0];
   
@@ -152,37 +152,4 @@ export function convertOllamaToModel(ollamaModel: OllamaModel): Model {
     architecture: capabilities.modelFamily,
     created: new Date(ollamaModel.modified_at).getTime(),
   };
-}
-
-/**
- * Check if a local model supports vision
- */
-export function localModelSupportsVision(modelName: string): boolean {
-  const baseModel = modelName.toLowerCase().replace('local:', '').split(':')[0];
-  const knownCapabilities = KNOWN_MODEL_CAPABILITIES[modelName.replace('local:', '')] || 
-                           KNOWN_MODEL_CAPABILITIES[baseModel];
-  
-  if (knownCapabilities?.supportsVision) return true;
-  
-  // Pattern-based detection
-  return /llava|moondream|bakllava|vision/i.test(modelName);
-}
-
-/**
- * Get context window for local model
- */
-export function getLocalModelContextWindow(modelName: string): number {
-  const baseModel = modelName.toLowerCase().replace('local:', '').split(':')[0];
-  const knownCapabilities = KNOWN_MODEL_CAPABILITIES[modelName.replace('local:', '')] || 
-                           KNOWN_MODEL_CAPABILITIES[baseModel];
-  
-  if (knownCapabilities?.contextWindow) return knownCapabilities.contextWindow;
-  
-  // Pattern-based estimation
-  if (/llama3\.[1-9]|phi3/i.test(modelName)) return 128000;
-  if (/mixtral|qwen2\.[5-9]/i.test(modelName)) return 32768;
-  if (/codellama/i.test(modelName)) return 16384;
-  if (/llama3|mistral|gemma/i.test(modelName)) return 8192;
-  
-  return 4096; // Conservative default
 }

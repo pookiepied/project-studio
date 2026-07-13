@@ -16,13 +16,6 @@ export const TYPE_LABELS: Record<Model["type"], string> = {
   video: "Video",
 };
 
-/** Compact context-window label for a known (non-optional) token count. */
-export function formatContextWindow(tokens: number): string {
-  if (tokens >= 1_000_000) return `${Math.round(tokens / 1_000_000)}M`;
-  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K`;
-  return String(tokens);
-}
-
 /** Compact context-window label that tolerates an undefined/zero count. */
 export function formatCtx(tokens?: number): string {
   if (!tokens) return "Unknown";
