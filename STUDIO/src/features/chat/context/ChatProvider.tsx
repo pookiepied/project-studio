@@ -32,7 +32,6 @@ import {
 import type { ChatConversation, ChatMessage }          from "@/types";
 import type { AutoRoutedInfo } from "@/types/chat";
 import { memorySystem }                                from "@/core/storage/memorySystem";
-import { safeIsVisionModel, safeGetContextWindow } from "@/core/network/fallbackService";
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
 import {
@@ -61,7 +60,6 @@ import { applyCatchUp }                               from "./catchUp";
 import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/services/pendingCompletion";
 import { chat } from "@/features/chat/services/chatService";
 import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import { getClaudeContextWindowTokens } from "@/cliBridges";
 import type { PermissionModeId, PermissionDecision, ActionMode, ManagementKind } from "@/core/permissions";
 import {
   evaluateToolCall,
@@ -91,7 +89,7 @@ import { backgroundSessionTracker } from "@/features/chat/conversations/backgrou
 import { NotificationService } from "@/core/notifications";
 import type { PendingMessage } from "./types";
 import type { ClaudeSessionMetadata } from "@/types";
-import { getAIMode } from "@/core/config/autoMode";
+import { resolveContextLimit, supportsVisionForModel } from "./ChatProviderModelHelpers";
 
 // ---------------------------------------------------------------------------
 // Context
@@ -118,33 +116,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // ── Context-limit calculator ────────────────────────────────────────────
   const getContextLimit = useCallback((modelId: string): number => {
-    try {
-      const normalizedModelId = getAIMode(modelId)?.modelId ?? modelId;
-      if (/^(claude-|sonnet$|opus$|haiku$|fable$)/i.test(normalizedModelId)) {
-        return getClaudeContextWindowTokens(normalizedModelId);
-      }
-      if (!models.length) return DEFAULT_MAX_CONTEXT_TOKENS;
-      // Virtual routing names ("auto", "fast", etc.) don't have entries in the models list.
-      // Use the last resolved model if known; otherwise return a generous default.
-      if (
-        normalizedModelId === "auto" ||
-        normalizedModelId === "fast" ||
-        normalizedModelId === "standard" ||
-        normalizedModelId === "advanced"
-      ) {
-        const resolved = autoRoutedModel?.model;
-        if (resolved) return Math.floor(safeGetContextWindow(models, resolved) * 0.75);
-        return 200_000;
-      }
-      const detectedLimit = safeGetContextWindow(models, normalizedModelId);
-      if (detectedLimit > DEFAULT_MAX_CONTEXT_TOKENS) return Math.floor(detectedLimit * 0.75);
-      if (/^(openrouter:|openai:|anthropic:|google:|groq:)/i.test(normalizedModelId)) {
-        return 200_000;
-      }
-      return Math.floor(detectedLimit * 0.75);
-    } catch {
-      return DEFAULT_MAX_CONTEXT_TOKENS;
-    }
+    return resolveContextLimit({ modelId, models, autoRoutedModel });
   }, [models, autoRoutedModel]);
 
   // ── Core state ─────────────────────────────────────────────────────────
@@ -563,9 +535,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [settings.showNotifications, settings.notifyConversationDone]);
 
   // ── Model capabilities ──────────────────────────────────────────────────
-  const currentModelSupportsVision = models.length > 0
-    ? safeIsVisionModel(models, currentModel)
-    : /vision|llava|moondream|gpt-4o|claude-3|gemini.*vision/i.test(currentModel);
+  const currentModelSupportsVision = supportsVisionForModel(models, currentModel);
 
   // ── Permission helpers ──────────────────────────────────────────────────
   const { permittedTools, grantToolPermission, revokeToolPermission, resetPermittedTools } = usePermittedTools();
