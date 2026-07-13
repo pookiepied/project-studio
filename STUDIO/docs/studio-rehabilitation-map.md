@@ -145,8 +145,8 @@ before splitting.
 `npx knip --reporter compact` currently reports:
 
 - 0 unused files after the first proof pass
-- 68 unused exports
-- 57 unused exported types
+- 64 unused exports
+- 55 unused exported types
 - 0 duplicate exports after the duplicate-export proof pass
 
 Unused files removed in the first proof pass:
@@ -261,6 +261,8 @@ Completed:
   preserving their live public functions.
 - Removed or privatized unused app-level convenience exports while preserving
   the live app shell and settings surfaces.
+- Removed or privatized unused CLI bridge exports while preserving the live
+  Claude bridge surface.
 - Updated stale live comments that referenced deleted code.
 - Updated `gate/lint-baseline.json` with the project ratchet command after the
   deleted files made old baseline entries stale.

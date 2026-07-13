@@ -42,10 +42,6 @@ function normalizeAccountStatus(payload: ClaudeAuthStatusCliResponse): ClaudeAcc
   };
 }
 
-export function clearClaudeAccountStatusCache(): void {
-  cachedStatus = null;
-}
-
 export async function getClaudeAccountStatus(force = false): Promise<ClaudeAccountStatus> {
   if (!force && cachedStatus && Date.now() - cachedStatus.checkedAt < CACHE_TTL_MS) {
     return cachedStatus;

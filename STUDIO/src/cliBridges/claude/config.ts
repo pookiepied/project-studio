@@ -7,7 +7,7 @@ import type { ClaudeEffortLevel } from "../types";
  * module because they are shared across Studio AI, Claude, and future CLIs.
  */
 
-export type ClaudeModelGlyph = "leaf" | "lightning" | "star" | "sparkle";
+type ClaudeModelGlyph = "leaf" | "lightning" | "star" | "sparkle";
 
 /**
  * `id` is what we pass to Claude Code. The short family aliases keep the bridge
@@ -25,10 +25,8 @@ export const CLAUDE_MODELS: {
   { id: "fable",  label: "Fable 5",   description: "Most capable",         icon: "sparkle" },
 ];
 
-export type ClaudeModelId = (typeof CLAUDE_MODELS)[number]["id"];
-
-export const CLAUDE_CONTEXT_WINDOW_TOKENS = 200_000;
-export const CLAUDE_LARGE_CONTEXT_WINDOW_TOKENS = 1_000_000;
+const CLAUDE_CONTEXT_WINDOW_TOKENS = 200_000;
+const CLAUDE_LARGE_CONTEXT_WINDOW_TOKENS = 1_000_000;
 
 export function getClaudeContextWindowTokens(modelId: string): number {
   const id = modelId.toLowerCase();

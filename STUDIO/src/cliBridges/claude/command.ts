@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export async function runClaudeCommand(args: string[]): Promise<string> {
+async function runClaudeCommand(args: string[]): Promise<string> {
   return invoke<string>("execute_shell_command", {
     command: "claude",
     args,
