@@ -29,14 +29,14 @@ import {
   useMemo,
   useRef,
 } from "react";
-import type { ChatConversation, ChatMessage }          from "@/types";
+import type { ChatConversation }                       from "@/types";
 import type { AutoRoutedInfo } from "@/types/chat";
 import { memorySystem }                                from "@/core/storage/memorySystem";
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
 import {
   createConversation, saveConversation, loadConversation,
-  getConversationMessages, updateConversationTitle, getAllConversations,
+  updateConversationTitle, getAllConversations,
 } from "@/features/chat/conversations/chatHistoryService";
 import type { ConversationStorageScope } from "@/core/conversations";
 import {
@@ -54,7 +54,7 @@ import { usePermittedTools }                           from "@/features/chat/hoo
 
 import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
-import { DEFAULT_MAX_CONTEXT_TOKENS, MESSAGES_PER_PAGE } from "./constants";
+import { DEFAULT_MAX_CONTEXT_TOKENS } from "./constants";
 import { maybeCompact }                                from "./contextCompactor";
 import { applyCatchUp }                               from "./catchUp";
 import { fetchPendingCompletion, clearPendingCompletion } from "@/features/chat/services/pendingCompletion";
@@ -79,6 +79,7 @@ import { useSendPipeline } from "./useSendPipeline";
 import { useConversationActions } from "./useConversationActions";
 import { useAccessPrompts } from "./useAccessPrompts";
 import { useStreamingLifecycle } from "./useStreamingLifecycle";
+import { useConversationDisplay } from "./useConversationDisplay";
 
 import {
   saveConvProjectCtx,
@@ -142,10 +143,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [reasoningBudget,    setReasoningBudget]    = useState<number | undefined>(undefined);
 
   // ── Lazy loading ────────────────────────────────────────────────────────
-  const [displayedMessages, setDisplayedMessages] = useState<ChatMessage[]>([]);
-  const [hasMoreMessages,   setHasMoreMessages]   = useState(false);
-  const [isLoadingMore,     setIsLoadingMore]      = useState(false);
-  const [messageOffset,     setMessageOffset]      = useState(0);
+  const {
+    displayedMessages,
+    hasMoreMessages,
+    isLoadingMore,
+    appendToDisplayedMessages,
+    loadInitialMessages,
+    loadMoreMessages,
+    setDisplayedMessages,
+    setHasMoreMessages,
+    setMessageOffset,
+  } = useConversationDisplay({ conversation });
 
   // ── Tool / interaction state ────────────────────────────────────────────
   const [activeToolCalls,  setActiveToolCalls]  = useState<ActiveToolCall[]>([]);
@@ -511,20 +519,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setThinkingContent,
   });
 
-  // ── Conversation display helpers ────────────────────────────────────────
-  // Defined BEFORE handleStreamDone so the closure captures it correctly.
-  const appendToDisplayedMessages = useCallback((message: ChatMessage) => {
-    setDisplayedMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === message.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = message;
-        return next;
-      }
-      return [...prev, message];
-    });
-  }, []);
-
+  // Inbound stream handlers.
   const { agentChat, answerPendingQuestion } = useStreamHandlers({
     conversation,
     conversationStorageScope,
@@ -571,30 +566,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   });
 
   // ── Conversation helpers ────────────────────────────────────────────────
-  const loadInitialMessages = useCallback(async (conversationId: string, totalCount: number) => {
-    const msgs = await getConversationMessages(conversationId, MESSAGES_PER_PAGE, 0);
-    setDisplayedMessages(msgs.reverse());
-    setMessageOffset(MESSAGES_PER_PAGE);
-    setHasMoreMessages(totalCount > MESSAGES_PER_PAGE);
-  }, []);
-
-  const loadMoreMessages = useCallback(async () => {
-    if (!conversation || isLoadingMore || !hasMoreMessages) return;
-    setIsLoadingMore(true);
-    try {
-      const more = await getConversationMessages(conversation.id, MESSAGES_PER_PAGE, messageOffset);
-      if (more.length > 0) {
-        setDisplayedMessages((prev) => [...more.reverse(), ...prev]);
-        setMessageOffset((prev) => prev + more.length);
-        setHasMoreMessages(more.length === MESSAGES_PER_PAGE);
-      } else {
-        setHasMoreMessages(false);
-      }
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [conversation, isLoadingMore, hasMoreMessages, messageOffset]);
-
   const getOrCreateConversation = useCallback(async (
     content: string,
     model:   string
