@@ -27,8 +27,9 @@
     }
   ],
   "permissions": [],
-  "tags": [],
+  "tags": ["knowledge"],
   "metadata": {
+    "category": "knowledge",
     "templateOnly": true
   }
 }
