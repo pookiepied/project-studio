@@ -29,13 +29,13 @@ import { useClaudeAccountStatus }                    from "@/features/chat/hooks
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
-import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import {
   RightWorkspacePanel,
   useRightWorkspace,
 } from "@/features/workspace";
-import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatComposerPanels";
+import { PendingComposerInteractions } from "./ChatComposerPanels";
+import { ChatConversationComposerDock } from "./ChatConversationComposerDock";
 import { ChatPageOverlays } from "./ChatPageOverlays";
 import { ChatTopChrome } from "./ChatTopChrome";
 import { useComposerDockHeight } from "./useComposerDockHeight";
@@ -553,62 +553,19 @@ export const ChatPage = () => {
                 />
                 </div>{/* end rail + scroll area wrapper */}
 
-                {/* Floating composer - overlays the bottom of the message area.
-                    pointer-events-none lets scroll pass through the empty gutters;
-                    the centred column re-enables interaction. A gradient backdrop
-                    fades messages out exactly as they reach the text field. */}
-                <div
-                  ref={composerDockRef}
-                  className="absolute bottom-0 inset-x-0 z-20 pointer-events-none"
-                  // This overlay is a DOM sibling of the message scroller, not a
-                  // descendant, so native wheel scrolling stops working the moment
-                  // the cursor is over its pointer-events-auto column (TurnStatus,
-                  // approval cards); forward the delta manually so scroll/lock
-                  // behaves the same everywhere over the conversation.
-                  onWheel={(e) => forwardWheel(e.deltaY)}
-                >
-                  {/* Soft fade above the dock - messages dissolve just before the
-                      text field (and above the Claude-owns-transcript banner when
-                      it's shown) instead of hard-clipping. Mirrors the top fade. */}
-                  <div className="pointer-events-none absolute inset-x-0 bottom-full h-4 bg-gradient-to-t from-white to-transparent dark:from-surface-page" />
-                  <div className="pointer-events-none absolute inset-0 bg-surface-page" />
-                  <div className="relative px-5 pt-3 pb-5">
-                    <div className="max-w-2xl mx-auto relative pointer-events-auto">
-                      {isClaudeOwnedConversation && (
-                        <ClaudeTranscriptNotice onFork={forkConversationToStudio} />
-                      )}
-
-                      <PendingMessageQueue
-                        messages={pendingMessages}
-                        onCancel={cancelPendingMessage}
-                      />
-
-                      <ConnectionStatusBar convId={conversation?.id} />
-
-                      {/* Review-mode permission slide-in - surfaces the first
-                          pending_approval tool call right above the composer.
-                          The promise held by ChatProvider's
-                          pendingApprovalResolveRef keeps waiting while the
-                          user navigates to another view; the card re-renders
-                          from activeToolCalls the moment chat comes back. */}
-                      <PendingComposerInteractions
-                        activeToolCalls={activeToolCalls}
-                        onApprovalDecision={resolveToolApproval}
-                        onQuestionAnswer={answerPendingQuestion}
-                      />
-
-                      {/* Turn status now renders inline in the scroll flow (see
-                          ChatMessageList's `turnStatus` prop below) so a short
-                          answer just sits below its own text wherever that
-                          lands, instead of being glued to the composer as a
-                          permanent HUD. It only ends up hugging the composer
-                          once real content grows tall enough to reach it;
-                          the existing auto-scroll pin handles that for free. */}
-
-                      {composerBlock(conversationInputRef)}
-                    </div>
-                  </div>
-                </div>
+                <ChatConversationComposerDock
+                  dockRef={composerDockRef}
+                  onWheelDelta={forwardWheel}
+                  isClaudeOwnedConversation={isClaudeOwnedConversation}
+                  onForkConversation={forkConversationToStudio}
+                  pendingMessages={pendingMessages}
+                  onCancelPendingMessage={cancelPendingMessage}
+                  conversationId={conversation?.id}
+                  activeToolCalls={activeToolCalls}
+                  onApprovalDecision={resolveToolApproval}
+                  onQuestionAnswer={answerPendingQuestion}
+                  composer={composerBlock(conversationInputRef)}
+                />
 
               </motion.div>
             )}

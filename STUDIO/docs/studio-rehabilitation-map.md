@@ -130,8 +130,8 @@ before splitting.
 | File | Lines | Initial read |
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
-| `src/features/chat/pages/ChatPage.tsx` | 602 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, and turn-status policy were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 573 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, engine/session state, and title generation were extracted |
+| `src/features/chat/pages/ChatPage.tsx` | 564 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, turn-status policy, and conversation composer dock were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 545 | Complex composite UI; browser rows/actions and tree grouping/search logic were extracted |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 537 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
@@ -441,6 +441,11 @@ Completed:
   `src/features/chat/pages/useChatTurnStatus.ts`.
 - Reduced `ChatPage.tsx` from 609 to 602 lines while keeping the message list
   layout and composer overlay behavior in the page.
+- Extracted ChatPage conversation composer overlay, Claude transcript notice,
+  pending queue, connection status, and permission cards into
+  `src/features/chat/pages/ChatConversationComposerDock.tsx`.
+- Reduced `ChatPage.tsx` from 602 to 564 lines while keeping the split-view
+  layout and message list wiring in the page.
 - Extracted ChatFloatingDock browser conversation/project rows and conversation
   action menu into `src/features/chat/components/ChatFloatingDockRows.tsx`.
 - Reduced `ChatFloatingDock.tsx` from the measured 937-line baseline to 627
