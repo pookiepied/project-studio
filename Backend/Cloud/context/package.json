@@ -12,7 +12,6 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "@studio/v2-contracts": "file:../shared/contracts",
     "hono": "^4.0.0"
   },
   "devDependencies": {

@@ -1,54 +1,153 @@
-import type { RegistrySkillRecord } from "@studio/v2-contracts";
+import { recordResourceVersion } from "../../database/resourceVersions";
+import { conflict } from "../../errors/appError";
+import { parseJson, stringifyJson } from "../../system/json";
+import { readableOwnerKeys } from "../../system/ownership";
+import type { SkillRecord, SkillSearch } from "./types";
 
-/** User-scoped D1 repository. Skill bodies stay behind instructionsRef. */
-export async function listSkills(db: D1Database, userId: string): Promise<RegistrySkillRecord[]> {
-  const result = await db.prepare("SELECT * FROM skills WHERE user_id=? ORDER BY name")
-    .bind(userId).all<Record<string, unknown>>();
-  return (result.results ?? []).map(toRecord);
+type SkillRow = Record<string, unknown>;
+
+export async function listSkills(db: D1Database, search: SkillSearch): Promise<SkillRecord[]> {
+  const [systemKey, userKey] = readableOwnerKeys(search.userId);
+  const clauses = ["owner_key IN (?, ?)"];
+  const values: unknown[] = [systemKey, userKey];
+
+  if (search.status) {
+    clauses.push("status = ?");
+    values.push(search.status);
+  }
+  if (search.origin) {
+    clauses.push("origin = ?");
+    values.push(search.origin);
+  }
+  if (search.ownerType) {
+    clauses.push("owner_type = ?");
+    values.push(search.ownerType);
+  }
+  if (search.query) {
+    clauses.push("(name LIKE ? OR slug LIKE ? OR description LIKE ?)");
+    const query = `%${search.query}%`;
+    values.push(query, query, query);
+  }
+  if (search.tag) {
+    clauses.push("tags LIKE ?");
+    values.push(`%"${search.tag}"%`);
+  }
+
+  const result = await db
+    .prepare(`SELECT * FROM skills WHERE ${clauses.join(" AND ")} ORDER BY updated_at DESC LIMIT ?`)
+    .bind(...values, search.limit)
+    .all<SkillRow>();
+  return (result.results ?? []).map(toSkill);
 }
 
-export async function getSkill(db: D1Database, userId: string, id: string): Promise<RegistrySkillRecord | null> {
-  const row = await db.prepare("SELECT * FROM skills WHERE user_id=? AND id=?")
-    .bind(userId, id).first<Record<string, unknown>>();
-  return row ? toRecord(row) : null;
+export async function getSkill(db: D1Database, userId: string, id: string): Promise<SkillRecord | null> {
+  const [systemKey, userKey] = readableOwnerKeys(userId);
+  const row = await db
+    .prepare("SELECT * FROM skills WHERE id = ? AND owner_key IN (?, ?)")
+    .bind(id, systemKey, userKey)
+    .first<SkillRow>();
+  return row ? toSkill(row) : null;
 }
 
-export async function upsertSkill(db: D1Database, record: RegistrySkillRecord): Promise<void> {
-  await db.prepare(`INSERT INTO skills
-    (id,user_id,name,origin,location,version,enabled,available,description,instructions_ref,required_tools,required_permissions,environments,activation_rules,resources,updated_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
-    ON CONFLICT(id,user_id) DO UPDATE SET name=excluded.name,origin=excluded.origin,location=excluded.location,version=excluded.version,
-      enabled=excluded.enabled,available=excluded.available,description=excluded.description,
-      instructions_ref=excluded.instructions_ref,required_tools=excluded.required_tools,
-      required_permissions=excluded.required_permissions,environments=excluded.environments,
-      activation_rules=excluded.activation_rules,resources=excluded.resources,updated_at=datetime('now')`)
-    .bind(record.ref.id, record.userId, record.ref.name, record.origin, record.location, record.version ?? "0.1.0",
-      Number(record.enabled), Number(record.available), record.description, record.instructionsRef ?? null,
-      JSON.stringify(record.requiredTools), JSON.stringify(record.requiredPermissions),
-      JSON.stringify(record.environments), JSON.stringify(record.activationRules), JSON.stringify(record.resources))
-    .run();
+export async function saveSkill(db: D1Database, skill: SkillRecord, changeNote?: string): Promise<SkillRecord> {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO skills (
+          id, owner_type, owner_user_id, owner_key, name, slug, description, origin, status, current_version,
+          instructions_ref, config_ref, tags, metadata, activation_rules,
+          required_tools, required_permissions, resources, mcp_server_ids,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(id, owner_key) DO UPDATE SET
+          name = excluded.name,
+          slug = excluded.slug,
+          description = excluded.description,
+          origin = excluded.origin,
+          status = excluded.status,
+          current_version = excluded.current_version,
+          instructions_ref = excluded.instructions_ref,
+          config_ref = excluded.config_ref,
+          tags = excluded.tags,
+          metadata = excluded.metadata,
+          activation_rules = excluded.activation_rules,
+          required_tools = excluded.required_tools,
+          required_permissions = excluded.required_permissions,
+          resources = excluded.resources,
+          mcp_server_ids = excluded.mcp_server_ids,
+          updated_at = datetime('now')`,
+      )
+      .bind(
+        skill.id,
+        skill.ownerType,
+        skill.ownerUserId ?? null,
+        skill.ownerKey,
+        skill.name,
+        skill.slug,
+        skill.description,
+        skill.origin,
+        skill.status,
+        skill.currentVersion,
+        skill.instructionsRef,
+        skill.configRef ?? null,
+        stringifyJson(skill.tags),
+        stringifyJson(skill.metadata),
+        stringifyJson(skill.activationRules),
+        stringifyJson(skill.requiredTools),
+        stringifyJson(skill.requiredPermissions),
+        stringifyJson(skill.resources),
+        stringifyJson(skill.mcpServerIds),
+      )
+      .run();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("UNIQUE")) throw conflict("Skill id or slug already exists for this owner.");
+    throw error;
+  }
+
+  await recordResourceVersion(db, {
+    kind: "skill",
+    resourceId: skill.id,
+    ownerType: skill.ownerType,
+    ownerKey: skill.ownerKey,
+    version: skill.currentVersion,
+    configRef: skill.configRef ?? skill.instructionsRef,
+    metadata: { name: skill.name, slug: skill.slug, status: skill.status },
+    changeNote,
+  });
+
+  const saved = await getSkill(db, skill.ownerUserId ?? "system", skill.id);
+  if (!saved) throw new Error("Failed to reload saved skill.");
+  return saved;
 }
 
 export async function deleteSkill(db: D1Database, userId: string, id: string): Promise<boolean> {
-  const result = await db.prepare("DELETE FROM skills WHERE user_id=? AND id=?").bind(userId, id).run();
+  const [systemKey, userKey] = readableOwnerKeys(userId);
+  const result = await db.prepare("DELETE FROM skills WHERE id = ? AND owner_key IN (?, ?)").bind(id, systemKey, userKey).run();
   return result.meta.changes > 0;
 }
 
-function toRecord(row: Record<string, unknown>): RegistrySkillRecord {
+function toSkill(row: SkillRow): SkillRecord {
   return {
-    ref: { id: String(row.id), kind: "skill", name: String(row.name) },
-    userId: String(row.user_id), origin: row.origin as RegistrySkillRecord["origin"], location: row.location as RegistrySkillRecord["location"],
-    enabled: Boolean(row.enabled), available: Boolean(row.available), version: String(row.version),
-    permissions: parse(row.required_permissions, []),
-    configRef: row.instructions_ref ? String(row.instructions_ref) : undefined,
-    metadata: {}, description: String(row.description ?? ""),
-    instructionsRef: row.instructions_ref ? String(row.instructions_ref) : undefined,
-    requiredTools: parse(row.required_tools, []), requiredPermissions: parse(row.required_permissions, []),
-    environments: parse(row.environments, []), activationRules: parse(row.activation_rules, {}),
-    resources: parse(row.resources, []),
+    id: String(row.id),
+    ownerType: row.owner_type as SkillRecord["ownerType"],
+    ownerUserId: row.owner_user_id ? String(row.owner_user_id) : undefined,
+    ownerKey: String(row.owner_key),
+    name: String(row.name),
+    slug: String(row.slug),
+    description: String(row.description ?? ""),
+    origin: row.origin as SkillRecord["origin"],
+    status: row.status as SkillRecord["status"],
+    currentVersion: String(row.current_version),
+    instructionsRef: String(row.instructions_ref),
+    configRef: row.config_ref ? String(row.config_ref) : undefined,
+    tags: parseJson<string[]>(row.tags, []),
+    metadata: parseJson<Record<string, unknown>>(row.metadata, {}),
+    activationRules: parseJson<Record<string, unknown>>(row.activation_rules, {}),
+    requiredTools: parseJson<string[]>(row.required_tools, []),
+    requiredPermissions: parseJson<string[]>(row.required_permissions, []),
+    resources: parseJson<unknown[]>(row.resources, []),
+    mcpServerIds: parseJson<string[]>(row.mcp_server_ids, []),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
   };
-}
-
-function parse<T>(value: unknown, fallback: T): T {
-  try { return JSON.parse(String(value ?? "")) as T; } catch { return fallback; }
 }

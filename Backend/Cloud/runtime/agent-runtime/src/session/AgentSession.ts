@@ -3,13 +3,13 @@ import {
   type LoopResult,
   type RegisteredTool,
   type RuntimeProfile,
-} from "@studio/v2-runtime";
+} from "../runtime/RuntimeSession";
 import type {
   AgentDefinition,
   ContextPackage,
   DelegationResult,
   RunState,
-} from "@studio/v2-contracts";
+} from "../contracts";
 import type { Env } from "../system/env";
 
 const DEFINITION_KEY = "agent:definition";

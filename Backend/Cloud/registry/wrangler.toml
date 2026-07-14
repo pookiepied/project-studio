@@ -1,4 +1,4 @@
-name = "studio-registry"
+name = "studio-cloud-library-registry"
 main = "src/index.ts"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
@@ -10,9 +10,5 @@ ENVIRONMENT = "production"
 
 [[d1_databases]]
 binding = "REGISTRY_DB"
-database_name = "studio-registry"
+database_name = "studio-cloud-library-registry"
 database_id = "eafac4b3-4db2-4c56-833e-83dc993fb33f"
-
-[[services]]
-binding = "MCP"
-service = "studio-mcp"

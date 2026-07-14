@@ -1,0 +1,217 @@
+import type { ContextPackage, ExecutionLimits, RunState, StudioToolDescriptor, ToolEffect } from "../contracts";
+
+export interface RuntimeEnv {
+  GATEWAY: Fetcher;
+  CONTEXT: Fetcher;
+  DATA: Fetcher;
+  MCP: Fetcher;
+}
+
+export interface RuntimeProfile {
+  consumer: "execution" | "planner" | "agent";
+  fallbackSystemPrompt: string;
+}
+
+export interface LoopResult {
+  text: string;
+}
+
+export interface RegisteredTool {
+  descriptor: StudioToolDescriptor;
+  policy: {
+    effect: ToolEffect;
+    requiresApproval: boolean;
+  };
+}
+
+interface RuntimeEvent {
+  eventId: string;
+  runId: string;
+  sequence: number;
+  type: string;
+  timestamp: string;
+  payload: Record<string, unknown>;
+}
+
+interface StartBody {
+  conversationId: string;
+  userId: string;
+  request: string;
+  modelId: string;
+  idempotencyKey: string;
+  branchId?: string;
+  turnId?: string;
+  runId?: string;
+  limits?: ExecutionLimits;
+}
+
+const RUN_KEY = "run:current";
+const EVENTS_KEY = "run:events";
+
+export abstract class RuntimeSession<Env extends RuntimeEnv> {
+  protected readonly ctx: DurableObjectState;
+  protected readonly env: Env;
+  protected abstract readonly profile: RuntimeProfile;
+  private cachedEvents: RuntimeEvent[] = [];
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    this.ctx = ctx;
+    this.env = env;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const userId = request.headers.get("x-user-id") ?? request.headers.get("X-User-ID");
+    if (!userId) return Response.json({ error: "unauthorized" }, { status: 401 });
+
+    if (request.method === "POST" && url.pathname === "/start") {
+      const body = (await request.json()) as StartBody;
+      if (body.userId !== userId) return Response.json({ error: "forbidden" }, { status: 403 });
+      return this.start(body);
+    }
+    if (request.method === "GET" && url.pathname === "/state") {
+      const run = await this.ctx.storage.get<RunState>(RUN_KEY);
+      return Response.json({ run: run ?? null }, { status: run ? 200 : 404 });
+    }
+    if (request.method === "GET" && url.pathname === "/ws") {
+      return Response.json({ error: "websocket_not_implemented" }, { status: 501 });
+    }
+    if (request.method === "POST" && ["/pause", "/resume", "/cancel"].includes(url.pathname)) {
+      return this.transition(url.pathname.slice(1) as "pause" | "resume" | "cancel");
+    }
+    if (request.method === "POST" && (url.pathname.startsWith("/approvals/") || url.pathname.startsWith("/external-tools/") || url.pathname.startsWith("/client-actions/"))) {
+      return Response.json({ accepted: true });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  }
+
+  protected async beforeExecute(): Promise<void> {}
+
+  protected composeSystemPrompt(context: ContextPackage | null): string {
+    return [
+      context?.runtime.systemPrompt ?? this.profile.fallbackSystemPrompt,
+      context?.runtime.instructions.filter(Boolean).join("\n\n"),
+    ].filter(Boolean).join("\n\n");
+  }
+
+  protected gateTools(tools: Record<string, RegisteredTool>): Record<string, RegisteredTool> {
+    return tools;
+  }
+
+  protected async finalize(_run: RunState, result: LoopResult): Promise<string> {
+    return result.text;
+  }
+
+  protected async emit(run: RunState, type: string, payload: Record<string, unknown>): Promise<void> {
+    const events = await this.readEvents();
+    events.push({
+      eventId: crypto.randomUUID(),
+      runId: run.runId,
+      sequence: events.length + 1,
+      type,
+      timestamp: new Date().toISOString(),
+      payload,
+    });
+    await this.ctx.storage.put(EVENTS_KEY, events);
+  }
+
+  protected eventsForRun(runId: string): RuntimeEvent[] {
+    return this.cachedEvents.filter((event) => event.runId === runId);
+  }
+
+  protected async postData(path: string, userId: string, body: unknown): Promise<Response> {
+    return this.env.DATA.fetch(`https://data${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": userId },
+      body: JSON.stringify(body),
+    });
+  }
+
+  private async start(body: StartBody): Promise<Response> {
+    const now = new Date().toISOString();
+    const existing = await this.ctx.storage.get<RunState>(RUN_KEY);
+    if (existing?.idempotencyKey === body.idempotencyKey) return Response.json({ run: existing });
+
+    const run: RunState = {
+      runId: body.runId ?? crypto.randomUUID(),
+      conversationId: body.conversationId,
+      userId: body.userId,
+      request: body.request,
+      modelId: body.modelId,
+      idempotencyKey: body.idempotencyKey,
+      branchId: body.branchId,
+      turnId: body.turnId ?? crypto.randomUUID(),
+      status: "running",
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      limits: body.limits,
+    };
+
+    await this.ctx.storage.put(RUN_KEY, run);
+    await this.emit(run, "run.started", { request: run.request });
+
+    try {
+      await this.beforeExecute();
+      const context = await this.loadContext(run);
+      this.composeSystemPrompt(context);
+      this.gateTools(this.registerTools(context?.tools ?? []));
+      const result: LoopResult = { text: "" };
+      const output = await this.finalize(run, result);
+      const completed = { ...run, status: "completed" as const, updatedAt: new Date().toISOString(), version: run.version + 1 };
+      await this.ctx.storage.put(RUN_KEY, completed);
+      await this.emit(completed, "run.completed", { output });
+      return Response.json({ run: completed, output });
+    } catch (error) {
+      const failed = { ...run, status: "failed" as const, updatedAt: new Date().toISOString(), version: run.version + 1 };
+      await this.ctx.storage.put(RUN_KEY, failed);
+      await this.emit(failed, "run.failed", { error: describe(error) });
+      return Response.json({ run: failed, error: describe(error) }, { status: 500 });
+    }
+  }
+
+  private async transition(action: "pause" | "resume" | "cancel"): Promise<Response> {
+    const run = await this.ctx.storage.get<RunState>(RUN_KEY);
+    if (!run) return Response.json({ error: "not_found" }, { status: 404 });
+    const status = action === "cancel" ? "cancelled" : action === "pause" ? "paused" : "running";
+    const next: RunState = { ...run, status, updatedAt: new Date().toISOString(), version: run.version + 1 };
+    await this.ctx.storage.put(RUN_KEY, next);
+    await this.emit(next, `run.${action}`, {});
+    return Response.json({ run: next });
+  }
+
+  private async loadContext(run: RunState): Promise<ContextPackage | null> {
+    const response = await this.env.CONTEXT.fetch("https://context/context", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": run.userId },
+      body: JSON.stringify({
+        userId: run.userId,
+        taskId: run.runId,
+        conversationId: run.conversationId,
+        task: run.request,
+        consumer: this.profile.consumer,
+      }),
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as ContextPackage;
+  }
+
+  private registerTools(descriptors: StudioToolDescriptor[]): Record<string, RegisteredTool> {
+    return Object.fromEntries(descriptors.map((descriptor) => [descriptor.name, {
+      descriptor,
+      policy: {
+        effect: descriptor.policy.effect ?? (descriptor.policy.requiresApproval ? "write" : "read"),
+        requiresApproval: descriptor.policy.requiresApproval ?? false,
+      },
+    }]));
+  }
+
+  private async readEvents(): Promise<RuntimeEvent[]> {
+    this.cachedEvents = (await this.ctx.storage.get<RuntimeEvent[]>(EVENTS_KEY)) ?? [];
+    return this.cachedEvents;
+  }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

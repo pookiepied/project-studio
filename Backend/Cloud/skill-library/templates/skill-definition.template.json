@@ -1,0 +1,24 @@
+{
+  "id": "product-self-knowledge",
+  "name": "Product Self-Knowledge",
+  "slug": "product-self-knowledge",
+  "description": "Concise current overview of Studio's product identity and cloud/local architecture.",
+  "version": "0.1.0",
+  "status": "draft",
+  "owner": {
+    "type": "system",
+    "userId": null
+  },
+  "instructionsRef": "bundled://skill-library/skills/product-self-knowledge/SKILL.md",
+  "activation": {
+    "when": "Use when an agent needs product or architecture self-knowledge.",
+    "hints": ["Studio architecture", "product identity"]
+  },
+  "requiredTools": [],
+  "requiredPermissions": [],
+  "resources": [],
+  "mcpServerIds": [],
+  "metadata": {
+    "format": "anthropic-skill"
+  }
+}

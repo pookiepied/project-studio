@@ -1,0 +1,11 @@
+name = "studio-cloud-skill-library"
+main = "src/index.ts"
+compatibility_date = "2026-07-14"
+
+[vars]
+ENVIRONMENT = "development"
+
+[[d1_databases]]
+binding = "SKILL_LIBRARY_DB"
+database_name = "studio-cloud-skill-library"
+database_id = "replace-with-skill-library-d1-id"

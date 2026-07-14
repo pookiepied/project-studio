@@ -1,4 +1,4 @@
-import type { ProjectContext } from "@studio/v2-contracts";
+import type { ProjectContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**

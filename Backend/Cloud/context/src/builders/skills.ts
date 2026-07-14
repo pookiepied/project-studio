@@ -1,4 +1,4 @@
-import type { RegistrySkillRecord, SkillContext } from "@studio/v2-contracts";
+import type { RegistrySkillRecord, SkillContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**

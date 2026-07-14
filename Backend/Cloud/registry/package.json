@@ -1,9 +1,9 @@
 {
-  "name": "studio-registry",
+  "name": "studio-cloud-library-registry",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Studio Registry - user-scoped source of truth for connectors, MCP servers, skills, and agents",
+  "description": "Studio Cloud Library Registry - cloud-only MCP server, skill, and agent library records",
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc --noEmit",
@@ -12,7 +12,6 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "@studio/v2-contracts": "file:../shared/contracts",
     "hono": "^4.0.0"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 # Studio Context
 
 Assembles the information an agent runtime needs for one task and returns it as a
-structured, compact, permission-aware `ContextPackage` (see `@studio/v2-contracts`).
+structured, compact, permission-aware context payload owned by this worker.
 
 The Context worker answers: *What is relevant to this task? Which tools should be
 exposed? Which skills should be loaded? Which agents can be delegated to? Which files,

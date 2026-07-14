@@ -1,4 +1,4 @@
-import type { McpContext, RegistryMcpRecord, StudioToolDescriptor } from "@studio/v2-contracts";
+import type { McpContext, RegistryMcpRecord, StudioToolDescriptor } from "../contracts";
 import type { Env } from "../system/env";
 
 export async function buildMcpContext(env: Env, userId: string, _task: string): Promise<{ context: McpContext[]; tools: StudioToolDescriptor[] }> {

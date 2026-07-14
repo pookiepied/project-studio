@@ -1,4 +1,4 @@
-import type { UserContext } from "@studio/v2-contracts";
+import type { UserContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**

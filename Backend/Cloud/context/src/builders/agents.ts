@@ -1,4 +1,4 @@
-import type { AgentContext, AgentDefinition } from "@studio/v2-contracts";
+import type { AgentContext, AgentDefinition } from "../contracts";
 import type { Env } from "../system/env";
 
 /**

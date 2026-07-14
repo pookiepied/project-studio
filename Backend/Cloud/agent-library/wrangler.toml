@@ -1,0 +1,14 @@
+name = "studio-cloud-agent-library"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "AGENT_LIBRARY_DB"
+database_name = "studio-cloud-agent-library"
+database_id = "replace-with-agent-library-d1-id"

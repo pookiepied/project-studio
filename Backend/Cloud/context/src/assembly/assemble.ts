@@ -1,4 +1,4 @@
-import type { ContextPackage, RuntimeConsumer } from "@studio/v2-contracts";
+import type { ContextPackage, RuntimeConsumer } from "../contracts";
 import type { Env } from "../system/env";
 import { buildMcpContext } from "../builders/mcp";
 import { buildConnectorContext } from "../builders/connectors";

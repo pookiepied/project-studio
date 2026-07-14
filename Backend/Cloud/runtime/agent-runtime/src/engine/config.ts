@@ -3,14 +3,14 @@ import type {
   AgentLimits,
   AgentPermissions,
   ExecutionLimits,
-} from "@studio/v2-contracts";
+} from "../contracts";
 
 /**
  * The configuration layer over the shared execution engine (architecture
  * decision #3): pure translation from an AgentDefinition + delegation request
  * into engine inputs. Deliberately NOT a second loop — it only computes the
  * model, prompt framing, tool permissions, and limits the engine will run
- * with. The engine itself is @studio/v2-runtime's RuntimeSession.
+ * with. The engine itself is this worker's local RuntimeSession.
  */
 
 /** AgentLimits (agent vocabulary) → ExecutionLimits (engine vocabulary). */

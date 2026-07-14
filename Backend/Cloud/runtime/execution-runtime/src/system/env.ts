@@ -1,4 +1,4 @@
-import type { RuntimeEnv } from "@studio/v2-runtime";
+import type { RuntimeEnv } from "../runtime/RuntimeSession";
 
 /**
  * Execution Runtime bindings. The shared engine needs GATEWAY, CONTEXT, DATA,

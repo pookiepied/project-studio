@@ -1,4 +1,4 @@
-import type { ConnectorContext, RegistryConnectorRecord, StudioToolDescriptor } from "@studio/v2-contracts";
+import type { ConnectorContext, RegistryConnectorRecord, StudioToolDescriptor } from "../contracts";
 import type { Env } from "../system/env";
 
 export async function buildConnectorContext(env: Env, userId: string, _task: string): Promise<{ context: ConnectorContext[]; tools: StudioToolDescriptor[] }> {
@@ -10,6 +10,7 @@ export async function buildConnectorContext(env: Env, userId: string, _task: str
   const tools = active.flatMap((item) => item.tools.filter((tool) => tool.enabled).map((tool): StudioToolDescriptor => ({
     name: `connector_${item.ref.id}_${tool.name}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64),
     description: tool.description, inputSchema: tool.inputSchema, family: "connector", target: "mcp-hub", location: "cloud", capabilityRef: item.ref,
+    policy: { requiresApproval: tool.permissions?.some((permission) => permission.includes("write") || permission.includes("destructive")) ?? false },
     route: { kind: "connector", slug: tool.name, connectionId: String(item.metadata.connectionId ?? item.ref.id), entityId: userId },
   })));
   return { context, tools };

@@ -1,4 +1,4 @@
-import type { Plan, PlanPhase, PlanStep } from "@studio/v2-contracts";
+import type { Plan, PlanPhase, PlanStep } from "../contracts";
 
 /**
  * Structured-output contract for the planning loop. The planner drives the

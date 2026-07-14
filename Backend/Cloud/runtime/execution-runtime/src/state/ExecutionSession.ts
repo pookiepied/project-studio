@@ -2,8 +2,8 @@ import {
   RuntimeSession,
   type LoopResult,
   type RuntimeProfile,
-} from "@studio/v2-runtime";
-import type { RunState } from "@studio/v2-contracts";
+} from "../runtime/RuntimeSession";
+import type { RunState } from "../contracts";
 import type { Env } from "../system/env";
 
 /**

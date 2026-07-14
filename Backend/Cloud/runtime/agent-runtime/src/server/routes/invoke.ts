@@ -3,7 +3,7 @@ import type {
   AgentDefinition,
   AgentLimits,
   AgentPermissions,
-} from "@studio/v2-contracts";
+} from "../../contracts";
 import type { Env } from "../../system/env";
 import {
   mapAgentLimits,

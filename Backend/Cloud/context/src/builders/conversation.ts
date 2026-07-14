@@ -1,4 +1,4 @@
-import type { ConversationContext } from "@studio/v2-contracts";
+import type { ConversationContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**

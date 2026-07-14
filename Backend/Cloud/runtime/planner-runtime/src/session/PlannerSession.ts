@@ -3,8 +3,8 @@ import {
   type LoopResult,
   type RegisteredTool,
   type RuntimeProfile,
-} from "@studio/v2-runtime";
-import type { ContextPackage, Plan, RunState } from "@studio/v2-contracts";
+} from "../runtime/RuntimeSession";
+import type { ContextPackage, Plan, RunState } from "../contracts";
 import type { Env } from "../system/env";
 import { PLAN_OUTPUT_INSTRUCTION, parsePlan } from "../planner/plan-format";
 

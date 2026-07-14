@@ -1,6 +1,6 @@
 # Studio Agent Runtime
 
-Executes registered `AgentDefinition` records (see `@studio/v2-contracts`): loads the
+Executes registered `AgentDefinition` records: loads the
 definition from the Registry, resolves the model, applies the system prompt and
 permissions, loads the permitted toolset and skills via Studio Context, runs the agent
 loop, enforces limits, and returns a structured result to the requesting user or
@@ -9,8 +9,8 @@ parent agent (delegation — ARCHITECTURE.md §17).
 ## Architecture decision #3 — resolved: reuse the shared engine
 
 This worker is a separate deployable, but it does **not** contain its own loop. It runs
-on `@studio/v2-runtime` — the same durable `RuntimeSession` engine as Execution and
-Planner. `AgentSession` (`src/session/`) subclasses it and specializes three points:
+on its local durable `RuntimeSession` engine. `AgentSession` (`src/session/`)
+subclasses it and specializes three points:
 `composeSystemPrompt` (the agent's prompt/personality/output format), `gateTools` (the
 agent's permission allowlist + read/write gate), and `finalize` (store a
 `DelegationResult`). `src/engine/config.ts` is the pure configuration layer that maps an

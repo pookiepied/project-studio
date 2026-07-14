@@ -2,7 +2,7 @@
 
 A separate agent loop designed for planning rather than execution. Investigates the
 project or environment, identifies requirements and risks, breaks work into phases,
-and produces structured `Plan` records (see `@studio/v2-contracts`) for the
+and produces structured `Plan` records for the
 Studio Execution Runtime to act on.
 
 ## Responsibilities
