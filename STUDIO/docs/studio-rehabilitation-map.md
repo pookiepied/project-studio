@@ -133,7 +133,7 @@ before splitting.
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 731 | Provider still owns many chat concerns; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, and project context state were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
-| `src/features/chat/pages/ChatPage.tsx` | 732 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, and composer input wiring were extracted |
+| `src/features/chat/pages/ChatPage.tsx` | 688 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, and environment controls were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 698 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
@@ -428,6 +428,11 @@ Completed:
   external text injection into `src/features/chat/pages/useChatComposerInput.ts`.
 - Reduced `ChatPage.tsx` from 755 to 732 lines while keeping send validation
   and attachment handling in the page.
+- Extracted ChatPage environment controls for conversation scope, engine
+  availability, and autopilot syncing/toggling into
+  `src/features/chat/pages/useChatEnvironmentControls.ts`.
+- Reduced `ChatPage.tsx` from 732 to 688 lines while keeping composer props and
+  top chrome wiring in the page.
 - Extracted ChatFloatingDock browser conversation/project rows and conversation
   action menu into `src/features/chat/components/ChatFloatingDockRows.tsx`.
 - Reduced `ChatFloatingDock.tsx` from the measured 937-line baseline to 627

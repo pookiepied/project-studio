@@ -25,7 +25,6 @@ import { usePermissionPrompt }                       from "@/features/chat/hooks
 import { useExclusivePanel, broadcastPanelOpen }     from "@/lib/hooks/useExclusivePanel";
 import { useLocalCapabilities }                      from "@/features/chat/hooks/useLocalCapabilities";
 import { useClaudeAccountStatus }                    from "@/features/chat/hooks/useClaudeAccountStatus";
-import type { ConversationStorageScope }             from "@/core/conversations";
 
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
@@ -39,12 +38,12 @@ import {
   RightWorkspacePanel,
   useRightWorkspace,
 } from "@/features/workspace";
-import type { ChatEngine } from "@/cliBridges/types";
 import { ClaudeTranscriptNotice, PendingComposerInteractions } from "./ChatComposerPanels";
 import { ChatPageOverlays } from "./ChatPageOverlays";
 import { ChatTopChrome } from "./ChatTopChrome";
 import { useComposerDockHeight } from "./useComposerDockHeight";
 import { useChatComposerInput } from "./useChatComposerInput";
+import { useChatEnvironmentControls } from "./useChatEnvironmentControls";
 
 // ---------------------------------------------------------------------------
 
@@ -113,7 +112,6 @@ export const ChatPage = () => {
 
   const messages = displayedMessages;
   const isClaudeOwnedConversation = conversation?.metadata?.owner === "claude";
-  const [conversationListScope, setConversationListScope] = useState<ConversationStorageScope>(conversationStorageScope);
   const hasStartedConversation = messages.length > 0;
 
   // -- External hooks ----------------------------------------------------------
@@ -133,15 +131,32 @@ export const ChatPage = () => {
   const conversationStatuses = useConversationStatuses();
 
   const {
+    conversationListScope,
+    availableEngines,
+    handleStorageScopeChange,
+    toggleAutopilot,
+  } = useChatEnvironmentControls({
+    conversationId: conversation?.id,
+    conversationStorageScope,
+    hasStartedConversation,
+    isClaudeOwnedConversation,
+    claudeCliAvailable,
+    chatEngine,
+    projectContext,
+    autopilotMode: settings.autopilotMode,
+    setChatEngine,
+    setConversationStorageScope,
+    createNewConversation,
+    setProjectContext,
+    updateSettings,
+  });
+
+  const {
     conversations,
     reload:                   reloadConversations,
     handleDeleteConversation: deleteConversation,
     handleSaveConvTitle:      saveConvTitle,
   } = useConversationsList(conversationListScope);
-
-  useEffect(() => {
-    setConversationListScope(conversationStorageScope);
-  }, [conversation?.id, conversationStorageScope]);
 
   const {
     messagesContainerRef, messagesEndRef, messagesContentRef, loadMoreTriggerRef, forwardWheel,
@@ -286,51 +301,6 @@ export const ChatPage = () => {
     [models, currentModel]
   );
 
-  const availableEngines = useMemo<readonly ChatEngine[]>(
-    () => isClaudeOwnedConversation
-      ? (["claude"] as const)
-      : conversationStorageScope === "local" && claudeCliAvailable
-      ? (["studio", "claude"] as const)
-      : (["studio"] as const),
-    [conversationStorageScope, claudeCliAvailable, isClaudeOwnedConversation]
-  );
-
-  useEffect(() => {
-    if (!availableEngines.includes(chatEngine)) {
-      setChatEngine(availableEngines[0], { persist: false });
-    }
-  }, [availableEngines, chatEngine, setChatEngine]);
-
-  // Mirror a project's per-folder accessMode onto the global autopilot flag so
-  // dependent surfaces (the Claude bridge permission mode, Settings) stay in
-  // step when a project is opened or its mode changes. We deliberately do NOT
-  // force a value when no project is active; a global chat owns its own
-  // review/autonomous choice via autopilotMode and must not be clobbered here
-  // (that was the bug that locked global chats to review).
-  useEffect(() => {
-    if (projectContext) {
-      updateSettings({ autopilotMode: projectContext.accessMode === "autonomous" });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectContext?.path, projectContext?.accessMode]);
-
-  // Shared by the chat dock and the composer's EnvironmentSelector.
-  // both let the user flip local/cloud scope.
-  const handleStorageScopeChange = useCallback(async (scope: ConversationStorageScope) => {
-    setConversationListScope(scope);
-
-    if (scope === conversationStorageScope) return;
-
-    if (!hasStartedConversation) {
-      setConversationStorageScope(scope);
-      return;
-    }
-
-    createNewConversation(scope, {
-      preserveProject: scope === "local" && !!projectContext,
-    });
-  }, [conversationStorageScope, hasStartedConversation, setConversationStorageScope, createNewConversation, projectContext]);
-
   // Shared props for both ChatComposer instances (empty state + conversation dock)
   const composerProps = {
     inputMessage, attachments, attachMenuRef, showAttachMenu,
@@ -350,21 +320,7 @@ export const ChatPage = () => {
     onTriggerFileInput: handleTriggerFileInput,
     onSelectRecentFile: handleSelectRecentFile,
     onAttachmentsChange: setAttachments,
-    onToggleAutopilot: () => {
-      // Derive the flip from the EFFECTIVE mode, not the raw global flag, so the
-      // toggle is correct whether or not a project is open. In a project the
-      // per-folder accessMode is authoritative (the mirror effect syncs
-      // autopilotMode); in a global chat autopilotMode is the single source.
-      const currentAutonomous = projectContext
-        ? projectContext.accessMode === "autonomous"
-        : settings.autopilotMode;
-      const newMode: "review" | "autonomous" = currentAutonomous ? "review" : "autonomous";
-      if (projectContext) {
-        setProjectContext({ ...projectContext, accessMode: newMode });
-      } else {
-        updateSettings({ autopilotMode: newMode === "autonomous" });
-      }
-    },
+    onToggleAutopilot: toggleAutopilot,
     onChatEngineChange: setChatEngine,
     onSelectModel: setModel,
     onClaudeModelChange: setClaudeModel,
