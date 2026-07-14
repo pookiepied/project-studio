@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence }                   from "framer-motion";
 import { BrowserPanelContext }                       from "@/app/contexts/BrowserPanelContext";
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
@@ -29,9 +29,6 @@ import { useClaudeAccountStatus }                    from "@/features/chat/hooks
 import { ChatMessageList }      from "@/features/chat/components/ChatMessageList";
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
-import { useProjects }          from "@/features/chat/hooks/useProjects";
-import { projectRegistry, type ProjectEntry } from "@/core/projects";
-import { open as openDialog }   from "@tauri-apps/plugin-dialog";
 import { PendingMessageQueue }  from "@/features/chat/components/PendingMessageQueue";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import {
@@ -44,6 +41,7 @@ import { ChatTopChrome } from "./ChatTopChrome";
 import { useComposerDockHeight } from "./useComposerDockHeight";
 import { useChatComposerInput } from "./useChatComposerInput";
 import { useChatEnvironmentControls } from "./useChatEnvironmentControls";
+import { useChatProjectRegistry } from "./useChatProjectRegistry";
 
 // ---------------------------------------------------------------------------
 
@@ -332,10 +330,17 @@ export const ChatPage = () => {
     onClaudeEffortLevelChange: setClaudeEffortLevel,
   };
 
-  // Project registry: the canonical list behind the projects/conversations
-  // switcher. Opening a folder registers it; selecting one makes it this
-  // conversation's context.
-  const { projects, refresh: refreshProjects, removeProject, deleteProject } = useProjects();
+  const {
+    projects,
+    removeProject,
+    deleteProject,
+    handleSelectProject,
+    handleOpenProjectFolder,
+  } = useChatProjectRegistry({
+    projectContext,
+    conversationStorageScope,
+    setProjectContext,
+  });
   const runningTurnTool = activeToolCalls.find(
     (tc) => tc.status === "running" && !tc.parentCallId
   );
@@ -346,32 +351,6 @@ export const ChatPage = () => {
     !!runningTurnTool;
   const hasActiveTurn = isLoading || isStreaming || !!streamingMessageId;
   const isPreparingTurn = hasActiveTurn && !hasVisibleTurnActivity;
-
-  const handleSelectProject = useCallback(async (project: ProjectEntry) => {
-    setProjectContext({ path: project.path, name: project.name, accessMode: project.accessMode });
-    await projectRegistry.touch(project.id);
-    await refreshProjects();
-  }, [setProjectContext, refreshProjects]);
-
-  const handleOpenProjectFolder = useCallback(async () => {
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (typeof selected !== "string") return;
-    const entry = await projectRegistry.add(selected);
-    setProjectContext({ path: entry.path, name: entry.name, accessMode: entry.accessMode });
-    await refreshProjects();
-  }, [setProjectContext, refreshProjects]);
-
-  // Any project that becomes the active context gets registered, whichever way
-  // it was chosen (switcher, composer picker, or restored with a conversation).
-  const activeProjectPath = projectContext?.path;
-  const activeProjectName = projectContext?.name;
-  useEffect(() => {
-    if (!activeProjectPath || conversationStorageScope !== "local") return;
-    projectRegistry
-      .add(activeProjectPath, { name: activeProjectName })
-      .then(() => refreshProjects())
-      .catch(() => {});
-  }, [activeProjectPath, activeProjectName, conversationStorageScope, refreshProjects]);
 
   const composerBlock = (inputRef: React.RefObject<HTMLTextAreaElement | null>) => (
     <ChatComposer {...composerProps} inputRef={inputRef} />

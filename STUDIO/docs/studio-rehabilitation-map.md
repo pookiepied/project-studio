@@ -133,7 +133,7 @@ before splitting.
 | `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 628 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, and engine/session state were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
-| `src/features/chat/pages/ChatPage.tsx` | 688 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, and environment controls were extracted |
+| `src/features/chat/pages/ChatPage.tsx` | 609 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, and project registry wiring were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 639 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
@@ -433,6 +433,10 @@ Completed:
   `src/features/chat/pages/useChatEnvironmentControls.ts`.
 - Reduced `ChatPage.tsx` from 732 to 688 lines while keeping composer props and
   top chrome wiring in the page.
+- Extracted ChatPage project registry listing, folder selection, and active
+  project registration into `src/features/chat/pages/useChatProjectRegistry.ts`.
+- Reduced `ChatPage.tsx` from the current measured 627 to 609 lines while keeping top chrome project
+  props and project context ownership unchanged.
 - Extracted ChatFloatingDock browser conversation/project rows and conversation
   action menu into `src/features/chat/components/ChatFloatingDockRows.tsx`.
 - Reduced `ChatFloatingDock.tsx` from the measured 937-line baseline to 627
