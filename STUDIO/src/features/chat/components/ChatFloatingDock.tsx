@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Add,
@@ -21,13 +21,10 @@ import type { ProjectEntry } from "@/core/projects";
 import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
 import { ConversationActionsMenu, ConversationRow, ProjectRow } from "./ChatFloatingDockRows";
+import { normPath, useChatFloatingDockTree } from "./useChatFloatingDockTree";
 
 const SPRING = { type: "spring" as const, stiffness: 420, damping: 34 };
 const EASE = [0.16, 1, 0.3, 1] as const;
-
-function normPath(p?: string | null): string {
-  return p?.trim().replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase() ?? "";
-}
 
 interface ChatFloatingDockProps {
   active: boolean;
@@ -306,13 +303,6 @@ export function ChatFloatingDock({
 }
 
 
-interface ProjectGroup {
-  project?: ProjectEntry;
-  name: string;
-  path: string;
-  conversations: ConversationMetadata[];
-}
-
 function UnifiedBrowser({
   conversations,
   projects,
@@ -374,58 +364,12 @@ function UnifiedBrowser({
   const listRef = useRef<HTMLDivElement>(null);
 
   const isSearching = query.trim().length > 0;
-
-  const treeData = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let convs = conversations;
-    if (q) {
-      convs = conversations.filter((c) =>
-        `${c.title} ${c.projectName ?? ""} ${c.storageScope ?? ""}`.toLowerCase().includes(q),
-      );
-    }
-
-    const byProject = new Map<string, ProjectGroup>();
-    const loose: ConversationMetadata[] = [];
-
-    if (!isSearching) {
-      for (const p of projects) {
-        const key = normPath(p.path);
-        if (!byProject.has(key)) {
-          byProject.set(key, { project: p, name: p.name, path: p.path, conversations: [] });
-        }
-      }
-    }
-
-    for (const conv of convs) {
-      const key = normPath(conv.projectPath);
-      if (key) {
-        let group = byProject.get(key);
-        if (!group) {
-          group = {
-            name: conv.projectName ?? conv.projectPath ?? "Project",
-            path: conv.projectPath!,
-            conversations: [],
-          };
-          byProject.set(key, group);
-        }
-        group.conversations.push(conv);
-      } else {
-        loose.push(conv);
-      }
-    }
-
-    for (const g of byProject.values()) {
-      g.conversations.sort((a, b) => b.updatedAt - a.updatedAt);
-    }
-    loose.sort((a, b) => b.updatedAt - a.updatedAt);
-
-    return { loose, projectList: Array.from(byProject.values()) };
-  }, [conversations, projects, query, isSearching]);
-
-  const allMatchingConversations = useMemo(() => {
-    if (!isSearching) return [];
-    return [...treeData.loose, ...treeData.projectList.flatMap((g) => g.conversations)];
-  }, [treeData, isSearching]);
+  const { treeData, allMatchingConversations } = useChatFloatingDockTree({
+    conversations,
+    projects,
+    query,
+    isSearching,
+  });
 
   const renderItem = (conv: ConversationMetadata) => (
     <ConversationRow

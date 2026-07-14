@@ -131,13 +131,13 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/chat/pages/ChatPage.tsx` | 609 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, and project registry wiring were extracted |
-| `src/features/chat/components/ChatFloatingDock.tsx` | 592 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 587 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, and engine/session state were extracted |
-| `src/features/activity/pages/ActivityPage.tsx` | 451 | Page now focuses on display state and rendering; data fetching, loading state, refresh, and log polling were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 570 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
+| `src/features/chat/components/ChatFloatingDock.tsx` | 545 | Complex composite UI; browser rows/actions and tree grouping/search logic were extracted |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 537 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/chat/context/useStreamHandlers.ts` | 458 | Streaming protocol/event logic candidate; DSML continuation was extracted |
+| `src/features/activity/pages/ActivityPage.tsx` | 451 | Page now focuses on display state and rendering; data fetching, loading state, refresh, and log polling were extracted |
 
 ## Dead-Code Signals
 
@@ -441,6 +441,10 @@ Completed:
   action menu into `src/features/chat/components/ChatFloatingDockRows.tsx`.
 - Reduced `ChatFloatingDock.tsx` from the measured 937-line baseline to 627
   lines and normalized moved row text/separator comments to ASCII.
+- Extracted ChatFloatingDock project/conversation search and tree grouping into
+  `src/features/chat/components/useChatFloatingDockTree.ts`.
+- Reduced `ChatFloatingDock.tsx` from 592 to 545 lines while keeping browser
+  rendering, menu state, and dock shell behavior in place.
 - Extracted ChatProvider model context-window and vision support calculations
   into `src/features/chat/context/ChatProviderModelHelpers.ts`.
 - Reduced `ChatProvider.tsx` from the measured 987-line baseline to 957 lines
