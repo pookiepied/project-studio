@@ -36,6 +36,7 @@ invokeRoute.post("/:agentId", async (c) => {
   const body = await c.req.json<{
     conversationId: string;
     userId?: string;
+    workspaceId?: string;
     task: string;
     /** Scoped context only — never the parent's whole conversation. */
     context?: string;
@@ -97,6 +98,8 @@ invokeRoute.post("/:agentId", async (c) => {
     body: JSON.stringify({
       conversationId: body.conversationId,
       userId,
+      workspaceId: body.workspaceId,
+      agentId,
       request,
       modelId,
       idempotencyKey: body.idempotencyKey,

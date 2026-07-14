@@ -25,6 +25,16 @@ export interface RegisteredTool {
   };
 }
 
+export interface ToolExecutionResult {
+  ok: boolean;
+  jobId?: string;
+  toolCallId?: string;
+  toolName?: string;
+  status?: string;
+  result?: unknown;
+  error?: unknown;
+}
+
 interface RuntimeEvent {
   eventId: string;
   runId: string;
@@ -37,6 +47,8 @@ interface RuntimeEvent {
 interface StartBody {
   conversationId: string;
   userId: string;
+  workspaceId?: string;
+  agentId?: string;
   request: string;
   modelId: string;
   idempotencyKey: string;
@@ -128,6 +140,60 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
     });
   }
 
+  protected async executeToolCall(run: RunState, tool: RegisteredTool, args: Record<string, unknown>, toolCallId = crypto.randomUUID()): Promise<ToolExecutionResult> {
+    if (!tool.descriptor.route) {
+      return { ok: false, toolCallId, toolName: tool.descriptor.name, status: "failed", error: { code: "missing_tool_route", message: "Tool descriptor does not include an execution route." } };
+    }
+    const payload = {
+      userId: run.userId,
+      workspaceId: run.workspaceId,
+      sessionId: run.runId,
+      conversationId: run.conversationId,
+      agentId: run.agentId,
+      agentExecutionId: this.profile.consumer === "agent" ? run.runId : undefined,
+      toolCallId,
+      toolName: tool.descriptor.name,
+      arguments: args,
+      route: tool.descriptor.route,
+      sourceRuntime: this.profile.consumer,
+      idempotencyKey: `${run.runId}:${toolCallId}`,
+    };
+    await this.emit(run, "tool.call.started", { toolCallId, toolName: tool.descriptor.name });
+    const response = await this.env.TOOL_EXECUTION.fetch("https://tool-execution/execute", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": run.userId },
+      body: JSON.stringify(payload),
+    });
+    const result = await readJson<ToolExecutionResult>(response);
+    await this.emit(run, result.ok ? "tool.call.completed" : "tool.call.failed", { toolCallId, toolName: tool.descriptor.name, result });
+    return result;
+  }
+
+  protected async executeToolCalls(run: RunState, calls: Array<{ tool: RegisteredTool; args: Record<string, unknown>; toolCallId?: string }>): Promise<ToolExecutionResult[]> {
+    const payload = {
+      userId: run.userId,
+      sourceRuntime: this.profile.consumer,
+      workspaceId: run.workspaceId,
+      sessionId: run.runId,
+      conversationId: run.conversationId,
+      agentId: run.agentId,
+      agentExecutionId: this.profile.consumer === "agent" ? run.runId : undefined,
+      calls: calls.map((call) => ({
+        toolCallId: call.toolCallId ?? crypto.randomUUID(),
+        toolName: call.tool.descriptor.name,
+        arguments: call.args,
+        route: call.tool.descriptor.route,
+      })),
+    };
+    const response = await this.env.TOOL_EXECUTION.fetch("https://tool-execution/execute/batch", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": run.userId },
+      body: JSON.stringify(payload),
+    });
+    const body = await readJson<{ results?: ToolExecutionResult[] }>(response);
+    return body.results ?? [];
+  }
+
   private async start(body: StartBody): Promise<Response> {
     const now = new Date().toISOString();
     const existing = await this.ctx.storage.get<RunState>(RUN_KEY);
@@ -137,6 +203,8 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
       runId: body.runId ?? crypto.randomUUID(),
       conversationId: body.conversationId,
       userId: body.userId,
+      workspaceId: body.workspaceId,
+      agentId: body.agentId,
       request: body.request,
       modelId: body.modelId,
       idempotencyKey: body.idempotencyKey,
@@ -215,4 +283,14 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return { ok: false, error: { code: "invalid_tool_execution_response", message: text } } as T;
+  }
 }

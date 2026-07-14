@@ -15,8 +15,10 @@ export function normalizeExecutionRequest(value: unknown, inherited?: Partial<To
   return {
     userId,
     sourceRuntime,
+    workspaceId: optionalString(input.workspaceId ?? inherited?.workspaceId, "workspaceId"),
     sessionId: optionalString(input.sessionId ?? inherited?.sessionId, "sessionId"),
     conversationId: optionalString(input.conversationId ?? inherited?.conversationId, "conversationId"),
+    agentId: optionalString(input.agentId ?? inherited?.agentId, "agentId"),
     agentExecutionId: optionalString(input.agentExecutionId ?? inherited?.agentExecutionId, "agentExecutionId"),
     parentExecutionId: optionalString(input.parentExecutionId ?? inherited?.parentExecutionId, "parentExecutionId"),
     toolCallId,
@@ -38,8 +40,10 @@ export function normalizeBatchRequest(value: unknown): ToolExecutionBatchRequest
   const base = {
     userId: string(input.userId, "userId"),
     sourceRuntime: sourceRuntimeValue(input.sourceRuntime),
+    workspaceId: optionalString(input.workspaceId, "workspaceId"),
     sessionId: optionalString(input.sessionId, "sessionId"),
     conversationId: optionalString(input.conversationId, "conversationId"),
+    agentId: optionalString(input.agentId, "agentId"),
     agentExecutionId: optionalString(input.agentExecutionId, "agentExecutionId"),
     parentExecutionId: optionalString(input.parentExecutionId, "parentExecutionId"),
   };

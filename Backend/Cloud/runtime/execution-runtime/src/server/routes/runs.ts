@@ -26,6 +26,8 @@ runsRoute.post("/", async (c) => {
   const body = await c.req.json<{
     conversationId: string;
     userId?: string;
+    workspaceId?: string;
+    agentId?: string;
     request: string;
     modelId: string;
     /** Required: duplicate sends with the same key return the same run. */

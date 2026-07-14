@@ -5,8 +5,10 @@
 CREATE TABLE IF NOT EXISTS tool_execution_jobs (
   job_id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  workspace_id TEXT,
   session_id TEXT,
   conversation_id TEXT,
+  agent_id TEXT,
   agent_execution_id TEXT,
   tool_call_id TEXT NOT NULL,
   source_runtime TEXT NOT NULL,
@@ -29,7 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_tool_execution_jobs_user_created
   ON tool_execution_jobs (user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_tool_execution_jobs_scope
-  ON tool_execution_jobs (user_id, session_id, conversation_id, agent_execution_id);
+  ON tool_execution_jobs (user_id, workspace_id, session_id, conversation_id, agent_id, agent_execution_id);
 
 CREATE INDEX IF NOT EXISTS idx_tool_execution_jobs_tool_call
   ON tool_execution_jobs (user_id, tool_call_id);

@@ -8,7 +8,7 @@ import { resolveRoute, targetRef } from "./routes";
 import { dispatchSkillLibrary } from "./skillLibrary";
 
 export async function executeToolCall(env: Env, request: ToolExecutionRequest): Promise<ToolExecutionResult> {
-  const route = resolveRoute(request);
+  const route = await resolveRoute(env, request);
   const startedAt = new Date().toISOString();
   const job = await createJob(env.TOOL_EXECUTION_DB, request, route.kind, targetRef(route));
   if (job.status === "completed") {
@@ -69,7 +69,7 @@ export async function executeToolCall(env: Env, request: ToolExecutionRequest): 
   }
 }
 
-async function dispatch(env: Env, request: ToolExecutionRequest, route: ReturnType<typeof resolveRoute>): Promise<unknown> {
+async function dispatch(env: Env, request: ToolExecutionRequest, route: Awaited<ReturnType<typeof resolveRoute>>): Promise<unknown> {
   switch (route.kind) {
     case "agent-runtime":
       return dispatchAgentRuntime(env, request, route);

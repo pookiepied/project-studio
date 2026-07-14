@@ -29,6 +29,8 @@ plansRoute.post("/", async (c) => {
   const body = await c.req.json<{
     conversationId: string;
     userId?: string;
+    workspaceId?: string;
+    agentId?: string;
     goal: string;
     modelId: string;
     idempotencyKey: string;
@@ -44,6 +46,8 @@ plansRoute.post("/", async (c) => {
     body: JSON.stringify({
       conversationId: body.conversationId,
       userId,
+      workspaceId: body.workspaceId,
+      agentId: body.agentId,
       request: body.goal,
       modelId: body.modelId,
       idempotencyKey: body.idempotencyKey,

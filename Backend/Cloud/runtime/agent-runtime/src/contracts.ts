@@ -8,6 +8,8 @@ export interface RunState {
   runId: string;
   conversationId: string;
   userId: string;
+  workspaceId?: string;
+  agentId?: string;
   request: string;
   modelId: string;
   idempotencyKey: string;
@@ -39,13 +41,28 @@ export interface StudioToolDescriptor {
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
   annotations?: Record<string, unknown>;
+  family?: "connector" | "native-cloud" | "user-mcp" | "native-local" | "client";
+  target?: "mcp-hub" | "local-relay" | "client";
+  location?: "cloud" | "local";
   policy: {
     effect?: "none" | "read" | "write" | "destructive";
     requiresApproval?: boolean;
   };
+  route?: StudioToolRoute;
 }
 
 export type ToolEffect = "none" | "read" | "write" | "destructive";
+
+export type StudioToolRoute =
+  | { kind: "agent-runtime"; action: string; agentId?: string }
+  | { kind: "skill-library"; action: string }
+  | { kind: "native-cloud"; serviceId: string; toolName: string }
+  | { kind: "remote-mcp"; serverId: string; toolName: string; endpoint: string }
+  | { kind: "mcp-server"; serverId: string; endpoint: string; toolName?: string }
+  | { kind: "local-relay"; serverId: string; toolName: string; localRegistrationId?: string }
+  | { kind: "connector"; slug: string; connectionId: string; entityId: string }
+  | { kind: "memory"; operation: string; location?: "cloud" | "local" }
+  | { kind: "client"; action: string };
 
 export interface AgentPermissions {
   read: boolean;

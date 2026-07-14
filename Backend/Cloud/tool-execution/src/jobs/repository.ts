@@ -7,8 +7,10 @@ export async function createJob(db: D1Database, request: ToolExecutionRequest, r
   const job: ToolExecutionJobRecord = {
     jobId: request.jobId ?? crypto.randomUUID(),
     userId: request.userId,
+    workspaceId: request.workspaceId,
     sessionId: request.sessionId,
     conversationId: request.conversationId,
+    agentId: request.agentId,
     agentExecutionId: request.agentExecutionId,
     toolCallId: request.toolCallId,
     sourceRuntime: request.sourceRuntime,
@@ -28,15 +30,17 @@ export async function createJob(db: D1Database, request: ToolExecutionRequest, r
 
   await db.prepare(
     `INSERT INTO tool_execution_jobs (
-      job_id, user_id, session_id, conversation_id, agent_execution_id, tool_call_id,
+      job_id, user_id, workspace_id, session_id, conversation_id, agent_id, agent_execution_id, tool_call_id,
       source_runtime, tool_name, status, route_kind, target_ref, idempotency_key,
       request_json, started_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     job.jobId,
     job.userId,
+    job.workspaceId ?? null,
     job.sessionId ?? null,
     job.conversationId ?? null,
+    job.agentId ?? null,
     job.agentExecutionId ?? null,
     job.toolCallId,
     job.sourceRuntime,
@@ -95,8 +99,10 @@ function toJob(row: JobRow): ToolExecutionJobRecord {
   return {
     jobId: String(row.job_id),
     userId: String(row.user_id),
+    workspaceId: row.workspace_id ? String(row.workspace_id) : undefined,
     sessionId: row.session_id ? String(row.session_id) : undefined,
     conversationId: row.conversation_id ? String(row.conversation_id) : undefined,
+    agentId: row.agent_id ? String(row.agent_id) : undefined,
     agentExecutionId: row.agent_execution_id ? String(row.agent_execution_id) : undefined,
     toolCallId: String(row.tool_call_id),
     sourceRuntime: row.source_runtime as ToolExecutionJobRecord["sourceRuntime"],

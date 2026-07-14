@@ -25,6 +25,24 @@ Current dispatch support:
 - `skill-library`: supports bundled system skill listing/search/read.
 - `mcp-server` / `remote-mcp`: sends a standard MCP `tools/call` JSON-RPC
   request to the resolved endpoint.
+- MCP registry lookup: when a route is not supplied, the worker can resolve an
+  active registered MCP tool by its namespaced tool name.
 
 Native tools, memory, local relay, and connector dispatch routes are explicit
 placeholders until their target services expose stable contracts.
+
+## Runtime Access
+
+Execution Runtime, Planner Runtime, and Agent Runtime each bind this worker as
+`TOOL_EXECUTION`. Their runtime session bases expose local helper methods for:
+
+- a single scoped tool call
+- a batch of independent scoped tool calls
+
+Every request carries the caller's `userId`, optional `workspaceId`,
+`sessionId`, `conversationId`, optional `agentId`, optional
+`agentExecutionId`, `toolCallId`, and idempotency key. The Tool Execution Worker
+records those values in D1 and never stores process-global execution state.
+
+The current runtime loops are still model-loop scaffolds, so these helpers are
+the integration point used when actual model tool-call handling is implemented.

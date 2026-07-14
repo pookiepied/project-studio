@@ -29,8 +29,10 @@ export type SkillToolAction =
 
 export interface ToolExecutionScope {
   userId: string;
+  workspaceId?: string;
   sessionId?: string;
   conversationId?: string;
+  agentId?: string;
   agentExecutionId?: string;
   parentExecutionId?: string;
   toolCallId: string;
@@ -50,8 +52,10 @@ export interface ToolExecutionRequest extends ToolExecutionScope {
 export interface ToolExecutionBatchRequest {
   userId: string;
   sourceRuntime: SourceRuntime;
+  workspaceId?: string;
   sessionId?: string;
   conversationId?: string;
+  agentId?: string;
   agentExecutionId?: string;
   parentExecutionId?: string;
   calls: ToolExecutionRequest[];
@@ -93,8 +97,10 @@ export type ToolExecutionResult = ToolExecutionSuccess | ToolExecutionFailure;
 export interface ToolExecutionJobRecord {
   jobId: string;
   userId: string;
+  workspaceId?: string;
   sessionId?: string;
   conversationId?: string;
+  agentId?: string;
   agentExecutionId?: string;
   toolCallId: string;
   sourceRuntime: SourceRuntime;
