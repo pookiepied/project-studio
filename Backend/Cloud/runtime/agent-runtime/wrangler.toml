@@ -18,10 +18,10 @@ service = "studio-gateway"
 binding = "REGISTRY"
 service = "studio-registry"
 
-# Studio Context — capability resolution for the agent.
+# Studio Context Engine - capability resolution for the agent.
 [[services]]
 binding = "CONTEXT"
-service = "studio-context"
+service = "studio-context-engine"
 
 # Studio Data — durable result/transcript persistence.
 [[services]]

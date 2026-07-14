@@ -14,7 +14,7 @@ lives in [ARCHITECTURE.md](ARCHITECTURE.md).
 | `agent-library/` | Studio Cloud Agent Library | Stores and resolves full cloud agent definitions for Agent Runtime |
 | `skill-library/` | Studio Cloud Skill Library | Stores and resolves full cloud skill definitions in Anthropic skill format |
 | `mcp-library/` | Studio Cloud MCP Library | Stores discoverable cloud MCP server definitions |
-| `context/` | Studio Context | Assembles task-specific context packages for agent runtimes |
+| `context-engine/` | Studio Context Engine | Assembles cached, runtime-specific context projections for agent runtimes |
 | `tool-execution/` | Studio Tool Execution Worker | Centralized validation, routing, dispatch, and result normalization for explicit model tool calls |
 | `agent-runtime/` | Studio Agent Runtime | Executes user-created and Studio-provided agent definitions |
 | `data/` | Studio Data | User-owned content: conversations, uploads, generated artifacts, object storage |

@@ -1,4 +1,4 @@
-name = "studio-context"
+name = "studio-context-engine"
 main = "src/index.ts"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
@@ -8,12 +8,12 @@ preview_urls = false
 [vars]
 ENVIRONMENT = "production"
 
-# Studio Registry — what exists for this user.
+# Studio Registry - what exists for this user.
 [[services]]
 binding = "REGISTRY"
 service = "studio-registry"
 
-# Studio Data — conversations, attachments, files.
+# Studio Data - conversations, attachments, files.
 [[services]]
 binding = "DATA"
 service = "studio-data"

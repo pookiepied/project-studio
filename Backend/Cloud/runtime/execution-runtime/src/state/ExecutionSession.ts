@@ -8,10 +8,10 @@ import type { Env } from "../system/env";
 
 /**
  * The Execution Runtime's session: the general-purpose agent that executes a
- * user's task directly. It is the shared engine (RuntimeSession) with:
+ * user's task directly. It is the local base runtime session with:
  *
  * - the "execution" consumer profile,
- * - no tool gating (it may use every capability Studio Context exposes), and
+ * - no tool gating (it may use every capability Studio Context Engine exposes), and
  * - a finalize hook that hands the completed transcript to Studio Data.
  *
  * Everything hard — the durable state machine, checkpoints, idempotency,

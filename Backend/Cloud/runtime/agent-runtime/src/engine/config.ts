@@ -6,14 +6,12 @@ import type {
 } from "../contracts";
 
 /**
- * The configuration layer over the shared execution engine (architecture
- * decision #3): pure translation from an AgentDefinition + delegation request
- * into engine inputs. Deliberately NOT a second loop — it only computes the
- * model, prompt framing, tool permissions, and limits the engine will run
- * with. The engine itself is this worker's local RuntimeSession.
+ * Pure translation from an AgentDefinition and delegation request into local
+ * runtime inputs. This is not a second loop; it computes model, prompt framing,
+ * tool permissions, and limits for this worker's RuntimeSession.
  */
 
-/** AgentLimits (agent vocabulary) → ExecutionLimits (engine vocabulary). */
+/** Maps AgentLimits (agent vocabulary) into ExecutionLimits (runtime vocabulary). */
 export function mapAgentLimits(limits: AgentLimits | undefined): ExecutionLimits {
   const mapped: ExecutionLimits = {};
   if (limits?.maxSteps !== undefined) mapped.maxModelSteps = limits.maxSteps;
@@ -23,9 +21,8 @@ export function mapAgentLimits(limits: AgentLimits | undefined): ExecutionLimits
 }
 
 /**
- * A delegated invocation may only ever NARROW an agent's own permissions,
- * never widen them (ARCHITECTURE.md §17 — a child never gets more than its
- * definition grants). Booleans AND together; the tool allowlist intersects.
+ * A delegated invocation may only ever narrow an agent's own permissions, never
+ * widen them. Booleans AND together; the tool allowlist intersects.
  */
 export function narrowPermissions(
   base: AgentPermissions,
@@ -43,7 +40,7 @@ export function narrowPermissions(
   };
 }
 
-/** Take the tighter of two optional limit sets (smaller value wins). */
+/** Take the tighter of two optional limit sets. Smaller values win. */
 export function narrowLimits(
   base: ExecutionLimits,
   override: ExecutionLimits | undefined,
@@ -62,11 +59,8 @@ export function narrowLimits(
 
 /**
  * Resolve the AgentDefinition to run. Preference order:
- *  1. an inline definition supplied by the caller (a delegating parent that
- *     already holds it, or direct invocation) — avoids a Registry round-trip;
- *  2. Studio Registry's `/agents/:id`.
- * Returns null when neither yields a definition (Registry's agent endpoint is
- * still a stub); the route turns that into a clear, actionable error.
+ * 1. an inline definition supplied by the caller;
+ * 2. Studio Registry's `/agents/:id`.
  */
 export async function resolveDefinition(
   registry: Fetcher,

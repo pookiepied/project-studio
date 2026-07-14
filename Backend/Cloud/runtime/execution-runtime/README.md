@@ -10,8 +10,8 @@ file operations, research, and other general-purpose work.
 - Call models through Gateway (`GATEWAY` service binding) — never direct providers
 - Stream output and reasoning states to clients
 - Perform tool calls, including parallel tool calls, across multi-step tasks
-- Receive its context package from Studio Context (`CONTEXT` binding)
-- Invoke task-scoped tools selected by Studio Context, including connectors,
+- Receive its context package from Studio Context Engine (`CONTEXT` binding)
+- Invoke task-scoped tools selected by Studio Context Engine, including connectors,
   native cloud tools, remote MCP tools, and eventually local relay tools
 - Report progress; handle retries and failures; return final results
 - Own durable, resumable execution state via the `ExecutionSession` Durable Object
@@ -19,7 +19,7 @@ file operations, research, and other general-purpose work.
 ## Must NOT
 
 - Manage registries or discover integrations (Studio Registry's job)
-- Manually assemble context (Studio Context's job)
+- Manually assemble context (Studio Context Engine's job)
 - Store conversations, uploads, or artifacts itself (Studio Data's job)
 - Implement provider logic (Gateway's job)
 
@@ -45,7 +45,7 @@ src/
    a second active run (single-threaded duplicate guard) and starts the loop.
 2. Every event is appended to the SQLite event log **before** any WebSocket
    broadcast — the log is the source of truth, connections are views.
-3. Before the loop starts, the runtime asks Studio Context for a `ContextPackage`.
+3. Before the loop starts, the runtime asks Studio Context Engine for a `ContextPackage`.
    The runtime consumes the supplied prompt/history/tool package/limit profile; it
    does not scan registries, buckets, uploads, or conversation storage itself.
 4. Before every model attempt and after each completed step, the message history

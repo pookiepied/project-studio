@@ -312,7 +312,7 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
   }
 
   private async loadContext(run: RunState): Promise<ContextPackage | null> {
-    const response = await this.env.CONTEXT.fetch("https://context/context", {
+    const response = await this.env.CONTEXT.fetch("https://context-engine/context-engine", {
       method: "POST",
       headers: { "content-type": "application/json", "x-user-id": run.userId },
       body: JSON.stringify({

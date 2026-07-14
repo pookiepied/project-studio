@@ -7,7 +7,7 @@ import type { Plan, PlanPhase, PlanStep } from "../contracts";
  * We parse that object into a Plan, assigning the server-owned ids.
  */
 
-/** Appended to whatever framing Studio Context (or the fallback) provides. */
+/** Appended to whatever framing Studio Context Engine (or the fallback) provides. */
 export const PLAN_OUTPUT_INSTRUCTION = `
 You are producing a structured execution plan. You may use read-only tools to
 inspect the task first. When you are ready, output your FINAL answer as a single

@@ -2,9 +2,9 @@ import type { ConversationContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**
- * Conversation layer (§19.1): current message, relevant history, prior tool
- * results, attachments. Pulls from Studio Data — relevant slices only, never
- * the full raw history.
+ * Conversation layer: current message, relevant history, prior tool results,
+ * and attachments. Pulls relevant slices from Studio Data, never the full raw
+ * history.
  */
 export async function buildConversationContext(
   env: Env,

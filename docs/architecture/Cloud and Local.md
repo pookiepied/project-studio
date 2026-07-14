@@ -52,7 +52,7 @@ The cloud version will run primarily on Cloudflare infrastructure. Depending on 
 - WebSockets where still justified
 - Internal service-to-service communication
 - A cloud agent runtime
-- A cloud context worker
+- A cloud Context Engine worker
 - Cloud-hosted connectors
 - Cloud-hosted memory and native tool capabilities
 - Cloud data storage
@@ -323,7 +323,7 @@ Other skills may be added later.
 
 The local application will have its own local skill library.
 
-Local skills should be available to local agents without requiring the cloud registry or cloud context worker.
+Local skills should be available to local agents without requiring the cloud registry or cloud Context Engine worker.
 
 The architecture must determine whether cloud-authored skills can be synchronized, copied, installed, or version-pinned locally.
 

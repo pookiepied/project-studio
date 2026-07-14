@@ -13,10 +13,10 @@ ENVIRONMENT = "production"
 binding = "GATEWAY"
 service = "studio-gateway"
 
-# Studio Context — task-specific context packages.
+# Studio Context Engine - task-specific context projections.
 [[services]]
 binding = "CONTEXT"
-service = "studio-context"
+service = "studio-context-engine"
 
 # Studio Registry — capability lookups when the runtime needs a direct check.
 [[services]]

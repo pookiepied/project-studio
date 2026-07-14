@@ -1,9 +1,9 @@
 {
-  "name": "studio-context",
+  "name": "studio-context-engine",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Studio Context - assembles task-specific context packages for agent runtimes",
+  "description": "Studio Context Engine - assembles cached, runtime-specific context projections for agent runtimes",
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc --noEmit",

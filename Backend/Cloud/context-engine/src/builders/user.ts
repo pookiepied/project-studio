@@ -2,8 +2,8 @@ import type { UserContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**
- * User layer (§19.6): preferences, relevant long-term memories, workspace
- * configuration, permission settings.
+ * User layer: preferences, relevant long-term memories, workspace configuration,
+ * and permission settings.
  */
 export async function buildUserContext(
   env: Env,
@@ -11,13 +11,20 @@ export async function buildUserContext(
   task: string,
 ): Promise<UserContext> {
   const response = await env.MCP.fetch("http://mcp/internal/native/execute", {
-    method: "POST", headers: { "content-type": "application/json", "x-user-id": userId },
+    method: "POST",
+    headers: { "content-type": "application/json", "x-user-id": userId },
     body: JSON.stringify({ serviceId: "memory", toolName: "memory_recall", toolArgs: { user_id: userId, query: task, limit: 5 } }),
   });
   if (!response.ok) throw new Error(`Memory lookup failed (${response.status}).`);
   const payload = await response.json<Record<string, unknown>>();
   const parsed = extractMemoryPayload(payload);
-  return { preferences: parsed.preferences, relevantMemories: parsed.memories, permissions: [] };
+  return {
+    preferences: parsed.preferences,
+    relevantMemories: parsed.memories,
+    recentMemory: parsed.memories,
+    userProfile: parsed.preferences,
+    permissions: [],
+  };
 }
 
 function extractMemoryPayload(payload: Record<string, unknown>): { preferences: Record<string, string>; memories: string[] } {
@@ -34,5 +41,7 @@ function extractMemoryPayload(payload: Record<string, unknown>): { preferences: 
       preferences: Object.fromEntries(preference.map((value, index) => [String(index), typeof value === "string" ? value : String((value as Record<string, unknown>).content ?? "")])),
       memories: relevant.map((value) => typeof value === "string" ? value : String((value as Record<string, unknown>).content ?? "")).filter(Boolean),
     };
-  } catch { return { preferences: {}, memories: [text.slice(0, 8_000)] }; }
+  } catch {
+    return { preferences: {}, memories: [text.slice(0, 8_000)] };
+  }
 }

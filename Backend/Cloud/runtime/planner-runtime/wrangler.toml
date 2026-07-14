@@ -13,10 +13,10 @@ ENVIRONMENT = "production"
 binding = "GATEWAY"
 service = "studio-gateway"
 
-# Studio Context — task-specific context packages (planner consumer).
+# Studio Context Engine - task-specific context projections (planner consumer).
 [[services]]
 binding = "CONTEXT"
-service = "studio-context"
+service = "studio-context-engine"
 
 # Studio Data — durable plan persistence.
 [[services]]

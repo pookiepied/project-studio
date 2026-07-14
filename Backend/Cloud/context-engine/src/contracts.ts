@@ -1,5 +1,8 @@
 export type RuntimeConsumer = "execution" | "planner" | "agent";
 export type ResourceScope = "system" | "user";
+export type CapabilityType = "mcp-server" | "mcp-tool" | "connector" | "skill" | "agent" | "native-tool" | "memory-tool" | "internal-tool";
+export type CapabilityAvailability = "available" | "unavailable" | "disabled" | "unauthorized" | "disconnected";
+export type ContextCacheStatus = "hit" | "miss" | "refreshed";
 
 export interface ResourceRef {
   id: string;
@@ -17,14 +20,21 @@ export interface ExecutionLimits {
 
 export interface ContextPackage {
   userId: string;
+  workspaceId?: string;
+  agentId?: string;
   conversationId?: string;
   taskId: string;
+  contextEngine: ContextEngineMetadata;
   runtime: {
     consumer: RuntimeConsumer;
     systemPrompt: string;
     instructions: string[];
     limits: ExecutionLimits;
   };
+  internal: InternalContextSummary;
+  sendable: SendableContext;
+  capabilityCatalog: CapabilitySummary[];
+  defaultTools: StudioToolDescriptor[];
   user: UserContext;
   project: ProjectContext;
   conversation: ConversationContext;
@@ -35,9 +45,94 @@ export interface ContextPackage {
   agents: AgentContext[];
 }
 
+export interface ContextEngineMetadata {
+  service: "studio-context-engine";
+  projectionId: string;
+  cacheKey: string;
+  cacheStatus: ContextCacheStatus;
+  assembledAt: string;
+  versions: {
+    context: string;
+    registry: string;
+    memory: string;
+    capability: string;
+  };
+}
+
+export interface InternalContextSummary {
+  capabilityCount: number;
+  toolCount: number;
+  defaultToolCount: number;
+  memoryCategories: Array<"recent_memory" | "user_profile">;
+  projection: RuntimeConsumer;
+}
+
+export interface SendableContext {
+  format: "studio.context.projection.v1";
+  sections: SendableSection[];
+  toolNames: string[];
+  defaultToolNames: string[];
+  expansionToolName: "expand_tool";
+  serialization: {
+    stablePrefixSections: string[];
+    dynamicSections: string[];
+    deterministic: true;
+  };
+}
+
+export interface SendableSection {
+  id: string;
+  stability: "stable" | "semi-stable" | "dynamic";
+  content: unknown;
+}
+
+export interface CapabilitySummary {
+  id: string;
+  type: CapabilityType;
+  name: string;
+  description: string;
+  availability: CapabilityAvailability;
+  scope: ResourceScope;
+  source: string;
+  expandable: boolean;
+  executable: boolean;
+  version?: string;
+  category?: string;
+  tags?: string[];
+  toolName?: string;
+  parentId?: string;
+}
+
+export interface ExpandToolRequest {
+  userId: string;
+  workspaceId?: string;
+  agentId?: string;
+  conversationId?: string;
+  taskId?: string;
+  task?: string;
+  consumer: RuntimeConsumer;
+  type?: CapabilityType | "all";
+  name?: string;
+  id?: string;
+  category?: string;
+}
+
+export interface ExpandToolResponse {
+  query: Omit<ExpandToolRequest, "userId" | "workspaceId" | "agentId" | "conversationId" | "taskId" | "task" | "consumer">;
+  matches: CapabilityExpansion[];
+}
+
+export interface CapabilityExpansion {
+  summary: CapabilitySummary;
+  tool?: StudioToolDescriptor;
+  details?: Record<string, unknown>;
+}
+
 export interface UserContext {
   preferences: Record<string, string>;
   relevantMemories: string[];
+  recentMemory: string[];
+  userProfile: Record<string, string>;
   permissions: string[];
 }
 
@@ -109,6 +204,8 @@ export interface StudioToolDescriptor {
     requiresApproval?: boolean;
   };
   route:
+    | { kind: "agent-runtime"; action: string; agentId?: string }
+    | { kind: "skill-library"; action: string }
     | { kind: "native-cloud"; serviceId: string; toolName: string }
     | { kind: "remote-mcp"; serverId: string; toolName: string; endpoint: string }
     | { kind: "local-relay"; serverId: string; toolName: string; localRegistrationId?: string }

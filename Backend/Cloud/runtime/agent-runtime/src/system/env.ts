@@ -1,7 +1,7 @@
 import type { RuntimeEnv } from "../runtime/RuntimeSession";
 
 /**
- * Agent Runtime bindings. The shared engine needs GATEWAY, CONTEXT, DATA, and
+ * Agent Runtime bindings. The local runtime session needs GATEWAY, CONTEXT, DATA, and
  * MCP (RuntimeEnv); this worker adds its Durable Object namespace and the
  * Registry binding it loads agent definitions from.
  */

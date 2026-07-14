@@ -12,11 +12,11 @@ const LATEST_PLAN_KEY = "plan:latest";
 
 /**
  * The Planner Runtime's session: the same durable engine as execution, with
- * three deliberate differences (architecture decision #3 — reuse the engine):
+ * three deliberate differences over the local base runtime session:
  *
  * - the "planner" consumer profile,
  * - a read-only tool gate (write/destructive capabilities are stripped no
- *   matter what Studio Context exposes), and
+ *   matter what Studio Context Engine exposes), and
  * - a finalize hook that parses the loop's structured output into a Plan,
  *   stores it, and emits it as an artifact.
  *
@@ -77,7 +77,7 @@ export class PlannerSession extends RuntimeSession<Env> {
     return JSON.stringify(plan);
   }
 
-  /** Extend the shared HTTP surface with plan retrieval, else delegate. */
+  /** Extend the base HTTP surface with plan retrieval, else delegate. */
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/plan") {

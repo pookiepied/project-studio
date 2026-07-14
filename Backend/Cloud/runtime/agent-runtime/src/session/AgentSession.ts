@@ -18,16 +18,16 @@ const RESULT_KEY = "agent:result";
 /**
  * The Agent Runtime's session: the same durable engine as execution and
  * planning, configured by an AgentDefinition instead of a fixed profile
- * (architecture decision #3 — reuse the engine, never rebuild the loop).
+ * over this worker's local base runtime session.
  *
  * The invoke route resolves the effective definition (Registry or inline,
  * with delegation permissions already narrowed) and hands it to `/start`;
  * this session persists it durably so it survives eviction/recovery, then
  * specializes the engine from it:
  *
- * - `composeSystemPrompt` — the agent's own prompt/personality/output format,
- * - `gateTools`           — the agent's permission allowlist + read/write gate,
- * - `finalize`            — store a DelegationResult for the caller to fetch.
+ * - `composeSystemPrompt`: the agent's own prompt/personality/output format,
+ * - `gateTools`: the agent's permission allowlist plus read/write gate,
+ * - `finalize`: store a DelegationResult for the caller to fetch.
  *
  * Limits and model come through the normal engine inputs (mapped by the route).
  */
@@ -45,7 +45,7 @@ export class AgentSession extends RuntimeSession<Env> {
     this.definition = (await this.ctx.storage.get<AgentDefinition>(DEFINITION_KEY)) ?? null;
   }
 
-  /** The agent definition IS the identity — it supersedes Context's framing. */
+  /** The agent definition is the identity. It supersedes Context Engine framing. */
   protected override composeSystemPrompt(context: ContextPackage | null): string {
     const def = this.definition;
     if (!def) return super.composeSystemPrompt(context);
@@ -60,13 +60,13 @@ export class AgentSession extends RuntimeSession<Env> {
   /**
    * Permission gate: an agent may use only the effects its definition grants
    * and, when the definition names an explicit tool allowlist, only those
-   * tools. Everything Studio Context exposed is filtered through this.
+   * tools. Everything Studio Context Engine exposes is filtered through this.
    */
   protected override gateTools(
     tools: Record<string, RegisteredTool>,
   ): Record<string, RegisteredTool> {
     const def = this.definition;
-    if (!def) return {}; // No resolved definition → no tools (fail safe).
+    if (!def) return {}; // No resolved definition means no tools (fail safe).
     const allow = new Set(def.permissions.tools);
     const restrictToAllowlist = allow.size > 0;
     const gated: Record<string, RegisteredTool> = {};
@@ -97,7 +97,7 @@ export class AgentSession extends RuntimeSession<Env> {
   }
 
   /**
-   * Extend the shared surface: intercept `/start` to persist the definition
+   * Extend the base surface: intercept `/start` to persist the definition
    * out of the body, and serve `/result`. Everything else delegates to the
    * engine's HTTP surface unchanged.
    */
