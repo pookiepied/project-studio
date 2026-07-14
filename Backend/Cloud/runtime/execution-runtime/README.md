@@ -7,7 +7,7 @@ file operations, research, and other general-purpose work.
 ## Responsibilities
 
 - Receive user requests and run the main agent loop (ReAct-style)
-- Call models through Gateway v2 (`GATEWAY` service binding) — never direct providers
+- Call models through Gateway (`GATEWAY` service binding) — never direct providers
 - Stream output and reasoning states to clients
 - Perform tool calls, including parallel tool calls, across multi-step tasks
 - Receive its context package from Studio Context (`CONTEXT` binding)
@@ -21,7 +21,7 @@ file operations, research, and other general-purpose work.
 - Manage registries or discover integrations (Studio Registry's job)
 - Manually assemble context (Studio Context's job)
 - Store conversations, uploads, or artifacts itself (Studio Data's job)
-- Implement provider logic (Gateway v2's job)
+- Implement provider logic (Gateway's job)
 
 ## Structure
 

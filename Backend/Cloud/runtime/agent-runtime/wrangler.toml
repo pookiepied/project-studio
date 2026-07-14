@@ -8,7 +8,7 @@ preview_urls = false
 [vars]
 ENVIRONMENT = "production"
 
-# Gateway v2 — all model access goes through the gateway, never direct providers.
+# Gateway — all model access goes through the gateway, never direct providers.
 [[services]]
 binding = "GATEWAY"
 service = "studio-gateway"

@@ -148,23 +148,17 @@ The exact boundaries remain subject to the architecture QA process.
 
 ## 3.1 Gateway and Gateway V2
 
-The current codebase contains both:
+The codebase previously contained both the legacy gateway and a newer replacement implementation.
 
-- `gateway`
-- `gateway-v2`
-
-`gateway-v2` is the newer and intended primary gateway implementation.
+The replacement implementation has been promoted to the active `gateway`, and the legacy gateway has been removed.
 
 The reason for creating Gateway V2 was to refactor the gateway so that it contains only gateway-related functionality. The gateway should not become a general-purpose backend worker.
 
 The intended direction is:
 
-1. Review the current `gateway` and `gateway-v2` implementations.
-2. Confirm that every required gateway responsibility has been migrated to Gateway V2.
-3. Confirm that no required behavior exists only in the old gateway.
-4. Remove the old gateway folder and any obsolete gateway workers after parity is verified.
-5. Rename `gateway-v2` to `gateway`.
-6. Preserve the resulting gateway as a focused, deployable Cloudflare Worker.
+1. Preserve the active `gateway` as a focused, deployable Cloudflare Worker.
+2. Keep non-gateway responsibilities out of the gateway.
+3. Route model-provider requests through the active gateway implementation.
 
 ### Gateway responsibilities should remain narrow
 
@@ -1774,7 +1768,7 @@ Remove the old `gateway` implementation only after verifying that Gateway V2 ful
 
 ## 23.2 Rename Gateway V2
 
-After removal of the old gateway, rename `gateway-v2` to `gateway`.
+The old gateway has been removed, and the replacement implementation has been renamed to `gateway`.
 
 ## 23.3 Remove non-gateway responsibilities from Gateway
 

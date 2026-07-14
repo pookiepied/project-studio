@@ -377,7 +377,7 @@ Output:
 ### Phase 6: Migration and Acceptance
 
 1. What current code depends on the old Gateway?
-2. What behavior must be proven before `gateway-v2` can replace `gateway`?
+2. What behavior was proven before the active `gateway` replaced the legacy gateway?
 3. Which old registries, V2 folder concepts, and local MCP code paths are reusable?
 4. Which folders or workers can be removed immediately, and which require parity tests first?
 5. What acceptance tests prove the selected architecture is implemented correctly?

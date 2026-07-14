@@ -16,8 +16,8 @@ lives in [ARCHITECTURE.md](ARCHITECTURE.md).
 | `data/` | Studio Data | User-owned content: conversations, uploads, generated artifacts, object storage |
 | `shared/contracts/` | @studio/v2-contracts | Cross-worker types: context packages, agent definitions, execution events |
 
-Existing services (`gateway-v2` / Gateway v2, auth, API, tracking) continue to operate
-alongside these workers. All model access goes through Gateway v2 — no worker in V2
+Existing services (Gateway, auth, API, tracking) continue to operate
+alongside these workers. All model access goes through Gateway — no worker in V2
 implements its own provider logic.
 
 ## Principles
