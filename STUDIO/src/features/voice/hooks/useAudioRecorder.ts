@@ -12,6 +12,7 @@ import {
   isAPIConfigurationError,
   setupSpeechAnalyser,
 } from "./audioRecorderSetup";
+import { cleanupAudioRecorderResources } from "./audioRecorderCleanup";
 
 interface AudioRecorderOptions {
   chunkDuration?: number; // seconds
@@ -68,73 +69,13 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
    * Cleanup function to stop recording and release resources
    */
   const cleanup = useCallback(() => {
-    logger.debug('AudioRecorder', "Starting cleanup");
-
-    // Clear intervals
-    if (checkIntervalRef.current) {
-      clearInterval(checkIntervalRef.current);
-      checkIntervalRef.current = null;
-    }
-    if (chunkIntervalRef.current) {
-      clearInterval(chunkIntervalRef.current);
-      chunkIntervalRef.current = null;
-    }
-
-    // Stop and cleanup MediaRecorder
-    const mediaRecorder = mediaRecorderRef.current;
-    if (mediaRecorder) {
-      // Clear stored intervals
-      if ((mediaRecorder as any).checkInterval) {
-        clearInterval((mediaRecorder as any).checkInterval);
-        delete (mediaRecorder as any).checkInterval;
-      }
-      if ((mediaRecorder as any).chunkInterval) {
-        clearInterval((mediaRecorder as any).chunkInterval);
-        delete (mediaRecorder as any).chunkInterval;
-      }
-
-      // Stop recording if active
-      if (mediaRecorder.state === "recording" || mediaRecorder.state === "paused") {
-        try {
-          mediaRecorder.stop();
-        } catch (error) {
-          logger.warn('AudioRecorder', "Error stopping MediaRecorder:", error);
-        }
-      }
-
-      // Stop all media tracks
-      if (mediaRecorder.stream) {
-        mediaRecorder.stream.getTracks().forEach((track) => {
-          track.stop();
-          logger.debug('AudioRecorder', `Stopped track: ${track.kind}`);
-        });
-      }
-
-      // Clear event handlers to prevent memory leaks
-      mediaRecorder.ondataavailable = null;
-      mediaRecorder.onerror = null;
-      mediaRecorder.onstop = null;
-      mediaRecorder.onstart = null;
-
-      mediaRecorderRef.current = null;
-    }
-
-    // Close AudioContext
-    const audioContext = audioContextRef.current;
-    if (audioContext && audioContext.state !== "closed") {
-      try {
-        audioContext.close();
-        logger.debug('AudioRecorder', "Closed AudioContext");
-      } catch (error) {
-        logger.warn('AudioRecorder', "Error closing AudioContext:", error);
-      }
-      audioContextRef.current = null;
-    }
-
-    // Clear analyser reference
-    analyserRef.current = null;
-
-    logger.debug('AudioRecorder', "Cleanup complete");
+    cleanupAudioRecorderResources({
+      mediaRecorderRef,
+      audioContextRef,
+      analyserRef,
+      checkIntervalRef,
+      chunkIntervalRef,
+    });
   }, []);
 
   /**
