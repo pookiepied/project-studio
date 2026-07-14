@@ -7,7 +7,7 @@ tool's business logic.
 Flow:
 
 1. Execution Runtime receives a user request and runs the main agent loop.
-2. Context Worker prepares context and visible tool definitions.
+2. Context Engine prepares context and visible tool definitions.
 3. The model returns a tool call.
 4. Execution Runtime sends the explicit tool call to this worker.
 5. Tool Execution Worker validates, resolves, dispatches, tracks, and normalizes
@@ -24,7 +24,9 @@ Current dispatch support:
 - `agent-runtime`: forwards supported delegated-agent calls to Agent Runtime.
 - `skill-library`: supports bundled system skill listing/search/read.
 - `mcp-server` / `remote-mcp`: sends a standard MCP `tools/call` JSON-RPC
-  request to the resolved endpoint.
+  request to HTTP(S) endpoints.
+- Studio service-bound MCP facades: dispatches `studio-agent-execution-mcp`
+  tools to Agent Runtime and `studio-skill-library-mcp` tools to Skill Library.
 - MCP registry lookup: when a route is not supplied, the worker can resolve an
   active registered MCP tool by its namespaced tool name.
 

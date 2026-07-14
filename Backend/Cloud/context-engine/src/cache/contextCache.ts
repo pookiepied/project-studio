@@ -1,25 +1,39 @@
-import type { ContextPackage } from "../contracts";
+import type { AgentContext, CapabilitySummary, ConnectorContext, ContextCacheStatus, McpContext, ProjectContext, SkillContext, StudioToolDescriptor } from "../contracts";
 
 interface CacheEntry {
   expiresAt: number;
-  package: ContextPackage;
+  snapshot: CapabilitySnapshot;
+}
+
+export interface CapabilitySnapshot {
+  cacheKey: string;
+  cacheStatus: ContextCacheStatus;
+  assembledAt: string;
+  project: ProjectContext;
+  connectors: ConnectorContext[];
+  mcp: McpContext[];
+  tools: StudioToolDescriptor[];
+  defaultTools: StudioToolDescriptor[];
+  skills: SkillContext[];
+  agents: AgentContext[];
+  capabilityCatalog: CapabilitySummary[];
 }
 
 const CACHE = new Map<string, CacheEntry>();
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
-export function readContextCache(key: string): ContextPackage | null {
+export function readCapabilitySnapshot(key: string): CapabilitySnapshot | null {
   const entry = CACHE.get(key);
   if (!entry) return null;
   if (entry.expiresAt <= Date.now()) {
     CACHE.delete(key);
     return null;
   }
-  return entry.package;
+  return { ...entry.snapshot, cacheStatus: "hit" };
 }
 
-export function writeContextCache(key: string, value: ContextPackage): void {
-  CACHE.set(key, { expiresAt: Date.now() + DEFAULT_TTL_MS, package: value });
+export function writeCapabilitySnapshot(key: string, value: CapabilitySnapshot): void {
+  CACHE.set(key, { expiresAt: Date.now() + DEFAULT_TTL_MS, snapshot: { ...value, cacheStatus: "refreshed" } });
 }
 
 export function invalidateContextCache(prefix?: string): number {
@@ -33,21 +47,17 @@ export function invalidateContextCache(prefix?: string): number {
   return count;
 }
 
-export function contextCacheKey(input: {
+export function capabilityCacheKey(input: {
   userId: string;
   workspaceId?: string;
   agentId?: string;
-  conversationId?: string;
-  taskId: string;
   consumer: string;
 }): string {
   return [
-    "context-engine:v1",
+    "context-engine:capabilities:v1",
     input.userId,
     input.workspaceId ?? "system-workspace",
     input.agentId ?? "main-agent",
-    input.conversationId ?? "no-conversation",
     input.consumer,
-    input.taskId,
   ].join(":");
 }

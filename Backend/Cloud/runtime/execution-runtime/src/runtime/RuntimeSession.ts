@@ -156,6 +156,9 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
     if (!tool.descriptor.route) {
       return { ok: false, toolCallId, toolName: tool.descriptor.name, status: "failed", error: { code: "missing_tool_route", message: "Tool descriptor does not include an execution route." } };
     }
+    if (tool.descriptor.route.kind === "client") {
+      return this.executeClientTool(run, tool, args, toolCallId);
+    }
     const payload = {
       userId: run.userId,
       workspaceId: run.workspaceId,
@@ -270,7 +273,7 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
       await this.beforeExecute();
       const context = await this.loadContext(run);
       this.composeSystemPrompt(context);
-      this.gateTools(this.registerTools(context?.tools ?? []));
+      this.gateTools(this.registerTools(context?.defaultTools ?? context?.tools ?? []));
       const result: LoopResult = { text: "" };
       const output = await this.finalize(run, result);
       const completed = { ...run, status: "completed" as const, updatedAt: new Date().toISOString(), version: run.version + 1 };
@@ -312,7 +315,7 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
 
   private async visibleTools(run: RunState): Promise<Record<string, RegisteredTool>> {
     const context = await this.loadContext(run);
-    return this.gateTools(this.registerTools(context?.tools ?? []));
+    return this.gateTools(this.registerTools(context?.defaultTools ?? context?.tools ?? []));
   }
 
   private async loadContext(run: RunState): Promise<ContextPackage | null> {
@@ -339,6 +342,36 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
         requiresApproval: descriptor.policy.requiresApproval ?? false,
       },
     }]));
+  }
+
+  private async executeClientTool(run: RunState, tool: RegisteredTool, args: Record<string, unknown>, toolCallId: string): Promise<ToolExecutionResult> {
+    if (tool.descriptor.route?.kind !== "client" || tool.descriptor.route.action !== "expand_tool") {
+      return { ok: false, toolCallId, toolName: tool.descriptor.name, status: "failed", error: { code: "unsupported_client_tool", message: "Unsupported runtime-internal tool.", retryable: false } };
+    }
+    await this.emit(run, "tool.call.started", { toolCallId, toolName: tool.descriptor.name, internal: true });
+    const response = await this.env.CONTEXT.fetch("https://context-engine/expand-tool", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": run.userId },
+      body: JSON.stringify({
+        userId: run.userId,
+        workspaceId: run.workspaceId,
+        agentId: run.agentId,
+        conversationId: run.conversationId,
+        taskId: run.runId,
+        task: run.request,
+        consumer: this.profile.consumer,
+        ...args,
+      }),
+    });
+    const result = await readJson<unknown>(response);
+    if (!response.ok) {
+      const failure = { ok: false, toolCallId, toolName: tool.descriptor.name, status: "failed" as const, error: { code: "context_expansion_failed", message: JSON.stringify(result), retryable: response.status >= 500 } };
+      await this.emit(run, "tool.call.failed", { toolCallId, toolName: tool.descriptor.name, result: failure });
+      return failure;
+    }
+    const success = { ok: true, toolCallId, toolName: tool.descriptor.name, status: "completed" as const, result };
+    await this.emit(run, "tool.call.completed", { toolCallId, toolName: tool.descriptor.name, result: success });
+    return success;
   }
 
   private async readEvents(): Promise<RuntimeEvent[]> {

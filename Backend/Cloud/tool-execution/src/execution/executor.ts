@@ -77,6 +77,7 @@ async function dispatch(env: Env, request: ToolExecutionRequest, route: Awaited<
       return dispatchSkillLibrary(env, request, route);
     case "mcp-server":
     case "remote-mcp":
+      if (route.endpoint.startsWith("service-binding://")) return dispatchServiceBoundMcp(env, request, route);
       return dispatchMcpTool(request, route);
     case "connector":
       throw notImplemented("Connector dispatch requires a stable Connectors execution contract.");
@@ -87,4 +88,25 @@ async function dispatch(env: Env, request: ToolExecutionRequest, route: Awaited<
     case "memory":
       throw notImplemented("Memory dispatch requires the Memory service contract.");
   }
+}
+
+function dispatchServiceBoundMcp(env: Env, request: ToolExecutionRequest, route: Extract<Awaited<ReturnType<typeof resolveRoute>>, { kind: "mcp-server" | "remote-mcp" }>): Promise<unknown> {
+  const toolName = route.toolName ?? request.toolName;
+  if (route.serverId === "studio-agent-execution-mcp") {
+    return dispatchAgentRuntime(env, { ...request, toolName }, { kind: "agent-runtime", action: asAgentAction(toolName) });
+  }
+  if (route.serverId === "studio-skill-library-mcp") {
+    return dispatchSkillLibrary(env, { ...request, toolName }, { kind: "skill-library", action: asSkillAction(toolName) });
+  }
+  throw notImplemented(`No service-binding dispatcher is registered for MCP server ${route.serverId}.`);
+}
+
+function asAgentAction(toolName: string): Parameters<typeof dispatchAgentRuntime>[2]["action"] {
+  if (toolName === "spawn_agent" || toolName === "await_agent" || toolName === "get_agent_status" || toolName === "report_back" || toolName === "read_agent_result" || toolName === "cancel_agent") return toolName;
+  throw notImplemented(`MCP tool ${toolName} is not a supported agent execution action.`);
+}
+
+function asSkillAction(toolName: string): Parameters<typeof dispatchSkillLibrary>[2]["action"] {
+  if (toolName === "skill_list" || toolName === "skill_search" || toolName === "skill_get" || toolName === "skill_read" || toolName === "skill_read_resource" || toolName === "skill_resolve") return toolName;
+  throw notImplemented(`MCP tool ${toolName} is not a supported skill library action.`);
 }

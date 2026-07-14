@@ -4,25 +4,6 @@ import type { Env } from "../system/env";
 
 type SkillRoute = Extract<ToolRoute, { kind: "skill-library" }>;
 
-const bundledSkillContent: Record<string, string> = {
-  "product-self-knowledge": `---
-name: Product Self-Knowledge
-description: Use when an agent needs a concise, current understanding of Studio's product identity and cloud/local architecture.
----
-
-# Product Self-Knowledge
-
-Studio is an AI workspace built by pookiepied for cloud-local agent workflows, software work, research, and tool-assisted execution.
-The cloud system is being split into focused Workers instead of one overloaded chat worker.
-Gateway owns model-provider routing; runtimes own agent loops; Context assembles relevant resources; Data owns user content and artifacts.
-The Cloud Library Registry stores searchable registrations for system and future user-scoped skills, MCP servers, and agents.
-The Agent, Skill, and MCP Libraries store full definitions for those resource types while the registry keeps metadata and references.
-Memory and native tools are first-party platform services, not ordinary discoverable MCP library entries.
-Cloud resources are system-managed first, but registry and library schemas are designed for future user-scoped resources with strict isolation.
-Do not claim a Studio feature is live unless it is verified in the current codebase or current runtime.
-`,
-};
-
 export async function dispatchSkillLibrary(env: Env, request: ToolExecutionRequest, route: SkillRoute): Promise<unknown> {
   const skills = await listSystemSkills(env);
   switch (route.action) {
@@ -36,9 +17,7 @@ export async function dispatchSkillLibrary(env: Env, request: ToolExecutionReque
     }
     case "skill_read": {
       const skill = requireSkill(skills, request);
-      const content = bundledSkillContent[skill.id];
-      if (!content) throw notImplemented("Only bundled system SKILL.md reads are available in the first Tool Execution Worker pass.", { skillId: skill.id });
-      return { skill, content, frontmatter: { name: skill.name, description: skill.description }, resourceRefs: skill.resources };
+      return readSkillInstructions(env, skill);
     }
     case "skill_resolve": {
       const skill = requireSkill(skills, request);
@@ -47,6 +26,13 @@ export async function dispatchSkillLibrary(env: Env, request: ToolExecutionReque
     case "skill_read_resource":
       throw notImplemented("skill_read_resource requires Skill Library resource endpoints before it can read supporting files.");
   }
+}
+
+async function readSkillInstructions(env: Env, skill: SkillDefinition): Promise<unknown> {
+  const response = await env.SKILL_LIBRARY.fetch(`https://skill-library/skills/system/${encodeURIComponent(skill.id)}/read`);
+  const body = await readJson(response);
+  if (!response.ok) throw upstreamError("Skill Library read failed.", body, response.status >= 500);
+  return body;
 }
 
 async function listSystemSkills(env: Env): Promise<SkillDefinition[]> {

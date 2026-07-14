@@ -14,9 +14,10 @@ Two MCP server definitions are currently bundled as system-scoped resources:
   resolution.
 
 Memory MCP and Native Tools MCP remain platform services outside this library.
-These definitions are kept in `draft` status until their backing Worker
-implementations are added, so the Context Worker will not expose non-runnable
-tools as active capabilities.
+The bundled Studio Agent Execution MCP and Studio Skill Library MCP definitions
+are active system capabilities. Tool Execution dispatches their
+`service-binding://` endpoint refs to the owning internal workers instead of
+treating them as remote HTTP MCP servers.
 
 ## Categories
 

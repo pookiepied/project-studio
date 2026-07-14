@@ -33,6 +33,14 @@ export interface ContextPackage {
     instructions: string[];
     limits: ExecutionLimits;
   };
+  sendable?: {
+    format: "studio.context.projection.v1";
+    sections: Array<{ id: string; stability: "stable" | "semi-stable" | "dynamic"; content: unknown }>;
+    toolNames: string[];
+    defaultToolNames: string[];
+    expansionToolName: "expand_tool";
+  };
+  defaultTools?: StudioToolDescriptor[];
   tools: StudioToolDescriptor[];
 }
 

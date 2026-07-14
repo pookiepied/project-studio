@@ -7,7 +7,7 @@ description: Use when an agent needs a concise, current understanding of Studio'
 
 Studio is an AI workspace built by pookiepied for cloud-local agent workflows, software work, research, and tool-assisted execution.
 The cloud system is being split into focused Workers instead of one overloaded chat worker.
-Gateway owns model-provider routing; runtimes own agent loops; Context assembles relevant resources; Data owns user content and artifacts.
+Gateway owns model-provider routing; runtimes own agent loops; Context Engine assembles relevant resources; Data owns user content and artifacts.
 The Cloud Library Registry stores searchable registrations for system and future user-scoped skills, MCP servers, and agents.
 The Agent, Skill, and MCP Libraries store full definitions for those resource types while the registry keeps metadata and references.
 Memory and native tools are first-party platform services, not ordinary discoverable MCP library entries.

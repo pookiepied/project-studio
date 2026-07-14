@@ -7,7 +7,7 @@ import { buildUserContext } from "../builders/user";
 import { buildProjectContext } from "../builders/project";
 import { buildSkillContext } from "../builders/skills";
 import { buildAgentContext } from "../builders/agents";
-import { contextCacheKey, readContextCache, writeContextCache } from "../cache/contextCache";
+import { capabilityCacheKey, readCapabilitySnapshot, writeCapabilitySnapshot, type CapabilitySnapshot } from "../cache/contextCache";
 import { buildCapabilityCatalog, buildSendableContext } from "../projection/catalog";
 import { defaultTools } from "../projection/defaultTools";
 
@@ -30,33 +30,60 @@ export async function assembleContext(
   env: Env,
   request: ContextRequest,
 ): Promise<ContextPackage> {
-  const cacheKey = contextCacheKey(request);
-  const cached = readContextCache(cacheKey);
-  if (cached) {
-    return { ...cached, contextEngine: { ...cached.contextEngine, cacheStatus: "hit" } };
-  }
-  const assembled = await buildContextPackage(env, request, cacheKey, "miss");
-  writeContextCache(cacheKey, { ...assembled, contextEngine: { ...assembled.contextEngine, cacheStatus: "refreshed" } });
-  return assembled;
+  const cacheKey = capabilityCacheKey(request);
+  const cached = readCapabilitySnapshot(cacheKey);
+  const snapshot = cached ?? await buildCapabilitySnapshot(env, request, cacheKey, "miss");
+  if (!cached) writeCapabilitySnapshot(cacheKey, snapshot);
+  return buildContextPackage(env, request, snapshot);
+}
+
+async function buildCapabilitySnapshot(
+  env: Env,
+  request: ContextRequest,
+  cacheKey: string,
+  cacheStatus: ContextCacheStatus,
+): Promise<CapabilitySnapshot> {
+  const [mcp, connectors, skills, agents, project] = await Promise.all([
+    buildMcpContext(env, request.userId, request.task),
+    buildConnectorContext(env, request.userId, request.task),
+    buildSkillContext(env, request.userId, request.task),
+    buildAgentContext(env, request.userId, request.task),
+    soft(() => buildProjectContext(env, request.userId, request.task), { relevantFiles: [], documentation: [], workspace: { location: "local" as const, available: false } }),
+  ]);
+  const defaults = defaultTools();
+  const tools = uniqueTools([...defaults, ...connectors.tools, ...mcp.tools]);
+  const capabilityCatalog = buildCapabilityCatalog({
+    mcp: mcp.context,
+    connectors: connectors.context,
+    skills,
+    agents,
+    tools,
+    defaultTools: defaults,
+  });
+  return {
+    cacheKey,
+    cacheStatus,
+    assembledAt: new Date().toISOString(),
+    project,
+    connectors: connectors.context,
+    mcp: mcp.context,
+    tools,
+    defaultTools: defaults,
+    skills,
+    agents,
+    capabilityCatalog,
+  };
 }
 
 async function buildContextPackage(
   env: Env,
   request: ContextRequest,
-  cacheKey: string,
-  cacheStatus: ContextCacheStatus,
+  snapshot: CapabilitySnapshot,
 ): Promise<ContextPackage> {
-  const [mcp, connectors, conversation, skills, agents, user, project] = await Promise.all([
-    buildMcpContext(env, request.userId, request.task),
-    buildConnectorContext(env, request.userId, request.task),
+  const [conversation, user] = await Promise.all([
     buildConversationContext(env, request.userId, request.conversationId, request.task),
-    buildSkillContext(env, request.userId, request.task),
-    buildAgentContext(env, request.userId, request.task),
     soft(() => buildUserContext(env, request.userId, request.task), { preferences: {}, relevantMemories: [], recentMemory: [], userProfile: {}, permissions: [] }),
-    soft(() => buildProjectContext(env, request.userId, request.task), { relevantFiles: [], documentation: [], workspace: { location: "local" as const, available: false } }),
   ]);
-  const defaults = defaultTools();
-  const tools = uniqueTools([...defaults, ...connectors.tools, ...mcp.tools]);
   const base = {
     userId: request.userId,
     workspaceId: request.workspaceId,
@@ -66,8 +93,8 @@ async function buildContextPackage(
     contextEngine: {
       service: "studio-context-engine" as const,
       projectionId: crypto.randomUUID(),
-      cacheKey,
-      cacheStatus,
+      cacheKey: snapshot.cacheKey,
+      cacheStatus: snapshot.cacheStatus,
       assembledAt: new Date().toISOString(),
       versions: {
         context: "v1",
@@ -79,34 +106,26 @@ async function buildContextPackage(
     runtime: {
       consumer: request.consumer,
       systemPrompt: systemPromptFor(request.consumer),
-      instructions: [capabilityPreamble(mcp.context, connectors.context)],
+      instructions: [capabilityPreamble(snapshot.mcp, snapshot.connectors)],
       limits: {},
     },
     user,
-    project,
+    project: snapshot.project,
     conversation,
-    connectors: connectors.context,
-    mcp: mcp.context,
-    tools,
-    defaultTools: defaults,
-    skills,
-    agents,
-  } satisfies Omit<ContextPackage, "internal" | "sendable" | "capabilityCatalog">;
-  const capabilityCatalog = buildCapabilityCatalog({
-    mcp: base.mcp,
-    connectors: base.connectors,
-    skills: base.skills,
-    agents: base.agents,
-    tools: base.tools,
-    defaultTools: base.defaultTools,
-  });
+    connectors: snapshot.connectors,
+    mcp: snapshot.mcp,
+    tools: snapshot.tools,
+    defaultTools: snapshot.defaultTools,
+    skills: snapshot.skills,
+    agents: snapshot.agents,
+    capabilityCatalog: snapshot.capabilityCatalog,
+  } satisfies Omit<ContextPackage, "internal" | "sendable">;
   const withCatalog = {
     ...base,
-    capabilityCatalog,
     internal: {
-      capabilityCount: capabilityCatalog.length,
-      toolCount: tools.length,
-      defaultToolCount: defaults.length,
+      capabilityCount: snapshot.capabilityCatalog.length,
+      toolCount: snapshot.tools.length,
+      defaultToolCount: snapshot.defaultTools.length,
       memoryCategories: ["recent_memory", "user_profile"] as const,
       projection: request.consumer,
     },

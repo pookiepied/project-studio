@@ -16,6 +16,7 @@ export function buildCapabilityCatalog(input: {
   tools: StudioToolDescriptor[];
   defaultTools: StudioToolDescriptor[];
 }): CapabilitySummary[] {
+  const defaultNames = new Set(input.defaultTools.map((tool) => tool.name));
   const summaries: CapabilitySummary[] = [
     ...input.defaultTools.map((tool) => toolSummary(tool, "internal-tool")),
     ...input.mcp.map(mcpSummary),
@@ -35,7 +36,7 @@ export function buildCapabilityCatalog(input: {
     ...input.connectors.map(connectorSummary),
     ...input.skills.map(skillSummary),
     ...input.agents.map(agentSummary),
-    ...input.tools.map((tool) => toolSummary(tool, tool.family === "connector" ? "connector" : "mcp-tool")),
+    ...input.tools.filter((tool) => !defaultNames.has(tool.name)).map((tool) => toolSummary(tool, tool.family === "connector" ? "connector" : "mcp-tool")),
   ];
 
   return uniqueById(summaries).sort(compareCapability);
@@ -65,7 +66,14 @@ export function buildSendableContext(context: Omit<ContextPackage, "sendable">):
       {
         id: "default_tools",
         stability: "stable",
-        content: context.defaultTools.map((tool) => ({ name: tool.name, description: tool.description })),
+        content: context.defaultTools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          outputSchema: tool.outputSchema,
+          annotations: tool.annotations,
+          policy: tool.policy,
+        })),
       },
       {
         id: "user_profile",
