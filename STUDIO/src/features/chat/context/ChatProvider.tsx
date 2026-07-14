@@ -34,18 +34,9 @@ import type { AutoRoutedInfo } from "@/types/chat";
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
 import {
-  createConversation, saveConversation, loadConversation, updateConversationTitle,
+  createConversation, loadConversation, updateConversationTitle,
 } from "@/features/chat/conversations/chatHistoryService";
 import type { ConversationStorageScope } from "@/core/conversations";
-import {
-  canContinueWithEngine,
-  isClaudeOwnedConversation,
-  normalizeEngineForConversationOwner,
-} from "@/features/chat/conversations/ownership/conversationOwnership";
-import {
-  getPreferredChatEngine,
-  savePreferredChatEngine,
-} from "@/features/chat/conversations/preferences/chatEnginePreference";
 
 import { useVoiceInput }                               from "@/features/voice/hooks/useVoiceInput";
 import { usePermittedTools }                           from "@/features/chat/hooks/usePermittedTools";
@@ -54,8 +45,6 @@ import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
 import { DEFAULT_MAX_CONTEXT_TOKENS } from "./constants";
 import { chat } from "@/features/chat/services/chatService";
-import type { ChatEngine, ClaudeEffortLevel } from "@/cliBridges/types";
-import type { PermissionModeId } from "@/core/permissions";
 import { GlobalAccessModal } from "@/features/permissions/components/GlobalAccessModal";
 import { ManagementAccessModal } from "@/features/permissions/components/ManagementAccessModal";
 import type { ToolApprovalDecision } from "./types";
@@ -70,10 +59,10 @@ import { useConversationBootstrap } from "./useConversationBootstrap";
 import { useToolPermissionEvaluator } from "./useToolPermissionEvaluator";
 import { useChatBackgroundServices } from "./useChatBackgroundServices";
 import { useProjectContextState } from "./useProjectContextState";
+import { useChatEngineState } from "./useChatEngineState";
 
 import { saveConvProjectCtx } from "./projectContextStorage";
 import type { PendingMessage } from "./types";
-import type { ClaudeSessionMetadata } from "@/types";
 import { resolveContextLimit, supportsVisionForModel } from "./ChatProviderModelHelpers";
 
 // ---------------------------------------------------------------------------
@@ -117,12 +106,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // isRecordingVoice + voice send/transcribe come from useVoiceInput (below sendMessage)
   const [error,              setError]              = useState<string | null>(null);
   const [currentModel,       setCurrentModel]       = useState(settings.defaultChatModel || "auto");
-  const [conversationStorageScope, setConversationStorageScopeState] = useState<ConversationStorageScope>("cloud");
-  const [chatEngine,       setChatEngineState]  = useState<ChatEngine>("studio");
-  const [claudeModel,         setClaudeModelState]    = useState("sonnet");
-  const [claudeSession,      setClaudeSession]      = useState<ClaudeSessionMetadata | null>(null);
-  const [claudePermissionMode, setClaudePermissionModeState] = useState<PermissionModeId>("default");
-  const [claudeEffortLevel,    setClaudeEffortLevelState]    = useState<ClaudeEffortLevel>("medium");
   const [isMemoryEnabled,    setIsMemoryEnabled]    = useState(false);
   const [thinkingContent,    setThinkingContent]    = useState("");
   const [reasoningBudget,    setReasoningBudget]    = useState<number | undefined>(undefined);
@@ -148,6 +131,32 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isSummarizing,  setIsSummarizing]  = useState(false);
   const [contextTokens,  setContextTokens]  = useState(0);
   const [contextLimit,   setContextLimit]   = useState(DEFAULT_MAX_CONTEXT_TOKENS);
+
+  const {
+    conversationStorageScope,
+    setConversationStorageScope: setConversationStorageScopeForEngine,
+    setConversationStorageScopeState,
+    chatEngine,
+    setChatEngine,
+    setChatEngineState,
+    claudeModel,
+    setClaudeModel,
+    setClaudeModelState,
+    claudeSession,
+    setClaudeSession,
+    claudePermissionMode,
+    setClaudePermissionModeState,
+    claudeEffortLevel,
+    setClaudeEffortLevelState,
+    persistConversationMetadata,
+  } = useChatEngineState({
+    conversation,
+    currentModel,
+    getContextLimit,
+    setConversation,
+    setContextLimit,
+    setError,
+  });
 
   // Real context-window occupancy from the model's own usage accounting rather
   // than a tokenizer estimate. Sum of the input components (fresh + cache) is
@@ -175,6 +184,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     conversationStorageScope,
     setConversation,
   });
+
+  const setConversationStorageScope = useCallback((scope: ConversationStorageScope) => {
+    setConversationStorageScopeForEngine(scope);
+    setProjectContextState(null);
+    pendingProjectContextRef.current = null;
+  }, [setConversationStorageScopeForEngine, setProjectContextState, pendingProjectContextRef]);
   // ── Workspace trust ──────────────────────────────────────────────────────
   // Trust is recorded when a project folder is selected. Here we only *read* it,
   // below, to gate mutating tool calls via the permission engine.
@@ -197,97 +212,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     autopilotMode: !!settings.autopilotMode,
     isStreaming,
   });
-  const persistConversationMetadata = useCallback(async (
-    conv: ChatConversation,
-    provider: ChatEngine,
-    nextClaude?: ClaudeSessionMetadata | null
-  ) => {
-    const updatedConv: ChatConversation = {
-      ...conv,
-      updatedAt: Date.now(),
-      metadata: {
-        ...(conv.metadata ?? {}),
-        provider,
-        ...(nextClaude ? { claude: nextClaude } : {}),
-      },
-    };
-    if (!isClaudeOwnedConversation(updatedConv)) {
-      await saveConversation(updatedConv);
-    }
-    setConversation(updatedConv);
-    setChatEngineState(provider);
-    if (updatedConv.metadata?.storageScope === "local") {
-      savePreferredChatEngine(provider, updatedConv.id);
-    }
-    setClaudeSession(nextClaude ?? updatedConv.metadata?.claude ?? null);
-    if (nextClaude?.model) setClaudeModelState(nextClaude.model);
-    return updatedConv;
-  }, []);
-
-  const setChatEngine = useCallback((mode: ChatEngine, options: { persist?: boolean } = {}) => {
-    if (conversationStorageScope === "cloud" && mode !== "studio") return;
-    if (conversation && !canContinueWithEngine(conversation.metadata, mode)) {
-      setError("This is a Claude Code native conversation. Continue with Claude, or fork it into a Studio conversation first.");
-      return;
-    }
-    setChatEngineState(mode);
-    setContextLimit(getContextLimit(mode === "claude" ? claudeModel : currentModel));
-    if (conversationStorageScope === "local" && options.persist !== false) {
-      savePreferredChatEngine(mode, conversation?.id ?? null);
-    }
-    if (!conversation) return;
-    const nextConversation: ChatConversation = {
-      ...conversation,
-      updatedAt: Date.now(),
-      metadata: {
-        ...(conversation.metadata ?? {}),
-        provider: mode,
-      },
-    };
-    if (!isClaudeOwnedConversation(nextConversation)) {
-      saveConversation(nextConversation).catch(() => {});
-    }
-    setConversation(nextConversation);
-  }, [conversation, conversationStorageScope, setError, claudeModel, currentModel, getContextLimit]);
-
-  const setConversationStorageScope = useCallback((scope: ConversationStorageScope) => {
-    setConversationStorageScopeState(scope);
-    if (scope === "cloud") {
-      setChatEngineState("studio");
-      setContextLimit(getContextLimit(currentModel));
-    } else {
-      const preferredEngine = getPreferredChatEngine() ?? "studio";
-      setChatEngineState(preferredEngine);
-      setContextLimit(getContextLimit(preferredEngine === "claude" ? claudeModel : currentModel));
-    }
-    setProjectContextState(null);
-    pendingProjectContextRef.current = null;
-  }, [claudeModel, currentModel, getContextLimit]);
-
-  const setClaudeModel = useCallback((model: string) => {
-    setClaudeModelState(model);
-    setContextLimit(getContextLimit(model));
-    setClaudeSession((prev) => {
-      const next = { ...(prev ?? {}), model };
-      if (conversation) {
-        const nextConversation: ChatConversation = {
-          ...conversation,
-          updatedAt: Date.now(),
-          metadata: {
-            ...(conversation.metadata ?? {}),
-            claude: {
-              ...(conversation.metadata?.claude ?? {}),
-              model,
-            },
-          },
-        };
-        saveConversation(nextConversation).catch(() => {});
-        setConversation(nextConversation);
-      }
-      return next;
-    });
-  }, [conversation, getContextLimit]);
-
   // ── Harness inline segment state ────────────────────────────────────────
   const [harnessSegments, setHarnessSegments] = useState<MessageSegment[]>([]);
   /** Completed interleaved segments built during the current turn. */
@@ -310,33 +234,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!conversation && settings.defaultChatModel) setCurrentModel(settings.defaultChatModel);
   }, [settings.defaultChatModel, conversation]);
-
-  useEffect(() => {
-    if (!conversation) {
-      setChatEngineState(conversationStorageScope === "local" ? getPreferredChatEngine() ?? "studio" : "studio");
-      setClaudeSession(null);
-      return;
-    }
-    // "cloud" is a legacy stored value — treat as "claude"
-    const raw = conversation.metadata?.provider ?? "studio";
-    const nextProvider: ChatEngine = raw === "cloud" ? "claude" : (raw as ChatEngine);
-    const nextScope = conversation.metadata?.storageScope ?? "cloud";
-    const nextClaude = conversation.metadata?.claude ?? null;
-    setConversationStorageScopeState(nextScope);
-    const preferredProvider = getPreferredChatEngine(conversation.id) ?? nextProvider;
-    setChatEngineState(nextScope === "cloud" ? "studio" : normalizeEngineForConversationOwner(conversation.metadata, preferredProvider));
-    setClaudeSession(nextClaude);
-    if (nextClaude?.model) setClaudeModelState(nextClaude.model);
-    if (nextClaude?.permissionMode) setClaudePermissionModeState(nextClaude.permissionMode as PermissionModeId);
-    if (nextClaude?.effortLevel)    setClaudeEffortLevelState(nextClaude.effortLevel as ClaudeEffortLevel);
-  // conversation.id/metadata slices used as narrow trigger; full object excluded to avoid excessive re-fire
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id, conversation?.metadata, conversationStorageScope]);
-
-  useEffect(() => {
-    const activeModelId = chatEngine === "claude" ? claudeModel : currentModel;
-    setContextLimit(getContextLimit(activeModelId));
-  }, [chatEngine, claudeModel, currentModel, getContextLimit]);
 
   // When a new conversation is first created (conversation.id goes from null → new id),
   // persist any project context the user selected before sending the first message.
