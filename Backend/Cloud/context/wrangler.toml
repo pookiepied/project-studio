@@ -19,5 +19,9 @@ binding = "DATA"
 service = "studio-data"
 
 [[services]]
+binding = "CONNECTORS"
+service = "connectors"
+
+[[services]]
 binding = "MCP"
 service = "studio-mcp"

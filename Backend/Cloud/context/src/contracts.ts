@@ -124,42 +124,56 @@ export interface RegistryToolRecord {
 }
 
 export interface RegistryMcpRecord {
-  ref: ResourceRef;
-  enabled: boolean;
-  available: boolean;
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  ownerType: ResourceScope;
+  ownerUserId?: string;
+  status: "draft" | "active" | "disabled" | "archived";
   origin: string;
-  location: "cloud" | "local";
-  localRegistrationId?: string;
+  transport: "streamable-http" | "sse" | "http";
+  endpointRef?: string;
   metadata: Record<string, unknown>;
   tools: RegistryToolRecord[];
 }
 
-export interface RegistryConnectorRecord {
-  ref: ResourceRef;
-  enabled: boolean;
-  available: boolean;
-  authenticated: boolean;
-  metadata: Record<string, unknown>;
-  tools: RegistryToolRecord[];
+export interface ConnectorToolRecord {
+  slug: string;
+  name: string;
+  description: string;
+  inputParameters: Record<string, unknown>;
+  connectionId: string;
+  entityId: string;
+  appKey: string;
+  displayName: string;
+}
+
+export interface ConnectorAppRecord {
+  appName: string;
+  displayName: string;
+  tools: Array<{
+    name: string;
+    description: string;
+  }>;
 }
 
 export interface RegistrySkillRecord {
-  ref: ResourceRef;
-  enabled: boolean;
-  available: boolean;
+  id: string;
+  name: string;
+  slug: string;
   description: string;
+  ownerType: ResourceScope;
+  status: "draft" | "active" | "disabled" | "archived";
   activationRules: Record<string, unknown>;
 }
 
 export interface AgentDefinition {
   id: string;
   name: string;
+  slug: string;
   description: string;
-  enabled: boolean;
-  permissions: {
-    delegation: boolean;
-  };
-  runtime: {
-    location: "cloud" | "local";
-  };
+  ownerType: ResourceScope;
+  status: "draft" | "active" | "disabled" | "archived";
+  runtimeType: "agent-runtime";
 }

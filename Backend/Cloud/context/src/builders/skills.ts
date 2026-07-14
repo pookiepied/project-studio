@@ -2,9 +2,8 @@ import type { RegistrySkillRecord, SkillContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**
- * Skill layer (§19.4): relevant skills with summaries and activation
- * conditions. Full instructions load progressively — only when a skill is
- * activated, never for every skill in every request.
+ * Skill layer: relevant skills with summaries and activation conditions.
+ * Full instructions load progressively when a skill is activated.
  */
 export async function buildSkillContext(
   env: Env,
@@ -15,10 +14,14 @@ export async function buildSkillContext(
   if (!response.ok) throw new Error(`Registry skill lookup failed (${response.status}).`);
   const { items } = await response.json<{ items: RegistrySkillRecord[] }>();
   const tokens = new Set(task.toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 2));
-  return items.filter((item) => item.enabled && item.available).filter((item) => {
-    const haystack = `${item.ref.name} ${item.description} ${JSON.stringify(item.activationRules)}`.toLowerCase();
+  return items.filter((item) => item.status === "active").filter((item) => {
+    const haystack = `${item.name} ${item.description} ${JSON.stringify(item.activationRules)}`.toLowerCase();
     return tokens.size === 0 || [...tokens].some((token) => haystack.includes(token));
-  }).map((item) => ({ ref: item.ref, summary: item.description, activationHint: activationHint(item) }));
+  }).map((item) => ({
+    ref: { id: item.id, kind: "skill", name: item.name, scope: item.ownerType },
+    summary: item.description,
+    activationHint: activationHint(item),
+  }));
 }
 
 function activationHint(skill: RegistrySkillRecord): string | undefined {

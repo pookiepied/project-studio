@@ -61,7 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_ev_event    ON events(event, ts DESC);
 
 -- ── Agent Trace Spans ─────────────────────────────────────────────────────────
 --
--- LangGraph node / LLM / tool spans with parent-child hierarchy.
+-- Runtime node / LLM / tool spans with parent-child hierarchy.
 -- Use run_id to reconstruct the full trace tree for one agent execution.
 -- span_type : 'llm' | 'tool' | 'chain' | 'node' | 'agent'
 -- status    : 'running' | 'success' | 'error'
@@ -120,7 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_te_outcome ON tail_events(outcome, ts DESC);
 -- ── AI Usage Events ───────────────────────────────────────────────────────────
 --
 -- Per-request AI usage: tokens, cost, latency, provider, model.
--- run_id links to the spans table for full LangGraph trace correlation.
+-- run_id links to the spans table for full runtime trace correlation.
 -- status : 'success' | 'error'
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS usage_events (

@@ -2,8 +2,8 @@ import type { ProjectContext } from "../contracts";
 import type { Env } from "../system/env";
 
 /**
- * Project and file layer (§19.7): relevant files, project structure,
- * documentation, uploads, artifacts, and local/cloud workspace state.
+ * Project and file layer: relevant files, project structure, documentation,
+ * uploads, artifacts, and local/cloud workspace state.
  */
 export async function buildProjectContext(
   env: Env,
@@ -12,7 +12,7 @@ export async function buildProjectContext(
 ): Promise<ProjectContext> {
   const response = await env.REGISTRY.fetch("http://registry/mcp", { headers: { "x-user-id": userId } });
   if (!response.ok) throw new Error(`Registry workspace lookup failed (${response.status}).`);
-  const { items } = await response.json<{ items: Array<{ ref: { id: string }; location: "cloud" | "local"; enabled: boolean; available: boolean }> }>();
-  const harness = items.find((item) => item.ref.id === "studio-harness" && item.enabled && item.available);
-  return { relevantFiles: [], documentation: [], workspace: { location: harness?.location ?? "local", available: Boolean(harness) } };
+  const { items } = await response.json<{ items: Array<{ id: string; status: string }> }>();
+  const harness = items.find((item) => item.id === "studio-harness" && item.status === "active");
+  return { relevantFiles: [], documentation: [], workspace: { location: "local", available: Boolean(harness) } };
 }

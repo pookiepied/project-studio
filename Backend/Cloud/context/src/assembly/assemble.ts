@@ -27,8 +27,6 @@ export async function assembleContext(
   env: Env,
   request: ContextRequest,
 ): Promise<ContextPackage> {
-  const refresh = await env.REGISTRY.fetch("http://registry/sync/platform", { method: "POST", headers: { "x-user-id": request.userId } });
-  if (!refresh.ok) throw new Error(`Registry platform refresh failed (${refresh.status}).`);
   const [mcp, connectors, conversation, skills, agents, user, project] = await Promise.all([
     buildMcpContext(env, request.userId, request.task),
     buildConnectorContext(env, request.userId, request.task),
