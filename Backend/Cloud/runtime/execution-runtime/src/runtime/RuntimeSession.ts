@@ -58,6 +58,12 @@ interface StartBody {
   limits?: ExecutionLimits;
 }
 
+interface RuntimeToolCallBody {
+  toolName: string;
+  arguments?: Record<string, unknown>;
+  toolCallId?: string;
+}
+
 const RUN_KEY = "run:current";
 const EVENTS_KEY = "run:events";
 
@@ -91,6 +97,12 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
     }
     if (request.method === "POST" && ["/pause", "/resume", "/cancel"].includes(url.pathname)) {
       return this.transition(url.pathname.slice(1) as "pause" | "resume" | "cancel");
+    }
+    if (request.method === "POST" && url.pathname === "/tools/execute") {
+      return this.executeRequestedTool(await request.json());
+    }
+    if (request.method === "POST" && url.pathname === "/tools/execute/batch") {
+      return this.executeRequestedTools(await request.json());
     }
     if (request.method === "POST" && (url.pathname.startsWith("/approvals/") || url.pathname.startsWith("/external-tools/") || url.pathname.startsWith("/client-actions/"))) {
       return Response.json({ accepted: true });
@@ -140,7 +152,7 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
     });
   }
 
-  protected async executeToolCall(run: RunState, tool: RegisteredTool, args: Record<string, unknown>, toolCallId = crypto.randomUUID()): Promise<ToolExecutionResult> {
+  protected async executeToolCall(run: RunState, tool: RegisteredTool, args: Record<string, unknown>, toolCallId: string = crypto.randomUUID()): Promise<ToolExecutionResult> {
     if (!tool.descriptor.route) {
       return { ok: false, toolCallId, toolName: tool.descriptor.name, status: "failed", error: { code: "missing_tool_route", message: "Tool descriptor does not include an execution route." } };
     }
@@ -192,6 +204,40 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
     });
     const body = await readJson<{ results?: ToolExecutionResult[] }>(response);
     return body.results ?? [];
+  }
+
+  private async executeRequestedTool(body: unknown): Promise<Response> {
+    try {
+      const run = await this.requireActiveRun();
+      const call = readToolCall(body);
+      const tool = await this.requireVisibleTool(run, call.toolName);
+      const result = await this.executeToolCall(run, tool, call.arguments ?? {}, call.toolCallId);
+      return Response.json(result, { status: result.ok ? 200 : 502 });
+    } catch (error) {
+      return Response.json({ ok: false, error: describe(error) }, { status: 400 });
+    }
+  }
+
+  private async executeRequestedTools(body: unknown): Promise<Response> {
+    try {
+      const run = await this.requireActiveRun();
+      const input = readObject(body);
+      const rawCalls = input.calls;
+      if (!Array.isArray(rawCalls) || rawCalls.length < 1 || rawCalls.length > 20) {
+        return Response.json({ error: "invalid_request", message: "calls must contain between 1 and 20 tool calls." }, { status: 400 });
+      }
+      const tools = await this.visibleTools(run);
+      const calls = rawCalls.map((raw) => {
+        const call = readToolCall(raw);
+        const tool = tools[call.toolName];
+        if (!tool) throw new Error(`Tool ${call.toolName} is not available in this runtime context.`);
+        return { tool, args: call.arguments ?? {}, toolCallId: call.toolCallId };
+      });
+      const results = await this.executeToolCalls(run, calls);
+      return Response.json({ ok: results.every((result) => result.ok), results });
+    } catch (error) {
+      return Response.json({ ok: false, error: describe(error) }, { status: 400 });
+    }
   }
 
   private async start(body: StartBody): Promise<Response> {
@@ -249,6 +295,26 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
     return Response.json({ run: next });
   }
 
+  private async requireActiveRun(): Promise<RunState> {
+    const run = await this.ctx.storage.get<RunState>(RUN_KEY);
+    if (!run) throw new Error("No active run.");
+    if (run.status === "completed" || run.status === "cancelled" || run.status === "failed") {
+      throw new Error(`Run is ${run.status}; tools cannot be executed.`);
+    }
+    return run;
+  }
+
+  private async requireVisibleTool(run: RunState, toolName: string): Promise<RegisteredTool> {
+    const tool = (await this.visibleTools(run))[toolName];
+    if (!tool) throw new Error(`Tool ${toolName} is not available in this runtime context.`);
+    return tool;
+  }
+
+  private async visibleTools(run: RunState): Promise<Record<string, RegisteredTool>> {
+    const context = await this.loadContext(run);
+    return this.gateTools(this.registerTools(context?.tools ?? []));
+  }
+
   private async loadContext(run: RunState): Promise<ContextPackage | null> {
     const response = await this.env.CONTEXT.fetch("https://context/context", {
       method: "POST",
@@ -283,6 +349,22 @@ export abstract class RuntimeSession<Env extends RuntimeEnv> {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function readToolCall(value: unknown): RuntimeToolCallBody {
+  const input = readObject(value);
+  const toolName = input.toolName;
+  if (typeof toolName !== "string" || toolName.trim() === "") throw new Error("toolName is required.");
+  const args = input.arguments;
+  if (args !== undefined && (typeof args !== "object" || args === null || Array.isArray(args))) throw new Error("arguments must be an object.");
+  const toolCallId = input.toolCallId;
+  if (toolCallId !== undefined && typeof toolCallId !== "string") throw new Error("toolCallId must be a string.");
+  return { toolName, arguments: args as Record<string, unknown> | undefined, toolCallId };
+}
+
+function readObject(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Expected an object.");
+  return value as Record<string, unknown>;
 }
 
 async function readJson<T>(response: Response): Promise<T> {

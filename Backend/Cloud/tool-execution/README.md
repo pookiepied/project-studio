@@ -46,3 +46,17 @@ records those values in D1 and never stores process-global execution state.
 
 The current runtime loops are still model-loop scaffolds, so these helpers are
 the integration point used when actual model tool-call handling is implemented.
+
+Each runtime also exposes authenticated session proxy routes for exercising the
+same path:
+
+- Execution Runtime: `POST /runs/:conversationId/tools/execute`
+- Execution Runtime: `POST /runs/:conversationId/tools/execute/batch`
+- Planner Runtime: `POST /plans/:conversationId/tools/execute`
+- Planner Runtime: `POST /plans/:conversationId/tools/execute/batch`
+- Agent Runtime: `POST /invoke/:agentId/:conversationId/tools/execute`
+- Agent Runtime: `POST /invoke/:agentId/:conversationId/tools/execute/batch`
+
+The runtime session reloads its current Context package, gates the visible tools
+for that runtime, and only forwards calls for tools present in that gated set.
+The Tool Execution Worker then performs destination dispatch and job tracking.

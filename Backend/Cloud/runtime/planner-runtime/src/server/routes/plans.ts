@@ -86,6 +86,18 @@ plansRoute.get("/:conversationId/ws", (c) => {
   );
 });
 
+for (const path of ["tools/execute", "tools/execute/batch"] as const) {
+  plansRoute.post(`/:conversationId/${path}`, async (c) => {
+    const userId = authenticatedUserId(c.req.raw);
+    if (!userId) return c.json({ error: "unauthorized" }, 401);
+    return forward(c.env, c.req.param("conversationId"), `/${path}`, {
+      method: "POST",
+      body: await c.req.text(),
+      headers: { "content-type": "application/json", "x-user-id": userId },
+    });
+  });
+}
+
 // Control commands may carry { expectedVersion } for compare-and-swap.
 for (const action of ["pause", "resume", "cancel"] as const) {
   plansRoute.post(`/:conversationId/${action}`, async (c) => {

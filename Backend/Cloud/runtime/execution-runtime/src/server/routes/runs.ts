@@ -89,6 +89,18 @@ runsRoute.post("/:conversationId/external-tools/:toolCallId/resolve", async (c) 
   });
 });
 
+for (const path of ["tools/execute", "tools/execute/batch"] as const) {
+  runsRoute.post(`/:conversationId/${path}`, async (c) => {
+    const userId = authenticatedUserId(c.req.raw);
+    if (!userId) return c.json({ error: "unauthorized" }, 401);
+    return forward(c.env, c.req.param("conversationId"), `/${path}`, {
+      method: "POST",
+      body: await c.req.text(),
+      headers: { "content-type": "application/json", "x-user-id": userId },
+    });
+  });
+}
+
 runsRoute.post("/:conversationId/client-actions/:toolCallId/resolve", async (c) => {
   const userId = authenticatedUserId(c.req.raw);
   if (!userId) return c.json({ error: "unauthorized" }, 401);

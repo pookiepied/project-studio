@@ -141,6 +141,18 @@ invokeRoute.get("/:agentId/:conversationId/ws", (c) => {
   );
 });
 
+for (const path of ["tools/execute", "tools/execute/batch"] as const) {
+  invokeRoute.post(`/:agentId/:conversationId/${path}`, async (c) => {
+    const userId = authenticatedUserId(c.req.raw);
+    if (!userId) return c.json({ error: "unauthorized" }, 401);
+    return session(c.env, c.req.param("conversationId")).fetch(`https://session/${path}`, {
+      method: "POST",
+      body: await c.req.text(),
+      headers: { "content-type": "application/json", "x-user-id": userId },
+    });
+  });
+}
+
 for (const action of ["pause", "resume", "cancel"] as const) {
   invokeRoute.post(`/:agentId/:conversationId/${action}`, async (c) => {
     const userId = authenticatedUserId(c.req.raw);
