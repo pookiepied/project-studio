@@ -133,7 +133,7 @@ before splitting.
 | `src/features/chat/pages/ChatPage.tsx` | 609 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, and project registry wiring were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 592 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 587 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, and engine/session state were extracted |
-| `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
+| `src/features/activity/pages/ActivityPage.tsx` | 451 | Page now focuses on display state and rendering; data fetching, loading state, refresh, and log polling were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 570 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 537 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
@@ -497,6 +497,10 @@ Completed:
   `src/core/errors/diagnosticReportFormatter.ts`.
 - Reduced `comprehensiveDiagnostics.ts` from 616 to 558 lines while keeping the
   diagnostics runner and existing public exports in place.
+- Extracted ActivityPage data fetching, loading state, refresh orchestration,
+  and request-log polling into `src/features/activity/pages/useActivityData.ts`.
+- Reduced `ActivityPage.tsx` from 574 to 451 lines while keeping chart controls,
+  derived stats, and page rendering in place.
 
 Recommended order:
 

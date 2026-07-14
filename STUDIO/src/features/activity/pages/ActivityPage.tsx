@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState } from "react";
 import { ChartLineUp, TerminalWindow, Robot } from "@/ui/icons";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -6,180 +6,46 @@ import {
 import { Icon, Refresh, Warning } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
-import { createHeaders } from "@/lib/api";
-import { apiManager } from "@/core/network/apiManager";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useSettings } from "@/app/contexts/SettingsContext";
 import { isResolvedDark } from "@/lib/theme";
-import { logger } from "@/core/logging/logger";
-import { prefetchProfiles } from "@/core/network/userProfileCache";
 import { LOG_GRID_TEMPLATE } from "@/design/constants";
 
 import type {
-  SystemStatus, AuthHealth, SummaryData, UsageRow, LogEntry,
   ChartMetric, ActivityMode,
 } from "../types";
-import { fmtTokens, fmtCost, fmtShortDate, fmtMetricValue, fillDailyGaps } from "../formatters";
+import { fmtTokens, fmtCost, fmtShortDate, fmtMetricValue } from "../formatters";
 import { ProviderCard, ChartTooltip, LogRow, HealthCard } from "../components";
+import { useActivityData } from "./useActivityData";
 
 export const ActivityPage = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
   const isDark = isResolvedDark(settings.theme);
 
-  // ── UI state ──────────────────────────────────────────────────────────────
   const [days, setDays] = useState(30);
   const [metric, setMetric] = useState<ChartMetric>("requests");
   const [providerFilter, setProviderFilter] = useState("all");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [mode, setMode] = useState<ActivityMode>("gateway");
 
-  // ── Data state ────────────────────────────────────────────────────────────
-  const [systemHealth, setSystemHealth] = useState<SystemStatus | null>(null);
-  const [authHealth, setAuthHealth] = useState<AuthHealth | null>(null);
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [chartData, setChartData] = useState<UsageRow[]>([]);
-  const [providerData, setProviderData] = useState<UsageRow[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [personalSummary, setPersonalSummary] = useState<SummaryData | null>(null);
-
-  // ── Loading state ─────────────────────────────────────────────────────────
-  const [loadingHealth, setLoadingHealth] = useState(true);
-  const [loadingChart, setLoadingChart] = useState(true);
-  const [loadingProviders, setLoadingProviders] = useState(true);
-  const [loadingLogs, setLoadingLogs] = useState(true);
-  const [loadingPersonal, setLoadingPersonal] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ── Fetchers ──────────────────────────────────────────────────────────────
-
-  const fetchHealth = useCallback(async () => {
-    setLoadingHealth(true);
-    try {
-      const endpoints = await apiManager.getEndpoints();
-      const statusUrl = endpoints.health.replace(/\/health$/, "") + "/system/status";
-      const [statusRes, authRes] = await Promise.allSettled([
-        fetch(statusUrl),
-        fetch(`${endpoints.auth}/health`),
-      ]);
-      if (statusRes.status === "fulfilled" && statusRes.value.ok)
-        setSystemHealth(await statusRes.value.json() as SystemStatus);
-      if (authRes.status === "fulfilled" && authRes.value.ok)
-        setAuthHealth(await authRes.value.json() as AuthHealth);
-    } catch (err) {
-      logger.error("ActivityPage", "health fetch failed", err);
-    } finally {
-      setLoadingHealth(false);
-    }
-  }, []);
-
-  const fetchSummary = useCallback(async () => {
-    setError(null);
-    try {
-      const [endpoints, headers] = await Promise.all([apiManager.getEndpoints(), createHeaders()]);
-      const res = await fetch(endpoints.tracking.summary, { headers });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setSummary(await res.json() as SummaryData);
-    } catch (err) {
-      logger.error("ActivityPage", "summary fetch failed", err);
-      setError("Could not load activity data.");
-    }
-  }, []);
-
-  const fetchChart = useCallback(async () => {
-    setLoadingChart(true);
-    try {
-      const [endpoints, headers] = await Promise.all([apiManager.getEndpoints(), createHeaders()]);
-      const params = new URLSearchParams({ group_by: "day", days: String(days) });
-      if (providerFilter !== "all") params.set("provider", providerFilter);
-      const res = await fetch(`${endpoints.tracking.usage}?${params}`, { headers });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json() as { data: UsageRow[] };
-      const enriched = (data.data ?? []).map((row) => ({
-        ...row,
-        error_rate: row.requests > 0 ? Math.round((row.error_count / row.requests) * 1000) / 10 : 0,
-      }));
-      setChartData(fillDailyGaps(enriched, days));
-    } catch (err) {
-      logger.error("ActivityPage", "chart fetch failed", err);
-    } finally {
-      setLoadingChart(false);
-    }
-  }, [days, providerFilter]);
-
-  const fetchProviders = useCallback(async () => {
-    setLoadingProviders(true);
-    try {
-      const [endpoints, headers] = await Promise.all([apiManager.getEndpoints(), createHeaders()]);
-      const params = new URLSearchParams({ group_by: "provider", days: "30" });
-      const res = await fetch(`${endpoints.tracking.usage}?${params}`, { headers });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json() as { data: UsageRow[] };
-      setProviderData(data.data ?? []);
-    } catch (err) {
-      logger.error("ActivityPage", "providers fetch failed", err);
-    } finally {
-      setLoadingProviders(false);
-    }
-  }, []);
-
-  const fetchLogs = useCallback(async () => {
-    try {
-      const [endpoints, headers] = await Promise.all([apiManager.getEndpoints(), createHeaders()]);
-      const params = new URLSearchParams({ limit: "50" });
-      if (providerFilter !== "all") params.set("provider", providerFilter);
-      const res = await fetch(`${endpoints.tracking.logs}?${params}`, { headers });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json() as { events: LogEntry[] };
-      const events = data.events ?? [];
-      const uniqueIds = [...new Set(events.map((e) => e.user_id).filter(Boolean))];
-      if (uniqueIds.length > 0) prefetchProfiles(uniqueIds);
-      setLogs(events);
-    } catch (err) {
-      logger.error("ActivityPage", "logs fetch failed", err);
-    } finally {
-      setLoadingLogs(false);
-    }
-  }, [providerFilter]);
-
-  const fetchPersonal = useCallback(async () => {
-    setLoadingPersonal(true);
-    try {
-      const [endpoints, headers] = await Promise.all([apiManager.getEndpoints(), createHeaders()]);
-      const res = await fetch(endpoints.tracking.me, { headers });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setPersonalSummary(await res.json() as SummaryData);
-    } catch (err) {
-      logger.error("ActivityPage", "personal summary fetch failed", err);
-    } finally {
-      setLoadingPersonal(false);
-    }
-  }, []);
-
-  // ── Effects ───────────────────────────────────────────────────────────────
-
-  useEffect(() => { fetchHealth(); }, [fetchHealth]);
-  useEffect(() => { fetchSummary(); }, [fetchSummary]);
-  useEffect(() => { fetchProviders(); }, [fetchProviders]);
-  useEffect(() => { fetchChart(); }, [fetchChart]);
-  useEffect(() => { setLoadingLogs(true); fetchLogs(); }, [fetchLogs]);
-  useEffect(() => { fetchPersonal(); }, [fetchPersonal]);
-
-  useEffect(() => {
-    pollingRef.current = setInterval(fetchLogs, 15_000);
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, [fetchLogs]);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await Promise.all([fetchHealth(), fetchSummary(), fetchChart(), fetchProviders(), fetchLogs(), fetchPersonal()]);
-    setIsRefreshing(false);
-  };
-
-  // ── Derived ───────────────────────────────────────────────────────────────
+  const {
+    systemHealth,
+    authHealth,
+    summary,
+    chartData,
+    providerData,
+    logs,
+    personalSummary,
+    loadingHealth,
+    loadingChart,
+    loadingProviders,
+    loadingLogs,
+    loadingPersonal,
+    error,
+    isRefreshing,
+    handleRefresh,
+  } = useActivityData({ days, providerFilter });
 
   const stats = summary;
   const credits = summary?.credits ?? [];
@@ -208,9 +74,7 @@ export const ActivityPage = () => {
     };
   })();
 
-  // Chart geometry colours — neutral, on-ramp values. recharts needs literal
-  // colour strings (no CSS classes), so these are the documented data-viz
-  // exception (D-401): they carry no semantic hue, only neutral greys.
+  // Recharts needs literal color strings; these are neutral data-viz values.
   /* eslint-disable no-restricted-syntax */
   const chartBarColor = isDark ? "#A3A3A3" : "#737373";
   const gridColor    = "var(--surface-raised)";
@@ -226,8 +90,6 @@ export const ActivityPage = () => {
   ];
 
   const xAxisInterval = days === 7 ? 0 : days === 14 ? 1 : 2;
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-full flex flex-col bg-surface-page overflow-hidden transition-colors duration-normal">
