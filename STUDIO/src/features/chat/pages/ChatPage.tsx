@@ -42,6 +42,7 @@ import { useComposerDockHeight } from "./useComposerDockHeight";
 import { useChatComposerInput } from "./useChatComposerInput";
 import { useChatEnvironmentControls } from "./useChatEnvironmentControls";
 import { useChatProjectRegistry } from "./useChatProjectRegistry";
+import { useChatTurnStatus } from "./useChatTurnStatus";
 
 // ---------------------------------------------------------------------------
 
@@ -341,16 +342,22 @@ export const ChatPage = () => {
     conversationStorageScope,
     setProjectContext,
   });
-  const runningTurnTool = activeToolCalls.find(
-    (tc) => tc.status === "running" && !tc.parentCallId
-  );
-  const hasVisibleTurnActivity =
-    streamingContent.trim().length > 0 ||
-    thinkingContent.trim().length > 0 ||
-    harnessSegments.length > 0 ||
-    !!runningTurnTool;
-  const hasActiveTurn = isLoading || isStreaming || !!streamingMessageId;
-  const isPreparingTurn = hasActiveTurn && !hasVisibleTurnActivity;
+
+  const turnStatus = useChatTurnStatus({
+    activeToolCalls,
+    streamingContent,
+    thinkingContent,
+    harnessSegments,
+    isLoading,
+    isStreaming,
+    streamingMessageId,
+    hasMessages: messages.length > 0,
+    pendingPermission,
+    chatEngine,
+    conversationId: conversation?.id,
+    usageContextTokens,
+    contextLimit,
+  });
 
   const composerBlock = (inputRef: React.RefObject<HTMLTextAreaElement | null>) => (
     <ChatComposer {...composerProps} inputRef={inputRef} />
@@ -507,20 +514,7 @@ export const ChatPage = () => {
                   />
                   <ChatMessageList
                   scrollPaddingBottom={composerDockH + BOTTOM_SCROLL_CLEARANCE}
-                  turnStatus={messages.length > 0 && !pendingPermission ? {
-                    engine: chatEngine,
-                    convId: conversation?.id,
-                    generating: isPreparingTurn || hasVisibleTurnActivity,
-                    label: (() => {
-                      if (isPreparingTurn) return "Preparing";
-                      if (runningTurnTool) return "Working";
-                      if (streamingContent && streamingContent.length > 0) return "Responding";
-                      return "Thinking";
-                    })(),
-                    thinking: thinkingContent,
-                    contextUsed: usageContextTokens && usageContextTokens > 0 ? usageContextTokens : undefined,
-                    contextLimit,
-                  } : null}
+                  turnStatus={turnStatus}
                   messages={messages}
                   isLoadingMore={isLoadingMore}
                   hasMoreMessages={hasMoreMessages}
