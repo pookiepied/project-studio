@@ -33,6 +33,10 @@ binding = "MCP"
 service = "studio-mcp"
 
 [[services]]
+binding = "TOOL_EXECUTION"
+service = "studio-tool-execution"
+
+[[services]]
 binding = "TRACKER"
 service = "studio-tracker"
 

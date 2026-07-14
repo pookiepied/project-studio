@@ -33,6 +33,10 @@ service = "studio-data"
 binding = "MCP"
 service = "studio-mcp"
 
+[[services]]
+binding = "TOOL_EXECUTION"
+service = "studio-tool-execution"
+
 # Durable Object: one AgentSession per agent invocation/conversation.
 [[durable_objects.bindings]]
 name = "AGENT_SESSION"

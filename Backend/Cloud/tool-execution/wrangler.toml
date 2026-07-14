@@ -1,0 +1,29 @@
+name = "studio-tool-execution"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "TOOL_EXECUTION_DB"
+database_name = "studio-tool-execution"
+database_id = "replace-with-tool-execution-d1-id"
+
+# Studio Registry - capability and MCP metadata lookups.
+[[services]]
+binding = "REGISTRY"
+service = "studio-registry"
+
+# Studio Agent Runtime - delegated agent execution.
+[[services]]
+binding = "AGENT_RUNTIME"
+service = "studio-agent-runtime"
+
+# Studio Skill Library - bundled and future persistent skill resources.
+[[services]]
+binding = "SKILL_LIBRARY"
+service = "studio-cloud-skill-library"

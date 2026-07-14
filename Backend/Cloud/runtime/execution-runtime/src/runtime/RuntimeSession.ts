@@ -5,6 +5,7 @@ export interface RuntimeEnv {
   CONTEXT: Fetcher;
   DATA: Fetcher;
   MCP: Fetcher;
+  TOOL_EXECUTION: Fetcher;
 }
 
 export interface RuntimeProfile {

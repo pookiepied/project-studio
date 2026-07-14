@@ -28,6 +28,10 @@ service = "studio-data"
 binding = "MCP"
 service = "studio-mcp"
 
+[[services]]
+binding = "TOOL_EXECUTION"
+service = "studio-tool-execution"
+
 # Durable Object: one PlannerSession per conversation.
 [[durable_objects.bindings]]
 name = "PLANNER_SESSION"
