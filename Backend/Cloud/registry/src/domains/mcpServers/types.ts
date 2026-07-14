@@ -12,6 +12,8 @@ export interface McpToolRecord {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
   enabled: boolean;
   metadata: Record<string, unknown>;
 }

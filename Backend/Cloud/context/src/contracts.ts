@@ -98,6 +98,8 @@ export interface StudioToolDescriptor {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
   family: "connector" | "native-cloud" | "user-mcp" | "native-local" | "client";
   target: "mcp-hub" | "local-relay" | "client";
   location: "cloud" | "local";
@@ -118,6 +120,8 @@ export interface RegistryToolRecord {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
   enabled: boolean;
   permissions?: string[];
   metadata?: Record<string, unknown>;

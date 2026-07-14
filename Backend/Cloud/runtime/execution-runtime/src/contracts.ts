@@ -38,6 +38,8 @@ export interface StudioToolDescriptor {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
   policy: {
     effect?: "none" | "read" | "write" | "destructive";
     requiresApproval?: boolean;

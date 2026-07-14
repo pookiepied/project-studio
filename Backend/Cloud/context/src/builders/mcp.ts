@@ -17,19 +17,29 @@ function descriptor(item: RegistryMcpRecord, tool: RegistryMcpRecord["tools"][nu
   const route = platformManaged
     ? { kind: "native-cloud" as const, serviceId: item.id, toolName: tool.name }
     : { kind: "remote-mcp" as const, serverId: item.id, toolName: tool.name, endpoint: String(item.endpointRef ?? item.metadata.endpoint ?? "") };
+  const effect = readEffect(tool.metadata?.effect);
   return {
     name: `mcp_${item.id}_${tool.name}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64),
     description: tool.description,
     inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
+    annotations: tool.annotations,
     family: platformManaged ? "native-cloud" : "user-mcp",
     target: "mcp-hub",
     location: "cloud",
     capabilityRef: refFor(item),
-    policy: { requiresApproval: tool.permissions?.some((permission) => permission.includes("write") || permission.includes("destructive")) ?? false },
+    policy: {
+      effect,
+      requiresApproval: effect === "write" || effect === "destructive" || (tool.permissions?.some((permission) => permission.includes("write") || permission.includes("destructive")) ?? false),
+    },
     route,
   };
 }
 
 function refFor(item: RegistryMcpRecord) {
   return { id: item.id, kind: "mcp-server", name: item.name, scope: item.ownerType };
+}
+
+function readEffect(value: unknown): StudioToolDescriptor["policy"]["effect"] {
+  return value === "read" || value === "write" || value === "destructive" || value === "none" ? value : undefined;
 }

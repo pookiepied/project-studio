@@ -91,6 +91,8 @@ function normalizeTools(value: unknown): McpToolRecord[] {
       name: requireString(tool.name, `tools[${index}].name`),
       description: optionalString(tool.description, `tools[${index}].description`) ?? "",
       inputSchema: optionalObject(tool.inputSchema, `tools[${index}].inputSchema`),
+      outputSchema: tool.outputSchema === undefined ? undefined : optionalObject(tool.outputSchema, `tools[${index}].outputSchema`),
+      annotations: tool.annotations === undefined ? undefined : optionalObject(tool.annotations, `tools[${index}].annotations`),
       enabled: typeof tool.enabled === "boolean" ? tool.enabled : true,
       metadata: optionalObject(tool.metadata, `tools[${index}].metadata`),
     };

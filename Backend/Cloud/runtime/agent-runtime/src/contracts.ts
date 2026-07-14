@@ -4,7 +4,6 @@ export interface ExecutionLimits {
   maxTotalTokens?: number;
   maxToolCalls?: number;
 }
-
 export interface RunState {
   runId: string;
   conversationId: string;
@@ -38,6 +37,8 @@ export interface StudioToolDescriptor {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
   policy: {
     effect?: "none" | "read" | "write" | "destructive";
     requiresApproval?: boolean;

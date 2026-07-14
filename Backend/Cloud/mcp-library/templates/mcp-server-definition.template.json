@@ -22,14 +22,25 @@
         "properties": {},
         "additionalProperties": false
       },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
       "enabled": false,
       "metadata": {}
     }
   ],
   "permissions": [],
-  "tags": ["knowledge"],
+  "tags": ["execution"],
   "metadata": {
-    "category": "knowledge",
+    "category": "execution",
     "templateOnly": true
   }
 }
