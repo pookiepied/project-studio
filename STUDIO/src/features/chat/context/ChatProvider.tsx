@@ -33,9 +33,7 @@ import type { ChatConversation }                       from "@/types";
 import type { AutoRoutedInfo } from "@/types/chat";
 import { useSettings }                                 from "@/app/contexts/SettingsContext";
 import { useModelsContext as useModels }                from "@/features/models/context";
-import {
-  createConversation, loadConversation, updateConversationTitle,
-} from "@/features/chat/conversations/chatHistoryService";
+import { createConversation } from "@/features/chat/conversations/chatHistoryService";
 import type { ConversationStorageScope } from "@/core/conversations";
 
 import { useVoiceInput }                               from "@/features/voice/hooks/useVoiceInput";
@@ -44,7 +42,6 @@ import { usePermittedTools }                           from "@/features/chat/hoo
 import type { MessageSegment } from "@/types";
 import type { ChatContextType, ActiveToolCall, TaskItem } from "./types";
 import { DEFAULT_MAX_CONTEXT_TOKENS } from "./constants";
-import { chat } from "@/features/chat/services/chatService";
 import { GlobalAccessModal } from "@/features/permissions/components/GlobalAccessModal";
 import { ManagementAccessModal } from "@/features/permissions/components/ManagementAccessModal";
 import type { ToolApprovalDecision } from "./types";
@@ -64,6 +61,7 @@ import { useChatEngineState } from "./useChatEngineState";
 import { saveConvProjectCtx } from "./projectContextStorage";
 import type { PendingMessage } from "./types";
 import { resolveContextLimit, supportsVisionForModel } from "./ChatProviderModelHelpers";
+import { generateConversationTitleInBackground } from "./conversationTitleGeneration";
 
 // ---------------------------------------------------------------------------
 // Context
@@ -363,24 +361,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setConversation(c);
       if (pendingProject) saveConvProjectCtx(c.id, pendingProject);
 
-      // Fire-and-forget: generate an AI title in the background
-      const snippet = content.trim().slice(0, 800);
-      chat(
-        [
-          { role: "system", content: "Generate a concise 3-5 word title for this conversation based on the user message. Reply with only the title — no quotes, no punctuation, no explanation." },
-          { role: "user",   content: snippet },
-        ],
+      generateConversationTitleInBackground({
+        conversation: c,
+        initialContent: content,
         model,
-        { max_tokens: 30, direct: true }
-      ).then(async (result) => {
-        if (!result.success || !result.data) return;
-        const aiTitle = result.data.trim().replace(/^["'""'']+|["'""'']+$/g, "").slice(0, 80);
-        if (!aiTitle) return;
-        await updateConversationTitle(c.id, aiTitle);
-        const updated = await loadConversation(c.id);
-        if (updated) setConversation(updated);
-        window.dispatchEvent(new CustomEvent("studio:title-updated", { detail: { id: c.id, title: aiTitle } }));
-      }).catch(() => { /* keep truncated title on failure */ });
+        setConversation,
+      });
 
       return c;
     } finally {

@@ -131,7 +131,7 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/chat/pages/ChatPage.tsx` | 602 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, and turn-status policy were extracted |
-| `src/features/chat/context/ChatProvider.tsx` | 587 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, and engine/session state were extracted |
+| `src/features/chat/context/ChatProvider.tsx` | 573 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, engine/session state, and title generation were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 570 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 545 | Complex composite UI; browser rows/actions and tree grouping/search logic were extracted |
@@ -488,6 +488,10 @@ Completed:
   `src/features/chat/context/useChatEngineState.ts`.
 - Reduced `ChatProvider.tsx` from 731 to 628 lines while preserving the same
   public provider fields and action-hook setter contracts.
+- Extracted ChatProvider background conversation title generation into
+  `src/features/chat/context/conversationTitleGeneration.ts`.
+- Reduced `ChatProvider.tsx` from 587 to 573 lines while keeping conversation
+  creation, project metadata persistence, and provider state ownership in place.
 - Extracted the Studio stream handler's inline DSML tool-call continuation path
   into `src/features/chat/context/handleDsmlContinuation.ts`.
 - Reduced `useStreamHandlers.ts` from 588 to 498 lines while keeping the same
