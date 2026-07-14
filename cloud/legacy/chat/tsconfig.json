@@ -6,7 +6,7 @@
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@gateway/*": ["../gateway/src/*"]
+      "@gateway/*": ["../../gateways/gateway/src/*"]
     },
     "types": ["@cloudflare/workers-types", "node"],
     "resolveJsonModule": true,

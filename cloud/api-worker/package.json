@@ -1,16 +1,15 @@
 {
-  "name": "auth-gate",
+  "name": "api-gateway",
   "version": "1.0.0",
-  "description": "STUDIO Authentication Gate - Google OAuth + JWT issuance",
+  "description": "STUDIO API Gateway - Request routing, job queue, auth validation",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail",
-    "whitelist": "node whitelist-manager.js"
+    "tail": "wrangler tail"
   },
   "dependencies": {
-    "@studio/jwt": "file:../packages/jwt",
+    "@studio/jwt": "file:../../shared/packages/jwt",
     "hono": "^4.0.0"
   },
   "devDependencies": {

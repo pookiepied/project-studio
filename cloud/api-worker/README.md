@@ -17,7 +17,7 @@ The public-facing entry point for Project Studio. All frontend requests go throu
 ### 1. Authentication
 
 All requests are validated here. Two accepted token types:
-- **User JWT** — issued by `auth/` after Google OAuth login. 1-hour lifetime.
+- **User JWT** — issued by `cloud/services/auth/` after Google OAuth login. 1-hour lifetime.
 - Engine key auth was removed — JWT-only for all routes.
 
 ### 2. AI Request Routing
@@ -49,8 +49,8 @@ To stage a release: build + sign with `npx tauri build`, upload installer to R2,
 ### 5. Proxies
 
 Forwards requests to internal-only workers that have no public routes:
-- **User preferences** → `workers/Studio/` (injecting authenticated user ID as trusted header)
-- **Analytics/usage** → `tracker/` worker
+- **User preferences** -> `cloud/services/studio-worker/` (injecting authenticated user ID as trusted header)
+- **Analytics/usage** -> `cloud/services/tracker/` worker
 - **AI requests** → `studio-chat` (WebSocket upgrade + HTTP)
 
 ### 6. OpenAI Adapter

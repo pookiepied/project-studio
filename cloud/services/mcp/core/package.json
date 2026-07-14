@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@studio/jwt": "file:../packages/jwt",
+    "@studio/jwt": "file:../../../../shared/packages/jwt",
     "aws4fetch": "^1.0.20"
   },
   "devDependencies": {

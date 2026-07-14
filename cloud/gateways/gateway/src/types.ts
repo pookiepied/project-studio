@@ -9,4 +9,4 @@ export type {
   Model,
   ModelsResponse,
   ProviderContract,
-} from "../../chat/src/server/types";
+} from "../../../legacy/chat/src/server/types";
