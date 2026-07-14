@@ -13,6 +13,7 @@ import {
   setupSpeechAnalyser,
 } from "./audioRecorderSetup";
 import { cleanupAudioRecorderResources } from "./audioRecorderCleanup";
+import { finalizeAudioRecorderTranscription } from "./audioRecorderFinalization";
 
 interface AudioRecorderOptions {
   chunkDuration?: number; // seconds
@@ -389,12 +390,12 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
     const pollInterval = 100;
     let waitedTime = 0;
 
-    logger.debug('AudioRecorder', `Waiting for ${pendingTranscriptionsRef.current} pending transcription(s)…`);
+    logger.debug('AudioRecorder', `Waiting for ${pendingTranscriptionsRef.current} pending transcription(s)...`);
 
     while (pendingTranscriptionsRef.current > 0 && waitedTime < maxWaitTime) {
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
       waitedTime += pollInterval;
-      logger.debug('AudioRecorder', `Still waiting… pending=${pendingTranscriptionsRef.current} elapsed=${waitedTime}ms`);
+      logger.debug('AudioRecorder', `Still waiting... pending=${pendingTranscriptionsRef.current} elapsed=${waitedTime}ms`);
     }
 
     if (waitedTime >= maxWaitTime) {
@@ -406,11 +407,18 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
     // Additional small wait to ensure the last chunk is added to the array
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Merge all transcriptions
-    await finalizeTranscription();
-    // finalizeTranscription is component-local (declared below; re-bind on recordingState only)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordingState]);
+    await finalizeAudioRecorderTranscription({
+      chunks: transcriptionChunksRef.current,
+      autoRephrase,
+      rephraseTone,
+      rephraseModel,
+      setRecordingState,
+      setFinalTranscript,
+      setRephrasedText,
+      onComplete,
+      onError,
+    });
+  }, [autoRephrase, onComplete, onError, rephraseModel, rephraseTone]);
 
   /**
    * Transcribe a single audio chunk
@@ -485,127 +493,6 @@ export function useAudioRecorder(options: AudioRecorderOptions = {}) {
       );
     } finally {
       pendingTranscriptionsRef.current = Math.max(0, pendingTranscriptionsRef.current - 1);
-    }
-  };
-
-  /**
-   * Safely copy text to clipboard with error handling
-   */
-  const copyToClipboard = async (text: string): Promise<boolean> => {
-    try {
-      await navigator.clipboard.writeText(text);
-      logger.debug('AudioRecorder', `Copied to clipboard`);
-      return true;
-    } catch (error) {
-      const userMessage = errorService.getUserMessage(error);
-      logger.error('AudioRecorder', `Failed to copy:`, userMessage);
-      // Don't report to error service - clipboard is optional feature
-      // User can still see and use the text even if clipboard fails
-      return false;
-    }
-  };
-
-  /**
-   * Finalize transcription and optionally rephrase
-   */
-  const finalizeTranscription = async () => {
-    try {
-      logger.debug('AudioRecorder', `Starting finalization with ${transcriptionChunksRef.current.length} chunks`);
-
-      // Merge all chunks
-      const finalText = processTranscriptionChunks(
-        transcriptionChunksRef.current.map((c) => c.text)
-      );
-
-      logger.debug('AudioRecorder', `Final text: "${finalText}"`);
-      setFinalTranscript(finalText);
-
-      if (!finalText) {
-        logger.debug('AudioRecorder', `No text to process, completing`);
-        setRecordingState(RecordingState.COMPLETE);
-        onComplete?.(finalText);
-        return;
-      }
-
-      // Rephrase if enabled
-      if (autoRephrase) {
-        logger.debug('AudioRecorder', `Starting rephrase with tone: ${rephraseTone}, text length: ${finalText.length}`);
-        logger.debug('AudioRecorder', `Text to rephrase: "${finalText.substring(0, 100)}..."`);
-        setRecordingState(RecordingState.REPHRASING);
-
-        try {
-          const rephraseResult = await aiService.rephrase(
-            finalText,
-            rephraseTone,
-            rephraseModel
-          );
-
-          logger.debug('AudioRecorder', `Rephrase result:`, rephraseResult);
-          
-          if (rephraseResult.success && rephraseResult.data) {
-            logger.debug('AudioRecorder', `Rephrase success: "${rephraseResult.data}"`);
-            setRephrasedText(rephraseResult.data);
-
-            // Copy to clipboard (with error handling)
-            await copyToClipboard(rephraseResult.data);
-
-            setRecordingState(RecordingState.COMPLETE);
-            onComplete?.(finalText, rephraseResult.data);
-          } else {
-            logger.error('AudioRecorder', `Rephrase failed:`, rephraseResult.error);
-            
-            // Report rephrase error but still show original text
-            reportError(new Error(`Rephrase failed: ${rephraseResult.error}`), {
-              action: "rephrase",
-              textLength: finalText.length,
-              tone: rephraseTone,
-              model: rephraseModel,
-            });
-            
-            // Fall back to original text
-            await copyToClipboard(finalText);
-            setRecordingState(RecordingState.COMPLETE);
-            onComplete?.(finalText);
-          }
-        } catch (error) {
-          logger.error('AudioRecorder', `Rephrase exception:`, error);
-          
-          // Report unexpected rephrase error
-          reportError(
-            error instanceof Error ? error : new Error("Rephrase exception"),
-            {
-              action: "rephrase",
-              textLength: finalText.length,
-              tone: rephraseTone,
-              model: rephraseModel,
-            }
-          );
-          
-          // Fall back to original text
-          await copyToClipboard(finalText);
-          setRecordingState(RecordingState.COMPLETE);
-          onComplete?.(finalText);
-        }
-      } else {
-        logger.debug('AudioRecorder', `Auto-rephrase disabled, copying original`);
-        // Copy original to clipboard (with error handling)
-        await copyToClipboard(finalText);
-
-        setRecordingState(RecordingState.COMPLETE);
-        onComplete?.(finalText);
-      }
-    } catch (error) {
-      const userMessage = errorService.getUserMessage(error);
-      logger.error('AudioRecorder', "Error:", error);
-      
-      // Report error
-      reportError(
-        error instanceof Error ? error : new Error(userMessage),
-        { action: "finalizeTranscription", chunkCount: transcriptionChunksRef.current.length }
-      );
-      
-      setRecordingState(RecordingState.ERROR);
-      onError?.(userMessage);
     }
   };
 

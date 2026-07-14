@@ -132,10 +132,10 @@ before splitting.
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/chat/pages/ChatPage.tsx` | 602 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, and turn-status policy were extracted |
 | `src/features/chat/context/ChatProvider.tsx` | 573 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, engine/session state, and title generation were extracted |
-| `src/features/voice/hooks/useAudioRecorder.ts` | 570 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
 | `src/features/chat/components/ChatFloatingDock.tsx` | 545 | Complex composite UI; browser rows/actions and tree grouping/search logic were extracted |
 | `src/features/workspace/pages/WorkspacePage.tsx` | 537 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
+| `src/features/voice/hooks/useAudioRecorder.ts` | 468 | Hook still mixes recording state and chunk transcription; browser setup, cleanup, and finalization/rephrase helpers were extracted |
 | `src/features/chat/context/useStreamHandlers.ts` | 458 | Streaming protocol/event logic candidate; DSML continuation was extracted |
 | `src/features/activity/pages/ActivityPage.tsx` | 451 | Page now focuses on display state and rendering; data fetching, loading state, refresh, and log polling were extracted |
 
@@ -504,6 +504,11 @@ Completed:
   `src/features/voice/hooks/audioRecorderCleanup.ts`.
 - Reduced `useAudioRecorder.ts` from 698 to 639 lines while keeping start/stop
   state transitions inside the hook.
+- Extracted voice-recorder final transcription merging, optional rephrase,
+  clipboard copy, and finalization error handling into
+  `src/features/voice/hooks/audioRecorderFinalization.ts`.
+- Reduced `useAudioRecorder.ts` from 570 to 468 lines while keeping recording
+  state, chunk capture, and per-chunk transcription inside the hook.
 - Extracted diagnostic report types and text export formatting into
   `src/core/errors/diagnosticTypes.ts` and
   `src/core/errors/diagnosticReportFormatter.ts`.
