@@ -130,14 +130,14 @@ before splitting.
 | File | Lines | Initial read |
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
-| `src/features/workspace/pages/WorkspacePage.tsx` | 578 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
-| `src/features/chat/context/ChatProvider.tsx` | 628 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, and engine/session state were extracted |
-| `src/features/chat/components/ChatFloatingDock.tsx` | 627 | Complex composite UI; browser rows/actions were extracted |
 | `src/features/chat/pages/ChatPage.tsx` | 609 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, and project registry wiring were extracted |
-| `src/features/voice/hooks/useAudioRecorder.ts` | 639 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
-| `src/core/errors/comprehensiveDiagnostics.ts` | 616 | Diagnostic collectors may be separable |
+| `src/features/chat/components/ChatFloatingDock.tsx` | 592 | Complex composite UI; browser rows/actions were extracted |
+| `src/features/chat/context/ChatProvider.tsx` | 587 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, and engine/session state were extracted |
 | `src/features/activity/pages/ActivityPage.tsx` | 574 | Page-level decomposition candidate |
-| `src/features/chat/context/useStreamHandlers.ts` | 498 | Streaming protocol/event logic candidate; DSML continuation was extracted |
+| `src/features/voice/hooks/useAudioRecorder.ts` | 570 | Hook still mixes recording state, chunk transcription, finalization, and errors; browser setup and cleanup helpers were extracted |
+| `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 537 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
+| `src/features/chat/context/useStreamHandlers.ts` | 458 | Streaming protocol/event logic candidate; DSML continuation was extracted |
 
 ## Dead-Code Signals
 
@@ -492,6 +492,11 @@ Completed:
   `src/features/voice/hooks/audioRecorderCleanup.ts`.
 - Reduced `useAudioRecorder.ts` from 698 to 639 lines while keeping start/stop
   state transitions inside the hook.
+- Extracted diagnostic report types and text export formatting into
+  `src/core/errors/diagnosticTypes.ts` and
+  `src/core/errors/diagnosticReportFormatter.ts`.
+- Reduced `comprehensiveDiagnostics.ts` from 616 to 558 lines while keeping the
+  diagnostics runner and existing public exports in place.
 
 Recommended order:
 

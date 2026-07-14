@@ -11,33 +11,10 @@ import { networkStateManager } from '../network/networkStateService';
 import { apiManager } from '../network/apiManager';
 import { memorySystem } from '../storage/memorySystem';
 import { NotificationService } from '../notifications';
+import { formatDiagnosticReport } from './diagnosticReportFormatter';
+import type { DiagnosticReport, DiagnosticTest } from './diagnosticTypes';
 
-export interface DiagnosticTest {
-  id: string;
-  name: string;
-  category: 'platform' | 'storage' | 'network' | 'api' | 'security' | 'ui' | 'system' | 'features';
-  status: 'pending' | 'running' | 'pass' | 'fail' | 'warning' | 'skip';
-  message: string;
-  details?: any;
-  duration?: number;
-  timestamp?: number;
-}
-
-export interface DiagnosticReport {
-  timestamp: number;
-  environment: string;
-  platform: string;
-  userAgent: string;
-  tests: DiagnosticTest[];
-  summary: {
-    total: number;
-    passed: number;
-    failed: number;
-    warnings: number;
-    skipped: number;
-  };
-  recommendations: string[];
-}
+export type { DiagnosticReport, DiagnosticTest } from './diagnosticTypes';
 
 class ComprehensiveDiagnostics {
   private tests: DiagnosticTest[] = [];
@@ -616,43 +593,7 @@ class ComprehensiveDiagnostics {
    */
   async exportReport(report?: DiagnosticReport): Promise<string> {
     const diagnosticReport = report || await this.runDiagnostics();
-    
-    let output = '=== STUDIO Diagnostic Report ===\n\n';
-    output += `Generated: ${new Date(diagnosticReport.timestamp).toISOString()}\n`;
-    output += `Environment: ${diagnosticReport.environment}\n`;
-    output += `Platform: ${diagnosticReport.platform}\n\n`;
-    
-    output += '=== Summary ===\n';
-    output += `Total Tests: ${diagnosticReport.summary.total}\n`;
-    output += `Passed: ${diagnosticReport.summary.passed}\n`;
-    output += `Failed: ${diagnosticReport.summary.failed}\n`;
-    output += `Warnings: ${diagnosticReport.summary.warnings}\n`;
-    output += `Skipped: ${diagnosticReport.summary.skipped}\n\n`;
-    
-    // Group tests by category
-    const categories = [...new Set(diagnosticReport.tests.map(t => t.category))];
-    
-    for (const category of categories) {
-      const categoryTests = diagnosticReport.tests.filter(t => t.category === category);
-      output += `=== ${category.toUpperCase()} TESTS ===\n`;
-      
-      for (const test of categoryTests) {
-        const status = test.status.toUpperCase().padEnd(8);
-        output += `[${status}] ${test.name}\n`;
-        output += `           ${test.message}\n`;
-        if (test.duration) {
-          output += `           Duration: ${test.duration}ms\n`;
-        }
-        output += '\n';
-      }
-    }
-    
-    output += '=== Recommendations ===\n';
-    diagnosticReport.recommendations.forEach((rec, index) => {
-      output += `${index + 1}. ${rec}\n`;
-    });
-    
-    return output;
+    return formatDiagnosticReport(diagnosticReport);
   }
 }
 
