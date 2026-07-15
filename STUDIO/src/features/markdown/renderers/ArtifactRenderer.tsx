@@ -10,8 +10,9 @@ import type {
   ArtifactTimelineItem,
 } from "@/types/artifacts";
 import { parseArtifact } from "@/lib/artifact";
+import { artifactRendererDescriptor } from "@/features/artifacts/registry";
 import { JsonRenderer } from "./JsonRenderer";
-import { WebSearchArtifact } from "./artifacts";
+import { CalendarArtifact, GmailArtifact, ImageGenerationArtifact, WebSearchArtifact } from "./artifacts";
 
 interface ArtifactRendererProps {
   code: string;
@@ -19,10 +20,11 @@ interface ArtifactRendererProps {
 
 function statusTone(status: Artifact["status"]) {
   switch (status) {
+    case "completed":
     case "success":
       return {
         icon: <Success size="sm" weight="fill" className="text-secondary" />,
-        label: "Success",
+        label: "Completed",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
     case "partial":
@@ -31,17 +33,33 @@ function statusTone(status: Artifact["status"]) {
         label: "Partial",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
+    case "failed":
     case "error":
+    case "rejected":
       return {
         icon: <Reject size="sm" weight="fill" className="text-secondary" />,
-        label: "Error",
+        label: status === "rejected" ? "Rejected" : "Failed",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
+    case "cancelled":
+      return {
+        icon: <Reject size="sm" weight="fill" className="text-secondary" />,
+        label: "Cancelled",
+        pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
+      };
+    case "empty":
+      return {
+        icon: <Error size="sm" weight="fill" className="text-secondary" />,
+        label: "Empty",
+        pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
+      };
+    case "loading":
+    case "streaming":
     case "pending":
     default:
       return {
         icon: <Clock size="sm" weight="fill" className="text-secondary" />,
-        label: "Pending",
+        label: status === "streaming" ? "Streaming" : status === "loading" ? "Loading" : "Pending",
         pill: "bg-surface-raised text-secondary border-surface-border dark:bg-surface-raised/20 dark:text-secondary dark:border-surface-border/40",
       };
   }
@@ -237,11 +255,24 @@ export function ArtifactRenderer({ code }: ArtifactRendererProps) {
     );
   }
 
-  if (artifact.kind === "web_search") {
+  if (artifact.kind === "web_search" || artifact.kind === "web_research" || artifact.kind === "web_fetch") {
     return <WebSearchArtifact artifact={artifact} />;
   }
 
+  if (artifact.kind === "generated_image" || artifact.kind === "image_generation") {
+    return <ImageGenerationArtifact artifact={artifact} />;
+  }
+
+  if (artifact.kind.startsWith("gmail_")) {
+    return <GmailArtifact artifact={artifact} />;
+  }
+
+  if (artifact.kind.startsWith("calendar_")) {
+    return <CalendarArtifact artifact={artifact} />;
+  }
+
   const tone = statusTone(artifact.status ?? "success");
+  const descriptor = artifactRendererDescriptor(artifact);
   const sourceParts = [artifact.source?.app, artifact.source?.server, artifact.source?.tool].filter(Boolean);
   const category = artifact.category ?? "general";
 
@@ -256,7 +287,7 @@ export function ArtifactRenderer({ code }: ArtifactRendererProps) {
               <span>{tone.label}</span>
             </span>
             <span className="inline-flex items-center rounded-full border border-surface-border dark:border-surface-border px-2 py-0.5 text-2xs font-medium text-muted dark:text-disabled">
-              {category} / {artifact.kind}
+              {descriptor.label} / {category} / {artifact.kind}
             </span>
           </div>
           {artifact.summary && <p className="mt-1 text-sm leading-relaxed text-secondary dark:text-disabled">{artifact.summary}</p>}

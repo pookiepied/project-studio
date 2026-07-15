@@ -4,6 +4,7 @@ export interface ExecutionLimits {
   maxTotalTokens?: number;
   maxToolCalls?: number;
 }
+
 export interface RunState {
   runId: string;
   conversationId: string;
@@ -35,12 +36,76 @@ export interface ContextPackage {
   sendable?: {
     format: "studio.context.projection.v1";
     sections: Array<{ id: string; stability: "stable" | "semi-stable" | "dynamic"; content: unknown }>;
+    modelInput?: ProviderNeutralModelInput;
     toolNames: string[];
     defaultToolNames: string[];
-    expansionToolName: "expand_tool";
+    discoveryToolName?: "discover_tools";
+    resolveToolName?: "resolve_tool";
+    expansionToolName?: "discover_tools" | "expand_tool";
   };
   defaultTools?: StudioToolDescriptor[];
   tools: StudioToolDescriptor[];
+}
+
+export interface ProviderNeutralModelInput {
+  format: "studio.model-input.v1";
+  generatedAt: string;
+  messages: ProviderNeutralMessage[];
+  tools: ProviderNeutralToolSchema[];
+  resources: ProviderNeutralResource[];
+  cachePlan: {
+    stablePrefixSectionIds: string[];
+    semiStableSectionIds: string[];
+    dynamicSectionIds: string[];
+    currentTurnSectionIds: string[];
+  };
+  loweringHints: {
+    images: "reference-only";
+    files: "reference-only";
+    artifacts: "summary-or-text";
+    toolSchemas: "materialized-defaults-only";
+  };
+}
+
+export interface ProviderNeutralMessage {
+  id: string;
+  role: "system" | "user" | "assistant" | "tool";
+  channel: "context" | "transcript" | "current_input";
+  stability: "stable" | "semi-stable" | "dynamic";
+  sourceSectionId: string;
+  createdAt?: string;
+  parts: ProviderNeutralMessagePart[];
+}
+
+export type ProviderNeutralMessagePart =
+  | { kind: "text"; text: string; source?: string; truncated?: boolean }
+  | { kind: "summary"; text: string; source?: string }
+  | { kind: "image_ref"; resourceId: string; title?: string; contentType?: string }
+  | { kind: "file_ref"; resourceId: string; title?: string; contentType?: string }
+  | { kind: "artifact_ref"; artifactId: string; title: string; family?: string; type?: string; status?: string; summary?: string }
+  | { kind: "attachment_ref"; attachmentId: string; title: string; contentType?: string; summary?: string }
+  | { kind: "tool_call"; toolCallId?: string; toolName: string; inputSummary?: string }
+  | { kind: "tool_result"; toolCallId?: string; toolName?: string; summary: string };
+
+export interface ProviderNeutralResource {
+  id: string;
+  kind: "artifact" | "attachment";
+  title: string;
+  contentType?: string;
+  status?: string;
+  family?: string;
+  type?: string;
+  modelVisibility: "include" | "reference_only" | "omit";
+  inlineMode: "reference" | "summary" | "text" | "image" | "file";
+  hasInlineText: boolean;
+}
+
+export interface ProviderNeutralToolSchema {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  policy: StudioToolDescriptor["policy"];
 }
 
 export interface StudioToolDescriptor {
@@ -49,7 +114,7 @@ export interface StudioToolDescriptor {
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
   annotations?: Record<string, unknown>;
-  family?: "connector" | "native-cloud" | "user-mcp" | "native-local" | "client";
+  family?: "connector" | "native-cloud" | "user-mcp" | "native-local" | "client" | "memory";
   target?: "mcp-hub" | "local-relay" | "client";
   location?: "cloud" | "local";
   policy: {
@@ -71,42 +136,3 @@ export type StudioToolRoute =
   | { kind: "connector"; slug: string; connectionId: string; entityId: string }
   | { kind: "memory"; operation: string; location?: "cloud" | "local" }
   | { kind: "client"; action: string };
-
-export interface AgentPermissions {
-  read: boolean;
-  write: boolean;
-  delegation: boolean;
-  tools: string[];
-  allowedConnectors: string[];
-  allowedMcpServers: string[];
-  allowedSkills: string[];
-}
-
-export interface AgentLimits {
-  maxSteps?: number;
-  maxDurationMs?: number;
-  maxTokens?: number;
-}
-
-export interface AgentDefinition {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  systemPrompt: string;
-  personality?: string;
-  outputFormat?: "text" | "json" | "structured";
-  modelPreference?: string;
-  permissions: AgentPermissions;
-  limits?: AgentLimits;
-  runtime: {
-    location: "cloud" | "local";
-  };
-}
-
-export interface DelegationResult {
-  agentId: string;
-  status: "completed" | "failed" | "cancelled";
-  output: string;
-  error?: string;
-}

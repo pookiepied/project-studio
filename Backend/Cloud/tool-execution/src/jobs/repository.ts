@@ -26,7 +26,7 @@ export async function createJob(db: D1Database, request: ToolExecutionRequest, r
   };
 
   const existing = request.idempotencyKey ? await findByIdempotencyKey(db, request.userId, request.idempotencyKey) : null;
-  if (existing) return existing;
+  if (existing) return { ...existing, replayed: true };
 
   await db.prepare(
     `INSERT INTO tool_execution_jobs (

@@ -19,6 +19,15 @@ binding = "DATA"
 service = "studio-data"
 
 [[services]]
+binding = "TOOL_POOL"
+service = "studio-tool-pool"
+
+[[d1_databases]]
+binding = "CONTEXT_DB"
+database_name = "studio-context-engine"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[services]]
 binding = "CONNECTORS"
 service = "connectors"
 

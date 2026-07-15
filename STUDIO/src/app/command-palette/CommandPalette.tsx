@@ -68,6 +68,7 @@ export function CommandPalette() {
       nav("Open Profile",     "profile",    "account memory personal context"),
       nav("Open Projects",    "projects",   "project workspace folder"),
       nav("Open Workspace",   "workspace",  "context documents automation"),
+      nav("Open Artifacts",   "artifacts",  "artifact catalog inline preview web research"),
       nav("Open Apps",        "extensions", "mcp plugins integrations"),
       nav("Open Transcribe",  "transcribe", "audio speech text"),
       nav("Open Computer Use", "computer",   "desktop browser automation"),

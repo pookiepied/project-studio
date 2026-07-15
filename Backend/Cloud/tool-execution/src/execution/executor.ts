@@ -1,11 +1,13 @@
-import type { ToolExecutionRequest, ToolExecutionResult } from "../contracts";
+import type { ToolArtifactUpdate, ToolExecutionRequest, ToolExecutionResult, ToolTranscriptEventRef } from "../contracts";
 import type { Env } from "../system/env";
 import { notImplemented, toToolError } from "../errors";
 import { completeJob, createJob, failJob } from "../jobs/repository";
 import { dispatchAgentRuntime } from "./agentRuntime";
 import { dispatchMcpTool } from "./mcp";
 import { resolveRoute, targetRef } from "./routes";
+import { dispatchConnector, dispatchMemory, dispatchNativeCloud } from "./serviceDispatch";
 import { dispatchSkillLibrary } from "./skillLibrary";
+import { persistToolCallEvent, persistToolResultEvent } from "./transcripts";
 
 export async function executeToolCall(env: Env, request: ToolExecutionRequest): Promise<ToolExecutionResult> {
   const route = await resolveRoute(env, request);
@@ -14,11 +16,13 @@ export async function executeToolCall(env: Env, request: ToolExecutionRequest): 
   if (job.status === "completed") {
     return {
       ok: true,
+      format: "studio.tool-execution.result.v1",
       jobId: job.jobId,
       toolCallId: job.toolCallId,
       toolName: job.toolName,
       status: "completed",
       result: job.result,
+      artifacts: extractArtifactUpdates(job.result),
       route,
       startedAt: job.startedAt ?? startedAt,
       completedAt: job.completedAt ?? job.updatedAt,
@@ -27,6 +31,7 @@ export async function executeToolCall(env: Env, request: ToolExecutionRequest): 
   if (job.status === "failed") {
     return {
       ok: false,
+      format: "studio.tool-execution.result.v1",
       jobId: job.jobId,
       toolCallId: job.toolCallId,
       toolName: job.toolName,
@@ -38,16 +43,40 @@ export async function executeToolCall(env: Env, request: ToolExecutionRequest): 
     };
   }
 
+  if (job.replayed) {
+    const normalized = toToolError(new Error("Tool call is already running for this idempotency key."));
+    return {
+      ok: false,
+      format: "studio.tool-execution.result.v1",
+      jobId: job.jobId,
+      toolCallId: job.toolCallId,
+      toolName: job.toolName,
+      status: "failed",
+      error: { ...normalized, code: "duplicate_in_progress", retryable: true },
+      route,
+      startedAt: job.startedAt ?? startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  }
+
+  const transcriptEvents: ToolTranscriptEventRef[] = [];
   try {
+    const callEvent = await safePersist(() => persistToolCallEvent(env, job, request));
+    if (callEvent) transcriptEvents.push(callEvent);
     const result = await dispatch(env, request, route);
     const completed = await completeJob(env.TOOL_EXECUTION_DB, job, result);
+    const resultEvent = await safePersist(() => persistToolResultEvent(env, completed, request, { ok: true, result }));
+    if (resultEvent) transcriptEvents.push(resultEvent);
     return {
       ok: true,
+      format: "studio.tool-execution.result.v1",
       jobId: completed.jobId,
       toolCallId: completed.toolCallId,
       toolName: completed.toolName,
       status: "completed",
       result,
+      artifacts: extractArtifactUpdates(result),
+      transcriptEvents,
       route,
       startedAt: completed.startedAt ?? startedAt,
       completedAt: completed.completedAt ?? new Date().toISOString(),
@@ -55,17 +84,30 @@ export async function executeToolCall(env: Env, request: ToolExecutionRequest): 
   } catch (error) {
     const normalized = toToolError(error);
     const failed = await failJob(env.TOOL_EXECUTION_DB, job, normalized);
+    const resultEvent = await safePersist(() => persistToolResultEvent(env, failed, request, { ok: false, error: normalized }));
+    if (resultEvent) transcriptEvents.push(resultEvent);
     return {
       ok: false,
+      format: "studio.tool-execution.result.v1",
       jobId: failed.jobId,
       toolCallId: failed.toolCallId,
       toolName: failed.toolName,
       status: "failed",
       error: normalized,
+      transcriptEvents,
       route,
       startedAt: failed.startedAt ?? startedAt,
       completedAt: failed.completedAt ?? new Date().toISOString(),
     };
+  }
+}
+
+async function safePersist(write: () => Promise<ToolTranscriptEventRef | undefined>): Promise<ToolTranscriptEventRef | undefined> {
+  try {
+    return await write();
+  } catch (error) {
+    console.warn("Tool transcript persistence failed", error);
+    return undefined;
   }
 }
 
@@ -80,13 +122,13 @@ async function dispatch(env: Env, request: ToolExecutionRequest, route: Awaited<
       if (route.endpoint.startsWith("service-binding://")) return dispatchServiceBoundMcp(env, request, route);
       return dispatchMcpTool(request, route);
     case "connector":
-      throw notImplemented("Connector dispatch requires a stable Connectors execution contract.");
+      return dispatchConnector(env, request, route);
     case "native-cloud":
-      throw notImplemented("Native cloud tool dispatch requires a stable Native Tools service contract.");
+      return dispatchNativeCloud(env, request, route);
     case "local-relay":
       throw notImplemented("Local relay dispatch requires the desktop relay protocol.");
     case "memory":
-      throw notImplemented("Memory dispatch requires the Memory service contract.");
+      return dispatchMemory(env, request, route);
   }
 }
 
@@ -109,4 +151,23 @@ function asAgentAction(toolName: string): Parameters<typeof dispatchAgentRuntime
 function asSkillAction(toolName: string): Parameters<typeof dispatchSkillLibrary>[2]["action"] {
   if (toolName === "skill_list" || toolName === "skill_search" || toolName === "skill_get" || toolName === "skill_read" || toolName === "skill_read_resource" || toolName === "skill_resolve") return toolName;
   throw notImplemented(`MCP tool ${toolName} is not a supported skill library action.`);
+}
+
+function extractArtifactUpdates(result: unknown): ToolArtifactUpdate[] | undefined {
+  if (typeof result !== "object" || result === null) return undefined;
+  const artifacts = (result as { artifacts?: unknown }).artifacts;
+  if (!Array.isArray(artifacts)) return undefined;
+  const updates = artifacts.flatMap((item): ToolArtifactUpdate[] => {
+    if (typeof item !== "object" || item === null) return [];
+    const value = item as Record<string, unknown>;
+    if (typeof value.artifactId !== "string") return [];
+    return [{
+      artifactId: value.artifactId,
+      artifactVersionId: typeof value.artifactVersionId === "string" ? value.artifactVersionId : undefined,
+      eventId: typeof value.eventId === "string" ? value.eventId : undefined,
+      status: typeof value.status === "string" ? value.status : undefined,
+      title: typeof value.title === "string" ? value.title : undefined,
+    }];
+  });
+  return updates.length ? updates : undefined;
 }

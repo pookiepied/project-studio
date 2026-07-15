@@ -11,6 +11,7 @@ export type View =
   | "memories"
   | "projects"
   | "workspace"
+  | "artifacts"
   | "extensions"
   | "activity"
   | "manage"

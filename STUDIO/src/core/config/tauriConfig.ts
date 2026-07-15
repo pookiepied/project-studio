@@ -61,6 +61,18 @@ export const API_ENDPOINTS = {
       me: `${TAURI_CONFIG.API_BASE_URL}/adapters/openai/v1/tracking/me`,
     },
   },
+
+  cloud: {
+    runs: `${TAURI_CONFIG.API_BASE_URL}/cloud/runs`,
+    plans: `${TAURI_CONFIG.API_BASE_URL}/cloud/plans`,
+    agents: `${TAURI_CONFIG.API_BASE_URL}/cloud/agents`,
+    conversations: `${TAURI_CONFIG.API_BASE_URL}/cloud/conversations`,
+    transcripts: `${TAURI_CONFIG.API_BASE_URL}/cloud/transcripts`,
+    uploads: `${TAURI_CONFIG.API_BASE_URL}/cloud/uploads`,
+    artifacts: `${TAURI_CONFIG.API_BASE_URL}/cloud/artifacts`,
+    objects: `${TAURI_CONFIG.API_BASE_URL}/cloud/objects`,
+    models: `${TAURI_CONFIG.API_BASE_URL}/cloud/models`,
+  },
   
   // System endpoints
   health: `${TAURI_CONFIG.API_BASE_URL}/health`,

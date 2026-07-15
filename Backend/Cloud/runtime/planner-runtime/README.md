@@ -19,12 +19,22 @@ Studio Execution Runtime to act on.
   the planner operates with **read-only access by default** (enforced in
   `src/tools/readonly.ts`)
 - Execute plans (Execution Runtime's job)
-- Discover capabilities itself (Registry/Context's job)
+- Own callable capability discovery (Registry/Tool Pool's job)
 
 ## Open decision
 
 The loop model — custom planning loop, ReAct with read-only tools, staged workflow,
 or hybrid — is open decision #2 and is decided after these boundaries are stable.
+
+## Status
+
+Implemented: Durable Object run state, Context Engine handoff, direct Tool Pool
+discovery/resolve, read-only tool gating, plan finalization scaffold, and Studio
+Data transcript-event persistence.
+
+Still pending: real planning model loop, provider-neutral request builder,
+streaming, checkpoint recovery, approval flow, and richer plan-to-execution
+handoff.
 
 ## Structure
 

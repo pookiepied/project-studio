@@ -8,8 +8,9 @@ import { buildProjectContext } from "../builders/project";
 import { buildSkillContext } from "../builders/skills";
 import { buildAgentContext } from "../builders/agents";
 import { capabilityCacheKey, readCapabilitySnapshot, writeCapabilitySnapshot, type CapabilitySnapshot } from "../cache/contextCache";
-import { buildCapabilityCatalog, buildSendableContext } from "../projection/catalog";
-import { defaultTools } from "../projection/defaultTools";
+import { buildSendableContext } from "../projection/catalog";
+import { recordContextAssembly } from "../state/assemblies";
+import { readToolPoolProjection } from "../toolPool/client";
 
 /**
  * Orchestrates the layer builders and combines their output into one compact,
@@ -50,16 +51,17 @@ async function buildCapabilitySnapshot(
     buildAgentContext(env, request.userId, request.task),
     soft(() => buildProjectContext(env, request.userId, request.task), { relevantFiles: [], documentation: [], workspace: { location: "local" as const, available: false } }),
   ]);
-  const defaults = defaultTools();
-  const tools = uniqueTools([...defaults, ...connectors.tools, ...mcp.tools]);
-  const capabilityCatalog = buildCapabilityCatalog({
-    mcp: mcp.context,
-    connectors: connectors.context,
-    skills,
-    agents,
-    tools,
-    defaultTools: defaults,
+  const toolPool = await readToolPoolProjection(env, {
+    userId: request.userId,
+    workspaceId: request.workspaceId,
+    agentId: request.agentId,
+    conversationId: request.conversationId,
+    task: request.task,
+    consumer: request.consumer,
   });
+  const defaults = toolPool.defaultTools;
+  const tools = uniqueTools([...defaults]);
+  const capabilityCatalog = toolPool.summaries;
   return {
     cacheKey,
     cacheStatus,
@@ -72,6 +74,7 @@ async function buildCapabilitySnapshot(
     skills,
     agents,
     capabilityCatalog,
+    toolProjectionGeneratedAt: toolPool.generatedAt,
   };
 }
 
@@ -82,7 +85,7 @@ async function buildContextPackage(
 ): Promise<ContextPackage> {
   const [conversation, user] = await Promise.all([
     buildConversationContext(env, request.userId, request.conversationId, request.task),
-    soft(() => buildUserContext(env, request.userId, request.task), { preferences: {}, relevantMemories: [], recentMemory: [], userProfile: {}, permissions: [] }),
+    soft(() => buildUserContext(env, request.userId, request.task), { preferences: {}, relevantMemories: [], memoryReferences: [], recentMemory: [], userProfile: {}, permissions: [] }),
   ]);
   const base = {
     userId: request.userId,
@@ -130,6 +133,17 @@ async function buildContextPackage(
       projection: request.consumer,
     },
   } satisfies Omit<ContextPackage, "sendable">;
+  await Promise.all([
+    recordContextAssembly(env, {
+    userId: request.userId,
+    conversationId: request.conversationId,
+    consumer: request.consumer,
+    taskId: request.taskId,
+    toolProjectionGeneratedAt: snapshot.toolProjectionGeneratedAt,
+    cacheStatus: snapshot.cacheStatus,
+    }),
+    recordMemoryReferences(env, request, user.memoryReferences),
+  ]);
   return { ...withCatalog, sendable: buildSendableContext(withCatalog) };
 }
 
@@ -164,4 +178,39 @@ function uniqueTools(tools: ContextPackage["tools"]): ContextPackage["tools"] {
   const byName = new Map<string, ContextPackage["tools"][number]>();
   for (const tool of tools) byName.set(tool.name, tool);
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function recordMemoryReferences(
+  env: Env,
+  request: ContextRequest,
+  references: ContextPackage["user"]["memoryReferences"],
+): Promise<void> {
+  if (!request.conversationId || references.length === 0) return;
+  try {
+    await env.DATA.fetch("https://data.internal/transcripts/events", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": request.userId },
+      body: JSON.stringify({
+        events: references.slice(0, 10).map((memory, index) => ({
+          id: `ce_mem_${request.taskId}_${memory.id}_${index}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120),
+          conversationId: request.conversationId,
+          turnId: request.taskId,
+          source: "context-engine",
+          kind: "memory_reference",
+          visibility: "audit",
+          role: "system",
+          summary: memory.summary ?? memory.content.slice(0, 240),
+          metadata: {
+            memoryId: memory.id,
+            category: memory.category,
+            score: memory.score,
+            source: memory.source,
+            updatedAt: memory.updatedAt,
+          },
+        })),
+      }),
+    });
+  } catch (error) {
+    console.warn("Memory reference transcript persistence failed", error);
+  }
 }

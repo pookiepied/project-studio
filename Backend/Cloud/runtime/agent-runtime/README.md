@@ -2,7 +2,8 @@
 
 Executes registered `AgentDefinition` records: loads the definition from the
 Registry, resolves the model, applies the system prompt and permissions, loads
-the permitted toolset and skills via Studio Context Engine, runs the agent loop,
+the initial context via Studio Context Engine, resolves callable capabilities
+through Studio Tool Pool, runs the agent loop,
 enforces limits, and returns a structured result to the requesting user or
 parent agent.
 
@@ -15,6 +16,17 @@ three points: `composeSystemPrompt`, `gateTools`, and `finalize`.
 `src/engine/config.ts` maps an `AgentDefinition` and delegation request into
 runtime inputs such as model, limits, and narrowed permissions. State machine,
 checkpoints, recovery, and streaming behavior remain local to this worker.
+
+## Status
+
+Implemented: local runtime session scaffold, Context Engine handoff, direct Tool
+Pool discovery/resolve, delegated agent configuration mapping, default tool
+gating, Tool Execution Worker dispatch, and Studio Data transcript-event
+persistence.
+
+Still pending: real delegated model loop, agent definition loading from the final
+Agent Library/Registry boundary, report-back storage, streaming, checkpoint
+recovery, and provider-neutral request building.
 
 ## Must Not
 

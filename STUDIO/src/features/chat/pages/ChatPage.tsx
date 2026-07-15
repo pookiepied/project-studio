@@ -30,6 +30,7 @@ import { ChatMessageList }      from "@/features/chat/components/ChatMessageList
 import { ConversationRail }     from "@/features/chat/components/ConversationRail";
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
+import { LeftWorkspaceSidebar } from "@/features/chat/components/LeftWorkspaceSidebar";
 import {
   RightWorkspacePanel,
   useRightWorkspace,
@@ -43,6 +44,7 @@ import { useChatComposerInput } from "./useChatComposerInput";
 import { useChatEnvironmentControls } from "./useChatEnvironmentControls";
 import { useChatProjectRegistry } from "./useChatProjectRegistry";
 import { useChatTurnStatus } from "./useChatTurnStatus";
+import { useRenderableConversation } from "@/features/chat/canonical";
 
 // ---------------------------------------------------------------------------
 
@@ -109,7 +111,15 @@ export const ChatPage = () => {
     cancelPendingMessage,
   } = useChat();
 
-  const messages = displayedMessages;
+  const canonicalConversation = useRenderableConversation({
+    conversationId: conversation?.id,
+    enabled: conversationStorageScope === "cloud" && conversation?.metadata?.owner !== "claude",
+    limit: 500,
+  });
+  const messages =
+    canonicalConversation.status === "ready" && canonicalConversation.state
+      ? canonicalConversation.state.messages
+      : displayedMessages;
   const isClaudeOwnedConversation = conversation?.metadata?.owner === "claude";
   const hasStartedConversation = messages.length > 0;
 
@@ -235,6 +245,7 @@ export const ChatPage = () => {
 
   // -- Model library -----------------------------------------------------------
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
 
   // -- Rename modal ------------------------------------------------------------
   const { isEditingTitle, titleInput, setIsEditingTitle, setTitleInput, handleSaveTitle } =
@@ -454,6 +465,47 @@ export const ChatPage = () => {
           if (!rightWorkspace.open) broadcastPanelOpen("tools");
           rightWorkspace.toggleOpen();
         }}
+      />
+
+      <LeftWorkspaceSidebar
+        open={leftSidebarOpen}
+        onOpenChange={setLeftSidebarOpen}
+        scope={conversationStorageScope}
+        onScopeChange={handleStorageScopeChange}
+        projects={projects}
+        currentProjectPath={projectContext?.path}
+        conversations={conversations}
+        currentConvId={conversation?.id}
+        conversationStatuses={conversationStatuses}
+        onSelectProject={handleSelectProject}
+        onOpenProjectFolder={handleOpenProjectFolder}
+        onRemoveProject={(id) => { void removeProject(id); }}
+        onDeleteProject={(id) => { void deleteProject(id); }}
+        onSelectConversation={async (id) => { await loadConversationById(id); }}
+        onOpenConversationInSideChat={(id) => {
+          rightWorkspace.openView("side-chat", { conversationId: id });
+          broadcastPanelOpen("tools");
+        }}
+        onOpenConversationInNewWindow={(id) => { void openConversationWindow(id); }}
+        onNewConversation={() => {
+          createNewConversation(conversationListScope, {
+            preserveProject: conversationListScope === "local" && !!projectContext,
+          });
+        }}
+        onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
+        onDeleteConversation={(id, e) => {
+          e.stopPropagation();
+          deleteConversation(id, conversation?.id, loadConversationById, createNewConversation)
+            .catch(() => {});
+        }}
+        editingConvId={editingConvId}
+        editingConvTitle={editingConvTitle}
+        onEditTitleChange={setEditingConvTitle}
+        onSaveConvTitle={(id) =>
+          saveConvTitle(id, editingConvTitle, conversation?.id, updateTitle)
+            .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
+        }
+        onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
       />
 
       {/* -- SPLIT VIEW: chat column + side panels -- */}

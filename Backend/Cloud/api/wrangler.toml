@@ -1,0 +1,34 @@
+name = "studio-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+
+# Studio Data - conversations, transcripts, uploads, artifacts, objects.
+[[services]]
+binding = "DATA"
+service = "studio-data"
+
+# Studio Execution Runtime - primary cloud agent loop.
+[[services]]
+binding = "EXECUTION_RUNTIME"
+service = "studio-execution-runtime"
+
+# Studio Planner Runtime - planning cloud agent loop.
+[[services]]
+binding = "PLANNER_RUNTIME"
+service = "studio-planner-runtime"
+
+# Studio Agent Runtime - generic configured sub-agent runtime.
+[[services]]
+binding = "AGENT_RUNTIME"
+service = "studio-agent-runtime"
+
+# Studio Gateway - model provider gateway and registry management.
+[[services]]
+binding = "GATEWAY"
+service = "studio-gateway"

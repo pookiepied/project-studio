@@ -26,6 +26,7 @@ import { ExtensionsPage } from "@/features/extensions";
 import { ActivityPage }   from "@/features/activity";
 import { ManagePage }     from "@/features/manage";
 import { WorkspacePage }   from "@/features/workspace";
+import { ArtifactCatalogPage } from "@/features/artifacts";
 import { ComputerUsePage } from "@/features/computerUse";
 
 import { NavigationProvider }   from "../contexts/NavigationContext";
@@ -91,6 +92,7 @@ export const HomePage = () => {
       case "memories":    return wrap("memories",    <MemoriesPage />);
       case "projects":    return wrap("projects",    <ProjectsPage />);
       case "workspace":   return wrap("workspace",   <WorkspacePage />);
+      case "artifacts":   return wrap("artifacts",   <ArtifactCatalogPage />);
       case "extensions":  return wrap("extensions",  <ExtensionsPage />);
       case "activity":    return wrap("activity",    <ActivityPage />);
       case "manage":      return wrap("manage",      <ManagePage />);

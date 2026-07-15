@@ -141,6 +141,15 @@ invokeRoute.get("/:agentId/:conversationId/ws", (c) => {
   );
 });
 
+invokeRoute.get("/:agentId/:conversationId/events", (c) => {
+  const userId = authenticatedUserId(c.req.raw);
+  if (!userId) return c.json({ error: "unauthorized" }, 401);
+  const after = c.req.query("after") ?? c.req.query("lastSeq") ?? "0";
+  return session(c.env, c.req.param("conversationId")).fetch(`https://session/events?after=${encodeURIComponent(after)}`, {
+    headers: { "x-user-id": userId },
+  });
+});
+
 for (const path of ["tools/execute", "tools/execute/batch"] as const) {
   invokeRoute.post(`/:agentId/:conversationId/${path}`, async (c) => {
     const userId = authenticatedUserId(c.req.raw);

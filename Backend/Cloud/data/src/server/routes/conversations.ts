@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../system/env";
+import { deleteManagedObject } from "../../storage/objects";
+import { ownsConversation, requireUserId } from "../identity";
 
 export const conversationsRoute = new Hono<{ Bindings: Env }>();
 
@@ -31,7 +33,11 @@ conversationsRoute.post("/", async (c) => {
   )
     .bind(id, userId, body.title ?? null, now, now)
     .run();
-  return c.json({ id, title: body.title ?? null, createdAt: now, updatedAt: now });
+  const row = await c.env.DATA_DB.prepare(
+    `SELECT id, title, created_at AS createdAt, updated_at AS updatedAt
+     FROM conversations WHERE id = ? AND user_id = ?`,
+  ).bind(id, userId).first();
+  return row ? c.json(row) : c.json({ error: "id_conflict" }, 409);
 });
 
 conversationsRoute.get("/:id", async (c) => {
@@ -75,36 +81,75 @@ conversationsRoute.post("/:id/messages", async (c) => {
   await c.env.DATA_DB.prepare(
     `INSERT INTO messages (id, conversation_id, user_id, role, content, created_at)
      VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO UPDATE SET content = excluded.content`,
+     ON CONFLICT (id) DO UPDATE SET
+       content = excluded.content
+     WHERE messages.user_id = excluded.user_id
+       AND messages.conversation_id = excluded.conversation_id`,
   )
     .bind(id, conversationId, userId, body.role, body.content, now)
     .run();
+  const message = await c.env.DATA_DB.prepare(
+    `SELECT id, conversation_id AS conversationId, role, content, created_at AS createdAt
+     FROM messages WHERE id = ? AND user_id = ? AND conversation_id = ?`,
+  ).bind(id, userId, conversationId).first();
+  if (!message) return c.json({ error: "id_conflict" }, 409);
   await c.env.DATA_DB.prepare("UPDATE conversations SET updated_at = ? WHERE id = ? AND user_id = ?")
     .bind(now, conversationId, userId)
     .run();
-  return c.json({ id, conversationId, role: body.role, content: body.content, createdAt: now });
+  return c.json(message);
 });
 
 conversationsRoute.delete("/:id", async (c) => {
   const userId = requireUserId(c.req.raw);
+  const conversationId = c.req.param("id");
+  const allowed = await ownsConversation(c.env, userId, conversationId);
+  if (!allowed) return c.json({ deleted: false });
+
+  const objects = await c.env.DATA_DB.prepare(
+    "SELECT id FROM storage_objects WHERE user_id = ? AND conversation_id = ?",
+  ).bind(userId, conversationId).all<{ id: string }>();
+  for (const object of objects.results ?? []) {
+    await deleteManagedObject(c.env, userId, object.id);
+  }
+
+  await c.env.DATA_DB.prepare("DELETE FROM active_transcript_projections WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM transcript_side_payloads WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM transcript_segments WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM conversation_events WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM transcript_records WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM attachments WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM artifact_permission_decisions WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM artifact_events WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM artifact_versions WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM artifact_roots WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
+  await c.env.DATA_DB.prepare("DELETE FROM plans WHERE conversation_id = ? AND user_id = ?")
+    .bind(conversationId, userId)
+    .run();
   await c.env.DATA_DB.prepare("DELETE FROM messages WHERE conversation_id = ? AND user_id = ?")
-    .bind(c.req.param("id"), userId)
+    .bind(conversationId, userId)
     .run();
   const result = await c.env.DATA_DB.prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?")
-    .bind(c.req.param("id"), userId)
+    .bind(conversationId, userId)
     .run();
   return c.json({ deleted: result.meta.changes > 0 });
 });
-
-async function ownsConversation(env: Env, userId: string, conversationId: string): Promise<boolean> {
-  const row = await env.DATA_DB.prepare("SELECT id FROM conversations WHERE id = ? AND user_id = ?")
-    .bind(conversationId, userId)
-    .first();
-  return Boolean(row);
-}
-
-function requireUserId(request: Request): string {
-  const userId = request.headers.get("X-User-ID") ?? request.headers.get("x-user-id");
-  if (!userId) throw new Error("X-User-ID required");
-  return userId;
-}

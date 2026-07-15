@@ -86,6 +86,15 @@ plansRoute.get("/:conversationId/ws", (c) => {
   );
 });
 
+plansRoute.get("/:conversationId/events", (c) => {
+  const userId = authenticatedUserId(c.req.raw);
+  if (!userId) return c.json({ error: "unauthorized" }, 401);
+  const after = c.req.query("after") ?? c.req.query("lastSeq") ?? "0";
+  return forward(c.env, c.req.param("conversationId"), `/events?after=${encodeURIComponent(after)}`, {
+    headers: { "x-user-id": userId },
+  });
+});
+
 for (const path of ["tools/execute", "tools/execute/batch"] as const) {
   plansRoute.post(`/:conversationId/${path}`, async (c) => {
     const userId = authenticatedUserId(c.req.raw);

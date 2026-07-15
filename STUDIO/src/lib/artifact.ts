@@ -5,7 +5,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isStatus(value: unknown): value is Artifact["status"] {
-  return value === "success" || value === "partial" || value === "pending" || value === "error";
+  return (
+    value === "loading" ||
+    value === "streaming" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "cancelled" ||
+    value === "rejected" ||
+    value === "partial" ||
+    value === "empty" ||
+    value === "pending" ||
+    value === "success" ||
+    value === "error"
+  );
 }
 
 function isCategory(value: unknown): value is Artifact["category"] {

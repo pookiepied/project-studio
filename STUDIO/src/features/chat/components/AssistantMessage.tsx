@@ -2,6 +2,7 @@ import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/features/markdown";
+import { ArtifactRenderer } from "@/features/markdown";
 import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { RuntimeStepCard } from "@/runtime";
 import { InlineToolSteps } from "@/runtime";
@@ -20,6 +21,38 @@ const MemoizedMarkdown = memo(({ content }: { content: string }) => (
     {content}
   </ReactMarkdown>
 ));
+
+function CanonicalArtifactInline({ message }: { message: ChatMessage }) {
+  const canonical = message.metadata?.canonical;
+  const artifact = canonical?.artifact;
+  const artifactId = canonical?.artifactIds?.[0];
+
+  if (!artifact && !artifactId) return null;
+
+  if (artifact) {
+    return (
+      <div className="max-w-2xl overflow-hidden rounded-xl border border-surface-border bg-surface-page shadow-sm dark:border-surface-border dark:bg-surface-base">
+        <ArtifactRenderer code={JSON.stringify(artifact, null, 2)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl rounded-xl border border-surface-border bg-surface-page px-4 py-3 shadow-sm dark:border-surface-border dark:bg-surface-base">
+      <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-disabled dark:text-muted">
+        Artifact
+      </div>
+      <div className="mt-1 text-sm font-medium text-primary dark:text-primary">
+        {message.content.split("\n")[0] || artifactId}
+      </div>
+      {message.content.includes("\n") && (
+        <p className="mt-1 text-sm leading-relaxed text-muted dark:text-disabled">
+          {message.content.split("\n").slice(1).join("\n").trim()}
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface AssistantMessageProps {
   message:            ChatMessage;
@@ -140,6 +173,8 @@ export const AssistantMessage = ({
                 />
               )}
             </div>
+          ) : message.metadata?.canonical?.artifactIds?.length ? (
+            <CanonicalArtifactInline message={message} />
           ) : (
             <div className="w-full flex flex-col gap-2 min-w-0">
               {/* Reasoning is a live-only, ephemeral surface owned by the bottom

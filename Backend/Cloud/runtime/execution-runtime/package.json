@@ -7,6 +7,8 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc --noEmit",
+    "verify:artifact-flow": "node scripts/verify-runtime-artifact-flow.mjs",
+    "verify": "npm run build && npm run verify:artifact-flow",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"

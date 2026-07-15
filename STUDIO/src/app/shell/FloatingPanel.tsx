@@ -12,6 +12,7 @@ import {
   Brain,
   Expand,
   Grid,
+  Lightning,
   Message,
   Microphone,
   Monitor,
@@ -53,6 +54,7 @@ const FLOATING_PANEL_CATEGORIES: Category[] = [
     label: "Spaces",
     items: [
       { id: "workspace", label: "Workspace", Icon: Project },
+      { id: "artifacts", label: "Artifacts", Icon: Lightning },
       { id: "extensions", label: "Apps", Icon: Grid },
     ],
   },

@@ -17,6 +17,7 @@ export interface CapabilitySnapshot {
   skills: SkillContext[];
   agents: AgentContext[];
   capabilityCatalog: CapabilitySummary[];
+  toolProjectionGeneratedAt?: string;
 }
 
 const CACHE = new Map<string, CacheEntry>();

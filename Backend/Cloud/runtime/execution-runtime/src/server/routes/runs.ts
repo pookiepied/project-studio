@@ -63,6 +63,15 @@ runsRoute.get("/:conversationId/ws", (c) => {
   );
 });
 
+runsRoute.get("/:conversationId/events", (c) => {
+  const userId = authenticatedUserId(c.req.raw);
+  if (!userId) return c.json({ error: "unauthorized" }, 401);
+  const after = c.req.query("after") ?? c.req.query("lastSeq") ?? "0";
+  return forward(c.env, c.req.param("conversationId"), `/events?after=${encodeURIComponent(after)}`, {
+    headers: { "x-user-id": userId },
+  });
+});
+
 // The frontend resolves permission requests here — the runtime only
 // listens and enforces. Body: { approved: boolean, resolvedBy?: string }.
 runsRoute.post("/:conversationId/approvals/:approvalId/resolve", async (c) =>

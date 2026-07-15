@@ -1,4 +1,5 @@
 // Chat domain types moved from src/types/index.ts per T5.5 (D-527 shim pattern).
+import type { Artifact } from "@/types/artifacts";
 
 // Harness execution events (Studio Harness inline cards)
 
@@ -53,6 +54,21 @@ export interface ChatMessage {
     };
     onApprove?: () => void;
     onDeny?: () => void;
+    canonical?: {
+      conversationId: string;
+      turnId?: string | null;
+      branchId: string;
+      eventIds: string[];
+      sequenceRange: [number, number];
+      revisionId?: string | null;
+      revisionNumber?: number;
+      status?: string;
+      sourceKinds?: string[];
+      artifactIds?: string[];
+      artifact?: Artifact;
+      attachmentIds?: string[];
+      toolCallIds?: string[];
+    };
   };
 }
 

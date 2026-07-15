@@ -2,7 +2,18 @@ type ArtifactCategory = "general" | "coding";
 
 export type ArtifactSurface = "chat" | "overview" | "panel";
 
-type ArtifactStatus = "success" | "partial" | "pending" | "error";
+export type ArtifactStatus =
+  | "loading"
+  | "streaming"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "rejected"
+  | "partial"
+  | "empty"
+  | "pending"
+  | "success"
+  | "error";
 
 type ArtifactDensity = "line" | "card" | "expanded";
 

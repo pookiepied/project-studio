@@ -4,6 +4,12 @@ import type {
   ConnectorContext,
   ContextPackage,
   McpContext,
+  ProviderNeutralMessage,
+  ProviderNeutralMessagePart,
+  ProviderNeutralResource,
+  ProviderNeutralToolSchema,
+  ResolvedContextResource,
+  SendableSection,
   SkillContext,
   StudioToolDescriptor,
 } from "../contracts";
@@ -43,67 +49,221 @@ export function buildCapabilityCatalog(input: {
 }
 
 export function buildSendableContext(context: Omit<ContextPackage, "sendable">): ContextPackage["sendable"] {
+  const sections = buildSendableSections(context);
+  const stablePrefixSections = ["capability_catalog", "default_tools"];
+  const dynamicSections = ["memory_references", "model_transcript", "context_references", "resolved_resources", "current_message"];
   return {
     format: "studio.context.projection.v1",
-    sections: [
-      {
-        id: "capability_catalog",
-        stability: "stable",
-        content: context.capabilityCatalog.map(({ id, type, name, description, availability, scope, source, expandable, executable, toolName, parentId }) => ({
-          id,
-          type,
-          name,
-          description,
-          availability,
-          scope,
-          source,
-          expandable,
-          executable,
-          toolName,
-          parentId,
-        })),
-      },
-      {
-        id: "default_tools",
-        stability: "stable",
-        content: context.defaultTools.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          outputSchema: tool.outputSchema,
-          annotations: tool.annotations,
-          policy: tool.policy,
-        })),
-      },
-      {
-        id: "user_profile",
-        stability: "semi-stable",
-        content: stableRecord(context.user.userProfile),
-      },
-      {
-        id: "recent_memory",
-        stability: "semi-stable",
-        content: [...context.user.recentMemory].sort(),
-      },
-      {
-        id: "conversation_history",
-        stability: "dynamic",
-        content: context.conversation.relevantHistory,
-      },
-      {
-        id: "current_message",
-        stability: "dynamic",
-        content: context.conversation.currentMessage,
-      },
-    ],
+    sections,
+    modelInput: buildProviderNeutralModelInput(context, sections, stablePrefixSections, dynamicSections),
     toolNames: context.tools.map((tool) => tool.name).sort(),
     defaultToolNames: context.defaultTools.map((tool) => tool.name).sort(),
-    expansionToolName: "expand_tool",
+    discoveryToolName: "discover_tools",
+    resolveToolName: "resolve_tool",
+    expansionToolName: "discover_tools",
     serialization: {
-      stablePrefixSections: ["capability_catalog", "default_tools"],
-      dynamicSections: ["conversation_history", "current_message"],
+      stablePrefixSections,
+      dynamicSections,
       deterministic: true,
     },
+  };
+}
+
+function buildSendableSections(context: Omit<ContextPackage, "sendable">): SendableSection[] {
+  return [
+    {
+      id: "capability_catalog",
+      stability: "stable",
+      content: context.capabilityCatalog.map(({ id, type, name, description, availability, scope, source, expandable, executable, toolName, parentId }) => ({
+        id,
+        type,
+        name,
+        description,
+        availability,
+        scope,
+        source,
+        expandable,
+        executable,
+        toolName,
+        parentId,
+      })),
+    },
+    {
+      id: "default_tools",
+      stability: "stable",
+      content: context.defaultTools.map((tool) => toolSchema(tool)),
+    },
+    {
+      id: "user_profile",
+      stability: "semi-stable",
+      content: stableRecord(context.user.userProfile),
+    },
+    {
+      id: "recent_memory",
+      stability: "semi-stable",
+      content: [...context.user.recentMemory].sort(),
+    },
+    {
+      id: "memory_references",
+      stability: "dynamic",
+      content: context.user.memoryReferences.map((memory) => ({
+        id: memory.id,
+        category: memory.category,
+        summary: memory.summary ?? memory.content.slice(0, 240),
+        score: memory.score,
+        source: memory.source,
+        updatedAt: memory.updatedAt,
+      })),
+    },
+    {
+      id: "model_transcript",
+      stability: "dynamic",
+      content: context.conversation.relevantHistory,
+    },
+    {
+      id: "context_references",
+      stability: "dynamic",
+      content: context.conversation.contextReferences,
+    },
+    {
+      id: "resolved_resources",
+      stability: "dynamic",
+      content: context.conversation.resolvedResources,
+    },
+    {
+      id: "current_message",
+      stability: "dynamic",
+      content: context.conversation.currentMessage,
+    },
+  ];
+}
+
+function buildProviderNeutralModelInput(
+  context: Omit<ContextPackage, "sendable">,
+  sections: SendableSection[],
+  stablePrefixSectionIds: string[],
+  dynamicSectionIds: string[],
+): ContextPackage["sendable"]["modelInput"] {
+  const byId = new Map(sections.map((section) => [section.id, section]));
+  const messages: ProviderNeutralMessage[] = [];
+  const addContextText = (sectionId: string, text: string, stability: ProviderNeutralMessage["stability"]) => {
+    if (text.trim().length === 0) return;
+    messages.push({
+      id: `context:${sectionId}`,
+      role: "system",
+      channel: "context",
+      stability,
+      sourceSectionId: sectionId,
+      parts: [{ kind: "text", text, source: sectionId }],
+    });
+  };
+
+  addContextText("capability_catalog", compactJson(byId.get("capability_catalog")?.content), "stable");
+  addContextText("user_profile", compactJson(byId.get("user_profile")?.content), "semi-stable");
+  addContextText("recent_memory", compactJson(byId.get("recent_memory")?.content), "semi-stable");
+  addContextText("memory_references", compactJson(byId.get("memory_references")?.content), "dynamic");
+  addContextText("context_references", compactJson(byId.get("context_references")?.content), "dynamic");
+
+  for (const resource of context.conversation.resolvedResources) {
+    const parts = resourceParts(resource);
+    if (parts.length === 0) continue;
+    messages.push({
+      id: `resource:${resource.id}`,
+      role: "system",
+      channel: "context",
+      stability: "dynamic",
+      sourceSectionId: "resolved_resources",
+      parts,
+    });
+  }
+
+  for (const [index, turn] of context.conversation.relevantHistory.entries()) {
+    messages.push({
+      id: `transcript:${index}`,
+      role: turn.role,
+      channel: "transcript",
+      stability: "dynamic",
+      sourceSectionId: "model_transcript",
+      createdAt: turn.createdAt,
+      parts: [{ kind: "text", text: turn.content, source: "model_transcript" }],
+    });
+  }
+
+  messages.push({
+    id: "current:user-message",
+    role: "user",
+    channel: "current_input",
+    stability: "dynamic",
+    sourceSectionId: "current_message",
+    parts: [{ kind: "text", text: context.conversation.currentMessage, source: "current_message" }],
+  });
+
+  return {
+    format: "studio.model-input.v1",
+    generatedAt: context.contextEngine.assembledAt,
+    messages,
+    tools: context.defaultTools.map((tool) => toolSchema(tool)),
+    resources: context.conversation.resolvedResources.map(resourceSummary),
+    cachePlan: {
+      stablePrefixSectionIds,
+      semiStableSectionIds: ["user_profile", "recent_memory"],
+      dynamicSectionIds,
+      currentTurnSectionIds: ["current_message"],
+    },
+    loweringHints: {
+      images: "reference-only",
+      files: "reference-only",
+      artifacts: "summary-or-text",
+      toolSchemas: "materialized-defaults-only",
+    },
+  };
+}
+
+function resourceParts(resource: ResolvedContextResource): ProviderNeutralMessagePart[] {
+  if (resource.modelVisibility === "omit") return [];
+  const common = {
+    title: resource.title,
+    contentType: resource.contentType,
+    summary: resource.summary,
+  };
+  const reference =
+    resource.kind === "artifact"
+      ? { kind: "artifact_ref" as const, artifactId: resource.id, title: resource.title, family: resource.family, type: resource.type, status: resource.status, summary: resource.summary }
+      : { kind: "attachment_ref" as const, attachmentId: resource.id, ...common };
+
+  if (resource.content?.format === "text" && resource.modelVisibility === "include") {
+    return [
+      reference,
+      { kind: "text", text: resource.content.text, source: resource.id, truncated: resource.content.truncated },
+    ];
+  }
+  if (resource.inlineMode === "image") return [{ kind: "image_ref", resourceId: resource.id, title: resource.title, contentType: resource.contentType }];
+  if (resource.inlineMode === "file") return [{ kind: "file_ref", resourceId: resource.id, title: resource.title, contentType: resource.contentType }];
+  return [reference];
+}
+
+function resourceSummary(resource: ResolvedContextResource): ProviderNeutralResource {
+  return {
+    id: resource.id,
+    kind: resource.kind,
+    title: resource.title,
+    contentType: resource.contentType,
+    status: resource.status,
+    family: resource.family,
+    type: resource.type,
+    modelVisibility: resource.modelVisibility,
+    inlineMode: resource.inlineMode,
+    hasInlineText: resource.content?.format === "text",
+  };
+}
+
+function toolSchema(tool: StudioToolDescriptor): ProviderNeutralToolSchema {
+  return {
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
+    policy: tool.policy,
   };
 }
 
@@ -191,4 +351,12 @@ function compareCapability(a: CapabilitySummary, b: CapabilitySummary): number {
 
 function stableRecord(input: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(input).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function compactJson(input: unknown): string {
+  if (input === undefined || input === null) return "";
+  if (typeof input === "string") return input;
+  if (Array.isArray(input) && input.length === 0) return "";
+  if (typeof input === "object" && Object.keys(input as Record<string, unknown>).length === 0) return "";
+  return JSON.stringify(input);
 }

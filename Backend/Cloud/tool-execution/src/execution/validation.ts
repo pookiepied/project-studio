@@ -26,10 +26,38 @@ export function normalizeExecutionRequest(value: unknown, inherited?: Partial<To
     idempotencyKey: optionalString(input.idempotencyKey, "idempotencyKey"),
     toolName,
     arguments: args,
-    route: normalizeRoute(input.route),
+    tool: normalizeMaterializedTool(input.tool),
+    route: normalizeRoute(input.route) ?? normalizeRoute(readOptionalObject(input.tool)?.route),
     timeoutMs: optionalNumber(input.timeoutMs, "timeoutMs"),
     metadata: input.metadata === undefined ? undefined : readObject(input.metadata),
   };
+}
+
+function normalizeMaterializedTool(value: unknown): ToolExecutionRequest["tool"] {
+  if (value === undefined || value === null) return undefined;
+  const tool = readObject(value);
+  return {
+    name: string(tool.name, "tool.name"),
+    description: optionalString(tool.description, "tool.description"),
+    inputSchema: tool.inputSchema === undefined ? undefined : readObject(tool.inputSchema),
+    outputSchema: tool.outputSchema === undefined ? undefined : readObject(tool.outputSchema),
+    annotations: tool.annotations === undefined ? undefined : readObject(tool.annotations),
+    policy: tool.policy === undefined ? undefined : readPolicy(tool.policy),
+    route: normalizeRoute(tool.route),
+  };
+}
+
+function readPolicy(value: unknown): NonNullable<ToolExecutionRequest["tool"]>["policy"] {
+  const policy = readObject(value);
+  const effect = optionalString(policy.effect, "tool.policy.effect");
+  if (effect !== undefined && effect !== "none" && effect !== "read" && effect !== "write" && effect !== "destructive") {
+    throw invalidRequest("tool.policy.effect must be none, read, write, or destructive.");
+  }
+  const requiresApproval = policy.requiresApproval;
+  if (requiresApproval !== undefined && typeof requiresApproval !== "boolean") {
+    throw invalidRequest("tool.policy.requiresApproval must be a boolean.");
+  }
+  return { effect, requiresApproval };
 }
 
 export function normalizeBatchRequest(value: unknown): ToolExecutionBatchRequest {
@@ -118,6 +146,11 @@ function sourceRuntimeValue(value: unknown): SourceRuntime {
 function readObject(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw invalidRequest("Expected an object.");
   return value as Record<string, unknown>;
+}
+
+function readOptionalObject(value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined || value === null) return undefined;
+  return readObject(value);
 }
 
 function string(value: unknown, field: string): string {

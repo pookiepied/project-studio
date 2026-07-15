@@ -26,6 +26,17 @@ interface APIEndpoints {
     credits: string;
     me: string;
   };
+  cloud: {
+    runs: string;
+    plans: string;
+    agents: string;
+    conversations: string;
+    transcripts: string;
+    uploads: string;
+    artifacts: string;
+    objects: string;
+    models: string;
+  };
 }
 
 class APIManager {
@@ -94,6 +105,7 @@ class APIManager {
         adminModes: API_ENDPOINTS.adapter.adminModes,
         registryManagement: API_ENDPOINTS.adapter.registryManagement,
         tracking: API_ENDPOINTS.adapter.tracking,
+        cloud: API_ENDPOINTS.cloud,
       };
     }
 
@@ -103,6 +115,17 @@ class APIManager {
     if (!config.baseUrl) {
       // Return empty endpoints if no API is configured
       const empty = { summary: "", usage: "", logs: "", credits: "", me: "" };
+      const emptyCloud = {
+        runs: "",
+        plans: "",
+        agents: "",
+        conversations: "",
+        transcripts: "",
+        uploads: "",
+        artifacts: "",
+        objects: "",
+        models: "",
+      };
       return {
         auth: "",
         chats: "",
@@ -116,11 +139,13 @@ class APIManager {
         adminModes: "",
         registryManagement: "",
         tracking: empty,
+        cloud: emptyCloud,
       };
     }
 
     const baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
     const trackingBase = `${baseUrl}/adapters/openai/v1/tracking`;
+    const cloudBase = `${baseUrl}/cloud`;
 
     // Auth and chats are on separate domains
     return {
@@ -141,6 +166,17 @@ class APIManager {
         logs: `${trackingBase}/logs`,
         credits: `${trackingBase}/credits`,
         me: `${trackingBase}/me`,
+      },
+      cloud: {
+        runs: `${cloudBase}/runs`,
+        plans: `${cloudBase}/plans`,
+        agents: `${cloudBase}/agents`,
+        conversations: `${cloudBase}/conversations`,
+        transcripts: `${cloudBase}/transcripts`,
+        uploads: `${cloudBase}/uploads`,
+        artifacts: `${cloudBase}/artifacts`,
+        objects: `${cloudBase}/objects`,
+        models: `${cloudBase}/models`,
       },
     };
   }

@@ -42,12 +42,11 @@ import {
   type CreateAgentDraft,
   type UserAgent,
 } from "@/features/workspace/services/agentWorkflowService";
-import { ArtifactLabPanel } from "@/features/artifacts";
 import { AgentRow, CreateAgentForm } from "./WorkspaceAutomation";
 import { DocumentList, MemoryList } from "./WorkspaceContextLists";
 import { CATEGORY_LABELS, formatBytes, formatRelative } from "./workspaceFormat";
 
-type WorkspaceSection = "overview" | "artifacts" | "context" | "automation" | "activity";
+type WorkspaceSection = "overview" | "context" | "automation" | "activity";
 
 const ACCEPTED_TYPES = ".txt,.md,.json,text/plain,text/markdown,text/x-markdown,application/json";
 const STORAGE_LIMIT = 500 * 1024 * 1024;
@@ -67,7 +66,6 @@ const UploadSimple = makeLocalIcon(UploadSimpleIcon);
 
 const SECTIONS: Array<{ id: WorkspaceSection; label: string; icon: React.ElementType; hint: string }> = [
   { id: "overview", label: "Overview", icon: Project, hint: "Current state" },
-  { id: "artifacts", label: "Artifacts", icon: Lightning, hint: "Universal lab" },
   { id: "context", label: "Context", icon: Database, hint: "Docs and memory" },
   { id: "automation", label: "Automation", icon: Robot, hint: "Agents and routines" },
   { id: "activity", label: "Activity", icon: Graph, hint: "Workspace events" },
@@ -413,20 +411,9 @@ export const WorkspacePage = () => {
                         <span className="flex-1 text-xs text-secondary">Inspect timeline</span>
                         <Collapse size="sm" className="text-disabled" />
                       </Button>
-                      <Button variant="ghost" onClick={() => setSection("artifacts")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
-                        <Lightning size="sm" className="text-muted" />
-                        <span className="flex-1 text-xs text-secondary">Open artifact lab</span>
-                        <Collapse size="sm" className="text-disabled" />
-                      </Button>
                     </div>
                   </section>
                 </div>
-              </motion.div>
-            )}
-
-            {section === "artifacts" && (
-              <motion.div key="artifacts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="min-h-full">
-                <ArtifactLabPanel />
               </motion.div>
             )}
 

@@ -11,6 +11,19 @@ export type ToolRoute =
   | { kind: "connector"; slug: string; connectionId: string; entityId: string }
   | { kind: "memory"; operation: string; location?: "cloud" | "local" };
 
+export interface MaterializedToolDescriptor {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
+  policy?: {
+    effect?: "none" | "read" | "write" | "destructive";
+    requiresApproval?: boolean;
+  };
+  route?: ToolRoute;
+}
+
 export type AgentToolAction =
   | "spawn_agent"
   | "await_agent"
@@ -42,8 +55,10 @@ export interface ToolExecutionScope {
 }
 
 export interface ToolExecutionRequest extends ToolExecutionScope {
+  format?: "studio.tool-execution.request.v1";
   toolName: string;
   arguments: Record<string, unknown>;
+  tool?: MaterializedToolDescriptor;
   route?: ToolRoute;
   timeoutMs?: number;
   metadata?: Record<string, unknown>;
@@ -63,11 +78,14 @@ export interface ToolExecutionBatchRequest {
 
 export interface ToolExecutionSuccess {
   ok: true;
+  format: "studio.tool-execution.result.v1";
   jobId: string;
   toolCallId: string;
   toolName: string;
   status: "completed";
   result: unknown;
+  artifacts?: ToolArtifactUpdate[];
+  transcriptEvents?: ToolTranscriptEventRef[];
   route: ToolRoute;
   startedAt: string;
   completedAt: string;
@@ -75,11 +93,13 @@ export interface ToolExecutionSuccess {
 
 export interface ToolExecutionFailure {
   ok: false;
+  format: "studio.tool-execution.result.v1";
   jobId: string;
   toolCallId: string;
   toolName: string;
   status: "failed";
   error: ToolExecutionError;
+  transcriptEvents?: ToolTranscriptEventRef[];
   route?: ToolRoute;
   startedAt: string;
   completedAt: string;
@@ -93,6 +113,20 @@ export interface ToolExecutionError {
 }
 
 export type ToolExecutionResult = ToolExecutionSuccess | ToolExecutionFailure;
+
+export interface ToolArtifactUpdate {
+  artifactId: string;
+  artifactVersionId?: string;
+  eventId?: string;
+  status?: string;
+  title?: string;
+}
+
+export interface ToolTranscriptEventRef {
+  eventId: string;
+  kind: "tool_call" | "tool_result";
+  sequence?: number;
+}
 
 export interface ToolExecutionJobRecord {
   jobId: string;
@@ -116,4 +150,5 @@ export interface ToolExecutionJobRecord {
   startedAt?: string;
   completedAt?: string;
   updatedAt: string;
+  replayed?: boolean;
 }

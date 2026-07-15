@@ -13,10 +13,30 @@ binding = "TOOL_EXECUTION_DB"
 database_name = "studio-tool-execution"
 database_id = "replace-with-tool-execution-d1-id"
 
+# Studio Data - canonical transcript persistence for tool calls/results.
+[[services]]
+binding = "DATA"
+service = "studio-data"
+
 # Studio Registry - capability and MCP metadata lookups.
 [[services]]
 binding = "REGISTRY"
 service = "studio-registry"
+
+# Studio Connectors - user-authorized connector tool execution.
+[[services]]
+binding = "CONNECTORS"
+service = "studio-connectors"
+
+# Studio Native Tools - cloud-native tools such as web/search/media services.
+[[services]]
+binding = "NATIVE_TOOLS"
+service = "studio-native-tools"
+
+# Studio Memory - memory search/write/update operations.
+[[services]]
+binding = "MEMORY"
+service = "studio-memory"
 
 # Studio Agent Runtime - delegated agent execution.
 [[services]]

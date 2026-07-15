@@ -7,6 +7,9 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc --noEmit",
+    "verify": "npm run build && npm run verify:transcripts && npm run verify:integration",
+    "verify:transcripts": "node scripts/verify-transcript-contract.mjs",
+    "verify:integration": "node scripts/verify-local-integration.mjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
