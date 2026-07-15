@@ -5,40 +5,28 @@
  */
 
 /* Transparent workspace shell --------------------------------------------------
- * With transparent: true (tauri.conf.json) the native window is fully
- * transparent. html/body/#root are transparent so .zen-surface — with its
- * border-radius — becomes the actual visible window shape. Areas outside
- * the radius (the 4 corner triangles) are transparent → Mac-style rounded
- * window on Windows. */
-html.zen-window,
-html.zen-window body,
-html.zen-window #root {
+ * With transparent: true (tauri.conf.json) the native window is transparent.
+ * html/body are transparent so #root — now the root bordered rounded
+ * surface (defined here and in index.html/index.css) — is the actual visible
+ * window shape. Areas outside #root's radius (the 4 corner triangles) are
+ * transparent → Mac-style rounded window on Windows. */
+html,
+html body {
   background: transparent !important;
 }
 
-/* Elegant window outline ------------------------------------------------------
- * A single light-grey hairline that hugs the whole app window, following its
- * rounded corners exactly — same shape, one ring.
+/* Persistent root app surface ------------------------------------------------
+ * The window outline + rounded corners + drop shadow live on #root, the
+ * outermost React container that already exists at first paint (index.html)
+ * — so the border is present on EVERY window (main, overlay, splash) and
+ * through EVERY lifecycle state (preload / refresh / reload), never flashing
+ * in only after React mounts.
  *
- * The border lives ONLY on .zen-surface, the element that owns the
- * border-radius. CSS border + border-radius always follows the curve, and
- * overflow:hidden clips all children to the padding box so they can never
- * paint over the border. No pseudo-elements, no z-index, no #root border.
- *
- * IMPORTANT: #root must NOT have its own border — it fills the full
- * rectangular viewport and its border draws square, which shows through
- * .zen-surface's rounded corners as a mismatched square outline behind the
- * rounded one. Only .zen-surface gets the border.
- *
- * box-sizing: border-box means the border draws inside the fixed inset.
- * --surface-border auto-switches in dark mode via tokens.css. */
-
-/* The app surface — its border-radius IS the visible window shape because the
- * OS window is transparent. Areas outside this radius are transparent.
- * The border + box-shadow follow the same rounded curve.
- * box-sizing: border-box means the border draws inside the fixed inset.
- * --surface-border auto-switches in dark mode via tokens.css. */
-.zen-surface {
+ * Only #root draws this border. .zen-surface is now a transparent pass-through
+ * that inherits #root's clipped rounded shape — it must NOT re-declare a
+ * border/bg/box-shadow (a duplicate square edge would peek through the
+ * rounded corners while #root's border draws the real curve). */
+#root {
   position: fixed;
   inset: var(--zen-frame-inset, 0px);
   border-radius: var(--zen-frame-radius, 12px);
@@ -46,18 +34,28 @@ html.zen-window #root {
   border: 4px solid var(--surface-border);
   background: var(--surface-page);
   isolation: isolate;
+  box-sizing: border-box;
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 0.03),
     0 8px 28px -4px rgb(0 0 0 / 0.14),
     0 2px 8px -2px rgb(0 0 0 / 0.08);
 }
 
-html.dark .zen-surface {
+html.dark #root {
   background: var(--app-bg-dark);
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 0.40),
     0 8px 28px -4px rgb(0 0 0 / 0.50),
     0 2px 8px -2px rgb(0 0 0 / 0.30);
+}
+
+/* Transparent pass-through — inherits #root's clipped rounded shape. */
+.zen-surface {
+  position: fixed;
+  inset: var(--zen-frame-inset, 0px);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 /* ── Hover-reveal window chrome ──────────────────────────────────────────── */

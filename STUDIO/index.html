@@ -10,13 +10,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style>
-      html.zen-window,
-      html.zen-window body,
-      html.zen-window #root {
+      /* The bordered rounded "window" surface is a ROOT concern — it lives on
+         #root (present in index.html before any JS/CSS bundle loads) so it
+         paints on EVERY window (main, overlay, splash) and through every
+         lifecycle state (preload / refresh / reload). html/body stay
+         transparent so the OS frameless window shows #root's rounded shape. */
+      html,
+      html body {
         background: transparent !important;
       }
 
-      .zen-surface {
+      #root {
         position: fixed;
         inset: var(--zen-frame-inset, 0px);
         border-radius: var(--zen-frame-radius, 12px);
@@ -25,13 +29,30 @@
         background: var(--surface-page, #FFFFFF);
         isolation: isolate;
         box-sizing: border-box;
+        box-shadow:
+          0 0 0 1px rgb(0 0 0 / 0.03),
+          0 8px 28px -4px rgb(0 0 0 / 0.14),
+          0 2px 8px -2px rgb(0 0 0 / 0.08);
       }
 
-      html.dark .zen-surface {
+      html.dark #root {
         border-color: var(--surface-border, #2A2A2A);
         background: var(--app-bg-dark, #121212);
+        box-shadow:
+          0 0 0 1px rgb(0 0 0 / 0.40),
+          0 8px 28px -4px rgb(0 0 0 / 0.50),
+          0 2px 8px -2px rgb(0 0 0 / 0.30);
       }
 
+      /* .zen-surface is now a transparent pass-through — #root owns the
+         window outline. Kept only so existing layout classes still apply. */
+      .zen-surface {
+        position: fixed;
+        inset: var(--zen-frame-inset, 0px);
+        background: transparent;
+        border: none;
+        box-shadow: none;
+      }
     </style>
 
     <script>

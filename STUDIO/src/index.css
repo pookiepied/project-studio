@@ -31,8 +31,10 @@ body {
 }
 
 html.overlay-window,
-html.overlay-window body,
-html.overlay-window #root {
+html.overlay-window body {
+  /* #root carries the bordered rounded surface for every window (incl.
+     overlay popups); only html/body are transparent so the OS transparent
+     window reveals #root's rounded shape. */
   background: transparent !important;
   background-color: transparent !important;
   overflow: hidden;

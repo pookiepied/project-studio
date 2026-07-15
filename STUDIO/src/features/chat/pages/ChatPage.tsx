@@ -467,49 +467,52 @@ export const ChatPage = () => {
         }}
       />
 
-      <LeftWorkspaceSidebar
-        open={leftSidebarOpen}
-        onOpenChange={setLeftSidebarOpen}
-        scope={conversationStorageScope}
-        onScopeChange={handleStorageScopeChange}
-        projects={projects}
-        currentProjectPath={projectContext?.path}
-        conversations={conversations}
-        currentConvId={conversation?.id}
-        conversationStatuses={conversationStatuses}
-        onSelectProject={handleSelectProject}
-        onOpenProjectFolder={handleOpenProjectFolder}
-        onRemoveProject={(id) => { void removeProject(id); }}
-        onDeleteProject={(id) => { void deleteProject(id); }}
-        onSelectConversation={async (id) => { await loadConversationById(id); }}
-        onOpenConversationInSideChat={(id) => {
-          rightWorkspace.openView("side-chat", { conversationId: id });
-          broadcastPanelOpen("tools");
-        }}
-        onOpenConversationInNewWindow={(id) => { void openConversationWindow(id); }}
-        onNewConversation={() => {
-          createNewConversation(conversationListScope, {
-            preserveProject: conversationListScope === "local" && !!projectContext,
-          });
-        }}
-        onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
-        onDeleteConversation={(id, e) => {
-          e.stopPropagation();
-          deleteConversation(id, conversation?.id, loadConversationById, createNewConversation)
-            .catch(() => {});
-        }}
-        editingConvId={editingConvId}
-        editingConvTitle={editingConvTitle}
-        onEditTitleChange={setEditingConvTitle}
-        onSaveConvTitle={(id) =>
-          saveConvTitle(id, editingConvTitle, conversation?.id, updateTitle)
-            .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
-        }
-        onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
-      />
-
-      {/* -- SPLIT VIEW: chat column + side panels -- */}
+      {/* -- SPLIT VIEW: left sidebar + chat column + side panels -- */}
       <div className="flex-1 flex overflow-hidden min-h-0">
+
+        {/* Left sidebar is rendered as the first flex child so its panel can
+            push (reflow) the chat column on expand/collapse, mirroring the
+            right workspace. Its fixed control controls float above the flow. */}
+        <LeftWorkspaceSidebar
+          open={leftSidebarOpen}
+          onOpenChange={setLeftSidebarOpen}
+          scope={conversationStorageScope}
+          onScopeChange={handleStorageScopeChange}
+          projects={projects}
+          currentProjectPath={projectContext?.path}
+          conversations={conversations}
+          currentConvId={conversation?.id}
+          conversationStatuses={conversationStatuses}
+          onSelectProject={handleSelectProject}
+          onOpenProjectFolder={handleOpenProjectFolder}
+          onRemoveProject={(id) => { void removeProject(id); }}
+          onDeleteProject={(id) => { void deleteProject(id); }}
+          onSelectConversation={async (id) => { await loadConversationById(id); }}
+          onOpenConversationInSideChat={(id) => {
+            rightWorkspace.openView("side-chat", { conversationId: id });
+            broadcastPanelOpen("tools");
+          }}
+          onOpenConversationInNewWindow={(id) => { void openConversationWindow(id); }}
+          onNewConversation={() => {
+            createNewConversation(conversationListScope, {
+              preserveProject: conversationListScope === "local" && !!projectContext,
+            });
+          }}
+          onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
+          onDeleteConversation={(id, e) => {
+            e.stopPropagation();
+            deleteConversation(id, conversation?.id, loadConversationById, createNewConversation)
+              .catch(() => {});
+          }}
+          editingConvId={editingConvId}
+          editingConvTitle={editingConvTitle}
+          onEditTitleChange={setEditingConvTitle}
+          onSaveConvTitle={(id) =>
+            saveConvTitle(id, editingConvTitle, conversation?.id, updateTitle)
+              .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
+          }
+          onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
+        />
 
         {/* -- Chat column -- */}
         <div className="flex-1 flex flex-col overflow-hidden relative" style={{ minWidth: "380px" }}>

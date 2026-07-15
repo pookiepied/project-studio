@@ -255,7 +255,7 @@ export function RightWorkspacePanel({
         >
           <div className="flex h-full transition-colors duration-300" style={{ width: workspaceWidth, minWidth: workspaceWidth }}>
             <ResizeHandle onMouseDown={onResizeDown} />
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-l border-surface-border bg-surface-page">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-2xl rounded-bl-2xl border-l border-surface-border bg-surface-page shadow-xl">
               <WorkspaceHeader
                 tabs={tabs}
                 activeTabId={activeTabId}

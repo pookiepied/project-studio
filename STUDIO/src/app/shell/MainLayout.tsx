@@ -56,8 +56,9 @@ export const MainLayout = ({ children, currentView, onViewChange }: MainLayoutPr
     const root = document.documentElement;
     root.classList.toggle("zen-window", workspaceShell);
     // Single source of truth for the shell geometry. These vars drive both
-    // the panel (.zen-surface) and the hover chrome (.zen-chrome) so the
-    // minimize/close controls stay aligned to the real window edge + radius.
+    // the root surface (#root border-radius/inset) and the hover chrome
+    // (.zen-chrome) so the minimize/close controls stay aligned to the real
+    // window edge + radius.
     if (workspaceShell) {
       root.style.setProperty("--zen-frame-inset", `${WORKSPACE_SHELL.frameInset}px`);
       root.style.setProperty("--zen-frame-radius", `${WORKSPACE_SHELL.frameRadius}px`);
@@ -77,8 +78,8 @@ export const MainLayout = ({ children, currentView, onViewChange }: MainLayoutPr
     <div
       className={
         workspaceShell
-          ? "zen-surface relative flex flex-col overflow-hidden transition-colors duration-300 bg-surface-page"
-          : "relative h-screen w-full flex flex-col overflow-hidden transition-colors duration-300 bg-surface-page"
+          ? "relative h-full w-full flex flex-col overflow-hidden transition-colors duration-300 bg-surface-page"
+          : "relative h-full w-full flex flex-col overflow-hidden transition-colors duration-300 bg-surface-page"
       }
     >
 
