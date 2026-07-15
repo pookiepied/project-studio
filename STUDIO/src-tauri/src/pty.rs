@@ -6,7 +6,8 @@
 /// `vim`, `git log --graph`, etc. all work correctly.
 ///
 /// Tauri commands exposed:
-///   pty_create(sessionId, cols, rows, cwd?)  → spawns shell, starts streaming
+///   pty_create(sessionId, cols, rows, cwd?, env?, program?, args?) → spawns
+///     shell (or `program` directly when given), starts streaming
 ///   pty_write(sessionId, data)               → stdin to shell (keypresses / paste)
 ///   pty_resize(sessionId, cols, rows)        → resize terminal window
 ///   pty_close(sessionId)                     → kill shell, free resources
@@ -56,6 +57,12 @@ pub fn new_store() -> PtyStore {
 // ─── Commands ────────────────────────────────────────────────────────────────
 
 /// Spawn a real PTY-backed shell and begin streaming its output.
+///
+/// `program`/`args` (optional): when set, the PTY launches that program
+/// directly (e.g. `claude`, `codex`, `opencode`) instead of an interactive
+/// shell. On Windows it is run through `powershell -NoLogo -Command <prog>`
+/// so npm-style `.cmd` shims resolve and the command isn't echoed as typed
+/// input — the program owns the terminal from the first frame.
 #[tauri::command]
 pub fn pty_create(
     session_id: String,
@@ -63,6 +70,8 @@ pub fn pty_create(
     rows: u16,
     cwd: Option<String>,
     env: Option<std::collections::HashMap<String, String>>,
+    program: Option<String>,
+    args: Option<Vec<String>>,
     app_handle: tauri::AppHandle,
     store: tauri::State<'_, PtyStore>,
 ) -> Result<(), String> {
@@ -98,11 +107,32 @@ pub fn pty_create(
             }
         };
 
-        // ── Build shell command ──
+        // ── Build the command to spawn ──
+        // If `program` is provided, launch it directly (via PowerShell -Command
+        // on Windows so .cmd shims resolve and the invocation isn't echoed).
+        // Otherwise fall back to the default interactive shell.
         #[cfg(target_os = "windows")]
         let shell_cmd = {
-            let mut c = CommandBuilder::new("powershell");
-            c.args(["-NoLogo"]);
+            let mut c = match &program {
+                Some(prog) => {
+                    let mut c = CommandBuilder::new("powershell");
+                    c.args(["-NoLogo", "-NoProfile", "-Command"]);
+                    let mut line = prog.clone();
+                    if let Some(ref a) = args {
+                        for arg in a.iter() {
+                            line.push(' ');
+                            line.push_str(arg);
+                        }
+                    }
+                    c.arg(line);
+                    c
+                }
+                None => {
+                    let mut c = CommandBuilder::new("powershell");
+                    c.args(["-NoLogo"]);
+                    c
+                }
+            };
             if let Some(ref dir) = cwd {
                 c.cwd(dir);
             }
@@ -115,8 +145,22 @@ pub fn pty_create(
         };
         #[cfg(not(target_os = "windows"))]
         let shell_cmd = {
-            let mut c = CommandBuilder::new("bash");
-            c.arg("-l");
+            let mut c = match &program {
+                Some(prog) => {
+                    let mut c = CommandBuilder::new(prog);
+                    if let Some(ref a) = args {
+                        for arg in a.iter() {
+                            c.arg(arg);
+                        }
+                    }
+                    c
+                }
+                None => {
+                    let mut c = CommandBuilder::new("bash");
+                    c.arg("-l");
+                    c
+                }
+            };
             if let Some(ref dir) = cwd {
                 c.cwd(dir);
             }

@@ -1,4 +1,4 @@
-type LocalCapabilityId = "claude-cli";
+export type LocalCapabilityId = "claude-cli" | "codex-cli" | "opencode-cli";
 
 export interface LocalCapabilityStatus {
   id: LocalCapabilityId;

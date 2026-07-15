@@ -49,27 +49,49 @@ async function commandExists(command: string): Promise<boolean> {
   return Boolean(firstNonEmptyLine(result));
 }
 
-async function detectClaudeCli(): Promise<LocalCapabilityStatus> {
+interface CliProbe {
+  id: LocalCapabilityStatus["id"];
+  command: string;
+  label: string;
+}
+
+const CLI_PROBES: readonly CliProbe[] = [
+  { id: "claude-cli",   command: "claude",   label: "Claude Code CLI" },
+  { id: "codex-cli",    command: "codex",    label: "OpenAI Codex CLI" },
+  { id: "opencode-cli", command: "opencode", label: "opencode CLI" },
+];
+
+async function detectCli(probe: CliProbe): Promise<LocalCapabilityStatus> {
   const checkedAt = Date.now();
-  const installed = await commandExists("claude");
+  const installed = await commandExists(probe.command);
 
   if (!installed) {
     return {
-      id: "claude-cli",
-      label: "Claude Code CLI",
+      id: probe.id,
+      label: probe.label,
       available: false,
-      detail: "Claude CLI was not found on PATH.",
+      detail: `${probe.command} was not found on PATH.`,
       checkedAt,
     };
   }
 
-  const version = firstNonEmptyLine(await execute("claude", ["--version"]));
+  const version = firstNonEmptyLine(await execute(probe.command, ["--version"]));
   return {
-    id: "claude-cli",
-    label: "Claude Code CLI",
+    id: probe.id,
+    label: probe.label,
     available: true,
     version,
     checkedAt,
+  };
+}
+
+function unavailable(probe: CliProbe, detail: string): LocalCapabilityStatus {
+  return {
+    id: probe.id,
+    label: probe.label,
+    available: false,
+    detail,
+    checkedAt: Date.now(),
   };
 }
 
@@ -92,11 +114,13 @@ async function checkLocalCapabilitiesUncached(): Promise<LocalCapabilitiesSnapsh
   const checkedAt = Date.now();
 
   try {
-    const claudeCli = await detectClaudeCli();
+    const results = await Promise.all(CLI_PROBES.map(detectCli));
     return {
       checkedAt,
       capabilities: {
-        "claude-cli": claudeCli,
+        "claude-cli":   results[0],
+        "codex-cli":    results[1],
+        "opencode-cli": results[2],
       },
     };
   } catch (error) {
@@ -104,13 +128,9 @@ async function checkLocalCapabilitiesUncached(): Promise<LocalCapabilitiesSnapsh
     return {
       checkedAt,
       capabilities: {
-        "claude-cli": {
-          id: "claude-cli",
-          label: "Claude Code CLI",
-          available: false,
-          detail: "Capability check failed.",
-          checkedAt,
-        },
+        "claude-cli":   unavailable(CLI_PROBES[0], "Capability check failed."),
+        "codex-cli":    unavailable(CLI_PROBES[1], "Capability check failed."),
+        "opencode-cli": unavailable(CLI_PROBES[2], "Capability check failed."),
       },
     };
   }

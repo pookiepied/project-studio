@@ -36,7 +36,7 @@ export { executeLocalTools, type ToolExecutionCallbacks } from "./execution/exec
 
 // capabilities — what's running + turn body builder
 export { checkLocalCapabilities } from "./capabilities/capabilityService";
-export type { LocalCapabilitiesSnapshot } from "./capabilities/types";
+export type { LocalCapabilitiesSnapshot, LocalCapabilityId } from "./capabilities/types";
 export { buildChatBody, getMcpServers } from "./capabilities/buildChatBody";
 
 // ui — tool-card display

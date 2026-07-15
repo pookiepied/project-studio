@@ -31,6 +31,12 @@ import { ConversationRail }     from "@/features/chat/components/ConversationRai
 import { ChatComposer }         from "@/features/chat/components/ChatComposer";
 import { ConnectionStatusBar }  from "@/features/chat/components/ConnectionStatusBar";
 import { LeftWorkspaceSidebar } from "@/features/chat/components/LeftWorkspaceSidebar";
+import type { CliAvailability } from "@/features/chat/cliTabs/ChatTabBar";
+import { ChatTabBar } from "@/features/chat/cliTabs/ChatTabBar";
+import { useChatTabs } from "@/features/chat/cliTabs/useChatTabs";
+import { getCliTool } from "@/features/chat/cliTabs/cliTools";
+import { STUDIO_TAB_ID } from "@/features/chat/cliTabs/types";
+import { CliTerminal } from "@/features/workspace/terminal/CliTerminal";
 import {
   RightWorkspacePanel,
   useRightWorkspace,
@@ -126,7 +132,7 @@ export const ChatPage = () => {
   // -- External hooks ----------------------------------------------------------
   const { models, loading: modelsLoading } = useModels();
   const { settings, updateSettings }       = useSettings();
-  const { claudeCliAvailable }             = useLocalCapabilities();
+  const { claudeCliAvailable, claudeCliStatus, codexCliAvailable, codexCliStatus, opencodeCliAvailable, opencodeCliStatus } = useLocalCapabilities();
   const { status: claudeAccountStatus, loading: claudeAccountLoading, refresh: refreshClaudeAccountStatus } =
     useClaudeAccountStatus(conversationStorageScope === "local" && claudeCliAvailable, claudeSession?.lastTurnAt ?? 0);
   const tts                                = useTTS();
@@ -246,6 +252,16 @@ export const ChatPage = () => {
   // -- Model library -----------------------------------------------------------
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
+
+  // -- Chat tabs (Studio permanent, CLI terminals alongside) ------------------
+  const { tabs: chatTabs, activeId: activeTabId, setActiveId: selectTab, openCli, closeTab } = useChatTabs();
+  const activeTabIsStudio = activeTabId === STUDIO_TAB_ID;
+
+  const cliInfo: Record<string, CliAvailability> = {
+    claude:   { available: claudeCliAvailable,   version: claudeCliStatus?.version },
+    codex:    { available: codexCliAvailable,    version: codexCliStatus?.version },
+    opencode: { available: opencodeCliAvailable, version: opencodeCliStatus?.version },
+  };
 
   // -- Rename modal ------------------------------------------------------------
   const { isEditingTitle, titleInput, setIsEditingTitle, setTitleInput, handleSaveTitle } =
@@ -465,6 +481,8 @@ export const ChatPage = () => {
           if (!rightWorkspace.open) broadcastPanelOpen("tools");
           rightWorkspace.toggleOpen();
         }}
+        onOpenCli={openCli}
+        cliInfo={cliInfo}
       />
 
       {/* -- SPLIT VIEW: left sidebar + chat column + side panels -- */}
@@ -517,7 +535,28 @@ export const ChatPage = () => {
         {/* -- Chat column -- */}
         <div className="flex-1 flex flex-col overflow-hidden relative" style={{ minWidth: "380px" }}>
 
-          {/* -- MAIN CONTENT: empty-centered / conversation -- */}
+          {/* -- CLI terminals: each stays mounted so backgrounded sessions
+               keep running; only the active one is visible. -- */}
+          {chatTabs.filter(t => t.kind === "cli").map(tab => {
+            const tool = getCliTool(tab.cliId!);
+            return (
+              <div
+                key={tab.id}
+                className={activeTabId === tab.id ? "flex-1 flex flex-col overflow-hidden" : "hidden"}
+              >
+                <CliTerminal
+                  program={tool.program}
+                  args={tool.args}
+                  cwd={projectContext?.path ?? null}
+                  active={activeTabId === tab.id}
+                />
+              </div>
+            );
+          })}
+
+          {/* -- STUDIO tab: chat content — always mounted, hidden when a CLI
+               tab is active so the DOM / scroll position survives. -- */}
+          <div className={activeTabIsStudio ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <AnimatePresence mode="popLayout" initial={false}>
             {isEmptyConversation ? (
 
@@ -625,6 +664,15 @@ export const ChatPage = () => {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
+
+          {/* Bottom tab strip — only visible when CLI tabs exist */}
+          <ChatTabBar
+            tabs={chatTabs}
+            activeId={activeTabId}
+            onSelectTab={selectTab}
+            onCloseTab={closeTab}
+          />
 
         </div>{/* end chat column */}
 

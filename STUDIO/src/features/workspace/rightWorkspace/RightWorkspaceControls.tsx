@@ -4,6 +4,9 @@ import { ProjectLauncher } from "./ProjectLauncher";
 import type { ProjectContextLike } from "./types";
 import type { ConversationStorageScope } from "@/core/conversations";
 import { IconButton } from "@/ui/primitives/IconButton";
+import { CliLauncherButton } from "@/features/chat/cliTabs/CliLauncherButton";
+import type { CliToolId } from "@/features/chat/cliTabs/cliTools";
+import type { CliAvailability } from "@/features/chat/cliTabs/ChatTabBar";
 
 interface RightWorkspaceControlsProps {
   isTauri: boolean;
@@ -12,6 +15,8 @@ interface RightWorkspaceControlsProps {
   onToggleOpen: () => void;
   scope: ConversationStorageScope;
   onScopeChange: (scope: ConversationStorageScope) => void;
+  onOpenCli?: (id: CliToolId) => void;
+  cliInfo?: Record<CliToolId, CliAvailability>;
 }
 
 /**
@@ -27,10 +32,16 @@ export function RightWorkspaceControls({
   onToggleOpen,
   scope,
   onScopeChange,
+  onOpenCli,
+  cliInfo,
 }: RightWorkspaceControlsProps) {
   return (
     <div className="studio-chat-right-actions flex items-center gap-1.5">
       <EnvironmentSelector scope={scope} onScopeChange={onScopeChange} placement="down" />
+
+      {onOpenCli && cliInfo && (
+        <CliLauncherButton onOpenCli={onOpenCli} cliInfo={cliInfo} />
+      )}
 
       <ProjectLauncher isTauri={isTauri} projectContext={projectContext} />
 

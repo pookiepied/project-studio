@@ -4,4 +4,6 @@
 export { StudioMark } from "./StudioMark";
 export { AppLogo } from "./AppLogo";
 export { ClaudeCodeIcon } from "./ClaudeCodeIcon";
+export { CodexIcon } from "./CodexIcon";
+export { OpencodeIcon } from "./OpencodeIcon";
 export { StudioIcon } from "./StudioIcon";

@@ -9,6 +9,8 @@ import type { ConversationMetadata } from "@/features/chat/hooks/useConversation
 import { ClaudeUsageBadge } from "@/features/chat/components/ClaudeUsageBadge";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
 import { RightWorkspaceControls } from "@/features/workspace";
+import type { CliToolId } from "@/features/chat/cliTabs/cliTools";
+import type { CliAvailability } from "@/features/chat/cliTabs/ChatTabBar";
 
 type BranchProjectContext = ComponentProps<typeof BranchSelector>["projectContext"];
 type SetBranchProjectContext = ComponentProps<typeof BranchSelector>["setProjectContext"];
@@ -58,6 +60,8 @@ export function ChatTopChrome({
   isTauri,
   workspaceOpen,
   onToggleWorkspace,
+  onOpenCli,
+  cliInfo,
 }: {
   active: boolean;
   conversationTitle?: string;
@@ -101,6 +105,8 @@ export function ChatTopChrome({
   isTauri: boolean;
   workspaceOpen: boolean;
   onToggleWorkspace: () => void;
+  onOpenCli?: (id: CliToolId) => void;
+  cliInfo?: Record<CliToolId, CliAvailability>;
 }) {
   return (
     <>
@@ -175,6 +181,8 @@ export function ChatTopChrome({
           onToggleOpen={onToggleWorkspace}
           scope={scope}
           onScopeChange={onScopeChange}
+          onOpenCli={onOpenCli}
+          cliInfo={cliInfo}
         />
       </div>
     </>

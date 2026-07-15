@@ -27,5 +27,9 @@ export function useLocalCapabilities() {
     refresh,
     claudeCliAvailable: snapshot?.capabilities["claude-cli"].available ?? false,
     claudeCliStatus: snapshot?.capabilities["claude-cli"] ?? null,
+    codexCliAvailable: snapshot?.capabilities["codex-cli"].available ?? false,
+    codexCliStatus: snapshot?.capabilities["codex-cli"] ?? null,
+    opencodeCliAvailable: snapshot?.capabilities["opencode-cli"].available ?? false,
+    opencodeCliStatus: snapshot?.capabilities["opencode-cli"] ?? null,
   };
 }
