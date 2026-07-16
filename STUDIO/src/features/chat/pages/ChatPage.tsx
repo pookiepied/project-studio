@@ -483,6 +483,7 @@ export const ChatPage = () => {
         }}
         onOpenCli={openCli}
         cliInfo={cliInfo}
+        hasActiveConversation={hasStartedConversation}
       />
 
       {/* -- SPLIT VIEW: left sidebar + chat column + side panels -- */}
@@ -547,7 +548,7 @@ export const ChatPage = () => {
                 <CliTerminal
                   program={tool.program}
                   args={tool.args}
-                  cwd={projectContext?.path ?? null}
+                  cwd={tab.cwd ?? null}
                   active={activeTabId === tab.id}
                 />
               </div>

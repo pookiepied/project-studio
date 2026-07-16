@@ -15,8 +15,9 @@ interface RightWorkspaceControlsProps {
   onToggleOpen: () => void;
   scope: ConversationStorageScope;
   onScopeChange: (scope: ConversationStorageScope) => void;
-  onOpenCli?: (id: CliToolId) => void;
+  onOpenCli?: (id: CliToolId, cwd: string | null) => void;
   cliInfo?: Record<CliToolId, CliAvailability>;
+  hasActiveConversation?: boolean;
 }
 
 /**
@@ -34,13 +35,14 @@ export function RightWorkspaceControls({
   onScopeChange,
   onOpenCli,
   cliInfo,
+  hasActiveConversation,
 }: RightWorkspaceControlsProps) {
   return (
     <div className="studio-chat-right-actions flex items-center gap-1.5">
       <EnvironmentSelector scope={scope} onScopeChange={onScopeChange} placement="down" />
 
       {onOpenCli && cliInfo && (
-        <CliLauncherButton onOpenCli={onOpenCli} cliInfo={cliInfo} />
+        <CliLauncherButton onOpenCli={onOpenCli} cliInfo={cliInfo} hasActiveConversation={!!hasActiveConversation} />
       )}
 
       <ProjectLauncher isTauri={isTauri} projectContext={projectContext} />

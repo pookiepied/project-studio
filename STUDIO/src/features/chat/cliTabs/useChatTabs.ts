@@ -12,10 +12,10 @@ export function useChatTabs() {
   const [tabs, setTabs] = useState<ChatTab[]>([STUDIO_TAB]);
   const [activeId, setActiveId] = useState<string>(STUDIO_TAB_ID);
 
-  const openCli = useCallback((cliId: CliToolId) => {
+  const openCli = useCallback((cliId: CliToolId, cwd: string | null = null) => {
     const title = getCliTool(cliId).label;
     const id = `cli-${++_seq}-${Date.now()}`;
-    setTabs((prev) => [...prev, { id, kind: "cli", cliId, title }]);
+    setTabs((prev) => [...prev, { id, kind: "cli", cliId, title, cwd }]);
     setActiveId(id);
   }, []);
 

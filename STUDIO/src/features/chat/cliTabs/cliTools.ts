@@ -11,11 +11,11 @@ export interface CliTool {
   program: string;
   args: string[];
   capabilityId: LocalCapabilityId;
+  /** URL to install / download the CLI (opened when not found on PATH). */
+  installUrl: string;
   Icon: ComponentType<{ size?: number; className?: string }>;
 }
 
-/** Launchable coding-agent CLIs. Availability is resolved against the local
- *  capability snapshot so the launcher only offers CLIs actually on PATH. */
 export const CLI_TOOLS: readonly CliTool[] = [
   {
     id: "claude",
@@ -23,6 +23,7 @@ export const CLI_TOOLS: readonly CliTool[] = [
     program: "claude",
     args: [],
     capabilityId: "claude-cli",
+    installUrl: "https://docs.anthropic.com/en/docs/claude-code/overview",
     Icon: ClaudeCodeIcon,
   },
   {
@@ -31,14 +32,16 @@ export const CLI_TOOLS: readonly CliTool[] = [
     program: "codex",
     args: [],
     capabilityId: "codex-cli",
+    installUrl: "https://github.com/openai/codex",
     Icon: CodexIcon,
   },
   {
     id: "opencode",
-    label: "opencode",
+    label: "OpenCode",
     program: "opencode",
     args: [],
     capabilityId: "opencode-cli",
+    installUrl: "https://opencode.ai/install",
     Icon: OpencodeIcon,
   },
 ];

@@ -62,6 +62,7 @@ export function ChatTopChrome({
   onToggleWorkspace,
   onOpenCli,
   cliInfo,
+  hasActiveConversation,
 }: {
   active: boolean;
   conversationTitle?: string;
@@ -105,8 +106,9 @@ export function ChatTopChrome({
   isTauri: boolean;
   workspaceOpen: boolean;
   onToggleWorkspace: () => void;
-  onOpenCli?: (id: CliToolId) => void;
+  onOpenCli?: (id: CliToolId, cwd: string | null) => void;
   cliInfo?: Record<CliToolId, CliAvailability>;
+  hasActiveConversation?: boolean;
 }) {
   return (
     <>
@@ -183,6 +185,7 @@ export function ChatTopChrome({
           onScopeChange={onScopeChange}
           onOpenCli={onOpenCli}
           cliInfo={cliInfo}
+          hasActiveConversation={hasActiveConversation}
         />
       </div>
     </>

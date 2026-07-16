@@ -1,52 +1,47 @@
 /**
  * OpencodeIcon
  *
- * Mark for the opencode CLI (sst/opencode). A `</>` code-bracket glyph on a
- * rounded badge — reads instantly as "code" at small sizes in the tab launcher.
+ * Official OpenCode logo (from opencode.ai/favicon.svg). A geometric "O"-like
+ * shape with a rectangular cutout, rendered on a dark rounded badge.
  *
- * Colour: #A855F7 — opencode's violet.
+ * Colour: #131010 — OpenCode's brand near-black background.
  */
 
-// eslint-disable-next-line no-restricted-syntax -- opencode brand colour; no neutral-token equivalent (§17 brand carve-out)
-const BRAND = "#A855F7";
+import type { ComponentType } from "react";
+
+// eslint-disable-next-line no-restricted-syntax -- OpenCode brand colour; no semantic-token equivalent (§17 brand carve-out)
+const BRAND = "#131010";
+
+// eslint-disable-next-line no-restricted-syntax -- OpenCode brand colours; no semantic-token equivalent (§17 brand carve-out)
+const INNER = "#5A5858";
 
 interface OpencodeIconProps {
   size?: number;
   className?: string;
 }
 
-export function OpencodeIcon({ size = 16, className }: OpencodeIconProps) {
+export const OpencodeIcon: ComponentType<{ size?: number; className?: string }> = function OpencodeIcon({ size = 16, className }: OpencodeIconProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 512 512"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
     >
-      <rect x="0.5" y="0.5" width="23" height="23" rx="6" fill={BRAND} />
+      <rect width="512" height="512" rx="112" fill={BRAND} />
       <path
-        d="M9.2 8.2 6 11.4c-.3.3-.3.8 0 1.1l3.2 3.2"
-        stroke="white"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M320 224V352H192V224H320Z"
+        fill={INNER}
       />
       <path
-        d="M14.8 8.2 18 11.4c.3.3.3.8 0 1.1l-3.2 3.2"
-        stroke="white"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.1 7.4 10.9 16.6"
-        stroke="white"
-        strokeWidth="1.6"
-        strokeLinecap="round"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z"
+        fill="white"
       />
     </svg>
   );
-}
+};
