@@ -32,12 +32,21 @@ body {
 
 html.overlay-window,
 html.overlay-window body {
-  /* #root carries the bordered rounded surface for every window (incl.
-     overlay popups); only html/body are transparent so the OS transparent
-     window reveals #root's rounded shape. */
+  /* Pulse keeps every host layer transparent; its island draws its own shape. */
   background: transparent !important;
   background-color: transparent !important;
   overflow: hidden;
+}
+
+html[data-window-surface="transparent-widget"],
+html[data-window-surface="transparent-widget"] body,
+html[data-window-surface="floating-utility"],
+html[data-window-surface="floating-utility"] body,
+html[data-window-surface="overlay"],
+html[data-window-surface="overlay"] body {
+  background: transparent !important;
+  background-color: transparent !important;
+  color-scheme: normal;
 }
 
 code,

@@ -254,8 +254,28 @@ export const ChatPage = () => {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
 
   // -- Chat tabs (Studio permanent, CLI terminals alongside) ------------------
-  const { tabs: chatTabs, activeId: activeTabId, setActiveId: selectTab, openCli, closeTab } = useChatTabs();
+  const {
+    tabs: chatTabs,
+    activeId: activeTabId,
+    activatedIds: activatedChatTabIds,
+    selectTab,
+    openCli,
+    closeTab,
+    moveTab,
+    updateStudioMetadata,
+  } = useChatTabs({
+    scope: conversationStorageScope,
+    projectPath: projectContext?.path,
+    conversationId: conversation?.id,
+  });
   const activeTabIsStudio = activeTabId === STUDIO_TAB_ID;
+
+  useEffect(() => {
+    const contextLine = conversationStorageScope === "local"
+      ? projectContext?.path || "No project selected"
+      : "Cloud conversation";
+    updateStudioMetadata(conversation?.title || "Studio", contextLine);
+  }, [conversation?.title, conversationStorageScope, projectContext?.path, updateStudioMetadata]);
 
   const cliInfo: Record<string, CliAvailability> = {
     claude:   { available: claudeCliAvailable,   version: claudeCliStatus?.version },
@@ -422,16 +442,10 @@ export const ChatPage = () => {
       />
 
       <ChatTopChrome
-        active={hasStartedConversation}
         conversationTitle={conversation?.title}
         projectName={conversationStorageScope === "local" ? projectContext?.name : undefined}
         scope={conversationStorageScope}
         onScopeChange={handleStorageScopeChange}
-        projects={projects}
-        currentProjectPath={projectContext?.path}
-        conversations={conversations}
-        currentConvId={conversation?.id}
-        conversationStatuses={conversationStatuses}
         projectContext={projectContext}
         setProjectContext={setProjectContext}
         isEmptyConversation={isEmptyConversation}
@@ -445,35 +459,6 @@ export const ChatPage = () => {
         claudeAccountLoading={claudeAccountLoading}
         claudeRateLimit={claudeSession?.rateLimit}
         onRefreshClaudeAccount={() => refreshClaudeAccountStatus(true)}
-        onSelectProject={handleSelectProject}
-        onOpenProjectFolder={handleOpenProjectFolder}
-        onRemoveProject={(id) => { void removeProject(id); }}
-        onDeleteProject={(id) => { void deleteProject(id); }}
-        onSelectConversation={async (id) => { await loadConversationById(id); }}
-        onOpenConversationInSideChat={(id) => {
-          rightWorkspace.openView("side-chat", { conversationId: id });
-          broadcastPanelOpen("tools");
-        }}
-        onOpenConversationInNewWindow={(id) => { void openConversationWindow(id); }}
-        onNewConversation={() => {
-          createNewConversation(conversationListScope, {
-            preserveProject: conversationListScope === "local" && !!projectContext,
-          });
-        }}
-        onStartEditTitle={(id, title, e) => { e.stopPropagation(); setEditingConvId(id); setEditingConvTitle(title); }}
-        onDeleteConversation={(id, e) => {
-          e.stopPropagation();
-          deleteConversation(id, conversation?.id, loadConversationById, createNewConversation)
-            .catch(() => {});
-        }}
-        editingConvId={editingConvId}
-        editingConvTitle={editingConvTitle}
-        onEditTitleChange={setEditingConvTitle}
-        onSaveConvTitle={(id) =>
-          saveConvTitle(id, editingConvTitle, conversation?.id, updateTitle)
-            .then(() => { setEditingConvId(null); setEditingConvTitle(""); })
-        }
-        onCancelConvEdit={() => { setEditingConvId(null); setEditingConvTitle(""); }}
         rightPanelWidth={rightPanelWidth}
         isTauri={isTauri}
         workspaceOpen={rightWorkspace.open}
@@ -483,7 +468,6 @@ export const ChatPage = () => {
         }}
         onOpenCli={openCli}
         cliInfo={cliInfo}
-        hasActiveConversation={hasStartedConversation}
       />
 
       {/* -- SPLIT VIEW: left sidebar + chat column + side panels -- */}
@@ -539,6 +523,7 @@ export const ChatPage = () => {
           {/* -- CLI terminals: each stays mounted so backgrounded sessions
                keep running; only the active one is visible. -- */}
           {chatTabs.filter(t => t.kind === "cli").map(tab => {
+            if (!activatedChatTabIds.has(tab.id)) return null;
             const tool = getCliTool(tab.cliId!);
             return (
               <div
@@ -550,6 +535,7 @@ export const ChatPage = () => {
                   args={tool.args}
                   cwd={tab.cwd ?? null}
                   active={activeTabId === tab.id}
+                  cliId={tab.cliId}
                 />
               </div>
             );
@@ -667,12 +653,14 @@ export const ChatPage = () => {
           </AnimatePresence>
           </div>
 
-          {/* Bottom tab strip — only visible when CLI tabs exist */}
+          {/* The task rail always reserves its footprint; its strip is only
+              painted when task tabs exist, keeping the composer stationary. */}
           <ChatTabBar
             tabs={chatTabs}
             activeId={activeTabId}
             onSelectTab={selectTab}
             onCloseTab={closeTab}
+            onMoveTab={moveTab}
           />
 
         </div>{/* end chat column */}

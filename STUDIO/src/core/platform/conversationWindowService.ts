@@ -26,6 +26,8 @@ export async function openConversationWindow(conversationId: string) {
     minWidth: 900,
     minHeight: 620,
     decorations: false,
+    transparent: true,
+    shadow: false,
     visible: true,
     resizable: true,
     focus: true,

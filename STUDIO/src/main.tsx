@@ -35,6 +35,9 @@ if (typeof window !== "undefined") {
   const isOverlayWindow = search.get("w") === "overlay";
   const isSplashPreview = search.get("splashPreview") === "1";
   const isMainStudioWindow = !isOverlayWindow && !isSplashPreview;
+  root.dataset.windowSurface = isOverlayWindow
+    ? "transparent-widget"
+    : (search.get("surface") || "standard");
   try {
     const storedTheme = localStorage.getItem("studio-theme");
     if (isThemePreference(storedTheme)) {

@@ -11,6 +11,7 @@ import type { View } from "@/types/navigation";
 import { resolveTheme } from "@/lib/theme";
 import { isWorkspaceShell, WORKSPACE_SHELL } from "@/app/shell/shellConfig";
 import { WorkspaceShellChrome } from "@/app/shell/WorkspaceShellChrome";
+import { GlobalDockProvider } from "@/app/contexts/GlobalDockContext";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -75,6 +76,7 @@ export const MainLayout = ({ children, currentView, onViewChange }: MainLayoutPr
 
   return (
     <CommandPaletteProvider>
+    <GlobalDockProvider>
     <div
       className={
         workspaceShell
@@ -92,7 +94,6 @@ export const MainLayout = ({ children, currentView, onViewChange }: MainLayoutPr
         <WorkspaceShellChrome
           currentView={currentView}
           onNavigate={onViewChange}
-          showDock={currentView !== "chat"}
         />
       ) : (
         <>
@@ -124,6 +125,7 @@ export const MainLayout = ({ children, currentView, onViewChange }: MainLayoutPr
         {children}
       </div>
     </div>
+    </GlobalDockProvider>
     </CommandPaletteProvider>
   );
 };

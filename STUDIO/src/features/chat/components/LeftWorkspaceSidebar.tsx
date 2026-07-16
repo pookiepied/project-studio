@@ -139,7 +139,7 @@ export function LeftWorkspaceSidebar({
       {/* Top-left fixed controls: sidebar toggle, search (cmd-k), and
           independent back/forward navigation icons. */}
       <div
-        className="pointer-events-auto fixed top-[9px] z-toast flex h-7 items-center gap-1"
+        className="pointer-events-auto fixed top-0 z-toast flex h-[var(--studio-topbar-height)] items-center gap-1 px-1"
         style={{ left: 72 }}
       >
         <IconButton

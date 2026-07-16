@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Command } from "cmdk";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import {
   Search,
   Add,
@@ -18,6 +19,7 @@ import {
   type MessageHit,
 } from "@/features/chat/services/searchConversations";
 import type { View } from "@/types/navigation";
+import { projectRegistry, type ProjectEntry } from "@/core/projects";
 
 interface ActionItem {
   id:       string;
@@ -35,11 +37,13 @@ export function CommandPalette() {
   const [query, setQuery]                 = useState("");
   const [conversations, setConversations] = useState<ConversationMetadata[]>([]);
   const [hits, setHits]                   = useState<MessageHit[]>([]);
+  const [projects, setProjects]           = useState<ProjectEntry[]>([]);
 
   useEffect(() => {
     if (!open) { setQuery(""); setHits([]); return; }
     invalidateSearchCache();
     getAllConversations().then(setConversations).catch(() => {});
+    projectRegistry.list().then(setProjects).catch(() => setProjects([]));
   }, [open]);
 
   useEffect(() => {
@@ -90,6 +94,10 @@ export function CommandPalette() {
       .slice(0, ql ? 6 : 8),
     [conversations, ql]
   );
+  const filteredProjects = useMemo(
+    () => projects.filter(project => !ql || project.name.toLowerCase().includes(ql) || project.path.toLowerCase().includes(ql)).slice(0, 6),
+    [projects, ql],
+  );
 
   const itemCls =
     "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-secondary " +
@@ -97,7 +105,7 @@ export function CommandPalette() {
   const headingCls =
     "px-3 pt-3 pb-1 text-2xs font-semibold uppercase tracking-wider text-muted";
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -106,9 +114,9 @@ export function CommandPalette() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 bg-scrim backdrop-blur-sm z-modal"
+            className="fixed inset-0 z-context bg-scrim backdrop-blur-sm"
           />
-          <div className="fixed inset-0 z-modal flex items-start justify-center pt-[16vh] px-4 pointer-events-none">
+          <div className="fixed inset-0 z-context flex items-start justify-center px-4 pt-[16vh] pointer-events-none" role="dialog" aria-modal="true" aria-label="Command palette">
           <motion.div
             initial={{ opacity: 0, scale: 0.97, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -162,6 +170,21 @@ export function CommandPalette() {
                   </Command.Group>
                 )}
 
+                {filteredProjects.length > 0 && (
+                  <Command.Group>
+                    <div className={headingCls}>Projects</div>
+                    {filteredProjects.map(project => (
+                      <Command.Item key={project.id} value={`project-${project.id}`} keywords={[project.name, project.path]} onSelect={() => run(() => navigateTo("projects"))} className={itemCls}>
+                        <Forward size="md" className="flex-shrink-0 text-muted" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{project.name}</span>
+                          <span className="block truncate text-2xs text-muted">{project.path}</span>
+                        </span>
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                )}
+
                 {hits.length > 0 && (
                   <Command.Group>
                     <div className={headingCls}>Messages</div>
@@ -189,6 +212,7 @@ export function CommandPalette() {
           </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

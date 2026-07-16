@@ -17,6 +17,7 @@ import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FONT_MONO } from "@/design/fonts";
+import { codingSessionManager } from "./codingSessionManager";
 
 /* eslint-disable no-restricted-syntax -- xterm ITheme needs raw hex ANSI values */
 const DARK_THEME: ITheme = {
@@ -58,18 +59,75 @@ function isDarkMode(): boolean {
   return document.documentElement.classList.contains("dark");
 }
 
+function token(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function terminalTheme(): ITheme {
+  const base = isDarkMode() ? DARK_THEME : LIGHT_THEME;
+  const background = token("--surface-page", base.background || "transparent");
+  const foreground = token("--text-primary", base.foreground || "inherit");
+  return {
+    ...base,
+    background,
+    foreground,
+    cursor: token("--text-secondary", foreground),
+    cursorAccent: background,
+    selectionBackground: token("--surface-selected", base.selectionBackground || background),
+    selectionForeground: foreground,
+    black: background,
+    brightBlack: token("--text-muted", base.brightBlack || foreground),
+    white: token("--text-secondary", base.white || foreground),
+    brightWhite: foreground,
+  };
+}
+
 export interface CliTerminalProps {
   program: string;
   args?: string[];
   cwd?: string | null;
   /** Whether this terminal's tab is currently shown. Drives refit + focus. */
   active: boolean;
+  cliId?: string;
 }
 
 let _sesSeq = 0;
 const nextSesId = () => `cli-${++_sesSeq}-${Date.now()}`;
 
-export function CliTerminal({ program, args = [], cwd = null, active }: CliTerminalProps) {
+async function ensureOpencodeSystemThemeConfig(): Promise<string | null> {
+  try {
+    const [{ appDataDir, join }, fs] = await Promise.all([
+      import("@tauri-apps/api/path"),
+      import("@tauri-apps/plugin-fs"),
+    ]);
+    const dir = await join(await appDataDir(), "cli");
+    await fs.mkdir(dir, { recursive: true });
+    const path = await join(dir, "opencode-tui-system.json");
+    await fs.writeTextFile(path, JSON.stringify({
+      $schema: "https://opencode.ai/tui.json",
+      theme: "system",
+    }, null, 2));
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+async function themeEnv(cliId?: string): Promise<Record<string, string>> {
+  const dark = isDarkMode();
+  const env: Record<string, string> = {
+    COLORTERM: "truecolor",
+    TERM: "xterm-256color",
+    COLORFGBG: dark ? "15;0" : "0;15",
+  };
+  if (cliId === "opencode") {
+    const tuiConfig = await ensureOpencodeSystemThemeConfig();
+    if (tuiConfig) env.OPENCODE_TUI_CONFIG = tuiConfig;
+  }
+  return env;
+}
+
+export function CliTerminal({ program, args = [], cwd = null, active, cliId }: CliTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -78,6 +136,7 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
   const roRef = useRef<ResizeObserver | null>(null);
   const fitFrameRef = useRef<number | null>(null);
   const ptyReadyRef = useRef(false);
+  const activeRef = useRef(active);
   const lastSizeRef = useRef<{ cols: number; rows: number } | null>(null);
   const fontSizeRef = useRef(12);
 
@@ -114,7 +173,7 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
       cursorBlink: true,
       cursorStyle: "bar",
       scrollback: 5000,
-      theme: isDarkMode() ? DARK_THEME : LIGHT_THEME,
+      theme: terminalTheme(),
       allowTransparency: false,
       convertEol: false,
     });
@@ -134,12 +193,33 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
 
     let ulData: () => void = () => {};
     let ulExit: () => void = () => {};
+    let admitted = false;
+    let disposed = false;
 
     (async () => {
+      try {
+        codingSessionManager.acquire({
+          id: sessionId,
+          runtime: "local",
+          kind: cliId === "opencode" ? "opencode" : "cli-bridge",
+          cwd,
+          status: "starting",
+        });
+        admitted = true;
+        if (disposed) {
+          codingSessionManager.release(sessionId);
+          admitted = false;
+          return;
+        }
+      } catch (error) {
+        xterm.writeln(`\r\n\x1b[31m${error instanceof Error ? error.message : String(error)}\x1b[0m\r\n`);
+        return;
+      }
       ulData = await listen<{ sessionId: string; data: string }>(
         "pty-data",
         ({ payload }) => {
           if (payload.sessionId !== sessionId) return;
+          codingSessionManager.update(sessionId, "active");
           xterm.write(payload.data);
         },
       );
@@ -147,9 +227,19 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
         "pty-exit",
         ({ payload }) => {
           if (payload.sessionId !== sessionId) return;
+          codingSessionManager.update(sessionId, "exited");
+          codingSessionManager.release(sessionId);
+          admitted = false;
           xterm.writeln("\r\n\x1b[2m[" + program + " exited — close the tab to remove]\x1b[0m");
         },
       );
+      if (disposed) {
+        ulData();
+        ulExit();
+        codingSessionManager.release(sessionId);
+        admitted = false;
+        return;
+      }
       unlistensRef.current = [ulData, ulExit];
 
       try {
@@ -158,13 +248,23 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
           cols: xterm.cols,
           rows: xterm.rows,
           cwd: cwd ?? null,
+          env: await themeEnv(cliId),
           program,
           args,
         });
+        if (disposed) {
+          invoke("pty_close", { sessionId }).catch(() => {});
+          codingSessionManager.release(sessionId);
+          admitted = false;
+          return;
+        }
         ptyReadyRef.current = true;
+        codingSessionManager.update(sessionId, activeRef.current ? "active" : "idle");
         scheduleFit(true);
       } catch (err) {
-        xterm.writeln(`\r\n\x1b[31mFailed to launch ${program}: ${err}\x1b[0m\r\n`);
+        codingSessionManager.release(sessionId);
+        admitted = false;
+        if (!disposed) xterm.writeln(`\r\n\x1b[31mFailed to launch ${program}: ${err}\x1b[0m\r\n`);
       }
     })();
 
@@ -175,10 +275,12 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
     }
 
     return () => {
+      disposed = true;
       if (fitFrameRef.current !== null) cancelAnimationFrame(fitFrameRef.current);
       roRef.current?.disconnect();
       unlistensRef.current.forEach((fn) => fn());
       invoke("pty_close", { sessionId }).catch(() => {});
+      if (admitted) codingSessionManager.release(sessionId);
       xterm.dispose();
       termRef.current = null;
       fitRef.current = null;
@@ -190,6 +292,9 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
 
   // Refit + focus when the tab becomes active.
   useEffect(() => {
+    activeRef.current = active;
+    const sessionId = sessionRef.current;
+    if (sessionId) codingSessionManager.update(sessionId, active ? "active" : "idle");
     if (active) scheduleFit(true);
   }, [active, scheduleFit]);
 
@@ -197,16 +302,18 @@ export function CliTerminal({ program, args = [], cwd = null, active }: CliTermi
   useEffect(() => {
     const observer = new MutationObserver(() => {
       if (termRef.current) {
-        termRef.current.options.theme = isDarkMode() ? DARK_THEME : LIGHT_THEME;
+        termRef.current.options.theme = terminalTheme();
+        termRef.current.refresh(0, Math.max(0, termRef.current.rows - 1));
+        scheduleFit();
       }
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     return () => observer.disconnect();
-  }, []);
+  }, [scheduleFit]);
 
   return (
-    <div className="h-full w-full bg-surface-page">
-      <div ref={containerRef} className="h-full w-full" style={{ padding: "8px 12px" }} />
+    <div className="h-full w-full overflow-hidden rounded-lg bg-surface-page px-4 pb-2 pt-[52px]">
+      <div ref={containerRef} className="h-full w-full overflow-hidden rounded-lg bg-surface-page" />
     </div>
   );
 }

@@ -27,6 +27,7 @@ import { IconButton } from "@/ui/primitives/IconButton";
 import { NotificationBell } from "@/app/shell/NotificationBell";
 import { ThemeToggle } from "@/app/shell/ThemeToggle";
 import type { View } from "@/types/navigation";
+import { useGlobalDock } from "@/app/contexts/GlobalDockContext";
 
 interface NavItem {
   id: View;
@@ -169,7 +170,7 @@ export function FloatingPanelFrame({
   dockClassName?: string;
 }) {
   return (
-    <div className={`pointer-events-none fixed inset-x-0 top-[5.5px] z-toast flex justify-center ${className}`}>
+    <div className={`pointer-events-none fixed inset-x-0 top-0 z-toast flex h-[var(--studio-topbar-height)] items-center justify-center ${className}`}>
       <motion.div className="pointer-events-auto">
         <motion.div
           layout
@@ -267,9 +268,37 @@ export function FloatingPanel({
   currentView: View;
   onNavigate: (view: View) => void;
 }) {
+  const { chatDockVisible, setChatDockVisible, toggleChatDock } = useGlobalDock();
+  const dockVisible = currentView !== "chat" || chatDockVisible;
+
+  useEffect(() => {
+    if (currentView !== "chat" && chatDockVisible) setChatDockVisible(false);
+  }, [chatDockVisible, currentView, setChatDockVisible]);
+
   return (
-    <FloatingPanelFrame>
-      <FloatingPanelNavigation currentView={currentView} onNavigate={onNavigate} />
-    </FloatingPanelFrame>
+    <>
+      {dockVisible && (
+        <FloatingPanelFrame>
+          <FloatingPanelNavigation currentView={currentView} onNavigate={onNavigate} />
+        </FloatingPanelFrame>
+      )}
+
+      {currentView === "chat" && (
+        <div
+          className="studio-chat-dock-switch pointer-events-none fixed top-0 z-toast flex h-[var(--studio-topbar-height)] items-center"
+          style={{ left: "min(calc(50% + 280px), calc(100% - 250px))" }}
+        >
+          <IconButton
+            size="sm"
+            aria-label={chatDockVisible ? "Show conversation title" : "Show navigation dock"}
+            title={chatDockVisible ? "Show conversation title" : "Show navigation dock"}
+            onClick={toggleChatDock}
+            className="pointer-events-auto h-6 w-6 rounded-full text-muted hover:bg-surface-hover hover:text-primary"
+          >
+            <Expand size="xs" className={`transition-transform duration-150 ${chatDockVisible ? "rotate-180" : ""}`} />
+          </IconButton>
+        </div>
+      )}
+    </>
   );
 }

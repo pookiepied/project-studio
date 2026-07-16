@@ -10,38 +10,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style>
-      /* The bordered rounded "window" surface is a ROOT concern — it lives on
-         #root (present in index.html before any JS/CSS bundle loads) so it
-         paints on EVERY window (main, overlay, splash) and through every
-         lifecycle state (preload / refresh / reload). html/body stay
-         transparent so the OS frameless window shows #root's rounded shape. */
+      /* Standard-window framing lives here so it paints before the JS/CSS
+         bundles load. Transparent utility variants explicitly opt out. */
       html,
       html body {
         background: transparent !important;
       }
 
-      #root {
+      html:not([data-window-surface]),
+      html[data-window-surface="standard"] {
+        --window-frame-color: var(--surface-border, #E6E6E6);
+        --window-frame-bg: var(--surface-page, #FFFFFF);
+      }
+
+      html.dark[data-window-surface="standard"] {
+        --window-frame-color: var(--surface-border, #2A2A2A);
+        --window-frame-bg: var(--app-bg-dark, #121212);
+      }
+
+      html:not([data-window-surface]) #root,
+      html[data-window-surface="standard"] #root {
         position: fixed;
         inset: var(--zen-frame-inset, 0px);
         border-radius: var(--zen-frame-radius, 12px);
         overflow: hidden;
-        border: 4px solid var(--surface-border, #E6E6E6);
-        background: var(--surface-page, #FFFFFF);
+        border: 0;
+        background: var(--window-frame-bg);
         isolation: isolate;
         box-sizing: border-box;
         box-shadow:
-          0 0 0 1px rgb(0 0 0 / 0.03),
           0 8px 28px -4px rgb(0 0 0 / 0.14),
           0 2px 8px -2px rgb(0 0 0 / 0.08);
       }
 
-      html.dark #root {
-        border-color: var(--surface-border, #2A2A2A);
-        background: var(--app-bg-dark, #121212);
+      html.dark[data-window-surface="standard"] #root {
         box-shadow:
-          0 0 0 1px rgb(0 0 0 / 0.40),
           0 8px 28px -4px rgb(0 0 0 / 0.50),
           0 2px 8px -2px rgb(0 0 0 / 0.30);
+      }
+
+      /* Descendants can cover a root border in the frameless WebView. Keep the
+         visible frame as the root's final, topmost paint layer instead. */
+      html:not([data-window-surface]) #root::after,
+      html[data-window-surface="standard"] #root::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2147483647;
+        pointer-events: none;
+        border: 4px solid var(--window-frame-color);
+        border-radius: inherit;
+        box-sizing: border-box;
+      }
+
+      html[data-window-surface="transparent-widget"] #root,
+      html[data-window-surface="floating-utility"] #root,
+      html[data-window-surface="overlay"] #root {
+        position: fixed;
+        inset: 0;
+        overflow: visible;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      html[data-window-surface="transparent-widget"] #root::after,
+      html[data-window-surface="floating-utility"] #root::after,
+      html[data-window-surface="overlay"] #root::after {
+        content: none;
       }
 
       /* .zen-surface is now a transparent pass-through — #root owns the
@@ -62,6 +99,10 @@
           var isOverlay = params.get('w') === 'overlay';
           var isSplashPreview = params.get('splashPreview') === '1';
           var root = document.documentElement;
+
+          root.dataset.windowSurface = isOverlay
+            ? 'transparent-widget'
+            : (params.get('surface') || 'standard');
 
           if (isOverlay) {
             root.classList.add('overlay-window');

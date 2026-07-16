@@ -12,12 +12,8 @@ import { environmentService } from "@/core/platform/environmentService";
 import { logger } from "@/core/logging/logger";
 
 const DOT_SIZE = 10;
-// Shared top-row center line (px). Must match the FloatingPanel dock center and
-// the .studio-chat-header center in workspaceShell.css. The dock sits at 23px
-// (top-[5.5px] + h-[35px]/2) at the 14px root font, so the window controls and
-// chat-header controls all align to that line.
-const TOP_ROW_CENTER_Y = 23;
-const TOP_OFFSET = TOP_ROW_CENTER_Y - DOT_SIZE / 2;
+// The fixed wrapper uses the shared top-bar height, so its flex center matches
+// the dock and both chat control zones without component-specific offsets.
 const LEFT_OFFSET = 14;
 const DOT_GAP = 8;
 
@@ -54,8 +50,8 @@ export function WindowTrafficLights() {
 
   return (
     <div
-      className="pointer-events-auto fixed z-toast flex items-center"
-      style={{ left: LEFT_OFFSET, top: TOP_OFFSET, gap: DOT_GAP }}
+      className="pointer-events-auto fixed top-0 z-toast flex h-[var(--studio-topbar-height)] items-center"
+      style={{ left: LEFT_OFFSET, gap: DOT_GAP }}
     >
       {LIGHTS.map(({ kind, color, label }) => (
         <IconButton

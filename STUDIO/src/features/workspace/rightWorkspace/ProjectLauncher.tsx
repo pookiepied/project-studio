@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Expand } from "@/ui/icons";
+import { Expand, FolderOpen } from "@/ui/icons";
 import { useOnClickOutside } from "@/lib/hooks/useOnClickOutside";
 import { useDisclosure } from "@/lib/hooks/useDisclosure";
 import { useSettings } from "@/app/contexts/SettingsContext";
@@ -209,9 +209,11 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
 
   const selectedApp = availableApps.find((app) => app.id === selectedAppId);
   const defaultApp = selectedApp ?? availableApps[0];
-  if (!isTauri || !projectContext?.path || !defaultApp) return null;
+  if (!isTauri) return null;
+  const projectReady = !!projectContext?.path;
 
   const openApp = (app: ExternalProjectApp, remember = false) => {
+    if (!projectContext?.path) return;
     onClose();
     if (remember) {
       setSelectedAppId(app.id);
@@ -227,19 +229,21 @@ export function ProjectLauncher({ isTauri, projectContext }: ProjectLauncherProp
       <div className="flex h-7 items-center rounded-lg border border-surface-border bg-surface-page shadow-sm dark:border-surface-border dark:bg-surface-raised">
         <IconButton
           size="sm"
-          onClick={() => openApp(defaultApp)}
-          aria-label={`Open project in ${defaultApp.label}`}
-          title={`Open project in ${defaultApp.label}`}
-          className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted transition-colors duration-100 hover:bg-surface-page hover:text-secondary dark:text-muted dark:hover:bg-surface-selected dark:hover:text-disabled"
+          onClick={() => defaultApp && openApp(defaultApp)}
+          disabled={!projectReady || !defaultApp}
+          aria-label={projectReady && defaultApp ? `Open project in ${defaultApp.label}` : "Select a project first"}
+          title={projectReady && defaultApp ? `Open project in ${defaultApp.label}` : "Select a project first"}
+          className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted transition-colors duration-100 hover:bg-surface-page hover:text-secondary disabled:cursor-not-allowed disabled:opacity-45 dark:text-muted dark:hover:bg-surface-selected dark:hover:text-disabled"
         >
-          <ProjectAppIcon app={defaultApp} isDark={isDark} />
+          {defaultApp ? <ProjectAppIcon app={defaultApp} isDark={isDark} /> : <FolderOpen size="sm" />}
         </IconButton>
         <IconButton
           size="sm"
           onClick={onToggle}
+          disabled={!projectReady || !defaultApp}
           aria-label="Choose project app"
-          title="Choose project app"
-          className="flex h-7 !w-5 items-center justify-center rounded-r-lg border-l border-surface-border text-disabled transition-colors duration-100 hover:bg-surface-page hover:text-secondary dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-disabled"
+          title={projectReady ? "Choose project app" : "Select a project first"}
+          className="flex h-7 !w-5 items-center justify-center rounded-r-lg border-l border-surface-border text-disabled transition-colors duration-100 hover:bg-surface-page hover:text-secondary disabled:cursor-not-allowed disabled:opacity-45 dark:border-surface-border dark:hover:bg-surface-selected dark:hover:text-disabled"
         >
           <Expand size="xs" />
         </IconButton>

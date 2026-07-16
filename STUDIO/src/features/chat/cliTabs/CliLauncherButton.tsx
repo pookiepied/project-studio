@@ -5,13 +5,14 @@ import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
 import { CLI_TOOLS, type CliToolId, getCliTool } from "./cliTools";
 import type { CliAvailability } from "./ChatTabBar";
+import { resolveCodingProject } from "@/core/projects/codingProjectResolver";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 interface CliLauncherButtonProps {
   onOpenCli: (id: CliToolId, cwd: string | null) => void;
   cliInfo: Record<CliToolId, CliAvailability>;
-  hasActiveConversation: boolean;
+  activeProjectPath?: string | null;
 }
 
 async function openExternalUrl(url: string) {
@@ -23,8 +24,7 @@ async function openExternalUrl(url: string) {
   }
 }
 
-export function CliLauncherButton({ onOpenCli, cliInfo, hasActiveConversation }: CliLauncherButtonProps) {
-  void hasActiveConversation;
+export function CliLauncherButton({ onOpenCli, cliInfo, activeProjectPath }: CliLauncherButtonProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -46,10 +46,22 @@ export function CliLauncherButton({ onOpenCli, cliInfo, hasActiveConversation }:
 
   const handleSelectCli = (id: CliToolId) => {
     setMenuOpen(false);
-    // If in an active conversation with a project, use that project path.
-    // Otherwise show the project prompt.
+    const resolution = resolveCodingProject({ conversationProjectPath: activeProjectPath });
+    if (resolution.source !== "picker") {
+      onOpenCli(id, resolution.path);
+      return;
+    }
     setPendingCli(id);
   };
+
+  useEffect(() => {
+    if (!pendingCli) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPendingCli(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pendingCli]);
 
   const handleProjectPrompt = async (useProject: boolean) => {
     if (!pendingCli) return;
