@@ -316,6 +316,78 @@ Observed responsibilities inside `WorkspacePage.tsx`:
 | `workspace/life/types.ts` | Domain DTOs: workspace, project, note, task, revision, context preview, snapshot, organized capture. | Good candidate to remain the workspace domain contract, but naming `life` should be revisited after the workspace domain stabilizes. |
 | `workspace/life/workspaceService.ts` | Local seed/store, cloud requests, project/note/task CRUD, revisions, context preview, reset, and AI capture organization through chat service. | Service mixes cloud adapter, local adapter, domain mutations, and AI capture orchestration. Split only after page controller extraction makes call sites smaller. |
 
+Workspace cloud/domain authority:
+
+An untracked decision note at `docs/Architecture/Workspace Domain.md` states
+that Workspace belongs inside the existing `studio-data` domain, exposed through
+the authenticated API edge at `/studio/data/workspace`. The current dirty code
+matches that direction in broad shape, but it is still active work and should be
+treated as a contract-in-progress until the Backend/API/Studio changes are
+committed together.
+
+Observed cloud/data path:
+
+| Layer | Current evidence | Rehabilitation meaning |
+| --- | --- | --- |
+| Frontend endpoint config | `src/core/config/tauriConfig.ts` and `src/core/network/apiManager.ts` expose `endpoints.cloud.workspace` as `${baseUrl}/studio/data/workspace`. | Workspace frontend code should use the endpoint manager rather than hard-coded worker URLs. |
+| Frontend service | `workspace/life/workspaceService.ts` gets a Studio token, calls the workspace endpoint, falls back to `localStorage` key `studio.workspace.local.v1`, and sends `expectedRevisionNumber` when patching notes. | Local storage is recovery/test adapter behavior, not the source of truth for saved workspace content. |
+| API edge | `api/src/studio/data/index.ts` forwards `/studio/data/workspace` and `/studio/data/workspace/*` through `requireUser` to the data worker. | Authenticated user identity comes from the API edge; clients must not prove ownership by IDs alone. |
+| Data worker route | `Backend/Cloud/data/src/index.ts` mounts `workspaceRoute` at `/workspace`. | Workspace lives beside conversations, uploads, artifacts, plans, transcripts, and objects in the data worker. |
+| Workspace route | `Backend/Cloud/data/src/server/routes/workspace.ts` implements project, note, revision, task, Markdown export, and AI context-preview endpoints with `requireUserId`, workspace lookup, and `user_id`/`workspace_id` filtering. | Route is already large and should be split by resource only after endpoint and schema contracts stabilize. |
+| D1 schema | `Backend/Cloud/data/schema.sql` contains `workspaces`, `workspace_projects`, `workspace_tags`, project tags, notes, note revisions, tasks, task-note links, and external links. | Database shape is a backend contract; frontend type renames must account for persisted column names and migration history. |
+| Migration | `Backend/Cloud/data/migrations/0002_workspace_foundation.sql` is untracked in the live checkout. | Do not claim the workspace schema is shipped until migration/source-of-truth status is confirmed. |
+
+Current workspace authority rules:
+
+1. Cloud data is the intended authority for saved Workspace records. D1 owns
+   workspace, project, note, revision, task, relationship, tag, and external
+   link metadata.
+2. Markdown note content is canonical through `content_markdown` /
+   `contentMarkdown`; editor JSON, local drafts, and local snapshots are cache
+   or recovery layers.
+3. Writes should pass through the authenticated API edge, then to the data
+   worker with `user_id` and `workspace_id` filtering on every query.
+4. Note saves need optimistic/conflict behavior around `expectedRevisionNumber`
+   and `revision_conflict`, not blind last-write-wins.
+5. AI context preview assembles Workspace records for the client, but provider
+   LLM calls, agent orchestration, connector auth, and external tool execution
+   remain outside the data worker.
+
+Workspace domain risks found during mapping:
+
+- `WorkspacePage.tsx`, `workspacePage.css`, `workspace/life/`, right-workspace
+  files, package files, API proxy files, Backend Cloud data schema, and the
+  workspace route/migration are dirty or untracked together. Treat the current
+  Workspace system as one active feature branch, not a stable refactor target.
+- `workspaceService.ts` mixes cloud client, local adapter, local seed data,
+  domain mutation logic, context preview fallback, and AI capture organization.
+  Splitting the page before reducing that service boundary may simply move the
+  confusion sideways.
+- The frontend DTOs use camelCase while D1 uses snake_case. Any generator,
+  rename, or type extraction must preserve the mapping intentionally.
+- Boolean-like fields cross the frontend/backend boundary as `number | boolean`
+  in several DTOs. Clean this only with backend response proof and UI checks.
+- The name `workspace/life/` communicates product mood more than code
+  responsibility. Rename only after deciding whether the stable boundary is
+  `workspace/domain`, `workspace/data`, `workspace/storage`, or
+  `workspace/services`.
+
+Workspace cloud/domain cleanup rules:
+
+1. Do not make local adapter behavior authoritative. It may seed, cache, recover,
+   or demo, but saved content should be recoverable from cloud once the cloud
+   route is configured.
+2. Do not split route files or service files without preserving endpoint paths,
+   auth forwarding, `user_id`/`workspace_id` filters, revision creation, soft
+   delete behavior, and task-note link semantics.
+3. Do not rename DTO fields or folders before checking frontend types, SQL
+   aliases, API proxy responses, local storage migration, and existing saved
+   drafts.
+4. Do not move Workspace into a separate worker/domain unless the decision doc is
+   superseded; first release direction is `/studio/data/workspace`.
+5. Do not treat untracked architecture docs or migrations as shipped truth until
+   their owning task commits them.
+
 Suggested first workspace split after handoff:
 
 1. Extract `useWorkspaceController.ts` with snapshot/source/load/save-state,
