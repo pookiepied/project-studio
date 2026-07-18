@@ -857,6 +857,70 @@ Layer/CSS authority findings:
 | Pre-React shell styling | `src/main.tsx` imports design CSS and pre-applies theme/shell/window-surface classes before React mounts. | `MainLayout.tsx` repeats workspace-shell class and geometry variable mutations after React mounts. Treat this as a lifecycle contract, not just CSS duplication. |
 | Feature CSS additions | New dirty workspace work includes `src/features/workspace/pages/workspacePage.css`. | Decide whether feature CSS may own page-local layout only, or whether shell geometry variables and scroll/clipping rules must stay in app shell CSS. |
 
+Layer and portal registry triage:
+
+Studio has a tokenized z-index scale, but it does not yet have a registry that
+defines which surfaces may use each layer, where portals mount, or which owner
+controls focus/dismissal. Current overlays often portal directly to
+`document.body`, so stacking behavior is distributed across individual call
+sites.
+
+Current layer scale:
+
+| Token | Value | Current intended role | Observed drift |
+| --- | ---: | --- | --- |
+| `z-overlay` / `--z-overlay` | 40 | Lightweight app overlays below modals. | Rarely used compared with direct `z-*` values. |
+| `z-modal` / `--z-modal` | 50 | Modal dialogs and startup splash. | Some modal-like surfaces use raw `z-50`; splash shares modal layer with dialogs. |
+| `z-popover` / `--z-popover` | 60 | Dropdowns, popovers, menus, select content. | Some popovers use raw `z-50` or inline `9999`. |
+| `z-toast` / `--z-toast` | 70 | Toasts and fixed top chrome. | Traffic lights, global dock, chat top chrome, and route flash overlays all use this high layer. |
+| `z-context` / `--z-context` | 80 | Context menus and command-palette style command surfaces. | Command palette uses the highest token and can sit above modal/splash semantics. |
+
+Observed portal owners:
+
+| Owner | Portal target | Current layer behavior | Registry need |
+| --- | --- | --- | --- |
+| `CommandPalette.tsx` | `document.body` | `z-context` scrim and dialog. | Needs classification as command surface, not generic context menu. |
+| `AccountMenu.tsx` | `document.body` | Raw `z-50` fixed menu. | Should use a named popover/menu layer. |
+| `RightWorkspaceChrome.tsx` | `document.body` | `z-popover` workspace tab list and create menu. | Needs workspace-panel popover ownership and focus/dismissal rules. |
+| Chat dock rows/action menus | `document.body` | Inline `zIndex: 9998/9999` plus `z-context` local menus. | Must be reconciled before dock/global shell renames. |
+| Chat branch/environment selectors | `document.body` | Inline `9999` or `z-popover`. | Should use a shared anchored-popover layer helper. |
+| Markdown image/link popovers | `document.body` | `z-context`, `z-popover`, and hardcoded `bg-black/80` lightbox. | Decide whether media lightbox is a deliberate modal exception. |
+| Model library panel | `document.body` | `z-modal` wrapper plus local hardcoded backdrop. | Should use modal/scrim tokens consistently. |
+| Permission modals | In-tree fixed layers | Raw `z-50` with `bg-scrim`. | Should use `z-modal` token and shared modal shell semantics. |
+| Radix Select | Radix portal | `z-popover` content. | Acceptable primitive-level portal, but should be documented as part of popover layer. |
+
+Fixed chrome owners:
+
+- `WindowTrafficLights`, `FloatingPanel`, `ChatTopChrome`, `LeftWorkspaceSidebar`
+  controls, `UpdateBanner`, `InlineToast`, and `ReadAloudMiniPlayer` use
+  fixed positioning with `z-toast` or nearby layers.
+- These are not temporary toasts; several are persistent app chrome. The layer
+  registry should split "persistent chrome" from "ephemeral toast" even if they
+  temporarily share a numeric layer.
+
+Layer registry shape needed:
+
+1. Define named semantic layers, for example `splash`, `modal`, `command`,
+   `context-menu`, `anchored-popover`, `persistent-chrome`, `toast`, and
+   `media-lightbox`.
+2. For each semantic layer, define allowed owners, portal root, dismissal/focus
+   rules, and whether it may appear during startup splash.
+3. Introduce shared layer helpers or constants before replacing inline
+   `9998/9999` values.
+4. Treat hardcoded media/scrim backdrops as exceptions that need labels, not as
+   silent drift.
+5. Decide whether persistent top chrome should keep using `z-toast` or receive a
+   separate token before changing splash or traffic-light layering.
+
+Layer stop conditions:
+
+- Do not change token values in `tokens.css` or Tailwind until the semantic
+  layer registry exists.
+- Do not replace inline `9998/9999` one call site at a time without deciding
+  which semantic layer they intended to escape to.
+- Do not add new `document.body` portals without naming their semantic layer and
+  dismissal/focus owner.
+
 Layout, clipping, and scroll ownership findings:
 
 | Area | Observed owner today | Rehabilitation risk |
