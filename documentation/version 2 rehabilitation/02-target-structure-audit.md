@@ -1,13 +1,106 @@
 # Version 2 Rehabilitation: Target Structure Audit
 
 Evidence pass: 2026-07-18
-Scope: Independent target-structure proposal for Studio after the V2 removal
-audit. This document intentionally does not edit source files. It describes the
-shape we should verify and then implement in small slices.
+Status: corrected second-pass checkpoint, not final implementation approval.
+Scope: `STUDIO/` source, native shell, scripts, daemon, bundled capability
+library, and build/config files relevant to V2 structure.
+Independent cross-check: read-only sidecar agent `019f75b9-7d74-7093-8f17-4f6ff48ffa90`
+audited `STUDIO/src/features` and returned feature-level keep/migrate/remove
+evidence. Its useful classifications are folded in below. One sidecar statement
+was corrected here: `git_checkout_branch` is registered in Rust; the missing
+review command is `git_stash_and_checkout`.
+
+## Correction
+
+The previous version of this document was a starter direction. It was not a
+complete second pass. It did not justify every move with enough file-level
+evidence, and it could have caused bad structural work if treated as final.
+
+This revision raises the bar:
+
+- Every recommendation must name the current owner, future owner, and blocker.
+- Removal candidates remain blocked until all frontend callers, native commands,
+  bundle resources, build scripts, and data migrations are mapped.
+- Physical moves and renames are not approved by this document. This document is
+  the target map used to design later small slices.
+- Any path not explicitly classified below is not approved for deletion.
+
+## Verified Inventory
+
+Current non-generated Studio file count, excluding `node_modules`, `dist`,
+`target`, and root package locks:
+
+| Area | Files | Read/audit status | V2 treatment |
+| --- | ---: | --- | --- |
+| `src` | 550 | Inventory, line counts, imports/exports, and key files read. Full feature-by-feature content pass still in progress. | Primary Desktop/Web React source. |
+| `src-tauri` | 84 | Rust command inventory and key native files read. Icon/assets treated as packaged assets. | Native desktop shell and OS bridge. |
+| `library` | 155 | File inventory complete; bundled MCP package intent read through config/build/runtime callers. Full per-tool review pending. | Temporary bundled capability source until Studio CLI migration/removal. |
+| `daemon` | 15 | File inventory complete; local provider purpose read from Tauri commands and daemon tree. Full provider code review pending. | Likely old local provider service unless Studio CLI adopts it. |
+| `scripts` | 6 | Inventory complete; script purposes classified by package scripts and content scan. | Build/release/vendor/proof utilities. |
+| `public` | 7 | Inventory only. | Static assets; audit by references before cleanup. |
+| `web` | 4 | Inventory only. | Web entry/distribution variant, not Desktop local runtime. |
+| `gate` | 2 | Inventory only. | Quality baseline state; preserve unless gate process changes. |
+| `vendor` | 2 source-like entries in this filtered count | Inventory only. | Bundled external resources; not app source cleanup. |
+
+Current `STUDIO/src` shape:
+
+| Area | Files | Lines | Current role | V2 target |
+| --- | ---: | ---: | --- | --- |
+| `app` | 46 | 4648 | Boot, providers, routes, shell chrome, global listeners. | Keep as `app`, split into `entry`, `startup`, `providers`, `routes`, `shell`, `globals`. |
+| `features` | 332 | 57510 | Product features and several execution surfaces. | Keep feature-oriented, but move execution authority out to `cloud` and `studio-cli`. |
+| `core` | 74 | 8291 | Mixed infrastructure: storage, network, permissions, platform, errors, models. | Split into `platform`, `cloud`, `app-storage`, `security`, and feature-owned services. |
+| `runtime` | 26 | 3073 | Desktop Local Runtime: WebSocket pool, local MCP lifecycle, local tool execution, runtime UI. | Split into `cloud/runs`, `studio-cli`, and `run-events`; retire MCP execution. |
+| `ui` | 27 | 1590 | Brand, feedback, icons, primitives. | Split into `design-system`, `brand`, and `shared/components`. |
+| `lib` | 24 | 2320 | Mixed utilities, token manager, API client, parsers, hooks. | Move domain utilities to owners; keep only feature-neutral helpers in `shared`. |
+| `design` | 7 | 580 | CSS tokens, typography, syntax, prose, motion/font constants. | Rename to `design-system` after CSS authority is mapped. |
+| `cliBridges` | 5 | 155 | Claude-specific CLI bridge despite generic name. | Replace with `studio-cli`; keep external CLI only as advanced terminal/agent-runner if needed. |
+| `types` | 6 | 364 | Shared DTO/type dumping ground. | Move to owner-local types plus `shared/types` for cross-boundary DTOs. |
+
+Feature clusters by current size:
+
+| Feature | Files | Lines | V2 classification |
+| --- | ---: | ---: | --- |
+| `chat` | 126 | 15663 | Highest-risk migration area; owns cloud/local/Claude conversation authority today. |
+| `manage` | 14 | 13251 | Mostly model/admin registry; huge snapshot file needs source-of-truth decision. |
+| `workspace` | 36 | 7285 | Mixes cloud workspace data, local test adapter, file/browser/terminal/review surfaces. |
+| `markdown` | 22 | 3440 | Rendering system; likely keep, split artifact renderers from generic markdown. |
+| `models` | 24 | 3185 | Model registry/local provider UI; split cloud gateway registry from local provider daemon. |
+| `voice` | 19 | 2963 | Keep product feature; preserve provider lifetime and overlay contracts. |
+| `artifacts` | 9 | 2677 | Keep, but lab/demo surface needs split/classification. |
+| `settings` | 14 | 1877 | Keep, but local services/MCP settings will shrink after V2 removal. |
+| `extensions` | 16 | 1765 | Reclassify against cloud connectors/registry and local MCP management removal. |
+| `activity` | 10 | 1072 | Cloud/account activity surface; likely keep under `features/activity`. |
+| `auth` | 5 | 1063 | Keep; belongs to Desktop/Web account shell. |
+| `permissions` | 9 | 1039 | Keep UI, but engine/protocol must split between cloud display and Studio CLI approvals. |
+| `transcription`, `tts`, `memories`, `computerUse` | 27 combined | 2196 | Product decision per feature; not deletion by default. |
+
+## Feature Folder Classification
+
+This table is the current feature-level V2 classification. It is not a deletion
+approval; it identifies ownership pressure and the next safe action.
+
+| Feature | Classification | Evidence | V2 action |
+| --- | --- | --- | --- |
+| `features/activity` | Keep. | `pages/useActivityData.ts` consumes cloud tracking endpoints via `apiManager` and authenticated fetch helpers. No local runtime authority found. | Keep as cloud observability/activity surface; later move clients to `cloud/activity`. |
+| `features/artifacts` | Keep and split. | `ArtifactLabPanel.tsx` is the largest hand-authored app surface and contains catalog data, fixtures, generated media data, connector examples, activity preview UI, and controls. | Keep production artifact panel/rendering; split or remove lab/demo fixtures after product decision. |
+| `features/auth` | Keep. | `AuthContext.tsx`, `GoogleLoginButton.tsx`, `googleSDK.ts`, and `tauriOAuth.ts` own account/login flow; `tauriOAuth.ts` invokes opener plugin. | Keep auth feature; move Tauri-specific OAuth bridge to `platform` later. |
+| `features/chat` | Migrate/split with extreme care. | Imports `@/runtime`, `@/cliBridges`, Claude bridge, local conversation store, Claude transcript adapter, storage scope, and WebSocket send pipeline. | Keep chat UI; migrate local authority to Studio CLI and cloud authority to `cloud/chat`; retire Claude/local runtime after replacements. |
+| `features/computerUse` | Candidate remove/archive from Desktop route. | Current page is a placeholder surface; actual computer-use capability lives under bundled MCP package. | Remove route or repurpose only if Studio CLI/native computer-use surface is defined. |
+| `features/extensions` | Split/migrate. | `useMcpServers.ts` invokes `mcp_list_running`, `mcp_start_server`, `mcp_stop_server`, and resolves bundled local MCP servers. | Keep connector/cloud extension UI if needed; move local MCP management to Studio CLI/cloud registry or retire. |
+| `features/manage` | Keep cloud/admin; split snapshot. | `modelRegistry/curatedRegistrySnapshot.ts` is 11k+ lines; registry service talks to backend registry endpoints. | Keep admin/model registry UI; move snapshot to generated/static/source-of-truth path. |
+| `features/markdown` | Keep. | Reusable markdown, code, Mermaid, artifact renderers. No direct local execution authority found in scan. | Keep as shared rendering system; later split generic markdown from artifact rendering. |
+| `features/memories` | Keep as cloud feature. | Page fetches memories endpoints; no local runtime ownership found. | Keep; move API client to `cloud` if needed. |
+| `features/models` | Split/migrate local provider daemon. | `useLocalProviderDaemon.ts` invokes `local_provider_start/stop`; model context imports daemon client. | Keep model library/picker; decide whether Studio CLI owns local providers, then remove Desktop daemon path if so. |
+| `features/permissions` | Keep UI, retarget protocol. | Permission cards/modal/hooks import `@/runtime` tool labels/icons and local capability grants. | Retarget to Studio CLI/cloud approval events; retire Local Runtime capability grant UI. |
+| `features/settings` | Keep and shrink. | Settings imports runtime permission keys/capabilities and local service panels describe local harness. | Keep settings shell; remove/rename local harness settings after Studio CLI migration. |
+| `features/transcription` | Product decision required. | Parakeet install/config services invoke shell/file commands. | Keep if Desktop owns local transcription addon; otherwise move to platform/native service or Studio CLI capability. |
+| `features/tts` | Product decision required. | Edge TTS install/synthesis invokes shell/file commands. | Same as transcription. |
+| `features/voice` | Keep and split. | Live session uses cloud chat services and local TTS; provider lifetime is mounted through `HomePage`. | Preserve voice session lifetime; split cloud chat, local TTS, overlay concerns. |
+| `features/workspace` | Split/migrate. | Terminal invokes PTY, browser invokes native child webviews, review invokes Git, workspace service mixes cloud API and local seeded test adapter. | Keep only V2 surfaces that consume Studio CLI/cloud; split review, terminal, browser, files, and workspace data by owner. |
 
 ## Product Boundary
 
-Studio should be organized around three product surfaces:
+V2 should organize around product authority, not around vague folder importance.
 
 1. Studio Web
    - Cloud-first distribution.
@@ -25,45 +118,14 @@ Studio should be organized around three product surfaces:
      launch/control, run visibility, review UI, side chat, artifacts, and
      product navigation.
 
-Desktop should not keep a second local agent runtime that competes with Studio
-CLI. Cloud execution remains cloud-owned. Local execution becomes Studio
-CLI-owned.
-
-## Naming Rule
-
-Avoid folder names that describe importance instead of responsibility.
-
-Prefer:
-
-- `app-shell`
-- `cloud`
-- `studio-cli`
-- `workspace`
-- `chat`
-- `review`
-- `settings`
-- `auth`
-- `design-system`
-- `platform`
-- `storage`
-- `commands`
-
-Avoid vague names for large areas:
-
-- `core` when the module is actually auth, platform, storage, network, or
-  permissions.
-- `runtime` inside Desktop when the real runtime authority is either Studio
-  Cloud or Studio CLI.
-- `library` inside `src` when it is not a shared leaf utility.
-- `ui` as a dumping ground for unrelated visual pieces.
+Desktop should not keep a second local agent runtime. Cloud execution remains
+cloud-owned. Local execution becomes Studio CLI-owned.
 
 ## Proposed Repository-Level Shape
 
-This is the target mental model, not a patch plan.
-
 ```text
 Project Studio/
-  api/                         public API / auth-facing server project
+  api/                         public API/auth-facing server project
   Backend/
     Cloud/                     cloud workers and cloud-first runtime systems
       gateways/
@@ -78,62 +140,66 @@ Project Studio/
       skill-library/
       mcp-library/
       tracker/
+  studio-cli/                  future adjacent product, likely derived from OpenCode
   STUDIO/
-    src/                       Desktop/Web React application source
+    src/                       Desktop/Web React app shell and product UI
     src-tauri/                 native desktop shell and OS bridge
-    web/                       web entry/distribution shell
-    public/                    shared static app assets
-    scripts/                   build, package, vendor, proof utilities
+    web/                       web entry/distribution variant
+    public/                    static assets
+    scripts/                   build, release, vendor, gate utilities
     vendor/                    packaged external binaries/resources
-    library/                   temporary bundled capability source until V2 removal
+    library/                   temporary bundled capability source until migrated
     docs/                      Studio-specific rehabilitation notes
   documentation/
     version 2 rehabilitation/  V2 planning and audit trail
   temp/opencode/               external reference/fork workspace for Studio CLI
 ```
 
-Backend Cloud should not be physically folded into `STUDIO/`. Studio Desktop can
-consume cloud contracts, but the cloud workers remain backend products.
-
-Studio CLI should also not be folded into `STUDIO/src`. If it remains based on
-OpenCode, it should live as an adjacent product/package or external workspace,
-then Desktop integrates through a defined CLI protocol.
+`Backend/Cloud` should not move into `STUDIO`. `studio-cli` should not live
+inside `STUDIO/src`; Desktop should integrate it through a protocol/client.
 
 ## Proposed `STUDIO/src` Shape
-
-Current `STUDIO/src` has `app`, `cliBridges`, `core`, `design`, `features`,
-`lib`, `runtime`, `types`, and `ui`. V2 should move toward this responsibility
-model:
 
 ```text
 src/
   app/
-    entry/                     React entry helpers and app bootstrap
-    routes/                    route-level composition
-    shell/                     window/shell chrome, navigation, layout, topbar
+    entry/                     React entry, pre-React theme/surface setup
+    startup/                   readiness phases, splash lifecycle, app_ready contract
     providers/                 app-level provider composition and lifetimes
+    routes/                    route-level composition
+    shell/                     window chrome, navigation, docks, layout
+    globals/                   global listeners, context menus, shortcut hosts
 
   platform/
-    tauri/                     invoke wrappers and native capability detection
+    tauri/                     typed invoke wrappers and command-family clients
     windows/                   overlay/conversation/native window orchestration
-    storage/                   app storage abstractions
-    network/                   API manager and cloud endpoint clients
+    storage/                   app-local settings/cache storage only
+    secure-storage/            token/keychain wrappers
     updates/                   updater and release metadata
+    diagnostics/               local diagnostics/reporting
 
   cloud/
+    api/                       endpoint config and authenticated fetch
     chat/                      cloud conversation/run client
-    workspace/                 cloud workspace/data client
-    tools/                     cloud tool/event descriptors
-    models/                    model registry client/snapshot handling
-    connectors/                connector-facing client UI adapters
+    workspace/                 Studio Data workspace client
+    models/                    gateway/model registry client
+    connectors/                connector-facing client adapters
+    activity/                  tracking/usage/log clients
+    mcp-registry/              cloud/local registry sync contracts
 
   studio-cli/
-    client/                    headless CLI process/protocol client
+    client/                    headless process/protocol client
     sessions/                  local session list/read/send/cancel API
-    events/                    normalized CLI event stream
+    events/                    normalized local run event stream
     approvals/                 local approval request bridge
     review/                    CLI-backed diff/review adapters
     capabilities/              CLI availability/version/config detection
+    terminal/                  optional PTY host when visible terminal remains
+
+  run-events/
+    components/                tool cards, inline steps, permission cards
+    classify/                  display classification for cloud/CLI events
+    types.ts
 
   features/
     chat/
@@ -142,12 +208,15 @@ src/
     artifacts/
     settings/
     auth/
+    models/
+    activity/
+    permissions/
+    markdown/
     voice/
     transcription/
     tts/
-    activity/
-    permissions/
-    extensions/                only if extensions remain a product surface
+    memories/
+    extensions/
 
   design-system/
     tokens/
@@ -157,147 +226,160 @@ src/
     icons/
 
   shared/
-    components/                reusable feature-neutral components
+    components/
     hooks/
     utils/
     types/
 ```
 
-This is not a request to move everything immediately. It is the organizing
-target used to classify future changes.
+## Current To Target Mapping
 
-## Current Folder Mapping
+| Current path | Verified role | Target path | Action | Blocker |
+| --- | --- | --- | --- | --- |
+| `src/main.tsx` | React mount, pre-React theme/window-surface setup, reload shortcut guard, global error logging. | `app/entry/main.tsx` plus `app/startup/preReactSurface.ts` | Split later. | Startup lifecycle contract. |
+| `src/app/App.tsx` | Overlay/splash route detection, app initialization, secure storage, error handler, storage init, bundled skill deployment, `app_ready`, splash dismissal. | `app/startup/AppStartup.tsx`, `app/routes/WindowSurfaceRouter.tsx` | Split later. | Readiness phases and splash/native show contract. |
+| `src/app/AppRouter.tsx` | Auth/API loading, background completion toast, runtime init modal, main route switch. | `app/routes/AppRouter.tsx` plus `studio-cli/capabilities` or legacy runtime gate during migration. | Keep then split runtime init out. | Local runtime removal plan. |
+| `src/app/routes/HomePage.tsx` | Root view switch, provider lifetime for recording/chat/live session, global shortcut hosts. | `app/routes/HomePage.tsx` plus `app/routes/viewRegistry.tsx` | Split view registry later. | Provider lifetime contract. |
+| `src/app/shell/**` | Standard titlebar, workspace shell, global dock, traffic lights, nav popup, layout width store. | `app/shell/**` | Keep; rename internals only after shell ownership map. | Global dock/top chrome ownership and layer registry. |
+| `src/runtime/transport/wsPool.ts` | Cloud chat WebSocket pool, buffering, reconnect, local-tools-pending bridge. | `cloud/chat/runSocketPool.ts` after local tool callback is removed. | Migrate. | Cloud run protocol separated from local tool execution. |
+| `src/runtime/transport/useAgentChat.ts` | React adapter for `wsPool`. | `cloud/chat/useCloudRun.ts` | Migrate. | Same as above. |
+| `src/runtime/protocol.ts` | Cloud run WebSocket DTO plus local tool handler shapes. | Split to `cloud/chat/protocol.ts` and `run-events/types.ts`. | Split. | Cloud event protocol and CLI event normalization. |
+| `src/runtime/servers/**` | Bundled local MCP catalog/lifecycle/manifest sync/runtime init. | Temporary `legacy-local-runtime`, then delete or migrate pieces to `studio-cli/capabilities`. | Retire. | Studio CLI protocol and replacement for local MCP/skill registry sync. |
+| `src/runtime/execution/**` | Desktop local tool executor, permission gate, builtin tool handling. | `studio-cli/approvals` for UI protocol pieces; tool execution moves to Studio CLI/cloud. | Retire. | Studio CLI owns local tool calls. |
+| `src/runtime/invoke/invokeMcpTool.ts` | Tauri MCP IPC caller and output truncation/image extraction. | Delete from Desktop or move extraction helpers to `run-events`. | Retire/migrate. | No remaining `mcp_call_tool` callers. |
+| `src/runtime/ui/**` | Runtime tool cards and display classification. | `run-events/components` and `run-events/classify`. | Keep/move. | Event shape normalized for cloud and CLI. |
+| `src/cliBridges/**` | Claude-specific chat engine bridge. | `studio-cli/**`; optional `legacy/claude-bridge` until removed. | Replace. | Studio CLI local chat engine exists. |
+| `src/core/storage/**` | App local storage, web storage, cloud chat storage, Tauri filesystem access, secure storage helpers. | `platform/storage`, `platform/secure-storage`, `cloud/chat/storage`, `studio-cli/sessions`. | Split. | Conversation/session ownership migration. |
+| `src/core/network/**` and `src/lib/api.ts` | Endpoint registry and generic authenticated HTTP client. | `cloud/api/**`. | Move later. | API endpoints grouped by product client. |
+| `src/core/permissions/**` | Permission mode config, risk engine, grants, scope filtering. | `features/permissions`, `studio-cli/approvals`, `run-events/types`, possibly `platform/security`. | Split. | Approval protocol for Studio CLI. |
+| `src/core/platform/**` | Environment, windows, overlay, tray, shortcuts, autostart, paths. | `platform/**` | Move later. | Window/surface taxonomy. |
+| `src/core/mcpRegistry/**` | Local registry sync to cloud registry. | `cloud/mcp-registry` plus `studio-cli/capabilities` if retained. | Reclassify. | Registry owner decision. |
+| `src/features/chat/**` | Main conversation UX, cloud/local scope, Claude engine, local storage, runtime send/stream. | Keep UI under `features/chat`; move authority clients out. | Major migration. | Studio CLI local session protocol and cloud run client split. |
+| `src/features/chat/conversations/storage/**` | Studio-owned local conversation JSON/JSONL/Markdown store. | Delete/migrate to `studio-cli/sessions/import`. | Retire. | Existing local conversation migration/import decision. |
+| `src/features/chat/conversations/claude/**` | Claude native transcript adapter. | One-time importer or delete. | Retire. | Whether old Claude sessions need import. |
+| `src/features/workspace/pages/WorkspacePage.tsx` | Cloud/local workspace page plus local test adapter UI state. | `features/workspace` with `cloud/workspace` service. | Split. | Workspace source contract. |
+| `src/features/workspace/life/workspaceService.ts` | Cloud Workspace API client plus local seeded adapter plus AI organize. | Split to `cloud/workspace/client.ts`, `features/workspace/localFixtures.ts`, `features/workspace/organizeCapture.ts`. | Split. | Product decision: workspace page in Desktop V2. |
+| `src/features/workspace/rightWorkspace/**` | Review/browser/terminal/files/side-chat/artifact/conversation panel mix. | `features/review`, `studio-cli/terminal`, `features/side-chat`, `features/artifacts`, `features/workspace/surfaces`. | Split after taxonomy. | Final right-panel surface list. |
+| `src/features/workspace/browser/**` | Browser child webview/iframe panel. | Keep only if product surface remains. | Decide. | Browser product value decision. |
+| `src/features/workspace/terminal/**` | Generic PTY terminal and CLI tabs. | `studio-cli/terminal` if used to host CLI; otherwise advanced terminal. | Migrate/remove. | Studio CLI headless/PTY strategy. |
+| `src/features/workspace/rightWorkspace/ReviewPanel.tsx` | Direct Git review UI. | `features/review` consuming Studio CLI or direct Git adapter. | Keep/migrate. | Missing `git_stash_and_checkout` command bug and owner decision. |
+| `src/features/models/**` | Model UI plus local provider daemon UI. | Split cloud model registry from local provider setup. | Split. | Does Studio CLI own local providers? |
+| `src/features/settings/**` | Settings panels including local services/debug. | Keep, but remove local runtime settings after migration. | Shrink. | Runtime/MCP/local provider decisions. |
+| `src/ui/**` | Brand/icons/primitives/feedback. | `design-system/**`, `brand/**`, `shared/components`. | Move after imports stable. | CSS/design authority. |
+| `src/lib/tokenManager.ts` | Large auth token/secure storage manager. | `platform/secure-storage/tokenManager.ts` or `features/auth/services`. | Move/split. | Auth/session storage contract. |
+| `src/types/**` | Cross-cutting DTOs. | Owner-local `types.ts` plus `shared/types`. | Split gradually. | Import graph cleanup. |
 
-| Current area | V2 target | Action |
+## Native Command Families
+
+The Rust command inventory is now a hard prerequisite for removals.
+
+| Native file | Commands / responsibility | V2 action |
 | --- | --- | --- |
-| `src/app` | `src/app` | Keep, but split entry/bootstrap/providers/shell/routes more clearly. |
-| `src/core/network` | `src/platform/network` or `src/cloud/*` | Split API infrastructure from cloud product clients. |
-| `src/core/platform` | `src/platform/windows` and `src/platform/tauri` | Keep native shell/window services, rename by responsibility. |
-| `src/core/storage` | `src/platform/storage` | Keep storage abstraction, but separate cloud conversation storage from app-local storage. |
-| `src/core/permissions` | `src/features/permissions` plus `studio-cli/approvals` | Split UI/domain permission display from local CLI approval protocol. |
-| `src/runtime` | `src/cloud/chat`, `src/studio-cli/*`, `src/features/chat/run-events` | Retire Desktop-local runtime as a subsystem; migrate reusable display/event pieces. |
-| `src/cliBridges` | `src/studio-cli` | Replace generic/Claude bridge with native Studio CLI bridge. |
-| `src/design` | `src/design-system` | Rename only after CSS authority and imports are stable. |
-| `src/ui` | `src/design-system/components` or `src/shared/components` | Split branding/icons/feedback/primitives by real ownership. |
-| `src/lib` | `src/shared/utils` or owner folders | Move large domain utilities to owners; keep only tiny generic utilities shared by many areas. |
-| `src/types` | `src/shared/types` plus feature-local `types.ts` | Avoid global type dumping; keep cross-boundary DTOs explicit. |
-| `src/features/workspace/browser` | undecided | Remove, keep, or rebuild depending on browser product decision. |
-| `src/features/workspace/terminal` | `src/studio-cli/client` or advanced terminal feature | Studio CLI host should not be mixed with generic terminal tabs. |
-| `src/features/workspace/rightWorkspace` | `features/review`, `features/artifacts`, `features/side-chat`, shell panel components | Split by product surface after right-panel taxonomy is settled. |
+| `src-tauri/src/lib.rs` | Tauri builder, tray, startup visibility, `app_ready`, window close-to-tray, WebView2 mic patch, command registration. | Keep and split only after startup/window contract. |
+| `src-tauri/src/commands.rs` | Secure storage, filesystem helpers, Claude bridge, local provider daemon commands, Chrome debug, CSP, shell streaming, platform info, OAuth server wrapper. | Split by command family; remove Claude/local provider only after callers gone. |
+| `src-tauri/src/mcp.rs` | MCP subprocess manager, JSON-RPC, bundled server path resolution. | Retire from Desktop after Studio CLI owns local tools. |
+| `src-tauri/src/pty.rs` | PTY session store and terminal events. | Keep only as Studio CLI host/advanced terminal. |
+| `src-tauri/src/native_browser.rs` | Child webview browser panel commands. | Keep only if browser remains. |
+| `src-tauri/src/commands/git.rs` | Git status/diff/stage/commit/branch commands. | Keep/migrate; review UI currently depends on it. |
+| `src-tauri/src/local_registry.rs` | Local MCP/skill registry commands. | Reclassify under cloud registry/Studio CLI capability sync. |
+| `src-tauri/src/control_server.rs` | Local control server config. | Reclassify with MCP/skill management. |
+| `src-tauri/src/daemon/mod.rs` | Local provider daemon handle. | Candidate removal unless Studio CLI adopts it. |
 
-## Cloud And Local Separation
+Verified issue:
 
-Do not organize the app around a raw `cloud/` vs `local/` toggle in the UI.
-Organize code around authority:
+- `src/features/workspace/rightWorkspace/ReviewPanel.tsx` calls
+  `invoke("git_stash_and_checkout", ...)`.
+- `src-tauri/src/commands/git.rs` and `src-tauri/src/lib.rs` register
+  `git_checkout_branch`, `git_create_branch`, `git_status_summary`, `git_diff`,
+  `git_recent_commits`, `git_stage`, `git_unstage`, and `git_commit`, but no
+  `git_stash_and_checkout`.
+- The review surface is therefore a bug-bearing migration blocker, not a folder
+  to delete blindly.
 
-- Cloud authority:
-  - cloud conversation/run state
-  - Studio Data
-  - hosted tools/connectors/agents
-  - model gateway
-  - cloud memory and cloud artifacts
-- Studio CLI authority:
-  - local workspace sessions
-  - local repo/files/terminal/git
-  - local tool execution
-  - local transcript/session storage
-  - local approvals for machine-affecting actions
-- Desktop authority:
-  - native shell
-  - navigation
-  - visibility/review UI
-  - account/settings
-  - bridge orchestration between user, CLI, and cloud
+## Monolith Split Matrix
 
-In code, this means `cloud/*` and `studio-cli/*` should be service/client
-boundaries, while `features/*` should render product workflows.
+Line count is triage only. Split by responsibility and import direction.
 
-## Monolith Split Strategy
+| File | Lines | Current responsibilities | Target split | Import direction |
+| --- | ---: | --- | --- | --- |
+| `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Snapshot data. | Decide generated/source-of-truth; do not hand-split. | UI imports data; data imports nothing. |
+| `src/features/artifacts/components/ArtifactLabPanel.tsx` | 1870 | Lab catalog, fixtures, generated media data, connector fixtures, activity preview UI, selection controls. | `artifactLabCatalog.ts`, `fixtures/*`, `artifactLabBuildArtifact.ts`, `ArtifactActivityPreview.tsx`, root panel. | Root panel imports fixtures/components. |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Page state, local helpers, note/task/project CRUD UI, Markdown editor, quick capture, context preview, revision UI. | `useWorkspaceController.ts`, `workspacePageUtils.ts`, `WorkspaceLibrary.tsx`, `WorkspaceEditor.tsx`, `WorkspaceDetailsPanel.tsx`, `QuickCaptureDrawer.tsx`. | Page imports controller and sections; sections receive props. |
+| `src/features/chat/pages/ChatPage.tsx` | 675 | Chat page composition, shell/dock wiring, workspace panel wiring, composer props. | Wait for shell/global dock map; then split page controller and layout sections. | Page owns orchestration; shell consumes only public callbacks. |
+| `src/features/chat/context/ChatProvider.tsx` | 573 | Conversation state coordinator, engine state, project context, tool state, streaming refs. | After Studio CLI/cloud split: `CloudConversationProvider`, `LocalCliSessionProvider`, `ChatUiStateProvider` or smaller hooks. | Provider composes authority clients; clients do not import UI. |
+| `src/features/chat/context/useSendPipeline.ts` | 509 | Studio cloud send, Claude send, local runtime body building, image/doc handling, regeneration/continue. | `sendCloudTurn.ts`, `sendStudioCliTurn.ts`, `prepareAttachments.ts`, `continueOrRegenerate.ts`. | Pipeline imports cloud/CLI clients; no runtime executor. |
+| `src-tauri/src/commands.rs` | 941 | Many unrelated command families. | `commands/storage.rs`, `commands/claude_bridge.rs` temporary, `commands/local_provider.rs`, `commands/browser_debug.rs`, `commands/shell.rs`, `commands/platform.rs`, `commands/oauth.rs`. | `lib.rs` registers command families. |
+| `src-tauri/src/mcp.rs` | 573 | MCP subprocess lifecycle and JSON-RPC. | No split unless retained temporarily; otherwise remove after migration. | Runtime/CLI migration first. |
+| `src/runtime/transport/wsPool.ts` | 518 | Cloud WebSocket pool plus local tool-pending execution bridge. | `cloudRunSocketPool.ts` without local executor; local tool events become display/approval protocol. | Cloud client emits events; UI subscribes. |
+| `src/features/workspace/terminal/TerminalPanel.tsx` | 556 | xterm tabs, PTY lifecycle, panel chrome, resizing. | `usePtySessions.ts`, `TerminalTabs.tsx`, `TerminalViewport.tsx`, optional `StudioCliTerminalHost.tsx`. | Panel imports session hook and UI leaves. |
+| `src/features/workspace/rightWorkspace/ReviewPanel.tsx` | 469 | Git status/diff/branch/commit UI plus missing stash command path. | `useReviewState.ts`, `ReviewFileList.tsx`, `DiffViewer.tsx`, `CommitPanel.tsx`, `BranchSwitcher.tsx`. | Review page imports adapter; adapter targets Studio CLI or Git service. |
+| `src/lib/tokenManager.ts` | 492 | Token storage, refresh, secure persistence, user id helpers. | `authTokenStore.ts`, `tokenRefreshClient.ts`, `secureTokenPersistence.ts`. | Auth/platform services import secure storage. |
 
-Split by responsibility, not by line count alone.
+## Removal And Migration Dependencies
 
-Priority monoliths from the current map and V2 audit:
+Do not delete a folder until these dependency checks are complete.
 
-| File | Split direction |
+| Candidate | Required proof |
 | --- | --- |
-| `src/features/workspace/pages/WorkspacePage.tsx` | Extract workspace controller/state, then page sections, then source-specific adapters. |
-| `src/features/workspace/life/workspaceService.ts` | Split cloud client, local fallback, seed data, mutations, context preview, and AI organize actions. |
-| `src/features/artifacts/components/ArtifactLabPanel.tsx` | Decide lab/demo/product role; split catalog data, filters, preview, and action handlers. |
-| `src/features/chat/context/ChatProvider.tsx` | Separate cloud run state, local Studio CLI state, conversation metadata, transient turn state, and UI-only state. |
-| `src/features/chat/context/useSendPipeline.ts` | Split cloud send, Studio CLI send, retry/continuation, and persistence. |
-| `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx` | Split shell panel geometry from product tab/surface rendering. |
-| `src-tauri/src/commands.rs` | Create command inventory first; split by command family only after frontend callers are mapped. |
+| `src/runtime/**` | All `@/runtime` callers moved to `cloud`, `studio-cli`, or `run-events`; `AppRouter` no longer starts local MCP runtime; chat send no longer calls `buildChatBody/getMcpServers/executeLocalTools`. |
+| `src/cliBridges/**` | `ChatEngine` no longer includes `claude`; `ChatProvider`, `ChatComposer`, permission modes, conversation ownership, and Tauri `claude_bridge_*` callers are removed or migrated. |
+| Local conversation store | Studio CLI session list/read/send protocol exists; local history UI reads CLI sessions or migration/import path is implemented. |
+| Claude transcript adapter | Decision made whether to import old Claude sessions; `claude-native:` ids no longer needed in live list. |
+| Bundled MCP packages | `mcp-build.mjs`, `tauri.conf.json` resources, `src-tauri/src/mcp.rs`, runtime catalog, settings/extensions callers are all removed/migrated. |
+| PTY terminal | Studio CLI headless strategy decided; generic terminal either stays advanced tool or is removed from primary chat. |
+| Native browser | Browser product decision made; `native_browser_*` callers gone if removed. |
+| Local provider daemon | Studio CLI/cloud gateway ownership of local models decided; models/settings callers gone if removed. |
 
-Preferred shape for large features:
+## Naming Decisions
 
-```text
-features/<feature>/
-  pages/
-  components/
-  hooks/
-  services/
-  state/
-  types.ts
-  index.ts
-```
+Use names that describe authority:
 
-Use `services/` only for feature-owned side effects. Shared infrastructure moves
-to `platform`, `cloud`, or `studio-cli`.
-
-## Import And Barrel Rules
-
-The future structure should make imports explain ownership.
-
-Rules:
-
-1. Feature code may import from `platform`, `cloud`, `studio-cli`,
-   `design-system`, and `shared`.
-2. `cloud` and `studio-cli` should not import feature UI.
-3. `platform` should not import feature UI.
-4. Cross-feature imports require a public `index.ts` or a move to `shared`.
-5. Avoid deep imports into another feature's private folders.
-6. Barrels should be small public surfaces, not re-export-everything dumps.
-7. Inline helper blocks inside page files should move to feature-local modules
-   once they are reused or obscure the page responsibility.
-
-## Renaming Candidates
-
-These are candidates, not immediate moves:
-
-| Current name | Issue | Candidate |
+| Current name | Problem | Candidate |
 | --- | --- | --- |
-| `runtime` | Ambiguous with cloud runtime and no longer future local authority. | `cloud-chat-client`, `run-events`, `studio-cli`, or delete by slice. |
-| `cliBridges` | Generic name hides Claude-specific implementation. | `studio-cli` after replacement; `claude-bridge` only as temporary legacy folder. |
-| `core` | Mixed platform/network/storage/permissions/errors/models. | Split into `platform`, `cloud`, feature-owned services, and `shared`. |
-| `design` | Acceptable, but less explicit as a system authority. | `design-system`. |
-| `ui` | Too broad. | Split into `design-system/components`, `shared/components`, and `brand`. |
-| `library` under root | Bundled capability source, not app library. | Keep as temporary `library` until V2 removal; future CLI/native-tool packages should move out. |
-| `workspace/rightWorkspace` | Describes placement, not product responsibility. | Split into `review`, `side-chat`, `artifacts`, `shell/panels`, or `workspace/surfaces`. |
+| `runtime` | Conflicts with cloud runtime and is not future local authority. | Split into `cloud`, `studio-cli`, `run-events`, then delete legacy. |
+| `cliBridges` | Generic name hides Claude-only implementation. | `studio-cli`; temporary `legacy/claude-bridge` if needed. |
+| `core` | Mixed infrastructure and domain code. | `platform`, `cloud`, `security`, feature-owned services, `shared`. |
+| `lib` | Utilities plus auth/API/token/domain parsers. | `shared/utils` for true utilities; owner folders for domain code. |
+| `ui` | Presentation dumping ground. | `design-system/components`, `design-system/icons`, `brand`, `shared/components`. |
+| `design` | Acceptable but less explicit. | `design-system` after CSS authority audit. |
+| `workspace/rightWorkspace` | Describes placement, not responsibility. | `features/review`, `features/side-chat`, `features/workspace/surfaces`, `studio-cli/terminal`. |
 
-## Physical Reorganization Order
+## Implementation Order
 
-Do not start by moving folders. Start by removing superseded systems and defining
-new boundaries.
+1. Finish file-level read pass and mark every folder classified.
+2. Define Studio CLI Desktop protocol:
+   - launch/headless mode
+   - session list/read/send/cancel
+   - stream events
+   - tool-call events
+   - approval requests
+   - file/git/review events
+   - error/reconnect semantics
+3. Split cloud chat transport from Desktop local tool execution.
+4. Migrate local chat/workspace authority from Claude/local runtime to Studio CLI.
+5. Remove Claude chat engine path.
+6. Migrate or import local conversation history.
+7. Retire local MCP runtime from Desktop.
+8. Remove bundled MCP build/resources only after runtime callers are gone.
+9. Simplify right workspace surfaces.
+10. Split monoliths and rename folders after removal reduces the tree.
+11. Create `03-final-rehabilitation-plan.md` combining this document,
+    `01-removal-audit.md`, and `STUDIO/docs/studio-rehabilitation-map.md`.
 
-1. Finish caller inventory and dependency blockers for removal candidates.
-2. Define Studio CLI Desktop protocol.
-3. Migrate local chat/workspace authority to Studio CLI.
-4. Remove Claude/local-runtime/MCP execution paths in safe slices.
-5. Create `src/studio-cli` and `src/cloud` boundaries.
-6. Move surviving runtime UI/event-display pieces into feature or shared
-   locations.
-7. Split workspace and chat monoliths by source authority and UI surface.
-8. Rename `core`, `design`, `ui`, and right-workspace folders only after their
-   contents are reduced and classified.
-9. Finalize imports/barrels and run typecheck/build gates.
+## Remaining Audit Passes Before Final Plan
 
-## Next Document
+These are not optional:
 
-The final V2 plan should merge:
+- Complete per-feature read pass for all 332 `src/features` files.
+- Complete per-package read pass for all bundled MCP server source files.
+- Complete daemon provider code read pass before deciding local provider
+  deletion.
+- Asset/reference audit for `public`, `web`, `vendor`, icons, installer assets,
+  and CSS fixtures.
+- Exact frontend-to-native invoke matrix, including dynamic invokes inside
+  `nativeBrowserService.ts`.
+- Exact import-cycle and cross-boundary import report after the target folders
+  are accepted.
 
-- `STUDIO/docs/studio-rehabilitation-map.md`
-- `documentation/version 2 rehabilitation/01-removal-audit.md`
-- this target-structure audit
-
-The final plan should be the only implementation checklist. It should include
-checkboxes, slice order, verification commands, and stop conditions.
+Until those are complete, this document is a corrected target checkpoint, not a
+deletion or rename checklist.
