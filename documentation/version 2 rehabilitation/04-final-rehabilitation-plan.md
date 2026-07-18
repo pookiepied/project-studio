@@ -6,7 +6,7 @@ verified slices.
 
 ## Source Of Truth
 
-The Version 2 documentation has four non-duplicating responsibilities:
+The Version 2 documentation has five non-duplicating responsibilities:
 
 1. `01-removal-audit.md` explains why an old owner must leave Studio and the
    dependency order for doing so.
@@ -16,6 +16,9 @@ The Version 2 documentation has four non-duplicating responsibilities:
    row for every tracked file under `STUDIO/`.
 4. This document combines the removal audit, target structure, and unfinished
    Version 1 rehabilitation work into the ordered program of work.
+5. `05-decision-and-deferral-register.md` records judgment: decisions taken,
+   items deliberately deferred with their owning phase, and open questions. It
+   exists so that a deferral cannot quietly become a permanent state.
 
 When these documents disagree, the precedence is:
 
