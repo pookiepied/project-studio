@@ -383,6 +383,36 @@ Three findings change later phases:
 
 ### R3: Split Conversation Authority
 
+Slice plan. Each slice is independently committable and verifiable. Slices 1-3
+require no running CLI; slices 4-6 do.
+
+| Slice | Work | Needs a live CLI | Status |
+| --- | --- | --- | --- |
+| 3.1 | Extract `run-events` from `src/runtime/ui`. | No | Done, `0a49ff4` |
+| 3.2 | Extract cloud transport: move `wsPool`, `useAgentChat`, and the cloud half of `protocol.ts` to `cloud/chat`. Split the local-tool callback out of the socket pool so the cloud client no longer knows about local execution. | No | Next |
+| 3.3 | Delete the Claude chat-engine path: `src/cliBridges/**`, `runClaudeTurn.ts`, `EngineSelector`, Claude branches in `ChatProvider`/`useSendPipeline`, and the `claude_bridge_*` Tauri commands once callers are gone. Pure removal (L-01 to L-03). | No | After 3.2 |
+| 3.4 | Build `studio-cli/client` and `studio-cli/capabilities`: spawn `serve` with a generated password, discover the port, probe `/api/health`. | Yes | Blocked on 3.3 |
+| 3.5 | Build `studio-cli/sessions` and `studio-cli/events`: list/create/read/prompt/interrupt, SSE subscription with heartbeat detection, and history reconciliation on reconnect or overflow. | Yes | Blocked on 3.4 |
+| 3.6 | Retire `executeLocalTools`: route tool execution and approvals through the CLI, with `studio-cli/approvals` answering permission requests (L-05). | Yes | Blocked on 3.5 |
+
+Ordering rationale: 3.2 and 3.3 are extraction and deletion of code Desktop
+already owns, so they shrink the surface before any integration risk is
+introduced. Deleting the Claude path before building the CLI client also avoids
+maintaining two engine paths simultaneously.
+
+Constraints that slices 3.4-3.6 must honour, from `06-studio-cli-contract.md`:
+
+- Spawn `serve` with `OPENCODE_SERVER_PASSWORD` set to a per-launch secret and
+  bind to loopback. The server is unauthenticated by default.
+- Every request carries the workspace directory.
+- There is no SSE resume. After any disconnect or subscriber overflow,
+  reconcile via `GET /api/session/:sessionID/history`.
+- Never block the SSE subscription while rendering; the subscriber queue drops
+  at capacity 256.
+
+Original scope statement follows.
+
+
 Separate cloud conversation transport from Studio CLI local sessions. Replace
 `ChatEngine`, Claude bridge state, local runtime request building, and local tool
 execution with cloud and CLI clients. Preserve chat UI and run-event display.

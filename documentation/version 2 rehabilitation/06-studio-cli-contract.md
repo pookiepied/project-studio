@@ -153,6 +153,35 @@ The conclusion: a PTY bridge would mean parsing human-readable output from a
 program that already offers a typed API over HTTP with a structured event
 stream. Desktop should launch `serve`, hold the process, and speak the protocol.
 
+### Empirically Verified 2026-07-19
+
+The CLI was started and probed live, so the claims below are observed rather
+than inferred. It runs today with no preparation: `bun run --conditions=browser
+./src/index.ts serve --port <port>` from `temp/opencode/packages/studio`.
+
+- `GET /api/health` returns `{"healthy":true}`.
+- `GET /api/event` returns `Content-Type: text/event-stream` and immediately
+  delivers `data: {"id":"evt_...","type":"server.connected","data":{}}`,
+  followed by periodic `: heartbeat` comments.
+- `GET /api/session?directory=<path>` returns an empty list on a fresh install.
+
+Two corrections and one warning came out of this:
+
+1. **Events do carry an id, but only inside the JSON payload.** The SSE frame has
+   no protocol-level `id:` line, so `Last-Event-ID` still cannot work. The
+   payload id could support a client-side cursor, but `GET /api/event` accepts
+   no parameters at all, so there is no server-side resume to ask for. The
+   reconciliation requirement stands.
+2. **There is a heartbeat**, so a dead connection is detectable without waiting
+   for the next real event.
+3. **The server is unauthenticated by default.** A request with no credentials
+   returned 200. Auth activates only when `OPENCODE_SERVER_PASSWORD` is set;
+   `packages/server/src/auth.ts` reads it from the environment and treats an
+   absent value as "no auth required". Any process on the machine can therefore
+   drive the agent, execute tools, and read the workspace. Desktop must set a
+   per-launch password when spawning `serve`, and should bind to loopback only.
+   Note the variable is still named `OPENCODE_*`; the rebrand has not reached it.
+
 ### Operational Details That Constrain The Client
 
 Three details were read from the source and materially affect implementation:

@@ -27,6 +27,7 @@ Last updated: 2026-07-19.
 | D-11 | Derive the Studio CLI contract from the CLI's existing API rather than specifying one. | `temp/opencode` already ships a typed HTTP API and SSE event stream with 18 protocol groups. Writing an idealized contract against a CLI that already has a real one would produce fiction. R2's deliverable is a mapping plus gap analysis. | 2026-07-19 |
 | D-12 | Do not unify the cloud and CLI transports. | Cloud chat is WebSocket; the CLI is SSE. Only the normalized event model in `run-events` is shared. Forcing one transport layer would couple two independently evolving protocols. | 2026-07-19 |
 | D-15 | Local-session attachments pass by reference, not upload. | `PromptInput.FileAttachment` carries a `uri`, and `resolvePrompt` in `packages/core/src/session.ts` accepts either a `data:` URI or a parseable URL/path, deriving MIME from either. Local workspace files can therefore be passed by path and never leave the machine. Cloud sessions keep the existing Studio Data upload path. | 2026-07-19 |
+| D-17 | The Studio CLI already runs; no build-out is needed to unblock R3. | Verified live on 2026-07-19: `bun run --conditions=browser ./src/index.ts serve --port <n>` from `temp/opencode/packages/studio` starts a working server. `/api/health` returned `{"healthy":true}`, `/api/event` streamed `server.connected` plus heartbeats, and `/api/session` responded. Bun 1.2.19 and 648 installed dependencies were already present. Creating a separate runnable copy would duplicate a working tree for no gain. | 2026-07-19 |
 | D-16 | Split the cloud generated-image helpers out of the display classifier during the run-events extraction. | `extractGeneratedImageIds` and `deleteRemoteImages` matched a cloud endpoint shape and issued a DELETE `fetch`. Leaving them in `run-events/classify` would have put a cloud network call inside an authority-neutral display module, contradicting the point of the extraction. Moved to `features/chat/services/generatedImages.ts`, target owner `cloud/chat`. | 2026-07-19 |
 | D-14 | Retire the CLI bridge entirely rather than retargeting it from Claude Code to Studio CLI. Desktop launches `studio serve` and speaks HTTP + SSE through the generated SDK. | The CLI ships a headless `serve` command, and its own TUI is an HTTP client of that server rather than a stdio consumer. A generated typed SDK (`createStudioClient`) already exists. A PTY bridge would mean parsing human-readable output from a program that already offers a typed API with a structured event stream. | 2026-07-19 |
 | D-13 | Make the `run-events` extraction the first slice of R3, ahead of any protocol work. | Verified that `src/runtime/ui/` imports nothing from transport, execution, servers, or protocol. It is a pure relocation with no CLI dependency, and it shrinks the `src/runtime` deletion surface before protocol risk is introduced. | 2026-07-19 |
@@ -42,10 +43,55 @@ Last updated: 2026-07-19.
 | F-05 | `ArtifactLabPanel.tsx` (1,870 lines) has no consumer and is fully dead. | Product decision, then W3 | Artifact surface ownership is undecided: separate catalog page versus right-panel surface. Not a mechanical dead-code removal. | Largest single dead-code item in the tree. Decide before W3 begins. |
 | F-06 | `documentation/audit/` G-02 lists restoring `youtube-transcript` into `Backend/Cloud`. | Cloud audit program | D-02 cancelled the feature in Studio, but the cloud remediation binder still plans to restore it. Different program, not touched here. | Cloud work could re-introduce a cancelled feature. Confirm cancellation there. |
 | F-07 | Remove the Studio copy of computer-use plus its Tauri resources, `mcp-build.mjs` entry, catalog registration, and source references. | R5 | The package is still live and bundled. Removing it in R1 breaks the desktop build. | This is the step that actually completes R1's intent. R5 must not close without it. |
-| F-09 | CLI has no Git or review API; only turn-level `session.revert.*`. | R7 | The CLI protocol has no `git` group. Desktop's `ReviewPanel` uses Tauri git commands directly. Either the CLI grows a git group or Desktop keeps Git ownership for review. Interacts with the known `git_stash_and_checkout` bug. | R7 cannot decide the review surface without this. See contract G-1. |
+| F-09 | Git/review is implemented in the CLI core but not exposed over HTTP. | R7, plus a CLI-side protocol addition | `packages/core/src/git.ts` provides a full `@studio/GitV2` service including `change.capture`, `change.apply`, and `change.discard`, which is exactly accept/reject of file changes. There is no `git` protocol group, so none of it is reachable from Desktop. The session already knows which files it changed via `revert.files` and snapshots; Desktop's Tauri git cannot answer that question because it has no session concept. | Recommended resolution: expose a git group in the CLI and have Desktop mirror it. Pending product-owner confirmation. See contract G-1. |
 | F-10 | Migration format mapping for existing local conversations and Claude transcripts. | R4 | Downgraded from a hard block: `studio import <file>` accepts session data as JSON, and `studio export` emits that shape. The remaining work is converting Desktop's stores into that schema, using export output as the target. | R4 needs the format mapping, not a new API. See contract G-2. |
 | F-11 | ~~SSE reconnect/replay unverified.~~ **Resolved 2026-07-19 by inspection:** there is no SSE resume. Events are emitted with `id: undefined`, so `Last-Event-ID` cannot work, and the subscriber queue is dropping at capacity 256. Desktop must reconcile via `session.history` after any disconnect or overflow, and must never block the subscription while rendering. Now a design constraint, tracked in the contract. | Closed | - | - |
 | F-08 | ~~Package metadata: `license` absent on all five `@studio/*` packages.~~ **Resolved 2026-07-19** by D-09: `UNLICENSED` + `private: true`. | Closed | - | - |
+
+## Rename Candidates
+
+Recorded at move time, applied in W5. The plan requires a candidate name to be
+recorded before a move; these are those records. Nothing here is applied yet,
+because renaming during a relocation makes the diff unreviewable.
+
+| Current | Candidate | Why | Owning phase |
+| --- | --- | --- | --- |
+| `run-events/components/RuntimeStepCard.tsx` | `RunStepCard.tsx` | Carries the legacy `Runtime` prefix into a subsystem that deliberately replaced the local runtime. | W5 |
+| `run-events/components/toolCardRegistry.tsx` | `toolCardRegistry.ts` or keep | Holds JSX so the extension is correct today; revisit if the registry becomes data-only. | W5 |
+| `src/runtime/**` | deleted, not renamed | Target tree keeps no `runtime` folder. Remaining contents split to `cloud/chat`, `studio-cli/*`, or are removed. | R3-R5 |
+| `src/cliBridges/**` | deleted | Generic name hiding a Claude-only implementation. Superseded by the CLI client. | R3 |
+| `src/core/**` | `platform`, `cloud`, `security`, `shared` | Mixed infrastructure and domain code. | W5 |
+| `src/lib/**` | `shared/utils` plus owner folders | Utilities mixed with auth/API/token/domain parsers. | W5 |
+| `src/ui/**` | `design-system/*`, `brand`, `shared/components` | Presentation dumping ground. | W5 |
+| `src/design/**` | `design-system` | Less explicit than the target name. | W5 |
+| `workspace/rightWorkspace/**` | `features/review`, `features/side-chat`, `features/workspace/surfaces` | Describes placement, not responsibility. | W5 |
+
+## Legacy Removal Checklist
+
+Every legacy item that must eventually disappear, with the phase that owns the
+deletion. This exists so that "we will remove it later" is auditable rather than
+aspirational. An item may only be struck when its removal is committed.
+
+| # | Legacy item | Owning phase | Blocked by |
+| --- | --- | --- | --- |
+| L-01 | `src/cliBridges/**` and the Claude chat-engine path | R3 | Nothing; retirement decided in D-14 |
+| L-02 | `claude_bridge_start` / `claude_bridge_stop` Tauri commands | R3 | All frontend callers removed first |
+| L-03 | `ChatEngine = "studio" \| "claude"` type and Claude metadata in chat types | R3 | Conversation authority model replaces it |
+| L-04 | `src/runtime/transport/**` (wsPool, useAgentChat) | R3 | Extract to `cloud/chat` first |
+| L-05 | `src/runtime/execution/**` (executeLocalTools, permission gate) | R3 | CLI owns tool execution |
+| L-06 | `src/runtime/capabilities/**` (buildChatBody, getMcpServers) | R3/R5 | Cloud body building moves to `cloud/chat` |
+| L-07 | `src/runtime/servers/**` (local MCP catalog/lifecycle) | R5 | CLI owns local MCP |
+| L-08 | `src/runtime/invoke/invokeMcpTool.ts` | R5 | No remaining `mcp_call_tool` callers |
+| L-09 | `src/runtime/` folder itself | R5 | All of L-04 through L-08 |
+| L-10 | Local conversation store and Claude transcript adapter | R4 | Migration format mapping (F-10) |
+| L-11 | Bundled MCP Tauri resources and `mcp-build.mjs` entries | R5 | Runtime callers gone |
+| L-12 | Studio copy of computer-use and its registrations | R5 | Same as F-07 |
+| L-13 | `library/mcp-servers/harness/studio-harness/**` | R5 | CLI covers local coding tools |
+| L-14 | `library/mcp-servers/system/**` (mcp/skill management/execution) | R5 | Schemas moved to CLI or cloud |
+| L-15 | `STUDIO/daemon/**` and `local_provider_*` commands | R6 | Local provider ownership decision |
+| L-16 | Vendored `rg`/Git/Bash packaging | R6 | CLI packaging decision |
+| L-17 | `docs/architecture/Cloud and Local*.md` | W6 | Superseded by V2 docs |
+| L-18 | `OPENCODE_*` env var names surfaced to Desktop | CLI program | Upstream rebrand incomplete |
 
 ## Open Questions
 
@@ -66,4 +112,4 @@ Last updated: 2026-07-19.
 | R1 Phase A: preserve computer-use | `45df4c0` | Scope proved as exactly 67 files (66 package + 1 skill), matching the ledger's 67 `MIGRATE_TO_CLI_PRESERVE_SOURCE` rows 1:1. Provenance verified first-party. `author` metadata added to all five `@studio/*` packages. SHA-256 manifest recorded and tracked. Copy staged and verified byte-for-byte. Package builds standalone and serves 117 tools over MCP; no tests exist. |
 | Licensing + lint re-baseline | `c96cf58` | `UNLICENSED` + `private: true` on all five packages (D-09). Lint ratchet re-baselined per-file at 38 (D-10); `npm run gate` passes end to end for the first time. |
 | R2: Studio CLI contract | `3164c97`, `efda1eb` | `06-studio-cli-contract.md`. Contract derived from the CLI's real protocol: 18 groups, typed HTTP API, SSE stream, already rebranded to `@studio-ai/*`. Sessions, approvals, files, terminal fully covered. CLI bridge retired in favour of `serve` + SDK (D-14). |
-| R3 slice 1: run-events extraction | pending commit | Six display files moved from `src/runtime/ui` to `src/run-events/{components,classify}`. Cloud image helpers split out (D-16). Seven consumers retargeted. Import purity verified: run-events depends only on `@/lib/formatters`, `@/types`, `@/ui`, framer-motion, and react. Gate, build, typecheck, and cycles all pass. |
+| R3 slice 1: run-events extraction | `0a49ff4` | Six display files moved from `src/runtime/ui` to `src/run-events/{components,classify}`. Cloud image helpers split out (D-16). Seven consumers retargeted. Import purity verified: run-events depends only on `@/lib/formatters`, `@/types`, `@/ui`, framer-motion, and react. Gate, build, typecheck, and cycles all pass. |
