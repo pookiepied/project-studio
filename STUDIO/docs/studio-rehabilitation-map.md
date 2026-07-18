@@ -456,6 +456,18 @@ First-pass ownership findings from the live checkout:
 | Splash and layer tokens | `src/ui/feedback/SplashScreen.tsx` uses `z-modal`; global dock, traffic lights, and chat top chrome use `z-toast`; token values live in `src/design/tokens.css`. | Layer ordering is currently distributed. Build a layer/portal registry before changing token values. |
 | Encoded/comment cleanup | `HomePage.tsx`, `App.tsx`, `main.tsx`, and `shellConfig.ts` still contain stale decorative separators or mojibake in comments. | ASCII/comment cleanup is valid rehabilitation work, but it should be a narrow cleanup slice after the architecture map is updated. |
 
+Layer/CSS authority findings:
+
+| Area | Intended authority | Live drift to resolve |
+| --- | --- | --- |
+| Z-index tokens | `src/design/tokens.css` defines `--z-overlay`, `--z-modal`, `--z-popover`, `--z-toast`, and `--z-context`; `tailwind.config.js` bridges them as `z-overlay`, `z-modal`, `z-popover`, `z-toast`, and `z-context`. | Some overlays still bypass the scale with inline `zIndex: 9998/9999` in chat dock rows and CLI tab previews, and local `z-10`/`z-[1]` values appear inside components. |
+| Portal roots | Most app/feature overlays portal directly to `document.body` through `createPortal`; Radix select uses `RadixSelect.Portal`. | There is no app-level portal registry or named overlay host, so stacking, focus, and dismissal ownership are implicit at each call site. |
+| Modal/backdrop surfaces | Modal-like overlays mostly use `z-modal` plus `bg-scrim` from design tokens. | A few surfaces use hardcoded backdrops such as `bg-black/40` or `bg-black/80`; classify whether these are deliberate media/lightbox exceptions or design-token drift. |
+| Global base CSS | `src/index.css` owns reset, body/html backgrounds, transparent window variants, focus defaults, reduced motion, scrollbar treatment, drag helpers, and chat scroll anchors. | It also owns feature-adjacent helpers like chat scroll classes; decide whether those remain global utilities or move under feature CSS after shell contracts stabilize. |
+| Workspace shell CSS | `src/app/shell/workspaceShell.css` owns `--studio-topbar-height`, `--studio-topbar-control`, hover chrome, and zen-window chat-header alignment. | The file applies `html, html body { background: transparent !important; }` globally despite being described as workspace-shell scoped, so standard/surface variants need an authority review before CSS restructuring. |
+| Pre-React shell styling | `src/main.tsx` imports design CSS and pre-applies theme/shell/window-surface classes before React mounts. | `MainLayout.tsx` repeats workspace-shell class and geometry variable mutations after React mounts. Treat this as a lifecycle contract, not just CSS duplication. |
+| Feature CSS additions | New dirty workspace work includes `src/features/workspace/pages/workspacePage.css`. | Decide whether feature CSS may own page-local layout only, or whether shell geometry variables and scroll/clipping rules must stay in app shell CSS. |
+
 ### Phase 4: Monolith splits
 
 Start with files that are large and actively edited, not generated data.
