@@ -641,6 +641,63 @@ Tooling stop conditions:
 - Do not remove nested `node_modules` from bundled MCP servers until release
   packaging no longer depends on shipping them.
 
+Root loose-file artifact triage:
+
+The Studio root mixes first-class project configuration, deployment metadata,
+local convenience files, generated logs, and likely stale test output. This is a
+good early cleanup lane because it improves contributor navigation without
+moving application code, but the tracked/untracked distinction matters.
+
+Current root loose-file classification:
+
+| File or pattern | Current status | Classification | Future action |
+| --- | --- | --- | --- |
+| `package.json`, `package-lock.json` | Tracked; currently dirty in the live worktree. | Root Node manifest and lockfile. | Do not touch until the active dependency/script work is settled. |
+| `vite.config.ts`, `vite.config.web.ts`, `tsconfig*.json`, `tailwind.config.js`, `postcss.config.js`, `eslint.config.js`, `knip.json`, `index.html` | Tracked project configuration. | First-class build, lint, typecheck, CSS, and HTML entry configuration. | Keep at root unless a future tooling workspace layout is designed. |
+| `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` | Tracked under `src-tauri`. | Native app/package authority, not root clutter. | Keep under Tauri ownership. |
+| `.gitignore` | Tracked. | Ignore policy; currently ignores logs, batch files, build outputs, env files, editor files, and generated vendor binaries except vendor manifest/README. | Clean mojibake/decorative comments later as text hygiene, without changing ignore behavior. |
+| `.vercelignore`, `vercel.json` | Tracked and referenced by their deployment filenames; `vercel.json` calls `npm run web:build` and outputs `dist-web`. | Web deployment metadata. | Keep if Vercel deployment remains supported; otherwise remove in a deployment cleanup slice with an explicit decision. |
+| `README.md` | Tracked, 29-byte placeholder. | Contributor-facing doc placeholder. | Replace with a useful Studio contributor overview rather than delete blindly. |
+| `twtest_input.css`, `twtest_out.css` | Tracked; no references found in root scripts/config search. | Likely stale Tailwind experiment or generated test output. | Candidate for a focused cleanup commit after confirming no external workflow uses it. |
+| `.codex-vite-outline*.log`, `vite-dev*.log` | Ignored by `.gitignore`, untracked local logs. | Local runtime/debug artifacts. | Safe to remove locally when desired, but not a repository cleanup commit unless they become tracked. |
+| `run-tauri.bat`, `run-web.bat` | Ignored by `.gitignore`, untracked local launch helpers. | Local Windows convenience scripts. | Do not commit as-is. If launchers are desired, replace with documented npm scripts or tracked scripts intentionally. |
+
+Root artifact cleanup rules:
+
+1. Tracked root config files are not clutter merely because they live at the
+   root. They define build, type, lint, CSS, web, and deployment entry points.
+2. Ignored local artifacts can be removed from the working copy, but they should
+   not be part of rehabilitation commits unless the repo accidentally tracks
+   them.
+3. Placeholder docs should be upgraded into contributor guidance when the target
+   organization is stable enough to describe.
+4. Generated experiment outputs need a reference check and then a small deletion
+   commit; do not fold them into unrelated source cleanup.
+5. Deployment metadata needs an explicit deployment-support decision before
+   removal, even if no TypeScript import references it.
+
+Suggested future root cleanup order:
+
+1. Delete `twtest_input.css` and `twtest_out.css` in a narrow cleanup slice if a
+   final search still finds no references.
+2. Remove ignored local logs from the working copy only when the user wants a
+   clean local root; no commit directive is needed for ignored files.
+3. Replace the placeholder `README.md` after the top-level organization model
+   and proof matrix are stable enough to explain.
+4. Revisit Vercel files only after deciding whether Studio still supports a web
+   deployment path.
+5. Keep batch launch helpers untracked; if needed, document `npm run tauri` and
+   `npm run web:dev` instead.
+
+Root artifact stop conditions:
+
+- Do not delete tracked deployment files without a deployment decision.
+- Do not commit ignored local logs or batch files.
+- Do not rewrite root tool configs while `STUDIO/package.json` or lockfiles are
+  dirty from another active track.
+- Do not replace `README.md` with detailed structure docs until the structure is
+  less fluid.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
