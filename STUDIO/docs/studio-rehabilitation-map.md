@@ -285,6 +285,63 @@ Boundary notes:
 - Because `ArtifactLabPanel.tsx`, `registry.ts`, and several artifact renderers
   are dirty now, this is audit evidence only until those files are handed over.
 
+Workspace page responsibility triage:
+
+`src/features/workspace/pages/WorkspacePage.tsx` is dirty and currently mixes
+workspace controller state, persistence calls, local UI state, markdown editing,
+quick capture, and large page sections. The new `workspace/life/` folder gives
+the workspace domain a clearer service/type boundary, but the page still acts as
+the state controller.
+
+Observed responsibilities inside `WorkspacePage.tsx`:
+
+| Responsibility | Current evidence | Candidate extraction |
+| --- | --- | --- |
+| Page-local helpers | `cx`, `boolish`, `relative`, `formatDate`, `noteSignature`, `makeStarterMarkdown`, and `downloadMarkdown`. | `workspacePageUtils.ts`, with download kept browser-only. |
+| Small controls | `IconButton`, `FormatButton`, and the commented-out `ProjectPicker`. | Keep live controls near page or move to `WorkspaceControls.tsx`; remove commented legacy picker in a later cleanup slice if confirmed unused. |
+| Snapshot and source state | `snapshot`, `loading`, `saving`, `saveState`, `forceLocal`, `savedNoteSignatures`, `noteSaveTimer`, and `load`. | `useWorkspaceController.ts` or `useWorkspaceSnapshot.ts`, after dirty work is handed over. |
+| Selection and derived lists | Project/note/task selection state plus `projectNotes`, `projectTasks`, `selectedNote`, `selectedTask`, filtered notes/tasks, open/completed tasks. | `useWorkspaceSelection.ts` if it stays page-local, or fold into the controller hook. |
+| Capture drawer state | `captureText`, `organized`, `organizing`, `workspace-capture-text` listener, local capture draft persistence, `organizeCapture`, and `acceptOrganized`. | `useWorkspaceCapture.ts`; keep localStorage key ownership explicit. |
+| Note autosave and revisions | Dirty detection via `noteSignature`, delayed autosave, `saveNote`, `updateNoteLocal`, `loadNoteRevisions`, and `restoreRevision`. | `useWorkspaceNoteEditing.ts`, with conflict/save-state behavior preserved. |
+| Project/task mutations | `createProject`, `createNote`, `createTask`, `toggleTask`, `resetLocal`, and source-aware optimistic snapshot updates. | Controller hook action surface; avoid scattering snapshot mutation rules across UI components. |
+| AI context preview | `contextPreview`, `contextLoading`, `previewContext`, details-panel copy behavior. | `useWorkspaceContextPreview.ts`, or part of controller if context is a core workspace action. |
+| Markdown editor behavior | `editorMode`, `editorRef`, `applyMarkdown`, `handleEditorKeyDown`, and markdown preview rendering. | `WorkspaceNoteCanvas.tsx` plus `useMarkdownEditorCommands.ts`. |
+| Page shell/navigation | Workspace topbar, project rail, library/search/surface switch, canvas shell, details panel, quick-add modal/drawer. | Separate section components only after controller hook exists, so props stay small. |
+| CSS and visual skin | `workspacePage.css` owns full-page clipping, aurora/project shader classes, pane layout, command bar, and nested scroll. | Do not split CSS until theme/CSS authority and layout/scroll contracts are settled. |
+
+`workspace/life/` boundary observed:
+
+| File | Owns today | Notes |
+| --- | --- | --- |
+| `workspace/life/types.ts` | Domain DTOs: workspace, project, note, task, revision, context preview, snapshot, organized capture. | Good candidate to remain the workspace domain contract, but naming `life` should be revisited after the workspace domain stabilizes. |
+| `workspace/life/workspaceService.ts` | Local seed/store, cloud requests, project/note/task CRUD, revisions, context preview, reset, and AI capture organization through chat service. | Service mixes cloud adapter, local adapter, domain mutations, and AI capture orchestration. Split only after page controller extraction makes call sites smaller. |
+
+Suggested first workspace split after handoff:
+
+1. Extract `useWorkspaceController.ts` with snapshot/source/load/save-state,
+   selected IDs, derived selected entities, and mutation actions. Keep behavior
+   identical and keep `WorkspacePage.tsx` as composition owner.
+2. Extract `useWorkspaceCapture.ts` after the controller exists, because capture
+   actions create notes/tasks and need a small controller action surface.
+3. Extract `WorkspaceNoteCanvas.tsx` and markdown command helpers after autosave
+   behavior is isolated.
+4. Extract navigation/library/details/quick-add section components only after
+   state props are small and stable.
+5. Revisit the name `workspace/life/` only after the service has either stayed
+   as the domain boundary or split into `workspace/domain`, `workspace/storage`,
+   and `workspace/ai`.
+
+Workspace stop conditions:
+
+- Do not edit `WorkspacePage.tsx`, `workspacePage.css`,
+  `workspace/life/workspaceService.ts`, right-workspace panels, or geometry
+  files until the current workspace dirty work is committed or explicitly
+  handed over.
+- Do not move `workspacePage.css` rules while root scroll, page scroll, and
+  shell clipping ownership are still under audit.
+- Do not split `workspaceService.ts` before confirming cloud endpoint contracts
+  and local-storage migration behavior.
+
 ## Dead-Code Signals
 
 `npx knip --reporter compact` currently reports:
