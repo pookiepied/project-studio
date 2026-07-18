@@ -426,6 +426,10 @@ Current files to reconcile first:
 
 - `src/app/routes/HomePage.tsx`
 - `src/app/shell/FloatingPanel.tsx`
+- `src/app/shell/MainLayout.tsx`
+- `src/app/shell/WorkspaceShellChrome.tsx`
+- `src/app/shell/shellConfig.ts`
+- `src/app/shell/workspaceLayoutStore.ts`
 - `src/features/chat/pages/ChatTopChrome.tsx`
 - `src/features/chat/pages/ChatPage.tsx`
 - `src/features/chat/components/ChatFloatingDockRows.tsx`
@@ -435,6 +439,22 @@ Current files to reconcile first:
 - `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx`
 - `src/features/workspace/rightWorkspace/ConversationWorkspacePanel.tsx`
 - `src/features/workspace/rightWorkspace/workspacePanelGeometry.ts`
+
+First-pass ownership findings from the live checkout:
+
+| Area | Observed owner today | Rehabilitation risk |
+| --- | --- | --- |
+| App initialization | `src/app/App.tsx` owns frontend initialization steps and calls Tauri `app_ready` after `isInitialized`; splash removal separately waits for router readiness and minimum splash duration. | Rust may show/focus the real window before the router/session and splash lifecycle finish. Readiness needs named phases instead of a single frontend-ready event. |
+| Native window visibility | `src-tauri/src/lib.rs` owns `app_ready`, startup show/focus, minimize-to-tray close behavior, and platform window rounding. | UI shell readiness and native visibility are coupled only by a broad `app_ready` command, so z-index symptoms can mask lifecycle timing bugs. |
+| Shell mode selection | `src/main.tsx` pre-applies theme/shell classes before React; `src/app/shell/MainLayout.tsx` reapplies workspace shell classes and chooses workspace shell vs standard titlebar shell. | Two places mutate `html` shell classes and geometry vars. Keep them aligned or move toward a single shell lifecycle authority. |
+| Provider and page routing | `src/app/routes/HomePage.tsx` owns current view state, the major providers below app providers, global shortcut/context listeners, permission host, and page transitions. | HomePage is both route switch and cross-feature provider host. Future page moves should not hide provider lifetime decisions inside feature folders. |
+| Global dock frame/nav | `src/app/shell/FloatingPanel.tsx` owns the top-center global navigation frame and currently toggles `chatDockVisible` based on whether the active view is chat. | The state name is chat-specific while the dock is now global shell chrome; rename only after the dock/page ownership contract is settled. |
+| Chat top chrome | `src/features/chat/pages/ChatTopChrome.tsx` owns chat title/project/context badges and the fixed top-right right-workspace controls. | Chat still owns shell-positioned controls via `z-toast`; this should be audited before moving chat files or changing layer tokens. |
+| Workspace shell chrome | `src/app/shell/WorkspaceShellChrome.tsx` composes hover chrome, traffic lights, and the global floating panel. | This is the clearest candidate for the workspace-shell chrome boundary, but it does not yet own all fixed top chrome. |
+| Cross-cutting layout widths | `src/app/shell/workspaceLayoutStore.ts` exposes module-level left/right width signals consumed outside normal props flow. | This is a small layout bus. Document allowed publishers/subscribers before expanding it or replacing it with context. |
+| Right workspace surface | `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx` owns right-panel width, resize behavior, active-tab rendering, and the switch between conversation workspace and classic workspace. | It mixes layout geometry, tab rendering, and mode switching. Split only after deciding whether conversation workspace is a mode, tab, or separate surface. |
+| Splash and layer tokens | `src/ui/feedback/SplashScreen.tsx` uses `z-modal`; global dock, traffic lights, and chat top chrome use `z-toast`; token values live in `src/design/tokens.css`. | Layer ordering is currently distributed. Build a layer/portal registry before changing token values. |
+| Encoded/comment cleanup | `HomePage.tsx`, `App.tsx`, `main.tsx`, and `shellConfig.ts` still contain stale decorative separators or mojibake in comments. | ASCII/comment cleanup is valid rehabilitation work, but it should be a narrow cleanup slice after the architecture map is updated. |
 
 ### Phase 4: Monolith splits
 
