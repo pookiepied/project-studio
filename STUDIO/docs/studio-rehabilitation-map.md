@@ -787,6 +787,64 @@ First-pass ownership findings from the live checkout:
 | Splash and layer tokens | `src/ui/feedback/SplashScreen.tsx` uses `z-modal`; global dock, traffic lights, and chat top chrome use `z-toast`; token values live in `src/design/tokens.css`. | Layer ordering is currently distributed. Build a layer/portal registry before changing token values. |
 | Encoded/comment cleanup | `HomePage.tsx`, `App.tsx`, `main.tsx`, and `shellConfig.ts` still contain stale decorative separators or mojibake in comments. | ASCII/comment cleanup is valid rehabilitation work, but it should be a narrow cleanup slice after the architecture map is updated. |
 
+Startup lifecycle contract triage:
+
+The startup problem is a lifecycle problem, not a stacking-order problem. The
+main Tauri window is configured hidden/unfocused, React renders the real app
+tree behind a splash overlay, and `app_ready` currently asks Rust to show/focus
+the native window before the app has proven that router/session restoration and
+splash dismissal are complete.
+
+Observed startup phases today:
+
+| Phase | Current owner | Current signal | Risk |
+| --- | --- | --- | --- |
+| Native window creation | `src-tauri/tauri.conf.json` and `src-tauri/src/lib.rs` | Main window is frameless, transparent, `visible: false`, and `focus: false`. | Native window visibility is intentionally delayed, but the delay is coupled to one broad frontend signal. |
+| Pre-React shell setup | `src/main.tsx` | Applies `data-window-surface`, early theme class, overlay class, and workspace-shell `zen-window` geometry before React mounts. | Duplicates shell/theme work later in `MainLayout`; must remain aligned until there is one shell lifecycle owner. |
+| Surface routing | `src/app/App.tsx` module-scope query checks | `?w=overlay` skips full initialization, `?splashPreview=1` renders preview, otherwise `MainApp`. | Window/surface variants branch before providers. New variants need explicit classification. |
+| Frontend initialization | `MainApp` in `src/app/App.tsx` | Initializes secure storage, global error handler, unified storage, theme/auth/offline placeholder steps, and bundled local skills, then sets `isInitialized`. | This phase is currently treated as enough to call native `app_ready`, but it is not enough to prove the app is interactive. |
+| Native show/focus | `MainApp` calls `invoke("app_ready")`; Rust `app_ready` shows/focuses the main window. | Called in `requestAnimationFrame` immediately after `isInitialized` flips. Rust respects `should_show_on_ready`. | Native window may appear while router/auth/API checks, session restoration, and splash minimum duration are still pending. |
+| Provider/router readiness | `AppProviders` and `AppRouter` | App providers mount, AuthProvider loads, API config is checked, runtime init modal may appear, then `onReady` sets `isRouterReady`. | Router-ready does not mean conversation-ready or workspace-ready; it only means the route can render. |
+| Page/provider restoration | `HomePage`, chat provider/bootstrap, workspace page/service | HomePage mounts feature providers; chat bootstrap may load most recent conversation after mount and after `studio:storage-ready`. | App readiness should not imply active conversation/session restoration is complete. |
+| Splash dismissal | `MainApp` | Waits for `isInitialized`, `isRouterReady`, no error, and `STARTUP_SPLASH_MIN_MS`, then unmounts `SplashScreen` with `SPLASH_EXIT_DURATION_SECONDS`. | Splash is an in-window overlay using `z-modal`; top chrome can appear above it if other chrome uses a higher layer. |
+| Interactive shell | `MainLayout`, `WorkspaceShellChrome`, `HomePage`, feature pages | Shell classes, global dock, hover chrome, and page content are active. | There is no single `interactive` signal after splash exit and page/session restore. |
+
+Contract needed before code changes:
+
+1. Split the single `app_ready` meaning into named readiness states such as
+   `frontend_initialized`, `router_ready`, `session_restore_started`,
+   `session_restored`, `splash_minimum_elapsed`, `splash_dismissed`,
+   `shell_interactive`, and `native_visible`.
+2. Decide which state is allowed to call native show/focus. The likely
+   candidate is not `frontend_initialized`; it should be at least
+   router-ready plus an intentional native visibility decision.
+3. Decide whether native visibility should happen while splash is visible or
+   only after splash exit begins. If it happens under the splash, top chrome
+   layers must be suppressed or classified, not merely moved by z-index.
+4. Preserve overlay and splash-preview branches as separate surface variants
+   that do not run full startup lifecycle.
+5. Keep `MainLayout` and `main.tsx` shell class mutations synchronized until a
+   single shell lifecycle owner is introduced.
+
+Suggested future implementation order:
+
+1. Add a small startup lifecycle helper or context that records readiness phases
+   without changing behavior.
+2. Route the existing `isInitialized`, `isRouterReady`, and splash timer through
+   that helper, still preserving the current visual behavior.
+3. Move the native `app_ready` call behind the selected readiness phase after
+   the lifecycle evidence is visible in code.
+4. Only then revisit layer tokens or chrome visibility during splash.
+
+Startup stop conditions:
+
+- Do not change `z-modal`, `z-toast`, splash z-index, or traffic-light z-index
+  as the primary startup fix.
+- Do not move `app_ready` without naming the readiness phase that owns native
+  show/focus.
+- Do not treat `AppRouter.onReady` as conversation/session restoration without
+  checking `HomePage`, `ChatProvider`, and `useConversationBootstrap`.
+
 Layer/CSS authority findings:
 
 | Area | Intended authority | Live drift to resolve |
