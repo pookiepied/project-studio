@@ -502,6 +502,22 @@ State ownership and persistence findings:
 | Workspace source state | `WorkspacePage.tsx` owns UI selection state, save/dirty state, force-local preference, capture draft, note revision view, and context preview. `workspaceService.ts` owns cloud calls and the local adapter under `studio.workspace.local.v1`. | Workspace is currently page-state-heavy and service-backed. Split UI sections only after extracting or documenting the workspace state controller. |
 | Voice session state | `LiveSessionProvider` is mounted under `HomePage` but above pages, so voice state survives view changes and syncs to the Pulse overlay. | Voice session lifetime depends on provider placement, not route identity. Page reorganization must preserve this. |
 
+Window and surface variant findings:
+
+| Surface | Observed owner today | Rehabilitation risk |
+| --- | --- | --- |
+| Main desktop window | `src-tauri/tauri.conf.json` defines the primary Tauri window as frameless, transparent, hidden at launch, unfocused, and shown later through `app_ready`. | Native window behavior, splash timing, and React shell readiness are coupled across Rust config, Rust commands, and React startup. |
+| Main React app | `src/app/App.tsx` renders `MainApp` unless query params request overlay or splash preview. `MainApp` owns initialization and wraps `AppProviders`. | Query-param routing happens before the normal provider tree. New window variants should be explicit so they do not accidentally run full app initialization. |
+| Overlay window | `overlayService.ts` creates a persistent Tauri `WebviewWindow` labeled `overlay` at `/?w=overlay`; `OverlayPage.tsx` skips the app provider chain and communicates through Tauri events. | Overlay is a separate native window with separate theme, size, and positioning lifecycle. Do not treat it as an app overlay/portal. |
+| Splash preview | `App.tsx` routes `?splashPreview=1` to `SplashPreviewPage`, which renders only splash preview controls and writes `studio-theme`. | Preview is a utility route that mutates theme state. Keep it classified separately from startup splash behavior. |
+| Auth callback | `AppRouter.tsx` detects `/oauth/callback` and renders `AuthCallback` inside the normal provider stack after app initialization. | Callback is a route variant, not a separate window. It still depends on AuthProvider and can affect session/localStorage state. |
+| Login/welcome surface | `ShaderWelcomePage.tsx` is selected by `AppRouter` when unauthenticated and owns its own context menu, theme toggle, and Tauri window controls. | It behaves like a shell-adjacent surface even though it is a route page. Shell/window-control ownership should be reconciled before moving auth pages. |
+| Conversation windows | `conversationWindowService.ts` creates a new Tauri `WebviewWindow` per conversation with `/?view=chat&conversationId=...`; web fallback uses `window.open`. | The query params do not currently map to a dedicated route in `App.tsx`/`AppRouter`. Audit whether conversation windows restore the intended conversation or just boot the normal app. |
+| Right workspace tabs | `RightWorkspacePanel.tsx` owns in-page tab surfaces: browser, terminal, files, review, side-chat, artifacts, and conversation workspace. | These are panels inside the main React tree, not windows. Their lifecycle is tied to chat/right-workspace state. |
+| Side chat | `SideChatPanel.tsx` is a right-workspace tab with its own conversation state, opened from chat or workspace controls. | Side chat is a nested conversation surface and should not be confused with separate conversation windows. |
+| Native browser child webviews | `src-tauri/src/native_browser.rs` creates child webviews inside the main window; `nativeBrowserService.ts` maps browser tab ids to labels such as `studio-browser-<tab>`. | Browser content is neither a React iframe alone nor a separate Tauri window. Geometry, visibility, and cleanup live across React panel state and Rust child-webview commands. |
+| Web/html browser fallback | `BrowserPanel.tsx` also supports HTML/iframe-style rendering when native browser support is unavailable. | Browser panels have two rendering backends. Keep this backend split visible before reorganizing workspace browser files. |
+
 ### Phase 4: Monolith splits
 
 Start with files that are large and actively edited, not generated data.
