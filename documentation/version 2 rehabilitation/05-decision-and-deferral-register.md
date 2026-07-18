@@ -27,6 +27,8 @@ Last updated: 2026-07-19.
 | D-11 | Derive the Studio CLI contract from the CLI's existing API rather than specifying one. | `temp/opencode` already ships a typed HTTP API and SSE event stream with 18 protocol groups. Writing an idealized contract against a CLI that already has a real one would produce fiction. R2's deliverable is a mapping plus gap analysis. | 2026-07-19 |
 | D-12 | Do not unify the cloud and CLI transports. | Cloud chat is WebSocket; the CLI is SSE. Only the normalized event model in `run-events` is shared. Forcing one transport layer would couple two independently evolving protocols. | 2026-07-19 |
 | D-15 | Local-session attachments pass by reference, not upload. | `PromptInput.FileAttachment` carries a `uri`, and `resolvePrompt` in `packages/core/src/session.ts` accepts either a `data:` URI or a parseable URL/path, deriving MIME from either. Local workspace files can therefore be passed by path and never leave the machine. Cloud sessions keep the existing Studio Data upload path. | 2026-07-19 |
+| D-19 | Complete the Studio CLI rebrand now, as an isolated subagent task, before Desktop integration. | R3 slices 3.4-3.6 will hardcode env var names, config paths, and the binary name. Renaming after integration forces a second pass through Desktop. The package rename is already done, so the tree is stuck in a half-state. 460 test files provide a verification baseline. The work is isolated from STUDIO. Supersedes the narrow reading of D-05, which was about not building CLI *functionality*; a naming pass is not product work. | 2026-07-19 |
+| D-20 | Clean break on CLI naming: no backward compatibility. | Nobody uses this CLI and Desktop is its only future consumer, so dual-path config/env fallback code would be written only to be deleted. Confirmed by the product owner. | 2026-07-19 |
 | D-17 | The Studio CLI already runs; no build-out is needed to unblock R3. | Verified live on 2026-07-19: `bun run --conditions=browser ./src/index.ts serve --port <n>` from `temp/opencode/packages/studio` starts a working server. `/api/health` returned `{"healthy":true}`, `/api/event` streamed `server.connected` plus heartbeats, and `/api/session` responded. Bun 1.2.19 and 648 installed dependencies were already present. Creating a separate runnable copy would duplicate a working tree for no gain. | 2026-07-19 |
 | D-16 | Split the cloud generated-image helpers out of the display classifier during the run-events extraction. | `extractGeneratedImageIds` and `deleteRemoteImages` matched a cloud endpoint shape and issued a DELETE `fetch`. Leaving them in `run-events/classify` would have put a cloud network call inside an authority-neutral display module, contradicting the point of the extraction. Moved to `features/chat/services/generatedImages.ts`, target owner `cloud/chat`. | 2026-07-19 |
 | D-14 | Retire the CLI bridge entirely rather than retargeting it from Claude Code to Studio CLI. Desktop launches `studio serve` and speaks HTTP + SSE through the generated SDK. | The CLI ships a headless `serve` command, and its own TUI is an HTTP client of that server rather than a stdio consumer. A generated typed SDK (`createStudioClient`) already exists. A PTY bridge would mean parsing human-readable output from a program that already offers a typed API with a structured event stream. | 2026-07-19 |
@@ -92,6 +94,21 @@ aspirational. An item may only be struck when its removal is committed.
 | L-16 | Vendored `rg`/Git/Bash packaging | R6 | CLI packaging decision |
 | L-17 | `docs/architecture/Cloud and Local*.md` | W6 | Superseded by V2 docs |
 | L-18 | `OPENCODE_*` env var names surfaced to Desktop | CLI program | Upstream rebrand incomplete |
+
+## Corrections To Earlier Findings
+
+Recorded so that a wrong call made confidently does not survive as fact.
+
+| # | Original claim | Correction | Date |
+| --- | --- | --- | --- |
+| C-01 | The 38 lint errors would be throwaway work because the files get restructured. | Wrong. None of the eight files are deleted by R3-R7; they are kept, split, or moved, so the fixes survive. The real blocker is inability to verify rendered output without credentials. | 2026-07-19 |
+| C-02 | `opencode.ai` URLs are a high-risk "must not rename" category because they are live external endpoints and provider attribution. | Overstated. `opencode.ai` appears in **zero** source files; all 12 occurrences are in tests. Source already emits `https://studio.ai/` and `X-Title: studio`. The headers are attribution sent *to third-party gateways* (OpenRouter, NVIDIA, Kilo, LLMGateway, ZenMux), never a dependency on OpenCode's own gateway. The CLI is already independent of it. | 2026-07-19 |
+| C-03 | Implicit assumption that the CLI test suite was a clean baseline. | Wrong. The suite is already red: source was rebranded but 118 of 460 test files still assert pre-rebrand values. Verified by running `provider-nvidia.test.ts` (1 pass, 3 fail). Any rebrand plan must capture which tests already fail before changing anything. | 2026-07-19 |
+
+The genuine "must not rename" set is narrower and different from C-02: the npm
+package names `opencode-gitlab-auth`, `opencode-poe-auth`,
+`opencode-openai-codex-auth`, and `opencode-copilot-auth`. The first two are live
+imports; all four are real published packages whose names are not ours to change.
 
 ## Open Questions
 
