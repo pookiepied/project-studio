@@ -66,6 +66,36 @@ Current file counts after the first dead-code proof pass:
 `vendor/` is large by design and should be classified as bundled runtime
 material, not ordinary source debt.
 
+Observed source-like folder snapshot on 2026-07-18, excluding common install,
+build, target, and vendor output during a dirty worktree:
+
+| Area | Files | Current contract |
+| --- | ---: | --- |
+| `src/` | 550 | Primary React application source. Treat as the main feature/shell rehabilitation target. |
+| `src-tauri/` | 85 | Desktop platform layer: Tauri config, Rust commands, native windows, tray, plugins, and platform bridges. Audit with startup/window contracts before moving app shell code. |
+| `library/` | 160 | Bundled MCP servers and skills. This is capability-library source, not generic shared app code. It needs its own dead-code/build pass because the root Knip config ignores `library/mcp-servers/**` and `library/skills/**`. |
+| `daemon/` | 16 | Small local provider bridge for Ollama and LM Studio with its own package, TypeScript build, and Node tests. Treat as a local service boundary rather than frontend code. |
+| `scripts/` | 6 | Build/release/vendor/installer utilities referenced by package scripts. Audit by script entry point and package-script usage, not by app imports. |
+| `web/` | 4 | Separate web entry/build variant using `vite.config.web.ts` and `web-main.tsx`. Keep distinct from the desktop app shell until surface variants are explicit. |
+| `gate/` | 2 | Ratchet baselines for lint and cycles. Preserve as quality-gate state unless replacing the gate process. |
+| `public/` | 7 | Static app/web assets. Audit through asset references and packaging behavior. |
+| `docs/` | 2 | Local architecture/rehabilitation documentation for this effort. |
+
+Root manifest signals:
+
+- `package.json` defines the primary verification commands: `typecheck`,
+  `deadcode`, `ratchet:lint`, `ratchet:cycles`, and `gate`.
+- `package.json` also defines operational entry points for Tauri, vendor sync,
+  web builds, preview, and installer asset generation.
+- `knip.json` currently scans only `src/main.tsx`, `web/web-main.tsx`,
+  `src/**/*.{ts,tsx}`, and `web/**/*.{ts,tsx}`. It ignores `src-tauri/**`,
+  `daemon/**`, `library/mcp-servers/**`, `library/skills/**`, `scripts/**`,
+  and `vendor/**`, so root `npm run deadcode` cannot prove those ignored
+  areas are unused.
+- `daemon/package.json` identifies `daemon/` as
+  `studio-harness-provider-daemon`, a local provider bridge with `build`,
+  `dev`, `start`, and `test` scripts.
+
 ## Existing Architecture Signal
 
 The strongest existing architecture rule is in `eslint.config.js`:
