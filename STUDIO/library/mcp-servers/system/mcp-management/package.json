@@ -13,5 +13,7 @@
     "esbuild": "^0.24.0",
     "typescript": "^5.6.0"
   },
-  "author": "Asif Ahsan Sabbir <asifahsansabbir@gmail.com>"
+  "author": "Asif Ahsan Sabbir <asifahsansabbir@gmail.com>",
+  "license": "UNLICENSED",
+  "private": true
 }

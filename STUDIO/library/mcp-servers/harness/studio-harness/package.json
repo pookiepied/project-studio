@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Studio Harness MCP server: local coding/project harness (filesystem, code search & intelligence, git, shell/PowerShell, REPL, LSP)",
   "author": "Asif Ahsan Sabbir <asifahsansabbir@gmail.com>",
+  "license": "UNLICENSED",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __createRequire } from 'module'; import { fileURLToPath as __fileURLToPath } from 'url'; import { dirname as __pathDirname } from 'path'; const require = __createRequire(import.meta.url); const __filename = __fileURLToPath(import.meta.url); const __dirname = __pathDirname(__filename);\" --target=node18 --external:node-ssh --external:ssh2 --external:cpu-features --outfile=dist/index.js",
