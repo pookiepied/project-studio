@@ -265,6 +265,66 @@ Use these rules before moving files:
 10. Avoid new cross-feature deep imports. Use feature public surfaces when they
     exist, and create them deliberately when they do not.
 
+### Target Organization Model
+
+This is the first human-readable target shape. It is a direction for future
+manual refactors, not permission to move files before the gates above are
+satisfied.
+
+| Layer | Intended meaning | Contributor mental model | Move/rename posture |
+| --- | --- | --- | --- |
+| `src/app/` | App composition, provider placement, routes, shell chrome, startup lifecycle, and window/surface selection. | "How the Studio application boots, chooses a surface, and composes features." | Keep shell/page ownership decisions here until startup, surface, and provider contracts are explicit. |
+| `src/features/<feature>/` | Product capabilities with user-facing workflows, feature state, feature services, feature UI, and feature-local types. | "What Studio lets the user do." | Prefer feature-local extractions before cross-layer moves. Create public feature surfaces before other features consume internals. |
+| `src/runtime/` | Runtime-facing integration with tools, local execution, permissions, local servers, and transport surfaces used by features. | "How Studio talks to executable or tool-like local/runtime capabilities." | Keep for now, but add README/contract before renaming; do not confuse with Tauri, daemon, or bundled MCP server source. |
+| `src/core/` | Cross-cutting infrastructure that is not product-specific: config, storage, network, platform, errors, diagnostics, project metadata, and service primitives. | "Shared machinery used by many layers." | Keep parent name until subfolders are classified; strengthen subfolder names before considering a parent rename. |
+| `src/ui/` | Generic reusable visual components, primitives, icons, branding, and feedback surfaces with no product workflow ownership. | "Reusable presentation pieces." | Move product-aware UI back into features; keep primitive exports small and intentional. |
+| `src/design/` | Tokens, typography, motion, Tailwind bridges, and CSS authority for the design system. | "The visual language and global design rules." | Treat CSS moves as architecture work; do not consolidate styles until shell/theme authority is mapped. |
+| `src/lib/` | Small framework-agnostic helpers and hooks with no product, runtime, or storage ownership. | "Tiny utilities." | Shrink over time by moving behavior-rich code into features/core/runtime and leaving only generic helpers. |
+| `src/types/` | Shared DTOs and contracts needed across multiple layers. | "Types that truly cross boundaries." | Avoid broad type barrels; keep feature-local types inside features unless at least two layers need them. |
+| `src/cliBridges/` | Bridges to external CLI-backed providers, currently Claude-focused. | "Adapters for CLI tools Studio can drive." | Keep separate while its bridge identity is clearer than runtime/core ownership; reassess after runtime contract work. |
+| `src/main.tsx`, `src/index.css`, `src/vite-env.d.ts` | Browser/React entry, global CSS entry, and Vite ambient types. | "The frontend entry points." | Keep minimal; push product and shell responsibilities down into named app/design modules. |
+
+Preferred feature-internal shape once a feature is large enough:
+
+```text
+src/features/<feature>/
+  components/      reusable feature UI pieces
+  context/         feature provider and state orchestration
+  hooks/           feature-specific hooks
+  pages/           route/page-level composition
+  services/        feature-owned side effects, persistence, or API adapters
+  types.ts         feature-local contracts
+  index.ts         small public surface, only when another layer needs it
+```
+
+Not every feature needs every folder. Small features should stay flat until a
+second responsibility appears.
+
+Public surface rules:
+
+1. A feature public `index.ts` should export only stable surfaces used outside
+   the feature.
+2. Deep imports inside the same feature are acceptable; deep imports across
+   features should be treated as debt unless the target is clearly a stable
+   submodule.
+3. Cross-feature imports should read like product composition, not shared state
+   tunneling.
+4. Shared services should move down to `core/` or `runtime/` only when they are
+   genuinely product-neutral.
+5. Snapshot/generated data should have a visible owner and generation story
+   before anyone edits or splits it by hand.
+
+Deferred naming decisions:
+
+- Keep `core`, `runtime`, and `lib` names until their contents have local
+  README/contract notes or equivalent map coverage.
+- Do not rename `rightWorkspace` until the surface taxonomy decides whether it
+  is a layout region, workspace feature mode, or app shell panel.
+- Do not collapse root `library/` into `src/lib/`; root `library/` is bundled
+  capability source, while `src/lib/` is app utility code.
+- Do not merge `manage` and `models`; the current target is `models` as shared
+  model/provider capability and `manage` as admin/configuration surface.
+
 ## Phase Plan
 
 ### Phase 0: Baseline and map
