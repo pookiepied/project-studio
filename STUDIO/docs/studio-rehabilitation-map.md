@@ -1018,6 +1018,70 @@ Daemon stop conditions:
 - Do not change default ports or CSP entries without checking daemon, direct
   Ollama, Tauri command, and web security behavior.
 
+Scripts ownership and proof:
+
+The `scripts/` folder is root workflow infrastructure, not app source. Root
+Knip ignores it, and normal TypeScript import searches will not prove script
+usage. Script liveness is defined by npm scripts, Tauri config, release flow,
+generated assets, quality gates, and operator workflows.
+
+Current script evidence:
+
+| Script | Current callers | Rehabilitation note |
+| --- | --- | --- |
+| `scripts/ratchet.mjs` | `package.json` scripts `ratchet:lint`, `ratchet:cycles`, and `gate`. Reads/writes baselines in `gate/`. | Quality-gate owner. Deleting or moving it changes the project's regression policy. |
+| `scripts/tauri-wrapper.mjs` | Root `package.json` script `tauri`. Loads signing config, runs `vendor-sync` before Tauri dev/build, disables updater artifacts for unsigned dev builds, then forwards to Tauri CLI. | Tauri command wrapper and vendor-readiness owner. Do not bypass casually. |
+| `scripts/vendor-sync.mjs` | Root `vendor:sync`, `tauri-wrapper`, `.gitignore`/vendor docs, and vendor runtime workflow. | Single supported generator for vendored ripgrep/Git runtime material. |
+| `scripts/mcp-build.mjs` | `src-tauri/tauri.conf.json` `beforeBuildCommand` and `release.mjs`. Builds five first-party MCP servers; skips when `STUDIO_RELEASE=1`. | MCP package build owner for dev and package builds. |
+| `scripts/release.mjs` | Manual release entry; calls `mcp-build`, prunes MCP dev dependencies, sets signing env, runs `npm run tauri build`, uploads installer/signature manifest through Wrangler. | Production release orchestration. High-risk, networked, and stateful. |
+| `scripts/generate-installer-assets.ps1` | Root `installer:assets`; writes `src-tauri/installer-assets/header.bmp` and `sidebar.bmp`, which Tauri NSIS config references. | Generated installer-artwork owner. Windows/PowerShell-specific. |
+
+Related baseline/data files:
+
+| File or folder | Current role | Rehabilitation note |
+| --- | --- | --- |
+| `gate/lint-baseline.json` | Baseline consumed by `ratchet.mjs lint`. | Empty object today, but still a live gate input. |
+| `gate/cycles-baseline.json` | Baseline consumed by `ratchet.mjs cycles`. | Empty object today, but still a live gate input. |
+| `src-tauri/installer-assets/*.bmp` | Output of `generate-installer-assets.ps1` and input to Tauri NSIS bundle config. | Generated but tracked/package-critical assets. |
+
+Script cleanup and repair rules:
+
+1. Do not classify a script as unused without checking `package.json`,
+   `tauri.conf.json`, other scripts, release docs/workflows, and generated
+   output references.
+2. Keep scripts physically under `scripts/` until a tooling workspace layout is
+   designed. Moving them affects npm commands, Tauri config, release commands,
+   and documentation.
+3. Treat `release.mjs` as high-risk: it mutates version sync state, prunes
+   dependencies, signs builds, uploads to R2, writes KV, and deploys a Worker.
+   Never run it as a verification shortcut.
+4. Treat `ratchet.mjs` and `gate/` as one contract. Updating baselines is a
+   policy decision, not a mechanical formatting step.
+5. Script text-hygiene cleanup is allowed only when it preserves command strings,
+   paths, environment variable names, and generated output semantics exactly.
+
+Suggested future script implementation order:
+
+1. Clean decorative/mojibake comments in scripts as no-behavior text hygiene,
+   one script at a time.
+2. Add a contributor proof table for common commands: `typecheck`,
+   `ratchet:lint`, `ratchet:cycles`, `web:build`, daemon test, MCP builds, and
+   vendor sync.
+3. Audit `release.mjs` only after Backend/API dirty work settles, because it
+   writes release data through the sibling `api` project and Cloudflare tools.
+4. Verify whether `mcp-build.mjs` should also build or package the daemon if the
+   daemon remains a supported production feature.
+5. Keep installer asset generation separate from visual redesign; it writes
+   package assets, not app UI.
+
+Script stop conditions:
+
+- Do not run `release.mjs` during rehabilitation mapping or ordinary cleanup.
+- Do not re-baseline ratchet gates without an explicit quality-gate decision.
+- Do not move or rename scripts while `STUDIO/package.json`, Tauri config, or
+  release/package paths are dirty from another active task.
+- Do not delete `gate/` baselines just because they are currently empty objects.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
