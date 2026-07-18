@@ -59,7 +59,8 @@ These counts describe ownership work, not an instruction to bulk-delete files.
 
 ## Current Verification Baseline
 
-Checks run against the live checkpoint on 2026-07-18:
+Checks run against `f2ae555` on 2026-07-18, before the R0 slice. Post-slice
+results are recorded under R0 in the ordered program.
 
 - `npm run typecheck`: passes.
 - `npm run ratchet:cycles`: passes with zero circular imports.
@@ -102,6 +103,17 @@ fresh reference search and lockfile update:
 - `@react-three/fiber`
 - `camera-controls`
 - `three-stdlib`
+
+R0 execution correction: the fresh reference search disproved one of these three.
+`@react-three/fiber` is a real runtime dependency and was retained. It is
+imported by the reachable module graph of `@shadergradient/react`, which
+`src/features/workspace/pages/ProjectShaderCover.tsx` lazy-loads from the live
+`WorkspacePage`. `@shadergradient/react` declares only `react`/`react-dom` as
+peers, so the package.json entry is the only thing keeping the module
+resolvable; removing it would have broken the workspace project cover. Knip
+still reports it as an unused dependency, and that report is a known false
+positive. `camera-controls` and `three-stdlib` were confirmed unreachable from
+both source and the shadergradient graph, and were removed.
 
 ## Atomic File Decisions
 
@@ -234,9 +246,33 @@ Version 2 removal disposition.
 
 ### R0: Proven Dead Code
 
+Status: complete.
+
 Delete only the eight confirmed files and three dependency declarations listed
 above. Run reference search, typecheck, dead-code analysis, gate, build, and
 focused UI smoke tests. Commit this as one reviewable checkpoint.
+
+Executed on 2026-07-18 against `f2ae555`. All eight files were deleted. Two of
+the three dependency declarations were removed; `@react-three/fiber` was
+retained for the reason recorded under Confirmed Cleanup Set. The eight ledger
+rows moved from `READY_FOR_FOCUSED_REMOVAL_SLICE` to `REMOVED_IN_R0_SLICE`.
+
+Result after the slice:
+
+- `npm run typecheck`: passes.
+- `npm run deadcode`: unused files 6 to 0; unused dependencies 3 to 1, the
+  remaining one being the `@react-three/fiber` false positive. Unused exports
+  (29) and unused exported types (28) are unchanged; they need caller-level
+  review and are not part of R0.
+- `npm run ratchet:cycles`: passes with zero circular imports.
+- `npm run gate`: still stops at the lint ratchet with the same 38 pre-existing
+  errors in the same eight files. This slice added none of them.
+- `npm run build`: passes, including the `ProjectShaderCover` chunk.
+- Smoke test: the web dev entry boots and renders the login shell with no new
+  console errors. Authenticated workspace and chat surfaces were not exercised
+  because the environment has no credentials configured; the deleted files were
+  unreachable from any entry point and the production build covers their former
+  module graph.
 
 ### R1: Preserve Computer Use
 

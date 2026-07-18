@@ -87,6 +87,13 @@ The same slice may remove the unused declarations `@react-three/fiber`,
 file after a fresh reference search. This removes dependency entries, not the
 package files themselves.
 
+Executed 2026-07-18. All eight files were deleted. The required fresh reference
+search disproved one dependency claim: `@react-three/fiber` is imported by the
+reachable module graph of `@shadergradient/react`, which the live
+`ProjectShaderCover` surface loads, so it was retained. Only `camera-controls`
+and `three-stdlib` were removed. See `04-final-rehabilitation-plan.md` for the
+full R0 record.
+
 All other removal-shaped rows are blocked on replacement, migration, caller,
 packaging, provenance, or product-decision prerequisites recorded in the ledger.
 
