@@ -288,6 +288,35 @@ Next:
 
 Status: in progress.
 
+Scope clarification:
+
+The completed `knip` pass proves the configured app/web scope only. It does not
+prove that adjacent Studio systems are unused, because `knip.json` intentionally
+ignores `src-tauri/**`, `daemon/**`, `library/mcp-servers/**`,
+`library/skills/**`, `scripts/**`, and `vendor/**`.
+
+Dead-code proof matrix:
+
+| Area | Current automated coverage | Required proof before removal |
+| --- | --- | --- |
+| `src/` app source | Covered by root `npm run deadcode`, `typecheck`, `ratchet:lint`, and `ratchet:cycles`. | Knip signal plus import search, typecheck, ratchet gates, and a narrow behavior check when the file owns runtime behavior. |
+| `web/` entry variant | Covered by root Knip through `web/web-main.tsx` and by `web:build`. | Knip signal plus `npm run web:build`; confirm the file is not part of desktop-only fallback behavior. |
+| `src-tauri/` | Ignored by root Knip; compiled through Tauri/Rust toolchain, not TypeScript imports. | Rust/Tauri reference search, command/event invocation search from `src/`, Tauri build/check evidence, and startup/window contract review. |
+| `daemon/` | Ignored by root Knip; has its own `daemon/package.json`. | Daemon package `build`/`test`, route/service reference search, and confirmation of how Studio starts or bundles the local provider bridge. |
+| `library/mcp-servers/` | Ignored by root Knip; each MCP server has its own package entry and build script. | Per-server package build, registry/manifest reference search, bundled-library packaging check, and MCP tool surface review. |
+| `library/skills/` | Ignored by root Knip; skill files are data/manifest-driven. | Skill manifest/catalog reference search and packaging/install-path evidence. Do not delete skill assets based on TypeScript import absence. |
+| `scripts/` | Ignored by root Knip but referenced by root package scripts and release workflows. | Root package-script reference, CI/release/vendor workflow search, and manual review of external invocation names. |
+| `public/` | Not meaningfully covered by TypeScript dead-code tools. | Static asset reference search across HTML/CSS/TS/Tauri/web manifests and packaged-app verification for icons or favicons. |
+| `vendor/` | Ignored by root Knip and large by design. | Vendor manifest/sync-script evidence and bundle/runtime lookup proof. Treat as external runtime material, not normal source. |
+| `gate/` | Used by ratchet scripts rather than app imports. | `scripts/ratchet.mjs` reference plus successful ratchet command. Preserve unless replacing the quality-gate process. |
+
+Current dirty-tree constraint:
+
+- The MCP harness under `library/mcp-servers/harness/studio-harness/` is
+  currently dirty with many deleted and modified tool files. Do not make
+  dead-code claims or cleanup commits in that area until the active harness work
+  is committed or explicitly handed over.
+
 Completed:
 
 - Removed the 4 unused files reported by `knip`.
