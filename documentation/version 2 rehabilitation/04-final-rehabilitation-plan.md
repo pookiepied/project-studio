@@ -6,7 +6,7 @@ verified slices.
 
 ## Source Of Truth
 
-The Version 2 documentation has five non-duplicating responsibilities:
+The Version 2 documentation has six non-duplicating responsibilities:
 
 1. `01-removal-audit.md` explains why an old owner must leave Studio and the
    dependency order for doing so.
@@ -16,7 +16,10 @@ The Version 2 documentation has five non-duplicating responsibilities:
    row for every tracked file under `STUDIO/`.
 4. This document combines the removal audit, target structure, and unfinished
    Version 1 rehabilitation work into the ordered program of work.
-5. `05-decision-and-deferral-register.md` records judgment: decisions taken,
+5. `06-studio-cli-contract.md` is the R2 deliverable: the mapping between
+   Desktop needs and the Studio CLI protocol, with the gaps that block later
+   phases.
+6. `05-decision-and-deferral-register.md` records judgment: decisions taken,
    items deliberately deferred with their owning phase, and open questions. It
    exists so that a deferral cannot quietly become a permanent state.
 
@@ -31,12 +34,27 @@ When these documents disagree, the precedence is:
 
 ## Verified Inventory
 
+As audited on 2026-07-18, at checkpoint `f2ae555`:
+
 - Tracked files under `STUDIO/`: 844.
 - Ledger rows: 844, plus one CSV header.
 - Textual tracked files read by the audit: 785.
 - Binary assets classified by path, package role, and reference requirements: 58.
 - Gitlinks: 1 (`STUDIO/src-tauri/yt-transcript-mcp`).
 - Version 2 planning files: 4, including this document.
+
+Current state as of 2026-07-19, after R0, R0.5, R1 Phase A, and R2:
+
+- Tracked files under `STUDIO/`: 835. Nine fewer: eight deleted in R0, plus the
+  `yt-transcript-mcp` gitlink removed in R0.5.
+- Ledger rows: still 844 plus header. Removed files keep their row as an audit
+  record, with `audit_status` recording the removal.
+- Gitlinks: 0.
+- Version 2 planning files: 6, plus an `artifacts/` directory holding the
+  computer-use checksum manifest.
+
+The audited figures above are retained because the disposition counts that
+follow were derived from them.
 
 The ledger currently assigns these atomic dispositions:
 
@@ -81,6 +99,12 @@ The lint regression is an existing source baseline to resolve in a dedicated
 slice. It does not invalidate this documentation-only checkpoint, but no later
 implementation slice may report the full gate as passing until it is fixed or
 explicitly re-baselined with justification.
+
+Resolved 2026-07-19. The ratchet was explicitly re-baselined at its existing 38
+errors under decision D-10, with the justification recorded there: the cost was
+never the violations themselves but that a red gate cannot detect *new* ones.
+The baseline is per-file, so a new violation in any of the eight files still
+fails. `npm run gate` now passes end to end. Fixing the 38 remains open as F-03.
 
 ## Confirmed Cleanup Set
 
@@ -333,10 +357,29 @@ package build/tests, update packaging ownership, then remove the Studio copy.
 
 ### R2: Define The Studio CLI Contract
 
+Status: complete for everything that does not require a product decision or a
+running CLI. Deliverable is `06-studio-cli-contract.md`.
+
 Specify launch/version/capability detection, headless sessions, send/cancel,
 stream events, tool events, approvals, files, Git/review, terminal behavior,
 errors, reconnect, and migration/import APIs. No runtime deletion begins before
 the replacement contracts needed by its callers exist.
+
+The contract was derived from the CLI's real protocol rather than invented. The
+OpenCode tree already ships a typed HTTP API with 18 protocol groups and an SSE
+event stream, already rebranded to `@studio-ai/*`. Sessions, approvals, files,
+and terminal are fully covered by existing endpoints; the event taxonomy already
+exists and Desktop must normalize rather than redefine it.
+
+Three findings change later phases:
+
+- The CLI streams over Server-Sent Events while cloud chat uses a WebSocket
+  pool. Desktop speaks both. Only the normalized event model is shared.
+- There is no Git or review API and no migration/import API. These are recorded
+  as F-09 and F-10 and block R7 and R4 respectively.
+- `src/runtime/ui/` imports nothing from transport, execution, servers, or
+  protocol. The `run-events` extraction is therefore a pure relocation with no
+  CLI dependency and becomes the first slice of R3.
 
 ### R3: Split Conversation Authority
 
