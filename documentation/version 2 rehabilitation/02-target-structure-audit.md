@@ -34,7 +34,7 @@ Current non-generated Studio file count, excluding `node_modules`, `dist`,
 | --- | ---: | --- | --- |
 | `src` | 550 | Inventory, line counts, imports/exports, and key files read. Full feature-by-feature content pass still in progress. | Primary Desktop/Web React source. |
 | `src-tauri` | 84 | Rust command inventory and key native files read. Icon/assets treated as packaged assets. | Native desktop shell and OS bridge. |
-| `library` | 155 | File inventory complete; bundled MCP package intent read through config/build/runtime callers. Full per-tool review pending. | Temporary bundled capability source until Studio CLI migration/removal. |
+| `library` | 155 | File inventory complete; bundled MCP package intent read through config/build/runtime callers. Full per-tool review pending. | Legacy staging only. Migrate preserved packages to Studio CLI or reference storage, then remove from Studio packaging/tree. |
 | `daemon` | 15 | File inventory complete; local provider purpose read from Tauri commands and daemon tree. Full provider code review pending. | Likely old local provider service unless Studio CLI adopts it. |
 | `scripts` | 6 | Inventory complete; script purposes classified by package scripts and content scan. | Build/release/vendor/proof utilities. |
 | `public` | 7 | Inventory only. | Static assets; audit by references before cleanup. |
@@ -49,7 +49,7 @@ Current `STUDIO/src` shape:
 | `app` | 46 | 4648 | Boot, providers, routes, shell chrome, global listeners. | Keep as `app`, split into `entry`, `startup`, `providers`, `routes`, `shell`, `globals`. |
 | `features` | 332 | 57510 | Product features and several execution surfaces. | Keep feature-oriented, but move execution authority out to `cloud` and `studio-cli`. |
 | `core` | 74 | 8291 | Mixed infrastructure: storage, network, permissions, platform, errors, models. | Split into `platform`, `cloud`, `app-storage`, `security`, and feature-owned services. |
-| `runtime` | 26 | 3073 | Desktop Local Runtime: WebSocket pool, local MCP lifecycle, local tool execution, runtime UI. | Split into `cloud/runs`, `studio-cli`, and `run-events`; retire MCP execution. |
+| `runtime` | 26 | 3073 | Desktop Local Runtime: WebSocket pool, local MCP lifecycle, local tool execution, runtime UI. | Extract only cloud client/display pieces, then delete the `runtime` subsystem. |
 | `ui` | 27 | 1590 | Brand, feedback, icons, primitives. | Split into `design-system`, `brand`, and `shared/components`. |
 | `lib` | 24 | 2320 | Mixed utilities, token manager, API client, parsers, hooks. | Move domain utilities to owners; keep only feature-neutral helpers in `shared`. |
 | `design` | 7 | 580 | CSS tokens, typography, syntax, prose, motion/font constants. | Rename to `design-system` after CSS authority is mapped. |
@@ -121,6 +121,28 @@ V2 should organize around product authority, not around vague folder importance.
 Desktop should not keep a second local agent runtime. Cloud execution remains
 cloud-owned. Local execution becomes Studio CLI-owned.
 
+## Hard Target Decisions
+
+These decisions correct the most important ambiguity in the earlier checkpoint.
+
+- `STUDIO/src/runtime/**` is a legacy Desktop Local Runtime and is a deletion
+  target. It may be mined temporarily for cloud WebSocket client code or
+  run-event display components, but the target Studio source tree must not keep
+  a folder or subsystem named `runtime`.
+- `STUDIO/library/**` is a legacy bundled capability staging area and is a
+  migration/removal target. MCP servers, skills, agent-library concepts, and
+  local tool packages belong to `studio-cli`, cloud workers, or a separate
+  reference/third-party source area, not to the Studio Desktop/Web app.
+- `computer-use` must be preserved intact before removal from the Desktop
+  bundle. It should move to Studio CLI or to a clearly named reference package
+  such as `third-party/reference/computer-use` until the CLI-owned package is
+  ready.
+- Desktop may keep thin clients named after their authority, such as
+  `cloud/chat`, `studio-cli/client`, and `run-events`. Those are integration and
+  display layers, not replacements for the old local runtime.
+- Any temporary compatibility folder must be named as legacy or migration-only,
+  and must not appear in the final target structure.
+
 ## Proposed Repository-Level Shape
 
 ```text
@@ -141,6 +163,13 @@ Project Studio/
       mcp-library/
       tracker/
   studio-cli/                  future adjacent product, likely derived from OpenCode
+    packages/
+      computer-use/            preserved/migrated local capability package
+      mcp-servers/             CLI-owned local MCP/tool packages if retained
+      skills/                  CLI-owned local skill packages if retained
+  third-party/
+    reference/                 immutable backups/external source snapshots during migration
+      computer-use/            temporary source backup until Studio CLI owns it
   STUDIO/
     src/                       Desktop/Web React app shell and product UI
     src-tauri/                 native desktop shell and OS bridge
@@ -148,7 +177,6 @@ Project Studio/
     public/                    static assets
     scripts/                   build, release, vendor, gate utilities
     vendor/                    packaged external binaries/resources
-    library/                   temporary bundled capability source until migrated
     docs/                      Studio-specific rehabilitation notes
   documentation/
     version 2 rehabilitation/  V2 planning and audit trail
@@ -157,6 +185,8 @@ Project Studio/
 
 `Backend/Cloud` should not move into `STUDIO`. `studio-cli` should not live
 inside `STUDIO/src`; Desktop should integrate it through a protocol/client.
+`STUDIO/library` exists in the current checkout only as legacy staging and is
+not part of the target repository shape.
 
 ## Proposed `STUDIO/src` Shape
 
@@ -187,7 +217,7 @@ src/
     activity/                  tracking/usage/log clients
     mcp-registry/              cloud/local registry sync contracts
 
-  studio-cli/
+  studio-cli/                  Desktop-side client only, not the CLI product source
     client/                    headless process/protocol client
     sessions/                  local session list/read/send/cancel API
     events/                    normalized local run event stream
@@ -241,11 +271,11 @@ src/
 | `src/app/AppRouter.tsx` | Auth/API loading, background completion toast, runtime init modal, main route switch. | `app/routes/AppRouter.tsx` plus `studio-cli/capabilities` or legacy runtime gate during migration. | Keep then split runtime init out. | Local runtime removal plan. |
 | `src/app/routes/HomePage.tsx` | Root view switch, provider lifetime for recording/chat/live session, global shortcut hosts. | `app/routes/HomePage.tsx` plus `app/routes/viewRegistry.tsx` | Split view registry later. | Provider lifetime contract. |
 | `src/app/shell/**` | Standard titlebar, workspace shell, global dock, traffic lights, nav popup, layout width store. | `app/shell/**` | Keep; rename internals only after shell ownership map. | Global dock/top chrome ownership and layer registry. |
-| `src/runtime/transport/wsPool.ts` | Cloud chat WebSocket pool, buffering, reconnect, local-tools-pending bridge. | `cloud/chat/runSocketPool.ts` after local tool callback is removed. | Migrate. | Cloud run protocol separated from local tool execution. |
+| `src/runtime/transport/wsPool.ts` | Cloud chat WebSocket pool, buffering, reconnect, local-tools-pending bridge. | `cloud/chat/runSocketPool.ts` after local tool callback is removed; delete old `runtime` folder afterward. | Migrate then delete source folder. | Cloud run protocol separated from local tool execution. |
 | `src/runtime/transport/useAgentChat.ts` | React adapter for `wsPool`. | `cloud/chat/useCloudRun.ts` | Migrate. | Same as above. |
 | `src/runtime/protocol.ts` | Cloud run WebSocket DTO plus local tool handler shapes. | Split to `cloud/chat/protocol.ts` and `run-events/types.ts`. | Split. | Cloud event protocol and CLI event normalization. |
-| `src/runtime/servers/**` | Bundled local MCP catalog/lifecycle/manifest sync/runtime init. | Temporary `legacy-local-runtime`, then delete or migrate pieces to `studio-cli/capabilities`. | Retire. | Studio CLI protocol and replacement for local MCP/skill registry sync. |
-| `src/runtime/execution/**` | Desktop local tool executor, permission gate, builtin tool handling. | `studio-cli/approvals` for UI protocol pieces; tool execution moves to Studio CLI/cloud. | Retire. | Studio CLI owns local tool calls. |
+| `src/runtime/servers/**` | Bundled local MCP catalog/lifecycle/manifest sync/runtime init. | No target Studio folder. Delete after callers move to Studio CLI/cloud clients. | Retire/delete. | Studio CLI protocol and replacement for local MCP/skill registry sync. |
+| `src/runtime/execution/**` | Desktop local tool executor, permission gate, builtin tool handling. | No target Studio executor. Keep only approval/display types under `studio-cli/approvals` or `run-events` if needed. | Retire/delete. | Studio CLI owns local tool calls. |
 | `src/runtime/invoke/invokeMcpTool.ts` | Tauri MCP IPC caller and output truncation/image extraction. | Delete from Desktop or move extraction helpers to `run-events`. | Retire/migrate. | No remaining `mcp_call_tool` callers. |
 | `src/runtime/ui/**` | Runtime tool cards and display classification. | `run-events/components` and `run-events/classify`. | Keep/move. | Event shape normalized for cloud and CLI. |
 | `src/cliBridges/**` | Claude-specific chat engine bridge. | `studio-cli/**`; optional `legacy/claude-bridge` until removed. | Replace. | Studio CLI local chat engine exists. |
