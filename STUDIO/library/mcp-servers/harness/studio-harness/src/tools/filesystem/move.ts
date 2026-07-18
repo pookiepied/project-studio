@@ -32,8 +32,15 @@ export async function moveFile(
       try {
         const destDir = dirname(destination);
         await fs.mkdir(destDir, { recursive: true });
-        await fs.copyFile(source, destination);
-        await fs.unlink(source);
+        // copyFile fails with EISDIR on directories — branch on type so a
+        // cross-drive directory move works the same as a file move.
+        if ((await fs.stat(source)).isDirectory()) {
+          await fs.cp(source, destination, { recursive: true, force: true });
+          await fs.rm(source, { recursive: true, force: true });
+        } else {
+          await fs.copyFile(source, destination);
+          await fs.unlink(source);
+        }
         return {
           success: true,
           moved: { from: source, to: destination },

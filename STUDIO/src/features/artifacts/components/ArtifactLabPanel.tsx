@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArtifactRenderer } from "@/features/markdown";
 import { Select } from "@/ui/primitives/Select";
-import { Calendar, Clock, Edit, Email, Icon, ImageSquareIcon, Search, Send, SparkleIcon, Success, Warning } from "@/ui/icons";
+import { Calendar, Checklist, Clock, Code, Edit, Email, Files, FolderOpen, GithubLogoIcon, Icon, ImageSquareIcon, Search, Send, SparkleIcon, Success, VideoCameraIcon, Warning } from "@/ui/icons";
 import type { Artifact } from "@/types/artifacts";
 
 type CatalogArtifactId =
@@ -12,6 +12,9 @@ type CatalogArtifactId =
   | "image-queued"
   | "image-generating"
   | "image-completed"
+  | "video-queued"
+  | "video-generating"
+  | "video-completed"
   | "gmail-searching"
   | "gmail-search"
   | "gmail-empty"
@@ -24,14 +27,46 @@ type CatalogArtifactId =
   | "gmail-action"
   | "gmail-organize"
   | "gmail-failed"
+  | "outlook-search"
+  | "outlook-message"
+  | "outlook-draft"
+  | "outlook-action"
   | "calendar-search"
   | "calendar-event"
   | "calendar-draft"
   | "calendar-action"
   | "calendar-schedule"
-  | "calendar-availability";
+  | "calendar-availability"
+  | "drive-search"
+  | "drive-file"
+  | "drive-action"
+  | "github-search"
+  | "github-pr"
+  | "github-action"
+  | "todoist-search"
+  | "todoist-draft"
+  | "todoist-action";
 
-type CatalogFamily = "web" | "image" | "gmail" | "calendar";
+type CatalogFamily = "web" | "image" | "video" | "gmail" | "outlook" | "calendar" | "files" | "github" | "tasks";
+
+type ActivityStatus = "running" | "completed" | "failed" | "pending";
+
+type ToolActivityCall = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  status: ActivityStatus;
+  preview?: string;
+};
+
+type ToolActivityGroup = {
+  id: string;
+  title: string;
+  subtitle: string;
+  status: ActivityStatus;
+  icon: React.ReactNode;
+  calls: ToolActivityCall[];
+};
 
 const ARTIFACT_OPTIONS: Array<{ value: CatalogArtifactId; label: string }> = [
   { value: "web-searching", label: "Web research / searching" },
@@ -40,6 +75,9 @@ const ARTIFACT_OPTIONS: Array<{ value: CatalogArtifactId; label: string }> = [
   { value: "image-queued", label: "Image generation / queued" },
   { value: "image-generating", label: "Image generation / active" },
   { value: "image-completed", label: "Image generation / completed" },
+  { value: "video-queued", label: "Video generation / queued" },
+  { value: "video-generating", label: "Video generation / active" },
+  { value: "video-completed", label: "Video generation / completed" },
   { value: "gmail-searching", label: "Gmail / searching" },
   { value: "gmail-search", label: "Gmail / search results" },
   { value: "gmail-empty", label: "Gmail / empty search" },
@@ -52,25 +90,89 @@ const ARTIFACT_OPTIONS: Array<{ value: CatalogArtifactId; label: string }> = [
   { value: "gmail-action", label: "Gmail / action result" },
   { value: "gmail-organize", label: "Gmail / label and archive" },
   { value: "gmail-failed", label: "Gmail / failed action" },
+  { value: "outlook-search", label: "Outlook / search results" },
+  { value: "outlook-message", label: "Outlook / email thread" },
+  { value: "outlook-draft", label: "Outlook / draft review" },
+  { value: "outlook-action", label: "Outlook / action result" },
   { value: "calendar-search", label: "Calendar / search results" },
   { value: "calendar-event", label: "Calendar / event detail" },
   { value: "calendar-draft", label: "Calendar / event draft" },
   { value: "calendar-action", label: "Calendar / action result" },
   { value: "calendar-schedule", label: "Calendar / schedule view" },
   { value: "calendar-availability", label: "Calendar / availability check" },
+  { value: "drive-search", label: "Drive / file search" },
+  { value: "drive-file", label: "Drive / file detail" },
+  { value: "drive-action", label: "Drive / file action" },
+  { value: "github-search", label: "GitHub / triage list" },
+  { value: "github-pr", label: "GitHub / pull request" },
+  { value: "github-action", label: "GitHub / action result" },
+  { value: "todoist-search", label: "Todoist / task list" },
+  { value: "todoist-draft", label: "Todoist / task draft" },
+  { value: "todoist-action", label: "Todoist / action result" },
 ];
 
 const FAMILY_OPTIONS: Array<{ value: CatalogFamily; label: string; initial: CatalogArtifactId }> = [
   { value: "web", label: "Web", initial: "web-searching" },
   { value: "image", label: "Image", initial: "image-queued" },
+  { value: "video", label: "Video", initial: "video-queued" },
   { value: "gmail", label: "Gmail", initial: "gmail-searching" },
+  { value: "outlook", label: "Outlook", initial: "outlook-search" },
   { value: "calendar", label: "Calendar", initial: "calendar-search" },
+  { value: "files", label: "Files", initial: "drive-search" },
+  { value: "github", label: "GitHub", initial: "github-search" },
+  { value: "tasks", label: "Tasks", initial: "todoist-search" },
+];
+
+const FAMILY_SELECT_OPTIONS = FAMILY_OPTIONS.map((family) => ({
+  value: family.value,
+  label: family.label,
+}));
+
+const ACTIVITY_GROUPS: ToolActivityGroup[] = [
+  {
+    id: "explore",
+    title: "Exploring project files",
+    subtitle: "Reading the frontend artifact area and locating renderer contracts.",
+    status: "running",
+    icon: <FolderOpen size="sm" className="text-secondary dark:text-disabled" />,
+    calls: [
+      { id: "rg", title: "Searching files", subtitle: "rg artifact renderers", status: "completed", preview: "Found markdown artifact renderers and lab fixtures." },
+      { id: "read", title: "Reading source", subtitle: "ArtifactRenderer.tsx", status: "completed", preview: "Loaded renderer routing and artifact parser." },
+      { id: "inspect", title: "Inspecting catalog", subtitle: "ArtifactLabPanel.tsx", status: "running", preview: "Checking current preview families." },
+    ],
+  },
+  {
+    id: "edit",
+    title: "Updating the preview UI",
+    subtitle: "Applying a scalable selector and adding activity test cards.",
+    status: "completed",
+    icon: <Code size="sm" className="text-secondary dark:text-disabled" />,
+    calls: [
+      { id: "patch", title: "Editing file", subtitle: "ArtifactLabPanel.tsx", status: "completed", preview: "Added family selector and activity demo structures." },
+      { id: "typecheck", title: "Type checking", subtitle: "npm run typecheck", status: "completed", preview: "TypeScript completed successfully." },
+    ],
+  },
+  {
+    id: "single",
+    title: "Checking GitHub",
+    subtitle: "A single connector call can stay compact without becoming a fake group.",
+    status: "pending",
+    icon: <Icon icon={GithubLogoIcon} size="sm" weight="fill" className="text-secondary dark:text-disabled" />,
+    calls: [
+      { id: "github", title: "GitHub: Search pull requests", subtitle: "artifact connector renderer", status: "pending", preview: "Waiting for connector response." },
+    ],
+  },
 ];
 
 function artifactFamily(id: CatalogArtifactId): CatalogFamily {
   if (id.startsWith("image-")) return "image";
+  if (id.startsWith("video-")) return "video";
   if (id.startsWith("gmail-")) return "gmail";
+  if (id.startsWith("outlook-")) return "outlook";
   if (id.startsWith("calendar-")) return "calendar";
+  if (id.startsWith("drive-")) return "files";
+  if (id.startsWith("github-")) return "github";
+  if (id.startsWith("todoist-")) return "tasks";
   return "web";
 }
 
@@ -102,6 +204,8 @@ const SOURCE_RESULTS = [
   },
 ];
 
+// SVG fixture colors are literal asset data, not application chrome.
+/* eslint-disable no-restricted-syntax */
 const GENERATED_IMAGE_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
   <defs>
@@ -139,6 +243,46 @@ const GENERATED_IMAGE_URL = `data:image/svg+xml;charset=utf-8,${encodeURICompone
   </g>
 </svg>
 `)}`;
+
+const GENERATED_VIDEO_POSTER_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="midnightblue"/>
+      <stop offset="0.46" stop-color="steelblue"/>
+      <stop offset="1" stop-color="peru"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="aquamarine"/>
+      <stop offset="0.5" stop-color="white"/>
+      <stop offset="1" stop-color="moccasin"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" rx="42" fill="url(#bg)"/>
+  <g filter="url(#soft)" opacity=".5">
+    <circle cx="220" cy="150" r="110" fill="aquamarine"/>
+    <circle cx="1050" cy="560" r="190" fill="moccasin"/>
+  </g>
+  <path d="M120 510 C250 420 360 470 500 360 C665 230 785 315 930 210 C1015 148 1080 130 1160 118" fill="none" stroke="url(#line)" stroke-width="22" stroke-linecap="round" opacity=".9"/>
+  <g fill="white" opacity=".94">
+    <circle cx="120" cy="510" r="18"/>
+    <circle cx="500" cy="360" r="18"/>
+    <circle cx="930" cy="210" r="18"/>
+  </g>
+  <g transform="translate(596 316)">
+    <circle cx="44" cy="44" r="44" fill="white" opacity=".2"/>
+    <path d="M36 26 L66 44 L36 62 Z" fill="white" opacity=".9"/>
+  </g>
+  <rect x="76" y="620" width="1128" height="9" rx="4.5" fill="white" opacity=".22"/>
+  <rect x="76" y="620" width="420" height="9" rx="4.5" fill="white" opacity=".74"/>
+</svg>
+`)}`;
+
+const GENERATED_VIDEO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+/* eslint-enable no-restricted-syntax */
 
 const GMAIL_MESSAGES = [
   {
@@ -217,6 +361,113 @@ const CALENDAR_EVENTS = [
     attendees: [{ name: "Pookie", email: "pookie@example.com", status: "accepted" }],
     description: "Routine weekly operations review.",
     status: "confirmed",
+  },
+];
+
+const DRIVE_FILES = [
+  {
+    id: "drive-001",
+    name: "July spending summary",
+    type: "Google Sheet",
+    icon: "sheet",
+    owner: "Maya Chen",
+    modifiedAt: "Jul 16",
+    path: "Finance / July",
+    description: "Spreadsheet with category totals, receipt references, and the final reconciliation note.",
+    shared: true,
+  },
+  {
+    id: "drive-002",
+    name: "Receipt reconciliation note",
+    type: "Google Doc",
+    icon: "document",
+    owner: "Finance Team",
+    modifiedAt: "Jul 15",
+    path: "Finance / July",
+    description: "Narrative summary of duplicate entries, missing receipts, and category decisions.",
+    shared: true,
+  },
+  {
+    id: "drive-003",
+    name: "July receipts",
+    type: "folder",
+    icon: "folder",
+    owner: "John Rivera",
+    modifiedAt: "Jul 14",
+    path: "Finance",
+    description: "Folder containing uploaded travel, software, meals, and office receipts.",
+  },
+];
+
+const GITHUB_ITEMS = [
+  {
+    id: "gh-001",
+    number: 248,
+    title: "Add artifact renderer registry for connector cards",
+    repo: "studio/frontend",
+    author: "maya",
+    state: "open",
+    type: "pull_request",
+    branch: "artifact-connectors",
+    updatedAt: "12 min ago",
+    labels: ["frontend", "artifacts"],
+    description: "Introduces connector-specific rendering for file, issue, and task workflows.",
+  },
+  {
+    id: "gh-002",
+    number: 241,
+    title: "Normalize Composio artifact output kinds",
+    repo: "studio/runtime",
+    author: "john",
+    state: "open",
+    type: "issue",
+    updatedAt: "1h ago",
+    labels: ["runtime", "contract"],
+    description: "The model should emit stable artifact kinds for connector results instead of generic JSON blocks.",
+  },
+  {
+    id: "gh-003",
+    title: "Artifact preview CI",
+    repo: "studio/frontend",
+    state: "success",
+    type: "workflow",
+    updatedAt: "2h ago",
+    description: "Typecheck, build, and artifact fixture smoke tests passed on the latest branch.",
+  },
+];
+
+const TODOIST_TASKS = [
+  {
+    id: "todo-001",
+    title: "Review connector artifact scope",
+    project: "Studio",
+    section: "Artifacts",
+    due: "Today",
+    assignee: "Pookie",
+    priority: "high",
+    status: "open",
+    labels: ["frontend", "planning"],
+    description: "Decide which connector outputs need custom artifacts and which can use generic file/data cards.",
+  },
+  {
+    id: "todo-002",
+    title: "Add GitHub artifact fixture",
+    project: "Studio",
+    section: "Artifacts",
+    due: "Tomorrow",
+    priority: "medium",
+    status: "in_progress",
+    labels: ["github"],
+  },
+  {
+    id: "todo-003",
+    title: "Document artifact JSON contract",
+    project: "Studio",
+    section: "Runtime",
+    due: "Friday",
+    priority: "low",
+    status: "completed",
+    labels: ["docs"],
   },
 ];
 
@@ -823,6 +1074,274 @@ function buildGmailArtifact(id: CatalogArtifactId): Artifact {
   };
 }
 
+function buildOutlookArtifact(id: CatalogArtifactId): Artifact {
+  if (id === "outlook-search") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "outlook_search",
+      title: "Outlook search results",
+      summary: "Found finance email context in the connected Outlook mailbox.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "Outlook emails found" },
+      source: { app: "outlook", tool: "outlook.search" },
+      data: {
+        query: "finance review July receipts",
+        mailbox: "Inbox",
+        messages: GMAIL_MESSAGES.slice(0, 2).map((message) => ({
+          ...message,
+          id: `outlook-${message.id}`,
+          labels: ["Outlook", ...(message.labels ?? [])],
+        })),
+      },
+    };
+  }
+
+  if (id === "outlook-message") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "outlook_thread",
+      title: "Outlook finance thread",
+      summary: "Opened the relevant Outlook thread and extracted the usable context.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "Outlook thread" },
+      source: { app: "outlook", tool: "outlook.get_thread" },
+      data: {
+        message: { ...GMAIL_MESSAGES[0], id: "outlook-msg-001", labels: ["Outlook", "Finance"] },
+        thread: GMAIL_MESSAGES.slice(0, 2).map((message) => ({ ...message, id: `outlook-${message.id}` })),
+      },
+    };
+  }
+
+  if (id === "outlook-draft") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "outlook_draft",
+      title: "Draft Outlook reply",
+      summary: "Prepared an Outlook reply for review before sending.",
+      status: "pending",
+      presentation: { surface: "chat", density: "card", compactLabel: "Outlook draft" },
+      source: { app: "outlook", tool: "outlook.create_draft" },
+      data: {
+        draft: {
+          id: "outlook-draft-001",
+          to: [{ name: "Maya Chen", email: "maya@northstar.finance" }],
+          subject: "Re: July spending summary",
+          body: "Hi Maya,\n\nI reviewed the July spending context and found John's current total at $4,820. The largest categories are travel, software, and team meals.\n\nBest,\nPookie",
+        },
+      },
+    };
+  }
+
+  return {
+    type: "artifact",
+    version: 1,
+    category: "general",
+    kind: "outlook_action",
+    title: "Outlook email sent",
+    summary: "The approved Outlook reply was sent.",
+    status: "completed",
+    presentation: { surface: "chat", density: "card", compactLabel: "Outlook sent" },
+    source: { app: "outlook", tool: "outlook.send" },
+    data: {
+      action: {
+        action: "send",
+        target: "Re: July spending summary",
+        result: "Sent to Maya Chen through Outlook.",
+      },
+    },
+  };
+}
+
+function buildDriveArtifact(id: CatalogArtifactId): Artifact {
+  if (id === "drive-file") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "googledrive_file",
+      title: "Drive file opened",
+      summary: "Opened the selected Drive file and extracted its file context.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "Drive file" },
+      source: { app: "googledrive", tool: "googledrive.get_file" },
+      data: {
+        provider: "googledrive",
+        file: DRIVE_FILES[0],
+      },
+    };
+  }
+
+  if (id === "drive-action") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "googledrive_action",
+      title: "Drive file shared",
+      summary: "The selected finance file was shared with the review group.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "Drive action" },
+      source: { app: "googledrive", tool: "googledrive.share" },
+      data: {
+        provider: "googledrive",
+        action: {
+          action: "share",
+          target: "July spending summary",
+          result: "Shared with Maya Chen and John Rivera with comment access.",
+        },
+      },
+    };
+  }
+
+  return {
+    type: "artifact",
+    version: 1,
+    category: "general",
+    kind: "googledrive_search",
+    title: "Drive search results",
+    summary: "Found files in Drive that match the finance review context.",
+    status: "completed",
+    presentation: { surface: "chat", density: "card", compactLabel: "Drive files" },
+    source: { app: "googledrive", tool: "googledrive.search" },
+    data: {
+      provider: "googledrive",
+      query: "July spending receipts finance",
+      location: "Finance",
+      files: DRIVE_FILES,
+    },
+  };
+}
+
+function buildGithubArtifact(id: CatalogArtifactId): Artifact {
+  if (id === "github-pr") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "github_pull_request",
+      title: "GitHub pull request",
+      summary: "Opened the selected pull request and summarized its review state.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "PR opened" },
+      source: { app: "github", tool: "github.get_pull_request" },
+      data: {
+        repo: "studio/frontend",
+        item: GITHUB_ITEMS[0],
+      },
+    };
+  }
+
+  if (id === "github-action") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "github_action",
+      title: "GitHub comment posted",
+      summary: "Posted a review comment on the selected pull request.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "GitHub action" },
+      source: { app: "github", tool: "github.create_comment" },
+      data: {
+        repo: "studio/frontend",
+        action: {
+          action: "comment",
+          target: "#248 Add artifact renderer registry for connector cards",
+          result: "Posted a comment asking for the artifact kind aliases to be documented before merge.",
+        },
+      },
+    };
+  }
+
+  return {
+    type: "artifact",
+    version: 1,
+    category: "general",
+    kind: "github_search",
+    title: "GitHub triage",
+    summary: "Found active GitHub work related to connector artifact rendering.",
+    status: "completed",
+    presentation: { surface: "chat", density: "card", compactLabel: "GitHub results" },
+    source: { app: "github", tool: "github.search" },
+    data: {
+      repo: "studio/frontend",
+      query: "artifact connector renderer",
+      items: GITHUB_ITEMS,
+    },
+  };
+}
+
+function buildTodoistArtifact(id: CatalogArtifactId): Artifact {
+  if (id === "todoist-draft") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "todoist_draft",
+      title: "Todoist task draft",
+      summary: "Prepared a task for review before creating it.",
+      status: "pending",
+      presentation: { surface: "chat", density: "card", compactLabel: "Task draft" },
+      source: { app: "todoist", tool: "todoist.create_task_draft" },
+      data: {
+        provider: "todoist",
+        draft: {
+          title: "Review Drive and GitHub artifact contracts",
+          project: "Studio",
+          due: "Tomorrow",
+          labels: ["artifacts", "connectors"],
+          description: "Confirm the LLM output shape for file search, GitHub triage, and task actions.",
+        },
+      },
+    };
+  }
+
+  if (id === "todoist-action") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "todoist_action",
+      title: "Todoist task completed",
+      summary: "Marked the connector artifact review task complete.",
+      status: "completed",
+      presentation: { surface: "chat", density: "card", compactLabel: "Task updated" },
+      source: { app: "todoist", tool: "todoist.complete_task" },
+      data: {
+        provider: "todoist",
+        action: {
+          action: "complete",
+          target: "Document artifact JSON contract",
+          result: "Marked complete in the Studio project.",
+        },
+      },
+    };
+  }
+
+  return {
+    type: "artifact",
+    version: 1,
+    category: "general",
+    kind: "todoist_search",
+    title: "Todoist tasks",
+    summary: "Found tasks related to the Studio artifact workstream.",
+    status: "completed",
+    presentation: { surface: "chat", density: "card", compactLabel: "Tasks found" },
+    source: { app: "todoist", tool: "todoist.search" },
+    data: {
+      provider: "todoist",
+      query: "Studio artifacts",
+      tasks: TODOIST_TASKS,
+    },
+  };
+}
+
 function buildImageArtifact(id: CatalogArtifactId): Artifact {
   const baseData = {
     prompt: "A polished colorful financial graph inspired by the uploaded budget document, soft natural light, clean editorial composition.",
@@ -933,10 +1452,145 @@ function buildImageArtifact(id: CatalogArtifactId): Artifact {
   };
 }
 
+function buildVideoArtifact(id: CatalogArtifactId): Artifact {
+  const baseData = {
+    prompt: "Animate the uploaded budget graph into a polished 8-second finance recap with rising line motion, soft camera drift, and readable category highlights.",
+    aspectRatio: "16:9",
+    duration: 8,
+    resolution: "1280x720",
+    model: "Studio video model",
+    mode: "text-to-video",
+    style: "Editorial motion graphic",
+  };
+
+  if (id === "video-queued") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "generated_video",
+      title: "Budget recap video",
+      summary: "The video request is queued and waiting for generation capacity.",
+      status: "pending",
+      presentation: {
+        surface: "chat",
+        density: "card",
+        compactLabel: "Video queued",
+      },
+      source: {
+        tool: "video.generate",
+      },
+      data: baseData,
+      sections: [
+        {
+          type: "timeline",
+          title: "Progress",
+          items: [
+            { label: "Prompt prepared", status: "completed" },
+            { label: "Shot plan queued", status: "pending" },
+            { label: "Video render pending", status: "pending" },
+          ],
+        },
+      ],
+    };
+  }
+
+  if (id === "video-generating") {
+    return {
+      type: "artifact",
+      version: 1,
+      category: "general",
+      kind: "generated_video",
+      title: "Budget recap video",
+      summary: "Rendering the motion sequence and composing the requested video output.",
+      status: "loading",
+      presentation: {
+        surface: "chat",
+        density: "card",
+        compactLabel: "Generating video",
+      },
+      source: {
+        tool: "video.generate",
+      },
+      data: {
+        ...baseData,
+        posterUrl: GENERATED_VIDEO_POSTER_URL,
+      },
+      sections: [
+        {
+          type: "timeline",
+          title: "Progress",
+          items: [
+            { label: "Prompt prepared", status: "completed" },
+            { label: "Motion plan created", status: "completed" },
+            { label: "Video render in progress", status: "loading" },
+            { label: "Output storage pending", status: "pending" },
+          ],
+        },
+      ],
+    };
+  }
+
+  return {
+    type: "artifact",
+    version: 1,
+    category: "general",
+    kind: "generated_video",
+    title: "Budget recap video",
+    summary: "Generated an 8-second finance recap video from the prompt and visual direction.",
+    status: "completed",
+    presentation: {
+      surface: "chat",
+      density: "card",
+      compactLabel: "Video generated",
+    },
+    source: {
+      tool: "video.generate",
+    },
+    data: {
+      ...baseData,
+      videoUrl: GENERATED_VIDEO_URL,
+      posterUrl: GENERATED_VIDEO_POSTER_URL,
+      outputs: [
+        {
+          label: "Primary video",
+          videoUrl: GENERATED_VIDEO_URL,
+          posterUrl: GENERATED_VIDEO_POSTER_URL,
+          duration: 8,
+          resolution: "1280x720",
+          aspectRatio: "16:9",
+        },
+      ],
+    },
+    stats: [
+      { label: "Outputs", value: 1 },
+      { label: "Duration", value: "8s" },
+      { label: "Aspect ratio", value: "16:9" },
+      { label: "Resolution", value: "1280x720" },
+    ],
+    sections: [
+      {
+        type: "timeline",
+        title: "Progress",
+        items: [
+          { label: "Prompt prepared", status: "completed" },
+          { label: "Video rendered", status: "completed" },
+          { label: "Stored as generated content", status: "completed" },
+        ],
+      },
+    ],
+  };
+}
+
 function buildArtifact(id: CatalogArtifactId): Artifact {
   if (id.startsWith("image-")) return buildImageArtifact(id);
+  if (id.startsWith("video-")) return buildVideoArtifact(id);
   if (id.startsWith("gmail-")) return buildGmailArtifact(id);
+  if (id.startsWith("outlook-")) return buildOutlookArtifact(id);
   if (id.startsWith("calendar-")) return buildCalendarArtifact(id);
+  if (id.startsWith("drive-")) return buildDriveArtifact(id);
+  if (id.startsWith("github-")) return buildGithubArtifact(id);
+  if (id.startsWith("todoist-")) return buildTodoistArtifact(id);
   return buildWebArtifact(id);
 }
 
@@ -954,6 +1608,12 @@ function statusCopy(id: CatalogArtifactId) {
       return { icon: <Icon icon={SparkleIcon} size="sm" />, label: "Generating" };
     case "image-completed":
       return { icon: <Success size="sm" />, label: "Image ready" };
+    case "video-queued":
+      return { icon: <Icon icon={VideoCameraIcon} size="sm" />, label: "Queued" };
+    case "video-generating":
+      return { icon: <Icon icon={SparkleIcon} size="sm" />, label: "Generating" };
+    case "video-completed":
+      return { icon: <Success size="sm" />, label: "Video ready" };
     case "gmail-searching":
       return { icon: <Clock size="sm" />, label: "Searching Gmail" };
     case "gmail-search":
@@ -978,6 +1638,14 @@ function statusCopy(id: CatalogArtifactId) {
       return { icon: <Success size="sm" />, label: "Organized" };
     case "gmail-failed":
       return { icon: <Clock size="sm" />, label: "Failed" };
+    case "outlook-search":
+      return { icon: <Search size="sm" />, label: "Outlook emails found" };
+    case "outlook-message":
+      return { icon: <Email size="sm" />, label: "Outlook thread" };
+    case "outlook-draft":
+      return { icon: <Edit size="sm" />, label: "Outlook draft" };
+    case "outlook-action":
+      return { icon: <Send size="sm" />, label: "Outlook sent" };
     case "calendar-search":
       return { icon: <Search size="sm" />, label: "Events found" };
     case "calendar-event":
@@ -990,10 +1658,56 @@ function statusCopy(id: CatalogArtifactId) {
       return { icon: <Calendar size="sm" />, label: "Agenda" };
     case "calendar-availability":
       return { icon: <Warning size="sm" />, label: "Availability" };
+    case "drive-search":
+      return { icon: <Files size="sm" />, label: "Files found" };
+    case "drive-file":
+      return { icon: <Files size="sm" />, label: "File opened" };
+    case "drive-action":
+      return { icon: <Success size="sm" />, label: "File shared" };
+    case "github-search":
+      return { icon: <Icon icon={GithubLogoIcon} size="sm" weight="fill" />, label: "GitHub results" };
+    case "github-pr":
+      return { icon: <Icon icon={GithubLogoIcon} size="sm" weight="fill" />, label: "Pull request" };
+    case "github-action":
+      return { icon: <Success size="sm" />, label: "GitHub updated" };
+    case "todoist-search":
+      return { icon: <Checklist size="sm" />, label: "Tasks found" };
+    case "todoist-draft":
+      return { icon: <Edit size="sm" />, label: "Task draft" };
+    case "todoist-action":
+      return { icon: <Success size="sm" />, label: "Task updated" };
   }
 }
 
 function promptCopy(id: CatalogArtifactId) {
+  if (id.startsWith("github-")) {
+    return {
+      user: "Check GitHub and triage the artifact-related pull requests.",
+      assistant: "I can keep GitHub search, pull request detail, and write actions visible as inline workflow artifacts.",
+    };
+  }
+
+  if (id.startsWith("drive-")) {
+    return {
+      user: "Find the Drive files related to John's July spending review.",
+      assistant: "I found the relevant file context and will keep Drive search and file actions visible as inline file artifacts.",
+    };
+  }
+
+  if (id.startsWith("todoist-")) {
+    return {
+      user: "Show me what tasks are open for the Studio artifact work.",
+      assistant: "I can show the task list, prepare new task drafts, and report task actions as inline artifacts.",
+    };
+  }
+
+  if (id.startsWith("outlook-")) {
+    return {
+      user: "Find the Outlook email about July spending and draft a reply.",
+      assistant: "I found the Outlook context and will keep the email thread, draft, and send result attached to the conversation.",
+    };
+  }
+
   if (id.startsWith("calendar-")) {
     return {
       user: "Check my calendar and schedule a finance review with Maya and John.",
@@ -1015,10 +1729,122 @@ function promptCopy(id: CatalogArtifactId) {
     };
   }
 
+  if (id.startsWith("video-")) {
+    return {
+      user: "Generate a short video recap from the uploaded budget graph.",
+      assistant: "I can keep the video generation lifecycle in one inline artifact, then attach the finished video output when it is ready.",
+    };
+  }
+
   return {
     user: "Check the uploaded budget document and image, then research whether Apple stock looks profitable.",
     assistant: "I found the relevant spending context. I'll keep web search and page fetching inside one inline research artifact so the result stays attached to the conversation.",
   };
+}
+
+function activityTone(status: ActivityStatus) {
+  if (status === "completed") return { label: "Completed", icon: <Success size="xs" className="text-secondary dark:text-disabled" /> };
+  if (status === "failed") return { label: "Failed", icon: <Warning size="xs" className="text-secondary dark:text-disabled" /> };
+  if (status === "running") return { label: "Running", icon: <Clock size="xs" className="text-secondary dark:text-disabled" /> };
+  return { label: "Pending", icon: <Clock size="xs" className="text-disabled dark:text-muted" /> };
+}
+
+function ActivityShimmer() {
+  return (
+    <motion.span
+      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent dark:via-white/[0.08]"
+      animate={{ x: ["-100%", "100%"] }}
+      transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+    />
+  );
+}
+
+function ToolCallRow({ call }: { call: ToolActivityCall }) {
+  const tone = activityTone(call.status);
+  return (
+    <div className="relative overflow-hidden rounded-xl bg-surface-page/55 px-3 py-2 dark:bg-white/[0.035]">
+      {call.status === "running" && <ActivityShimmer />}
+      <div className="relative flex items-start gap-2.5">
+        <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-surface-base dark:bg-white/[0.06]">
+          {tone.icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <div className="truncate text-xs font-medium text-primary dark:text-primary">{call.title}</div>
+            <div className="flex-shrink-0 text-2xs text-disabled dark:text-muted">{tone.label}</div>
+          </div>
+          {call.subtitle && <div className="mt-0.5 truncate text-2xs text-muted dark:text-muted">{call.subtitle}</div>}
+          {call.preview && <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-secondary dark:text-disabled">{call.preview}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToolActivityCard({ group }: { group: ToolActivityGroup }) {
+  const tone = activityTone(group.status);
+  const openByDefault = group.status === "running";
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      className="relative overflow-hidden rounded-2xl bg-surface-base/70 px-4 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.055)] ring-1 ring-black/[0.035] dark:bg-white/[0.055] dark:shadow-none dark:ring-white/[0.06]"
+    >
+      {group.status === "running" && <ActivityShimmer />}
+      <details open={openByDefault} className="relative group/activity">
+        <summary className="flex cursor-pointer list-none items-start gap-3">
+          <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-page/80 dark:bg-white/[0.07]">
+            {group.icon}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-primary dark:text-primary">{group.title}</span>
+            <span className="mt-0.5 block text-2xs text-disabled dark:text-muted">
+              {tone.label} / {group.calls.length} tool call{group.calls.length === 1 ? "" : "s"}
+            </span>
+            <span className="mt-2 block text-sm leading-relaxed text-secondary dark:text-disabled">{group.subtitle}</span>
+          </span>
+          <span className="mt-1 flex flex-shrink-0 items-center gap-1 rounded-full bg-surface-page/70 px-2 py-1 text-2xs text-muted dark:bg-white/[0.045] dark:text-muted">
+            {tone.icon}
+            <span>{tone.label}</span>
+          </span>
+        </summary>
+        <div className="mt-3 space-y-2">
+          {group.calls.map((call) => (
+            <ToolCallRow key={call.id} call={call} />
+          ))}
+        </div>
+      </details>
+    </motion.div>
+  );
+}
+
+function ActivityPreviewPanel() {
+  return (
+    <section className="mt-12 border-t border-surface-border/60 pt-8 dark:border-white/[0.06]">
+      <div className="mb-5">
+        <p className="text-2xs font-medium uppercase tracking-[0.16em] text-disabled dark:text-muted">
+          Tool activity catalog
+        </p>
+        <h2 className="mt-1 font-display text-xl font-normal text-primary">
+          Runtime activity preview
+        </h2>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+          System-generated activity groups for tool calls that do not need a curated LLM artifact.
+        </p>
+      </div>
+      <div className="grid gap-3">
+        {ACTIVITY_GROUPS.map((group) => (
+          <ToolActivityCard key={group.id} group={group} />
+        ))}
+      </div>
+      <div className="mt-4 rounded-2xl bg-surface-base/70 px-4 py-3 text-xs leading-relaxed text-muted dark:bg-white/[0.045] dark:text-muted">
+        Curated artifacts remain reserved for durable outputs. Tool activity is generated from runtime metadata and can collapse many raw calls into one readable work item.
+      </div>
+    </section>
+  );
 }
 
 export function ArtifactLabPanel() {
@@ -1033,9 +1859,9 @@ export function ArtifactLabPanel() {
   );
 
   return (
-    <div className="flex min-h-full flex-col bg-surface-page text-primary transition-colors duration-300">
-      <main className="chat-scroll-container flex-1 overflow-y-auto overflow-x-hidden px-4 pt-8 sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-col pb-16">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-page text-primary transition-colors duration-300">
+      <main className="chat-scroll-container min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pt-8 sm:px-6">
+        <div className="mx-auto flex max-w-3xl flex-col pb-20">
           <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <p className="text-2xs font-medium uppercase tracking-[0.16em] text-disabled dark:text-muted">
@@ -1048,26 +1874,17 @@ export function ArtifactLabPanel() {
                 A focused chat fixture for shaping artifact states before they move into production conversations.
               </p>
             </div>
-            <div className="flex w-full flex-col gap-2 sm:w-[340px]">
-              <div className="flex rounded-2xl bg-surface-base/70 p-1 dark:bg-white/[0.045]">
-                {FAMILY_OPTIONS.map((family) => {
-                  const active = selectedFamily === family.value;
-                  return (
-                    <button
-                      key={family.value}
-                      type="button"
-                      onClick={() => setSelectedId(family.initial)}
-                      className={`h-7 flex-1 rounded-xl text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-surface-page text-primary shadow-sm dark:bg-white/[0.08] dark:text-primary"
-                          : "text-muted hover:text-secondary dark:text-muted dark:hover:text-disabled"
-                      }`}
-                    >
-                      {family.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="grid w-full gap-2 sm:w-[380px] sm:grid-cols-[150px_minmax(0,1fr)]">
+              <Select
+                value={selectedFamily}
+                options={FAMILY_SELECT_OPTIONS}
+                onChange={(value) => {
+                  const nextFamily = FAMILY_OPTIONS.find((family) => family.value === value);
+                  if (nextFamily) setSelectedId(nextFamily.initial);
+                }}
+                aria-label="Artifact family"
+                className="!rounded-2xl !bg-surface-base/70 dark:!bg-white/[0.06]"
+              />
               <Select
                 value={selectedId}
                 options={visibleOptions}
@@ -1129,6 +1946,7 @@ export function ArtifactLabPanel() {
             </div>
           </motion.div>
           </div>
+          <ActivityPreviewPanel />
         </div>
       </main>
     </div>

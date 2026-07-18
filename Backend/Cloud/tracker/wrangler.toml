@@ -23,7 +23,7 @@
 #
 # No public domain needed — reachable only via service bindings from other workers.
 
-name = "tracker"
+name = "studio-tracker"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 workers_dev = false

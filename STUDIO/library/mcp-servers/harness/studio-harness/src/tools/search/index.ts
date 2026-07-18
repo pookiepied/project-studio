@@ -1,3 +1,0 @@
-import { wrapTool } from "../tool-contract.js";
-import { searchText as a } from "./text.js";import { searchFiles as b } from "./files.js";import { searchIdentifiers as c } from "./identifiers.js";import { searchImports as d } from "./imports.js";import { searchConfig as e } from "./config.js";import { searchTodos as f } from "./todos.js";
-export const searchText=wrapTool("search_text",a),searchFiles=wrapTool("search_files",b),searchIdentifiers=wrapTool("search_identifiers",c),searchImports=wrapTool("search_imports",d),searchConfig=wrapTool("search_config",e),searchTodos=wrapTool("search_todos",f);

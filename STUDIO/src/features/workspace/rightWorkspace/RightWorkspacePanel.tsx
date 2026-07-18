@@ -2,6 +2,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { setRightPanelWidth } from "@/app/shell/workspaceLayoutStore";
 import { ArtifactPanel } from "@/features/artifacts";
+import type { ActiveToolCall, TaskItem } from "@/types/tools";
+import type { ChatMessage, MessageSegment } from "@/types";
 import { BrowserPanel } from "../browser/BrowserPanel";
 import type { BrowserTab } from "../browser/types";
 import { TerminalPanel } from "../terminal/TerminalPanel";
@@ -10,6 +12,11 @@ import { ResizeHandle } from "./ResizeHandle";
 import { FilesPanel } from "./FilesPanel";
 import { ReviewPanel } from "./ReviewPanel";
 import { SideChatPanel } from "./SideChatPanel";
+import {
+  WORKSPACE_PANEL_DEFAULT_WIDTH,
+  clampWorkspacePanelWidth,
+} from "./workspacePanelGeometry";
+import { ConversationWorkspacePanel } from "./ConversationWorkspacePanel";
 import type {
   BrowserWorkspaceState,
   FilesWorkspaceState,
@@ -49,6 +56,19 @@ interface RightWorkspacePanelProps {
   onArtifactTabChange: (id: string) => void;
   onArtifactTabClose: (id: string) => void;
   onArtifactWidthChange: (width: number) => void;
+  messages: ChatMessage[];
+  activeToolCalls: ActiveToolCall[];
+  sessionTasks: TaskItem[];
+  pendingMessages: unknown[];
+  harnessSegments: MessageSegment[];
+  contextTokens: number;
+  contextLimit: number;
+  usageContextTokens: number;
+  isLoading: boolean;
+  isStreaming: boolean;
+  isSummarizing: boolean;
+  projectName?: string | null;
+  conversationTitle?: string | null;
 }
 
 export function RightWorkspacePanel({
@@ -76,13 +96,23 @@ export function RightWorkspacePanel({
   onArtifactTabChange,
   onArtifactTabClose,
   onArtifactWidthChange,
+  messages,
+  activeToolCalls,
+  sessionTasks,
+  pendingMessages,
+  harnessSegments,
+  contextTokens,
+  contextLimit,
+  usageContextTokens,
+  isLoading,
+  isStreaming,
+  isSummarizing,
+  projectName,
+  conversationTitle,
 }: RightWorkspacePanelProps) {
   const reduceMotion = useReducedMotion();
-  const [workspaceWidth, setWorkspaceWidth] = useState(() => {
-    const available = Math.max(320, window.innerWidth - 380);
-    const preferred = Math.round(window.innerWidth * 0.4);
-    return Math.min(available, Math.max(Math.min(480, available), preferred));
-  });
+  const [workspaceWidth, setWorkspaceWidth] = useState(() => clampWorkspacePanelWidth(WORKSPACE_PANEL_DEFAULT_WIDTH));
+  const [classicWorkspaceVisible, setClassicWorkspaceVisible] = useState(false);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0] ?? null;
 
   useEffect(() => {
@@ -91,8 +121,7 @@ export function RightWorkspacePanel({
   useEffect(() => () => setRightPanelWidth(0), []);
   useEffect(() => {
     const clampWidth = () => setWorkspaceWidth((current) => {
-      const max = Math.max(320, window.innerWidth - 360);
-      return Math.min(current, max);
+      return clampWorkspacePanelWidth(current);
     });
     window.addEventListener("resize", clampWidth);
     return () => window.removeEventListener("resize", clampWidth);
@@ -105,9 +134,7 @@ export function RightWorkspacePanel({
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     const onMove = (event: MouseEvent) => {
-      const maxW = Math.max(320, window.innerWidth - 360);
-      const minW = Math.min(maxW, Math.max(320, Math.round(window.innerWidth * 0.24)));
-      setWorkspaceWidth(Math.max(minW, Math.min(maxW, startW + (startX - event.clientX))));
+      setWorkspaceWidth(clampWorkspacePanelWidth(startW + (startX - event.clientX)));
     };
     const onUp = () => {
       document.body.style.cursor = "";
@@ -124,6 +151,11 @@ export function RightWorkspacePanel({
       rootPath: projectContext?.path ?? null,
       cwd: projectContext?.path ?? null,
     });
+  };
+
+  const launchClassicWorkspace = (type: WorkspaceTabType) => {
+    setClassicWorkspaceVisible(true);
+    create(type);
   };
 
   const renderTab = (tab: WorkspaceTab) => {
@@ -164,8 +196,9 @@ export function RightWorkspacePanel({
           visible={activeTab?.id === tab.id}
           width={workspaceWidth}
           onWidthChange={(width) => {
-            setWorkspaceWidth(width);
-            onBrowserWidthChange(width);
+            const nextWidth = clampWorkspacePanelWidth(width);
+            setWorkspaceWidth(nextWidth);
+            onBrowserWidthChange(nextWidth);
           }}
           onClose={() => onCloseTab(tab.id)}
           showChrome={false}
@@ -180,8 +213,9 @@ export function RightWorkspacePanel({
         <TerminalPanel
           width={workspaceWidth}
           onWidthChange={(width) => {
-            setWorkspaceWidth(width);
-            onTerminalWidthChange(width);
+            const nextWidth = clampWorkspacePanelWidth(width);
+            setWorkspaceWidth(nextWidth);
+            onTerminalWidthChange(nextWidth);
           }}
           onClose={() => onCloseTab(tab.id)}
           projectCwd={state.cwd ?? projectContext?.path ?? null}
@@ -231,8 +265,9 @@ export function RightWorkspacePanel({
         onTabChange={onArtifactTabChange}
         onTabClose={onArtifactTabClose}
         onWidthChange={(width) => {
-          setWorkspaceWidth(width);
-          onArtifactWidthChange(width);
+          const nextWidth = clampWorkspacePanelWidth(width);
+          setWorkspaceWidth(nextWidth);
+          onArtifactWidthChange(nextWidth);
         }}
         onClose={() => onCloseTab(tab.id)}
       />
@@ -243,38 +278,62 @@ export function RightWorkspacePanel({
     <AnimatePresence>
       {open && (
         <motion.div
+          layout
           key="right-workspace"
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: workspaceWidth, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
+          initial={{ width: 0 }}
+          animate={{ width: workspaceWidth }}
+          exit={{ width: 0 }}
           transition={{
             width: { duration: reduceMotion ? 0 : 0.24, ease: [0.32, 0.72, 0, 1] },
-            opacity: { duration: reduceMotion ? 0 : 0.16, ease: "easeOut" },
+            layout: { duration: reduceMotion ? 0 : 0.28, ease: [0.32, 0.72, 0, 1] },
           }}
           className="h-full flex-shrink-0 overflow-hidden"
         >
           <div className="flex h-full transition-colors duration-300" style={{ width: workspaceWidth, minWidth: workspaceWidth }}>
             <ResizeHandle onMouseDown={onResizeDown} />
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-2xl rounded-bl-2xl border-l border-surface-border bg-surface-page shadow-xl">
-              <WorkspaceHeader
-                tabs={tabs}
-                activeTabId={activeTabId}
-                onActivateTab={onActivateTab}
-                onCloseTab={onCloseTab}
-                onCreateTab={create}
-                onClose={onClose}
-              />
-              <div className="relative min-h-0 flex-1 overflow-hidden">
-                {tabs.length > 0 ? tabs.map((tab) => (
-                  <div
-                    key={tab.id}
-                    className={`absolute inset-0 min-h-0 min-w-0 overflow-hidden ${activeTab?.id === tab.id ? "visible" : "invisible pointer-events-none"}`}
-                    aria-hidden={activeTab?.id !== tab.id}
-                  >
-                    {renderTab(tab)}
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-border bg-surface-page shadow-none">
+              {classicWorkspaceVisible ? (
+                <>
+                  <WorkspaceHeader
+                    tabs={tabs}
+                    activeTabId={activeTabId}
+                    onActivateTab={onActivateTab}
+                    onCloseTab={onCloseTab}
+                    onCreateTab={create}
+                    onClose={() => setClassicWorkspaceVisible(false)}
+                  />
+                  <div className="relative min-h-0 flex-1 overflow-hidden">
+                    {tabs.length > 0 ? tabs.map((tab) => (
+                      <div
+                        key={tab.id}
+                        className={`absolute inset-0 min-h-0 min-w-0 overflow-hidden ${activeTab?.id === tab.id ? "visible" : "invisible pointer-events-none"}`}
+                        aria-hidden={activeTab?.id !== tab.id}
+                      >
+                        {renderTab(tab)}
+                      </div>
+                    )) : <WorkspaceLauncher onCreateTab={create} />}
                   </div>
-                )) : <WorkspaceLauncher onCreateTab={create} />}
-              </div>
+                </>
+              ) : (
+                <ConversationWorkspacePanel
+                  messages={messages}
+                  activeToolCalls={activeToolCalls}
+                  sessionTasks={sessionTasks}
+                  pendingMessages={pendingMessages}
+                  harnessSegments={harnessSegments}
+                  contextTokens={contextTokens}
+                  contextLimit={contextLimit}
+                  usageContextTokens={usageContextTokens}
+                  isLoading={isLoading}
+                  isStreaming={isStreaming}
+                  isSummarizing={isSummarizing}
+                  projectName={projectName}
+                  conversationTitle={conversationTitle}
+                  tabsOpen={tabs.length}
+                  onLaunch={launchClassicWorkspace}
+                  onClose={onClose}
+                />
+              )}
             </div>
           </div>
         </motion.div>

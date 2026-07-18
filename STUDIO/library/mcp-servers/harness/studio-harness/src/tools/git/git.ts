@@ -22,11 +22,25 @@ async function runGit(
       cwd,
       maxBuffer: 20 * 1024 * 1024,
       timeout: timeoutMs,
+      // GIT_TERMINAL_PROMPT=0: a missing credential fails fast instead of blocking
+      // on a hidden prompt until the timeout. LC_ALL=C: force English messages so
+      // the "not a git repository" substring checks work under any locale.
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
     });
     return { stdout: result.stdout as string, stderr: result.stderr as string, exitCode: 0 };
   } catch (e: any) {
     if (e.code === "ENOENT") {
       return { stdout: "", stderr: "git not found. STUDIO bundles git under vendor/git — reinstall/repair STUDIO, or run `npm run vendor:sync git` in a dev checkout.", exitCode: 127 };
+    }
+    if (e.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+      return {
+        stdout: String(e.stdout ?? ""),
+        stderr:
+          `git produced more than 20 MB of output. Narrow the command ` +
+          `(add paths, --max-count, or -- <file>), or run it via the bash tool ` +
+          `redirecting output to a file.`,
+        exitCode: -1,
+      };
     }
     if (e.killed || e.signal) {
       return {

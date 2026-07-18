@@ -1,19 +1,11 @@
 /**
  * Code-intelligence tools — export boundary.
  *
- * These tools produce *understanding* of a codebase rather than raw file
- * access: structural outlines, symbol locations, import/dependency graphs, and
- * code-oriented project maps. Raw file read/write/search lives in ../filesystem.
+ * Only the structural-outline primitive survives here. Higher-level codebase
+ * understanding (indexing, symbol search, file analysis, dependency maps) was
+ * removed from layer 1 — those are orchestration concerns for a future
+ * Explore-agent profile, not primitive tools.
  *
- * These tools manage their own timeout + error contracts internally and are
- * re-exported directly.
+ * outline.ts manages its own timeout + {error} contract internally.
  */
-import { wrapTool } from "../tool-contract.js";
-import { findRelatedFiles as _findRelatedFiles } from "./find_related.js";
-
-export { outlineFile }                                from "./outline.js";
-export { indexCodebase }                              from "./index_codebase.js";
-export { exploreCodebase, searchSymbol, analyzeFile } from "./composite_tools.js";
-
-/** Deterministic file adjacency (tests/styles/types/stories/config for a file). */
-export const findRelatedFiles = wrapTool("find_related_files", _findRelatedFiles);
+export { outlineFile } from "./outline.js";

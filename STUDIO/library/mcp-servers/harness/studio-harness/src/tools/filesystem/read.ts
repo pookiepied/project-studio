@@ -1,5 +1,4 @@
 import { createReadStream, promises as fs } from "fs";
-import { createHash } from "crypto";
 import { createInterface } from "readline";
 import { resolve } from "path";
 import { classifyBuffer, GENERATED, inferLanguage } from "./inspect.js";
@@ -76,9 +75,6 @@ export async function readFile(args: Record<string, unknown>): Promise<Record<st
   let returnedBytes = 0;
   let outputLimited = false;
   const input = createReadStream(path, { encoding: (args.encoding as BufferEncoding) || "utf8" });
-  const hasher = createHash("sha256");
-  let streamedBytes = 0;
-  input.on("data", chunk => { const data = Buffer.from(chunk as string, (args.encoding as BufferEncoding) || "utf8"); streamedBytes += data.length; hasher.update(data); });
   const reader = createInterface({ input, crlfDelay: Infinity });
   for await (const line of reader) {
     lineNumber++;
@@ -96,7 +92,11 @@ export async function readFile(args: Record<string, unknown>): Promise<Record<st
   const requestedEnd = maxLines === undefined ? lineNumber : startLine + maxLines - 1;
   const after = await fs.stat(path);
   if (after.size !== stat.size || Math.floor(after.mtimeMs) !== Math.floor(stat.mtimeMs)) return { error: "file_changed_during_read", message: "The file changed while it was being read. Retry the read to obtain a consistent revision." };
-  const revision = { algorithm: "sha256", hash: hasher.digest("hex"), size_bytes: streamedBytes, modified_ms: Math.floor(stat.mtimeMs) };
+  // Compute the revision from the raw file bytes via the shared helper so this
+  // hash is identical to what edit/write/delete compute. Hashing the decoded →
+  // re-encoded stream (as before) diverged for any non-strict-UTF-8 file and
+  // caused false "stale_file" rejections on the next edit.
+  const revision = await getFileRevision(path);
   return {
     path: resolve(path),
     content: includeLineNumbers ? numbered(lines, startLine) : lines.join("\n"),

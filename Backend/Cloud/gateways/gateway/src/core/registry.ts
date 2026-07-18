@@ -4,8 +4,6 @@ import type {
   ChatResponse,
   EmbeddingsRequest,
   EmbeddingsResponse,
-  RerankRequest,
-  RerankResponse,
   TranscriptionRequest,
   TranscriptionResponse,
   SpeechRequest,
@@ -14,8 +12,7 @@ import type {
   ImageEditRequest,
   MediaResponse,
   VideoGenerationRequest,
-  VideoGenerationResponse,
-  AudioGenerationRequest
+  VideoGenerationResponse
 } from "./types";
 import type { GatewayEnv } from "../system/infrastructure/cloudflare/env";
 import { openaiProvider } from "../llm/providers/openai";
@@ -43,7 +40,6 @@ export interface HandlerContext {
 
 export type ChatHandler = (request: ChatRequest, context: HandlerContext) => Promise<ChatResponse | Response>;
 export type EmbedHandler = (request: EmbeddingsRequest, context: HandlerContext) => Promise<EmbeddingsResponse>;
-export type RerankHandler = (request: RerankRequest, context: HandlerContext) => Promise<RerankResponse>;
 export type TranscribeHandler = (
   request: TranscriptionRequest,
   context: HandlerContext
@@ -57,7 +53,6 @@ export type VideoHandler = (
   request: VideoGenerationRequest,
   context: HandlerContext
 ) => Promise<VideoGenerationResponse>;
-export type AudioGenHandler = (request: AudioGenerationRequest, context: HandlerContext) => Promise<MediaResponse>;
 export type CreditsHandler = (context: HandlerContext) => Promise<unknown>;
 
 export interface ProviderModule {
@@ -65,12 +60,10 @@ export interface ProviderModule {
   capabilities: Capability[];
   chat?: ChatHandler;
   embed?: EmbedHandler;
-  rerank?: RerankHandler;
   transcribe?: TranscribeHandler;
   speak?: SpeakHandler;
   image?: ImageHandler;
   video?: VideoHandler;
-  audioGen?: AudioGenHandler;
   credits?: CreditsHandler;
 }
 

@@ -8,7 +8,7 @@ export function ResizeHandle({ onMouseDown }: ResizeHandleProps) {
   return (
     <div
       onMouseDown={onMouseDown}
-      className="group relative w-3 flex-shrink-0 cursor-col-resize outline-none"
+      className="group relative w-2 flex-shrink-0 cursor-col-resize outline-none"
       role="separator"
       aria-orientation="vertical"
     >

@@ -4,34 +4,14 @@ import {
   withCloudflareGatewayFetch,
   type TransportConfig
 } from "./cloudflareGateway";
-import { directKeyTransport } from "./directKeys";
 
-const CF_NATIVE_PROVIDERS = new Set([
-  "openai",
-  "google",
-  "anthropic",
-  "groq",
-  "xai",
-  "deepseek",
-  "mistral",
-  "fal",
-  "replicate",
-  "elevenlabs",
-  "openrouter",
-  "alibaba",
-  "minimax",
-  "zai",
-  "xiaomi"
-]);
-
+// Every gateway provider is reached through Cloudflare AI Gateway (BYOK). There is no
+// direct-key transport: provider keys live in Cloudflare and are injected by the gateway,
+// so the worker only ever sends cf-aig-* headers (and strips any provider auth).
 export function getTransport(provider: string, env: GatewayEnv, fetchImpl?: typeof fetch): TransportConfig {
-  if (CF_NATIVE_PROVIDERS.has(provider)) {
-    const transport = cloudflareGatewayTransport(provider, env);
-    return {
-      ...transport,
-      fetch: withCloudflareGatewayFetch(fetchImpl)
-    };
-  }
-
-  return directKeyTransport(provider, env);
+  const transport = cloudflareGatewayTransport(provider, env);
+  return {
+    ...transport,
+    fetch: withCloudflareGatewayFetch(fetchImpl)
+  };
 }

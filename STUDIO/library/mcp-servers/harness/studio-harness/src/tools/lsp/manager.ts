@@ -17,6 +17,8 @@ import { spawn, execSync, type ChildProcess } from "child_process";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { pathToFileURL, fileURLToPath } from "url";
+import { killTree } from "../execution/run_process.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +57,8 @@ interface PendingRequest {
 
 export interface LspServer {
   process: ChildProcess;
+  /** Set once the process exits or errors, so a dead server is never reused. */
+  dead?: boolean;
   nextId: number;
   pending: Map<number, PendingRequest>;
   buffer: string;
@@ -144,6 +148,29 @@ export const SYMBOL_KIND_NAMES: Record<number, string> = {
 class LspManager {
   private servers = new Map<string, LspServer>();
 
+  constructor() {
+    // LSP servers (rust-analyzer, gopls, tsserver, …) are long-lived children.
+    // Without cleanup they outlive the harness process. Kill them on shutdown.
+    process.once("exit", () => this.killAll());
+    process.once("SIGINT", () => { this.killAll(); process.exit(130); });
+    process.once("SIGTERM", () => { this.killAll(); process.exit(143); });
+  }
+
+  /** Synchronously terminate every tracked server + its child tree. Shutdown path. */
+  private killAll(): void {
+    for (const [key, server] of this.servers) {
+      this.servers.delete(key);
+      const pid = server.process.pid;
+      if (pid == null) continue;
+      try {
+        if (process.platform === "win32") execSync(`taskkill /PID ${pid} /T /F`, { stdio: "ignore" });
+        else process.kill(-pid, "SIGKILL");
+      } catch {
+        try { server.process.kill(); } catch { /* already gone */ }
+      }
+    }
+  }
+
   // ── Language helpers ──────────────────────────────────────────────────────
 
   detectLanguage(filePath: string): string | null {
@@ -187,7 +214,11 @@ class LspManager {
   ): Promise<LspServer> {
     const key = `${language}:${workspaceRoot}`;
     const existing = this.servers.get(key);
-    if (existing && !existing.process.killed) return existing;
+    // `process.killed` is only true after an explicit .kill() — a server that
+    // crashed on its own reports killed=false, so we track a `dead` flag instead
+    // and evict it, otherwise every later request hangs until its timeout.
+    if (existing && !existing.dead) return existing;
+    if (existing) this.servers.delete(key);
 
     if (!LANG_SERVERS[language]) {
       throw new Error(
@@ -215,6 +246,7 @@ class LspManager {
   ): Promise<LspServer> {
     return new Promise((resolve, reject) => {
       const isWindows = process.platform === "win32";
+      const key = `${language}:${workspaceRoot}`;
       const args =
         language === "typescript" || language === "javascript"
           ? ["--stdio"]
@@ -248,6 +280,8 @@ class LspManager {
       });
 
       proc.on("error", (err) => {
+        server.dead = true;
+        if (this.servers.get(key) === server) this.servers.delete(key);
         const hint = this.getInstallHint(language);
         const msg = `LSP server '${bin}' failed to start: ${err.message}. Install: ${hint}`;
         reject(new Error(msg));
@@ -255,6 +289,10 @@ class LspManager {
       });
 
       proc.on("exit", (code) => {
+        // Mark dead and evict so getOrCreate spawns a fresh server next time
+        // instead of handing back a corpse whose requests will only ever time out.
+        server.dead = true;
+        if (this.servers.get(key) === server) this.servers.delete(key);
         this.rejectAll(
           server,
           new Error(`LSP server exited with code ${code}`),
@@ -265,7 +303,9 @@ class LspManager {
       this.sendInitialize(server, workspaceRoot)
         .then(() => resolve(server))
         .catch((e) => {
-          proc.kill();
+          server.dead = true;
+          if (this.servers.get(key) === server) this.servers.delete(key);
+          killTree(proc); // shell:true wraps the server in cmd.exe on Windows — kill the tree
           reject(e);
         });
     });
@@ -482,11 +522,10 @@ class LspManager {
     const key = `${language}:${workspaceRoot}`;
     const server = this.servers.get(key);
     if (server) {
-      try {
-        server.process.kill();
-      } catch {
-        /* ignore */
-      }
+      server.dead = true;
+      // killTree, not process.kill: on Windows the server runs under a cmd.exe
+      // wrapper (shell:true), so a bare kill would orphan the real server.
+      try { killTree(server.process); } catch { /* already gone */ }
       this.servers.delete(key);
     }
   }
@@ -497,17 +536,24 @@ class LspManager {
 // ---------------------------------------------------------------------------
 
 export function pathToUri(filePath: string): string {
-  const normalized = filePath.replace(/\\/g, "/");
-  return normalized.startsWith("/")
-    ? `file://${normalized}`
-    : `file:///${normalized}`;
+  // Already a URI? leave it. Otherwise let Node percent-encode spaces/non-ASCII
+  // and handle Windows drive letters — a hand-rolled string join does neither,
+  // which breaks every location + edit under a path containing a space.
+  if (/^[a-z]+:\/\//i.test(filePath)) return filePath;
+  try {
+    return pathToFileURL(filePath).href;
+  } catch {
+    return filePath;
+  }
 }
 
 export function uriToPath(uri: string): string {
-  return uri
-    .replace(/^file:\/\/\//, "")
-    .replace(/^file:\/\//, "")
-    .replace(/\//g, process.platform === "win32" ? "\\" : "/");
+  if (!uri.startsWith("file:")) return uri;
+  try {
+    return fileURLToPath(uri); // percent-decodes and resolves Windows/UNC paths
+  } catch {
+    return uri;
+  }
 }
 
 // ---------------------------------------------------------------------------

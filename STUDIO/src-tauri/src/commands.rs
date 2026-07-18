@@ -59,16 +59,24 @@ pub struct DirectoryEntry {
 
 #[tauri::command]
 pub async fn execute_shell_command(command: String, args: Vec<String>) -> Result<String, String> {
-    println!("[Shell] Executing: {} {:?}", command, args);
-
     let output = Command::new(&command)
         .args(&args)
         .output()
         .map_err(|e| format!("Failed to execute command '{}': {}", command, e))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Command failed: {}", stderr));
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() { stderr } else { stdout };
+        let exit_code = output
+            .status
+            .code()
+            .map_or_else(|| "unknown".to_string(), |code| code.to_string());
+        return Err(if detail.is_empty() {
+            format!("Command '{}' failed with exit code {}", command, exit_code)
+        } else {
+            format!("Command '{}' failed with exit code {}: {}", command, exit_code, detail)
+        });
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

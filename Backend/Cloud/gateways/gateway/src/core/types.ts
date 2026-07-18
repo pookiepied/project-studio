@@ -143,17 +143,6 @@ export interface EmbeddingsResponse {
   usage?: unknown;
 }
 
-export interface RerankRequest {
-  model: string;
-  query: string;
-  documents: string[];
-}
-
-export interface RerankResponse {
-  model: string;
-  results: unknown[];
-}
-
 export interface TranscriptionRequest {
   model: string;
   audio: ArrayBuffer;
@@ -244,9 +233,4 @@ export interface VideoGenerationResponse {
   // media pass-through. jobId is retained for any future truly-async provider path.
   jobId?: string;
   media?: MediaResponse;
-}
-
-export interface AudioGenerationRequest {
-  model: string;
-  prompt: string;
 }

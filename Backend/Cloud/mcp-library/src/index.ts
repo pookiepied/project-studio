@@ -6,7 +6,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.get("/health", (c) =>
   c.json({
-    service: "studio-cloud-mcp-library",
+    service: "studio-mcp-library",
     status: "ok",
     environment: c.env.ENVIRONMENT,
   }),

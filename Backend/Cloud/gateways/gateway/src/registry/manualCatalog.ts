@@ -108,7 +108,7 @@ export const MANUAL_MODEL_REGISTRY: RegistryModel[] = [
     jsonSchema: false,
     promptCaching: true,
     reasoning: ["none", "low", "medium", "high"],
-    reasoningControl: "thinking"
+    reasoningControl: "thinking_budget"
   }),
   chat("anthropic", "claude-sonnet-4-6", "Claude Sonnet 4.6", "Anthropic", "claude-sonnet", anthropicThinking()),
   chat("anthropic", "claude-sonnet-5", "Claude Sonnet 5", "Anthropic", "claude-sonnet", anthropicThinking()),
@@ -512,6 +512,8 @@ function googleThinking(): ChatOptions {
   };
 }
 
+// Modern Claude lineup (Sonnet 4.6, Sonnet 5, Opus 4.8, Fable 5): adaptive thinking controlled
+// by the `effort` parameter (manual budget_tokens returns 400 on these). See anthropic/chat.ts.
 function anthropicThinking(): ChatOptions {
   return {
     contextWindow: 1_000_000,
@@ -520,7 +522,7 @@ function anthropicThinking(): ChatOptions {
     jsonSchema: false,
     promptCaching: true,
     reasoning: ["none", "low", "medium", "high", "xhigh"],
-    reasoningControl: "thinking"
+    reasoningControl: "effort"
   };
 }
 

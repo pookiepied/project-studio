@@ -33,7 +33,7 @@ interface ChatTopChromeProps {
   claudeAccountLoading: boolean;
   claudeRateLimit: ClaudeUsageRateLimit;
   onRefreshClaudeAccount: () => void;
-  rightPanelWidth: number;
+  dockedPanelOpen: boolean;
   isTauri: boolean;
   workspaceOpen: boolean;
   onToggleWorkspace: () => void;
@@ -59,7 +59,7 @@ export function ChatTopChrome({
   claudeAccountLoading,
   claudeRateLimit,
   onRefreshClaudeAccount,
-  rightPanelWidth,
+  dockedPanelOpen,
   isTauri,
   workspaceOpen,
   onToggleWorkspace,
@@ -68,13 +68,26 @@ export function ChatTopChrome({
 }: ChatTopChromeProps) {
   const { chatDockVisible } = useGlobalDock();
   const usedTokens = usageContextTokens > 0 ? usageContextTokens : contextTokens;
+  const titleLabel = scope === "local"
+    ? projectName || projectContext?.name || conversationTitle || "Local project"
+    : conversationTitle || "New conversation";
+  const titleDetail = scope === "local" && conversationTitle ? conversationTitle : undefined;
 
   return (
     <>
-      <div className={`pointer-events-none fixed inset-x-0 top-0 z-toast flex h-[var(--studio-topbar-height)] items-center justify-center transition-opacity duration-150 ${chatDockVisible ? "invisible opacity-0" : "visible opacity-100"}`} aria-hidden={chatDockVisible}>
-        <div className="flex h-8 min-w-0 items-center gap-2 px-2 text-xs" style={{ maxWidth: "max(180px, min(520px, calc(100vw - 560px)))" }}>
-          {projectName && scope === "local" && <><FolderOpen size="sm" className="flex-shrink-0 text-muted" /><span className="max-w-32 truncate text-secondary">{projectName}</span><span className="text-muted">/</span></>}
-          <span className="min-w-0 truncate font-medium text-primary">{conversationTitle || "New conversation"}</span>
+      <div
+        className="pointer-events-none fixed top-0 z-toast hidden h-[var(--studio-topbar-height)] items-center min-[980px]:flex"
+        style={{
+          left: dockedPanelOpen ? 192 : 188,
+          right: chatDockVisible ? "calc(50vw + 300px)" : 360,
+        }}
+      >
+        <div
+          className="group/context pointer-events-auto relative flex h-8 min-w-0 max-w-full items-center gap-2 rounded-lg px-2 text-xs text-primary transition-colors hover:bg-surface-hover"
+          title={titleDetail ? `${titleLabel} / ${titleDetail}` : titleLabel}
+        >
+          {scope === "local" && <FolderOpen size="sm" className="flex-shrink-0 text-muted" />}
+          <span className="min-w-0 truncate font-medium">{titleLabel}</span>
           {projectContext && scope === "local" && (
             <div className="pointer-events-auto"><BranchSelector projectContext={projectContext} setProjectContext={setProjectContext} placement="down" /></div>
           )}
@@ -84,10 +97,19 @@ export function ChatTopChrome({
           {scope === "local" && chatEngine === "claude" && (
             <div className="pointer-events-auto"><ClaudeUsageBadge status={claudeAccountStatus} loading={claudeAccountLoading} rateLimit={claudeRateLimit} onRefresh={onRefreshClaudeAccount} compact /></div>
           )}
+          {titleDetail && (
+            <div className="pointer-events-none absolute left-0 top-full z-context mt-1 hidden w-72 rounded-xl border border-surface-border bg-surface-page p-3 shadow-lg group-hover/context:block">
+              <p className="truncate text-xs font-semibold text-primary">{titleLabel}</p>
+              <p className="mt-1 truncate text-xs text-secondary">{titleDetail}</p>
+              {projectContext?.path && (
+                <p className="mt-2 break-all text-2xs leading-relaxed text-muted">{projectContext.path}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="pointer-events-auto fixed top-0 z-toast flex h-[var(--studio-topbar-height)] items-center transition-[right] duration-300 ease-standard" style={{ right: rightPanelWidth + 14 }}>
+      <div className="pointer-events-auto fixed top-0 right-3.5 z-toast flex h-[var(--studio-topbar-height)] items-center">
         <RightWorkspaceControls
           isTauri={isTauri}
           projectContext={projectContext}

@@ -46,6 +46,14 @@ export function useChatProjectRegistry({
     await refreshProjects();
   }, [setProjectContext, refreshProjects]);
 
+  const renameProject = useCallback(async (id: string, name: string) => {
+    await projectRegistry.rename(id, name);
+    await refreshProjects();
+    if (projectContext && projects.some((project) => project.id === id && project.path === projectContext.path)) {
+      setProjectContext({ ...projectContext, name });
+    }
+  }, [projectContext, projects, refreshProjects, setProjectContext]);
+
   const activeProjectPath = projectContext?.path;
   const activeProjectName = projectContext?.name;
 
@@ -62,6 +70,7 @@ export function useChatProjectRegistry({
     projects,
     removeProject,
     deleteProject,
+    renameProject,
     handleSelectProject,
     handleOpenProjectFolder,
   };

@@ -223,8 +223,10 @@ When returning a structured result that should render as a reusable UI object ra
   "type": "artifact",
   "version": 1,
   "category": "general",
-  "kind": "search",
+  "kind": "web_search",
   "title": "Short title",
+  "summary": "One sentence summary.",
+  "status": "completed",
   "presentation": {
     "surface": "chat",
     "density": "card"
@@ -232,7 +234,20 @@ When returning a structured result that should render as a reusable UI object ra
 }
 \`\`\`
 
-Use artifact blocks for search results, link bundles, weather/location snapshots, memory summaries, timelines, task summaries, agent summaries, records, and other app-style outputs. Keep low-level tool names out of user-facing labels; describe the work in human terms such as "Exploring codebase" or "Checking sources". Do not use artifact blocks for ordinary conversation.`,
+Use artifact blocks for search results, generated images/videos, connector records/actions, file records, GitHub records, task records, timelines, and other app-style outputs. Keep low-level tool names out of user-facing labels; describe the work in human terms such as "Exploring codebase" or "Checking sources". Do not use artifact blocks for ordinary conversation.
+
+Supported artifact kinds and key data shapes:
+
+- Web/research: "web_search", "web_research", "web_fetch". Include \`meta.query\` and a \`sections\` item of type "links" with source links.
+- Image generation: "generated_image" or "image_generation". While generating, use status "loading" or "streaming" and optional timeline steps. When complete, include \`data.imageUrl\`, \`data.prompt\`, \`data.model\`, and optional \`data.aspectRatio\`.
+- Video generation: "generated_video" or "video_generation". While generating, use status "loading" or "streaming" and optional timeline steps. When complete, include \`data.videoUrl\`, \`data.prompt\`, \`data.model\`, optional \`data.posterUrl\`, \`data.duration\`, \`data.resolution\`, and \`data.aspectRatio\`.
+- Email: "gmail_search", "gmail_message", "gmail_thread", "gmail_draft", "gmail_action", or matching "outlook_*" kinds.
+- Calendar: "calendar_search", "calendar_list", "calendar_event", "calendar_draft", "calendar_action", "calendar_availability".
+- Cloud files: "googledrive_search", "googledrive_file", "googledrive_action", "googledocs_file", "googlesheets_file", "onedrive_file", "dropbox_file".
+- GitHub: "github_search", "github_issue", "github_pull_request", "github_repository", "github_workflow", "github_action".
+- Tasks: "task_list", "task_draft", "task_action", "todoist_task", "linear_issue", "jira_issue", "trello_card", "asana_task", "clickup_task".
+
+For completed generated media, prefer generated_image/generated_video over generic file/link artifacts so Studio can show the rich preview. For in-progress media, emit an artifact with status "loading" or "streaming" before the final result if useful. If a tool returns a generated image/video URL, include that URL in the artifact \`data\` object.`,
   });
 }
 

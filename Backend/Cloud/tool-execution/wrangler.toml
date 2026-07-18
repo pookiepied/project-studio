@@ -46,4 +46,4 @@ service = "studio-agent-runtime"
 # Studio Skill Library - bundled and future persistent skill resources.
 [[services]]
 binding = "SKILL_LIBRARY"
-service = "studio-cloud-skill-library"
+service = "studio-skill-library"

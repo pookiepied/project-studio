@@ -326,9 +326,17 @@ async function applyEdits(edits: Edit[], expected: any, server?: LspServer) {
   for (const [file, list] of grouped) {
     let text = originals.get(file)!;
     const lines = text.split(/(?<=\n)/);
-    const offset = (p: any) =>
-      lines.slice(0, p.line).join("").length +
-      lines[p.line]?.slice(0, p.character).length;
+    // Clamp both coordinates. LSP full-document edits routinely use an end
+    // position one line past the last line (e.g. {line: lineCount, character: 0});
+    // an unclamped `lines[p.line].slice(...)` yields undefined → NaN offset →
+    // the edit truncates or duplicates the whole file. Clamping to the end of the
+    // text makes an out-of-range position mean "end of document".
+    const offset = (p: any) => {
+      const line = Math.max(0, Math.min(p.line ?? 0, lines.length));
+      const lineText = lines[line] ?? "";
+      const col = Math.max(0, Math.min(p.character ?? 0, lineText.length));
+      return lines.slice(0, line).join("").length + col;
+    };
     for (const e of [...list].sort(
       (a, b) => offset(b.range.start) - offset(a.range.start),
     )) {

@@ -19,9 +19,7 @@ export async function anthropicChat(request: ChatRequest, context: HandlerContex
       toolChoice: toAiToolChoice(request.toolChoice),
       abortSignal: context.request.signal,
       providerOptions: {
-        anthropic: {
-          thinking: toAnthropicThinking(request)
-        }
+        anthropic: anthropicReasoningOptions(request)
       }
     };
 
@@ -152,15 +150,33 @@ function toAiToolChoice(toolChoice: ChatRequest["toolChoice"]) {
   return functionName ? { type: "tool" as const, toolName: functionName } : "auto";
 }
 
-// Maps the gateway's normalized ReasoningEffort scale onto Anthropic extended thinking.
-// Anthropic controls thinking depth with a `budget_tokens` count, so each effort level
-// maps to a budget. `none` (and no effort) disables thinking.
+// Anthropic has two distinct reasoning mechanisms depending on the model, so the gateway
+// passes each model exactly what its official API supports:
 //
-// NOTE (flagged for review): the newest Claude models (Opus 4.6+, Sonnet 5, Fable 5)
-// prefer *adaptive* thinking and reject an explicit `budget_tokens` at the raw API.
-// GATEWAY_GUIDE.md / the task specify mapping effort → budget_tokens, so that mapping is
-// implemented here; the AI SDK is expected to translate it, but this is the one place a
-// per-tier adaptive/budget split may need revisiting.
+//  1. Adaptive thinking + `effort` (the modern lineup: Opus 4.6+/4.7/4.8, Sonnet 4.6/5,
+//     Fable 5, …). Thinking depth is controlled by an `effort` level (low|medium|high|xhigh|
+//     max), and thinking is requested with `thinking: { type: "adaptive" }`. Manual
+//     `budget_tokens` returns HTTP 400 on these models.
+//     Ref: https://platform.claude.com/docs/en/build-with-claude/effort
+//  2. Manual thinking + `budget_tokens` (older lineup that is NOT effort-supported, e.g.
+//     Claude Haiku 4.5, Opus 4.5). Thinking depth is a token budget via
+//     `thinking: { type: "enabled", budgetTokens: N }`.
+//
+// Default = adaptive/effort: every current and future Claude model uses effort, so only the
+// known legacy budget models are listed below. A model missing from the set therefore gets the
+// future-proof effort path automatically.
+const ANTHROPIC_MANUAL_THINKING_MODELS = new Set<string>([
+  "claude-haiku-4-5",
+  "claude-haiku-4-5-20251001",
+  "claude-opus-4-5",
+  "claude-opus-4-5-20251101"
+]);
+
+function usesManualThinking(model: string): boolean {
+  return ANTHROPIC_MANUAL_THINKING_MODELS.has(model);
+}
+
+// Manual-thinking budget per effort tier (used only for legacy budget_tokens models).
 const REASONING_BUDGET_TOKENS: Record<Exclude<ReasoningEffort, "none">, number> = {
   minimal: 1024,
   low: 4000,
@@ -169,11 +185,38 @@ const REASONING_BUDGET_TOKENS: Record<Exclude<ReasoningEffort, "none">, number> 
   xhigh: 24000
 };
 
-function toAnthropicThinking(request: ChatRequest) {
+// Gateway effort scale (none|minimal|low|medium|high|xhigh) → Anthropic effort scale
+// (low|medium|high|xhigh|max). Anthropic has no "minimal"; validation already rejects efforts a
+// model doesn't declare, so "minimal" only reaches here defensively → mapped to "low".
+function toAnthropicEffort(effort: Exclude<ReasoningEffort, "none">): "low" | "medium" | "high" | "xhigh" {
+  switch (effort) {
+    case "minimal":
+    case "low":
+      return "low";
+    case "medium":
+      return "medium";
+    case "high":
+      return "high";
+    case "xhigh":
+      return "xhigh";
+  }
+}
+
+// Builds the `providerOptions.anthropic` reasoning fields for the resolved model.
+function anthropicReasoningOptions(request: ChatRequest): Record<string, unknown> {
   const effort = request.reasoningEffort;
-  if (!effort || effort === "none") return undefined;
-  const budgetTokens = request.reasoningBudget ?? REASONING_BUDGET_TOKENS[effort];
-  return { type: "enabled" as const, budgetTokens };
+
+  if (usesManualThinking(request.model)) {
+    // Legacy budget_tokens models. `none`/omitted → omit thinking (model does not think).
+    if (!effort || effort === "none") return {};
+    return { thinking: { type: "enabled", budgetTokens: request.reasoningBudget ?? REASONING_BUDGET_TOKENS[effort] } };
+  }
+
+  // Modern adaptive/effort models. `none`/omitted → omit thinking + effort so the model runs
+  // at its default (Opus 4.8 without thinking; Sonnet 5 / Fable 5 keep their always-on adaptive
+  // default, which cannot be disabled). Otherwise request adaptive thinking at the mapped effort.
+  if (!effort || effort === "none") return {};
+  return { effort: toAnthropicEffort(effort), thinking: { type: "adaptive" } };
 }
 
 function textFromPart(part: unknown): string {

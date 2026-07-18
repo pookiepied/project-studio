@@ -1,6 +1,11 @@
 import { spawn } from "child_process";
+import { StringDecoder } from "string_decoder";
 import { TOOL_TIMEOUTS } from "../tool-contract.js";
 import { resolveRipgrep } from "../shared/vendor.js";
+
+// Safety net against a runaway broad search buffering gigabytes before pagination.
+const MAX_GREP_OUTPUT_CHARS = 16_000_000;
+const MAX_GREP_STDERR_CHARS = 100_000;
 
 // Directories that produce noise in every search - excluded automatically.
 const AUTO_EXCLUDE_GLOBS = [
@@ -92,7 +97,9 @@ function rgArgsFor(parsed: GrepArgs): string[] {
     rgArgs.push("-g", excl);
   }
 
-  rgArgs.push(parsed.pattern, parsed.searchPath);
+  // `--` terminates option parsing so a pattern like "-l" or "--files" is
+  // searched for literally instead of being consumed as a ripgrep flag.
+  rgArgs.push("--", parsed.pattern, parsed.searchPath);
   return rgArgs;
 }
 
@@ -108,6 +115,10 @@ async function runRipgrep(parsed: GrepArgs): Promise<Record<string, unknown>> {
     let stdout = "";
     let stderr = "";
     let settled = false;
+    // StringDecoder reassembles multibyte UTF-8 split across chunks; the length
+    // guards keep a huge result set from exhausting memory before pagination.
+    const outDec = new StringDecoder("utf8");
+    const errDec = new StringDecoder("utf8");
 
     const proc = spawn(resolveRipgrep(), rgArgsFor(parsed), { stdio: "pipe" });
 
@@ -130,10 +141,16 @@ async function runRipgrep(parsed: GrepArgs): Promise<Record<string, unknown>> {
       });
     }, GREP_TIMEOUT_MS);
 
-    proc.stdout?.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
+    proc.stdout?.on("data", (d: Buffer) => {
+      if (stdout.length >= MAX_GREP_OUTPUT_CHARS) return;
+      const t = outDec.write(d);
+      stdout += stdout.length + t.length <= MAX_GREP_OUTPUT_CHARS ? t : t.slice(0, MAX_GREP_OUTPUT_CHARS - stdout.length);
+    });
+    proc.stderr?.on("data", (d: Buffer) => { if (stderr.length < MAX_GREP_STDERR_CHARS) stderr += errDec.write(d); });
 
     proc.on("close", (code) => {
+      stdout += outDec.end();
+      stderr += errDec.end();
       if (code !== null && code > 1) {
         finish({
           matches: "",

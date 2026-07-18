@@ -1,565 +1,1102 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
 import {
-  Icon,
-  type PhosphorIcon,
   Add,
-  Brain,
-  Checklist,
-  Collapse,
+  Calendar,
+  Check,
+  Clock,
+  Cloud,
+  Code,
+  Copy,
   Document,
-  Error,
+  Eye,
   FolderOpen,
-  Lightning,
-  Project,
-  ShieldCheck,
+  List,
+  More,
+  Redo,
+  Refresh,
+  Search,
   Spinner,
-  ArchiveBoxIcon,
-  DatabaseIcon,
-  GearSixIcon,
-  GraphIcon,
-  RobotIcon,
-  SpinnerGapIcon,
-  UploadSimpleIcon,
+  Warning,
 } from "@/ui/icons";
-import { EmptyState } from "@/ui/primitives/EmptyState";
 import { Button } from "@/ui/primitives/Button";
+import { Input } from "@/ui/primitives/Input";
+import { Textarea } from "@/ui/primitives/Textarea";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import {
-  deleteKbDoc,
-  deleteMemoryFact,
-  indexKbDocument,
-  listKbDocs,
-  listMemoryFacts,
-  type KbDocument,
-  type MemoryFact,
-} from "@/features/chat/attachments/kbService";
-import {
-  createAgent,
-  deleteAgent,
-  listAgents,
-  runAgent,
-  type CreateAgentDraft,
-  type UserAgent,
-} from "@/features/workspace/services/agentWorkflowService";
-import { AgentRow, CreateAgentForm } from "./WorkspaceAutomation";
-import { DocumentList, MemoryList } from "./WorkspaceContextLists";
-import { CATEGORY_LABELS, formatBytes, formatRelative } from "./workspaceFormat";
+import { markdownComponents } from "@/features/markdown";
+import { workspaceService } from "@/features/workspace/life/workspaceService";
+import type {
+  OrganizedCapture,
+  WorkspaceContextPreview,
+  WorkspaceNote,
+  WorkspaceNoteRevision,
+  WorkspaceSnapshot,
+  WorkspaceSource,
+  WorkspaceTask,
+} from "@/features/workspace/life/types";
+import "./workspacePage.css";
 
-type WorkspaceSection = "overview" | "context" | "automation" | "activity";
+type Surface = "notes" | "tasks";
+type EditorMode = "write" | "preview" | "split";
+type SaveState = "saved" | "dirty" | "saving" | "conflict" | "failed";
 
-const ACCEPTED_TYPES = ".txt,.md,.json,text/plain,text/markdown,text/x-markdown,application/json";
-const STORAGE_LIMIT = 500 * 1024 * 1024;
+const CAPTURE_DRAFT_KEY = "studio.workspace.captureDraft.v1";
+const ProjectShaderCover = lazy(() => import("./ProjectShaderCover").then((module) => ({ default: module.ProjectShaderCover })));
 
-type LocalIconProps = Omit<React.ComponentProps<typeof Icon>, "icon">;
+function cx(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
 
-const makeLocalIcon = (glyph: PhosphorIcon) =>
-  forwardRef<SVGSVGElement, LocalIconProps>((props, ref) => (
-    <Icon ref={ref} icon={glyph} {...props} />
-  ));
+function boolish(value: unknown) {
+  return value === true || value === 1;
+}
 
-const Database = makeLocalIcon(DatabaseIcon);
-const GearSix = makeLocalIcon(GearSixIcon);
-const Graph = makeLocalIcon(GraphIcon);
-const Robot = makeLocalIcon(RobotIcon);
-const UploadSimple = makeLocalIcon(UploadSimpleIcon);
+function relative(value?: string | null) {
+  if (!value) return "";
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return "";
+  const minutes = Math.max(1, Math.round((Date.now() - time) / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
 
-const SECTIONS: Array<{ id: WorkspaceSection; label: string; icon: React.ElementType; hint: string }> = [
-  { id: "overview", label: "Overview", icon: Project, hint: "Current state" },
-  { id: "context", label: "Context", icon: Database, hint: "Docs and memory" },
-  { id: "automation", label: "Automation", icon: Robot, hint: "Agents and routines" },
-  { id: "activity", label: "Activity", icon: Graph, hint: "Workspace events" },
-];
+function formatDate(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
-function ToolbarButton({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
+function noteSignature(note: Pick<WorkspaceNote, "title" | "contentMarkdown">) {
+  return `${note.title}\n\n${note.contentMarkdown}`;
+}
+
+function makeStarterMarkdown(projectName: string) {
+  return `# New note\n\nProject: ${projectName}\n\n`;
+}
+
+function downloadMarkdown(note: WorkspaceNote) {
+  const blob = new Blob([note.contentMarkdown], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = note.filename || `${note.title || "note"}.md`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function IconButton({ title, children, onClick, active }: { title: string; children: React.ReactNode; onClick: () => void; active?: boolean }) {
   return (
-    <Button
-      variant="primary"
+    <button
+      type="button"
+      title={title}
       onClick={onClick}
-      disabled={disabled}
-      className="inline-flex gap-1.5 rounded-md bg-primary px-3 py-1.5 h-auto text-xs font-medium text-on-emphasis transition-colors duration-150 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+      className={cx(
+        "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+        active ? "bg-primary text-on-emphasis" : "text-muted hover:bg-surface-hover hover:text-primary",
+      )}
     >
       {children}
-    </Button>
+    </button>
   );
 }
 
-function Metric({
-  label,
-  value,
-  sub,
+function FormatButton({ title, children, onClick }: { title: string; children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full px-2 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-primary"
+    >
+      {children}
+    </button>
+  );
+}
+
+/*
+function ProjectPicker({
+  projects,
+  selectedProject,
+  open,
+  onOpenChange,
+  onSelect,
 }: {
-  label: string;
-  value: string;
-  sub?: string;
+  projects: WorkspaceProject[];
+  selectedProject?: WorkspaceProject;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (projectId: string) => void;
 }) {
   return (
-    <div className="min-w-0 border-r border-surface-divider px-5 py-4 last:border-r-0">
-      <p className="text-2xs font-medium uppercase tracking-extra-wide text-disabled">{label}</p>
-      <p className="mt-1 truncate text-lg font-display text-primary">{value}</p>
-      {sub && <p className="mt-0.5 truncate text-xs text-disabled">{sub}</p>}
+    <div className="relative hidden min-w-0 md:block">
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className={cx(
+          "flex max-w-56 items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow-sm backdrop-blur-xl transition-colors",
+          open
+            ? "border-surface-border bg-surface-page text-primary"
+            : "border-surface-divider bg-surface-base/75 text-secondary hover:bg-surface-hover hover:text-primary",
+        )}
+      >
+        <Project size="xs" className="shrink-0 text-disabled" />
+        <span className="min-w-0 truncate">{selectedProject?.name ?? "Project"}</span>
+        <span className="shrink-0 text-2xs text-disabled">⌄</span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.16 }}
+            className="absolute left-0 top-11 z-40 w-72 overflow-hidden rounded-2xl border border-surface-divider bg-surface-page/96 p-1.5 shadow-2xl backdrop-blur-xl"
+          >
+            <div className="max-h-72 overflow-y-auto [scrollbar-width:none]">
+              {projects.map((project) => {
+                const active = project.id === selectedProject?.id;
+                return (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(project.id);
+                      onOpenChange(false);
+                    }}
+                    className={cx(
+                      "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                      active ? "bg-surface-base text-primary" : "text-secondary hover:bg-surface-hover hover:text-primary",
+                    )}
+                  >
+                    <span className={cx(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
+                      active ? "bg-primary text-on-emphasis" : "bg-surface-base text-muted",
+                    )}>
+                      {(project.icon || project.name.slice(0, 1)).slice(0, 1)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{project.name}</span>
+                      {project.description && <span className="block truncate text-xs text-disabled">{project.description}</span>}
+                    </span>
+                    {active && <Check size="xs" className="shrink-0 text-primary" />}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+*/
 
 export const WorkspacePage = () => {
   const { user } = useAuth();
-  const userId = user?.id ?? "";
+  const userId = user?.id ?? "local_user";
+  const [snapshot, setSnapshot] = useState<(WorkspaceSnapshot & { source: WorkspaceSource; warning?: string }) | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [forceLocal, setForceLocal] = useState(() => localStorage.getItem("studio.workspace.forceLocal") === "1");
+  const [surface, setSurface] = useState<Surface>("notes");
+  const [drawerOpen, setDrawerOpen] = useState(() => window.innerWidth >= 900);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [editorMode, setEditorMode] = useState<EditorMode>("write");
+  const [search, setSearch] = useState("");
+  const [draftProjectName, setDraftProjectName] = useState("");
+  const [draftTaskTitle, setDraftTaskTitle] = useState("");
+  const [captureText, setCaptureText] = useState(() => {
+    try {
+      return localStorage.getItem(CAPTURE_DRAFT_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [organized, setOrganized] = useState<OrganizedCapture | null>(null);
+  const [organizing, setOrganizing] = useState(false);
+  const [noteRevisions, setNoteRevisions] = useState<WorkspaceNoteRevision[]>([]);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [contextPreview, setContextPreview] = useState<WorkspaceContextPreview | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const savedNoteSignatures = useRef(new Map<string, string>());
+  const noteSaveTimer = useRef<number | null>(null);
 
-  const [section, setSection] = useState<WorkspaceSection>("overview");
+  const projects = snapshot?.projects ?? [];
+  const notes = snapshot?.notes ?? [];
+  const tasks = snapshot?.tasks ?? [];
+  const source = snapshot?.source ?? "local";
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0];
+  const projectNotes = notes.filter((note) => note.projectId === selectedProject?.id);
+  const projectTasks = tasks.filter((task) => task.projectId === selectedProject?.id);
+  const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? projectNotes[0];
+  const selectedTask = projectTasks.find((task) => task.id === selectedTaskId) ?? projectTasks[0];
+  const openTasks = projectTasks.filter((task) => task.status !== "completed" && task.status !== "cancelled");
+  const completedTasks = projectTasks.filter((task) => task.status === "completed");
 
-  const [docs, setDocs] = useState<KbDocument[]>([]);
-  const [totalBytes, setTotalBytes] = useState(0);
-  const [kbLoading, setKbLoading] = useState(true);
-  const [kbError, setKbError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const filteredNotes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return projectNotes;
+    return projectNotes.filter((note) => `${note.title} ${note.contentMarkdown}`.toLowerCase().includes(q));
+  }, [projectNotes, search]);
 
-  const [facts, setFacts] = useState<MemoryFact[]>([]);
-  const [memLoading, setMemLoading] = useState(true);
-  const [memError, setMemError] = useState<string | null>(null);
-  const [deletingFactId, setDeletingFactId] = useState<string | null>(null);
+  const filteredTasks = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const scoped = [...openTasks, ...completedTasks];
+    if (!q) return scoped;
+    return scoped.filter((task) => `${task.title} ${task.descriptionMarkdown}`.toLowerCase().includes(q));
+  }, [completedTasks, openTasks, search]);
 
-  const [agents, setAgents] = useState<UserAgent[]>([]);
-  const [agentsLoading, setAgentsLoading] = useState(true);
-  const [agentsError, setAgentsError] = useState<string | null>(null);
-  const [showCreateAgent, setShowCreateAgent] = useState(false);
+  const load = async (local = forceLocal) => {
+    setLoading(true);
+    try {
+      const next = await workspaceService.loadSnapshot(userId, local);
+      setSnapshot(next);
+      savedNoteSignatures.current = new Map(next.notes.map((note) => [note.id, noteSignature(note)]));
+      setSelectedProjectId((current) => current || next.projects[0]?.id || "");
+      setSelectedNoteId((current) => current || next.notes[0]?.id || "");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load Workspace");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!userId) {
-      setKbLoading(false);
-      setMemLoading(false);
-      setAgentsLoading(false);
+    void load(forceLocal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceLocal, userId]);
+
+  useEffect(() => {
+    const handleCaptureText = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text?.trim();
+      if (!text) return;
+      setCaptureText((current) => current.trim() ? `${current.trim()}\n\n${text}` : text);
+      setQuickOpen(true);
+      toast.success("Added to Quick Add");
+    };
+    window.addEventListener("workspace-capture-text", handleCaptureText);
+    return () => window.removeEventListener("workspace-capture-text", handleCaptureText);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (captureText.trim()) localStorage.setItem(CAPTURE_DRAFT_KEY, captureText);
+      else localStorage.removeItem(CAPTURE_DRAFT_KEY);
+    } catch {
+      /* best effort */
+    }
+  }, [captureText]);
+
+  useEffect(() => {
+    setContextPreview(null);
+    if (!selectedNote) {
+      setNoteRevisions([]);
       return;
     }
+    void loadNoteRevisions(selectedNote);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNote?.id, source]);
 
-    setKbLoading(true);
-    listKbDocs(userId)
-      .then(({ docs: nextDocs, totalBytes: nextBytes }) => {
-        setDocs(nextDocs);
-        setTotalBytes(nextBytes);
-      })
-      .catch((err: Error) => setKbError(err.message))
-      .finally(() => setKbLoading(false));
-
-    setMemLoading(true);
-    listMemoryFacts(userId, 100)
-      .then(({ memories }) => setFacts(memories))
-      .catch((err: Error) => setMemError(err.message))
-      .finally(() => setMemLoading(false));
-
-    setAgentsLoading(true);
-    listAgents(userId)
-      .then(setAgents)
-      .catch((err: Error) => setAgentsError(err.message))
-      .finally(() => setAgentsLoading(false));
-  }, [userId]);
-
-  const memoryCategories = useMemo(() => new Set(facts.map((fact) => fact.category ?? "knowledge")).size, [facts]);
-  const scheduledAgents = useMemo(() => agents.filter((agent) => agent.triggerType === "cron").length, [agents]);
-  const storagePct = Math.min(100, Math.round((totalBytes / STORAGE_LIMIT) * 100));
-
-  const timeline = useMemo(() => {
-    const docEvents = docs.slice(0, 5).map((doc) => ({
-      id: `doc-${doc.id}`,
-      icon: Document,
-      title: doc.name,
-      meta: `Document indexed - ${formatBytes(doc.size)}`,
-      ts: doc.createdAt,
-    }));
-    const agentEvents = agents.slice(0, 5).map((agent) => ({
-      id: `agent-${agent.id}`,
-      icon: Robot,
-      title: agent.name,
-      meta: `${agent.triggerType === "cron" ? "Scheduled routine" : "Manual routine"} - ${agent.status}`,
-      ts: agent.updatedAt,
-    }));
-    const memoryEvents = facts.slice(0, 5).map((fact) => ({
-      id: `memory-${fact.key}`,
-      icon: Brain,
-      title: fact.content,
-      meta: `Memory - ${CATEGORY_LABELS[fact.category] ?? fact.category}`,
-      ts: Date.parse(fact.updatedAt) || Date.now(),
-    }));
-    return [...docEvents, ...agentEvents, ...memoryEvents].sort((a, b) => b.ts - a.ts).slice(0, 12);
-  }, [agents, docs, facts]);
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !userId) return;
-    event.target.value = "";
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File too large. Max 5 MB.");
+  useEffect(() => {
+    if (!selectedNote) return;
+    const signature = noteSignature(selectedNote);
+    const savedSignature = savedNoteSignatures.current.get(selectedNote.id);
+    if (!savedSignature) {
+      savedNoteSignatures.current.set(selectedNote.id, signature);
+      setSaveState("saved");
       return;
     }
-    if (totalBytes + file.size > STORAGE_LIMIT) {
-      setUploadError("Workspace storage limit reached.");
+    if (signature === savedSignature) {
+      setSaveState("saved");
       return;
     }
+    setSaveState("dirty");
+    if (noteSaveTimer.current) window.clearTimeout(noteSaveTimer.current);
+    const noteForSave = selectedNote;
+    noteSaveTimer.current = window.setTimeout(() => {
+      void saveNote(noteForSave, { title: noteForSave.title, contentMarkdown: noteForSave.contentMarkdown });
+    }, 650);
+    return () => {
+      if (noteSaveTimer.current) window.clearTimeout(noteSaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNote?.id, selectedNote?.title, selectedNote?.contentMarkdown]);
 
-    setUploading(true);
-    setUploadError(null);
+  const createProject = async () => {
+    if (!draftProjectName.trim()) return;
+    setSaving(true);
     try {
-      const text = await file.text();
-      const newDoc = await indexKbDocument(text, file.name, file.size, file.type || "text/plain", userId);
-      setDocs((prev) => [newDoc, ...prev]);
-      setTotalBytes((prev) => prev + file.size);
-    } catch (err: any) {
-      setUploadError(err.message ?? "Upload failed.");
+      const project = await workspaceService.createProject(userId, {
+        name: draftProjectName.trim(),
+        description: "",
+        status: "active",
+      }, source);
+      setSnapshot((current) => current ? { ...current, projects: [project, ...current.projects] } : current);
+      setSelectedProjectId(project.id);
+      setDraftProjectName("");
+      toast.success("Project created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create project");
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
-  const handleDeleteDoc = async (docId: string, size: number) => {
-    if (!userId) return;
-    setDeletingDocId(docId);
+  const createNote = async (contentMarkdown?: string, title = "Untitled") => {
+    if (!selectedProject) return;
+    setSaving(true);
     try {
-      await deleteKbDoc(docId, userId);
-      setDocs((prev) => prev.filter((doc) => doc.id !== docId));
-      setTotalBytes((prev) => Math.max(0, prev - size));
+      const note = await workspaceService.createNote(userId, selectedProject.id, {
+        title,
+        contentMarkdown: contentMarkdown ?? makeStarterMarkdown(selectedProject.name),
+      }, source);
+      savedNoteSignatures.current.set(note.id, noteSignature(note));
+      setSnapshot((current) => current ? { ...current, notes: [note, ...current.notes] } : current);
+      setSelectedNoteId(note.id);
+      setSurface("notes");
+      setQuickOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create note");
     } finally {
-      setDeletingDocId(null);
+      setSaving(false);
     }
   };
 
-  const handleDeleteFact = async (factId: string) => {
-    if (!userId) return;
-    setDeletingFactId(factId);
+  const saveNote = async (noteToSave: WorkspaceNote, patch: Partial<WorkspaceNote>) => {
+    setSaveState("saving");
     try {
-      await deleteMemoryFact(factId, userId);
-      setFacts((prev) => prev.filter((fact) => fact.key !== factId));
-    } finally {
-      setDeletingFactId(null);
+      const updated = await workspaceService.updateNote(userId, noteToSave, patch, source);
+      const requestedSignature = noteSignature({ ...noteToSave, ...patch });
+      savedNoteSignatures.current.set(updated.id, noteSignature(updated));
+      setSnapshot((current) => current ? {
+        ...current,
+        notes: current.notes.map((note) => note.id === updated.id && noteSignature(note) === requestedSignature ? updated : note),
+      } : current);
+      setSaveState((current) => current === "saving" ? "saved" : current);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save note";
+      setSaveState(message.includes("revision_conflict") ? "conflict" : "failed");
+      toast.error(message);
     }
   };
 
-  const handleSaveAgent = async (draft: CreateAgentDraft) => {
-    if (!userId) return;
-    const newAgent = await createAgent(userId, draft);
-    setAgents((prev) => [newAgent, ...prev]);
-    setShowCreateAgent(false);
+  const updateNoteLocal = (patch: Partial<WorkspaceNote>) => {
+    if (!selectedNote) return;
+    setSnapshot((current) => current ? {
+      ...current,
+      notes: current.notes.map((note) => note.id === selectedNote.id ? { ...note, ...patch } : note),
+    } : current);
   };
 
-  const handleDeleteAgent = async (agentId: string) => {
-    if (!userId) return;
-    await deleteAgent(userId, agentId);
-    setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
+  const createTask = async (title = draftTaskTitle, descriptionMarkdown = "") => {
+    if (!selectedProject || !title.trim()) return;
+    setSaving(true);
+    try {
+      const task = await workspaceService.createTask(userId, {
+        projectId: selectedProject.id,
+        title: title.trim(),
+        descriptionMarkdown,
+        priority: "none",
+        noteIds: selectedNote ? [selectedNote.id] : [],
+      }, source);
+      setSnapshot((current) => current ? { ...current, tasks: [task, ...current.tasks] } : current);
+      setSelectedTaskId(task.id);
+      setDraftTaskTitle("");
+      setSurface("tasks");
+      setQuickOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create task");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleRunAgent = async (agentId: string) => {
-    if (!userId) return;
-    await runAgent(userId, agentId);
+  const toggleTask = async (task: WorkspaceTask) => {
+    const status = task.status === "completed" ? "planned" : "completed";
+    const updated = await workspaceService.updateTask(userId, task.id, { status }, source);
+    setSnapshot((current) => current ? {
+      ...current,
+      tasks: current.tasks.map((item) => item.id === task.id ? updated : item),
+    } : current);
   };
+
+  const loadNoteRevisions = async (note = selectedNote) => {
+    if (!note) return;
+    setRevisionsLoading(true);
+    try {
+      setNoteRevisions(await workspaceService.listNoteRevisions(userId, note.id, source));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load revisions");
+    } finally {
+      setRevisionsLoading(false);
+    }
+  };
+
+  const restoreRevision = async (revision: WorkspaceNoteRevision) => {
+    if (!selectedNote) return;
+    setSaving(true);
+    try {
+      const restored = await workspaceService.restoreNoteRevision(userId, selectedNote, revision, source);
+      savedNoteSignatures.current.set(restored.id, noteSignature(restored));
+      setSnapshot((current) => current ? {
+        ...current,
+        notes: current.notes.map((note) => note.id === restored.id ? restored : note),
+      } : current);
+      setSaveState("saved");
+      await loadNoteRevisions(restored);
+      toast.success("Revision restored");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not restore revision");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const previewContext = async () => {
+    const primaryId = selectedTask?.id ?? selectedNote?.id ?? selectedProject?.id;
+    const primaryType: WorkspaceContextPreview["primaryItem"]["type"] = selectedTask ? "task" : selectedNote ? "note" : "project";
+    if (!primaryId) return;
+    setContextLoading(true);
+    try {
+      setContextPreview(await workspaceService.previewContext(userId, primaryType, primaryId, source));
+      setDetailsOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not preview context");
+    } finally {
+      setContextLoading(false);
+    }
+  };
+
+  const organizeCapture = async () => {
+    if (!captureText.trim()) return;
+    setOrganizing(true);
+    try {
+      setOrganized(await workspaceService.organizeCapture(captureText, projects));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not organize");
+    } finally {
+      setOrganizing(false);
+    }
+  };
+
+  const acceptOrganized = async () => {
+    if (!organized) return;
+    await createNote(organized.markdown, organized.title);
+    for (const task of organized.tasks) await createTask(task.title, task.descriptionMarkdown ?? "");
+    setCaptureText("");
+    setOrganized(null);
+  };
+
+  const applyMarkdown = (kind: "bold" | "italic" | "heading" | "quote" | "code" | "bullet" | "number" | "task" | "link") => {
+    if (!selectedNote || !editorRef.current) return;
+    const textarea = editorRef.current;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = selectedNote.contentMarkdown.slice(0, start);
+    const selected = selectedNote.contentMarkdown.slice(start, end);
+    const after = selectedNote.contentMarkdown.slice(end);
+    const prefixLine = (prefix: string) => {
+      const lineStart = before.lastIndexOf("\n") + 1;
+      const blockStart = selected ? start : lineStart;
+      const block = selected || selectedNote.contentMarkdown.slice(lineStart, end);
+      const replaced = block.split("\n").map((line) => `${prefix}${line}`).join("\n");
+      updateNoteLocal({ contentMarkdown: `${selectedNote.contentMarkdown.slice(0, blockStart)}${replaced}${selectedNote.contentMarkdown.slice(end)}` });
+      requestAnimationFrame(() => textarea.focus());
+    };
+    if (kind === "heading") return prefixLine("## ");
+    if (kind === "quote") return prefixLine("> ");
+    if (kind === "bullet") return prefixLine("- ");
+    if (kind === "number") return prefixLine("1. ");
+    if (kind === "task") return prefixLine("- [ ] ");
+    let inserted = selected;
+    if (kind === "bold") inserted = `**${selected || "bold text"}**`;
+    if (kind === "italic") inserted = `_${selected || "italic text"}_`;
+    if (kind === "code") inserted = selected.includes("\n") ? `\`\`\`\n${selected || "code"}\n\`\`\`` : `\`${selected || "code"}\``;
+    if (kind === "link") inserted = `[${selected || "link text"}](url)`;
+    updateNoteLocal({ contentMarkdown: `${before}${inserted}${after}` });
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + inserted.length);
+    });
+  };
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    const key = event.key.toLowerCase();
+    if (key === "b") {
+      event.preventDefault();
+      applyMarkdown("bold");
+    }
+    if (key === "i") {
+      event.preventDefault();
+      applyMarkdown("italic");
+    }
+    if (key === "k") {
+      event.preventDefault();
+      applyMarkdown("link");
+    }
+  };
+
+  const toggleLocalMode = () => {
+    const next = !forceLocal;
+    localStorage.setItem("studio.workspace.forceLocal", next ? "1" : "0");
+    setForceLocal(next);
+  };
+
+  const resetLocal = () => {
+    const next = workspaceService.resetLocal(userId);
+    savedNoteSignatures.current = new Map(next.notes.map((note) => [note.id, noteSignature(note)]));
+    setSnapshot(next);
+    setSelectedProjectId(next.projects[0]?.id ?? "");
+    setSelectedNoteId(next.notes[0]?.id ?? "");
+    toast.success("Local test data reset");
+  };
+
+  if (loading || !snapshot) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface-page text-primary">
+        <div className="flex items-center gap-2 text-sm text-disabled">
+          <Spinner size="sm" className="animate-spin" />
+          Loading Workspace
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-surface-page text-primary transition-colors duration-300">
-      <header className="flex-shrink-0 border-b border-surface-divider px-6 pt-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-display font-normal text-primary">Workspace</h1>
-            <p className="mt-1 text-xs text-disabled">Persistent context, working material, and automation for your AI environment.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-              {uploading ? <Spinner size="sm" className="animate-spin" /> : <UploadSimple size="sm" />}
-              {uploading ? "Indexing" : "Add context"}
-            </ToolbarButton>
-            <input ref={fileInputRef} type="file" accept={ACCEPTED_TYPES} className="hidden" onChange={handleFileChange} />
-          </div>
-        </div>
+    <div className="workspace-root">
+      <div className="workspace-aurora" aria-hidden="true"><span /><span /><span /></div>
 
-        <div className="mt-5 grid grid-cols-4 border-t border-surface-divider">
-          <Metric label="Documents" value={kbLoading ? "..." : String(docs.length)} sub={`${formatBytes(totalBytes)} indexed`} />
-          <Metric label="Memory" value={memLoading ? "..." : String(facts.length)} sub={`${memoryCategories} categories`} />
-          <Metric label="Routines" value={agentsLoading ? "..." : String(agents.length)} sub={`${scheduledAgents} scheduled`} />
-          <Metric label="Storage" value={`${storagePct}%`} sub={`${formatBytes(totalBytes)} / ${formatBytes(STORAGE_LIMIT)}`} />
+      <header className="workspace-topbar">
+        <div className="workspace-topbar__path">
+          <IconButton title={drawerOpen ? "Hide library" : "Show library"} onClick={() => setDrawerOpen((value) => !value)} active={drawerOpen}>
+            <List size="sm" />
+          </IconButton>
+          <span className="workspace-topbar__crumb">{selectedProject?.name ?? "Workspace"}</span>
+          {surface === "notes" && selectedNote && <><span className="workspace-topbar__slash">/</span><span className="workspace-topbar__document">{selectedNote.title || "Untitled"}</span></>}
+        </div>
+        <div className="workspace-topbar__actions">
+          <span className={cx("workspace-save-state", saveState !== "saved" && "is-active")}>
+            {saveState === "saving" ? <Spinner size="xs" className="animate-spin" /> : source === "cloud" ? <Cloud size="xs" /> : <Warning size="xs" />}
+            <span>{saveState === "saved" ? (source === "cloud" ? "Saved" : "Local") : saveState}</span>
+          </span>
+          <IconButton title="Refresh workspace" onClick={() => void load(forceLocal)}><Refresh size="sm" /></IconButton>
+          <button type="button" className="workspace-quick-button" onClick={() => setQuickOpen(true)}><Add size="sm" /><span>Quick add</span></button>
         </div>
       </header>
 
-      {(kbError || memError || agentsError || uploadError) && (
-        <div className="flex flex-shrink-0 items-center gap-2 border-b border-surface-border bg-surface-raised px-6 py-2.5 text-xs text-secondary dark:border-surface-border/40 dark:bg-surface-raised/30 dark:text-secondary">
-          <Error size="sm" />
-          <span>{uploadError ?? kbError ?? memError ?? agentsError}</span>
-        </div>
-      )}
-
-      <div className="grid min-h-0 flex-1 grid-cols-[230px_1fr_300px]">
-        <aside className="border-r border-surface-divider bg-surface-base/40 p-3">
-          <div className="mb-3 px-2 text-2xs font-medium uppercase tracking-extra-wide text-disabled">Workspace OS</div>
-          <nav className="space-y-1">
-            {SECTIONS.map(({ id, label, icon: SectionIcon, hint }) => (
-              <Button
-                key={id}
-                variant="ghost"
-                onClick={() => setSection(id)}
-                className={`group w-full items-center gap-3 rounded-md px-2.5 py-2 h-auto justify-start text-left transition-colors ${
-                  section === id
-                    ? "bg-surface-page shadow-sm"
-                    : "hover:bg-surface-hover"
-                }`}
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-base">
-                  <SectionIcon size="sm" weight={section === id ? "fill" : undefined} className="text-muted" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-medium text-secondary">{label}</span>
-                  <span className="block truncate text-2xs text-disabled">{hint}</span>
-                </span>
-              </Button>
-            ))}
-          </nav>
-
-          <div className="mt-5 border-t border-surface-divider pt-4">
-            <div className="mb-2 px-2 text-2xs font-medium uppercase tracking-extra-wide text-disabled">Status</div>
-            <div className="space-y-2 px-2">
-              <div className="flex items-center justify-between text-xs text-muted">
-                <span>Context index</span>
-                <span className="text-secondary">Ready</span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted">
-                <span>Agent runtime</span>
-                <span className="text-secondary">Disabled</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-surface-base">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${storagePct}%` }} />
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <main className="min-w-0 overflow-y-auto">
-          <AnimatePresence mode="wait">
-            {section === "overview" && (
-              <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="p-6">
-                <div className="mb-6">
-                  <p className="text-2xs font-medium uppercase tracking-extra-wide text-disabled">Now</p>
-                  <h2 className="mt-1 font-display text-xl text-primary">Workspace state</h2>
-                </div>
-                <div className="grid grid-cols-3 border border-surface-divider">
-                  <div className="p-5">
-                    <FolderOpen size="lg" className="mb-4 text-muted" />
-                    <p className="text-sm font-medium text-primary">{docs.length} documents</p>
-                    <p className="mt-1 text-xs leading-relaxed text-disabled">Permanent knowledge currently available to chat and future agents.</p>
-                  </div>
-                  <div className="border-l border-surface-divider p-5">
-                    <Brain size="lg" className="mb-4 text-muted" />
-                    <p className="text-sm font-medium text-primary">{facts.length} memory facts</p>
-                    <p className="mt-1 text-xs leading-relaxed text-disabled">Distilled user and project context extracted from conversations.</p>
-                  </div>
-                  <div className="border-l border-surface-divider p-5">
-                    <Robot size="lg" className="mb-4 text-muted" />
-                    <p className="text-sm font-medium text-primary">{agents.length} routines</p>
-                    <p className="mt-1 text-xs leading-relaxed text-disabled">Saved automation definitions. Execution is waiting on the redesigned runtime.</p>
+      <div className="workspace-stage">
+        <AnimatePresence initial={false}>
+          {drawerOpen && (
+            <motion.aside
+              key="workspace-navigation"
+              initial={{ opacity: 0, x: -24, width: 0 }}
+              animate={{ opacity: 1, x: 0, width: "min(500px, 42vw)" }}
+              exit={{ opacity: 0, x: -20, width: 0 }}
+              transition={{ type: "spring", stiffness: 360, damping: 38, mass: 0.8 }}
+              className="workspace-navigation"
+            >
+              <div className="workspace-projects">
+                <div className="workspace-project-cover">
+                  <Suspense fallback={<div className="workspace-project-cover__fallback" />}>
+                    <ProjectShaderCover accent={selectedProject?.accent} />
+                  </Suspense>
+                  <div className="workspace-project-cover__scrim" />
+                  <div className="workspace-project-cover__content">
+                    <span>{selectedProject?.status ?? "active"}</span>
+                    <strong>{selectedProject?.name ?? "Workspace"}</strong>
+                    <small>{projectNotes.length} pages · {projectTasks.length} tasks</small>
                   </div>
                 </div>
-
-                <div className="mt-6 grid grid-cols-[1.2fr_0.8fr] gap-6">
-                  <section className="border border-surface-divider">
-                    <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
-                      <div>
-                        <p className="text-xs font-medium text-secondary">Recent workspace events</p>
-                        <p className="text-xs text-disabled">Documents, memory, and routines in one operational feed.</p>
-                      </div>
-                    </div>
-                    {timeline.length === 0 ? (
-                      <EmptyState icon={ArchiveBoxIcon} title="No events yet" body="Add context, build memory, or create routines to populate the workspace timeline." />
-                    ) : (
-                      <ul className="divide-y divide-surface-divider">
-                        {timeline.slice(0, 6).map((event) => (
-                          <li key={event.id} className="flex items-center gap-3 px-5 py-3">
-                            <event.icon size="sm" className="flex-shrink-0 text-muted" />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-medium text-secondary">{event.title}</p>
-                              <p className="text-xs text-disabled">{event.meta}</p>
-                            </div>
-                            <span className="flex-shrink-0 text-xs text-disabled">{formatRelative(event.ts)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-
-                  <section className="border border-surface-divider">
-                    <div className="border-b border-surface-divider px-5 py-3">
-                      <p className="text-xs font-medium text-secondary">Next controls</p>
-                      <p className="text-xs text-disabled">Fast paths into the real workspace objects.</p>
-                    </div>
-                    <div className="divide-y divide-surface-divider">
-                      <Button variant="ghost" onClick={() => setSection("context")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
-                        <Database size="sm" className="text-muted" />
-                        <span className="flex-1 text-xs text-secondary">Review context package</span>
-                        <Collapse size="sm" className="text-disabled" />
-                      </Button>
-                      <Button variant="ghost" onClick={() => setSection("automation")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
-                        <Lightning size="sm" className="text-muted" />
-                        <span className="flex-1 text-xs text-secondary">Create automation routine</span>
-                        <Collapse size="sm" className="text-disabled" />
-                      </Button>
-                      <Button variant="ghost" onClick={() => setSection("activity")} className="w-full items-center gap-3 px-5 py-3 h-auto justify-start text-left transition-colors hover:bg-surface-hover">
-                        <Graph size="sm" className="text-muted" />
-                        <span className="flex-1 text-xs text-secondary">Inspect timeline</span>
-                        <Collapse size="sm" className="text-disabled" />
-                      </Button>
-                    </div>
-                  </section>
+                <div className="workspace-projects__heading">
+                  <span className="workspace-eyebrow">Projects</span>
+                  <span className="workspace-project-count">{projects.length}</span>
                 </div>
-              </motion.div>
-            )}
-
-            {section === "context" && (
-              <motion.div key="context" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="grid grid-cols-2 gap-0">
-                <section className="min-h-full border-r border-surface-divider">
-                  <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
-                    <div>
-                      <p className="text-xs font-medium text-secondary">Knowledge base</p>
-                      <p className="text-xs text-disabled">{docs.length} documents - {formatBytes(totalBytes)}</p>
-                    </div>
-                    <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                      {uploading ? <Spinner size="sm" className="animate-spin" /> : <UploadSimple size="sm" />}
-                      Add
-                    </ToolbarButton>
-                  </div>
-                  {kbLoading ? <EmptyState icon={SpinnerGapIcon} title="Loading documents" body="Fetching indexed workspace context." /> : <DocumentList docs={docs} deletingDocId={deletingDocId} onDelete={handleDeleteDoc} />}
-                </section>
-                <section className="min-h-full">
-                  <div className="border-b border-surface-divider px-5 py-3">
-                    <p className="text-xs font-medium text-secondary">Memory facts</p>
-                    <p className="text-xs text-disabled">{facts.length} facts - {memoryCategories} categories</p>
-                  </div>
-                  {memLoading ? <EmptyState icon={SpinnerGapIcon} title="Loading memory" body="Fetching long-term memory facts." /> : <MemoryList facts={facts} deletingFactId={deletingFactId} onDelete={handleDeleteFact} />}
-                </section>
-              </motion.div>
-            )}
-
-            {section === "automation" && (
-              <motion.div key="automation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
-                <div className="flex items-center justify-between border-b border-surface-divider px-5 py-3">
-                  <div>
-                    <p className="text-xs font-medium text-secondary">Automation routines</p>
-                    <p className="text-xs text-disabled">Saved agent definitions, schedules, and run history.</p>
-                  </div>
-                  <ToolbarButton onClick={() => setShowCreateAgent((prev) => !prev)}>
-                    <Add size="sm" />
-                    New routine
-                  </ToolbarButton>
+                <nav className="workspace-project-list" aria-label="Projects">
+                  {projects.map((project, index) => {
+                    const active = selectedProject?.id === project.id;
+                    return (
+                      <button
+                        key={project.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedProjectId(project.id);
+                          setSelectedNoteId(notes.find((note) => note.projectId === project.id)?.id ?? "");
+                        }}
+                        className={cx("workspace-project", active && "is-active")}
+                      >
+                        <span className="workspace-project__icon" style={{ "--project-accent": project.accent || ["#7b8cff", "#d99b6c", "#7bb6a7"][index % 3] } as React.CSSProperties}>
+                          <FolderOpen size="sm" weight={active ? "fill" : "regular"} />
+                        </span>
+                        <span className="workspace-project__copy"><strong>{project.name}</strong><small>{notes.filter((note) => note.projectId === project.id).length} pages · {tasks.filter((task) => task.projectId === project.id).length} tasks</small></span>
+                        {boolish(project.isFavorite) && <span className="workspace-project__favorite">•</span>}
+                      </button>
+                    );
+                  })}
+                </nav>
+                <div className="workspace-new-project">
+                  <Input value={draftProjectName} onChange={(event) => setDraftProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createProject(); }} placeholder="New project" className="workspace-new-project__input" />
+                  <button type="button" title="Create project" onClick={createProject} disabled={!draftProjectName.trim() || saving}><Add size="xs" /></button>
                 </div>
-                <AnimatePresence>
-                  {showCreateAgent && <CreateAgentForm onSave={handleSaveAgent} onCancel={() => setShowCreateAgent(false)} />}
-                </AnimatePresence>
-                {agentsLoading ? (
-                  <EmptyState icon={SpinnerGapIcon} title="Loading routines" body="Fetching saved automation definitions." />
-                ) : agents.length === 0 && !showCreateAgent ? (
-                  <EmptyState icon={RobotIcon} title="No routines yet" body="Create a saved agent with a goal and trigger. Runtime execution will activate when the new agent worker is wired." />
-                ) : (
-                  <div>
-                    {agents.map((agent) => (
-                      <AgentRow key={agent.id} agent={agent} userId={userId} onDelete={handleDeleteAgent} onRun={handleRunAgent} />
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {section === "activity" && (
-              <motion.div key="activity" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
-                <div className="border-b border-surface-divider px-5 py-3">
-                  <p className="text-xs font-medium text-secondary">Workspace timeline</p>
-                  <p className="text-xs text-disabled">A local operational feed assembled from current workspace objects.</p>
+                <div className="workspace-source-controls">
+                  <span>{source === "cloud" ? <Cloud size="xs" /> : <Warning size="xs" />}{source === "cloud" ? "Cloud sync" : "Local workspace"}</span>
+                  <div><button type="button" onClick={toggleLocalMode}>{forceLocal ? "Try cloud" : "Use local"}</button><button type="button" onClick={resetLocal}>Reset</button></div>
                 </div>
-                {timeline.length === 0 ? (
-                  <EmptyState icon={ArchiveBoxIcon} title="No activity yet" body="Events appear after documents, memories, and routines exist." />
-                ) : (
-                  <ul className="divide-y divide-surface-divider">
-                    {timeline.map((event) => (
-                      <li key={event.id} className="flex items-center gap-3 px-5 py-3">
-                        <event.icon size="sm" className="flex-shrink-0 text-muted" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-secondary">{event.title}</p>
-                          <p className="text-xs text-disabled">{event.meta}</p>
-                        </div>
-                        <span className="flex-shrink-0 text-xs text-disabled">{formatRelative(event.ts)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </main>
+              </div>
 
-        <aside className="border-l border-surface-divider bg-surface-base/30 p-5">
-          <section className="mb-6">
-            <div className="mb-3 flex items-center gap-2">
-              <Checklist size="sm" className="text-muted" />
-              <p className="text-xs font-medium text-secondary">Context package</p>
-            </div>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Persistent docs</span>
-                <span className="text-primary">{docs.length}</span>
+              <div className="workspace-library">
+                <div className="workspace-library__intro">
+                  <span className="workspace-eyebrow">Project</span>
+                  <h2>{selectedProject?.name ?? "Untitled project"}</h2>
+                  <p>{selectedProject?.description || "Notes, decisions and next actions in one place."}</p>
+                </div>
+                <div className="workspace-surface-switch" role="tablist" aria-label="Workspace view">
+                  <button type="button" role="tab" aria-selected={surface === "notes"} onClick={() => setSurface("notes")} className={surface === "notes" ? "is-active" : ""}><Document size="xs" />Pages <span>{projectNotes.length}</span></button>
+                  <button type="button" role="tab" aria-selected={surface === "tasks"} onClick={() => setSurface("tasks")} className={surface === "tasks" ? "is-active" : ""}><Check size="xs" />Tasks <span>{projectTasks.length}</span></button>
+                </div>
+                <div className="workspace-library__tools">
+                  <label><Search size="sm" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${surface === "notes" ? "pages" : "tasks"}`} /></label>
+                  <button type="button" title={surface === "notes" ? "New page" : "New task"} onClick={() => surface === "notes" ? void createNote() : setQuickOpen(true)}><Add size="sm" /></button>
+                </div>
+                <div className="workspace-node-list">
+                  {surface === "notes" ? (
+                    filteredNotes.length === 0 ? <LibraryEmpty label="No pages here yet" onCreate={() => void createNote()} /> : filteredNotes.map((note) => (
+                      <button key={note.id} type="button" onClick={() => { setSelectedNoteId(note.id); if (window.innerWidth < 900) setDrawerOpen(false); }} className={cx("workspace-node", selectedNote?.id === note.id && "is-active")}>
+                        <span className="workspace-node__glyph"><Document size="sm" /></span>
+                        <span className="workspace-node__copy"><strong>{note.title || "Untitled"}</strong><small>{note.excerpt || note.filename}</small><em><Clock size="xs" />{relative(note.updatedAt)} ago</em></span>
+                      </button>
+                    ))
+                  ) : (
+                    filteredTasks.length === 0 ? <LibraryEmpty label="No tasks here yet" onCreate={() => setQuickOpen(true)} /> : filteredTasks.map((task) => (
+                      <button key={task.id} type="button" onClick={() => { setSelectedTaskId(task.id); if (window.innerWidth < 900) setDrawerOpen(false); }} className={cx("workspace-node workspace-task-node", selectedTask?.id === task.id && "is-active")}>
+                        <span onClick={(event) => { event.stopPropagation(); void toggleTask(task); }} className={cx("workspace-task-check", task.status === "completed" && "is-complete")}><Check size="xs" /></span>
+                        <span className="workspace-node__copy"><strong className={task.status === "completed" ? "line-through opacity-50" : ""}>{task.title}</strong><small>{task.descriptionMarkdown || "No details"}</small>{task.dueAt && <em><Calendar size="xs" />{formatDate(task.dueAt)}</em>}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Memory facts</span>
-                <span className="text-primary">{facts.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Automation routines</span>
-                <span className="text-primary">{agents.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Local project map</span>
-                <span className="text-disabled">planned</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Artifact lab</span>
-                <span className="text-primary">ready</span>
-              </div>
-            </div>
-          </section>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
-          <section className="mb-6 border-t border-surface-divider pt-5">
-            <div className="mb-3 flex items-center gap-2">
-              <ShieldCheck size="sm" className="text-muted" />
-              <p className="text-xs font-medium text-secondary">Workspace policy</p>
-            </div>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Memory injection</span>
-                <span className="text-primary">On</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Agent autonomy</span>
-                <span className="text-secondary">approval</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Desktop control</span>
-                <span className="text-disabled">separate mode</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="border-t border-surface-divider pt-5">
-            <div className="mb-3 flex items-center gap-2">
-              <GearSix size="sm" className="text-muted" />
-              <p className="text-xs font-medium text-secondary">Build notes</p>
-            </div>
-            <p className="text-xs leading-relaxed text-disabled">
-              This page uses existing KB, memory, workflow APIs, and a local artifact lab for previewing universal artifact payloads. Project maps, permissions, and real agent execution can be wired in as those backend surfaces land.
-            </p>
-          </section>
-        </aside>
+        <motion.main layout className="workspace-canvas-shell" transition={{ layout: { type: "spring", stiffness: 330, damping: 38 } }}>
+        {surface === "notes" ? (
+          selectedNote ? (
+            <NoteCanvas
+              note={selectedNote}
+              editorMode={editorMode}
+              setEditorMode={setEditorMode}
+              saveState={saveState}
+              updateNoteLocal={updateNoteLocal}
+              saveNote={saveNote}
+              applyMarkdown={applyMarkdown}
+              handleEditorKeyDown={handleEditorKeyDown}
+              editorRef={editorRef}
+              onExport={() => downloadMarkdown(selectedNote)}
+              onPreviewContext={previewContext}
+              contextLoading={contextLoading}
+              detailsOpen={detailsOpen}
+              setDetailsOpen={setDetailsOpen}
+            />
+          ) : (
+            <EmptyCanvas title="No note selected" action={() => void createNote()} actionLabel="New Note" />
+          )
+        ) : (
+          <TaskCanvas
+            task={selectedTask}
+            notes={notes}
+            draftTaskTitle={draftTaskTitle}
+            setDraftTaskTitle={setDraftTaskTitle}
+            createTask={createTask}
+            toggleTask={toggleTask}
+          />
+        )}
+        </motion.main>
       </div>
+
+      <AnimatePresence>
+        {detailsOpen && selectedNote && (
+          <motion.aside
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 30 }}
+            transition={{ type: "spring", stiffness: 420, damping: 36 }}
+            className="workspace-details-panel"
+          >
+            <DetailsPanel
+              note={selectedNote}
+              revisions={noteRevisions}
+              revisionsLoading={revisionsLoading}
+              onRefreshRevisions={() => void loadNoteRevisions()}
+              onRestore={restoreRevision}
+              contextPreview={contextPreview}
+              onCopyContext={async () => {
+                if (!contextPreview) return;
+                await navigator.clipboard?.writeText([
+                  `Primary: ${contextPreview.primaryItem.title ?? contextPreview.primaryItem.id}`,
+                  `Project: ${contextPreview.project?.name ?? "None"}`,
+                  `Notes: ${contextPreview.notes.map((note) => note.title).join(", ") || "None"}`,
+                  `Token estimate: ${contextPreview.tokenEstimate}`,
+                ].join("\n"));
+                toast.success("Context copied");
+              }}
+              saving={saving}
+            />
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {quickOpen && (
+          <motion.div
+            className="absolute inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/20 px-3 py-[8vh] backdrop-blur-sm sm:px-4 sm:pt-[12vh]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={() => setQuickOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              onMouseDown={(event) => event.stopPropagation()}
+              className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-surface-divider bg-surface-page/96 shadow-2xl backdrop-blur-xl"
+            >
+              <Textarea
+                value={captureText}
+                onChange={(event) => setCaptureText(event.target.value)}
+                autoFocus
+                placeholder="Quick Add"
+                className="min-h-40 resize-none rounded-none border-0 bg-transparent px-5 py-5 text-lg leading-relaxed focus-visible:ring-0 sm:min-h-44 sm:px-6 sm:py-6 sm:text-xl"
+              />
+              {organized && (
+                <div className="mx-5 mb-4 rounded-2xl bg-surface-base p-4">
+                  <p className="text-sm font-medium text-primary">{organized.title}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary">{organized.markdown}</p>
+                  {organized.tasks.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      {organized.tasks.map((task, index) => <p key={`${task.title}-${index}`} className="text-xs text-disabled">- {task.title}</p>)}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-divider px-5 py-4">
+                <p className="text-xs text-disabled">auto model - review before save</p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="ghost" size="sm" className="h-8 rounded-full text-xs" onClick={() => { setCaptureText(""); setOrganized(null); }}>Clear</Button>
+                  <Button variant="outline" size="sm" className="h-8 rounded-full text-xs" onClick={() => void createNote(captureText, "Captured note")} disabled={!captureText.trim()}>Note</Button>
+                  <Button variant="outline" size="sm" className="h-8 rounded-full text-xs" onClick={() => void createTask(captureText)} disabled={!captureText.trim()}>To Do</Button>
+                  {organized ? (
+                    <Button size="sm" className="h-8 rounded-full text-xs" onClick={acceptOrganized}>Save</Button>
+                  ) : (
+                    <Button size="sm" className="h-8 rounded-full text-xs" onClick={organizeCapture} loading={organizing} disabled={!captureText.trim()}>Organize</Button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
+function NoteCanvas({
+  note,
+  editorMode,
+  setEditorMode,
+  saveState,
+  updateNoteLocal,
+  saveNote,
+  applyMarkdown,
+  handleEditorKeyDown,
+  editorRef,
+  onExport,
+  onPreviewContext,
+  contextLoading,
+  detailsOpen,
+  setDetailsOpen,
+}: {
+  note: WorkspaceNote;
+  editorMode: EditorMode;
+  setEditorMode: (mode: EditorMode) => void;
+  saveState: SaveState;
+  updateNoteLocal: (patch: Partial<WorkspaceNote>) => void;
+  saveNote: (noteToSave: WorkspaceNote, patch: Partial<WorkspaceNote>) => Promise<void>;
+  applyMarkdown: (kind: "bold" | "italic" | "heading" | "quote" | "code" | "bullet" | "number" | "task" | "link") => void;
+  handleEditorKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  editorRef: React.RefObject<HTMLTextAreaElement | null>;
+  onExport: () => void;
+  onPreviewContext: () => void;
+  contextLoading: boolean;
+  detailsOpen: boolean;
+  setDetailsOpen: (value: boolean | ((current: boolean) => boolean)) => void;
+}) {
+  return (
+    <section className="workspace-note-canvas">
+      <div className="workspace-document-header">
+        <div className="workspace-document-header__title">
+          <span className="workspace-eyebrow">Markdown document</span>
+          <input
+            value={note.title}
+            onChange={(event) => updateNoteLocal({ title: event.target.value })}
+            onBlur={(event) => void saveNote(note, { title: event.target.value })}
+            placeholder="Untitled"
+          />
+        </div>
+        <div className="workspace-editor-mode" aria-label="Editor layout">
+          {(["write", "preview", "split"] as const).map((mode) => (
+            <button key={mode} type="button" onClick={() => setEditorMode(mode)} className={editorMode === mode ? "is-active" : ""}>
+              {editorMode === mode && <motion.span className="workspace-editor-mode__indicator" layoutId="workspace-editor-mode" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+              <span className="workspace-editor-mode__label">{mode}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <motion.div layout className={cx("workspace-editor-grid", editorMode === "split" && "is-split")}>
+        <AnimatePresence initial={false} mode="popLayout">
+          {(editorMode === "write" || editorMode === "split") && (
+            <motion.div
+              key="markdown-editor"
+              layout
+              initial={{ opacity: 0, x: -12, filter: "blur(4px)" }}
+              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, x: -10, filter: "blur(3px)" }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="workspace-editor-pane"
+            >
+              <div className="workspace-pane-label"><span>Markdown</span><span>{note.contentMarkdown.length} characters</span></div>
+              <textarea
+                ref={editorRef}
+                value={note.contentMarkdown}
+                onChange={(event) => updateNoteLocal({ contentMarkdown: event.target.value })}
+                onBlur={(event) => void saveNote(note, { contentMarkdown: event.target.value })}
+                onKeyDown={handleEditorKeyDown}
+                spellCheck
+                placeholder="Start writing…"
+                className="workspace-markdown-editor"
+              />
+            </motion.div>
+          )}
+          {(editorMode === "preview" || editorMode === "split") && (
+            <motion.article
+              key="markdown-preview"
+              layout
+              initial={{ opacity: 0, x: 12, filter: "blur(4px)" }}
+              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, x: 10, filter: "blur(3px)" }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="workspace-preview-pane"
+            >
+              <div className="workspace-pane-label"><span>Preview</span><span>Rendered</span></div>
+              <div className="workspace-prose prose prose-base max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{note.contentMarkdown}</ReactMarkdown>
+              </div>
+            </motion.article>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, x: "-50%", y: 14, scale: 0.98 }}
+        animate={{ opacity: 1, x: "-50%", y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 360, damping: 30, delay: 0.08 }}
+        className="workspace-commandbar"
+      >
+        <FormatButton title="Heading" onClick={() => applyMarkdown("heading")}>H2</FormatButton>
+        <FormatButton title="Bold" onClick={() => applyMarkdown("bold")}><strong>B</strong></FormatButton>
+        <FormatButton title="Italic" onClick={() => applyMarkdown("italic")}><em>I</em></FormatButton>
+        <FormatButton title="Link" onClick={() => applyMarkdown("link")}>↗</FormatButton>
+        <span className="workspace-commandbar__separator" />
+        <FormatButton title="Bullet" onClick={() => applyMarkdown("bullet")}>•</FormatButton>
+        <FormatButton title="Numbered" onClick={() => applyMarkdown("number")}>1.</FormatButton>
+        <FormatButton title="Checklist" onClick={() => applyMarkdown("task")}><Check size="xs" /></FormatButton>
+        <FormatButton title="Quote" onClick={() => applyMarkdown("quote")}>“</FormatButton>
+        <FormatButton title="Code" onClick={() => applyMarkdown("code")}><Code size="xs" /></FormatButton>
+        <span className="workspace-commandbar__separator" />
+        <FormatButton title="Export" onClick={onExport}><Document size="xs" /></FormatButton>
+        <FormatButton title="AI context" onClick={onPreviewContext}>{contextLoading ? <Spinner size="xs" className="animate-spin" /> : <Eye size="xs" />}</FormatButton>
+        <FormatButton title="Details" onClick={() => setDetailsOpen((value) => !value)}><More size="xs" /></FormatButton>
+        <span className="workspace-commandbar__status">{saveState === "saved" ? "Saved" : saveState}</span>
+      </motion.div>
+
+      {detailsOpen && <span className="sr-only">Details open</span>}
+    </section>
+  );
+}
+
+/* Legacy markup intentionally kept out of the canvas; editor panes above use layout
+   motion so switching between write, preview and split preserves spatial context. */
+
+function TaskCanvas({
+  task,
+  notes,
+  draftTaskTitle,
+  setDraftTaskTitle,
+  createTask,
+  toggleTask,
+}: {
+  task?: WorkspaceTask;
+  notes: WorkspaceNote[];
+  draftTaskTitle: string;
+  setDraftTaskTitle: (value: string) => void;
+  createTask: () => Promise<void>;
+  toggleTask: (task: WorkspaceTask) => Promise<void>;
+}) {
+  const linkedNotes = task ? notes.filter((note) => task.noteIds?.includes(note.id)) : [];
+  return (
+    <section className="workspace-task-canvas">
+      <div className="workspace-task-content">
+        <div className="workspace-task-create">
+          <Add size="sm" />
+          <Input value={draftTaskTitle} onChange={(event) => setDraftTaskTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createTask(); }} placeholder="Add a next action…" />
+          <button type="button" onClick={() => void createTask()} disabled={!draftTaskTitle.trim()}>Add task</button>
+        </div>
+
+        {!task ? (
+          <EmptyCanvas title="No task selected" />
+        ) : (
+          <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .24, ease: [0.22, 1, 0.36, 1] }} className="workspace-task-detail">
+            <div className="workspace-task-detail__status">
+              <button type="button" onClick={() => void toggleTask(task)} className={task.status === "completed" ? "is-complete" : ""}><Check size="sm" /></button>
+              <span>{task.status === "completed" ? "Completed" : task.status.replace("_", " ")}</span>
+              {task.dueAt && <em><Calendar size="xs" />{formatDate(task.dueAt)}</em>}
+            </div>
+            <h2 className={task.status === "completed" ? "is-complete" : ""}>{task.title}</h2>
+            {task.descriptionMarkdown && (
+              <div className="workspace-task-description prose prose-base max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{task.descriptionMarkdown}</ReactMarkdown>
+              </div>
+            )}
+            <div className="workspace-linked-notes">
+              <div><span className="workspace-eyebrow">Related pages</span><small>{linkedNotes.length} linked</small></div>
+              {linkedNotes.length === 0 ? (
+                <p className="workspace-linked-notes__empty">Link a page to give this task more context.</p>
+              ) : linkedNotes.map((note) => (
+                <div key={note.id} className="workspace-linked-note">
+                  <span><Document size="sm" /></span>
+                  <div><strong>{note.title}</strong><p>{note.excerpt}</p></div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DetailsPanel({
+  note,
+  revisions,
+  revisionsLoading,
+  onRefreshRevisions,
+  onRestore,
+  contextPreview,
+  onCopyContext,
+  saving,
+}: {
+  note: WorkspaceNote;
+  revisions: WorkspaceNoteRevision[];
+  revisionsLoading: boolean;
+  onRefreshRevisions: () => void;
+  onRestore: (revision: WorkspaceNoteRevision) => void;
+  contextPreview: WorkspaceContextPreview | null;
+  onCopyContext: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-extra-wide text-disabled">Document</p>
+        <div className="mt-3 space-y-2 text-sm">
+          <div className="flex min-w-0 justify-between gap-3"><span className="shrink-0 text-disabled">File</span><span className="min-w-0 truncate text-secondary">{note.filename}</span></div>
+          <div className="flex justify-between gap-3"><span className="text-disabled">Revision</span><span className="text-secondary">{note.revisionNumber}</span></div>
+        </div>
+      </div>
+
+      <div className="border-t border-surface-divider pt-5">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-extra-wide text-disabled">Revisions</p>
+          <button type="button" onClick={onRefreshRevisions} className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-primary">
+            <Redo size="sm" className={revisionsLoading ? "animate-spin" : ""} />
+          </button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {revisions.length === 0 ? <p className="text-sm text-disabled">No revisions yet.</p> : revisions.slice(0, 8).map((revision) => (
+            <div key={revision.id} className="rounded-2xl bg-surface-base p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-primary">Revision {revision.revisionNumber}</p>
+                  <p className="text-xs text-disabled">{revision.changeSource} - {relative(revision.createdAt)} ago</p>
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 rounded-full px-2 text-xs" disabled={saving || revision.revisionNumber === note.revisionNumber} onClick={() => onRestore(revision)}>
+                  Restore
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-surface-divider pt-5">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-extra-wide text-disabled">AI Context</p>
+          {contextPreview && (
+            <button type="button" onClick={onCopyContext} className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-primary">
+              <Copy size="sm" />
+            </button>
+          )}
+        </div>
+        {!contextPreview ? (
+          <p className="mt-3 text-sm text-disabled">No preview yet.</p>
+        ) : (
+          <div className="mt-3 space-y-3 text-sm">
+            <p className="text-secondary">{contextPreview.primaryItem.title ?? contextPreview.primaryItem.id}</p>
+            <p className="text-xs text-disabled">~{contextPreview.tokenEstimate} tokens</p>
+            {contextPreview.notes.map((item) => <p key={item.id} className="truncate text-secondary">{item.title}</p>)}
+            {contextPreview.warnings.map((warning) => <p key={warning} className="rounded-2xl bg-surface-base p-3 text-xs text-disabled">{warning}</p>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LibraryEmpty({ label, onCreate }: { label: string; onCreate: () => void }) {
+  return (
+    <div className="workspace-library-empty">
+      <span><Document size="sm" /></span>
+      <p>{label}</p>
+      <button type="button" onClick={onCreate}><Add size="xs" />Create one</button>
+    </div>
+  );
+}
+
+function EmptyCanvas({ title, action, actionLabel }: { title: string; action?: () => void; actionLabel?: string }) {
+  return (
+    <div className="flex h-full items-center justify-center px-8 text-center">
+      <div>
+        <p className="font-display text-2xl text-primary">{title}</p>
+        {action && actionLabel && <Button className="mt-4 rounded-full" onClick={action}>{actionLabel}</Button>}
+      </div>
+    </div>
+  );
+}

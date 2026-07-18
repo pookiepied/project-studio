@@ -1,4 +1,4 @@
-name = "studio-cloud-library-registry"
+name = "studio-registry"
 main = "src/index.ts"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]

@@ -1,24 +1,15 @@
 import { readFile, readManyFiles, fileMetadata, detectBinary, contentHash, watchFiles, editFile, multiEditFile, writeFile, globFiles, grepFiles, listDirectory, deleteFile, moveFile } from "./tools/filesystem/index.js";
 import { readNotebook } from "./tools/notebook/index.js";
-import { readArchiveManifest } from "./tools/archive/index.js";
-import { outlineFile, indexCodebase, exploreCodebase, searchSymbol, analyzeFile, findRelatedFiles } from "./tools/codeintel/index.js";
-import { buildCodeGraph, codeGraphStatus, graphNeighborsTool, graphPathTool, graphImpactTool } from "./tools/graph/index.js";
-import {
-  executeBash, executePowerShell, runRepl,
-  startProcess, readProcessOutput, writeProcessInput, stopProcess, listProcesses, commandExists,
-} from "./tools/execution/index.js";
+import { outlineFile } from "./tools/codeintel/index.js";
+import { executeBash, executePowerShell, runRepl } from "./tools/execution/index.js";
 import {
   gitStatus, gitDiff, gitLog, gitCommit, gitBranch, gitPush, gitPull, gitFetch, gitShow, gitStash, gitWorktree,
   gitInit, gitAdd, gitReset, gitRestore, gitRm, gitMv, gitMerge, gitRebase, gitCherryPick, gitRevert,
   gitTag, gitRemote, gitClone, gitBlame, gitClean, gitReflog, gitConfig, searchGitHistory,
 } from "./tools/git/index.js";
-import { searchText, searchFiles, searchIdentifiers, searchImports, searchConfig, searchTodos } from "./tools/search/index.js";
-import { semanticCodeSearch, semanticDocumentSearch, findSimilarImplementation, findFeatureImplementation, retrieveContextBundle, explainRetrieval, indexStatus, reindexPaths } from "./tools/context/index.js";
-import { parseFile, querySyntaxTree, findStructuralPattern, structuralReplace, extractSymbolBody, findDeadExports, findDuplicateStructure, calculateComplexity, detectSyntaxErrors } from "./tools/syntax/index.js";
 import { askUserQuestion } from "./tools/interaction/index.js";
 import { sleep } from "./tools/utils/index.js";
-import { runLsp, navigateSymbol, findSymbolRelationships, inspectSymbol, diagnostics, renameSymbol, codeActions, formatCode } from "./tools/lsp/index.js";
-import { LSP_TOOL_DEFINITION } from "./tools/lsp/definitions.js";
+import { navigateSymbol, findSymbolRelationships, inspectSymbol, diagnostics, renameSymbol, codeActions, formatCode } from "./tools/lsp/index.js";
 import { IDE_DEFINITIONS } from "./tools/lsp/ide-definitions.js";
 import { executeSshCommand, manageSshSession } from "./tools/network/index.js";
 import { finalizeToolDefinitions } from "./tool-schema.js";
@@ -33,14 +24,15 @@ import { GIT_DEFINITIONS }         from "./tools/git/definitions.js";
 import { UTILS_DEFINITIONS }       from "./tools/utils/definitions.js";
 import { INTERACTION_DEFINITIONS } from "./tools/interaction/definitions.js";
 import { NOTEBOOK_DEFINITIONS }    from "./tools/notebook/definitions.js";
-import { ARCHIVE_DEFINITIONS }     from "./tools/archive/definitions.js";
-import { SEARCH_DEFINITIONS }      from "./tools/search/definitions.js";
-import { CONTEXT_DEFINITIONS }     from "./tools/context/definitions.js";
-import { SYNTAX_DEFINITIONS }      from "./tools/syntax/definitions.js";
-import { GRAPH_DEFINITIONS }       from "./tools/graph/definitions.js";
 
 // ---------------------------------------------------------------------------
 // Tool definitions (schema sent to the AI via tools/list)
+//
+// LAYER 1 ONLY. This is the deliberately-minimal set of primitive tools:
+// atomic filesystem / execution / git / code-navigation operations plus
+// ask_user_question. Higher-altitude capabilities (exploration, semantic
+// retrieval, code-graph, structural analysis, subagent spawning, skills) are
+// NOT tools — they belong to layers 2-5 and are built on top of these.
 //
 // Composed from the per-folder definition arrays. This file only declares the
 // ORDER tools are advertised in — to change a tool's schema, edit the
@@ -50,18 +42,12 @@ import { GRAPH_DEFINITIONS }       from "./tools/graph/definitions.js";
 export const TOOL_DEFINITIONS = finalizeToolDefinitions([
   ...EXECUTION_DEFINITIONS,   // bash, powershell, repl
   ...NETWORK_DEFINITIONS,     // ssh_exec, ssh_session (remote command execution)
-  ...FILESYSTEM_DEFINITIONS,  // read/edit/write/delete/move, glob, grep, ls
-  ...NOTEBOOK_DEFINITIONS,
-  ...ARCHIVE_DEFINITIONS,
-  ...SEARCH_DEFINITIONS,      // bounded lexical, file, identifier, import, config, marker search
-  ...CONTEXT_DEFINITIONS,     // semantic, graph-enriched context retrieval and index control
-  ...SYNTAX_DEFINITIONS,      // Tree-sitter parsing, structural analysis, and safe rewriting
-  ...CODEINTEL_DEFINITIONS,   // outline, index_codebase, explore, search_symbol, analyze, find_related
-  ...GRAPH_DEFINITIONS,       // portable code-relationship graph: build, status, neighbors, path, impact
-  ...GIT_DEFINITIONS,         // full git surface: status/diff/log/commit/branch/push/pull/fetch/show/stash/worktree + init/add/reset/restore/rm/mv/merge/rebase/cherry-pick/revert/tag/remote/clone/blame/clean/reflog/config
+  ...FILESYSTEM_DEFINITIONS,  // read/edit/write/delete/move, glob, grep, ls, metadata, hash, watch
+  ...NOTEBOOK_DEFINITIONS,    // read_notebook
+  ...CODEINTEL_DEFINITIONS,   // outline_file (structural outline primitive)
+  ...GIT_DEFINITIONS,         // full git surface: status/diff/log/commit/branch/push/pull/fetch/show/stash/worktree + init/add/reset/restore/rm/mv/merge/rebase/cherry-pick/revert/tag/remote/clone/blame/clean/reflog/config + history search
   ...UTILS_DEFINITIONS,       // sleep
-  LSP_TOOL_DEFINITION,        // lsp
-  ...IDE_DEFINITIONS,         // structured IDE navigation, diagnostics, and safe semantic edits
+  ...IDE_DEFINITIONS,         // structured LSP navigation, diagnostics, and safe semantic edits
   ...INTERACTION_DEFINITIONS, // ask_user_question
 ]);
 
@@ -75,12 +61,6 @@ export const HANDLERS: Record<string, ToolHandler> = {
   bash: executeBash,
   powershell: executePowerShell,
   repl: runRepl,
-  start_process: startProcess,
-  read_process_output: readProcessOutput,
-  write_process_input: writeProcessInput,
-  stop_process: stopProcess,
-  list_processes: listProcesses,
-  command_exists: commandExists,
   ssh_exec: executeSshCommand,
   ssh_session: manageSshSession,
   read_file: readFile,
@@ -90,7 +70,6 @@ export const HANDLERS: Record<string, ToolHandler> = {
   content_hash: contentHash,
   watch_files: watchFiles,
   read_notebook: readNotebook,
-  read_archive_manifest: readArchiveManifest,
   edit_file: editFile,
   multi_edit: multiEditFile,
   write_file: writeFile,
@@ -100,16 +79,6 @@ export const HANDLERS: Record<string, ToolHandler> = {
   grep: grepFiles,
   ls: listDirectory,
   outline_file: outlineFile,
-  index_codebase: indexCodebase,
-  explore_codebase: exploreCodebase,
-  search_symbol: searchSymbol,
-  analyze_file: analyzeFile,
-  find_related_files: findRelatedFiles,
-  graph_build: buildCodeGraph,
-  graph_status: codeGraphStatus,
-  graph_neighbors: graphNeighborsTool,
-  graph_path: graphPathTool,
-  graph_impact: graphImpactTool,
   git_status: gitStatus,
   git_diff: gitDiff,
   git_log: gitLog,
@@ -139,32 +108,8 @@ export const HANDLERS: Record<string, ToolHandler> = {
   git_reflog: gitReflog,
   git_config: gitConfig,
   search_git_history: searchGitHistory,
-  search_text: searchText,
-  search_files: searchFiles,
-  search_identifiers: searchIdentifiers,
-  search_imports: searchImports,
-  search_config: searchConfig,
-  search_todos: searchTodos,
-  semantic_code_search: semanticCodeSearch,
-  semantic_document_search: semanticDocumentSearch,
-  find_similar_implementation: findSimilarImplementation,
-  find_feature_implementation: findFeatureImplementation,
-  retrieve_context_bundle: retrieveContextBundle,
-  explain_retrieval: explainRetrieval,
-  index_status: indexStatus,
-  reindex_paths: reindexPaths,
-  parse_file: parseFile,
-  query_syntax_tree: querySyntaxTree,
-  find_structural_pattern: findStructuralPattern,
-  structural_replace: structuralReplace,
-  extract_symbol_body: extractSymbolBody,
-  find_dead_exports: findDeadExports,
-  find_duplicate_structure: findDuplicateStructure,
-  calculate_complexity: calculateComplexity,
-  detect_syntax_errors: detectSyntaxErrors,
   sleep: sleep,
   ask_user_question: askUserQuestion,
-  lsp: runLsp,
   navigate_symbol: navigateSymbol,
   find_symbol_relationships: findSymbolRelationships,
   inspect_symbol: inspectSymbol,

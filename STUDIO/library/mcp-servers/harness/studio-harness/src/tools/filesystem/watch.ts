@@ -5,6 +5,9 @@ import { join, relative } from "path";
 type Stamp = { size: number; mtime: number };
 const snapshots = new Map<string, { root: string; files: Map<string, Stamp> }>();
 const IGNORED = new Set([".git", "node_modules", "dist", "build", "coverage"]);
+// Bound retained snapshots — a caller that snapshots and never drops would
+// otherwise leak a full file-stamp map per snapshot for the life of the server.
+const MAX_SNAPSHOTS = 50;
 
 async function scan(root: string, maxFiles: number): Promise<Map<string, Stamp>> {
   const files = new Map<string, Stamp>();
@@ -26,6 +29,7 @@ export async function watchFiles(args: Record<string, unknown>): Promise<Record<
   const maxFiles = Math.min((args.max_files as number) || 10_000, 100_000);
   if (action === "snapshot") {
     const root = (args.path as string) || process.cwd(); const files = await scan(root, maxFiles); const id = randomUUID();
+    if (snapshots.size >= MAX_SNAPSHOTS) { const oldest = snapshots.keys().next().value; if (oldest) snapshots.delete(oldest); }
     snapshots.set(id, { root, files }); return { snapshot_id: id, path: root, files: files.size };
   }
   if (action !== "changes") return { error: "action must be snapshot, changes, or drop" };

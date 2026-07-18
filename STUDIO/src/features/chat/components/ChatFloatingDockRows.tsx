@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
@@ -119,9 +120,9 @@ export function ProjectRow({
   conversationCount,
   onToggle,
   onSelect,
-  onOpenFolder,
   onRemove,
-  onDelete,
+  onRename,
+  onOpenInExplorer,
 }: {
   name: string;
   path: string;
@@ -132,17 +133,33 @@ export function ProjectRow({
   conversationCount: number;
   onToggle: () => void;
   onSelect: () => void;
-  onOpenFolder: () => void;
   onRemove: () => void;
-  onDelete: () => void;
+  onRename: (name: string) => void;
+  onOpenInExplorer: () => void;
 }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const rename = () => {
+    setActionsOpen(false);
+    const nextName = window.prompt("Rename project", name)?.trim();
+    if (!nextName || nextName === name) return;
+    onRename(nextName);
+  };
+
   return (
-    <div className={`group relative rounded-xl ${isCurrent ? "bg-surface-selected" : ""}`}>
+    <div
+      className={`group relative rounded-lg ${isCurrent ? "bg-surface-selected" : ""}`}
+      onMouseEnter={() => setPreviewOpen(true)}
+      onMouseLeave={() => {
+        setPreviewOpen(false);
+        setActionsOpen(false);
+      }}
+    >
       <div className="flex items-center">
         <IconButton
           aria-label={expanded ? "Collapse project" : "Expand project"}
           onClick={onToggle}
-          className="h-7 w-6 flex-shrink-0 rounded-l-xl text-muted hover:text-primary"
+          className="h-7 w-6 flex-shrink-0 rounded-l-lg text-muted hover:text-primary"
         >
           <Collapse size="xs" className={`transition-transform ${expanded ? "rotate-90" : ""}`} />
         </IconButton>
@@ -153,7 +170,7 @@ export function ProjectRow({
           className="min-w-0 flex-1 items-center gap-2 py-2 pr-16 text-left disabled:opacity-60"
         >
           <FolderOpen size="xs" weight={isCurrent ? "fill" : undefined} className="flex-shrink-0 text-secondary" />
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-primary">{name}</span>
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-primary" title={path}>{name}</span>
           {conversationCount > 0 && (
             <span className="rounded-full bg-surface-page px-1.5 py-0.5 text-2xs font-medium text-muted">
               {conversationCount}
@@ -161,37 +178,95 @@ export function ProjectRow({
           )}
         </Button>
       </div>
-      <p className="truncate pl-6 pr-2 pb-1 text-2xs text-muted">{path}</p>
+
+      {previewOpen && !actionsOpen && (
+        <motion.div
+          initial={{ opacity: 0, x: -4, scale: 0.98 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: -4, scale: 0.98 }}
+          transition={{ duration: 0.12, ease: "easeOut" }}
+          className="pointer-events-none absolute left-[calc(100%+10px)] top-0 z-context w-64 rounded-xl border border-surface-border bg-surface-page p-3 shadow-lg"
+        >
+          <div className="flex items-center gap-2">
+            <FolderOpen size="sm" className="text-secondary" />
+            <p className="min-w-0 truncate text-xs font-semibold text-primary">{name}</p>
+          </div>
+          <p className="mt-2 break-all text-2xs leading-relaxed text-muted">{path}</p>
+          <p className="mt-2 text-2xs text-muted">
+            {conversationCount} {conversationCount === 1 ? "chat" : "chats"}
+          </p>
+        </motion.div>
+      )}
 
       {hasRegisteredProject && (
         <div className="absolute right-1.5 top-1.5 hidden gap-0.5 group-hover:flex">
           <IconButton
-            aria-label="Open folder"
-            title="Open folder"
-            onClick={(event) => { event.stopPropagation(); onOpenFolder(); }}
+            aria-label="Project actions"
+            title="Project actions"
+            onClick={(event) => {
+              event.stopPropagation();
+              setActionsOpen((value) => !value);
+            }}
             className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
           >
-            <FolderOpen size="xs" />
-          </IconButton>
-          <IconButton
-            aria-label="Remove from list"
-            title="Remove from list"
-            onClick={(event) => { event.stopPropagation(); onRemove(); }}
-            className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
-          >
-            <Close size="xs" />
-          </IconButton>
-          <IconButton
-            aria-label="Delete Studio project data"
-            title="Delete Studio project data"
-            onClick={(event) => { event.stopPropagation(); onDelete(); }}
-            className="h-6 w-6 rounded-lg bg-surface-base text-muted hover:bg-surface-hover hover:text-primary"
-          >
-            <Delete size="xs" />
+            <More size="sm" />
           </IconButton>
         </div>
       )}
+
+      <AnimateProjectActions
+        open={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        onOpenInExplorer={() => {
+          setActionsOpen(false);
+          onOpenInExplorer();
+        }}
+        onRename={rename}
+        onRemove={() => {
+          setActionsOpen(false);
+          onRemove();
+        }}
+      />
     </div>
+  );
+}
+
+function AnimateProjectActions({
+  open,
+  onClose,
+  onOpenInExplorer,
+  onRename,
+  onRemove,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenInExplorer: () => void;
+  onRename: () => void;
+  onRemove: () => void;
+}) {
+  if (!open) return null;
+  const itemClass = "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-secondary hover:bg-surface-hover hover:text-primary";
+  return (
+    <>
+      <button type="button" aria-label="Close project actions" className="fixed inset-0 z-context cursor-default" onMouseDown={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: -4, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -4, scale: 0.98 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+        className="absolute right-1 top-8 z-context w-48 rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-lg"
+      >
+        <Button variant="ghost" onClick={onOpenInExplorer} className={itemClass}>
+          <FolderOpen size="sm" /> Open in Explorer
+        </Button>
+        <Button variant="ghost" onClick={onRename} className={itemClass}>
+          <Edit size="sm" /> Rename Project
+        </Button>
+        <Button variant="ghost" onClick={onRemove} className={itemClass}>
+          <Close size="sm" /> Remove
+        </Button>
+      </motion.div>
+    </>
   );
 }
 

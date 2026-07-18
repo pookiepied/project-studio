@@ -9,7 +9,7 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "@studio/jwt": "file:../../shared/packages/jwt",
+    "@studio/jwt": "file:../Backend/shared/packages/jwt",
     "hono": "^4.0.0"
   },
   "devDependencies": {

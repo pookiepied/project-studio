@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
     artifacts: `${TAURI_CONFIG.API_BASE_URL}/cloud/artifacts`,
     objects: `${TAURI_CONFIG.API_BASE_URL}/cloud/objects`,
     models: `${TAURI_CONFIG.API_BASE_URL}/cloud/models`,
+    workspace: `${TAURI_CONFIG.API_BASE_URL}/studio/data/workspace`,
   },
   
   // System endpoints

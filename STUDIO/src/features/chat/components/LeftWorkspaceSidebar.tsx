@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Add, Back, Close, FolderOpen, Forward, Message, Search } from "@/ui/icons";
+import { Add, Back, Close, Edit, FolderOpen, Forward, More, Search } from "@/ui/icons";
 import { useCommandPalette } from "@/app/contexts/CommandPaletteContext";
 import { NavToggleIcon } from "@/ui/icons/WorkspaceIcons";
 import { setLeftPanelWidth } from "@/app/shell/workspaceLayoutStore";
 import { Button } from "@/ui/primitives/Button";
 import { IconButton } from "@/ui/primitives/IconButton";
-import { SearchInput } from "@/ui/primitives";
 import type { ConversationStorageScope } from "@/core/conversations";
 import type { ProjectEntry } from "@/core/projects";
 import type { ConversationMetadata } from "@/features/chat/hooks/useConversationsList";
 import type { ConversationSessionStatus } from "@/features/chat/conversations/backgroundSessionTracker";
 import { ConversationActionsMenu, ConversationRow, ProjectRow } from "./ChatFloatingDockRows";
 import { normPath, useChatFloatingDockTree } from "./useChatFloatingDockTree";
+import { ResizeHandle } from "@/features/workspace/rightWorkspace/ResizeHandle";
+import {
+  WORKSPACE_PANEL_DEFAULT_WIDTH,
+  clampWorkspacePanelWidth,
+} from "@/features/workspace/rightWorkspace/workspacePanelGeometry";
 
-const PANEL_WIDTH = 320;
 const EASE = [0.32, 0.72, 0, 1] as const;
 
 interface LeftWorkspaceSidebarProps {
@@ -30,7 +33,7 @@ interface LeftWorkspaceSidebarProps {
   onSelectProject: (project: ProjectEntry) => void;
   onOpenProjectFolder: () => void;
   onRemoveProject: (id: string) => void;
-  onDeleteProject: (id: string) => void;
+  onRenameProject: (id: string, name: string) => void;
   onSelectConversation: (id: string) => void | Promise<void>;
   onOpenConversationInSideChat?: (id: string, title?: string) => void;
   onOpenConversationInNewWindow?: (id: string) => void;
@@ -57,7 +60,7 @@ export function LeftWorkspaceSidebar({
   onSelectProject,
   onOpenProjectFolder,
   onRemoveProject,
-  onDeleteProject,
+  onRenameProject,
   onSelectConversation,
   onOpenConversationInSideChat,
   onOpenConversationInNewWindow,
@@ -72,12 +75,15 @@ export function LeftWorkspaceSidebar({
 }: LeftWorkspaceSidebarProps) {
   const { setOpen: openCommandPalette } = useCommandPalette();
   const reduceMotion = useReducedMotion();
-  const [query, setQuery] = useState("");
+  const query = "";
+  const [workspaceWidth, setWorkspaceWidth] = useState(WORKSPACE_PANEL_DEFAULT_WIDTH);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ id: string; top: number; right: number } | null>(null);
+  const [projectCreateMenuOpen, setProjectCreateMenuOpen] = useState(false);
+  const [projectActionsMenuOpen, setProjectActionsMenuOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const projectEnabled = scope === "local";
-  const isSearching = query.trim().length > 0;
+  const isSearching = false;
 
   const { treeData, allMatchingConversations } = useChatFloatingDockTree({
     conversations,
@@ -85,6 +91,7 @@ export function LeftWorkspaceSidebar({
     query,
     isSearching,
   });
+  const currentProject = projects.find((project) => normPath(project.path) === normPath(currentProjectPath));
 
   useEffect(() => {
     if (!open || !currentProjectPath) return;
@@ -95,9 +102,14 @@ export function LeftWorkspaceSidebar({
   // Publish the panel's occupied width so fixed chrome (and the chat column)
   // can react to the push-layout, mirroring the right workspace signal.
   useEffect(() => {
-    setLeftPanelWidth(open ? PANEL_WIDTH : 0);
-  }, [open]);
+    setLeftPanelWidth(open ? workspaceWidth : 0);
+  }, [open, workspaceWidth]);
   useEffect(() => () => setLeftPanelWidth(0), []);
+  useEffect(() => {
+    const clampWidth = () => setWorkspaceWidth((current) => clampWorkspacePanelWidth(current));
+    window.addEventListener("resize", clampWidth);
+    return () => window.removeEventListener("resize", clampWidth);
+  }, []);
 
   const toggleProject = (key: string) => {
     setExpandedProjects((prev) => {
@@ -109,6 +121,52 @@ export function LeftWorkspaceSidebar({
   };
 
   const closePanel = () => onOpenChange(false);
+
+  const startScratchProject = () => {
+    onScopeChange("local");
+    onNewConversation();
+    setProjectCreateMenuOpen(false);
+    closePanel();
+  };
+
+  const useExistingFolder = () => {
+    if (!projectEnabled) onScopeChange("local");
+    setProjectCreateMenuOpen(false);
+    onOpenProjectFolder();
+  };
+
+  const renameProject = (project: ProjectEntry) => {
+    const nextName = window.prompt("Rename project", project.name)?.trim();
+    setProjectActionsMenuOpen(false);
+    if (!nextName || nextName === project.name) return;
+    onRenameProject(project.id, nextName);
+  };
+
+  const openProjectInExplorer = (project: ProjectEntry) => {
+    setProjectActionsMenuOpen(false);
+    import("@tauri-apps/plugin-opener")
+      .then(({ openPath }) => openPath(project.path))
+      .catch(() => {});
+  };
+
+  const onResizeDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = workspaceWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (event: MouseEvent) => {
+      setWorkspaceWidth(clampWorkspacePanelWidth(startW + (event.clientX - startX)));
+    };
+    const onUp = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   const renderItem = (conv: ConversationMetadata) => (
     <ConversationRow
@@ -133,6 +191,9 @@ export function LeftWorkspaceSidebar({
 
   const iconBtn =
     "studio-chat-icon-button flex h-7 w-7 items-center justify-center rounded-lg text-disabled transition-colors duration-100 hover:bg-surface-base hover:text-secondary dark:text-secondary dark:hover:bg-surface-raised dark:hover:text-disabled";
+  const navItem =
+    "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-primary hover:bg-surface-hover";
+  const sectionLabel = "px-2.5 text-2xs font-medium text-muted";
 
   return (
     <>
@@ -189,74 +250,52 @@ export function LeftWorkspaceSidebar({
       <AnimatePresence>
         {open && (
           <motion.div
+            layout
             key="left-workspace-sidebar"
             role="dialog"
             aria-label="Conversations and projects sidebar"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: PANEL_WIDTH, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={{ width: 0 }}
+            animate={{ width: workspaceWidth }}
+            exit={{ width: 0 }}
             transition={{
               width: { duration: reduceMotion ? 0 : 0.24, ease: EASE },
-              opacity: { duration: reduceMotion ? 0 : 0.16, ease: "easeOut" },
+              layout: { duration: reduceMotion ? 0 : 0.28, ease: EASE },
             }}
             className="h-full flex-shrink-0 overflow-hidden"
           >
-            <div className="flex h-full flex-col" style={{ width: PANEL_WIDTH, minWidth: PANEL_WIDTH }}>
-              {/* Reserve the top chrome strip so the macOS-style traffic lights
-                  (and the fixed control cluster) stay clear of the panel card. */}
-              <div className="h-[46px] flex-shrink-0" />
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-tr-2xl rounded-br-2xl border-r border-surface-border bg-surface-base shadow-xl">
-                <div className="border-b border-surface-divider p-2">
-                  <div className="flex items-center gap-1">
-                    <div className="flex-1">
-                      <SearchInput
-                        value={query}
-                        onValueChange={setQuery}
-                        aria-label="Search conversations and projects"
-                        placeholder="Search"
-                        size="md"
-                        className="rounded-xl bg-surface-page text-xs"
-                      />
-                    </div>
+            <div className="flex h-full transition-colors duration-300" style={{ width: workspaceWidth, minWidth: workspaceWidth }}>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-border bg-surface-page shadow-none">
+                <div className="flex items-center justify-between px-3 pb-2 pt-3">
+                  <button
+                    type="button"
+                    onClick={closePanel}
+                    className="min-w-0 truncate text-left text-sm font-semibold text-primary"
+                    title="Studio"
+                  >
+                    Studio
+                  </button>
+                  <div className="flex items-center gap-0.5">
+                    <IconButton
+                      aria-label="Search"
+                      title="Search"
+                      onClick={() => openCommandPalette(true)}
+                      className="h-7 w-7 rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
+                    >
+                      <Search size="sm" />
+                    </IconButton>
                     <IconButton
                       aria-label="Close sidebar"
+                      title="Close sidebar"
                       onClick={closePanel}
-                      className="h-8 w-8 flex-shrink-0 rounded-full text-muted hover:bg-surface-hover hover:text-primary"
+                      className="h-7 w-7 rounded-lg text-muted hover:bg-surface-hover hover:text-primary"
                     >
                       <Close size="sm" />
                     </IconButton>
                   </div>
-                  <div className="mt-2 flex gap-1.5">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        onNewConversation();
-                        closePanel();
-                      }}
-                      className="flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-page py-2 text-xs font-medium text-primary hover:bg-surface-hover"
-                    >
-                      <Message size="sm" />
-                      New chat
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        if (!projectEnabled) {
-                          onScopeChange("local");
-                          return;
-                        }
-                        onOpenProjectFolder();
-                      }}
-                      title={projectEnabled ? "Open a folder as a project" : "Switch to Local to add a project"}
-                      className="flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-page py-2 text-xs font-medium text-primary hover:bg-surface-hover"
-                    >
-                      <FolderOpen size="sm" />
-                      Add project
-                    </Button>
-                  </div>
                 </div>
 
-                <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 py-2 scrollbar-auto-hide">
+                <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1 scrollbar-auto-hide">
                   {isSearching ? (
                     allMatchingConversations.length === 0 ? (
                       <div className="px-4 py-10 text-center">
@@ -274,54 +313,119 @@ export function LeftWorkspaceSidebar({
                   ) : (
                     <>
                       {/* Row 1 — Conversations */}
-                      <section>
-                        <div className="flex items-center justify-between px-3 pb-1 pt-1">
-                          <p className="text-2xs font-semibold uppercase tracking-wide text-muted">
-                            Conversations
-                          </p>
-                          {conversations.length > 0 && (
-                            <span className="text-2xs text-muted">{conversations.length}</span>
-                          )}
-                        </div>
-                        {conversations.length === 0 ? (
-                          <div className="px-4 py-6 text-center">
-                            <p className="text-xs text-muted">No conversations yet.</p>
-                          </div>
-                        ) : (
-                          conversations.map(renderItem)
-                        )}
+                      <section className="space-y-0.5">
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            onNewConversation();
+                            closePanel();
+                          }}
+                          className={navItem}
+                        >
+                          <Edit size="sm" />
+                          New chat
+                        </Button>
                       </section>
 
                       {/* Row 2 — Projects */}
-                      <section className="mt-3">
-                        <div className="flex items-center justify-between px-3 pb-1 pt-1">
-                          <p className="text-2xs font-semibold uppercase tracking-wide text-muted">
-                            Projects
-                          </p>
-                          {projectEnabled && treeData.projectList.length > 0 && (
-                            <span className="text-2xs text-muted">{treeData.projectList.length}</span>
-                          )}
+                      <section className="mt-6">
+                        <div className="relative flex items-center justify-between pb-1">
+                          <p className={sectionLabel}>Projects</p>
+                          <div className="flex items-center gap-0.5 pr-1">
+                            <IconButton
+                              aria-label="Project options"
+                              title="Project options"
+                              onClick={() => {
+                                setProjectCreateMenuOpen(false);
+                                setProjectActionsMenuOpen((value) => !value);
+                              }}
+                              className="h-6 w-6 rounded-md text-muted hover:bg-surface-hover hover:text-primary"
+                            >
+                              <More size="sm" />
+                            </IconButton>
+                            <IconButton
+                              aria-label="New project"
+                              title="New project"
+                              onClick={() => {
+                                setProjectActionsMenuOpen(false);
+                                setProjectCreateMenuOpen((value) => !value);
+                              }}
+                              className="h-6 w-6 rounded-md text-muted hover:bg-surface-hover hover:text-primary"
+                            >
+                              <Add size="sm" />
+                            </IconButton>
+                          </div>
+                          <AnimatePresence>
+                            {projectActionsMenuOpen && (
+                              <>
+                                <button
+                                  type="button"
+                                  aria-label="Close project actions"
+                                  className="fixed inset-0 z-context cursor-default"
+                                  onMouseDown={() => setProjectActionsMenuOpen(false)}
+                                />
+                                <motion.div
+                                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                                  transition={{ duration: 0.12, ease: "easeOut" }}
+                                  className="absolute right-8 top-7 z-context w-48 rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-lg"
+                                >
+                                  {currentProject ? (
+                                    <>
+                                      <Button variant="ghost" onClick={() => openProjectInExplorer(currentProject)} className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover">
+                                        <FolderOpen size="sm" />
+                                        Open in Explorer
+                                      </Button>
+                                      <Button variant="ghost" onClick={() => renameProject(currentProject)} className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover">
+                                        <Edit size="sm" />
+                                        Rename Project
+                                      </Button>
+                                      <Button variant="ghost" onClick={() => { onRemoveProject(currentProject.id); setProjectActionsMenuOpen(false); }} className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover">
+                                        <Close size="sm" />
+                                        Remove
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <div className="px-2.5 py-2 text-xs text-muted">No project selected</div>
+                                  )}
+                                </motion.div>
+                              </>
+                            )}
+                            {projectCreateMenuOpen && (
+                              <>
+                                <button
+                                  type="button"
+                                  aria-label="Close project menu"
+                                  className="fixed inset-0 z-context cursor-default"
+                                  onMouseDown={() => setProjectCreateMenuOpen(false)}
+                                />
+                                <motion.div
+                                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                                  transition={{ duration: 0.12, ease: "easeOut" }}
+                                  className="absolute right-1 top-7 z-context w-52 rounded-xl border border-surface-border bg-surface-page p-1.5 shadow-lg"
+                                >
+                                  <Button variant="ghost" onClick={startScratchProject} className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover">
+                                    <Add size="sm" />
+                                    Start from scratch
+                                  </Button>
+                                  <Button variant="ghost" onClick={useExistingFolder} className="w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-xs text-primary hover:bg-surface-hover">
+                                    <FolderOpen size="sm" />
+                                    Use an existing folder
+                                  </Button>
+                                </motion.div>
+                              </>
+                            )}
+                          </AnimatePresence>
                         </div>
                         {!projectEnabled ? (
-                          <div className="rounded-xl border border-surface-border bg-surface-page p-3">
-                            <p className="text-xs font-semibold text-primary">Cloud environment is active</p>
-                            <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                              Project folders live on this computer. Switch to Local to add or browse projects.
-                            </p>
-                            <Button
-                              variant="ghost"
-                              onClick={() => onScopeChange("local")}
-                              className="mt-2 rounded-full bg-surface-selected px-3 py-1.5 text-xs font-medium text-primary hover:bg-surface-hover"
-                            >
-                              Switch to Local
-                            </Button>
-                          </div>
+                          <div className="px-2.5 py-1 text-xs text-muted">Switch to Local to browse projects.</div>
                         ) : treeData.projectList.length === 0 ? (
-                          <div className="px-4 py-6 text-center">
-                            <p className="text-xs text-muted">No projects yet.</p>
-                          </div>
+                          <div className="px-2.5 py-1 text-xs text-muted">No projects</div>
                         ) : (
-                          <div>
+                          <div className="space-y-0.5">
                             {treeData.projectList.map((group) => {
                               const key = normPath(group.path);
                               const expanded = expandedProjects.has(key);
@@ -338,9 +442,9 @@ export function LeftWorkspaceSidebar({
                                     conversationCount={group.conversations.length}
                                     onToggle={() => toggleProject(key)}
                                     onSelect={() => group.project && onSelectProject(group.project)}
-                                    onOpenFolder={onOpenProjectFolder}
                                     onRemove={() => group.project && onRemoveProject(group.project.id)}
-                                    onDelete={() => group.project && onDeleteProject(group.project.id)}
+                                    onRename={(name) => group.project && onRenameProject(group.project.id, name)}
+                                    onOpenInExplorer={() => group.project && openProjectInExplorer(group.project)}
                                   />
                                   <AnimatePresence initial={false}>
                                     {expanded && (
@@ -378,6 +482,20 @@ export function LeftWorkspaceSidebar({
                           </div>
                         )}
                       </section>
+
+                      <section className="mt-6">
+                        <div className="flex items-center justify-between pb-1">
+                          <p className={sectionLabel}>Chats</p>
+                          {conversations.length > 0 && (
+                            <span className="pr-2 text-2xs text-muted">{conversations.length}</span>
+                          )}
+                        </div>
+                        {conversations.length === 0 ? (
+                          <div className="px-2.5 py-1 text-xs text-muted">No chats</div>
+                        ) : (
+                          <div className="space-y-0.5">{conversations.map(renderItem)}</div>
+                        )}
+                      </section>
                     </>
                   )}
                 </div>
@@ -402,7 +520,9 @@ export function LeftWorkspaceSidebar({
                     />
                   );
                 })()}
+                </div>
               </div>
+              <ResizeHandle onMouseDown={onResizeDown} />
             </div>
           </motion.div>
         )}

@@ -12,7 +12,7 @@ import type {
 import { parseArtifact } from "@/lib/artifact";
 import { artifactRendererDescriptor } from "@/features/artifacts/registry";
 import { JsonRenderer } from "./JsonRenderer";
-import { CalendarArtifact, GmailArtifact, ImageGenerationArtifact, WebSearchArtifact } from "./artifacts";
+import { CalendarArtifact, CloudFileArtifact, GithubArtifact, GmailArtifact, ImageGenerationArtifact, TaskArtifact, VideoGenerationArtifact, WebSearchArtifact } from "./artifacts";
 
 interface ArtifactRendererProps {
   code: string;
@@ -255,20 +255,59 @@ export function ArtifactRenderer({ code }: ArtifactRendererProps) {
     );
   }
 
-  if (artifact.kind === "web_search" || artifact.kind === "web_research" || artifact.kind === "web_fetch") {
+  if (artifact.kind === "research" || artifact.kind === "web_search" || artifact.kind === "web_research" || artifact.kind === "web_fetch") {
     return <WebSearchArtifact artifact={artifact} />;
   }
 
-  if (artifact.kind === "generated_image" || artifact.kind === "image_generation") {
+  if (
+    artifact.kind === "generated_image" ||
+    artifact.kind === "image_generation" ||
+    (artifact.kind === "generated_media" && artifact.data && typeof artifact.data === "object" && "imageUrl" in artifact.data)
+  ) {
     return <ImageGenerationArtifact artifact={artifact} />;
   }
 
-  if (artifact.kind.startsWith("gmail_")) {
+  if (
+    artifact.kind === "generated_video" ||
+    artifact.kind === "video_generation" ||
+    (artifact.kind === "generated_media" && artifact.data && typeof artifact.data === "object" && "videoUrl" in artifact.data)
+  ) {
+    return <VideoGenerationArtifact artifact={artifact} />;
+  }
+
+  if (artifact.kind.startsWith("gmail_") || artifact.kind.startsWith("outlook_")) {
     return <GmailArtifact artifact={artifact} />;
   }
 
   if (artifact.kind.startsWith("calendar_")) {
     return <CalendarArtifact artifact={artifact} />;
+  }
+
+  if (
+    artifact.kind === "file" ||
+    artifact.kind.startsWith("googledrive_") ||
+    artifact.kind.startsWith("onedrive_") ||
+    artifact.kind.startsWith("dropbox_") ||
+    artifact.kind.startsWith("googledocs_") ||
+    artifact.kind.startsWith("googlesheets_")
+  ) {
+    return <CloudFileArtifact artifact={artifact} />;
+  }
+
+  if (artifact.kind.startsWith("github_")) {
+    return <GithubArtifact artifact={artifact} />;
+  }
+
+  if (
+    artifact.kind.startsWith("todoist_") ||
+    artifact.kind.startsWith("task_") ||
+    artifact.kind.startsWith("linear_") ||
+    artifact.kind.startsWith("jira_") ||
+    artifact.kind.startsWith("trello_") ||
+    artifact.kind.startsWith("asana_") ||
+    artifact.kind.startsWith("clickup_")
+  ) {
+    return <TaskArtifact artifact={artifact} />;
   }
 
   const tone = statusTone(artifact.status ?? "success");

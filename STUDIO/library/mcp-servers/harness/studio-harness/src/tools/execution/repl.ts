@@ -1,7 +1,8 @@
 import { spawn } from "child_process";
+import { StringDecoder } from "string_decoder";
 import { promises as fs } from "fs";
 import { TOOL_TIMEOUTS } from "../tool-contract.js";
-import { DEFAULT_MAX_OUTPUT_CHARS, ABSOLUTE_MAX_OUTPUT_CHARS } from "./run_process.js";
+import { DEFAULT_MAX_OUTPUT_CHARS, ABSOLUTE_MAX_OUTPUT_CHARS, killTree } from "./run_process.js";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
@@ -29,22 +30,36 @@ export async function runRepl(
         ? (["node", [tmpFile]] as [string, string[]])
         : (["python", [tmpFile]] as [string, string[]]);
 
-    return await new Promise<Record<string, unknown>>((resolve, reject) => {
-      let stdout = "";
+    return await new Promise<Record<string, unknown>>((resolve) => {
+      // Bounded head + accurate total, and a decoder that survives multibyte
+      // splits — mirrors run_process so a chatty script can't exhaust memory.
+      let head = "";
+      let total = 0;
       let stderr = "";
+      const outDec = new StringDecoder("utf8");
+      const errDec = new StringDecoder("utf8");
+
+      const appendOut = (text: string) => {
+        if (!text) return;
+        total += text.length;
+        const room = ABSOLUTE_MAX_OUTPUT_CHARS - head.length;
+        if (room > 0) head += text.length <= room ? text : text.slice(0, room);
+      };
 
       const proc = spawn(cmd, cmdArgs, {
         stdio: "pipe",
         env: { ...process.env },
+        detached: process.platform !== "win32",
       });
 
-      proc.stdout?.on("data", (d: Buffer) => { stdout += d.toString(); });
-      proc.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
+      proc.stdout?.on("data", (d: Buffer) => appendOut(outDec.write(d)));
+      proc.stderr?.on("data", (d: Buffer) => { stderr += errDec.write(d); });
 
       const timer = setTimeout(() => {
-        proc.kill();
+        killTree(proc); // kill the whole tree — the script may have spawned children
+        appendOut(outDec.end());
         resolve({
-          output: stdout,
+          output: head,
           error:
             `Execution timed out after ${timeout}ms. ` +
             `Split the code into smaller chunks, or increase the timeout parameter.`,
@@ -54,11 +69,13 @@ export async function runRepl(
 
       proc.on("close", (code) => {
         clearTimeout(timer);
-        let out = stdout;
+        appendOut(outDec.end());
+        stderr += errDec.end();
+        let out = head;
         let outTruncated = false;
-        if (out.length > maxChars) {
-          out = out.slice(0, maxChars) +
-            `\n\n[Output truncated — ${stdout.length.toLocaleString()} chars total, ` +
+        if (total > maxChars) {
+          out = head.slice(0, maxChars) +
+            `\n\n[Output truncated — ${total.toLocaleString()} chars total, ` +
             `first ${maxChars.toLocaleString()} shown. Pass max_output_chars up to ${ABSOLUTE_MAX_OUTPUT_CHARS.toLocaleString()} to see more.]`;
           outTruncated = true;
         }
@@ -74,7 +91,7 @@ export async function runRepl(
         clearTimeout(timer);
         // Resolve (not reject) so the caller always gets a structured result.
         resolve({
-          output: stdout,
+          output: head,
           error:
             err.message.includes("ENOENT")
               ? `${language === "node" ? "node" : "python"} not found in PATH. Is it installed?`

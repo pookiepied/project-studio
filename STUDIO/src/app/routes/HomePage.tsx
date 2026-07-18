@@ -59,6 +59,11 @@ export const HomePage = () => {
   // ── Recording callbacks ───────────────────────────────────────────────────
 
   const handleRecordingComplete = (_original: string, rephrased?: string) => {
+    if (currentView === "workspace") {
+      window.dispatchEvent(new CustomEvent("workspace-capture-text", {
+        detail: { text: rephrased || _original },
+      }));
+    }
     toast.success(rephrased ? "Text transcribed and rephrased!" : "Text transcribed!");
   };
 
@@ -92,7 +97,7 @@ export const HomePage = () => {
       case "memories":    return wrap("memories",    <MemoriesPage />);
       case "projects":    return wrap("projects",    <ProjectsPage />);
       case "workspace":   return wrap("workspace",   <WorkspacePage />);
-      case "artifacts":   return wrap("artifacts",   <ArtifactCatalogPage />);
+      case "artifacts":   return wrap("artifacts",   <ArtifactCatalogPage />, "h-full min-h-0");
       case "extensions":  return wrap("extensions",  <ExtensionsPage />);
       case "activity":    return wrap("activity",    <ActivityPage />);
       case "manage":      return wrap("manage",      <ManagePage />);

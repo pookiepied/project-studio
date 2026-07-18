@@ -268,11 +268,12 @@ export function FloatingPanel({
   currentView: View;
   onNavigate: (view: View) => void;
 }) {
-  const { chatDockVisible, setChatDockVisible, toggleChatDock } = useGlobalDock();
-  const dockVisible = currentView !== "chat" || chatDockVisible;
+  const { chatDockVisible, setChatDockVisible } = useGlobalDock();
+  const dockVisible = true;
 
   useEffect(() => {
-    if (currentView !== "chat" && chatDockVisible) setChatDockVisible(false);
+    const shouldReserveDock = currentView === "chat";
+    if (chatDockVisible !== shouldReserveDock) setChatDockVisible(shouldReserveDock);
   }, [chatDockVisible, currentView, setChatDockVisible]);
 
   return (
@@ -281,23 +282,6 @@ export function FloatingPanel({
         <FloatingPanelFrame>
           <FloatingPanelNavigation currentView={currentView} onNavigate={onNavigate} />
         </FloatingPanelFrame>
-      )}
-
-      {currentView === "chat" && (
-        <div
-          className="studio-chat-dock-switch pointer-events-none fixed top-0 z-toast flex h-[var(--studio-topbar-height)] items-center"
-          style={{ left: "min(calc(50% + 280px), calc(100% - 250px))" }}
-        >
-          <IconButton
-            size="sm"
-            aria-label={chatDockVisible ? "Show conversation title" : "Show navigation dock"}
-            title={chatDockVisible ? "Show conversation title" : "Show navigation dock"}
-            onClick={toggleChatDock}
-            className="pointer-events-auto h-6 w-6 rounded-full text-muted hover:bg-surface-hover hover:text-primary"
-          >
-            <Expand size="xs" className={`transition-transform duration-150 ${chatDockVisible ? "rotate-180" : ""}`} />
-          </IconButton>
-        </div>
       )}
     </>
   );

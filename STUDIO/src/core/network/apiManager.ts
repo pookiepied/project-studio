@@ -36,6 +36,7 @@ interface APIEndpoints {
     artifacts: string;
     objects: string;
     models: string;
+    workspace: string;
   };
 }
 
@@ -125,6 +126,7 @@ class APIManager {
         artifacts: "",
         objects: "",
         models: "",
+        workspace: "",
       };
       return {
         auth: "",
@@ -177,6 +179,7 @@ class APIManager {
         artifacts: `${cloudBase}/artifacts`,
         objects: `${cloudBase}/objects`,
         models: `${cloudBase}/models`,
+        workspace: `${baseUrl}/studio/data/workspace`,
       },
     };
   }

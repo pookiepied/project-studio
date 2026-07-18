@@ -4,7 +4,6 @@ import { BrowserPanelContext }                       from "@/app/contexts/Browse
 import { ArtifactPanelContext }                      from "@/app/contexts/ArtifactPanelContext";
 import { environmentService }                        from "@/core/platform/environmentService";
 import { openConversationWindow }                    from "@/core/platform/conversationWindowService";
-import { useRightPanelWidth }                         from "@/app/shell/workspaceLayoutStore";
 import { useChat }                                   from "@/features/chat/context";
 import { useModelsContext as useModels }              from "@/features/models/context";
 import { useDraftPersistence }                       from "@/features/chat/hooks/useDraftPersistence";
@@ -113,6 +112,7 @@ export const ChatPage = () => {
     reasoningBudget,
     setReasoningBudget,
     harnessSegments,
+    sessionTasks,
     pendingMessages,
     cancelPendingMessage,
   } = useChat();
@@ -225,10 +225,6 @@ export const ChatPage = () => {
   } = useArtifactPanel();
 
   const isTauri = environmentService.isTauri();
-  // Width the right workspace panel currently occupies (0 when closed). The
-  // top-right control cluster shifts left by this so it rides the panel's edge
-  // instead of being covered by it.
-  const rightPanelWidth = useRightPanelWidth();
 
   const rightWorkspace = useRightWorkspace({
     projectContext,
@@ -381,7 +377,7 @@ export const ChatPage = () => {
   const {
     projects,
     removeProject,
-    deleteProject,
+    renameProject,
     handleSelectProject,
     handleOpenProjectFolder,
   } = useChatProjectRegistry({
@@ -409,6 +405,7 @@ export const ChatPage = () => {
   const composerBlock = (inputRef: React.RefObject<HTMLTextAreaElement | null>) => (
     <ChatComposer {...composerProps} inputRef={inputRef} />
   );
+  const dockedPanelOpen = leftSidebarOpen || rightWorkspace.open;
 
   // -- Render ------------------------------------------------------------------
 
@@ -459,7 +456,7 @@ export const ChatPage = () => {
         claudeAccountLoading={claudeAccountLoading}
         claudeRateLimit={claudeSession?.rateLimit}
         onRefreshClaudeAccount={() => refreshClaudeAccountStatus(true)}
-        rightPanelWidth={rightPanelWidth}
+        dockedPanelOpen={dockedPanelOpen}
         isTauri={isTauri}
         workspaceOpen={rightWorkspace.open}
         onToggleWorkspace={() => {
@@ -471,7 +468,13 @@ export const ChatPage = () => {
       />
 
       {/* -- SPLIT VIEW: left sidebar + chat column + side panels -- */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div
+        className={`flex-1 flex min-h-0 overflow-hidden px-2 pb-2 pt-[var(--studio-topbar-height)] transition-colors duration-300 ${
+          dockedPanelOpen
+            ? "bg-surface-base"
+            : "bg-surface-page"
+        }`}
+      >
 
         {/* Left sidebar is rendered as the first flex child so its panel can
             push (reflow) the chat column on expand/collapse, mirroring the
@@ -489,7 +492,7 @@ export const ChatPage = () => {
           onSelectProject={handleSelectProject}
           onOpenProjectFolder={handleOpenProjectFolder}
           onRemoveProject={(id) => { void removeProject(id); }}
-          onDeleteProject={(id) => { void deleteProject(id); }}
+          onRenameProject={(id, name) => { void renameProject(id, name); }}
           onSelectConversation={async (id) => { await loadConversationById(id); }}
           onOpenConversationInSideChat={(id) => {
             rightWorkspace.openView("side-chat", { conversationId: id });
@@ -518,7 +521,16 @@ export const ChatPage = () => {
         />
 
         {/* -- Chat column -- */}
-        <div className="flex-1 flex flex-col overflow-hidden relative" style={{ minWidth: "380px" }}>
+        <motion.div
+          layout
+          transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
+          className={`flex-1 flex flex-col overflow-hidden relative transition-[border-radius,box-shadow,border-color,background-color] duration-300 ${
+            dockedPanelOpen
+              ? "rounded-2xl border border-surface-border bg-surface-page shadow-none"
+              : "border border-transparent bg-surface-page"
+          }`}
+          style={{ minWidth: "380px" }}
+        >
 
           {/* -- CLI terminals: each stays mounted so backgrounded sessions
                keep running; only the active one is visible. -- */}
@@ -663,7 +675,7 @@ export const ChatPage = () => {
             onMoveTab={moveTab}
           />
 
-        </div>{/* end chat column */}
+        </motion.div>{/* end chat column */}
 
         <RightWorkspacePanel
           open={rightWorkspace.open}
@@ -698,6 +710,19 @@ export const ChatPage = () => {
           onArtifactTabChange={setActiveArtifactTabId}
           onArtifactTabClose={closeArtifactTab}
           onArtifactWidthChange={setArtifactPanelWidth}
+          messages={messages}
+          activeToolCalls={activeToolCalls}
+          sessionTasks={sessionTasks}
+          pendingMessages={pendingMessages}
+          harnessSegments={harnessSegments}
+          contextTokens={contextTokens}
+          contextLimit={contextLimit}
+          usageContextTokens={usageContextTokens}
+          isLoading={isLoading}
+          isStreaming={isStreaming}
+          isSummarizing={isSummarizing}
+          projectName={projectContext?.name}
+          conversationTitle={conversation?.title}
         />
 
 

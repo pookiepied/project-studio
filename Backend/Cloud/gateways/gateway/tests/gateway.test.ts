@@ -738,6 +738,69 @@ describe("gateway worker", () => {
     expect(opus.capabilities.chat.reasoning.efforts).toContain("xhigh");
   });
 
+  it("maps effort to adaptive thinking + effort for modern Claude (Opus 4.8), not budget_tokens", async () => {
+    vi.mocked(generateText).mockResolvedValue({ text: "ok", finishReason: "stop", usage: {}, toolCalls: [] } as never);
+
+    await postChat(createEnv(), {
+      model: "claude-opus-4-8",
+      reasoningEffort: "high",
+      messages: [{ role: "user", content: "Think" }]
+    });
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
+      providerOptions: { anthropic: { effort?: string; thinking?: { type: string; budgetTokens?: number } } };
+    };
+    expect(call.providerOptions.anthropic.effort).toBe("high");
+    expect(call.providerOptions.anthropic.thinking).toEqual({ type: "adaptive" });
+    expect(call.providerOptions.anthropic.thinking?.budgetTokens).toBeUndefined();
+  });
+
+  it("maps xhigh effort straight through for modern Claude (Opus 4.8)", async () => {
+    vi.mocked(generateText).mockResolvedValue({ text: "ok", finishReason: "stop", usage: {}, toolCalls: [] } as never);
+
+    await postChat(createEnv(), {
+      model: "claude-opus-4-8",
+      reasoningEffort: "xhigh",
+      messages: [{ role: "user", content: "Think hard" }]
+    });
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
+      providerOptions: { anthropic: { effort?: string } };
+    };
+    expect(call.providerOptions.anthropic.effort).toBe("xhigh");
+  });
+
+  it("uses manual budget_tokens thinking for legacy Claude (Haiku 4.5), not effort", async () => {
+    vi.mocked(generateText).mockResolvedValue({ text: "ok", finishReason: "stop", usage: {}, toolCalls: [] } as never);
+
+    await postChat(createEnv(), {
+      model: "claude-haiku-4-5",
+      reasoningEffort: "high",
+      messages: [{ role: "user", content: "Think" }]
+    });
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
+      providerOptions: { anthropic: { effort?: string; thinking?: { type: string; budgetTokens?: number } } };
+    };
+    expect(call.providerOptions.anthropic.thinking).toEqual({ type: "enabled", budgetTokens: 16000 });
+    expect(call.providerOptions.anthropic.effort).toBeUndefined();
+  });
+
+  it("omits Anthropic thinking/effort when reasoning effort is 'none'", async () => {
+    vi.mocked(generateText).mockResolvedValue({ text: "ok", finishReason: "stop", usage: {}, toolCalls: [] } as never);
+
+    await postChat(createEnv(), {
+      model: "claude-opus-4-8",
+      reasoningEffort: "none",
+      messages: [{ role: "user", content: "Answer directly" }]
+    });
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
+      providerOptions: { anthropic: { effort?: string; thinking?: unknown } };
+    };
+    expect(call.providerOptions.anthropic.effort).toBeUndefined();
+    expect(call.providerOptions.anthropic.thinking).toBeUndefined();
+  });
 
   it("routes Anthropic through CF AI Gateway and strips the provider x-api-key header", async () => {
     const seen = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {

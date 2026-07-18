@@ -7,6 +7,7 @@ import { artifactsRoute } from "./server/routes/artifacts";
 import { plansRoute } from "./server/routes/plans";
 import { transcriptsRoute } from "./server/routes/transcripts";
 import { objectsRoute } from "./server/routes/objects";
+import { workspaceRoute } from "./server/routes/workspace";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -17,6 +18,7 @@ app.route("/artifacts", artifactsRoute);
 app.route("/plans", plansRoute);
 app.route("/transcripts", transcriptsRoute);
 app.route("/objects", objectsRoute);
+app.route("/workspace", workspaceRoute);
 
 app.onError((error, c) => {
   console.error(error);

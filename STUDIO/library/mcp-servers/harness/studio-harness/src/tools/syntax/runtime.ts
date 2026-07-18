@@ -37,6 +37,9 @@ const LANG: Record<string, string> = {
   ".css": "css",
 };
 let initialized = false;
+// Bound the parse cache: each entry holds a tree-sitter Tree backed by WASM
+// memory that is NOT reclaimed by GC — it must be .delete()d explicitly.
+const CACHE_MAX = 100;
 const languages = new Map<string, Language>(),
   parsers = new Map<string, Parser>(),
   cache = new Map<
@@ -68,6 +71,8 @@ export async function parsePath(file: string) {
     hash = crypto.createHash("sha256").update(text).digest("hex"),
     prior = cache.get(full);
   if (prior?.hash === hash) return { ...prior, path: full };
+  // Content changed for this path — free the stale tree before replacing it.
+  if (prior) { try { prior.tree.delete(); } catch { /* already freed */ } }
   let grammar = languages.get(language);
   if (!grammar) {
     grammar = await Parser.Language.load(
@@ -85,6 +90,15 @@ export async function parsePath(file: string) {
   if (!tree) throw new Error("Tree-sitter returned no syntax tree");
   const entry = { hash, tree, text, language, grammar };
   cache.set(full, entry);
+  // FIFO-evict the oldest entry (and free its WASM tree) once over the cap.
+  if (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest && oldest !== full) {
+      const evicted = cache.get(oldest);
+      try { evicted?.tree.delete(); } catch { /* already freed */ }
+      cache.delete(oldest);
+    }
+  }
   return { ...entry, path: full };
 }
 export async function parseText(language: string, text: string) {

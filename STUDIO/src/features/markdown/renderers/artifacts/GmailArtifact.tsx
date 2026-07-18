@@ -53,6 +53,10 @@ function gmailData(artifact: Artifact): GmailArtifactData {
   return artifact.data as GmailArtifactData;
 }
 
+function serviceName(artifact: Artifact) {
+  return artifact.kind.startsWith("outlook_") || artifact.source?.app === "outlook" ? "Outlook" : "Gmail";
+}
+
 function displayPerson(person: GmailPerson) {
   return person.name ? `${person.name} <${person.email}>` : person.email;
 }
@@ -95,7 +99,7 @@ function Header({
           {artifact.title}
         </div>
         <div className="mt-0.5 text-2xs text-disabled dark:text-muted">
-          Gmail / {statusLabel(artifact)}{meta ? ` / ${meta}` : ""}
+          {serviceName(artifact)} / {statusLabel(artifact)}{meta ? ` / ${meta}` : ""}
         </div>
         {artifact.summary && (
           <p className="mt-2 text-sm leading-relaxed text-secondary dark:text-disabled">
@@ -173,7 +177,7 @@ function GmailSearchArtifact({ artifact, data }: { artifact: Artifact; data: Gma
         meta={data.mailbox ?? "Inbox"}
       />
       <div className="mt-3 rounded-2xl bg-surface-page/55 px-3 py-2 text-xs text-muted dark:bg-white/[0.035] dark:text-muted">
-        {data.query ? `Search: ${data.query}` : "Searching Gmail"}
+        {data.query ? `Search: ${data.query}` : `Searching ${serviceName(artifact)}`}
       </div>
       <AnimatedList className="mt-2">
         {messages.length > 0 ? (
@@ -184,7 +188,7 @@ function GmailSearchArtifact({ artifact, data }: { artifact: Artifact; data: Gma
           ))
         ) : (
           <AnimatedItem className="rounded-2xl bg-surface-page/55 px-3 py-5 text-center text-sm text-disabled dark:bg-white/[0.035] dark:text-muted">
-            {working ? <>Matching emails will appear here as Gmail responds. <ProcessingDots /></> : "No matching emails found."}
+            {working ? <>Matching emails will appear here as {serviceName(artifact)} responds. <ProcessingDots /></> : "No matching emails found."}
           </AnimatedItem>
         )}
       </AnimatedList>
@@ -242,7 +246,7 @@ function GmailMessageArtifact({ artifact, data }: { artifact: Artifact; data: Gm
           Email details will appear here.
         </div>
       )}
-      <Footer text="Gmail message" />
+      <Footer text={`${serviceName(artifact)} message`} />
     </Shell>
   );
 }
@@ -258,7 +262,7 @@ function GmailDraftArtifact({ artifact, data }: { artifact: Artifact; data: Gmai
         meta={artifact.status === "completed" ? "Sent" : "Draft"}
       />
       {draft ? (
-        <AnimatedItem className="mt-3 rounded-[18px] bg-surface-page/55 px-3 py-3 dark:bg-white/[0.035]">
+        <AnimatedItem className="mt-3 rounded-2xl bg-surface-page/55 px-3 py-3 dark:bg-white/[0.035]">
           <div className="space-y-1.5 text-xs text-muted dark:text-disabled">
             <div><span className="text-disabled dark:text-muted">To </span>{draft.to.map(displayPerson).join(", ")}</div>
             {draft.cc?.length ? <div><span className="text-disabled dark:text-muted">Cc </span>{draft.cc.map(displayPerson).join(", ")}</div> : null}
@@ -281,7 +285,7 @@ function GmailDraftArtifact({ artifact, data }: { artifact: Artifact; data: Gmai
           Editable draft
         </span>
       </AnimatedList>
-      <Footer text="Gmail draft" />
+      <Footer text={`${serviceName(artifact)} draft`} />
     </Shell>
   );
 }
@@ -306,15 +310,15 @@ function GmailActionArtifact({ artifact, data }: { artifact: Artifact; data: Gma
         }
         meta={action?.action ? action.action.split("_").join(" ") : "Action"}
       />
-      <AnimatedItem className="mt-3 rounded-[18px] bg-surface-page/55 px-3 py-3 dark:bg-white/[0.035]">
+      <AnimatedItem className="mt-3 rounded-2xl bg-surface-page/55 px-3 py-3 dark:bg-white/[0.035]">
         <div className="text-sm font-medium text-primary dark:text-primary">
           {action?.target ?? artifact.title}
         </div>
         <p className="mt-2 text-sm leading-relaxed text-secondary dark:text-disabled">
-          {action?.result ?? artifact.summary ?? "Gmail action is waiting for a result."}
+          {action?.result ?? artifact.summary ?? `${serviceName(artifact)} action is waiting for a result.`}
         </p>
       </AnimatedItem>
-      <Footer text="Gmail action" />
+      <Footer text={`${serviceName(artifact)} action`} />
     </Shell>
   );
 }
@@ -326,8 +330,8 @@ function Footer({ text }: { text: string }) {
 export function GmailArtifact({ artifact }: Props) {
   const data = gmailData(artifact);
 
-  if (artifact.kind === "gmail_search") return <GmailSearchArtifact artifact={artifact} data={data} />;
-  if (artifact.kind === "gmail_message" || artifact.kind === "gmail_thread") return <GmailMessageArtifact artifact={artifact} data={data} />;
-  if (artifact.kind === "gmail_draft") return <GmailDraftArtifact artifact={artifact} data={data} />;
+  if (artifact.kind === "gmail_search" || artifact.kind === "outlook_search") return <GmailSearchArtifact artifact={artifact} data={data} />;
+  if (artifact.kind === "gmail_message" || artifact.kind === "gmail_thread" || artifact.kind === "outlook_message" || artifact.kind === "outlook_thread") return <GmailMessageArtifact artifact={artifact} data={data} />;
+  if (artifact.kind === "gmail_draft" || artifact.kind === "outlook_draft") return <GmailDraftArtifact artifact={artifact} data={data} />;
   return <GmailActionArtifact artifact={artifact} data={data} />;
 }

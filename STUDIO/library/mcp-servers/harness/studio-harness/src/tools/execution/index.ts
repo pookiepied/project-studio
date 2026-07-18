@@ -1,20 +1,13 @@
-import { wrapTool } from "../tool-contract.js";
-import {
-  startProcess as _startProcess,
-  readProcessOutput as _readProcessOutput,
-  writeProcessInput as _writeProcessInput,
-  stopProcess as _stopProcess,
-  listProcesses as _listProcesses,
-  commandExists as _commandExists,
-} from "./process_manager.js";
-
+/**
+ * Execution tools — export boundary.
+ *
+ * Primitive one-shot code execution: bash, powershell, and repl. Each runner
+ * manages its own timeout + {error} contract internally (see run_process.ts),
+ * so they are re-exported directly rather than through wrapTool.
+ *
+ * Stateful/background process management is intentionally NOT a primitive — it
+ * belongs to a higher orchestration layer, not layer 1.
+ */
 export { executeBash } from "./bash.js";
 export { executePowerShell } from "./powershell.js";
 export { runRepl } from "./repl.js";
-
-export const startProcess = wrapTool("start_process", _startProcess);
-export const readProcessOutput = wrapTool("read_process_output", _readProcessOutput);
-export const writeProcessInput = wrapTool("write_process_input", _writeProcessInput);
-export const stopProcess = wrapTool("stop_process", _stopProcess);
-export const listProcesses = wrapTool("list_processes", _listProcesses);
-export const commandExists = wrapTool("command_exists", _commandExists);

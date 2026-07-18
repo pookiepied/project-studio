@@ -24,6 +24,12 @@ dataRoutes.all('/artifacts/*', requireUser, (c) =>
 
 dataRoutes.post('/artifacts', requireUser, (c) => forwardData(c, '/artifacts'));
 
+dataRoutes.all('/workspace', requireUser, (c) => forwardData(c, '/workspace'));
+
+dataRoutes.all('/workspace/*', requireUser, (c) =>
+  forwardData(c, `/workspace/${c.req.param('*')}`),
+);
+
 async function forwardData(
   c: Context<{ Bindings: Env; Variables: Variables }>,
   dataPath: string,

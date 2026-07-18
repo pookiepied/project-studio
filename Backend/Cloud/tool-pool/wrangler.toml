@@ -19,7 +19,7 @@ service = "studio-registry"
 
 [[services]]
 binding = "CONNECTORS"
-service = "connectors"
+service = "studio-connectors"
 
 [[services]]
 binding = "SKILL_LIBRARY"
