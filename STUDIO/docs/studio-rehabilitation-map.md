@@ -822,6 +822,67 @@ Web boundary stop conditions:
 - Do not run web build verification while root package files are dirty unless
   the active package-owner task explicitly asks for it.
 
+Skill library ownership and proof:
+
+The `library/skills/` tree is manifest/content data, not normal app source.
+Static TypeScript import tools do not prove whether a skill is live. Bundled
+skills are discovered through Vite raw-file globbing, deployed to
+`$HOME/.studio/skills/`, registered through the skills API, and later read by
+local registry and MCP skill tools.
+
+Current skill-library evidence:
+
+| Area | Current evidence | Rehabilitation note |
+| --- | --- | --- |
+| `library/skills/studio-computer-use/skill.json` | The only tracked file under `library/skills/`; declares `entrypoint: "SKILL.md"`, required `computer-use`, and desktop-control permissions. | Manifest exists, but it is not sufficient for deployment by itself. |
+| `library/skills/**/SKILL.md` | No `SKILL.md` exists in the current Studio tree outside generated/excluded folders. | Current bundled skill deployment appears unable to deploy this skill because the deployer filters out entries without `SKILL.md`. |
+| `src/core/skills/skillDeployer.ts` | Uses `import.meta.glob("../../../library/skills/**/*.{md,json}", { query: "?raw", eager: true })`, groups by skill folder, and returns only groups with non-empty `skillMd`. | This is the app-side bundling/deployment owner. A missing `SKILL.md` causes `No bundled skills found to deploy`. |
+| `src/app/App.tsx` | Calls `deployBundledLocalSkills()` during app initialization. | Skill deployment is part of startup, so skill-library changes can affect startup behavior and auth/API registration. |
+| `src-tauri/src/local_registry.rs` | `local_skill_register` rejects folders without `SKILL.md`; sync payload emits local skills with `instructionsRef: local-skill://.../SKILL.md`. | Native registry also treats `SKILL.md` as the required skill instruction artifact. |
+| `src-tauri/src/control_server.rs` | `skill_read` reads `SKILL.md` from the registered skill `local_path`. | Runtime skill reading depends on the same file contract. |
+| MCP skill servers | `skill-management` registers local skill metadata; `skill-execution` defines `skill_read`, `skill_list`, `skill_search`, and `skill_run`. | Skill tools are separate system MCP package surfaces and need package/build proof before refactors. |
+| `computer-use` MCP skill reader | Reads `$HOME/.studio/skills/{key}/SKILL.md`. | Bundled and user-installed skills share the same installed file shape. |
+
+Skill cleanup and repair rules:
+
+1. A skill folder is valid only when its manifest and instruction artifact agree.
+   In the current code, `SKILL.md` is the required instruction file.
+2. Do not delete `library/skills` based on import absence; its live path is a
+   Vite raw glob plus runtime deployment and registry code.
+3. Do not rename `skill.json`, `SKILL.md`, or skill folder keys without updating
+   deployer parsing, native registry validation, MCP tool expectations, and
+   installed-skill paths.
+4. Treat skill changes as startup-affecting when `App.tsx` deploys bundled
+   skills during initialization.
+5. Keep skill-library content review separate from MCP skill-management server
+   refactors. One owns skill data, the other owns management/execution tooling.
+
+Suggested future skill implementation order:
+
+1. Decide whether `studio-computer-use` should be a bundled skill. If yes, add
+   the missing `SKILL.md` in a focused content slice and verify deployer grouping
+   sees one deployable skill.
+2. If bundled skills are not desired, remove or disable the incomplete
+   `skill.json` and the startup deploy call with explicit product approval.
+3. Add a small proof check for bundled skills: each `library/skills/<key>/`
+   folder should have `skill.json` and `SKILL.md`, and `skill.json.entrypoint`
+   should match.
+4. After harness/package dirty work settles, verify `skill-management` and
+   `skill-execution` builds independently from their package manifests.
+5. Document user-installed skill storage separately from bundled skill source:
+   `$HOME/.studio/skills/` is runtime data, not repository source.
+
+Skill stop conditions:
+
+- Do not create, delete, or rename skill files while treating this as a generic
+  dead-code cleanup.
+- Do not remove `deployBundledLocalSkills()` without deciding whether built-in
+  local skills are a product feature.
+- Do not edit system skill MCP packages while the broader harness/library dirty
+  worktree is active.
+- Do not mark `library/skills/studio-computer-use` healthy until a matching
+  `SKILL.md` exists or the manifest is intentionally removed.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
