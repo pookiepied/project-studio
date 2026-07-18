@@ -986,6 +986,68 @@ CSS stop conditions:
 - Do not run formatters or style tools that touch many CSS files during a
   focused rehabilitation slice.
 
+Text hygiene and comment cleanup triage:
+
+The original rehabilitation goal includes removing ASCII art, unnecessary
+Unicode, stale wording, and comments that no longer help navigation. The current
+Studio tree has enough mixed text that this needs a proof pass, not a blind
+search-and-replace. Non-ASCII characters appear in legitimate prose, user-facing
+copy, package metadata, and compatibility comments, while decorative separators
+and mojibake-prone comments are strong cleanup candidates.
+
+Read-only inventory from the current dirty worktree:
+
+| Pattern | Current concentration | Interpretation |
+| --- | --- | --- |
+| Non-ASCII text | Common in `src/features/chat`, `src/app/shell`, `src/design`, daemon comments, harness comments, and docs. | Not automatically dead or bad. Some entries are punctuation in explanatory comments or user-facing copy. |
+| Mojibake markers | No current `rg` hits for the direct `â`, `Â`, replacement-character, or similar marker search outside generated/excluded paths. | Some terminal output still renders design comments as mojibake, so cleanup should target source separators and punctuation even when stored bytes are valid UTF-8. |
+| Decorative separators | Concentrated in `src/design/*.css`, `eslint.config.js`, `src/features/extensions/hooks/useMcpServers.ts`, `library/mcp-servers/harness/...`, and some runtime/core files. | High-confidence cleanup class, but harness files are currently dirty and should wait for that worktree owner. |
+| Stale/deprecated/legacy wording | Appears in token migration, runtime manifest sync, shell mode migration, chat streaming, model picker, extension cleanup, daemon local model parsing, and harness stale-file safeguards. | Mixed. Some are active compatibility contracts, not stale code. Each needs an owner and removal condition. |
+
+Text hygiene rules:
+
+1. Remove decorative separator banners and ASCII-art style dividers when a normal
+   short comment or section name communicates the same information.
+2. Preserve comments that explain compatibility, migrations, stale-state
+   protection, storage formats, user-facing behavior, or non-obvious platform
+   constraints until the owning code is audited.
+3. Replace unnecessary Unicode punctuation in code comments with plain ASCII
+   unless it is part of user-facing copy, a protocol/string literal, a test
+   fixture, a third-party package file, or intentionally localized content.
+4. Do not edit package lockfiles, vendored code, generated assets, or build
+   output for text hygiene.
+5. Treat "legacy", "deprecated", "temporary", and "stale" comments as triage
+   markers. They should either gain a current owner/removal condition or be
+   removed with the code they describe.
+6. Keep text-hygiene slices path-limited and no-behavior. They should not move
+   files, rename exports, reformat surrounding code, or adjust runtime logic.
+
+Suggested future text-hygiene implementation order:
+
+1. Stable design CSS comments: remove decorative separator banners and stale
+   prose in `src/design/*.css` without touching declarations.
+2. Stable shell/global CSS comments: fix stale paths and punctuation in
+   `src/index.css` and `src/app/shell/workspaceShell.css` after surface
+   contracts are documented.
+3. Harness comments: defer until the harness dirty worktree is resolved, then
+   remove separator banners from tool registry/server/git/lsp files in small
+   category slices.
+4. Legacy/deprecated markers: create a separate compatibility-contract audit for
+   each subsystem before deleting comments or compatibility branches.
+5. User-facing copy: only normalize punctuation when the owning feature accepts
+   the wording change, because copy changes are product changes.
+
+Text hygiene stop conditions:
+
+- Do not run a repo-wide formatter or encoding conversion as a cleanup shortcut.
+- Do not remove a comment containing "legacy", "deprecated", "temporary", or
+  "stale" unless the corresponding behavior has an explicit owner and migration
+  decision.
+- Do not edit dirty harness files for text cleanup while harness architecture
+  work is active.
+- Do not classify non-ASCII string literals as cleanup without checking whether
+  they are user-facing UI copy, tests, protocol examples, or package metadata.
+
 Layout, clipping, and scroll ownership findings:
 
 | Area | Observed owner today | Rehabilitation risk |
