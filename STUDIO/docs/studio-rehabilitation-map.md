@@ -1082,6 +1082,111 @@ Script stop conditions:
   release/package paths are dirty from another active task.
 - Do not delete `gate/` baselines just because they are currently empty objects.
 
+Tauri/native ownership and proof:
+
+`src-tauri/` is not only a desktop wrapper. It owns native app lifecycle,
+window visibility, command/event bridge APIs, secure storage, filesystem access,
+shell execution, Git commands, PTY sessions, MCP subprocess management, local
+registry storage, local control-server access, local-provider daemon lifecycle,
+native browser child webviews, updater/package metadata, CSP, installer assets,
+and bundle resources.
+
+Current native source ownership:
+
+| File or zone | Owns today | Rehabilitation note |
+| --- | --- | --- |
+| `src-tauri/tauri.conf.json` | Hidden transparent frameless main window, startup visibility defaults, CSP, updater endpoint, NSIS target, icons, installer images, and bundled resources for MCP servers plus `vendor`. | Treat as native runtime/package contract. Resource and CSP edits need app, packaging, and security proof. |
+| `src-tauri/Cargo.toml` | Rust crate, Tauri plugins, keyring, SQLite, PTY, HTTP, and Windows WebView/DWM dependencies. | Rust dependency proof comes from Cargo/Tauri checks, not TypeScript dead-code tools. |
+| `src-tauri/src/lib.rs` | Tauri builder setup, plugins, tray state/menu events, secure-storage startup, `app_ready`, hidden-window show/focus, close-to-tray behavior, WebView2 microphone handling, DWM frame attributes, managed state, and full invoke handler list. | This is the native shell coordinator. Do not split it until startup lifecycle and window/surface contracts are mapped. |
+| `src-tauri/src/commands.rs` and `src-tauri/src/commands/` | Large command bridge: shell execution, Claude bridge, pip progress, file/directory commands, home paths, OAuth server, CSP state, secure storage, local-provider commands, Chrome debug commands, and Git subcommands. | Currently dirty and monolithic. Refactor only after command inventory and frontend invoke mapping are complete. |
+| `src-tauri/src/daemon/mod.rs` | Node local-provider daemon lifecycle and `local-provider-status` events, defaulting to port `11435`. | Covered by daemon proof; production bundle/path and CSP compatibility still need a dedicated local-provider slice. |
+| `src-tauri/src/mcp.rs` | MCP subprocess manager, JSON-RPC initialize/tool calls, timeout contract, process stop/list/setup commands, and bundled server path resolution. | Command names are public bridge APIs consumed from `src/runtime` and `src/features/extensions`. |
+| `src-tauri/src/local_registry.rs` | SQLite-backed local MCP and skill registry plus sync payload shape. | Registry schema and `local-registry-changed` event behavior need proof before moving or renaming. |
+| `src-tauri/src/control_server.rs` | Ephemeral localhost control server, bearer token, local MCP/skill tool dispatch, skill create/update file writes, and registry change emission. | This is an external control surface inside the desktop app; treat tool names and auth behavior as API. |
+| `src-tauri/src/pty.rs` | Long-lived shell PTY sessions for workspace terminals. | Coupled to workspace terminal components through `pty_create`, `pty_write`, `pty_resize`, and `pty_close`. |
+| `src-tauri/src/native_browser.rs` | Child webview creation, geometry, navigation, visibility, history, zoom, and data clearing for workspace browser tabs. | Coupled to `features/workspace/browser/nativeBrowserService.ts`; geometry changes need visual/runtime proof. |
+| `src-tauri/icons/`, `src-tauri/installer-assets/`, `src-tauri/build.rs` | Native icons, NSIS images, and package rebuild triggers. | Package assets are live even without TypeScript references. |
+
+Frontend bridge evidence:
+
+- `src/app/App.tsx` invokes `app_ready`; the startup map already notes this
+  currently fires before router/session restoration and splash completion.
+- `src/runtime/servers/*`, `src/runtime/invoke/invokeMcpTool.ts`, and
+  `src/features/extensions/hooks/useMcpServers.ts` call MCP start/stop/list,
+  tool invocation, manifests, and bundled path resolution commands.
+- `src/features/models/hooks/useLocalProviderDaemon.ts` calls
+  `local_provider_*` commands and listens to `local-provider-status`.
+- `src/features/workspace/browser/nativeBrowserService.ts` is the frontend
+  owner for the `native_browser_*` command family.
+- `src/features/workspace/terminal/*` calls the `pty_*` command family.
+- `src/core/storage`, `src/core/projects`, chat conversation storage, TTS, and
+  transcription services call file/home/shell commands from `commands.rs`.
+- `src/core/platform/overlayService.ts` and
+  `src/core/platform/conversationWindowService.ts` create frontend-managed
+  `WebviewWindow` surfaces that sit beside the Rust-managed main window and
+  native browser child webviews.
+
+Native risks found during mapping:
+
+1. `STUDIO/src-tauri/src/commands.rs` is dirty in the live checkout and is a
+   broad bridge file. Do not split, format, or rename it until the active owner
+   settles and a command table exists.
+2. Tauri command strings are public APIs. Renaming one requires updating the
+   Rust `generate_handler!` list and every frontend `invoke(...)` call site.
+3. `tauri.conf.json` bundle resources include first-party MCP server `dist` and
+   `node_modules` folders plus `vendor`, but not `daemon/`; meanwhile
+   `daemon/mod.rs` expects `daemon/dist/server.js` next to the binary in
+   production.
+4. Tauri CSP/default CSP strings allow `localhost:11434`, `127.0.0.1:11434`,
+   `localhost:10110`, and `127.0.0.1:10110`, but the local-provider daemon
+   default is `11435`. Treat this as a startup/local-provider contract issue,
+   not a one-line CSP patch.
+5. Native browser webviews are child webviews attached to the main window, while
+   overlay and conversation windows are frontend-created `WebviewWindow`
+   surfaces. They need a shared surface taxonomy before moving window code.
+6. The Rust app shell shows/focuses the main hidden window on `app_ready`, while
+   frontend splash/session/router readiness lives in React. Startup needs a
+   lifecycle mechanism, not isolated z-index or focus changes.
+
+Tauri cleanup and repair rules:
+
+1. Do not delete, rename, or move Rust commands without a bidirectional search:
+   Rust command definition, `generate_handler!`, frontend `invoke(...)`, event
+   listeners/emitters, and package config.
+2. Do not move native files without updating `mod` declarations, imports,
+   command handler registration, `tauri.conf.json`, `build.rs`, and scripts.
+3. Treat `tauri.conf.json` CSP, resources, updater, icons, NSIS settings, and
+   window defaults as runtime contracts.
+4. Treat `src-tauri/target/**` as generated build output, never source cleanup.
+5. Native changes need Rust/Tauri proof (`cargo check` or Tauri build as
+   appropriate) plus affected frontend behavior checks. Do not run broad native
+   proofs while `package.json`, lockfiles, or native files are dirty from
+   another task unless explicitly requested.
+
+Suggested future native implementation order:
+
+1. Create a command inventory table for every Rust command, frontend caller, and
+   event pair before splitting `commands.rs`.
+2. Split `commands.rs` only by stable domain after the inventory exists: files,
+   shell/process, security/CSP/storage, local provider, browser/debug, and Git.
+3. Fix and verify daemon packaging plus local-provider CSP/default-port behavior
+   in a dedicated startup/local-provider slice.
+4. Map native browser geometry lifecycle and workspace browser ownership before
+   moving browser panel or child-webview code.
+5. Define command naming and frontend bridge-wrapper conventions so new code
+   does not call raw command strings from many unrelated features.
+
+Tauri stop conditions:
+
+- Do not edit `src-tauri/src/commands.rs` while it is dirty unless this thread
+  receives an explicit handoff for that path.
+- Do not change CSP, `app_ready`, splash visibility, focus, or window z-order as
+  a one-off repair.
+- Do not rename command strings without full frontend invoke/event proof.
+- Do not claim production local-provider support works without checking bundle
+  resources, daemon build output, production path resolution, and CSP/port
+  behavior.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
