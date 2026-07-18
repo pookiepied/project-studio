@@ -274,6 +274,54 @@ Result after the slice:
   unreachable from any entry point and the production build covers their former
   module graph.
 
+### R0.5: Pre-R1 Codebase Cleanup
+
+Status: complete. Executed 2026-07-19 at product-owner request, between R0 and
+R1, to stabilize the codebase before ownership migration begins.
+
+Scope executed:
+
+- Dependency vulnerabilities: `npm audit fix` (non-breaking only). Nine
+  advisories reduced to two. All three high-severity advisories resolved
+  (`lodash-es`, `picomatch`, `vite`/`esbuild`), plus `@babel/core`, `mermaid`,
+  and `uuid`. `package.json` ranges were unchanged; only transitive lockfile
+  entries moved.
+- `knip.json`: added `@react-three/fiber` to `ignoreDependencies`. It is a real
+  runtime dependency that knip structurally cannot see, proven by build failure
+  when removed. The reason is recorded under Confirmed Cleanup Set.
+- Removed the orphaned `STUDIO/src-tauri/yt-transcript-mcp` gitlink. Provenance
+  recovered first: it is the external MIT package
+  `@kimtaeyoon83/mcp-server-youtube-transcript`. It had no `.gitmodules` entry,
+  so it was unresolvable on a fresh clone, and it was wired into nothing. The
+  product owner cancelled the YouTube transcript feature.
+- Corrected a factually stale comment in `src/runtime/servers/catalog.ts`: the
+  catalog lists five local MCP servers, not two.
+- Removed five redundant re-exports from `src/features/artifacts/index.ts`.
+  Consumers import `artifactRendererDescriptor` directly from `./registry`, and
+  the rest had no consumer at all. Unused exports 29 to 26, unused exported
+  types 28 to 26.
+
+Deliberately not done, with reasons recorded for the phase that owns them:
+
+- Bundle size and chunking. The main chunk is 11.4 MB raw / roughly 4.3 MB
+  gzipped. This is W7 work and must not be done before R3 through R7, which
+  delete `src/runtime`, the local MCP substrate, the Claude bridge, and several
+  right-panel surfaces. Optimizing chunk boundaries now would be redone.
+- The static-plus-dynamic import warnings for `unifiedStorageService`,
+  `apiManager`, and `errorReporting`. These are exactly the modules R3 and R4
+  re-own. Fixing the import pattern now would be discarded.
+- The 38 lint-ratchet errors. All are design-system convention violations, not
+  correctness defects: raw `<button>` instead of the `Button`/`IconButton`
+  primitives, arbitrary Tailwind values instead of named tokens, and raw hex
+  instead of semantic color tokens. Fixing them changes rendered output, which
+  cannot be verified in this environment because the app requires credentials to
+  reach the affected surfaces. They live in files scheduled for restructuring in
+  W2 and W3 and belong to W6.
+- The remaining 26 unused exports and 26 unused exported types. These require
+  per-symbol caller review, carry no runtime cost because the bundler already
+  drops them, and sit in files that R3 through R7 will move or delete. They
+  belong to W4.
+
 ### R1: Preserve Computer Use
 
 Recover provenance/license information, create the Studio CLI package owner,

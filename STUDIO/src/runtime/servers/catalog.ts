@@ -32,7 +32,7 @@ export interface LocalMcpServerDef {
   permissionKey: string;
 }
 
-/** The two local MCP servers. `studio-harness` is the connectivity indicator. */
+/** The five local MCP servers. `studio-harness` is the connectivity indicator. */
 export const LOCAL_MCP_SERVERS: readonly LocalMcpServerDef[] = [
   {
     name: "studio-harness",

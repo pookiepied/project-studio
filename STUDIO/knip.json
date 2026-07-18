@@ -4,5 +4,5 @@
   "project": ["src/**/*.{ts,tsx}", "web/**/*.{ts,tsx}"],
   "ignore": ["src-tauri/**", "daemon/**", "library/mcp-servers/**", "library/skills/**", "scripts/**", "vendor/**"],
   "ignoreBinaries": ["tauri", "powershell"],
-  "ignoreDependencies": ["madge"]
+  "ignoreDependencies": ["madge", "@react-three/fiber"]
 }
