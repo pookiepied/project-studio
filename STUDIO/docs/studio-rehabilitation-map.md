@@ -612,6 +612,59 @@ Studio CLI migration rules:
 5. Any future packaged Studio CLI integration needs Tauri resource mapping,
    update/install policy, PATH/binary resolution, and terminal lifecycle proof.
 
+Cloud/local runtime boundary:
+
+The word "runtime" currently names more than one layer. The frontend
+`src/runtime/` barrel describes itself as the Local Runtime boundary, but the
+cloud architecture also has independently deployed Runtime workers under
+`Backend/Cloud/runtime/`. Keep these meanings separate during organization work.
+
+Observed runtime layers:
+
+| Layer | Current evidence | Boundary decision |
+| --- | --- | --- |
+| Frontend/local runtime integration | `src/runtime/index.ts` exports WebSocket pool/transport, local MCP server catalog and lifecycle, local tool execution callbacks, local capability checks, and runtime tool-card UI. `src/runtime/protocol.ts` defines the current WebSocket envelope and chat request body. | This is the desktop/frontend integration boundary for local tools and the current agent WebSocket protocol. Do not confuse it with Cloudflare Runtime workers. |
+| Local MCP/process runtime | `src/runtime/servers/*` owns local MCP catalog, permissions, manifest reads, Tauri command invocation, and runtime init. `src-tauri/src/mcp.rs` and `tauri.conf.json` own process start and bundled server paths. | This is local executable capability lifecycle, split between frontend policy and Tauri process management. |
+| Cloud Runtime workers | `Backend/Cloud/runtime/execution-runtime`, `planner-runtime`, and `agent-runtime` each have Wrangler configs and READMEs describing Context Engine handoff, Tool Pool discovery/materialization, Tool Execution dispatch, runtime event storage, and Studio Data transcript persistence. | These are Cloudflare workers/Durable Object runtimes. They are adjacent architecture, not `STUDIO/src/runtime` internals. |
+| Studio Data | `Backend/Cloud/data` owns conversations, transcript events/projections, uploads, artifacts, object metadata, workspace data, and active projections. | Authoritative user-facing data belongs here; frontend state is optimistic/rendering state. |
+| Context Engine | `Backend/Cloud/context-engine` assembles model-facing context from Studio Data and requests Tool Pool projections. | It constructs context; it must not own callable tool registration or execution. |
+| Tool Pool | `Backend/Cloud/tool-pool` owns callable capability discovery, filtering, ranking, default projection, and lazy schema materialization. | It discovers/materializes tools; it does not execute them. |
+| Tool Execution | `Backend/Cloud/tool-execution` receives explicit selected tool calls and routes/executes them on demand. | It executes selected calls; it does not decide model context or available tools. |
+
+Runtime mental-model rules:
+
+1. Do not rename or move `src/runtime/` until the desktop/local runtime contract
+   has a README or equivalent map that distinguishes it from cloud Runtime
+   workers and Tauri process management.
+2. Do not copy Cloudflare worker implementation code into desktop runtime. Share
+   schemas, validation, deterministic domain logic, and conformance tests where
+   drift would be dangerous.
+3. Do not make the frontend transcript authoritative. Studio Data owns canonical
+   transcript events and active projections; frontend chat state may be
+   optimistic/rendering state.
+4. Do not let Context Engine become a tool registry or executor. Callable
+   discovery belongs to Tool Pool, and selected execution belongs to Tool
+   Execution.
+5. Do not implement local-only coding events, file edits, terminal operations,
+   repository state, or patch artifacts in the cloud runtime contract before the
+   local runtime phase explicitly needs them.
+
+Runtime integration risks:
+
+- `src/runtime/protocol.ts` references a cloud agent loop path in comments, but
+  the temporary runtime architecture note says frontend send/stream is not yet
+  fully on the new cloud runtime API. Treat current WebSocket protocol and the
+  future cloud runtime event stream as separate contracts until reconciled.
+- `Backend/Cloud` worker files are heavily dirty in this checkout. Do not use
+  their current shape as stable proof for frontend refactors until their owning
+  cloud task commits.
+- The runtime mental-model doc is itself temporary and untracked. It is a design
+  input, not shipped source, so future map updates should prefer committed
+  worker READMEs/contracts when they exist.
+- Local MCP servers, system MCP servers, cloud Tool Pool tools, and cloud Tool
+  Execution routes are all "tools" in conversation, but they have different
+  owners and proof gates.
+
 Preferred feature-internal shape once a feature is large enough:
 
 ```text
