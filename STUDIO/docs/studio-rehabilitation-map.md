@@ -7,14 +7,16 @@ files once ownership is clear.
 
 Last evidence pass: 2026-07-18.
 Baseline checkpoint: `d44311e chore: checkpoint studio worktree`.
-Current observed checkpoint: `3719af8 Checkpoint Studio UI and coding workflow`.
+Current observed checkpoint: `75fe729 chore: checkpoint studio rehabilitation work`.
 
 Current checkout note:
 
-- The worktree currently contains broad uncommitted work across Backend, Studio
-  harness, package manifests, Studio shell/chat/workspace files, and new
-  workspace-domain files. Treat this map update as an audit checkpoint, not as
-  ownership of that active UI/backend work.
+- The broad Backend, Studio harness, package manifest, shell/chat/workspace,
+  and workspace-domain work that was previously dirty is now checkpointed in
+  `75fe729`. The worktree was clean immediately after that commit.
+- This does not mean every checkpointed change is behavior-verified or ready for
+  broad follow-up refactors. Treat it as a restore point and a change-of-process
+  marker: future rehabilitation work should return to small, named slices.
 - Do not begin broad shell/CSS restructuring, page moves, or visual redesign
   until the architecture audit tracks below are mapped against the live
   worktree.
@@ -67,7 +69,7 @@ Current file counts after the first dead-code proof pass:
 material, not ordinary source debt.
 
 Observed source-like folder snapshot on 2026-07-18, excluding common install,
-build, target, and vendor output during a dirty worktree:
+build, target, and vendor output during the pre-`75fe729` checkpoint state:
 
 | Area | Files | Current contract |
 | --- | ---: | --- |
@@ -176,32 +178,32 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/chat/context/ChatProvider.tsx` | 573 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, engine/session state, and title generation were extracted |
-| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Live dirty work has grown the page again; now mixes workspace-domain data, page state, shell/surface composition, and new workspace styling hooks. Audit before splitting because several related files are uncommitted. |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Checkpointed workspace work has grown the page again; now mixes workspace-domain data, page state, shell/surface composition, and new workspace styling hooks. Audit before splitting because related files changed together. |
 | `src/features/chat/pages/ChatPage.tsx` | 675 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, turn-status policy, and conversation composer dock were extracted, but current shell/dock changes need re-audit. |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 468 | Hook still mixes recording state and chunk transcription; browser setup, cleanup, and finalization/rephrase helpers were extracted |
 | `src/features/chat/context/useStreamHandlers.ts` | 458 | Streaming protocol/event logic candidate; DSML continuation was extracted |
 | `src/features/activity/pages/ActivityPage.tsx` | 451 | Page now focuses on display state and rendering; data fetching, loading state, refresh, and log polling were extracted |
-| `src/features/chat/components/ChatFloatingDockRows.tsx` | 381 | Remaining row/action UI from the former chat dock path. Recheck live consumers before extracting or removing because the parent dock file is absent in the dirty worktree. |
+| `src/features/chat/components/ChatFloatingDockRows.tsx` | 381 | Remaining row/action UI from the former chat dock path. Recheck live consumers before extracting or removing because the parent dock file is absent in the current checkpoint. |
 | `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx` | 330 | Right workspace surface now composes new conversation workspace panels and geometry behavior; audit surface ownership before additional panel splits. |
-| `src/features/workspace/rightWorkspace/ConversationWorkspacePanel.tsx` | 327 | New untracked conversation workspace surface. Classify with workspace lifecycle and shell/page ownership before treating as stable structure. |
+| `src/features/workspace/rightWorkspace/ConversationWorkspacePanel.tsx` | 327 | New checkpointed conversation workspace surface. Classify with workspace lifecycle and shell/page ownership before treating as stable structure. |
 
 Live monolith measurement snapshot on 2026-07-18:
 
-These measurements include the current dirty worktree. They are triage evidence,
-not ownership of the active UI, backend, or harness work.
+These measurements include the `75fe729` checkpoint. They are triage evidence,
+not proof that the new UI, backend, or harness behavior is fully verified.
 
 Largest app/source files now observed:
 
 | File | Lines | Triage |
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Data/snapshot candidate. Do not split by hand until generated/source-of-truth status is known. |
-| `src/features/artifacts/components/ArtifactLabPanel.tsx` | 1870 | New largest hand-authored app surface and currently dirty. Audit artifact lab responsibilities before any extraction. |
-| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Dirty and actively growing around workspace-domain work. Needs a workspace state/controller map before the next split. |
+| `src/features/artifacts/components/ArtifactLabPanel.tsx` | 1870 | New largest hand-authored app surface in the checkpoint. Audit artifact lab responsibilities before any extraction. |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Recently grew around workspace-domain work. Needs a workspace state/controller map before the next split. |
 | `src/features/chat/pages/ChatPage.tsx` | 675 | Still large but blocked behind shell/global dock ownership re-audit. |
-| `src/features/chat/context/ChatProvider.tsx` | 573 | Still a state coordinator. Continue only after shell/workspace dirty work stops changing provider responsibilities. |
+| `src/features/chat/context/ChatProvider.tsx` | 573 | Still a state coordinator. Continue only after shell/workspace checkpoint changes are re-audited against provider responsibilities. |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Candidate for diagnostic collector extraction after app-shell tracks are quiet. |
-| `src/features/chat/components/LeftWorkspaceSidebar.tsx` | 511 | Dirty and geometry-related. Do not split before layout/panel ownership is settled. |
+| `src/features/chat/components/LeftWorkspaceSidebar.tsx` | 511 | Geometry-related shell/page boundary file. Do not split before layout/panel ownership is settled. |
 | `src/features/chat/context/useSendPipeline.ts` | 509 | Send pipeline subsystem candidate; likely safer after provider state boundaries are stable. |
 | `src/features/voice/hooks/useLiveSession.ts` | 501 | Voice session lifecycle candidate; preserve `HomePage` provider lifetime contract. |
 | `src/features/settings/components/SettingsDebugPanel.tsx` | 496 | Settings/debug UI candidate; likely lower collision risk than shell/workspace if file is clean. |
@@ -217,25 +219,24 @@ Largest adjacent-system files now observed:
 
 | File | Lines | Triage |
 | --- | ---: | --- |
-| `library/mcp-servers/harness/studio-harness/src/tools/git/git.ts` | 853 | Harness file is dirty; do not clean or split until harness work is committed or handed over. |
-| `src-tauri/src/commands.rs` | 846 | Native command surface is dirty; audit command groups before Rust extraction. |
-| `library/mcp-servers/harness/studio-harness/src/tools/lsp/ide.ts` | 537 | Harness LSP subsystem candidate, currently in dirty harness area. |
+| `library/mcp-servers/harness/studio-harness/src/tools/git/git.ts` | 853 | Harness file changed heavily in the checkpoint; do not clean or split until harness rebuild intent is reviewed. |
+| `src-tauri/src/commands.rs` | 846 | Native command surface changed in the checkpoint; audit command groups before Rust extraction. |
+| `library/mcp-servers/harness/studio-harness/src/tools/lsp/ide.ts` | 537 | Harness LSP subsystem candidate; review against the harness rebuild document before editing. |
 | `src-tauri/src/mcp.rs` | 508 | Native MCP integration candidate; classify with bundled MCP/library and runtime contracts. |
-| `library/mcp-servers/harness/studio-harness/src/tools/lsp/manager.ts` | 502 | Harness LSP lifecycle candidate, currently dirty. |
+| `library/mcp-servers/harness/studio-harness/src/tools/lsp/manager.ts` | 502 | Harness LSP lifecycle candidate; review against the harness rebuild document before editing. |
 | `library/mcp-servers/harness/studio-harness/src/tools/git/definitions.ts` | 481 | Harness schema/definition surface; may be generated or deliberately verbose. |
 | `src-tauri/src/lib.rs` | 460 | Startup/window lifecycle owner. Do not split before readiness contract is designed. |
 | `daemon/src/routes/chat.ts` | 257 | Daemon route candidate; smaller than app monoliths but owns streaming/local-provider behavior. |
 
-Current extraction priority once dirty ownership is resolved:
+Current extraction priority after the checkpoint:
 
-1. Do not touch harness files until the active harness deletion/rebuild work is
-   committed or explicitly handed over.
+1. Do not touch harness files until the checkpointed harness deletion/rebuild
+   work is reviewed against the harness rebuild document.
 2. For app code, decide whether `ArtifactLabPanel.tsx` is experimental,
    product-owned, or registry/demo-owned before extracting it; it is now the
    largest hand-authored app file.
-3. Resume workspace extraction only after the workspace-domain dirty files are
-   committed or handed over, starting with a state/controller map rather than UI
-   chunks.
+3. Resume workspace extraction only after the workspace-domain contracts are
+   documented, starting with a state/controller map rather than UI chunks.
 4. Resume chat page/provider extraction only after global dock and top-chrome
    ownership are reconciled.
 5. Prefer clean, lower-collision files such as diagnostics, settings debug, or
@@ -244,8 +245,8 @@ Current extraction priority once dirty ownership is resolved:
 
 Artifact Lab responsibility triage:
 
-`src/features/artifacts/components/ArtifactLabPanel.tsx` is currently dirty and
-is the largest hand-authored app file. It is a lab/catalog surface, while the
+`src/features/artifacts/components/ArtifactLabPanel.tsx` is the largest
+hand-authored app file in the current checkpoint. It is a lab/catalog surface, while the
 production artifact rendering path lives mostly in
 `src/features/markdown/renderers/ArtifactRenderer.tsx` and
 `src/features/markdown/renderers/artifacts/`.
@@ -283,11 +284,12 @@ Boundary notes:
 - Do not rename the artifacts feature until the relationship between artifact
   lab, runtime activity, connector outputs, and markdown rendering is clearer.
 - Because `ArtifactLabPanel.tsx`, `registry.ts`, and several artifact renderers
-  are dirty now, this is audit evidence only until those files are handed over.
+  changed together in the checkpoint, this is audit evidence only until their
+  product/runtime ownership is decided.
 
 Workspace page responsibility triage:
 
-`src/features/workspace/pages/WorkspacePage.tsx` is dirty and currently mixes
+`src/features/workspace/pages/WorkspacePage.tsx` currently mixes
 workspace controller state, persistence calls, local UI state, markdown editing,
 quick capture, and large page sections. The new `workspace/life/` folder gives
 the workspace domain a clearer service/type boundary, but the page still acts as
@@ -299,7 +301,7 @@ Observed responsibilities inside `WorkspacePage.tsx`:
 | --- | --- | --- |
 | Page-local helpers | `cx`, `boolish`, `relative`, `formatDate`, `noteSignature`, `makeStarterMarkdown`, and `downloadMarkdown`. | `workspacePageUtils.ts`, with download kept browser-only. |
 | Small controls | `IconButton`, `FormatButton`, and the commented-out `ProjectPicker`. | Keep live controls near page or move to `WorkspaceControls.tsx`; remove commented legacy picker in a later cleanup slice if confirmed unused. |
-| Snapshot and source state | `snapshot`, `loading`, `saving`, `saveState`, `forceLocal`, `savedNoteSignatures`, `noteSaveTimer`, and `load`. | `useWorkspaceController.ts` or `useWorkspaceSnapshot.ts`, after dirty work is handed over. |
+| Snapshot and source state | `snapshot`, `loading`, `saving`, `saveState`, `forceLocal`, `savedNoteSignatures`, `noteSaveTimer`, and `load`. | `useWorkspaceController.ts` or `useWorkspaceSnapshot.ts`, after the workspace source/state contract is documented. |
 | Selection and derived lists | Project/note/task selection state plus `projectNotes`, `projectTasks`, `selectedNote`, `selectedTask`, filtered notes/tasks, open/completed tasks. | `useWorkspaceSelection.ts` if it stays page-local, or fold into the controller hook. |
 | Capture drawer state | `captureText`, `organized`, `organizing`, `workspace-capture-text` listener, local capture draft persistence, `organizeCapture`, and `acceptOrganized`. | `useWorkspaceCapture.ts`; keep localStorage key ownership explicit. |
 | Note autosave and revisions | Dirty detection via `noteSignature`, delayed autosave, `saveNote`, `updateNoteLocal`, `loadNoteRevisions`, and `restoreRevision`. | `useWorkspaceNoteEditing.ts`, with conflict/save-state behavior preserved. |
@@ -318,12 +320,11 @@ Observed responsibilities inside `WorkspacePage.tsx`:
 
 Workspace cloud/domain authority:
 
-An untracked decision note at `docs/Architecture/Workspace Domain.md` states
+The checkpointed decision note at `docs/architecture/Workspace Domain.md` states
 that Workspace belongs inside the existing `studio-data` domain, exposed through
-the authenticated API edge at `/studio/data/workspace`. The current dirty code
-matches that direction in broad shape, but it is still active work and should be
-treated as a contract-in-progress until the Backend/API/Studio changes are
-committed together.
+the authenticated API edge at `/studio/data/workspace`. The current checkpoint
+matches that direction in broad shape, but it is still a contract-in-progress
+until the Backend/API/Studio behavior is verified together.
 
 Observed cloud/data path:
 
@@ -335,7 +336,7 @@ Observed cloud/data path:
 | Data worker route | `Backend/Cloud/data/src/index.ts` mounts `workspaceRoute` at `/workspace`. | Workspace lives beside conversations, uploads, artifacts, plans, transcripts, and objects in the data worker. |
 | Workspace route | `Backend/Cloud/data/src/server/routes/workspace.ts` implements project, note, revision, task, Markdown export, and AI context-preview endpoints with `requireUserId`, workspace lookup, and `user_id`/`workspace_id` filtering. | Route is already large and should be split by resource only after endpoint and schema contracts stabilize. |
 | D1 schema | `Backend/Cloud/data/schema.sql` contains `workspaces`, `workspace_projects`, `workspace_tags`, project tags, notes, note revisions, tasks, task-note links, and external links. | Database shape is a backend contract; frontend type renames must account for persisted column names and migration history. |
-| Migration | `Backend/Cloud/data/migrations/0002_workspace_foundation.sql` is untracked in the live checkout. | Do not claim the workspace schema is shipped until migration/source-of-truth status is confirmed. |
+| Migration | `Backend/Cloud/data/migrations/0002_workspace_foundation.sql` is now checkpointed. | Do not claim the workspace schema is shipped until migration/source-of-truth status is confirmed. |
 
 Current workspace authority rules:
 
@@ -357,8 +358,8 @@ Workspace domain risks found during mapping:
 
 - `WorkspacePage.tsx`, `workspacePage.css`, `workspace/life/`, right-workspace
   files, package files, API proxy files, Backend Cloud data schema, and the
-  workspace route/migration are dirty or untracked together. Treat the current
-  Workspace system as one active feature branch, not a stable refactor target.
+  workspace route/migration changed together in `75fe729`. Treat the current
+  Workspace system as one checkpointed feature area, not a stable refactor target.
 - `workspaceService.ts` mixes cloud client, local adapter, local seed data,
   domain mutation logic, context preview fallback, and AI capture organization.
   Splitting the page before reducing that service boundary may simply move the
@@ -385,8 +386,8 @@ Workspace cloud/domain cleanup rules:
    drafts.
 4. Do not move Workspace into a separate worker/domain unless the decision doc is
    superseded; first release direction is `/studio/data/workspace`.
-5. Do not treat untracked architecture docs or migrations as shipped truth until
-   their owning task commits them.
+5. Do not treat architecture docs or migrations as shipped truth until their
+   behavior is verified in the owning Backend/API/Studio path.
 
 Suggested first workspace split after handoff:
 
@@ -407,8 +408,8 @@ Workspace stop conditions:
 
 - Do not edit `WorkspacePage.tsx`, `workspacePage.css`,
   `workspace/life/workspaceService.ts`, right-workspace panels, or geometry
-  files until the current workspace dirty work is committed or explicitly
-  handed over.
+  files until the workspace source/state, scroll, and shell/page contracts are
+  named for the slice.
 - Do not move `workspacePage.css` rules while root scroll, page scroll, and
   shell clipping ownership are still under audit.
 - Do not split `workspaceService.ts` before confirming cloud endpoint contracts
@@ -416,8 +417,8 @@ Workspace stop conditions:
 
 Right-workspace surface triage:
 
-The right-workspace area is dirty and currently represents multiple concepts at
-once: a tab state hook, a resizable shell panel, a conversation dashboard/home
+The right-workspace area currently represents multiple concepts at once: a tab
+state hook, a resizable shell panel, a conversation dashboard/home
 mode, and classic tool tabs for review, browser, terminal, files, side chat, and
 artifacts.
 
@@ -462,8 +463,9 @@ Suggested first right-workspace split after handoff:
 
 Right-workspace stop conditions:
 
-- Do not edit right-workspace files while they are dirty unless this thread
-  receives an explicit handoff for those paths.
+- Do not edit right-workspace files as generic cleanup; each slice must name
+  whether it is touching tab state, shell geometry, conversation workspace, or
+  tool-panel rendering.
 - Do not move width logic without checking `workspaceLayoutStore`, chat push
   layout, `LeftWorkspaceSidebar`, browser width callbacks, terminal width
   callbacks, and artifact width callbacks.
@@ -577,7 +579,7 @@ rehabilitation:
 | --- | --- | --- |
 | Chat-engine CLI bridge | `src/cliBridges/types.ts` defines `ChatEngine` as Studio or Claude and describes CLI bridges as local command-line tools, not API providers. Rust `commands.rs` owns `claude_bridge_start` / `claude_bridge_stop`; chat hooks and Claude components consume this layer. | This is a chat transport bridge. It should not become the owner for every terminal-launched CLI. |
 | Local CLI tool tabs | `src/features/chat/cliTabs/cliTools.ts` lists Claude, Codex, and OpenCode as PTY-spawned tools; `src/features/workspace/terminal/CliTerminal.tsx` invokes `pty_create` with `program` and `args`; `runtime/capabilities/capabilityService.ts` probes `claude`, `codex`, and `opencode` on PATH. | These are local executable capabilities surfaced in the UI. They belong closer to runtime/workspace terminal ownership than to chat-engine bridge ownership. |
-| Future Studio CLI product | Untracked `docs/Architecture/Studio CLI Migration Plan.md` proposes a reduced fork of `temp/opencode`, keeping the CLI/TUI/core/server/sdk/llm closure, deleting unrelated OpenCode apps/packages, and redirecting provider/auth/update traffic to Studio Cloud. | Treat as an adjacent product/repository boundary, not a `src/` refactor. Integrate only through installed binary, PTY, local control APIs, or a future explicit SDK contract. |
+| Future Studio CLI product | Checkpointed `docs/architecture/Studio CLI Migration Plan.md` proposes a reduced fork of `temp/opencode`, keeping the CLI/TUI/core/server/sdk/llm closure, deleting unrelated OpenCode apps/packages, and redirecting provider/auth/update traffic to Studio Cloud. | Treat as an adjacent product/repository boundary, not a `src/` refactor. Integrate only through installed binary, PTY, local control APIs, or a future explicit SDK contract. |
 
 Current CLI app findings:
 
@@ -592,8 +594,9 @@ Current CLI app findings:
 - The migration plan says the Studio CLI fork should preserve upstream package
   boundaries, prefer additive provider/system-context/tool extensions, and avoid
   a blind search-and-replace for `.opencode/` paths or `OPENCODE_*` env vars.
-- The nested `temp/opencode` checkout currently exists and is very dirty. It
-  needs its own branch, commits, proof gates, and licensing/NOTICE review.
+- The nested `temp/opencode` checkout is outside the Studio source map. If it is
+  used for Studio CLI work, it needs its own branch, commits, proof gates, and
+  licensing/NOTICE review.
 
 Studio CLI migration rules:
 
@@ -655,12 +658,12 @@ Runtime integration risks:
   the temporary runtime architecture note says frontend send/stream is not yet
   fully on the new cloud runtime API. Treat current WebSocket protocol and the
   future cloud runtime event stream as separate contracts until reconciled.
-- `Backend/Cloud` worker files are heavily dirty in this checkout. Do not use
-  their current shape as stable proof for frontend refactors until their owning
-  cloud task commits.
-- The runtime mental-model doc is itself temporary and untracked. It is a design
-  input, not shipped source, so future map updates should prefer committed
-  worker READMEs/contracts when they exist.
+- `Backend/Cloud` worker files changed heavily in `75fe729`. Do not use their
+  current shape as stable proof for frontend refactors until the cloud behavior
+  is verified.
+- The runtime mental-model doc is explicitly temporary. It is a design input,
+  not shipped source, so future map updates should prefer durable worker
+  READMEs/contracts when they exist.
 - Local MCP servers, system MCP servers, cloud Tool Pool tools, and cloud Tool
   Execution routes are all "tools" in conversation, but they have different
   owners and proof gates.
@@ -794,10 +797,11 @@ Suggested future tooling implementation order:
    doc, using the matrix above as the source of truth.
 2. Audit root loose files (`*.log`, batch launchers, Tailwind test CSS, Vercel
    config, minimal README) as a no-code cleanup slice.
-3. Run the app/web proof commands only when `STUDIO/package.json` is not dirty,
-   because dependencies and scripts are currently part of another active track.
-4. Audit daemon and MCP package boundaries after their dirty worktree owners are
-   settled; build each package from its own manifest before deleting internals.
+3. Run the app/web proof commands after confirming the checkpointed package
+   changes install/build cleanly.
+4. Audit daemon and MCP package boundaries after reviewing the checkpointed
+   harness/package changes; build each package from its own manifest before
+   deleting internals.
 5. Revisit `knip.json` only after deciding whether to add separate workspaces or
    separate proof configs for daemon/MCP packages.
 
@@ -805,7 +809,7 @@ Tooling stop conditions:
 
 - Do not treat `npm run deadcode` as proof for ignored folders.
 - Do not edit `package.json`, lockfiles, Tauri config, or nested MCP packages
-  while they are dirty from another active task.
+  as drive-by cleanup; each needs an owner and proof command.
 - Do not delete Tauri bundle resources without a packaged-app proof path.
 - Do not remove nested `node_modules` from bundled MCP servers until release
   packaging no longer depends on shipping them.
@@ -821,7 +825,7 @@ Current root loose-file classification:
 
 | File or pattern | Current status | Classification | Future action |
 | --- | --- | --- | --- |
-| `package.json`, `package-lock.json` | Tracked; currently dirty in the live worktree. | Root Node manifest and lockfile. | Do not touch until the active dependency/script work is settled. |
+| `package.json`, `package-lock.json` | Tracked and clean after `75fe729`. | Root Node manifest and lockfile. | Touch only in dependency/script slices with install/build proof. |
 | `vite.config.ts`, `vite.config.web.ts`, `tsconfig*.json`, `tailwind.config.js`, `postcss.config.js`, `eslint.config.js`, `knip.json`, `index.html` | Tracked project configuration. | First-class build, lint, typecheck, CSS, and HTML entry configuration. | Keep at root unless a future tooling workspace layout is designed. |
 | `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` | Tracked under `src-tauri`. | Native app/package authority, not root clutter. | Keep under Tauri ownership. |
 | `.gitignore` | Tracked. | Ignore policy; currently ignores logs, batch files, build outputs, env files, editor files, and generated vendor binaries except vendor manifest/README. | Clean mojibake/decorative comments later as text hygiene, without changing ignore behavior. |
@@ -862,8 +866,8 @@ Root artifact stop conditions:
 
 - Do not delete tracked deployment files without a deployment decision.
 - Do not commit ignored local logs or batch files.
-- Do not rewrite root tool configs while `STUDIO/package.json` or lockfiles are
-  dirty from another active track.
+- Do not rewrite root tool configs as drive-by cleanup; package and lockfile
+  changes need their own dependency/script proof.
 - Do not replace `README.md` with detailed structure docs until the structure is
   less fluid.
 
@@ -970,8 +974,8 @@ Suggested future web boundary order:
 
 1. Add web support status to the future `README.md`: supported, experimental, or
    retired.
-2. Run `npm run web:build` once `STUDIO/package.json` and lockfile are no
-   longer dirty from another active track.
+2. Run `npm run web:build` after confirming the checkpointed package and lockfile
+   changes install cleanly.
 3. Decide whether the two manifests should remain separate. If consolidated,
    update `web/index.html`, `index.html`, `web/sw.js`, and public asset proof
    together.
@@ -988,8 +992,8 @@ Web boundary stop conditions:
   service-worker cache list.
 - Do not make shared `src/` moves without checking whether `web/web-main.tsx`
   and `vite.config.web.ts` still resolve aliases and imports.
-- Do not run web build verification while root package files are dirty unless
-  the active package-owner task explicitly asks for it.
+- Do not run web build verification as proof of unrelated behavior; use it when
+  a slice touches shared app/source, web entry, package scripts, or assets.
 
 Skill library ownership and proof:
 
@@ -1096,8 +1100,8 @@ Suggested future vendor implementation order:
 2. Add a small vendor proof checklist to contributor docs: run
    `node scripts/vendor-sync.mjs`, confirm manifest, and verify `resolveRipgrep`,
    `resolveGit`, and `resolveVendoredGitBash` behavior on the target platform.
-3. Do not change vendored Git/ripgrep versions until the harness dirty worktree
-   is settled and tool behavior can be verified.
+3. Do not change vendored Git/ripgrep versions until harness behavior can be
+   verified against the checkpointed tool changes.
 4. If repository cleanup removes local ignored vendor folders, treat it as local
    workspace cleanup only, followed by `npm run tauri dev` or `vendor:sync` to
    restore them.
@@ -1109,8 +1113,8 @@ Vendor stop conditions:
 - Do not commit generated vendor binary/tree files.
 - Do not remove `vendor/` from Tauri bundle resources without replacement
   packaging proof.
-- Do not make broad harness/vendor changes while harness files are dirty from
-  another active task.
+- Do not make broad harness/vendor changes while harness rebuild intent and
+  proof gates are unsettled.
 - Do not treat PATH fallback as sufficient proof on Windows; fresh user
   machines are expected not to have ripgrep or Git Bash installed.
 
@@ -1236,8 +1240,9 @@ Suggested future script implementation order:
 2. Add a contributor proof table for common commands: `typecheck`,
    `ratchet:lint`, `ratchet:cycles`, `web:build`, daemon test, MCP builds, and
    vendor sync.
-3. Audit `release.mjs` only after Backend/API dirty work settles, because it
-   writes release data through the sibling `api` project and Cloudflare tools.
+3. Audit `release.mjs` only after Backend/API checkpoint behavior is understood,
+   because it writes release data through the sibling `api` project and
+   Cloudflare tools.
 4. Verify whether `mcp-build.mjs` should also build or package the daemon if the
    daemon remains a supported production feature.
 5. Keep installer asset generation separate from visual redesign; it writes
@@ -1247,8 +1252,8 @@ Script stop conditions:
 
 - Do not run `release.mjs` during rehabilitation mapping or ordinary cleanup.
 - Do not re-baseline ratchet gates without an explicit quality-gate decision.
-- Do not move or rename scripts while `STUDIO/package.json`, Tauri config, or
-  release/package paths are dirty from another active task.
+- Do not move or rename scripts while package, Tauri, or release ownership is
+  unclear.
 - Do not delete `gate/` baselines just because they are currently empty objects.
 
 Tauri/native ownership and proof:
@@ -1267,7 +1272,7 @@ Current native source ownership:
 | `src-tauri/tauri.conf.json` | Hidden transparent frameless main window, startup visibility defaults, CSP, updater endpoint, NSIS target, icons, installer images, and bundled resources for MCP servers plus `vendor`. | Treat as native runtime/package contract. Resource and CSP edits need app, packaging, and security proof. |
 | `src-tauri/Cargo.toml` | Rust crate, Tauri plugins, keyring, SQLite, PTY, HTTP, and Windows WebView/DWM dependencies. | Rust dependency proof comes from Cargo/Tauri checks, not TypeScript dead-code tools. |
 | `src-tauri/src/lib.rs` | Tauri builder setup, plugins, tray state/menu events, secure-storage startup, `app_ready`, hidden-window show/focus, close-to-tray behavior, WebView2 microphone handling, DWM frame attributes, managed state, and full invoke handler list. | This is the native shell coordinator. Do not split it until startup lifecycle and window/surface contracts are mapped. |
-| `src-tauri/src/commands.rs` and `src-tauri/src/commands/` | Large command bridge: shell execution, Claude bridge, pip progress, file/directory commands, home paths, OAuth server, CSP state, secure storage, local-provider commands, Chrome debug commands, and Git subcommands. | Currently dirty and monolithic. Refactor only after command inventory and frontend invoke mapping are complete. |
+| `src-tauri/src/commands.rs` and `src-tauri/src/commands/` | Large command bridge: shell execution, Claude bridge, pip progress, file/directory commands, home paths, OAuth server, CSP state, secure storage, local-provider commands, Chrome debug commands, and Git subcommands. | Monolithic and changed in `75fe729`. Refactor only after command inventory and frontend invoke mapping are complete. |
 | `src-tauri/src/daemon/mod.rs` | Node local-provider daemon lifecycle and `local-provider-status` events, defaulting to port `11435`. | Covered by daemon proof; production bundle/path and CSP compatibility still need a dedicated local-provider slice. |
 | `src-tauri/src/mcp.rs` | MCP subprocess manager, JSON-RPC initialize/tool calls, timeout contract, process stop/list/setup commands, and bundled server path resolution. | Command names are public bridge APIs consumed from `src/runtime` and `src/features/extensions`. |
 | `src-tauri/src/local_registry.rs` | SQLite-backed local MCP and skill registry plus sync payload shape. | Registry schema and `local-registry-changed` event behavior need proof before moving or renaming. |
@@ -1297,9 +1302,8 @@ Frontend bridge evidence:
 
 Native risks found during mapping:
 
-1. `STUDIO/src-tauri/src/commands.rs` is dirty in the live checkout and is a
-   broad bridge file. Do not split, format, or rename it until the active owner
-   settles and a command table exists.
+1. `STUDIO/src-tauri/src/commands.rs` changed in `75fe729` and is a broad
+   bridge file. Do not split, format, or rename it until a command table exists.
 2. Tauri command strings are public APIs. Renaming one requires updating the
    Rust `generate_handler!` list and every frontend `invoke(...)` call site.
 3. `tauri.conf.json` bundle resources include first-party MCP server `dist` and
@@ -1328,9 +1332,8 @@ Tauri cleanup and repair rules:
    window defaults as runtime contracts.
 4. Treat `src-tauri/target/**` as generated build output, never source cleanup.
 5. Native changes need Rust/Tauri proof (`cargo check` or Tauri build as
-   appropriate) plus affected frontend behavior checks. Do not run broad native
-   proofs while `package.json`, lockfiles, or native files are dirty from
-   another task unless explicitly requested.
+   appropriate) plus affected frontend behavior checks. Run broad native proofs
+   only when the slice owns the relevant package/native changes.
 
 Suggested future native implementation order:
 
@@ -1347,8 +1350,8 @@ Suggested future native implementation order:
 
 Tauri stop conditions:
 
-- Do not edit `src-tauri/src/commands.rs` while it is dirty unless this thread
-  receives an explicit handoff for that path.
+- Do not edit `src-tauri/src/commands.rs` as generic cleanup; first create the
+  command inventory and caller map.
 - Do not change CSP, `app_ready`, splash visibility, focus, or window z-order as
   a one-off repair.
 - Do not rename command strings without full frontend invoke/event proof.
@@ -1356,12 +1359,12 @@ Tauri stop conditions:
   resources, daemon build output, production path resolution, and CSP/port
   behavior.
 
-Current dirty-tree constraint:
+Current harness checkpoint constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
-  currently dirty with many deleted and modified tool files. Do not make
-  dead-code claims or cleanup commits in that area until the active harness work
-  is committed or explicitly handed over.
+  checkpointed with many deleted and modified tool files. Do not make dead-code
+  claims or cleanup commits in that area until the harness rebuild intent and
+  proof path are reviewed.
 
 Completed:
 
@@ -1554,8 +1557,8 @@ Next:
 ### Architecture audit tracks
 
 Map these contracts before any further shell/CSS restructuring, page moves, or
-renames. The current dirty UI work is an investigation/input track, not a
-competing implementation owner.
+renames. The `75fe729` UI/backend checkpoint is an investigation/input track,
+not permission for broad redesign.
 
 | Track | Current signal | Next evidence to collect |
 | --- | --- | --- |
@@ -1669,7 +1672,7 @@ Layer/CSS authority findings:
 | Global base CSS | `src/index.css` owns reset, body/html backgrounds, transparent window variants, focus defaults, reduced motion, scrollbar treatment, drag helpers, and chat scroll anchors. | It also owns feature-adjacent helpers like chat scroll classes; decide whether those remain global utilities or move under feature CSS after shell contracts stabilize. |
 | Workspace shell CSS | `src/app/shell/workspaceShell.css` owns `--studio-topbar-height`, `--studio-topbar-control`, hover chrome, and zen-window chat-header alignment. | The file applies `html, html body { background: transparent !important; }` globally despite being described as workspace-shell scoped, so standard/surface variants need an authority review before CSS restructuring. |
 | Pre-React shell styling | `src/main.tsx` imports design CSS and pre-applies theme/shell/window-surface classes before React mounts. | `MainLayout.tsx` repeats workspace-shell class and geometry variable mutations after React mounts. Treat this as a lifecycle contract, not just CSS duplication. |
-| Feature CSS additions | New dirty workspace work includes `src/features/workspace/pages/workspacePage.css`. | Decide whether feature CSS may own page-local layout only, or whether shell geometry variables and scroll/clipping rules must stay in app shell CSS. |
+| Feature CSS additions | The `75fe729` workspace checkpoint includes `src/features/workspace/pages/workspacePage.css`. | Decide whether feature CSS may own page-local layout only, or whether shell geometry variables and scroll/clipping rules must stay in app shell CSS. |
 
 Layer and portal registry triage:
 
@@ -1753,7 +1756,7 @@ Current CSS authority levels:
 | `src/design/prose-chat.css` | Chat/markdown prose cascade that intentionally loads after `index.css`. | It is feature-adjacent but globally imported; decide whether this remains a shared markdown design layer or moves under markdown/chat after renderer ownership is mapped. |
 | `src/index.css` | Tailwind directives, reset, `html`/`body` background, transparent window variants, dark body color scheme, global focus/reduced-motion rules, mobile input sizing, scrollbars, chat scroll anchors, and Tauri drag helpers. | It owns a mix of true global rules and feature-adjacent utilities. Do not slim it down until chat scroll, surface variants, and shell lifecycle are explicit. |
 | `src/app/shell/workspaceShell.css` | Shell geometry variables (`--studio-topbar-height`, `--studio-topbar-control`), zen surface/hotzone styling, and zen-window chat-header alignment. | It also sets `html, html body { background: transparent !important; }` globally while its comment claims workspace-shell scope, and the comment references a stale token path. This is shell lifecycle drift, not just style duplication. |
-| `src/features/workspace/pages/workspacePage.css` | Dirty/untracked workspace page skin: page root clipping, staged layout, nested scroll containers, local workspace color variables, project cover/shader styling, command bar, details overlay, and workspace-specific controls. | It currently behaves like a separate feature design system with hardcoded colors, repeated light values for `html.dark`, disabled aurora CSS, and page-level clipping. Classify it as temporary experiment, page-local skin, or new tokenized workspace visual system before editing. |
+| `src/features/workspace/pages/workspacePage.css` | Checkpointed workspace page skin: page root clipping, staged layout, nested scroll containers, local workspace color variables, project cover/shader styling, command bar, details overlay, and workspace-specific controls. | It currently behaves like a separate feature design system with hardcoded colors, repeated light values for `html.dark`, disabled aurora CSS, and page-level clipping. Classify it as temporary experiment, page-local skin, or new tokenized workspace visual system before editing. |
 | `src/features/workspace/rightWorkspace/filesPanel.css` | Feature panel scrollbar treatment for markdown document previews. | This is a narrow feature utility that consumes global scrollbar tokens; keep local unless a shared panel-scrollbar primitive emerges. |
 | Third-party CSS imports | `@fontsource`, `@xterm/xterm/css/xterm.css`, and `katex/dist/katex.min.css` provide package-owned base styles. | Do not fold these into Studio CSS. Wrap or override at feature boundaries only when the owning feature documents the override. |
 | Tailwind/component class names | Component-local layout, spacing, states, and visual styling. | Should consume design tokens or feature-local variables; hardcoded colors need labels as fixed asset/media cases, OS chrome, or intentional experiments. |
@@ -1791,8 +1794,8 @@ Suggested future CSS implementation order:
 
 CSS stop conditions:
 
-- Do not move or normalize `workspacePage.css` while it is dirty/untracked and
-  the workspace layout/scroll contract is unresolved.
+- Do not move or normalize `workspacePage.css` while the workspace layout/scroll
+  contract is unresolved.
 - Do not remove the global transparent `html, body` rule from
   `workspaceShell.css` as a quick fix until surface variants are tested.
 - Do not consolidate `index.css` chat scroll helpers while composer dock and
@@ -1809,13 +1812,13 @@ search-and-replace. Non-ASCII characters appear in legitimate prose, user-facing
 copy, package metadata, and compatibility comments, while decorative separators
 and mojibake-prone comments are strong cleanup candidates.
 
-Read-only inventory from the current dirty worktree:
+Read-only inventory from the current checkpoint:
 
 | Pattern | Current concentration | Interpretation |
 | --- | --- | --- |
 | Non-ASCII text | Common in `src/features/chat`, `src/app/shell`, `src/design`, daemon comments, harness comments, and docs. | Not automatically dead or bad. Some entries are punctuation in explanatory comments or user-facing copy. |
 | Mojibake markers | No current `rg` hits for the direct `â`, `Â`, replacement-character, or similar marker search outside generated/excluded paths. | Some terminal output still renders design comments as mojibake, so cleanup should target source separators and punctuation even when stored bytes are valid UTF-8. |
-| Decorative separators | Concentrated in `src/design/*.css`, `eslint.config.js`, `src/features/extensions/hooks/useMcpServers.ts`, `library/mcp-servers/harness/...`, and some runtime/core files. | High-confidence cleanup class, but harness files are currently dirty and should wait for that worktree owner. |
+| Decorative separators | Concentrated in `src/design/*.css`, `eslint.config.js`, `src/features/extensions/hooks/useMcpServers.ts`, `library/mcp-servers/harness/...`, and some runtime/core files. | High-confidence cleanup class, but harness files should wait for the harness rebuild proof path. |
 | Stale/deprecated/legacy wording | Appears in token migration, runtime manifest sync, shell mode migration, chat streaming, model picker, extension cleanup, daemon local model parsing, and harness stale-file safeguards. | Mixed. Some are active compatibility contracts, not stale code. Each needs an owner and removal condition. |
 
 Text hygiene rules:
@@ -1843,9 +1846,9 @@ Suggested future text-hygiene implementation order:
 2. Stable shell/global CSS comments: fix stale paths and punctuation in
    `src/index.css` and `src/app/shell/workspaceShell.css` after surface
    contracts are documented.
-3. Harness comments: defer until the harness dirty worktree is resolved, then
-   remove separator banners from tool registry/server/git/lsp files in small
-   category slices.
+3. Harness comments: defer until the harness rebuild proof path is reviewed,
+   then remove separator banners from tool registry/server/git/lsp files in
+   small category slices.
 4. Legacy/deprecated markers: create a separate compatibility-contract audit for
    each subsystem before deleting comments or compatibility branches.
 5. User-facing copy: only normalize punctuation when the owning feature accepts
@@ -1857,8 +1860,8 @@ Text hygiene stop conditions:
 - Do not remove a comment containing "legacy", "deprecated", "temporary", or
   "stale" unless the corresponding behavior has an explicit owner and migration
   decision.
-- Do not edit dirty harness files for text cleanup while harness architecture
-  work is active.
+- Do not edit harness files for text cleanup while harness architecture work is
+  active or unverified.
 - Do not classify non-ASCII string literals as cleanup without checking whether
   they are user-facing UI copy, tests, protocol examples, or package metadata.
 
@@ -1915,12 +1918,11 @@ Window and surface variant findings:
 Implementation gates before code changes:
 
 Before any structural implementation in shell, chat, workspace, startup, or CSS,
-the slice must name which contracts it touches and prove that the target files
-are not owned by another active dirty-worktree task.
+the slice must name which contracts it touches and verify the worktree state.
 
 | Gate | Required decision/evidence | Blocks until satisfied |
 | --- | --- | --- |
-| Dirty worktree ownership | Inspect `git status --short` and identify whether each target path is already dirty from another task. If so, either wait for that work to be committed, receive an explicit handoff, or stay map-only. | Edits to active UI, backend, harness, package, or generated files that are not part of the current slice. |
+| Worktree ownership | Inspect `git status --short` and identify whether each target path has unstaged or staged changes from another task. If so, either wait for that work to be committed, receive an explicit handoff, or stay map-only. | Edits to active UI, backend, harness, package, or generated files that are not part of the current slice. |
 | Startup lifecycle | Define readiness phases for native process boot, pre-React shell setup, provider mount, auth/API checks, router/session restoration, active conversation restoration, shell mount, splash dismissal, and native show/focus. | `app_ready`, splash, startup z-index, native window visibility, and first-paint fixes. |
 | Surface taxonomy | Classify the target as a native window, route variant, app shell chrome, page-owned surface, in-page panel, portal overlay, or child webview. | Moves or renames of shell/page/window files and any attempt to merge conversation windows, side chat, overlay windows, or right-workspace panels. |
 | Shell/page ownership | Decide the owner for global dock state, page title swapping, top-right controls, taskbar/session controls, navigation/current view, and provider lifetime. | `HomePage.tsx`, `MainLayout.tsx`, `FloatingPanel.tsx`, `ChatTopChrome.tsx`, `ChatPage.tsx`, and workspace shell moves. |
@@ -1929,7 +1931,7 @@ are not owned by another active dirty-worktree task.
 | State/persistence scopes | Identify process, session, auth, page, conversation, project, workspace, and local filesystem state scopes plus restore order and migration behavior. | Logout/localStorage cleanup, conversation storage moves, project context moves, workspace service splits, and provider relocation. |
 | Theme/CSS authority | Decide which files own global tokens, shell geometry variables, pre-React classes, feature CSS, component classes, and local visual experiments. | `index.css`, `workspaceShell.css`, `workspacePage.css`, `tokens.css`, Tailwind layer changes, and shell class consolidation. |
 
-Next safe implementation candidates after the dirty tree is clean or handed over:
+Next safe implementation candidates after the checkpoint:
 
 1. Do a no-behavior ASCII/mojibake/comment cleanup slice in a very small file
    set such as `App.tsx`, `HomePage.tsx`, `main.tsx`, `shellConfig.ts`, and
@@ -1942,17 +1944,17 @@ Next safe implementation candidates after the dirty tree is clean or handed over
    shell/page ownership gate decides whether the dock is global shell chrome,
    chat chrome, or a mixed bridge.
 5. Resume `WorkspacePage.tsx` and right-workspace extraction only after the
-   current workspace dirty work is committed or explicitly handed over.
+   workspace contracts named above are documented for the slice.
 
 Stop conditions for implementation slices:
 
-- If a target file is dirty from another owner, stop at map updates or request
-  an explicit handoff for that path.
+- If a target file has uncommitted changes from another owner, stop at map
+  updates or request an explicit handoff for that path.
 - If a slice cannot name its startup, surface, layer, layout, state, and CSS
   contracts, do the audit first.
-- If verification is unreliable because package files or harness/runtime files
-  are dirty from another task, report the limited verification scope instead of
-  claiming behavior is proven.
+- If verification is unreliable because package, harness, or runtime ownership
+  is unclear, report the limited verification scope instead of claiming behavior
+  is proven.
 
 ### Phase 4: Monolith splits
 
@@ -2098,7 +2100,8 @@ Recommended order:
 3. Re-audit `src/features/chat/pages/ChatPage.tsx` with the new global dock and
    `ChatTopChrome` ownership before further chat page extraction.
 4. Continue `src/features/chat/context/ChatProvider.tsx` only after confirming
-   the dirty shell/workspace changes do not alter provider responsibilities.
+   the checkpointed shell/workspace changes do not alter provider
+   responsibilities.
 5. Continue `src/features/voice/hooks/useAudioRecorder.ts` when the shell
    architecture track is not active.
 
