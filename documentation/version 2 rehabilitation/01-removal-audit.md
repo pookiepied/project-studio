@@ -1,7 +1,7 @@
 # Version 2 Rehabilitation: Removal Audit
 
 Evidence pass: 2026-07-18
-Current checkpoint inspected: `d6ed7bb docs: refresh studio checkpoint guidance`
+Current checkpoint inspected: `f336305 docs: add exhaustive v2 studio file audit`
 Scope: `STUDIO/` desktop/frontend tree, with supporting references from `docs/architecture/` and `documentation/`.
 Independent verification: sub-agent Cicero confirmed the broad direction and
 flagged follow-up corrections after reading code. This revision folds those
@@ -19,8 +19,15 @@ and relay direction in favor of this product model:
 - Studio Desktop owns the native shell, account/session UX, cloud service access,
   Studio CLI orchestration, local review/visibility surfaces, and product UI.
 
-This document is not a deletion patch. Every removal candidate below still needs
-a second verification pass before any source deletion.
+This document is not a deletion patch. File-specific execution state lives in
+`03-file-ownership-ledger.csv`; the combined order and judgment policy live in
+`04-final-rehabilitation-plan.md`. Only rows marked
+`READY_FOR_FOCUSED_REMOVAL_SLICE` are eligible for the first deletion slice.
+
+The audit covers 844 tracked Studio files: 785 textual files were read, 58
+binary assets were classified, and one path is a gitlink. The expanded ledger
+records an atomic disposition, destination/owner, removal method, prerequisites,
+evidence scope, rework flags, verification, and status for every tracked path.
 
 ## Removal Principle
 
@@ -63,6 +70,25 @@ Keep or migrate code when it supports the new Desktop role:
 | Git/review commands | `STUDIO/src-tauri/src/commands/git.rs`, `STUDIO/src/core/git/gitService.ts`, `ReviewPanel.tsx` | Direct Git branch/status/diff/stage/commit UI. | Do not classify as delete. Migrate/decide owner. Prefer Studio CLI for repo authority; Desktop may keep review UI over CLI/git events. |
 | Local provider daemon | `STUDIO/daemon/**`, `local_provider_*` commands, local-provider hooks | Local Ollama/LM Studio provider bridge. | Likely remove from Desktop if local LLM/provider handling moves to Studio CLI. Keep only if CLI explicitly uses the daemon or Desktop still needs local model management. |
 | Old cloud/local symmetry docs | `docs/architecture/Cloud and Local*.md` | Describes bundled local runtime symmetry with cloud runtimes. | Supersede with V2 architecture docs; keep as historical reference until final V2 plan exists, then archive or delete. |
+
+## Confirmed First Removal Slice
+
+Fresh Knip analysis and direct content/reference inspection prove eight tracked
+files are currently unnecessary:
+
+| Files | Why | Removal method |
+| --- | --- | --- |
+| `twtest_input.css`, `twtest_out.css` | Unreferenced Tailwind experiment/output files. | Delete together, then run reference search, typecheck, dead-code analysis, gate, and build. |
+| `src/features/artifacts/examples.ts` | Unreachable fixture catalog with no live importer. | Delete in the same focused cleanup slice. |
+| `src/features/chat/attachments/kbService.ts`, `src/features/workspace/pages/WorkspaceAutomation.tsx`, `WorkspaceContextLists.tsx`, `workspaceFormat.ts`, `src/features/workspace/services/agentWorkflowService.ts` | Unreachable orphan cluster; its imports only connect files inside the same unreachable cluster. | Delete as one dependency cluster, then prove Knip/typecheck/build remain clean. |
+
+The same slice may remove the unused declarations `@react-three/fiber`,
+`camera-controls`, and `three-stdlib` from `package.json` and regenerate the lock
+file after a fresh reference search. This removes dependency entries, not the
+package files themselves.
+
+All other removal-shaped rows are blocked on replacement, migration, caller,
+packaging, provenance, or product-decision prerequisites recorded in the ledger.
 
 ## Concrete Evidence
 
@@ -359,32 +385,23 @@ These areas need product decisions before classification:
 - Cloud/local scope UI wording.
 - Whether existing local/Claude conversation history needs migration.
 
-## New Documentation Plan
+## Documentation Set
 
-Version 2 rehabilitation should produce three documents before deletion begins:
+The Version 2 folder intentionally contains four files:
 
-1. `01-removal-audit.md`
-   - This document.
-   - Concrete remove/keep/migrate candidates.
-2. `02-target-structure-audit.md`
-   - Independent target structure proposal without being constrained by the old
-     rehabilitation map.
-   - Should cover folder names, cloud/local/CLI separation, monolith split
-     targets, reusable component boundaries, and naming conventions.
-3. `03-final-rehabilitation-plan.md`
-   - Combined plan that merges:
-     - the original `STUDIO/docs/studio-rehabilitation-map.md`
-     - this V2 removal audit
-     - the V2 target structure audit
-   - This becomes the action checklist for implementation slices.
+1. This removal evidence document.
+2. `02-target-structure-audit.md`, the independent target structure.
+3. `03-file-ownership-ledger.csv`, one actionable record per tracked Studio file.
+4. `04-final-rehabilitation-plan.md`, the combined V1 and V2 judgment policy and
+   execution order.
 
-After `03-final-rehabilitation-plan.md` exists, the independent structure audit
-can be archived or deleted if it is fully merged. Keep the removal audit as a
-separate reference because deletion decisions need their own evidence trail.
+None is redundant: evidence, target, file decisions, and execution are separate
+review responsibilities.
 
-## Immediate Next Audit
+## Remaining Caller And Packaging Proof
 
-The next concrete audit should be a caller inventory, not implementation:
+Blocked removal rows require focused caller inventories during their named
+implementation slice:
 
 | Inventory | Command/evidence |
 | --- | --- |
@@ -397,5 +414,7 @@ The next concrete audit should be a caller inventory, not implementation:
 | Tauri bundle resources | inspect `STUDIO/src-tauri/tauri.conf.json` |
 | MCP build ownership | inspect `STUDIO/scripts/mcp-build.mjs` |
 
-This inventory should produce a deletion checklist with exact dependency
-blockers for each candidate path.
+The results update the affected ledger rows before implementation. A broad scan
+does not authorize removal; the slice must show that static imports, dynamic
+registration, native commands/events, data, and package resources are all
+accounted for.

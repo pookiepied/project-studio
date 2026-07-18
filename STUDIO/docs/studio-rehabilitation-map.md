@@ -1,5 +1,11 @@
 # Studio Rehabilitation Map
 
+> Historical Version 1 evidence. Version 2 ownership, removal, and execution
+> decisions in `documentation/version 2 rehabilitation/04-final-rehabilitation-plan.md`
+> supersede this document where they conflict. The startup, surface, shell/page,
+> layer/portal, layout/scroll, state/persistence, and theme/CSS audit tracks are
+> explicitly carried forward.
+
 This document is the working map for making Studio easier to understand,
 maintain, and safely refactor. It is intentionally conservative: first map the
 system, then remove proven dead code, then split monoliths, then rename or move

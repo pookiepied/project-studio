@@ -1,7 +1,9 @@
 # Version 2 Rehabilitation: Target Structure Audit
 
 Evidence pass: 2026-07-18
-Status: corrected second-pass checkpoint, not final implementation approval.
+Status: target-structure evidence. The combined execution policy is
+`04-final-rehabilitation-plan.md`; file-specific actions are in
+`03-file-ownership-ledger.csv`.
 Scope: `STUDIO/` source, native shell, scripts, daemon, bundled capability
 library, and build/config files relevant to V2 structure.
 Independent cross-check: read-only sidecar agent `019f75b9-7d74-7093-8f17-4f6ff48ffa90`
@@ -27,20 +29,23 @@ This revision raises the bar:
 
 ## Verified Inventory
 
-Current non-generated Studio file count, excluding `node_modules`, `dist`,
-`target`, and root package locks:
+Current tracked Studio file count. Generated directories such as `node_modules`,
+`dist`, and `target` are not tracked and therefore are not ledger rows:
 
 | Area | Files | Read/audit status | V2 treatment |
 | --- | ---: | --- | --- |
-| `src` | 550 | Inventory, line counts, imports/exports, and key files read. Full feature-by-feature content pass still in progress. | Primary Desktop/Web React source. |
-| `src-tauri` | 84 | Rust command inventory and key native files read. Icon/assets treated as packaged assets. | Native desktop shell and OS bridge. |
-| `library` | 155 | File inventory complete; bundled MCP package intent read through config/build/runtime callers. Full per-tool review pending. | Legacy staging only. Migrate preserved packages to Studio CLI or reference storage, then remove from Studio packaging/tree. |
-| `daemon` | 15 | File inventory complete; local provider purpose read from Tauri commands and daemon tree. Full provider code review pending. | Likely old local provider service unless Studio CLI adopts it. |
+| `src` | 550 | Every tracked text file read; import/dead-code/size evidence recorded. File-specific blocked decisions remain in the ledger. | Primary Desktop/Web React source. |
+| `src-tauri` | 77 | Every tracked text file read; Rust command/resource callers still require slice-specific proof before removal. | Native desktop shell and OS bridge. |
+| `library` | 160 | Every tracked text file read; package ownership/provenance and replacement gates are recorded per file. | Legacy staging only. Migrate preserved packages to Studio CLI, then remove from Studio packaging/tree. |
+| `daemon` | 16 | Every tracked text file read; local provider purpose verified from package, providers, Tauri launcher, and frontend callers. | Old Desktop local-provider service unless Studio CLI explicitly adopts it. |
 | `scripts` | 6 | Inventory complete; script purposes classified by package scripts and content scan. | Build/release/vendor/proof utilities. |
 | `public` | 7 | Inventory only. | Static assets; audit by references before cleanup. |
 | `web` | 4 | Inventory only. | Web entry/distribution variant, not Desktop local runtime. |
 | `gate` | 2 | Inventory only. | Quality baseline state; preserve unless gate process changes. |
-| `vendor` | 2 source-like entries in this filtered count | Inventory only. | Bundled external resources; not app source cleanup. |
+| `vendor` | 2 | Manifest/docs read with harness, sync script, and Tauri resource evidence. | Move to Studio CLI packaging only if still required; otherwise remove after harness retirement. |
+| `docs` | 2 | Historical Studio architecture/rehabilitation documentation. | Keep as evidence until replacement docs fully absorb live contracts. |
+| Root/config | 17 | Package, build, web, Tauri-facing, CSS fixture, and repository metadata files. | Keep/review individually; two CSS fixtures are confirmed deletion candidates. |
+| `.claude` | 1 | Claude-specific developer launch configuration. | Remove from product tree or retain only as explicit developer-owned configuration. |
 
 Current `STUDIO/src` shape:
 
@@ -134,9 +139,9 @@ These decisions correct the most important ambiguity in the earlier checkpoint.
   local tool packages belong to `studio-cli`, cloud workers, or a separate
   reference/third-party source area, not to the Studio Desktop/Web app.
 - `computer-use` must be preserved intact before removal from the Desktop
-  bundle. It should move to Studio CLI or to a clearly named reference package
-  such as `third-party/reference/computer-use` until the CLI-owned package is
-  ready.
+  bundle. Its package name is first-party (`@studio/computer-use`), so its target
+  is `studio-cli/packages/computer-use`. Use temporary migration staging only if
+  needed; do not label it third-party without verified external provenance.
 - Desktop may keep thin clients named after their authority, such as
   `cloud/chat`, `studio-cli/client`, and `run-events`. Those are integration and
   display layers, not replacements for the old local runtime.
@@ -168,8 +173,8 @@ Project Studio/
       mcp-servers/             CLI-owned local MCP/tool packages if retained
       skills/                  CLI-owned local skill packages if retained
   third-party/
-    reference/                 immutable backups/external source snapshots during migration
-      computer-use/            temporary source backup until Studio CLI owns it
+    reference/                 only verified externally sourced snapshots with license records
+  migration-staging/           temporary checked migration copies when cross-product work requires them
   STUDIO/
     src/                       Desktop/Web React app shell and product UI
     src-tauri/                 native desktop shell and OS bridge
@@ -376,7 +381,7 @@ Use names that describe authority:
 
 ## Implementation Order
 
-1. Finish file-level read pass and mark every folder classified.
+1. Remove only the proven-dead first slice recorded in the final plan.
 2. Define Studio CLI Desktop protocol:
    - launch/headless mode
    - session list/read/send/cancel
@@ -393,23 +398,25 @@ Use names that describe authority:
 8. Remove bundled MCP build/resources only after runtime callers are gone.
 9. Simplify right workspace surfaces.
 10. Split monoliths and rename folders after removal reduces the tree.
-11. Create `03-final-rehabilitation-plan.md` combining this document,
-    `01-removal-audit.md`, and `STUDIO/docs/studio-rehabilitation-map.md`.
+11. Apply the final judgment policy to the post-removal tree, then execute the
+    accepted target-path and rename matrix in small manual slices.
 
-## Remaining Audit Passes Before Final Plan
+## Remaining Gates Before Structural Implementation
 
-These are not optional:
+The file inventory and first disposition pass are complete. These implementation
+gates remain mandatory for rows that are still blocked:
 
-- Complete per-feature read pass for all 332 `src/features` files.
-- Complete per-package read pass for all bundled MCP server source files.
-- Complete daemon provider code read pass before deciding local provider
-  deletion.
-- Asset/reference audit for `public`, `web`, `vendor`, icons, installer assets,
-  and CSS fixtures.
 - Exact frontend-to-native invoke matrix, including dynamic invokes inside
   `nativeBrowserService.ts`.
-- Exact import-cycle and cross-boundary import report after the target folders
-  are accepted.
+- Exact package/resource/caller matrix for runtime, MCP, daemon, vendor, and
+  local conversation removal clusters.
+- Provenance/license recovery for code proposed for external/reference storage.
+- Studio CLI protocol and data-import contracts required by blocked rows.
+- Product decisions for browser, terminal, files, review/Git, local providers,
+  transcription/TTS, and the YouTube transcript gitlink.
+- Fresh asset/reference, dead-code, import-cycle, and cross-boundary reports at
+  the start of each relevant implementation slice.
 
-Until those are complete, this document is a corrected target checkpoint, not a
-deletion or rename checklist.
+This target document is not itself a deletion or rename checklist. Execution is
+authorized only by a scoped ledger selection and the slice contract in the final
+plan.
