@@ -698,6 +698,70 @@ Root artifact stop conditions:
 - Do not replace `README.md` with detailed structure docs until the structure is
   less fluid.
 
+Public and static asset triage:
+
+Static assets are not reliably proven by TypeScript import tools. Studio has
+two separate asset ownership zones: web/public assets under `public/`, and
+native/package assets under `src-tauri/`. Both need reference and packaging
+evidence before deletion.
+
+Current tracked `public/` assets:
+
+| Asset | Observed references | Classification |
+| --- | --- | --- |
+| `public/favicon.ico` | `index.html` and `web/index.html` link `/favicon.ico`. | Live browser/web favicon. |
+| `public/logo.png` | `index.html`, `web/index.html`, `web/manifest.json`, `public/site.webmanifest`, `ShaderWelcomePage`, and `StudioIcon`. | Live brand mark for app/web shell and PWA metadata. |
+| `public/apple-touch-icon.png` | `index.html`, `web/index.html`, and `public/site.webmanifest`. | Live web/PWA touch icon. |
+| `public/site.webmanifest` | Linked by desktop `index.html`; references `/logo.png` and `/apple-touch-icon.png`. | Live PWA/web metadata. |
+| `public/moon.png` | `ManagementAccessModal`. | Live permission-modal visual asset. |
+| `public/flower.png` | `ManagementAccessModal` and `LocalCapabilitiesModal`. | Live permission-modal visual asset. |
+| `public/sky.png` | `GlobalAccessModal`. | Live permission-modal visual asset. |
+
+Native/package asset zones:
+
+| Asset zone | Observed references | Classification |
+| --- | --- | --- |
+| `src-tauri/icons/32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico` | `src-tauri/tauri.conf.json` bundle icon list; `src-tauri/build.rs` rerun triggers; `icon.ico` is also the NSIS installer icon. | Live desktop packaging assets. |
+| `src-tauri/installer-assets/header.bmp`, `sidebar.bmp` | `tauri.conf.json` NSIS settings and `scripts/generate-installer-assets.ps1`. | Live Windows installer assets. |
+| Other `src-tauri/icons/*` platform variants | Present in the generated icon set but not all directly referenced by `tauri.conf.json`. | Generated/package asset candidates that need Tauri icon-generation and target-platform proof before pruning. |
+| `src-tauri/target/**` copied icons/vendor assets | Build output under ignored target tree. | Generated build artifacts; ignore for source cleanup. |
+
+Asset cleanup rules:
+
+1. Public assets require HTML, web manifest, source string, CSS, and web build
+   reference checks before removal.
+2. Tauri icons and installer images require `tauri.conf.json`, `build.rs`,
+   installer script, and packaged-app proof before removal.
+3. Large image size alone is not a cleanup reason if the asset is intentionally
+   used in a modal or branded first-run surface.
+4. Generated platform icon sets should be regenerated from a source asset or
+   pruned only with a documented target-platform decision.
+5. Do not rely on Knip or TypeScript import absence for `/asset.png` string
+   references or manifest-driven assets.
+
+Suggested future asset implementation order:
+
+1. No deletion currently recommended for `public/`; all seven tracked assets
+   have live references in the current tree.
+2. Decide whether `public/site.webmanifest` should also be linked from
+   `web/index.html`; desktop currently links it, while `web/index.html` links
+   favicons/touch icon and `web/manifest.json` exists separately.
+3. Audit whether `web/manifest.json` and `public/site.webmanifest` should be
+   consolidated or intentionally kept separate.
+4. Audit extra `src-tauri/icons/*` platform variants only after confirming
+   supported bundle targets and icon-generation workflow.
+5. Treat permission modal images (`moon`, `flower`, `sky`) as product/design
+   assets; replace or compress them only in a visual/product slice, not dead-code
+   cleanup.
+
+Asset stop conditions:
+
+- Do not delete any `public/` file based on Knip output.
+- Do not delete Tauri icons or installer BMP files without bundle verification.
+- Do not remove large permission images without checking the modal screens that
+  currently render them.
+- Do not edit `src-tauri/target/**`; it is generated build output.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
