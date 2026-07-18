@@ -186,6 +186,62 @@ before splitting.
 | `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx` | 330 | Right workspace surface now composes new conversation workspace panels and geometry behavior; audit surface ownership before additional panel splits. |
 | `src/features/workspace/rightWorkspace/ConversationWorkspacePanel.tsx` | 327 | New untracked conversation workspace surface. Classify with workspace lifecycle and shell/page ownership before treating as stable structure. |
 
+Live monolith measurement snapshot on 2026-07-18:
+
+These measurements include the current dirty worktree. They are triage evidence,
+not ownership of the active UI, backend, or harness work.
+
+Largest app/source files now observed:
+
+| File | Lines | Triage |
+| --- | ---: | --- |
+| `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Data/snapshot candidate. Do not split by hand until generated/source-of-truth status is known. |
+| `src/features/artifacts/components/ArtifactLabPanel.tsx` | 1870 | New largest hand-authored app surface and currently dirty. Audit artifact lab responsibilities before any extraction. |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Dirty and actively growing around workspace-domain work. Needs a workspace state/controller map before the next split. |
+| `src/features/chat/pages/ChatPage.tsx` | 675 | Still large but blocked behind shell/global dock ownership re-audit. |
+| `src/features/chat/context/ChatProvider.tsx` | 573 | Still a state coordinator. Continue only after shell/workspace dirty work stops changing provider responsibilities. |
+| `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Candidate for diagnostic collector extraction after app-shell tracks are quiet. |
+| `src/features/chat/components/LeftWorkspaceSidebar.tsx` | 511 | Dirty and geometry-related. Do not split before layout/panel ownership is settled. |
+| `src/features/chat/context/useSendPipeline.ts` | 509 | Send pipeline subsystem candidate; likely safer after provider state boundaries are stable. |
+| `src/features/voice/hooks/useLiveSession.ts` | 501 | Voice session lifecycle candidate; preserve `HomePage` provider lifetime contract. |
+| `src/features/settings/components/SettingsDebugPanel.tsx` | 496 | Settings/debug UI candidate; likely lower collision risk than shell/workspace if file is clean. |
+| `src/features/workspace/terminal/TerminalPanel.tsx` | 489 | Workspace tool-surface candidate; classify with right-workspace surface model. |
+| `src/features/manage/components/ModelRegistryView.tsx` | 471 | Manage/model boundary candidate; keep manage as admin surface consuming model capability. |
+| `src/features/workspace/rightWorkspace/ReviewPanel.tsx` | 469 | Workspace panel candidate; classify with right-workspace tab ownership. |
+| `src/features/voice/hooks/useAudioRecorder.ts` | 468 | Already partially extracted; reasonable future slice when shell work is inactive. |
+| `src/lib/tokenManager.ts` | 461 | Large for `lib/`; classify whether this is generic utility, auth/core infrastructure, or feature state before moving. |
+| `src/runtime/transport/wsPool.ts` | 459 | Runtime transport candidate; should remain under runtime until transport contract is documented. |
+| `src/features/chat/context/useStreamHandlers.ts` | 458 | Streaming protocol/event candidate; DSML continuation already extracted. |
+
+Largest adjacent-system files now observed:
+
+| File | Lines | Triage |
+| --- | ---: | --- |
+| `library/mcp-servers/harness/studio-harness/src/tools/git/git.ts` | 853 | Harness file is dirty; do not clean or split until harness work is committed or handed over. |
+| `src-tauri/src/commands.rs` | 846 | Native command surface is dirty; audit command groups before Rust extraction. |
+| `library/mcp-servers/harness/studio-harness/src/tools/lsp/ide.ts` | 537 | Harness LSP subsystem candidate, currently in dirty harness area. |
+| `src-tauri/src/mcp.rs` | 508 | Native MCP integration candidate; classify with bundled MCP/library and runtime contracts. |
+| `library/mcp-servers/harness/studio-harness/src/tools/lsp/manager.ts` | 502 | Harness LSP lifecycle candidate, currently dirty. |
+| `library/mcp-servers/harness/studio-harness/src/tools/git/definitions.ts` | 481 | Harness schema/definition surface; may be generated or deliberately verbose. |
+| `src-tauri/src/lib.rs` | 460 | Startup/window lifecycle owner. Do not split before readiness contract is designed. |
+| `daemon/src/routes/chat.ts` | 257 | Daemon route candidate; smaller than app monoliths but owns streaming/local-provider behavior. |
+
+Current extraction priority once dirty ownership is resolved:
+
+1. Do not touch harness files until the active harness deletion/rebuild work is
+   committed or explicitly handed over.
+2. For app code, decide whether `ArtifactLabPanel.tsx` is experimental,
+   product-owned, or registry/demo-owned before extracting it; it is now the
+   largest hand-authored app file.
+3. Resume workspace extraction only after the workspace-domain dirty files are
+   committed or handed over, starting with a state/controller map rather than UI
+   chunks.
+4. Resume chat page/provider extraction only after global dock and top-chrome
+   ownership are reconciled.
+5. Prefer clean, lower-collision files such as diagnostics, settings debug, or
+   voice recorder/session hooks if implementation work must proceed while shell
+   and workspace are active.
+
 ## Dead-Code Signals
 
 `npx knip --reporter compact` currently reports:
