@@ -883,6 +883,68 @@ Skill stop conditions:
 - Do not mark `library/skills/studio-computer-use` healthy until a matching
   `SKILL.md` exists or the manifest is intentionally removed.
 
+Vendor runtime ownership and proof:
+
+The `vendor/` folder is not normal source and not ordinary ignored clutter. It
+is the canonical source-and-runtime boundary for third-party native binaries
+that Studio ships so local tools work on machines without system installs.
+Only `vendor/manifest.json` and `vendor/README.md` are tracked; generated binary
+trees are ignored but still packaging-critical.
+
+Current vendor evidence:
+
+| Area | Current evidence | Rehabilitation note |
+| --- | --- | --- |
+| `vendor/manifest.json` | Tracked manifest for `ripgrep` and `git`; maps platforms to generated runtime paths such as `ripgrep/win32-x64/rg.exe` and `git/win32-x64`. | Source of truth for pinned runtime tool layout. Do not hand-edit binary paths. |
+| `vendor/README.md` | Tracked documentation explaining vendored binaries, layout, packaging, resolution order, and sync commands. | Useful contributor doc, but contains decorative/mojibake-prone punctuation that belongs in text hygiene later. |
+| `vendor/ripgrep/**` | Present locally but ignored by `.gitignore`. Produced from `@vscode/ripgrep`. | Generated runtime binary material; not a repo cleanup commit. |
+| `vendor/git/**` | Present locally but ignored by `.gitignore`. Produced from Git-for-Windows PortableGit on Windows; includes `cmd/git.exe` and `bin/bash.exe`. | Generated runtime tree. The whole tree must stay intact because Git/Bash resolve support files relative to their location. |
+| `.gitignore` | Ignores `/vendor/*` but keeps `vendor/manifest.json` and `vendor/README.md`. | Correct source/runtime split. Changing this affects repository size and packaging workflow. |
+| `scripts/vendor-sync.mjs` | Owns download, checksum, extraction, trimming, version stamp, atomic install, and manifest update for current platform. | Single supported way to refresh generated vendor binaries. |
+| `scripts/tauri-wrapper.mjs` | Runs `vendor-sync` before `tauri dev` and `tauri build`; failure is fatal. | Vendor availability is part of local dev/build readiness. |
+| `src-tauri/tauri.conf.json` | Bundles `../vendor` into app resources. | Generated vendor material is packaged even though ignored by Git. |
+| `library/.../tools/shared/vendor.ts` | Harness resolver walks up to find `vendor/manifest.json`, resolves ripgrep, git, and Git Bash, then falls back to PATH where allowed. | Runtime owner for harness filesystem, code-outline, git, and shell tools. |
+| Harness tool call sites | `grep`, `outline`, `git`, `git search`, and shell execution call the vendor resolver or error with restore instructions. | Removing vendor breaks tool behavior, especially on fresh Windows machines. |
+
+Vendor cleanup and repair rules:
+
+1. Treat `vendor/manifest.json` and `vendor/README.md` as source files; treat
+   `vendor/<tool>/<platform>/...` as generated runtime artifacts.
+2. Do not delete generated vendor folders merely because they are ignored or
+   absent from `git status`; Tauri dev/build and packaging expect them after
+   `vendor-sync`.
+3. Do not edit generated vendor trees manually. Regenerate with
+   `node scripts/vendor-sync.mjs` or a targeted tool argument.
+4. Do not rename vendor tool keys, platform paths, or entry files without
+   updating `vendor-sync`, `vendor.ts`, harness call sites, and Tauri packaging.
+5. Vendor changes need runtime proof: resolver path, harness tool behavior, and
+   packaged resource availability.
+
+Suggested future vendor implementation order:
+
+1. Clean decorative/mojibake comments in vendor docs/scripts as a no-behavior
+   text-hygiene slice, preserving commands and paths exactly.
+2. Add a small vendor proof checklist to contributor docs: run
+   `node scripts/vendor-sync.mjs`, confirm manifest, and verify `resolveRipgrep`,
+   `resolveGit`, and `resolveVendoredGitBash` behavior on the target platform.
+3. Do not change vendored Git/ripgrep versions until the harness dirty worktree
+   is settled and tool behavior can be verified.
+4. If repository cleanup removes local ignored vendor folders, treat it as local
+   workspace cleanup only, followed by `npm run tauri dev` or `vendor:sync` to
+   restore them.
+5. Keep vendor as top-level Studio runtime infrastructure unless a packaging
+   architecture change creates a stronger app-wide external-binary home.
+
+Vendor stop conditions:
+
+- Do not commit generated vendor binary/tree files.
+- Do not remove `vendor/` from Tauri bundle resources without replacement
+  packaging proof.
+- Do not make broad harness/vendor changes while harness files are dirty from
+  another active task.
+- Do not treat PATH fallback as sufficient proof on Windows; fresh user
+  machines are expected not to have ripgrep or Git Bash installed.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
