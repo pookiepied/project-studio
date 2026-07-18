@@ -342,6 +342,62 @@ Workspace stop conditions:
 - Do not split `workspaceService.ts` before confirming cloud endpoint contracts
   and local-storage migration behavior.
 
+Right-workspace surface triage:
+
+The right-workspace area is dirty and currently represents multiple concepts at
+once: a tab state hook, a resizable shell panel, a conversation dashboard/home
+mode, and classic tool tabs for review, browser, terminal, files, side chat, and
+artifacts.
+
+Observed right-workspace responsibilities:
+
+| Area | Owns today | Candidate boundary |
+| --- | --- | --- |
+| `useRightWorkspace.ts` | Visibility, tab list, active tab ID, tab creation/closing/updating, external open-state sync for terminal/browser/artifacts, side-chat de-dupe, browser-tab cleanup, and project-context reset. | Keep as the tab-state controller. It should not own panel width or visual rendering. |
+| `RightWorkspacePanel.tsx` | Open animation, `workspaceWidth`, resize drag behavior, `setRightPanelWidth` shell layout publication, classic-vs-conversation mode, and tab render dispatch. | Split width/resize into a small hook only after layout ownership is settled; keep render dispatch close to the panel until tab contracts stabilize. |
+| `workspacePanelGeometry.ts` | Default/min width, minimum remaining chat width, viewport-based max width, and width clamping. | Rename only after deciding whether this is generic shell side-panel geometry or right-workspace-specific geometry. |
+| `ResizeHandle.tsx` | Visual separator and mouse-down entry point only. | Good small primitive, but behavior still lives in `RightWorkspacePanel`. |
+| `types.ts` | Tab type/state contracts, project context shape, and external project app contracts. | Consider splitting tab-state types from external app launcher types if project launcher grows. |
+| `ConversationWorkspacePanel.tsx` | Conversation activity chart, token/context summary, active agent rail, task chain, tool launcher nav, and close action. | Treat as a conversation dashboard/home surface, not a classic tab, until surface taxonomy says otherwise. |
+| Classic tab renderers | `ReviewPanel`, `BrowserPanel`, `TerminalPanel`, `FilesPanel`, `SideChatPanel`, and `ArtifactPanel` are rendered by tab type. | Each renderer owns its tool-specific UI; the right-workspace shell should only pass state and lifecycle callbacks. |
+
+Mode split observed:
+
+- `RightWorkspacePanel` initially shows `ConversationWorkspacePanel` when
+  `classicWorkspaceVisible` is false.
+- Launching any workspace tool sets `classicWorkspaceVisible` true and creates a
+  classic tab.
+- Closing the classic header currently returns to the conversation dashboard
+  instead of closing the whole right-workspace surface.
+- The same panel width is shared by conversation dashboard, classic tabs,
+  browser, terminal, and artifact panel width callbacks.
+
+Suggested first right-workspace split after handoff:
+
+1. Document whether the conversation dashboard is a home mode, tab type, or
+   separate surface. Do this before adding persistence or route semantics.
+2. Extract `useRightWorkspacePanelWidth.ts` only after confirming the
+   `workspaceLayoutStore` publisher/subscriber contract and left-sidebar width
+   interaction.
+3. Extract `renderWorkspaceTab` or `WorkspaceTabContent.tsx` only after the
+   tab-state types are stable and side effects such as browser-tab cleanup stay
+   in the controller.
+4. Split `ConversationWorkspacePanel.tsx` into activity chart, usage/agent rail,
+   task chain, and launcher sections only after its status as home/tab/surface is
+   decided.
+5. Revisit `workspacePanelGeometry.ts` naming after deciding whether left and
+   right side panels share a generic shell geometry contract.
+
+Right-workspace stop conditions:
+
+- Do not edit right-workspace files while they are dirty unless this thread
+  receives an explicit handoff for those paths.
+- Do not move width logic without checking `workspaceLayoutStore`, chat push
+  layout, `LeftWorkspaceSidebar`, browser width callbacks, terminal width
+  callbacks, and artifact width callbacks.
+- Do not turn `ConversationWorkspacePanel` into a tab or separate route until
+  the surface taxonomy and page/shell ownership gates are satisfied.
+
 ## Dead-Code Signals
 
 `npx knip --reporter compact` currently reports:
