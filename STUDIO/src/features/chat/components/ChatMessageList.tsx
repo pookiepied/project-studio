@@ -2,7 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { StreamingText } from "@/features/chat/components/StreamingMarkdown";
 import { ErrorDisplay } from "@/ui/feedback/ErrorDisplay";
-import { ToolPermissionCard } from "@/runtime";
+import { ToolPermissionCard } from "@/run-events";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";
 import { TurnStatus } from "./idle/TurnStatus";

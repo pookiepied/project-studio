@@ -11,7 +11,8 @@
  */
 
 import { useCallback } from "react";
-import { buildChatBody, getMcpServers, extractGeneratedImageIds, deleteRemoteImages } from "@/runtime";
+import { buildChatBody, getMcpServers } from "@/runtime";
+import { extractGeneratedImageIds, deleteRemoteImages } from "@/features/chat/services/generatedImages";
 import type { ChatRequestBody } from "@/runtime";
 import { memorySystem } from "@/core/storage/memorySystem";
 import { errorService } from "@/core/errors/errorService";

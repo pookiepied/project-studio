@@ -2,7 +2,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock } from "@/ui/icons";
 import { Button } from "@/ui/primitives/Button";
-import { toolLabel, getToolIcon } from "@/runtime";
+import { toolLabel, getToolIcon } from "@/run-events";
 import { RISK_CLASS_META, extractTargetPaths } from "@/core/permissions";
 import type { GrantScope } from "@/core/permissions";
 import type { ActiveToolCall } from "@/features/chat/context/types";

@@ -39,9 +39,5 @@ export { checkLocalCapabilities } from "./capabilities/capabilityService";
 export type { LocalCapabilitiesSnapshot, LocalCapabilityId } from "./capabilities/types";
 export { buildChatBody, getMcpServers } from "./capabilities/buildChatBody";
 
-// ui — tool-card display
-export { toolLabel, getToolIcon } from "./ui/toolCardUtils";
-export { classifyToolDisplay, extractGeneratedImageIds, deleteRemoteImages } from "./ui/classifyToolDisplay";
-export { ToolPermissionCard } from "./ui/ToolPermissionCard";
-export { RuntimeStepCard } from "./ui/RuntimeStepCard";
-export { InlineToolSteps } from "./ui/InlineToolSteps";
+// Tool-card display moved to `@/run-events` in R3.
+// Generated-image helpers moved to `@/features/chat/services/generatedImages`.

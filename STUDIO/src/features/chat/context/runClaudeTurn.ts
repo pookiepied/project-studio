@@ -17,7 +17,7 @@ import { claudeBridgeService } from "@/features/chat/services/claudeBridgeServic
 import { effortToThinkingBudget } from "@/cliBridges";
 import type { ClaudeEffortLevel, ChatEngine } from "@/cliBridges/types";
 import { logger } from "@/core/logging/logger";
-import { classifyToolDisplay } from "@/runtime";
+import { classifyToolDisplay } from "@/run-events";
 import { buildHarnessEvent } from "@/lib/harnessEventUtils";
 import type { PermissionModeId } from "@/core/permissions";
 import type { ChatConversation, ClaudeSessionMetadata, MessageSegment } from "@/types";

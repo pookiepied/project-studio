@@ -18,9 +18,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import {
   executeLocalTools,
-  classifyToolDisplay,
   useAgentChat,
 } from "@/runtime";
+import { classifyToolDisplay } from "@/run-events";
 import { logger } from "@/core/logging/logger";
 import { memorySystem } from "@/core/storage/memorySystem";
 import { recordAgentToolResult } from "@/core/notifications";
