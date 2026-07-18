@@ -20,6 +20,8 @@ Last updated: 2026-07-19.
 | D-04 | Stage the computer-use copy in `temporary/` rather than `third-party/` or `studio-cli/`. | Studio CLI does not exist yet as a stable tree. `third-party/` is wrong on the evidence (see O-01). `temporary/` defers the naming question without asserting false provenance. | 2026-07-19 |
 | D-05 | Do not build Studio CLI as part of the rehabilitation program. | Converting the OpenCode clone into Studio CLI is an unbounded product build with no ledger rows and no defined done-state. It would break the slice contract. It runs as its own tracked program. | 2026-07-19 |
 | D-06 | Keep the Composio connector UI in the Studio frontend; retire only the local MCP management inside the same feature. | `composioService.ts` already targets the cloud `connectors` worker through `apiManager`, so it is correctly a cloud client. `useMcpServers.ts` in the same feature invokes local `mcp_*` Tauri commands and is the part that retires. See O-02. | 2026-07-19 |
+| D-07 | Stage the preserved computer-use copy in `temp/computer-use-migration`, but treat Git history plus the tracked checksum manifest as the real preservation guarantee. | `temp/` is gitignored (`.gitignore:66`), so a copy placed there is not version-controlled and cannot by itself satisfy "preserve intact". The manifest at `artifacts/computer-use-checksums.sha256` is tracked, so any future copy can be proven identical. | 2026-07-19 |
+| D-08 | Normalize three minified `package.json` files to standard indentation while adding metadata. | `mcp-management`, `skill-execution`, and `skill-management` were single-line minified; the other two packages were already pretty-printed. Minification in a hand-editable manifest is an artifact, not a style choice. Semantically identical. | 2026-07-19 |
 
 ## Deferred Items
 
@@ -49,3 +51,5 @@ Last updated: 2026-07-19.
 | --- | --- | --- |
 | R0: Proven dead code | `d1667e8` | 8 files deleted, 2 unused dependencies removed, unused files 6 to 0. |
 | R0.5: Pre-R1 cleanup | `9323125` | 9 npm advisories to 2 with all high-severity resolved, orphaned gitlink removed, knip false positive silenced, stale catalog comment corrected, 5 redundant re-exports dropped. |
+| Decision register created | `90d72f5` | This document. |
+| R1 Phase A: preserve computer-use | pending commit | Scope proved as exactly 67 files (66 package + 1 skill), matching the ledger's 67 `MIGRATE_TO_CLI_PRESERVE_SOURCE` rows 1:1. Provenance verified first-party. `author` metadata added to all five `@studio/*` packages. SHA-256 manifest recorded and tracked. Copy staged and verified byte-for-byte. Package builds standalone and serves 117 tools over MCP; no tests exist. |
