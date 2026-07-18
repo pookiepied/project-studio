@@ -762,6 +762,66 @@ Asset stop conditions:
   currently render them.
 - Do not edit `src-tauri/target/**`; it is generated build output.
 
+Web entry and deployment boundary:
+
+Studio has a desktop/Tauri entry and a web/PWA entry. They share `src/` and
+`public/`, but they do not have the same HTML shell, manifest, environment
+defines, or deployment path. Treating `web/` as dead because it is outside the
+desktop entry would be wrong unless web support is explicitly retired.
+
+Current web boundary evidence:
+
+| File | Current role | Rehabilitation note |
+| --- | --- | --- |
+| `index.html` | Desktop/Tauri HTML entry. Links `/favicon.ico`, `/logo.png`, `/apple-touch-icon.png`, and `/site.webmanifest`; pre-applies window surface, theme, and shell classes before `src/main.tsx`. | Owns startup shell behavior and desktop metadata. Do not merge with `web/index.html` casually. |
+| `web/index.html` | Web HTML entry. Links shared public favicon/logo/touch icon, links `/manifest.json`, sets web PWA metadata, and loads `./web-main.tsx`. | Web-specific shell and metadata. Lacks the desktop pre-React window surface setup by design. |
+| `web/web-main.tsx` | Web React entry. Imports app `App`, web font/design CSS subset, registers `/sw.js`, and mounts React. | Reuses the desktop app tree with web adapters/environment detection. Any app-level move must keep this entry compiling. |
+| `web/sw.js` | Web service worker registered by `web-main.tsx`. | Live web/PWA asset. Its cache list includes `/manifest.json`, so web manifest ownership is real. |
+| `web/manifest.json` | Web PWA manifest referenced by `web/index.html` and cached by `web/sw.js`; references `/logo.png`. | Web-specific manifest, separate from `public/site.webmanifest`. |
+| `public/site.webmanifest` | Desktop root HTML manifest, references `/logo.png` and `/apple-touch-icon.png`. | Desktop/browser metadata currently served from shared public assets. Decide later whether to consolidate with `web/manifest.json`. |
+| `vite.config.web.ts` | Web Vite config with root `web`, shared `publicDir`, output `dist-web`, `@` alias to `src`, and defines `__WEB_VERSION__ = true`, `__TAURI__ = false`. | Web build graph is first-class and distinct from Tauri Vite config. |
+| `vercel.json` / `.vercelignore` | Vercel deploy metadata: runs `npm run web:build`, serves `dist-web`, and excludes Tauri/library/build material. | Deployment ownership exists outside TypeScript imports. Remove only with a web deployment decision. |
+| `core/platform/environmentService.ts` | Reads `__WEB_VERSION__`, `__TAURI__`, Tauri globals, protocol, and service-worker availability. | Shared source contains platform branching. Cleanup must preserve web/desktop detection semantics. |
+
+Web/deployment cleanup rules:
+
+1. `web/` is a supported surface until a product decision says otherwise.
+   Require `npm run web:build` proof for shared app/source changes that may
+   affect the web entry.
+2. Desktop and web HTML files are allowed to differ. Desktop owns pre-React
+   window/shell setup; web owns PWA metadata and service-worker setup.
+3. `web/manifest.json` and `public/site.webmanifest` are not duplicates by proof
+   yet; they are two manifest files referenced by different entry surfaces.
+4. Vercel files are deployment metadata, not dead code. Remove them only if the
+   web deployment path is retired.
+5. Service-worker cache entries are asset references. Check `web/sw.js` before
+   deleting web/public files.
+
+Suggested future web boundary order:
+
+1. Add web support status to the future `README.md`: supported, experimental, or
+   retired.
+2. Run `npm run web:build` once `STUDIO/package.json` and lockfile are no
+   longer dirty from another active track.
+3. Decide whether the two manifests should remain separate. If consolidated,
+   update `web/index.html`, `index.html`, `web/sw.js`, and public asset proof
+   together.
+4. Audit web-specific gaps only after build proof, including service-worker
+   cache freshness and whether the shared `App` handles web-only platform
+   constraints cleanly.
+5. Keep deployment cleanup separate from app source cleanup.
+
+Web boundary stop conditions:
+
+- Do not delete `web/`, `vite.config.web.ts`, `vercel.json`, `.vercelignore`, or
+  `web/sw.js` based on desktop-only references.
+- Do not consolidate manifests without updating both HTML entries and the
+  service-worker cache list.
+- Do not make shared `src/` moves without checking whether `web/web-main.tsx`
+  and `vite.config.web.ts` still resolve aliases and imports.
+- Do not run web build verification while root package files are dirty unless
+  the active package-owner task explicitly asks for it.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
