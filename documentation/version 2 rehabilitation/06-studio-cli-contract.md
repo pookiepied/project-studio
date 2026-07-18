@@ -125,6 +125,54 @@ both this stream and the cloud run stream into one display model. The
 normalization layer is the contract Desktop owns; the event names above are the
 contract the CLI owns.
 
+## How The CLI Expects To Be Driven
+
+This section answers the question of whether Desktop should keep a PTY-style CLI
+bridge. The answer is no, and the evidence is in the CLI itself.
+
+**There is a headless server command.** `packages/studio/src/cli/cmd/serve.ts`
+is described as "starts a headless studio server" and prints
+`studio server listening on http://{hostname}:{port}`. This is the intended
+integration point for any non-terminal client.
+
+**The CLI's own frontend is an HTTP client, not a stdio consumer.** The TUI in
+`packages/studio/src/cli/cmd/tui.ts` does not parse terminal output. It obtains
+a `fetch` implementation and an `EventSource` and subscribes to
+`global.event`. The terminal UI is a client of the same API Desktop would use.
+
+**A generated, typed SDK already exists.** `packages/sdk/js` exports
+`createStudioClient` over the same protocol groups, including a v2 client. There
+is no need to hand-write a transport.
+
+**There is no desktop shell upstream.** No Tauri or Electron configuration
+exists anywhere in the tree; `packages/ui` is SolidJS consumed by the TUI. Studio
+Desktop would be the first GUI client, so there is no precedent that argues for
+a PTY bridge, and none that supplies reusable React components.
+
+The conclusion: a PTY bridge would mean parsing human-readable output from a
+program that already offers a typed API over HTTP with a structured event
+stream. Desktop should launch `serve`, hold the process, and speak the protocol.
+
+### Operational Details That Constrain The Client
+
+Three details were read from the source and materially affect implementation:
+
+1. **SSE events carry no id.** In the event handler, `eventData()` constructs
+   `Sse.Event` with `id: undefined`. There is therefore no `Last-Event-ID`
+   resume. A dropped connection cannot be resumed at the last event; Desktop
+   must reconcile by re-reading `GET /api/session/:sessionID/history`.
+2. **The subscriber queue drops.** The event bus uses `Queue.dropping` with a
+   bounded capacity (the handler sets `subscriberCapacity = 256`) and raises
+   `SubscriberOverflowError` past it. A slow consumer silently loses events.
+   Desktop must never block the subscription while rendering, and must treat
+   overflow as another trigger for history reconciliation.
+3. **Requests are workspace-scoped.** The SDK rewrites requests using an
+   `x-studio-directory` header, folded into a `directory` query parameter. The
+   server is multi-workspace; every call must carry the workspace directory.
+
+Authentication is HTTP basic via `@studio/ServerAuthConfig`. Desktop must
+generate a per-launch credential and must not ship a fixed default.
+
 ## Gaps
 
 These are the real output of R2. Each blocks a specific later phase.
@@ -132,9 +180,9 @@ These are the real output of R2. Each blocks a specific later phase.
 | # | Gap | Blocks | Notes |
 | --- | --- | --- | --- |
 | G-1 | **No Git or review API.** There is no `git` protocol group. The CLI offers `session.revert.*`, which is turn-level undo, not branch/status/diff/stage/commit. | R7, and the `ReviewPanel` decision | Desktop's `ReviewPanel` currently calls Tauri git commands directly. Either the CLI grows a git group, or Desktop keeps direct Git ownership for review. This must be decided before R7, and it interacts with the known `git_stash_and_checkout` bug. |
-| G-2 | **No migration or import API.** Nothing accepts Desktop's existing local conversations or Claude transcripts. | R4 | Either the CLI grows an import endpoint, or Desktop converts on read, or old history is declared non-portable. R4 cannot start without this decision. |
+| G-2 | **Migration path exists but format mapping does not.** `studio import <file>` accepts "session data from JSON file or URL", and `studio export [sessionID]` produces that JSON. | R4 | Downgraded from a hard block. The remaining work is converting Desktop's local conversation store and Claude transcripts into the CLI's session JSON shape. Use `studio export` output as the target schema. |
 | G-3 | **Launch and port discovery are unspecified.** `GET /api/health` exists, but how Desktop starts the process, learns the port, and supplies credentials is not defined by the CLI. | R3 | Desktop-side concern. Belongs in `studio-cli/client`. |
-| G-4 | **Reconnect and replay semantics are unverified.** SSE reconnect needs to answer whether events are replayed after a drop or silently lost. | R3 | If there is no replay, Desktop must re-read `session.history` on reconnect to avoid a torn transcript. |
+| G-4 | **Resolved by inspection: there is no SSE resume.** Events are emitted with `id: undefined`, and the subscriber queue is dropping with capacity 256. | R3 | Desktop must reconcile via `GET /api/session/:sessionID/history` after any disconnect or overflow. This is now a design constraint rather than an open question. The `--replay` flag on `run` is terminal transcript redraw, not event replay; do not confuse the two. |
 | G-5 | **Two transports, one UI.** Cloud chat is WebSocket; CLI is SSE. | R3 | `run-events` must be transport-agnostic. Do not try to unify the transports; unify only the normalized event model. |
 | G-6 | **No local MCP management API surfaced to Desktop.** The CLI has `skill` and `integration` groups, but Desktop's current `useMcpServers` expects start/stop/list of local MCP subprocesses. | R5 | Determines whether Desktop's MCP settings UI is retargeted or deleted. |
 
