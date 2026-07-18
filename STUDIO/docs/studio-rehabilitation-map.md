@@ -568,6 +568,50 @@ satisfied.
 | `src/cliBridges/` | Bridges to external CLI-backed providers, currently Claude-focused. | "Adapters for CLI tools Studio can drive." | Keep separate while its bridge identity is clearer than runtime/core ownership; reassess after runtime contract work. |
 | `src/main.tsx`, `src/index.css`, `src/vite-env.d.ts` | Browser/React entry, global CSS entry, and Vite ambient types. | "The frontend entry points." | Keep minimal; push product and shell responsibilities down into named app/design modules. |
 
+CLI and Studio CLI boundary:
+
+There are currently three separate CLI concepts. Keep them distinct during
+rehabilitation:
+
+| Concept | Current evidence | Boundary decision |
+| --- | --- | --- |
+| Chat-engine CLI bridge | `src/cliBridges/types.ts` defines `ChatEngine` as Studio or Claude and describes CLI bridges as local command-line tools, not API providers. Rust `commands.rs` owns `claude_bridge_start` / `claude_bridge_stop`; chat hooks and Claude components consume this layer. | This is a chat transport bridge. It should not become the owner for every terminal-launched CLI. |
+| Local CLI tool tabs | `src/features/chat/cliTabs/cliTools.ts` lists Claude, Codex, and OpenCode as PTY-spawned tools; `src/features/workspace/terminal/CliTerminal.tsx` invokes `pty_create` with `program` and `args`; `runtime/capabilities/capabilityService.ts` probes `claude`, `codex`, and `opencode` on PATH. | These are local executable capabilities surfaced in the UI. They belong closer to runtime/workspace terminal ownership than to chat-engine bridge ownership. |
+| Future Studio CLI product | Untracked `docs/Architecture/Studio CLI Migration Plan.md` proposes a reduced fork of `temp/opencode`, keeping the CLI/TUI/core/server/sdk/llm closure, deleting unrelated OpenCode apps/packages, and redirecting provider/auth/update traffic to Studio Cloud. | Treat as an adjacent product/repository boundary, not a `src/` refactor. Integrate only through installed binary, PTY, local control APIs, or a future explicit SDK contract. |
+
+Current CLI app findings:
+
+- The Studio frontend still has OpenCode-specific local capability names,
+  install URL, icon, PTY theme config, `OPENCODE_TUI_CONFIG`, and
+  `opencode-cli` identifiers. These are live support for an external installed
+  OpenCode binary, not proof that Studio CLI has been forked.
+- `CliTerminal.tsx` writes an OpenCode TUI config file under the Tauri app data
+  directory and sets the TUI theme to `system` when launching `opencode`.
+- `codingSessionManager` classifies PTY sessions as `"opencode"` only for the
+  OpenCode tool and otherwise as `"cli-bridge"`.
+- The migration plan says the Studio CLI fork should preserve upstream package
+  boundaries, prefer additive provider/system-context/tool extensions, and avoid
+  a blind search-and-replace for `.opencode/` paths or `OPENCODE_*` env vars.
+- The nested `temp/opencode` checkout currently exists and is very dirty. It
+  needs its own branch, commits, proof gates, and licensing/NOTICE review.
+
+Studio CLI migration rules:
+
+1. Do not fold `temp/opencode` into `STUDIO/src`, `STUDIO/runtime`, or
+   `STUDIO/library` during Studio frontend rehabilitation. If Studio CLI becomes
+   bundled, define a package/resource contract first.
+2. Do not rename `opencode` support in the Studio UI until deciding whether the
+   app is supporting upstream OpenCode, a forked `studio` binary, or both during
+   transition.
+3. Do not collapse `cliBridges`, PTY terminals, runtime capability detection,
+   and the future Studio CLI fork into one folder just because they all involve
+   command-line programs.
+4. Studio CLI proof belongs to the nested CLI checkout: runnable `studio`
+   binary, TUI help/branding grep, provider/update endpoint verification, Bun
+   workspace install/build, and license/NOTICE retention.
+5. Any future packaged Studio CLI integration needs Tauri resource mapping,
+   update/install policy, PATH/binary resolution, and terminal lifecycle proof.
+
 Preferred feature-internal shape once a feature is large enough:
 
 ```text
