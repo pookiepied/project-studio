@@ -3,6 +3,9 @@
 Evidence pass: 2026-07-18
 Current checkpoint inspected: `d6ed7bb docs: refresh studio checkpoint guidance`
 Scope: `STUDIO/` desktop/frontend tree, with supporting references from `docs/architecture/` and `documentation/`.
+Independent verification: sub-agent Cicero confirmed the broad direction and
+flagged follow-up corrections after reading code. This revision folds those
+corrections into the audit.
 
 This audit is the first Version 2 pass for retiring the old Desktop-local runtime
 and relay direction in favor of this product model:
@@ -57,7 +60,7 @@ Keep or migrate code when it supports the new Desktop role:
 | Native browser panel | `STUDIO/src/features/workspace/browser/**`, `STUDIO/src-tauri/src/native_browser.rs` | Direct browser tab surface and child webview commands. | Product decision required. Remove if browser becomes Studio CLI/cloud tool output only; keep only if Desktop browser adds unique review/research value. |
 | Direct terminal panel | `STUDIO/src/features/workspace/terminal/**`, `pty_*` commands | Full PTY terminal plus CLI runner. | Keep only as Studio CLI host/headless terminal or advanced terminal. Remove generic multi-agent terminal UX from primary product. |
 | Files panel | `STUDIO/src/features/workspace/rightWorkspace/FilesPanel.tsx`, file previews, Monaco source view | Direct file browser/preview inside right workspace. | Likely replace with Studio CLI file/session output and focused review surfaces. Remove direct file manager if it duplicates CLI-owned workspace. |
-| Git/review commands | `STUDIO/src-tauri/src/commands/git.rs`, `STUDIO/src/core/git/gitService.ts`, `ReviewPanel.tsx` | Direct Git branch/status/diff/stage/commit UI. | Keep review concept, but decide owner. Prefer Studio CLI for repo authority; Desktop may keep review UI over CLI/git events. |
+| Git/review commands | `STUDIO/src-tauri/src/commands/git.rs`, `STUDIO/src/core/git/gitService.ts`, `ReviewPanel.tsx` | Direct Git branch/status/diff/stage/commit UI. | Do not classify as delete. Migrate/decide owner. Prefer Studio CLI for repo authority; Desktop may keep review UI over CLI/git events. |
 | Local provider daemon | `STUDIO/daemon/**`, `local_provider_*` commands, local-provider hooks | Local Ollama/LM Studio provider bridge. | Likely remove from Desktop if local LLM/provider handling moves to Studio CLI. Keep only if CLI explicitly uses the daemon or Desktop still needs local model management. |
 | Old cloud/local symmetry docs | `docs/architecture/Cloud and Local*.md` | Describes bundled local runtime symmetry with cloud runtimes. | Supersede with V2 architecture docs; keep as historical reference until final V2 plan exists, then archive or delete. |
 
@@ -79,6 +82,8 @@ Evidence:
   tools inside the Desktop runtime.
 - `STUDIO/src/runtime/servers/catalog.ts` lists `studio-harness`,
   `computer-use`, `mcp-management`, `skill-management`, and `skill-execution`.
+  Its comment still says "two local MCP servers", but the actual catalog and
+  package surface includes five bundled/local system servers.
 
 V2 decision:
 
@@ -266,6 +271,17 @@ V2 decision:
   - maybe remove: native browser if browser panel is retired
   - maybe keep/rework: Git only if Desktop review stays direct
 
+Focused bug found during verification:
+
+- `STUDIO/src/features/workspace/rightWorkspace/ReviewPanel.tsx` calls
+  `invoke("git_stash_and_checkout", { path, branch })`.
+- Current Rust registration evidence shows `git_checkout_branch`,
+  `git_create_branch`, `git_stage`, `git_unstage`, and `git_commit`, but not
+  `git_stash_and_checkout`.
+- This is not a removal decision by itself. It is a V2 blocker: review/Git UI
+  needs a focused command inventory and bug check before either migration or
+  deletion work.
+
 Second-pass verification before removal:
 
 1. Build a Rust command inventory table.
@@ -309,6 +325,8 @@ Do not delete by folder size. Delete by dependency direction.
    - all `invoke("claude_bridge_*")`
    - all `invoke("pty_*")`
    - all `invoke("native_browser_*")`
+   - all direct Git command invokes, especially missing or mismatched command
+     names such as `git_stash_and_checkout`
    - all local conversation store imports
 3. Build the Studio CLI bridge contract:
    - launch/headless mode
@@ -375,6 +393,7 @@ The next concrete audit should be a caller inventory, not implementation:
 | Claude bridge callers | `rg "claude_bridge|runClaude|ChatEngine|ClaudeSession" STUDIO/src STUDIO/src-tauri/src` |
 | Local conversation callers | `rg "localConversation|conversationStorageScope|studio:storage-ready" STUDIO/src` |
 | PTY/native browser callers | `rg "pty_|native_browser_" STUDIO/src STUDIO/src-tauri/src` |
+| Git review command callers | `rg "git_stash_and_checkout|git_checkout_branch|git_create_branch|git_stage|git_commit" STUDIO/src STUDIO/src-tauri/src` |
 | Tauri bundle resources | inspect `STUDIO/src-tauri/tauri.conf.json` |
 | MCP build ownership | inspect `STUDIO/scripts/mcp-build.mjs` |
 
