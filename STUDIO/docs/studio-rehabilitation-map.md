@@ -518,6 +518,48 @@ Window and surface variant findings:
 | Native browser child webviews | `src-tauri/src/native_browser.rs` creates child webviews inside the main window; `nativeBrowserService.ts` maps browser tab ids to labels such as `studio-browser-<tab>`. | Browser content is neither a React iframe alone nor a separate Tauri window. Geometry, visibility, and cleanup live across React panel state and Rust child-webview commands. |
 | Web/html browser fallback | `BrowserPanel.tsx` also supports HTML/iframe-style rendering when native browser support is unavailable. | Browser panels have two rendering backends. Keep this backend split visible before reorganizing workspace browser files. |
 
+Implementation gates before code changes:
+
+Before any structural implementation in shell, chat, workspace, startup, or CSS,
+the slice must name which contracts it touches and prove that the target files
+are not owned by another active dirty-worktree task.
+
+| Gate | Required decision/evidence | Blocks until satisfied |
+| --- | --- | --- |
+| Dirty worktree ownership | Inspect `git status --short` and identify whether each target path is already dirty from another task. If so, either wait for that work to be committed, receive an explicit handoff, or stay map-only. | Edits to active UI, backend, harness, package, or generated files that are not part of the current slice. |
+| Startup lifecycle | Define readiness phases for native process boot, pre-React shell setup, provider mount, auth/API checks, router/session restoration, active conversation restoration, shell mount, splash dismissal, and native show/focus. | `app_ready`, splash, startup z-index, native window visibility, and first-paint fixes. |
+| Surface taxonomy | Classify the target as a native window, route variant, app shell chrome, page-owned surface, in-page panel, portal overlay, or child webview. | Moves or renames of shell/page/window files and any attempt to merge conversation windows, side chat, overlay windows, or right-workspace panels. |
+| Shell/page ownership | Decide the owner for global dock state, page title swapping, top-right controls, taskbar/session controls, navigation/current view, and provider lifetime. | `HomePage.tsx`, `MainLayout.tsx`, `FloatingPanel.tsx`, `ChatTopChrome.tsx`, `ChatPage.tsx`, and workspace shell moves. |
+| Layer/portal registry | Inventory current token use, direct `document.body` portals, Radix portals, inline z-index values, scrims, and fixed-position chrome. | z-index changes, overlay relocation, modal/backdrop consolidation, and portal-root refactors. |
+| Layout/scroll ownership | Identify root scroll owner, page scroll owner, panel width publishers/subscribers, composer overlay exclusion zones, resize-handle behavior, and clipping boundaries. | Chat scroll, composer dock, left/right panel resizing, workspace page CSS, and root overflow refactors. |
+| State/persistence scopes | Identify process, session, auth, page, conversation, project, workspace, and local filesystem state scopes plus restore order and migration behavior. | Logout/localStorage cleanup, conversation storage moves, project context moves, workspace service splits, and provider relocation. |
+| Theme/CSS authority | Decide which files own global tokens, shell geometry variables, pre-React classes, feature CSS, component classes, and local visual experiments. | `index.css`, `workspaceShell.css`, `workspacePage.css`, `tokens.css`, Tailwind layer changes, and shell class consolidation. |
+
+Next safe implementation candidates after the dirty tree is clean or handed over:
+
+1. Do a no-behavior ASCII/mojibake/comment cleanup slice in a very small file
+   set such as `App.tsx`, `HomePage.tsx`, `main.tsx`, `shellConfig.ts`, and
+   `tokens.css`.
+2. Add a startup lifecycle contract document or a small named readiness helper
+   before changing `app_ready`, splash timing, or z-index values.
+3. Create a layer/portal registry inventory before replacing inline z-index
+   values or moving overlays.
+4. Reconcile global dock naming such as `chatDockVisible` only after the
+   shell/page ownership gate decides whether the dock is global shell chrome,
+   chat chrome, or a mixed bridge.
+5. Resume `WorkspacePage.tsx` and right-workspace extraction only after the
+   current workspace dirty work is committed or explicitly handed over.
+
+Stop conditions for implementation slices:
+
+- If a target file is dirty from another owner, stop at map updates or request
+  an explicit handoff for that path.
+- If a slice cannot name its startup, surface, layer, layout, state, and CSS
+  contracts, do the audit first.
+- If verification is unreliable because package files or harness/runtime files
+  are dirty from another task, report the limited verification scope instead of
+  claiming behavior is proven.
+
 ### Phase 4: Monolith splits
 
 Start with files that are large and actively edited, not generated data.
