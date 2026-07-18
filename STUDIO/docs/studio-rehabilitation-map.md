@@ -921,6 +921,71 @@ Layer stop conditions:
 - Do not add new `document.body` portals without naming their semantic layer and
   dismissal/focus owner.
 
+Theme and CSS authority triage:
+
+Studio has a real token system, but the current CSS surface is split between
+global design authority, shell lifecycle styling, third-party package CSS, and
+feature-local visual experiments. Treating all CSS as equivalent would make the
+rehabilitation harder to reason about, so future cleanup should classify each
+file by authority before moving or consolidating styles.
+
+Current CSS authority levels:
+
+| File or source | Current authority | Drift or cleanup need |
+| --- | --- | --- |
+| `src/design/tokens.css` | Semantic surface, text, state, elevation, scrollbar, syntax, geometry, spacing, z-index, and motion tokens; bridged into Tailwind. | The file is the right design-system authority, but it contains decorative/mojibake separator comments and strongly worded historical notes that should be cleaned in a no-behavior slice. |
+| `src/design/typography.css` | Type scale and font variables, loaded after font packages and before global base CSS. | Keep as design authority; inline font references in code should stay aligned with it. |
+| `src/design/syntax.css` | Syntax highlighting cascade that intentionally loads after `index.css`. | Keep separate from generic prose and markdown layout until renderer ownership is mapped. |
+| `src/design/prose-chat.css` | Chat/markdown prose cascade that intentionally loads after `index.css`. | It is feature-adjacent but globally imported; decide whether this remains a shared markdown design layer or moves under markdown/chat after renderer ownership is mapped. |
+| `src/index.css` | Tailwind directives, reset, `html`/`body` background, transparent window variants, dark body color scheme, global focus/reduced-motion rules, mobile input sizing, scrollbars, chat scroll anchors, and Tauri drag helpers. | It owns a mix of true global rules and feature-adjacent utilities. Do not slim it down until chat scroll, surface variants, and shell lifecycle are explicit. |
+| `src/app/shell/workspaceShell.css` | Shell geometry variables (`--studio-topbar-height`, `--studio-topbar-control`), zen surface/hotzone styling, and zen-window chat-header alignment. | It also sets `html, html body { background: transparent !important; }` globally while its comment claims workspace-shell scope, and the comment references a stale token path. This is shell lifecycle drift, not just style duplication. |
+| `src/features/workspace/pages/workspacePage.css` | Dirty/untracked workspace page skin: page root clipping, staged layout, nested scroll containers, local workspace color variables, project cover/shader styling, command bar, details overlay, and workspace-specific controls. | It currently behaves like a separate feature design system with hardcoded colors, repeated light values for `html.dark`, disabled aurora CSS, and page-level clipping. Classify it as temporary experiment, page-local skin, or new tokenized workspace visual system before editing. |
+| `src/features/workspace/rightWorkspace/filesPanel.css` | Feature panel scrollbar treatment for markdown document previews. | This is a narrow feature utility that consumes global scrollbar tokens; keep local unless a shared panel-scrollbar primitive emerges. |
+| Third-party CSS imports | `@fontsource`, `@xterm/xterm/css/xterm.css`, and `katex/dist/katex.min.css` provide package-owned base styles. | Do not fold these into Studio CSS. Wrap or override at feature boundaries only when the owning feature documents the override. |
+| Tailwind/component class names | Component-local layout, spacing, states, and visual styling. | Should consume design tokens or feature-local variables; hardcoded colors need labels as fixed asset/media cases, OS chrome, or intentional experiments. |
+
+CSS authority rules:
+
+1. Design tokens define shared semantic values. Feature CSS should consume tokens
+   unless it is explicitly owning a bounded visual experiment or generated/media
+   fixture.
+2. `html`, `body`, background transparency, and window-surface variants belong to
+   the app startup/shell lifecycle plus `index.css`, not arbitrary feature CSS.
+3. Shell geometry variables and topbar/window-control alignment belong to app
+   shell CSS until a stronger shell lifecycle owner exists.
+4. Feature CSS may own page-local layout, scroll containers, and visual skin only
+   within its feature root. Global selectors need a documented mode scope such
+   as `html.<surface-mode>` or must move to app/design authority.
+5. Hardcoded colors are acceptable only for fixed OS chrome, logos/media,
+   generated visual fixtures, syntax/package overrides, or clearly documented
+   temporary experiments.
+6. Decorative comments, mojibake separators, stale path comments, and disabled
+   decorative CSS should be removed in dedicated no-behavior cleanup slices.
+
+Suggested future CSS implementation order:
+
+1. Clean stale comments/mojibake in stable design and shell CSS without changing
+   selectors or declarations.
+2. Add a short CSS authority note near the map or design docs so contributors
+   know when to use design tokens, shell CSS, feature CSS, or package overrides.
+3. Classify `workspacePage.css` as experimental page skin or migrate it toward
+   shared tokens after workspace layout/scroll ownership is settled.
+4. Split workspace-shell transparency from workspace-shell geometry only after
+   startup lifecycle and surface variants are testable.
+5. Move chat scroll helpers out of `index.css` only after chat scroll/composer
+   ownership is stable.
+
+CSS stop conditions:
+
+- Do not move or normalize `workspacePage.css` while it is dirty/untracked and
+  the workspace layout/scroll contract is unresolved.
+- Do not remove the global transparent `html, body` rule from
+  `workspaceShell.css` as a quick fix until surface variants are tested.
+- Do not consolidate `index.css` chat scroll helpers while composer dock and
+  message-list scroll ownership still cross component boundaries.
+- Do not run formatters or style tools that touch many CSS files during a
+  focused rehabilitation slice.
+
 Layout, clipping, and scroll ownership findings:
 
 | Area | Observed owner today | Rehabilitation risk |
