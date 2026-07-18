@@ -5,8 +5,23 @@ maintain, and safely refactor. It is intentionally conservative: first map the
 system, then remove proven dead code, then split monoliths, then rename or move
 files once ownership is clear.
 
-Last evidence pass: 2026-07-13.
+Last evidence pass: 2026-07-18.
 Baseline checkpoint: `d44311e chore: checkpoint studio worktree`.
+Current observed checkpoint: `3719af8 Checkpoint Studio UI and coding workflow`.
+
+Current checkout note:
+
+- The worktree currently contains broad uncommitted work across Backend, Studio
+  harness, package manifests, Studio shell/chat/workspace files, and new
+  workspace-domain files. Treat this map update as an audit checkpoint, not as
+  ownership of that active UI/backend work.
+- Do not begin broad shell/CSS restructuring, page moves, or visual redesign
+  until the architecture audit tracks below are mapped against the live
+  worktree.
+- `src/features/chat/components/ChatFloatingDock.tsx` is absent in the current
+  worktree. Older entries that describe that file are historical extraction
+  notes; the live dock ownership appears to have moved toward the global shell
+  dock path and must be re-audited before any further dock work.
 
 ## Goals
 
@@ -131,13 +146,15 @@ before splitting.
 | --- | ---: | --- |
 | `src/features/manage/modelRegistry/curatedRegistrySnapshot.ts` | 11519 | Generated or snapshot-like data; classify before editing |
 | `src/features/chat/context/ChatProvider.tsx` | 573 | Provider still owns turn orchestration and wiring; model/context helpers, access prompts, streaming lifecycle, conversation display pagination, conversation bootstrap, tool permission evaluation, background service effects, project context state, engine/session state, and title generation were extracted |
-| `src/features/chat/pages/ChatPage.tsx` | 564 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, turn-status policy, and conversation composer dock were extracted |
+| `src/features/workspace/pages/WorkspacePage.tsx` | 1045 | Live dirty work has grown the page again; now mixes workspace-domain data, page state, shell/surface composition, and new workspace styling hooks. Audit before splitting because several related files are uncommitted. |
+| `src/features/chat/pages/ChatPage.tsx` | 675 | Page composition remains heavy; composer panels, top chrome, overlays, composer dock measurement, composer input wiring, environment controls, project registry wiring, turn-status policy, and conversation composer dock were extracted, but current shell/dock changes need re-audit. |
 | `src/core/errors/comprehensiveDiagnostics.ts` | 558 | Diagnostic collectors may be separable; shared report types and text formatter were extracted |
-| `src/features/chat/components/ChatFloatingDock.tsx` | 545 | Complex composite UI; browser rows/actions and tree grouping/search logic were extracted |
-| `src/features/workspace/pages/WorkspacePage.tsx` | 537 | Page still mixes workflow state and section composition; context lists and automation UI were extracted |
 | `src/features/voice/hooks/useAudioRecorder.ts` | 468 | Hook still mixes recording state and chunk transcription; browser setup, cleanup, and finalization/rephrase helpers were extracted |
 | `src/features/chat/context/useStreamHandlers.ts` | 458 | Streaming protocol/event logic candidate; DSML continuation was extracted |
 | `src/features/activity/pages/ActivityPage.tsx` | 451 | Page now focuses on display state and rendering; data fetching, loading state, refresh, and log polling were extracted |
+| `src/features/chat/components/ChatFloatingDockRows.tsx` | 381 | Remaining row/action UI from the former chat dock path. Recheck live consumers before extracting or removing because the parent dock file is absent in the dirty worktree. |
+| `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx` | 330 | Right workspace surface now composes new conversation workspace panels and geometry behavior; audit surface ownership before additional panel splits. |
+| `src/features/workspace/rightWorkspace/ConversationWorkspacePanel.tsx` | 327 | New untracked conversation workspace surface. Classify with workspace lifecycle and shell/page ownership before treating as stable structure. |
 
 ## Dead-Code Signals
 
@@ -389,6 +406,36 @@ Next:
 - Retire the remaining awkward cross-feature imports in small, verified slices
   after the large files are easier to reason about.
 
+### Architecture audit tracks
+
+Map these contracts before any further shell/CSS restructuring, page moves, or
+renames. The current dirty UI work is an investigation/input track, not a
+competing implementation owner.
+
+| Track | Current signal | Next evidence to collect |
+| --- | --- | --- |
+| Startup lifecycle and readiness phases | The real app shell can mount behind the splash. Splash uses `z-modal` while traffic lights and chat chrome use `z-toast`. The `app_ready` signal has been observed before router/session restoration and splash completion. | Define explicit readiness phases for process boot, router restoration, session restoration, shell mount, and splash dismissal. Fix with a lifecycle mechanism, not a one-off z-index patch. |
+| Window and surface variants | Main window shell, chat page, right workspace, global floating dock, traffic lights, splash, taskbar/session controls, artifact panels, and workspace panels overlap in responsibility. | Inventory every window/surface entry point and classify which shell owns visibility, geometry, focus, and persistence. |
+| Page and shell ownership | `HomePage.tsx`, `FloatingPanel.tsx`, `ChatTopChrome.tsx`, `ChatPage.tsx`, `WorkspacePage.tsx`, and right-workspace panels all participate in top chrome or surface composition. | Decide which layer owns global dock state, page title swapping, taskbar/session controls, and chat/workspace-specific chrome. |
+| Layer and portal registry | Live classes include `z-modal`, `z-toast`, `z-context`, fixed top chrome, fixed global panel frames, and absolute menu layers. | Create a registry of layer tokens, portal roots, and allowed owners before changing z-index values or moving overlay markup. |
+| Layout, clipping, and scroll ownership | Chat message padding, composer dock height, push-layout sidebar, right workspace resizing, and workspace page CSS all affect available space. | Identify the single owner for root scroll, page scroll, overlay exclusion zones, resize handles, and clipping boundaries. |
+| State ownership and persistence scopes | Chat provider, router state, session restoration, workspace lifecycle files, project registry, and local/cloud workspace sources all persist overlapping state. | Separate process/session/page/conversation/project/workspace persistence scopes and document restore order. |
+| Theme and CSS authority | `index.css`, design tokens, Tailwind utility classes, `FloatingPanel` classes, and new `workspacePage.css` all affect app-level chrome. | Decide which files own global tokens, shell geometry variables, feature CSS, and local component styling before renaming or consolidating styles. |
+
+Current files to reconcile first:
+
+- `src/app/routes/HomePage.tsx`
+- `src/app/shell/FloatingPanel.tsx`
+- `src/features/chat/pages/ChatTopChrome.tsx`
+- `src/features/chat/pages/ChatPage.tsx`
+- `src/features/chat/components/ChatFloatingDockRows.tsx`
+- `src/features/workspace/pages/WorkspacePage.tsx`
+- `src/features/workspace/pages/workspacePage.css`
+- `src/features/workspace/life/`
+- `src/features/workspace/rightWorkspace/RightWorkspacePanel.tsx`
+- `src/features/workspace/rightWorkspace/ConversationWorkspacePanel.tsx`
+- `src/features/workspace/rightWorkspace/workspacePanelGeometry.ts`
+
 ### Phase 4: Monolith splits
 
 Start with files that are large and actively edited, not generated data.
@@ -526,11 +573,20 @@ Completed:
 
 Recommended order:
 
-1. Continue `src/features/workspace/pages/WorkspacePage.tsx`
-2. `src/features/chat/pages/ChatPage.tsx`
-3. `src/features/chat/context/ChatProvider.tsx`
-4. `src/features/chat/components/ChatFloatingDock.tsx`
-5. `src/features/voice/hooks/useAudioRecorder.ts`
+1. Audit startup/shell/window contracts from the architecture tracks above.
+2. Reconcile the live workspace growth around
+   `src/features/workspace/pages/WorkspacePage.tsx`,
+   `src/features/workspace/life/`, and right-workspace panels.
+3. Re-audit `src/features/chat/pages/ChatPage.tsx` with the new global dock and
+   `ChatTopChrome` ownership before further chat page extraction.
+4. Continue `src/features/chat/context/ChatProvider.tsx` only after confirming
+   the dirty shell/workspace changes do not alter provider responsibilities.
+5. Continue `src/features/voice/hooks/useAudioRecorder.ts` when the shell
+   architecture track is not active.
+
+Do not continue the historical `ChatFloatingDock.tsx` split until the removed
+file and replacement global dock path are reconciled against the committed
+state.
 
 Split rule:
 
