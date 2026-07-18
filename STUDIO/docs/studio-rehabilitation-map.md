@@ -582,6 +582,65 @@ Dead-code proof matrix:
 | `vendor/` | Ignored by root Knip and large by design. | Vendor manifest/sync-script evidence and bundle/runtime lookup proof. Treat as external runtime material, not normal source. |
 | `gate/` | Used by ratchet scripts rather than app imports. | `scripts/ratchet.mjs` reference plus successful ratchet command. Preserve unless replacing the quality-gate process. |
 
+Tooling and manifest evidence:
+
+The current Studio checkout has multiple independent build and proof graphs.
+The root `npm run deadcode` command is useful, but it only proves the graph
+configured in `knip.json`; it is not a project-wide unused-file oracle.
+
+| Tool or manifest | Current entry/coverage | Rehabilitation meaning |
+| --- | --- | --- |
+| Root `package.json` | `dev`, `build`, `typecheck`, `deadcode`, `ratchet:*`, `gate`, Tauri, web, vendor sync, and installer asset scripts. | Root scripts define the contributor-facing verification surface. Do not remove scripts or dependencies without checking script, Tauri, release, and packaging paths. |
+| `knip.json` | Entries are `src/main.tsx` and `web/web-main.tsx`; project files are `src/**/*.{ts,tsx}` and `web/**/*.{ts,tsx}`. | Knip can support cleanup in app/web source only. It explicitly ignores Tauri, daemon, library MCP servers, skills, scripts, and vendor. |
+| `tsconfig.json` | Includes `src`; strict TypeScript, `noUnusedLocals`, and `noUnusedParameters`; `@/*` maps to `src/*`. | Root typecheck does not compile `daemon`, `library/mcp-servers`, or Rust. TypeScript unused errors are scoped to `src`. |
+| `vite.config.ts` | Desktop/Tauri Vite graph, `@` alias, Tauri env flags, port `1420`, optimized Tauri imports, and desktop chunking. | Desktop-only entry and package dependencies can be live even if web build or Knip misses a path. |
+| `vite.config.web.ts` | Web root is `web`, public dir is shared `public`, output is `dist-web`, and `@` still resolves to `src`. | Web is a separate entry variant. Removal of shared source needs both desktop and web evidence when code is imported by both. |
+| `src-tauri/Cargo.toml` | Rust app crate, Tauri plugins, keyring, SQLite, pty, HTTP, Windows WebView/DWM dependencies. | Rust dependencies and files require Cargo/Tauri proof, command/event searches, and packaged-window behavior checks, not TypeScript import proof. |
+| `src-tauri/tauri.conf.json` | Hidden transparent frameless main window, CSP, updater, NSIS bundle, and resource bundling for MCP server `dist`/`node_modules` plus `vendor`. | Bundle resources are live packaging contracts. A folder can be packaging-critical even when no TypeScript import references it. |
+| `scripts/mcp-build.mjs` | Builds five first-party MCP servers unless `STUDIO_RELEASE=1` says release flow already built/pruned them. | MCP server source, `dist`, and `node_modules` have build/release semantics. Do not delete or move them without checking release and Tauri resource mapping. |
+| `daemon/package.json` | Separate TypeScript/Node project for local provider bridge, with `build`, `start`, `dev`, and `test`. | Daemon cleanup needs its own package build/test and startup/bundling evidence. |
+| First-party MCP package manifests | `@studio/studio-harness`, `@studio/computer-use`, `@studio/mcp-management`, `@studio/skill-management`, and `@studio/skill-execution` each build with esbuild into `dist/index.js`. | Each MCP server is its own package boundary. Root app tools cannot prove unused internals without server-specific entry and tool registry checks. |
+| Root loose artifacts | Logs, batch launchers, Tailwind test CSS, Vercel config, and README live at the Studio root. | Some are likely cleanup candidates, but each needs a quick owner check: dev log, local launcher, deployment config, or generated test artifact. |
+
+Unused-proof rules:
+
+1. A file is only "unused" after the right graph for its owner says so. App/web,
+   Rust/Tauri, daemon, MCP server, script, public asset, skill, and vendor files
+   have different proof requirements.
+2. Static import absence is not enough for Tauri commands/events, bundled
+   resources, MCP tools, skill manifests, vendor binaries, public assets, or
+   release scripts.
+3. Package dependencies should be classified by owner before removal: app/web,
+   Tauri build, daemon, first-party MCP package, scripts, or generated lockfile
+   transitive dependency.
+4. Nested `node_modules` under bundled MCP servers are packaging/runtime
+   material today. Treat them as generated/vendor-like until release packaging
+   has a replacement strategy.
+5. Root loose artifacts should be triaged separately from source: logs can often
+   be ignored or removed, while launchers/configs may be user workflows.
+
+Suggested future tooling implementation order:
+
+1. Add a "proof command by area" checklist to this map or a short contributor
+   doc, using the matrix above as the source of truth.
+2. Audit root loose files (`*.log`, batch launchers, Tailwind test CSS, Vercel
+   config, minimal README) as a no-code cleanup slice.
+3. Run the app/web proof commands only when `STUDIO/package.json` is not dirty,
+   because dependencies and scripts are currently part of another active track.
+4. Audit daemon and MCP package boundaries after their dirty worktree owners are
+   settled; build each package from its own manifest before deleting internals.
+5. Revisit `knip.json` only after deciding whether to add separate workspaces or
+   separate proof configs for daemon/MCP packages.
+
+Tooling stop conditions:
+
+- Do not treat `npm run deadcode` as proof for ignored folders.
+- Do not edit `package.json`, lockfiles, Tauri config, or nested MCP packages
+  while they are dirty from another active task.
+- Do not delete Tauri bundle resources without a packaged-app proof path.
+- Do not remove nested `node_modules` from bundled MCP servers until release
+  packaging no longer depends on shipping them.
+
 Current dirty-tree constraint:
 
 - The MCP harness under `library/mcp-servers/harness/studio-harness/` is
