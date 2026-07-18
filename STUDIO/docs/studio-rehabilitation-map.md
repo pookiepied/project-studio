@@ -242,6 +242,49 @@ Current extraction priority once dirty ownership is resolved:
    voice recorder/session hooks if implementation work must proceed while shell
    and workspace are active.
 
+Artifact Lab responsibility triage:
+
+`src/features/artifacts/components/ArtifactLabPanel.tsx` is currently dirty and
+is the largest hand-authored app file. It is a lab/catalog surface, while the
+production artifact rendering path lives mostly in
+`src/features/markdown/renderers/ArtifactRenderer.tsx` and
+`src/features/markdown/renderers/artifacts/`.
+
+Observed responsibilities inside `ArtifactLabPanel.tsx`:
+
+| Responsibility | Current evidence | Candidate extraction |
+| --- | --- | --- |
+| Catalog IDs and family grouping | `CatalogArtifactId`, `CatalogFamily`, `ARTIFACT_OPTIONS`, `FAMILY_OPTIONS`, `FAMILY_SELECT_OPTIONS`, and `artifactFamily`. | `artifactLabCatalog.ts` or `artifactLabOptions.ts`. |
+| Tool activity demo fixtures | `ActivityStatus`, `ToolActivityCall`, `ToolActivityGroup`, and `ACTIVITY_GROUPS`. | `artifactLabActivityFixtures.ts`. |
+| Web/source fixtures | `SOURCE_RESULTS` and `buildWebArtifact`. | `fixtures/webArtifacts.ts`. |
+| Generated media fixtures | Inline generated SVG data URLs, `GENERATED_VIDEO_URL`, `buildImageArtifact`, and `buildVideoArtifact`. | `fixtures/generatedMediaArtifacts.ts`; keep literal SVG fixture data out of the page component. |
+| Connector data fixtures | Gmail messages, calendar events, Drive files, GitHub items, Todoist tasks, and per-family builders. | One fixture module per connector family, or a `fixtures/connectors/` folder if the set keeps growing. |
+| Artifact builder routing | `buildArtifact` dispatches by ID prefix to each family builder. | `artifactLabBuildArtifact.ts` after fixture modules exist. |
+| Chat-copy/status-copy helpers | `statusCopy` and `promptCopy` map fixture IDs to preview copy/icons. | `artifactLabPreviewCopy.tsx` because it returns React icons. |
+| Runtime activity preview UI | `activityTone`, `ActivityShimmer`, `ToolCallRow`, `ToolActivityCard`, and `ActivityPreviewPanel`. | `ArtifactActivityPreview.tsx`. |
+| Page shell and controls | `ArtifactLabPanel` owns selected ID state, family/type selects, chat-like fixture layout, and `ArtifactRenderer` invocation. | Keep as the root component after fixture and preview extractions. |
+
+Suggested first split after handoff:
+
+1. Extract pure catalog/options and non-React artifact fixtures first. This
+   should reduce file size without changing rendering behavior.
+2. Extract generated media fixture data separately because the inline SVG data
+   is large and visually noisy.
+3. Extract `ArtifactActivityPreview.tsx` once fixtures are out, because that is
+   actual UI rather than data.
+4. Leave `ArtifactLabPanel.tsx` as the page-level composition owner with only
+   selection state, preview copy wiring, and `ArtifactRenderer`.
+
+Boundary notes:
+
+- Do not move production renderers from
+  `src/features/markdown/renderers/artifacts/` during the lab split; they are
+  the live markdown artifact rendering path.
+- Do not rename the artifacts feature until the relationship between artifact
+  lab, runtime activity, connector outputs, and markdown rendering is clearer.
+- Because `ArtifactLabPanel.tsx`, `registry.ts`, and several artifact renderers
+  are dirty now, this is audit evidence only until those files are handed over.
+
 ## Dead-Code Signals
 
 `npx knip --reporter compact` currently reports:
