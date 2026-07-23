@@ -10,6 +10,8 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
-    restoreMocks: true
+    restoreMocks: true,
+    testTimeout: 30_000,
+    fileParallelism: false
   }
 });

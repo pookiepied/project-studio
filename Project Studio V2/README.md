@@ -9,7 +9,7 @@ API, or either production model gateway.
 Flue owns the agent loop, canonical conversations, accepted submissions, model and tool events,
 cancellation, and restart recovery. Pi provides the model protocol layer underneath Flue.
 Project Studio owns product contracts, model-source selection, UI integration, authorization,
-tools, MCP connections, skills, sandbox policy, and future observability projections.
+tools, MCP connections, skills, sandbox policy, and observability composition.
 
 Project Studio terminology maps to Flue as follows:
 
@@ -32,6 +32,7 @@ src/
     studio.ts                 First continuing Flue agent
   application/
     harness-client.ts         UI-facing send/wait/observe/cancel/history boundary
+  app.ts                      Telemetry init + Flue standard mount only
   context/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
@@ -40,14 +41,24 @@ src/
   models/
     deterministic-provider.ts In-process Pi provider for the first vertical slice
     model-registry.ts         Model-source resolver
+  observability/
+    config.ts                 Validated exporter and content-capture config
+    errors.ts                 Safe error normalization/serialization
+    flue.ts                   One-time Flue OpenTelemetry registration
+    index.ts                  initialize/shutdown boundary
+    logger.ts                 Structured logger with trace correlation
+    redaction.ts              GenAI content redaction transform
+    sdk.ts                    OpenTelemetry Node SDK lifecycle
   tools/
     workspace-summary.ts      Typed tool used to prove tool continuation
   db.ts                       File-backed Flue SQLite adapter
 tests/
   integration/
     harness.test.ts           Real server, SQLite, cancellation, and restart tests
+    observability.test.ts     Span hierarchy, metrics, redaction, cancellation
   unit/
     architecture.test.ts      Boundary tests
+    observability.test.ts     Config, init-once, logger, errors, redaction
 docs/
   decisions/                  Architecture decision records
 ```
@@ -68,6 +79,7 @@ contain an implemented boundary.
 - Pi streaming and typed tool-call continuation.
 - Gateway-neutral model contracts.
 - Context optimization port with a fail-open passthrough implementation.
+- OpenTelemetry foundation with Flue GenAI instrumentation, structured logs, and safe errors.
 
 The deterministic provider is intentionally in-process. It makes the harness fully testable
 without credentials or network calls and will be replaced at bootstrap by the two gateway
@@ -96,9 +108,28 @@ $env:PORT = "3000"
 node dist/server.mjs
 ```
 
-Flue's standard agent route is enabled for the vertical slice. No custom `app.ts` or application
-routes are authored. Authentication must be added to the agent route admission middleware before
+`src/app.ts` initializes observability and mounts Flue's standard application. It does not add
+business HTTP routes. Authentication must be added to the agent route admission middleware before
 the server is exposed outside a trusted local environment.
+
+## Observability
+
+Project Studio configures the OpenTelemetry Node SDK, then registers `@flue/opentelemetry` once.
+Flue owns agent/model/tool span projection; Project Studio owns resource attributes, exporters,
+content policy, logs, and error serialization.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `PROJECT_STUDIO_SERVICE_NAME` | `project-studio-v2` | `service.name` |
+| `PROJECT_STUDIO_SERVICE_VERSION` | `0.1.0` | `service.version` |
+| `PROJECT_STUDIO_DEPLOYMENT_ENVIRONMENT` | `NODE_ENV` or `development` | `deployment.environment` |
+| `PROJECT_STUDIO_OTEL_EXPORTER` | `none` | `none`, `memory`, or `otlp` |
+| `PROJECT_STUDIO_OTEL_ENDPOINT` / `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | Enables OTLP when set |
+| `PROJECT_STUDIO_OTEL_CAPTURE_CONTENT` / `OTEL_GENAI_CAPTURE_CONTENT` | `false` | Opt-in GenAI content capture with redaction |
+
+There is no network exporter by default. GenAI content capture is off unless explicitly enabled,
+and enabled capture always runs through the redaction transform. Application logs are structured
+JSON on stdout/stderr with optional `trace_id` / `span_id` fields when a span is active.
 
 ## Persistence And Recovery
 
@@ -127,7 +158,7 @@ The next implementation phase should add adapters, not replace the harness:
 2. Studio cloud gateway registration and centralized authentication.
 3. MCP connection registry for local and authenticated cloud servers.
 4. Skill catalog, subagent profiles, sandbox adapters, and schedules.
-5. OpenTelemetry instrumentation and product-owned event projections.
+5. Product-owned event projections over Flue envelopes.
 6. Optional Headroom sidecar behind `ContextOptimizer`.
 
 Headroom is not installed in this phase. Its TypeScript package is a client for a separate
@@ -140,3 +171,4 @@ instructions, recent turns, or incomplete tool-call pairs.
 - [Harness boundaries](docs/decisions/0001-harness-boundaries.md)
 - [Two-gateway model](docs/decisions/0002-two-gateway-model.md)
 - [Context optimization](docs/decisions/0003-context-optimization.md)
+- [Observability foundation](docs/decisions/0004-observability.md)

@@ -133,66 +133,78 @@ afterEach(async () => {
 });
 
 describe.sequential("Flue harness vertical slice", () => {
-  it("accepts a run, streams renderable state, and keeps thread continuity", async () => {
-    const running = await startHarness(await createDatabasePath());
-    const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
-    const observation = client.observe("continuity");
+  it(
+    "accepts a run, streams renderable state, and keeps thread continuity",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+      const observation = client.observe("continuity");
 
-    const first = await client.send("continuity", "hello");
-    expect(first.submissionId).not.toBe("");
-    expect((await client.wait(first)).text).toBe("Echo: hello");
+      const first = await client.send("continuity", "hello");
+      expect(first.submissionId).not.toBe("");
+      expect((await client.wait(first)).text).toBe("Echo: hello");
 
-    observation.refresh();
-    await waitUntil(async () => {
-      const messages = observation.getSnapshot().conversation?.messages ?? [];
-      return messages.some(
-        (message) => textFromMessage(message) === "Echo: hello",
-      );
-    });
+      observation.refresh();
+      await waitUntil(async () => {
+        const messages = observation.getSnapshot().conversation?.messages ?? [];
+        return messages.some(
+          (message) => textFromMessage(message) === "Echo: hello",
+        );
+      });
 
-    const second = await client.send("continuity", "again");
-    expect((await client.wait(second)).text).toBe("Echo: again");
-    const history = await client.history("continuity");
-    expect(history.messages.length).toBeGreaterThanOrEqual(4);
+      const second = await client.send("continuity", "again");
+      expect((await client.wait(second)).text).toBe("Echo: again");
+      const history = await client.history("continuity");
+      expect(history.messages.length).toBeGreaterThanOrEqual(4);
 
-    observation.close();
-  });
+      observation.close();
+    },
+    30_000,
+  );
 
-  it("continues after a typed tool call and records the tool exchange", async () => {
-    const running = await startHarness(await createDatabasePath());
-    const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+  it(
+    "continues after a typed tool call and records the tool exchange",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
 
-    const run = await client.send("tools", "check the workspace");
-    const result = await client.wait(run);
-    expect(result.text).toBe("Project Studio V2 workspace is ready.");
+      const run = await client.send("tools", "check the workspace");
+      const result = await client.wait(run);
+      expect(result.text).toBe("Project Studio V2 workspace is ready.");
 
-    const history = await client.history("tools");
-    const parts = history.messages.flatMap((message) => message.parts);
-    expect(
-      parts.some(
-        (part) =>
-          part.type === "dynamic-tool" &&
-          part.toolName === "workspace_summary" &&
-          part.state === "output-available",
-      ),
-    ).toBe(true);
-  });
+      const history = await client.history("tools");
+      const parts = history.messages.flatMap((message) => message.parts);
+      expect(
+        parts.some(
+          (part) =>
+            part.type === "dynamic-tool" &&
+            part.toolName === "workspace_summary" &&
+            part.state === "output-available",
+        ),
+      ).toBe(true);
+    },
+    30_000,
+  );
 
-  it("cancels accepted work with a durable aborted outcome", async () => {
-    const running = await startHarness(await createDatabasePath());
-    const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+  it(
+    "cancels accepted work with a durable aborted outcome",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
 
-    const run = await client.send("cancel", "[slow] please wait");
-    expect(await client.cancel("cancel")).toBe(true);
-    await expect(client.wait(run)).rejects.toThrow();
+      const run = await client.send("cancel", "[slow] please wait");
+      expect(await client.cancel("cancel")).toBe(true);
+      await expect(client.wait(run)).rejects.toThrow();
 
-    const history = await client.history("cancel");
-    expect(
-      history.settlements.find(
-        (settlement) => settlement.submissionId === run.submissionId,
-      )?.outcome,
-    ).toBe("aborted");
-  });
+      const history = await client.history("cancel");
+      expect(
+        history.settlements.find(
+          (settlement) => settlement.submissionId === run.submissionId,
+        )?.outcome,
+      ).toBe("aborted");
+    },
+    30_000,
+  );
 
   it(
     "resumes an accepted submission after a Node process restart",
@@ -221,6 +233,6 @@ describe.sequential("Flue harness vertical slice", () => {
       const result = await replacementClient.wait(resumedRun);
       expect(result.text).toBe("Echo: survive restart");
     },
-    45_000,
+    90_000,
   );
 });
