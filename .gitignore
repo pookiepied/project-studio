@@ -64,6 +64,7 @@ desktop.ini
 # only — never part of this repo.
 Research/
 temp/
+temp-v2/
 
 # ── Python bytecode cache ────────────────────────────────────
 __pycache__/
