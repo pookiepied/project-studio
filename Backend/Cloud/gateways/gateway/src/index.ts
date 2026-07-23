@@ -1,28 +1,6 @@
-import { Hono } from "hono";
-import { chatRoute } from "./llm/features/chat/route";
-import { audioRoute } from "./llm/features/audio/route";
-import { embeddingsRoute } from "./llm/features/embeddings/route";
-import { imagesRoute } from "./llm/features/images/route";
-import { videoRoute } from "./llm/features/video/route";
-import { modelsRoute } from "./registry/route";
-import { creditsRoute } from "./llm/features/credits/route";
-import { registryManagementRoute } from "./management/registry/route";
-import { healthRoute } from "./system/health/route";
-import type { GatewayEnv } from "./system/infrastructure/cloudflare/env";
+import { createGatewayApp } from "@/app/createGatewayApp";
 
-const app = new Hono<{ Bindings: GatewayEnv }>();
-
-app.route("/health", healthRoute);
-app.route("/v1/chat/completions", chatRoute);
-app.route("/v1/embeddings", embeddingsRoute);
-app.route("/v1/audio", audioRoute);
-app.route("/v1/images", imagesRoute);
-app.route("/v1/videos", videoRoute);
-app.route("/v1/models", modelsRoute);
-app.route("/v1/credits", creditsRoute);
-app.route("/management/registry", registryManagementRoute);
-
-app.notFound((c) => c.json({ error: { code: "NOT_FOUND", message: "Route not found." } }, 404));
+const app = createGatewayApp();
 
 export default {
   fetch: app.fetch

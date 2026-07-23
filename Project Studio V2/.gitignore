@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.flue-vite/
+coverage/
+data/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo

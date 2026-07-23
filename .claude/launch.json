@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "eva-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8377", "--directory", "C:/Users/pooki/AppData/Local/Temp/claude/C--pookiepied-Project-Studio/ed98b655-7748-41de-861c-619fa11c86bd/scratchpad/eva"],
+      "port": 8377
+    },
+    {
+      "name": "ferry",
+      "runtimeExecutable": "C:/pookiepied/Ferry/venv/Scripts/python.exe",
+      "runtimeArgs": ["C:/pookiepied/Ferry/app.py"],
+      "port": 8790
+    }
+  ]
+}

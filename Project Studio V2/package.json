@@ -1,0 +1,30 @@
+{
+  "name": "project-studio-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first Project Studio agent harness",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "flue build --target node",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm build && vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@flue/runtime": "1.0.0-beta.9",
+    "@flue/sdk": "1.0.0-beta.9",
+    "@earendil-works/pi-ai": "0.80.10",
+    "valibot": "^1.1.0"
+  },
+  "devDependencies": {
+    "@flue/cli": "1.0.0-beta.9",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.8"
+  },
+  "packageManager": "pnpm@10.23.0"
+}

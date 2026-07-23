@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
-import { getTransport } from "../src/core/transport";
-import type { GatewayEnv } from "../src/system/infrastructure/cloudflare/env";
+import { getTransport } from "@/platform/cloudflare/aiGateway";
+import type { GatewayEnv } from "@/platform/cloudflare/environment";
 import {
   embed,
   experimental_generateSpeech,
@@ -26,32 +26,12 @@ vi.mock("ai", () => ({
   jsonSchema: vi.fn((schema: unknown) => schema)
 }));
 
-function createKv(): KVNamespace {
-  const values = new Map<string, string>();
-  return {
-    get: vi.fn(async (key: string, type?: string) => {
-      const value = values.get(key) ?? null;
-      return type === "json" && value ? JSON.parse(value) : value;
-    }),
-    put: vi.fn(async (key: string, value: string) => {
-      values.set(key, value);
-    }),
-    delete: vi.fn(async (key: string) => {
-      values.delete(key);
-    }),
-    list: vi.fn(async () => ({ keys: [], list_complete: true, cacheStatus: null })),
-    getWithMetadata: vi.fn(async () => ({ value: null, metadata: null }))
-  } as unknown as KVNamespace;
-}
-
 function createEnv(): GatewayEnv {
   return {
     CF_ACCOUNT_ID: "account-123",
     CF_AIG_GATEWAY_NAME: "studio-gateway",
     CF_AIG_BYOK_ALIAS: "production",
-    CF_AIG_TOKEN: "cf-token",
-    CREDITS_KV: createKv(),
-    MODEL_REGISTRY_KV: createKv()
+    CF_AIG_TOKEN: "cf-token"
   };
 }
 
@@ -100,7 +80,87 @@ describe("gateway worker", () => {
   it("builds the worker surface and responds to /health", async () => {
     const response = await worker.fetch(new Request("https://gateway.test/health"), createEnv(), {} as ExecutionContext);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ ok: true });
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "alive",
+      service: "studio-gateway",
+      version: "0.2.0"
+    });
+    expect(response.headers.get("x-request-id")).toBeTruthy();
+  });
+
+  it("reports readiness separately from liveness", async () => {
+    const ready = await worker.fetch(
+      new Request("https://gateway.test/health/ready"),
+      createEnv(),
+      {} as ExecutionContext
+    );
+    expect(ready.status).toBe(200);
+    await expect(ready.json()).resolves.toMatchObject({ ok: true, status: "ready" });
+
+    const notReady = await worker.fetch(
+      new Request("https://gateway.test/health/ready"),
+      { ...createEnv(), CF_AIG_TOKEN: "" },
+      {} as ExecutionContext
+    );
+    expect(notReady.status).toBe(503);
+    await expect(notReady.json()).resolves.toMatchObject({
+      ok: false,
+      status: "not_ready",
+      configuration: { missing: ["CF_AIG_TOKEN"] }
+    });
+  });
+
+  it("returns a centralized configuration error when transport credentials are missing", async () => {
+    const response = await postChat(
+      { ...createEnv(), CF_AIG_TOKEN: "" },
+      {
+        model: "openai:gpt-5.6-sol",
+        messages: [{ role: "user", content: "Hello" }]
+      }
+    );
+    const body = (await response.json()) as { error: { code: string; request_id: string } };
+
+    expect(response.status).toBe(503);
+    expect(body.error.code).toBe("CONFIGURATION_ERROR");
+    expect(body.error.request_id).toBeTruthy();
+    expect(generateText).not.toHaveBeenCalled();
+  });
+
+  it("reports provider capabilities without issuing paid probes", async () => {
+    const response = await worker.fetch(
+      new Request("https://gateway.test/health/providers"),
+      createEnv(),
+      {} as ExecutionContext
+    );
+    const body = (await response.json()) as {
+      probeMode: string;
+      providers: Array<{ id: string; transport: { mode: string; slug: string } }>;
+    };
+    expect(response.status).toBe(200);
+    expect(body.probeMode).toBe("configuration");
+    expect(body.providers.find((provider) => provider.id === "openai")?.transport).toMatchObject({
+      mode: "native",
+      slug: "openai"
+    });
+    expect(body.providers.find((provider) => provider.id === "alibaba")?.transport).toMatchObject({
+      mode: "custom",
+      slug: "custom-alibaba"
+    });
+  });
+
+  it("keeps removed credits and registry-management surfaces closed", async () => {
+    for (const path of ["/v1/credits/openrouter", "/management/registry/models"]) {
+      const response = await worker.fetch(
+        new Request(`https://gateway.test${path}`),
+        createEnv(),
+        {} as ExecutionContext
+      );
+      const body = (await response.json()) as { error: { code: string; request_id: string } };
+      expect(response.status).toBe(404);
+      expect(body.error.code).toBe("ROUTE_NOT_FOUND");
+      expect(body.error.request_id).toBeTruthy();
+    }
   });
 
   it("serves /v1/models from the gateway catalog shape", async () => {
@@ -109,9 +169,20 @@ describe("gateway worker", () => {
       createEnv(),
       {} as ExecutionContext
     );
-    const body = (await response.json()) as { data: Array<{ id: string }> };
+    const body = (await response.json()) as {
+      object: string;
+      totalModels: number;
+      data: Array<{ id: string }>;
+      providers: Record<string, { credentialStatus: string; apiKeyValid: boolean | null }>;
+    };
+
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ object: "list" });
+    expect(body.object).toBe("list");
+    expect(body.totalModels).toBeGreaterThan(0);
+    expect(body.providers.openai).toMatchObject({
+      credentialStatus: "not_probed",
+      apiKeyValid: null
+    });
     expect(body.data.some((model: { id: string }) => model.id === "openai:gpt-5.6-sol")).toBe(true);
   });
 
@@ -139,6 +210,7 @@ describe("gateway worker", () => {
       fullStream: (async function* () {
         yield { type: "text-delta", text: "hel" };
         yield { type: "text-delta", text: "lo" };
+        yield { type: "finish", totalUsage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 } };
       })()
     } as never);
 
@@ -151,7 +223,66 @@ describe("gateway worker", () => {
     const text = await response.text();
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     expect(text).toContain("hel");
+    expect(text).toContain("event: stream.started");
+    expect(text).toContain("event: model.message.delta");
+    expect(text).toContain("event: usage");
+    expect(text).toContain("event: model.usage");
+    expect(text).toContain("event: model.completed");
+    expect(text).toContain("event: stream.completed");
     expect(text).toContain("[DONE]");
+  });
+
+  it("streams tool call events immediately and preserves the aggregate tool_calls event", async () => {
+    vi.mocked(streamText).mockReturnValue({
+      fullStream: (async function* () {
+        yield { type: "tool-call", toolCallId: "call_lookup", toolName: "lookup", input: { q: "weather" } };
+        yield { type: "finish", totalUsage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 } };
+      })()
+    } as never);
+
+    const response = await postChat(createEnv(), {
+      model: "gpt-5.6-sol",
+      stream: true,
+      messages: [{ role: "user", content: "Use a tool" }],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "lookup",
+            parameters: { type: "object", properties: { q: { type: "string" } } }
+          }
+        }
+      ]
+    });
+
+    const text = await response.text();
+    expect(response.status).toBe(200);
+    expect(text).toContain("event: tool_call");
+    expect(text).toContain("event: model.tool_call.completed");
+    expect(text).toContain("event: tool_calls");
+    expect(text).toContain("call_lookup");
+    expect(text).toContain("[DONE]");
+  });
+
+  it("normalizes provider failures that occur after an SSE stream starts", async () => {
+    vi.mocked(streamText).mockReturnValue({
+      fullStream: (async function* () {
+        yield { type: "text-delta", text: "partial" };
+        throw new Error("provider connection failed");
+      })()
+    } as never);
+
+    const response = await postChat(createEnv(), {
+      model: "gpt-5.6-sol",
+      stream: true,
+      messages: [{ role: "user", content: "Say hello" }]
+    });
+
+    const text = await response.text();
+    expect(response.status).toBe(200);
+    expect(text).toContain("event: stream.error");
+    expect(text).toContain('"code":"PROVIDER_UNAVAILABLE"');
+    expect(text).not.toContain("provider connection failed");
   });
 
   it("passes tool calls through the chat response", async () => {
@@ -240,7 +371,7 @@ describe("gateway worker", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 
-  it("marks exact reviewed reasoning metadata in the model catalog", async () => {
+  it("exposes reviewed OpenAI reasoning metadata", async () => {
     const response = await worker.fetch(
       new Request("https://gateway.test/v1/models"),
       createEnv(),
@@ -267,141 +398,6 @@ describe("gateway worker", () => {
     expect(body.source).toBe("studio-curated");
     expect(body.registryVersion).toBeDefined();
     expect(body.data.some((model) => model.id === "openai:gpt-5.5")).toBe(true);
-  });
-
-  it("persists registry model additions through MODEL_REGISTRY_KV and exposes them from /v1/models", async () => {
-    const env = createEnv();
-    const catalogResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const catalog = (await catalogResponse.json()) as { data: Array<Record<string, unknown>> };
-    const base = catalog.data.find((model) => model.id === "openai:gpt-5.6-sol") as Record<string, unknown>;
-    const custom = {
-      ...base,
-      id: "openai:gpt-admin-test",
-      providerModelId: "gpt-admin-test",
-      displayName: "GPT Admin Test",
-      registry: {
-        ...(base.registry as Record<string, unknown>),
-        aliases: ["gpt-admin-test"],
-        version: "gpt-admin-test"
-      }
-    };
-
-    const saveResponse = await worker.fetch(
-      new Request("https://gateway.test/management/registry/models", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(custom)
-      }),
-      env,
-      {} as ExecutionContext
-    );
-    const saveBody = (await saveResponse.json()) as { persisted: boolean };
-    expect(saveResponse.status).toBe(200);
-    expect(saveBody.persisted).toBe(true);
-
-    const updatedResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const updated = (await updatedResponse.json()) as { data: Array<{ id: string; displayName?: string }> };
-    expect(updated.data.some((model) => model.id === "openai:gpt-admin-test" && model.displayName === "GPT Admin Test")).toBe(true);
-  });
-
-  it("requires the internal registry management token when configured", async () => {
-    const env = { ...createEnv(), REGISTRY_MANAGEMENT_TOKEN: "registry-secret" };
-
-    const denied = await worker.fetch(
-      new Request("https://gateway.test/management/registry/export"),
-      env,
-      {} as ExecutionContext
-    );
-    expect(denied.status).toBe(403);
-
-    const allowed = await worker.fetch(
-      new Request("https://gateway.test/management/registry/export", {
-        headers: { "x-studio-registry-management-token": "registry-secret" }
-      }),
-      env,
-      {} as ExecutionContext
-    );
-    expect(allowed.status).toBe(200);
-  });
-
-  it("deletes persisted custom registry models", async () => {
-    const env = createEnv();
-    const catalogResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const catalog = (await catalogResponse.json()) as { data: Array<Record<string, unknown>> };
-    const base = catalog.data.find((model) => model.id === "openai:gpt-5.6-sol") as Record<string, unknown>;
-    const custom = {
-      ...base,
-      id: "openai:gpt-delete-test",
-      providerModelId: "gpt-delete-test",
-      displayName: "GPT Delete Test",
-      registry: {
-        ...(base.registry as Record<string, unknown>),
-        aliases: ["gpt-delete-test"],
-        version: "gpt-delete-test"
-      }
-    };
-
-    await worker.fetch(
-      new Request("https://gateway.test/management/registry/models", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(custom)
-      }),
-      env,
-      {} as ExecutionContext
-    );
-
-    const deleteResponse = await worker.fetch(
-      new Request(`https://gateway.test/management/registry/models/${encodeURIComponent("openai:gpt-delete-test")}`, {
-        method: "DELETE"
-      }),
-      env,
-      {} as ExecutionContext
-    );
-    const deleteBody = (await deleteResponse.json()) as { deleted: boolean };
-    expect(deleteResponse.status).toBe(200);
-    expect(deleteBody.deleted).toBe(true);
-
-    const updatedResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const updated = (await updatedResponse.json()) as { data: Array<{ id: string }> };
-    expect(updated.data.some((model) => model.id === "openai:gpt-delete-test")).toBe(false);
-  });
-
-  it("deletes built-in curated registry models from the active registry", async () => {
-    const env = createEnv();
-
-    const deleteResponse = await worker.fetch(
-      new Request(`https://gateway.test/management/registry/models/${encodeURIComponent("openai:gpt-5.5")}`, {
-        method: "DELETE"
-      }),
-      env,
-      {} as ExecutionContext
-    );
-    expect(deleteResponse.status).toBe(200);
-
-    const updatedResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const updated = (await updatedResponse.json()) as { data: Array<{ id: string }> };
-    expect(updated.data.some((model) => model.id === "openai:gpt-5.5")).toBe(false);
   });
 
   it("includes curated OpenRouter free routes with free metadata", async () => {
@@ -432,76 +428,6 @@ describe("gateway worker", () => {
 
     expect(body.data.find((model) => model.id === "openrouter:google/gemma-4-31b-it:free")?.maxTokens).toBe(8192);
     expect(body.data.find((model) => model.id === "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free")?.contextWindow).toBe(1_000_000);
-  });
-
-  it("deletes OpenRouter models whose ids include slashes", async () => {
-    const env = createEnv();
-    const id = "openrouter:poolside/laguna-xs-2.1:free";
-    const deleteResponse = await worker.fetch(
-      new Request(`https://gateway.test/management/registry/models/${encodeURIComponent(id)}`, {
-        method: "DELETE"
-      }),
-      env,
-      {} as ExecutionContext
-    );
-    expect(deleteResponse.status).toBe(200);
-
-    const updatedResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const updated = (await updatedResponse.json()) as { data: Array<{ id: string }> };
-    expect(updated.data.some((model) => model.id === id)).toBe(false);
-  });
-
-  it("routes chat requests through a persisted registry model", async () => {
-    const env = createEnv();
-    const catalogResponse = await worker.fetch(
-      new Request("https://gateway.test/v1/models"),
-      env,
-      {} as ExecutionContext
-    );
-    const catalog = (await catalogResponse.json()) as { data: Array<Record<string, unknown>> };
-    const base = catalog.data.find((model) => model.id === "openai:gpt-5.6-sol") as Record<string, unknown>;
-    const custom = {
-      ...base,
-      id: "openai:gpt-admin-routing-test",
-      providerModelId: "gpt-admin-routing-test",
-      displayName: "GPT Admin Routing Test",
-      registry: {
-        ...(base.registry as Record<string, unknown>),
-        aliases: ["gpt-admin-routing-test"],
-        version: "gpt-admin-routing-test"
-      }
-    };
-
-    await worker.fetch(
-      new Request("https://gateway.test/management/registry/models", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(custom)
-      }),
-      env,
-      {} as ExecutionContext
-    );
-
-    vi.mocked(generateText).mockResolvedValue({
-      text: "custom model routed",
-      finishReason: "stop",
-      usage: { inputTokens: 1, outputTokens: 2 },
-      toolCalls: []
-    } as never);
-
-    const response = await postChat(env, {
-      model: "openai:gpt-admin-routing-test",
-      messages: [{ role: "user", content: "Say hello" }]
-    });
-
-    const body = (await response.json()) as { choices: Array<{ message: { content: string } }> };
-    expect(response.status).toBe(200);
-    expect(body.choices[0].message.content).toBe("custom model routed");
-    expect(generateText).toHaveBeenCalledOnce();
   });
 
   it("sends CF AI Gateway headers and strips provider Authorization", async () => {
@@ -614,7 +540,7 @@ describe("gateway worker", () => {
     expect(generateImage).toHaveBeenCalledOnce();
   });
 
-  // ── Anthropic (Claude) ────────────────────────────────────────────────────
+  // -- Anthropic (Claude) ----------------------------------------------------
 
   it("handles a non-streaming Anthropic chat completion", async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -824,7 +750,7 @@ describe("gateway worker", () => {
     expect(seen).toHaveBeenCalledOnce();
   });
 
-  // ── Groq (OpenAI-wire-compatible) ─────────────────────────────────────────
+  // -- Groq (OpenAI-wire-compatible) -----------------------------------------
 
   it("handles a non-streaming Groq chat completion", async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -1053,7 +979,7 @@ describe("gateway worker", () => {
     expect(embed).not.toHaveBeenCalled();
   });
 
-  it("excludes Groq safety/guard models from the curated catalog", async () => {
+  it("excludes Groq safety models from the curated catalog", async () => {
     const response = await worker.fetch(
       new Request("https://gateway.test/v1/models"),
       createEnv(),
@@ -1104,7 +1030,7 @@ describe("gateway worker", () => {
     expect(seen).toHaveBeenCalledOnce();
   });
 
-  // ── xAI (Grok, OpenAI-wire-compatible) ─────────────────────────────────────
+  // -- xAI (Grok, OpenAI-wire-compatible) -------------------------------------
 
   it("handles a non-streaming xAI chat completion", async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -1279,7 +1205,7 @@ describe("gateway worker", () => {
     expect(embed).not.toHaveBeenCalled();
   });
 
-  // ── DeepSeek (OpenAI-wire-compatible) ──────────────────────────────────────
+  // -- DeepSeek (OpenAI-wire-compatible) --------------------------------------
 
   it("handles a non-streaming DeepSeek chat completion", async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -1454,7 +1380,7 @@ describe("gateway worker", () => {
     expect(seen).toHaveBeenCalledOnce();
   });
 
-  // ── Structured output (response_format: json_schema) ──────────────────────
+  // -- Structured output (response_format: json_schema) ----------------------
   // The schema is passed to the model via the AI SDK's experimental_output across every
   // provider that declares the json-schema sub-feature (openai/google/groq). Anthropic
   // deliberately declares it unsupported (structured output via tool use) and is rejected.
@@ -1588,7 +1514,7 @@ describe("gateway worker", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 
-  // ── Mistral (OpenAI-wire-compatible: curated chat) ─────────────────────────
+  // -- Mistral (OpenAI-wire-compatible: curated chat) -------------------------
 
   it("handles a non-streaming Mistral chat completion", async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -1689,7 +1615,7 @@ describe("gateway worker", () => {
     expect(seen).toHaveBeenCalledOnce();
   });
 
-  // ── Fal (media: image gen/edit, video, TTS, STT) ───────────────────────────
+  // -- Fal (media: image gen/edit, video, TTS, STT) ---------------------------
 
   it("handles Fal image generation", async () => {
     vi.mocked(generateImage).mockResolvedValue({
@@ -1774,7 +1700,7 @@ describe("gateway worker", () => {
     expect(call.prompt.image).toBeDefined();
   });
 
-  // ── Replicate (media: image gen/edit, video) ───────────────────────────────
+  // -- Replicate (media: image gen/edit, video) -------------------------------
 
   it("handles Replicate image generation", async () => {
     vi.mocked(generateImage).mockResolvedValue({
@@ -1825,7 +1751,7 @@ describe("gateway worker", () => {
     expect(body.data[0].b64_json).toBe("cnZpZA==");
   });
 
-  // ── ElevenLabs (audio: TTS + STT) ──────────────────────────────────────────
+  // -- ElevenLabs (audio: TTS + STT) ------------------------------------------
 
   it("handles ElevenLabs text-to-speech", async () => {
     vi.mocked(experimental_generateSpeech).mockResolvedValue({

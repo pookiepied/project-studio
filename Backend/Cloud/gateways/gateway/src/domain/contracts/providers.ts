@@ -1,0 +1,16 @@
+export type ProviderId =
+  | "openai"
+  | "google"
+  | "anthropic"
+  | "groq"
+  | "xai"
+  | "deepseek"
+  | "mistral"
+  | "fal"
+  | "replicate"
+  | "elevenlabs"
+  | "openrouter"
+  | "alibaba"
+  | "minimax"
+  | "zai"
+  | "xiaomi";
