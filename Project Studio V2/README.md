@@ -32,15 +32,18 @@ src/
     studio.ts                 First continuing Flue agent
   application/
     harness-client.ts         UI-facing send/wait/observe/cancel/history boundary
-  app.ts                      Telemetry init + Flue standard mount only
+  app.ts                      Model-provider bootstrap + telemetry init + Flue mount
   context/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
     events.ts                 Product event envelope
-    models.ts                 Gateway-neutral model references
+    models.ts                 Gateway-neutral model references, capability, adapter contract
   models/
-    deterministic-provider.ts In-process Pi provider for the first vertical slice
-    model-registry.ts         Model-source resolver
+    adapters/
+      test-adapter.ts         Deterministic Pi provider behind the adapter contract
+    bootstrap.ts              Provider bootstrap coordinator and startup validation
+    model-registry.ts         Model-source resolver and capability aggregator
+    provider-config.ts        Validated model-source configuration
   observability/
     config.ts                 Validated exporter and content-capture config
     errors.ts                 Safe error normalization/serialization
@@ -58,6 +61,7 @@ tests/
     observability.test.ts     Span hierarchy, metrics, redaction, cancellation
   unit/
     architecture.test.ts      Boundary tests
+    model-providers.test.ts   Provider config, adapters, registry, bootstrap
     observability.test.ts     Config, init-once, logger, errors, redaction
 docs/
   decisions/                  Architecture decision records
@@ -77,13 +81,19 @@ contain an implemented boundary.
 - Durable cancellation with an `aborted` settlement.
 - Process-restart recovery from the same SQLite database.
 - Pi streaming and typed tool-call continuation.
-- Gateway-neutral model contracts.
+- Gateway-neutral model contracts with provider adapter composition.
 - Context optimization port with a fail-open passthrough implementation.
 - OpenTelemetry foundation with Flue GenAI instrumentation, structured logs, and safe errors.
 
 The deterministic provider is intentionally in-process. It makes the harness fully testable
-without credentials or network calls and will be replaced at bootstrap by the two gateway
-registrations. Agent and persistence code will not change when those adapters arrive.
+without credentials or network calls and sits behind the same `ModelProviderAdapter` contract
+that the future local and studio-cloud gateways will implement. Agent and persistence code will
+not change when those adapters arrive.
+
+`src/app.ts` validates and bootstraps model providers before initializing observability, then
+mounts Flue's standard application. It does not add business HTTP routes. Authentication must be
+added to the agent route admission middleware before the server is exposed outside a trusted
+local environment.
 
 ## Commands
 
@@ -108,10 +118,6 @@ $env:PORT = "3000"
 node dist/server.mjs
 ```
 
-`src/app.ts` initializes observability and mounts Flue's standard application. It does not add
-business HTTP routes. Authentication must be added to the agent route admission middleware before
-the server is exposed outside a trusted local environment.
-
 ## Observability
 
 Project Studio configures the OpenTelemetry Node SDK, then registers `@flue/opentelemetry` once.
@@ -130,6 +136,27 @@ content policy, logs, and error serialization.
 There is no network exporter by default. GenAI content capture is off unless explicitly enabled,
 and enabled capture always runs through the redaction transform. Application logs are structured
 JSON on stdout/stderr with optional `trace_id` / `span_id` fields when a span is active.
+
+## Model-Provider Composition
+
+Project Studio selects a model source at bootstrap through `PROJECT_STUDIO_MODEL_SOURCE`
+(default: `test`). Config parsing recognizes all three source identities. A
+`ProviderBootstrapCoordinator` runs once, creates the adapter for the selected source, registers
+it with Flue, builds a `ModelRegistry`, and validates the default model reference through it.
+
+| Source | Operational | Description |
+| --- | --- | --- |
+| `test` | Yes | In-process deterministic Pi provider; network-free |
+| `local` | No | Recognized by config; bootstrap fails immediately with `ProviderConfigurationError` until Phase 7 |
+| `studio-cloud` | No | Recognized by config; bootstrap fails immediately with `ProviderConfigurationError` until Phase 8 |
+
+Selecting `local` or `studio-cloud` today is a deliberate startup failure, not a silent no-op:
+there is no placeholder adapter that reports success without being able to serve a model.
+
+The `studio` agent references `STUDIO_MODEL_ID` (`"project-studio/default"`), a stable,
+gateway-neutral constant that names no source, provider, or implementation. Selecting `test`
+requires only a config change; the agent definition is not edited. Phase 7 and 8 adapters must
+resolve the same alias.
 
 ## Persistence And Recovery
 
@@ -154,8 +181,10 @@ Only one live Node process may own a given agent instance.
 
 The next implementation phase should add adapters, not replace the harness:
 
-1. Local model gateway registration with user-controlled credentials.
-2. Studio cloud gateway registration and centralized authentication.
+1. Local model gateway registration with user-controlled credentials, added as a new
+   `ModelProviderAdapter` selectable via the `local` source.
+2. Studio cloud gateway registration and centralized authentication, added as a new
+   `ModelProviderAdapter` selectable via the `studio-cloud` source.
 3. MCP connection registry for local and authenticated cloud servers.
 4. Skill catalog, subagent profiles, sandbox adapters, and schedules.
 5. Product-owned event projections over Flue envelopes.
@@ -172,3 +201,4 @@ instructions, recent turns, or incomplete tool-call pairs.
 - [Two-gateway model](docs/decisions/0002-two-gateway-model.md)
 - [Context optimization](docs/decisions/0003-context-optimization.md)
 - [Observability foundation](docs/decisions/0004-observability.md)
+- [Model-provider composition](docs/decisions/0005-model-provider-composition.md)

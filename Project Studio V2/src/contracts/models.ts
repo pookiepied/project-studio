@@ -16,6 +16,80 @@ export const modelReferenceSchema = v.object({
 
 export type ModelReference = v.InferOutput<typeof modelReferenceSchema>;
 
+/**
+ * "unknown" means the dimension has not been described yet, distinct from a
+ * confirmed "unsupported". Numeric limits use "unknown" rather than 0 for the
+ * same reason.
+ */
+export type CapabilityState = "supported" | "unsupported" | "unknown";
+
+export interface ModelCapability {
+  readonly textGeneration: CapabilityState;
+  readonly streaming: CapabilityState;
+  readonly reasoning: CapabilityState;
+  readonly toolCalling: CapabilityState;
+  readonly vision: CapabilityState;
+  readonly embeddings: CapabilityState;
+  readonly reranking: CapabilityState;
+  readonly imageGeneration: CapabilityState;
+  readonly videoGeneration: CapabilityState;
+  readonly speechGeneration: CapabilityState;
+  readonly transcription: CapabilityState;
+  readonly contextWindow: number | "unknown";
+  readonly maxOutputTokens: number | "unknown";
+}
+
+export interface ModelDescriptor {
+  readonly source: ModelSource;
+  readonly provider: string;
+  readonly model: string;
+  readonly resolvedModelId: string;
+  readonly capability: ModelCapability;
+  readonly operational: boolean;
+}
+
+export interface ModelProviderAdapter {
+  readonly source: ModelSource;
+  readonly operational: boolean;
+  register(): void;
+  resolve(reference: ModelReference): ModelDescriptor;
+  listModels(): readonly ModelDescriptor[];
+}
+
 export interface ModelProviderPort {
   resolve(reference: ModelReference): string;
+  resolveDescriptor(reference: ModelReference): ModelDescriptor;
+  listModels(): readonly ModelDescriptor[];
+  validate(reference: ModelReference): void;
+}
+
+/**
+ * Stable, gateway-neutral identity for the studio agent's model. It carries
+ * no source/provider/implementation detail so switching model sources never
+ * requires editing the agent definition.
+ */
+export const DEFAULT_MODEL_PROVIDER = "project-studio";
+export const DEFAULT_MODEL_NAME = "default";
+export const STUDIO_MODEL_ID = `${DEFAULT_MODEL_PROVIDER}/${DEFAULT_MODEL_NAME}`;
+
+export function defaultModelReference(source: ModelSource): ModelReference {
+  return {
+    source,
+    provider: DEFAULT_MODEL_PROVIDER,
+    model: DEFAULT_MODEL_NAME,
+  };
+}
+
+export class ProviderConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderConfigurationError";
+  }
+}
+
+export class ModelResolutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ModelResolutionError";
+  }
 }

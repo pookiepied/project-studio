@@ -9,8 +9,38 @@ import {
 } from "@earendil-works/pi-ai";
 import { registerApiProvider, registerProvider } from "@flue/runtime";
 
+import {
+  defaultModelReference,
+  ModelResolutionError,
+  type ModelCapability,
+  type ModelDescriptor,
+  type ModelProviderAdapter,
+  type ModelReference,
+} from "../../contracts/models.js";
+
 const api = "project-studio-test";
-const provider = "project-studio-test";
+const piProvider = "project-studio-test";
+
+const TEST_PROVIDER = "project-studio";
+const TEST_MODEL = "default";
+const CONTEXT_WINDOW = 32_000;
+const MAX_OUTPUT_TOKENS = 4_096;
+
+const TEST_CAPABILITY: ModelCapability = {
+  textGeneration: "supported",
+  streaming: "supported",
+  reasoning: "unsupported",
+  toolCalling: "supported",
+  vision: "unsupported",
+  embeddings: "unsupported",
+  reranking: "unsupported",
+  imageGeneration: "unsupported",
+  videoGeneration: "unsupported",
+  speechGeneration: "unsupported",
+  transcription: "unsupported",
+  contextWindow: CONTEXT_WINDOW,
+  maxOutputTokens: MAX_OUTPUT_TOKENS,
+};
 
 const emptyUsage = {
   input: 0,
@@ -35,7 +65,7 @@ function createMessage(
     role: "assistant",
     content,
     api,
-    provider,
+    provider: piProvider,
     model: model.id,
     usage: emptyUsage,
     stopReason: "stop",
@@ -54,7 +84,6 @@ function latestUserText(context: Context): string {
             .join("");
     }
   }
-
   return "";
 }
 
@@ -113,7 +142,11 @@ function stream(
         const message = createMessage(model, [toolCall]);
         message.stopReason = "toolUse";
 
-        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({
+          type: "toolcall_start",
+          contentIndex: 0,
+          partial: initial,
+        });
         events.push({
           type: "toolcall_end",
           contentIndex: 0,
@@ -143,7 +176,12 @@ function stream(
       }
 
       const message = createMessage(model, [{ type: "text", text }]);
-      events.push({ type: "text_end", contentIndex: 0, content: text, partial: message });
+      events.push({
+        type: "text_end",
+        contentIndex: 0,
+        content: text,
+        partial: message,
+      });
       events.push({ type: "done", reason: "stop", message });
     } catch (error) {
       const message = createMessage(model);
@@ -157,15 +195,55 @@ function stream(
   return events;
 }
 
-registerApiProvider({
-  api,
-  stream,
-  streamSimple: stream,
-});
+export class TestModelProviderAdapter implements ModelProviderAdapter {
+  readonly source = "test" as const;
+  readonly operational = true;
+  #registered = false;
 
-registerProvider(provider, {
-  api,
-  baseUrl: "in-process://project-studio-test",
-  contextWindow: 32_000,
-  maxTokens: 4_096,
-});
+  register(): void {
+    if (this.#registered) {
+      return;
+    }
+
+    registerApiProvider({
+      api,
+      stream,
+      streamSimple: stream,
+    });
+
+    registerProvider(TEST_PROVIDER, {
+      api,
+      baseUrl: "in-process://project-studio-test",
+      contextWindow: CONTEXT_WINDOW,
+      maxTokens: MAX_OUTPUT_TOKENS,
+    });
+
+    this.#registered = true;
+  }
+
+  resolve(reference: ModelReference): ModelDescriptor {
+    if (reference.source !== this.source) {
+      throw new ModelResolutionError(
+        `Model source "${reference.source}" does not match the "${this.source}" adapter.`,
+      );
+    }
+    if (reference.provider !== TEST_PROVIDER || reference.model !== TEST_MODEL) {
+      throw new ModelResolutionError(
+        `Unknown model "${reference.provider}/${reference.model}" for source "${this.source}".`,
+      );
+    }
+
+    return {
+      source: this.source,
+      provider: TEST_PROVIDER,
+      model: TEST_MODEL,
+      resolvedModelId: `${TEST_PROVIDER}/${TEST_MODEL}`,
+      capability: TEST_CAPABILITY,
+      operational: true,
+    };
+  }
+
+  listModels(): readonly ModelDescriptor[] {
+    return [this.resolve(defaultModelReference(this.source))];
+  }
+}
