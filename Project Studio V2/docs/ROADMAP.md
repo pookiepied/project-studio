@@ -22,14 +22,14 @@ capability path without an architecture decision.
 - Structured correlated logs, safe errors, and content redaction.
 - Runtime composition through `src/app.ts`.
 
-## Next
-
 ### Phase 6: Provider Bootstrap
 
-Create one lifecycle for selecting and registering `test`, `local`, and `studio-cloud` model
-sources. Keep concrete gateway transports out of the agent definition. Move the deterministic
-provider behind the same adapter contract. Add model identity, capability, configuration, and
-startup-validation tests.
+- One lifecycle for selecting and registering model sources.
+- Gateway-neutral `project-studio/default` model identity.
+- Deterministic provider behind the shared adapter contract.
+- Capability metadata, configuration validation, and startup rejection for unavailable sources.
+
+## Next
 
 ### Phase 7: Local Gateway
 
