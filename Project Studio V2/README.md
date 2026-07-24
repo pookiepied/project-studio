@@ -36,7 +36,6 @@ src/
   context/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
-    events.ts                 Product event envelope
     models.ts                 Gateway-neutral model references, capability, adapter contract
   models/
     adapters/
@@ -47,7 +46,8 @@ src/
       auth.ts                 Injected access-token provider and header safety
       client.ts               Origin-scoped HTTPS transport for the gateway
       sse-parser.ts           Server-sent event framing
-      event-mapper.ts         Gateway events to Pi events, with duplicate collapsing
+      stream-events.ts        Gateway SSE vocabulary, parsing, duplicate collapsing
+      event-mapper.ts         Gateway events projected onto Pi's event protocol
       request-mapper.ts       Pi transcript and tools to the gateway chat contract
       catalog.ts              /v1/models to ModelDescriptor and capabilities
       errors.ts               Safe typed gateway errors

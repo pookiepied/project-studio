@@ -29,12 +29,12 @@ import {
 } from "../studio-cloud/client.js";
 import type { StudioGatewayConfig } from "../studio-cloud/config.js";
 import { isAbortError, StudioGatewayError } from "../studio-cloud/errors.js";
+import { StudioPiEventMapper } from "../studio-cloud/event-mapper.js";
 import {
   dedupeStudioEvents,
   parseStudioEvent,
-  StudioPiEventMapper,
   type StudioStreamEvent,
-} from "../studio-cloud/event-mapper.js";
+} from "../studio-cloud/stream-events.js";
 import { parseSseFrames } from "../studio-cloud/sse-parser.js";
 import { toStudioChatRequest } from "../studio-cloud/request-mapper.js";
 

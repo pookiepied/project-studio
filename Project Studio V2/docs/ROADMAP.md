@@ -42,6 +42,29 @@ capability path without an architecture decision.
 - Gateway trust boundary documented: private worker behind the public API's service binding; the
   public API owns end-user authentication.
 
+### Phase 7.5: Architecture And Modularity Review
+
+An audit pass over the real code after the first external model transport, not a feature phase.
+
+- Removed `contracts/events.ts`: a product event envelope with no importer in `src/` or `tests/`,
+  and already inaccurate (it modelled no reasoning event while reasoning streaming was shipping).
+  The UI projection will be designed against a real consumer in Phase 18.
+- Split the gateway wire vocabulary out of `event-mapper.ts` into `stream-events.ts`. Decoding what
+  the gateway emits and projecting it onto Pi are separate responsibilities that change for
+  different reasons; an architecture test now fails if the wire module imports Pi or Flue.
+- Confirmed the deferred Phase 7 review gates: `tests/integration/studio-flue.test.ts` spawns the
+  generated `dist/server.mjs` and drives it over HTTP, and the documentation claims no account/
+  per-run switching and no automatic catalog loading.
+
+Recorded, deliberately not changed:
+
+- `application/harness-client.ts` returns Flue's `FlueConversationSnapshot`,
+  `AgentConversationObservation`, and `AgentPromptResponse` directly. Product-owned projections are
+  Phase 18 work with a real UI consumer; inventing them now would repeat the dead-abstraction
+  mistake.
+- `PassthroughContextOptimizer` has no production caller. It is a declared port from ADR 0003, kept
+  as a decided seam, and it is exercised only by a unit test today.
+
 ## Next
 
 ### Phase 8: Product Authentication, Secure Credentials, And Local BYOK

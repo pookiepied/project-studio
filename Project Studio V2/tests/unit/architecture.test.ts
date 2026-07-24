@@ -130,11 +130,24 @@ describe("startup ordering and adapter boundaries", () => {
       "../../src/models/adapters/studio-cloud-adapter.ts",
       "../../src/models/studio-cloud/client.ts",
       "../../src/models/studio-cloud/event-mapper.ts",
+      "../../src/models/studio-cloud/stream-events.ts",
       "../../src/models/studio-cloud/request-mapper.ts",
     ]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).not.toMatch(/from "ai"|@ai-sdk\//);
     }
+  });
+
+  it("keeps the gateway wire vocabulary independent of the Pi protocol", async () => {
+    // stream-events.ts describes what the gateway emits. Projecting that onto
+    // Pi belongs to event-mapper.ts; if the wire module starts importing Pi,
+    // the two responsibilities have merged again.
+    const source = await readFile(
+      new URL("../../src/models/studio-cloud/stream-events.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(/@earendil-works\/pi-ai|@flue\//);
   });
 
   it("keeps credentials out of the model contract and provider config modules", async () => {

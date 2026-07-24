@@ -153,14 +153,14 @@ Local BYOK source -> Pi provider collection -> provider APIs / Ollama / LM Studi
 - Phase 6: model-provider bootstrap and composition.
 - Phase 7 plus its 7.1 correction: Studio Gateway integration, committed as `8898458` after both
   suites were re-run green.
+- Phase 7.5: architecture and modularity review.
 
 ### Next
 
-- Phase 7.5: architecture and modularity review.
+- Phase 8: product auth, secure credentials, and local BYOK.
 
-Phase 7.5 is not a feature-expansion phase. It should audit the real code after the first external
-model transport and correct structural pressure before secure credentials and local BYOK increase
-the surface area.
+Phase 8 is the first phase since the audit, and it is large. Execute it as the reviewed subphases
+listed in section 21 rather than as one delegation.
 
 ## 6. What The Harness Can Do Today
 
@@ -205,7 +205,6 @@ Project Studio V2/
     context/
       context-optimizer.ts
     contracts/
-      events.ts
       models.ts
     models/
       adapters/
@@ -220,6 +219,7 @@ Project Studio V2/
         event-mapper.ts
         request-mapper.ts
         sse-parser.ts
+        stream-events.ts
       bootstrap.ts
       model-registry.ts
       provider-config.ts
@@ -538,8 +538,10 @@ prompt-cache reuse.
 
 The canonical Flue transcript is never overwritten by optimized context.
 
-`ContextOptimizer` currently uses a passthrough implementation. Headroom was researched and is
-reserved as an optional future sidecar:
+`ContextOptimizer` is a declared port with a passthrough implementation and, as of the Phase 7.5
+audit, no production caller: nothing in the request path invokes it yet. It is kept as a decided
+seam from ADR 0003, not presented as active behavior. Headroom was researched and is reserved as an
+optional future sidecar:
 
 - it is not installed;
 - it is not the harness;
@@ -971,19 +973,34 @@ The correct reuse strategy is:
 - safe outbound access-token boundary;
 - generated Flue server integration test.
 
-### Phase 7.5: Architecture/modularity review, next
+### Phase 7.5: Architecture/modularity review, complete
 
-Audit:
+Audited against the list below. Results:
 
-- every file maps to one responsibility;
-- adapter/config/transport/catalog/protocol/error boundaries;
-- no dead abstractions;
-- no accidental process-global state beyond required Flue/Pi registration;
-- model runtime remains separate from agent definition;
-- application contracts do not leak Flue or provider internals unnecessarily;
-- future BYOK, permission, native tool, MCP, UI projection, and auth integrations have clear ports;
-- large files are split only where responsibilities are genuinely mixed;
-- no empty speculative trees.
+- **No dead abstractions** — one violation found and removed. `contracts/events.ts` had zero
+  importers anywhere in `src/` or `tests/`, and its event union had already drifted from reality
+  (no reasoning event, while reasoning streaming shipped in Phase 7). Deleted.
+- **Large files split only where responsibilities are genuinely mixed** — one violation. The
+  398-line `event-mapper.ts` held both the gateway's SSE wire vocabulary and the Pi projection.
+  The wire half moved to `stream-events.ts`; an architecture test now fails if it imports Pi or
+  Flue.
+- **Application contracts do not leak Flue internals** — violated, and deliberately left alone.
+  `harness-client.ts` returns `FlueConversationSnapshot`, `AgentConversationObservation`, and
+  `AgentPromptResponse` straight through, so a UI binding to it binds to Flue's shapes. A
+  projection layer built now would have no consumer, which is the mistake in Problem 7; this is
+  Phase 18 work and is recorded as a known deferral instead.
+- **Every file maps to one responsibility** — otherwise holds. `studio-cloud/` keeps config,
+  transport, catalog, request mapping, wire events, projection, and errors in separate modules.
+- **Model runtime separate from agent definition** — holds, and is enforced by tests that read
+  `agents/studio.ts` and assert no URLs, credentials, adapter imports, or provider names.
+- **No accidental process-global state** — holds. The module-level bootstrap coordinator is the
+  intended single-use guard, and Pi/Flue provider registration is required by those libraries. The
+  one runtime mutation of global state is `loadCatalog()` re-registering the provider to attach
+  context-window limits; it is intentional and documented.
+- **Clear ports for future work** — `AccessTokenProvider`, `ModelProviderAdapter`, and
+  `ContextOptimizer` are real seams. `ContextOptimizer` has no production caller yet; section 13
+  now says so plainly.
+- **No empty speculative trees** — holds.
 
 ### Phase 8: Product auth, secure credentials, and local BYOK
 
@@ -1169,12 +1186,25 @@ Repeated lesson:
 - reject a feature that exists only in unit tests;
 - do not advertise planned behavior as operational behavior.
 
+### Problem 11: The dead-abstraction mistake recurred quietly
+
+Phase 7.1 removed the account/run routing snapshots (Problem 7), but `contracts/events.ts` survived
+from an earlier phase with no importer anywhere, and nothing surfaced it: dead code produces no
+test failures and no type errors. It was found only by the Phase 7.5 audit grepping for importers.
+
+Resolution:
+
+- an unused export is not a free option; it decays into a false description of the system;
+- when auditing, grep for importers rather than reading a file and judging its design in isolation;
+- write the projection when its consumer exists.
+
 ## 23. Current Verification Record And Risks
 
-Verified at the Phase 7 commit (`8898458`):
+Verified after Phase 7.5:
 
-- Studio Gateway: 91 tests passed; `tsc --noEmit` passed.
-- V2 harness: 92 tests passed across 7 files; build and typecheck passed.
+- Studio Gateway: 91 tests passed; `tsc --noEmit` passed (unchanged by 7.5).
+- V2 harness: 93 tests passed across 7 files; build and typecheck passed. The count rose from 92
+  at the Phase 7 commit (`8898458`) because 7.5 added the wire/protocol boundary guard.
 - `git diff --check` clean.
 
 Earlier revisions of this document recorded 108 and 105 tests. Those counts predate Phase 7.1 and
@@ -1196,7 +1226,10 @@ Known architectural deferrals:
 - no secure credential vault;
 - no local BYOK provider;
 - no permission/approval kernel;
-- no stable Project Studio UI event projection for thinking and tools.
+- no stable Project Studio UI event projection for thinking and tools; `application/harness-client.ts`
+  currently passes Flue's own snapshot, observation, and response types through to callers, which
+  Phase 18 must replace with product-owned read models;
+- `ContextOptimizer` is a declared port with no production caller.
 
 ## 24. Immediate Next Procedure
 
@@ -1218,22 +1251,20 @@ git diff --check
 git status --short
 ```
 
-The current step is Phase 7.5: a focused architecture pass against the audit list in section 21.
-Update this blueprint and `Project Studio V2/docs/ROADMAP.md` when it completes.
-
-Phase 7 review gates, confirmed at commit time:
+Phase 7.5 is complete; its findings are in section 21. All four Phase 7 review gates were
+confirmed:
 
 - no direct JWT middleware remains in Studio Gateway; the only auth-shaped code is upstream
   provider credential handling and `stripProviderAuthorization`;
 - provider transport, config, catalog, mapping, and errors live in `src/models/studio-cloud/`
-  rather than one adapter file.
+  rather than one adapter file;
+- `tests/integration/studio-flue.test.ts` spawns the generated `dist/server.mjs` as a child process
+  and drives it over HTTP against a local mock gateway, so it is genuinely end-to-end;
+- the documentation claims no account/per-run switching and no automatic catalog loading.
 
-Two gates were deferred into the Phase 7.5 audit rather than being verified before the commit:
-
-- that `tests/integration/studio-flue.test.ts` exercises a generated Flue server rather than being
-  an adapter test labelled end-to-end;
-- that the Phase 7 documentation claims no account/per-run switching and no automatic catalog
-  loading.
+The current step is Phase 8, executed as the subphases in section 21. Start with the public API
+proxy and the production session-backed `AccessTokenProvider`, since the development bootstrap
+token is the only thing standing in for real authentication today.
 
 ## 25. Guidance For A New LLM Conversation
 
