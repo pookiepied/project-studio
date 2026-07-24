@@ -1,6 +1,9 @@
 # ADR 0005: Model-Provider Composition
 
-Status: Accepted
+Status: Accepted; partially superseded by
+[ADR 0006](0006-studio-gateway-integration.md), which makes `studio-cloud`
+operational. The composition, capability, and registry decisions below still
+hold, as does the treatment of `local` as recognized-but-unavailable.
 
 ## Context
 

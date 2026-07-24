@@ -64,8 +64,12 @@ describe("model-provider composition", () => {
     );
   });
 
-  it("does not create an adapter for local or studio-cloud in this phase", () => {
+  it("does not create an adapter for local, which is not operational yet", () => {
     expect(() => createModelProviderAdapter("local")).toThrow();
+  });
+
+  it("does not create a studio-cloud adapter without validated configuration", () => {
+    delete process.env.PROJECT_STUDIO_GATEWAY_URL;
     expect(() => createModelProviderAdapter("studio-cloud")).toThrow();
   });
 
@@ -96,5 +100,51 @@ describe("studio agent has no gateway or provider side effects", () => {
     );
 
     expect(source).not.toMatch(/models\/adapters/);
+  });
+});
+
+describe("startup ordering and adapter boundaries", () => {
+  it("validates and bootstraps model providers before observability starts", async () => {
+    const source = await readFile(
+      new URL("../../src/app.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source.indexOf("bootstrapModelProviders")).toBeGreaterThan(-1);
+    expect(source.indexOf("bootstrapModelProviders")).toBeLessThan(
+      source.indexOf("initializeObservability("),
+    );
+  });
+
+  it("keeps the deterministic provider free of network transport", async () => {
+    const source = await readFile(
+      new URL("../../src/models/adapters/test-adapter.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(/\bfetch\b|node:http|XMLHttpRequest|undici/);
+  });
+
+  it("does not leak the gateway's Vercel AI SDK types into the harness", async () => {
+    for (const path of [
+      "../../src/models/adapters/studio-cloud-adapter.ts",
+      "../../src/models/studio-cloud/client.ts",
+      "../../src/models/studio-cloud/event-mapper.ts",
+      "../../src/models/studio-cloud/request-mapper.ts",
+    ]) {
+      const source = await readFile(new URL(path, import.meta.url), "utf8");
+      expect(source).not.toMatch(/from "ai"|@ai-sdk\//);
+    }
+  });
+
+  it("keeps credentials out of the model contract and provider config modules", async () => {
+    for (const path of [
+      "../../src/contracts/models.ts",
+      "../../src/models/provider-config.ts",
+      "../../src/models/model-registry.ts",
+    ]) {
+      const source = await readFile(new URL(path, import.meta.url), "utf8");
+      expect(source).not.toMatch(/authorization|bearer|accessToken|apiKey|secret/i);
+    }
   });
 });

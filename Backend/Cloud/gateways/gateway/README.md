@@ -90,6 +90,24 @@ module. Empty compatibility folders are intentionally not retained.
 
 The aliases `/v1/images/generate` and `/v1/videos/generate` remain available for existing clients.
 
+## Trust Boundary And Authentication
+
+Studio Gateway is a **private** Cloudflare Worker. It has no `workers.dev` subdomain and no custom
+route (`workers_dev` and `preview_urls` are disabled in `wrangler.toml`); it is invoked only
+through a Cloudflare **service binding** from the public Project Studio API.
+
+The **public API owns end-user authentication**. This worker performs no inbound end-user auth of
+its own and must not trust arbitrary public identity headers. Propagating trusted user identity
+from the API into the gateway is deferred until the API proxy contract is implemented.
+
+The chat `user` field is an opaque provider abuse-tracking identifier that the gateway forwards
+as-is; it is not a trust decision made by the gateway.
+
+The gateway does hold the operator's Cloudflare AI Gateway credential (`CF_AIG_TOKEN`) and strips
+provider authorization headers before forwarding, so callers can neither submit a provider key nor
+choose a key alias. No response, log, or error message contains that credential, a provider key, or
+a raw upstream error body.
+
 ## Providers
 
 There are 15 provider adapters and 109 curated models. Every provider operation uses the Vercel
@@ -157,8 +175,13 @@ runtime administration operation.
 ## Tools And Streaming
 
 The gateway accepts OpenAI-compatible tool definitions and returns normalized tool calls. It does
-not execute a tool. The future Flue/Pi harness owns the agent loop, MCP dispatch, tool execution,
+not execute a tool. The Flue/Pi harness owns the agent loop, MCP dispatch, tool execution,
 retries, and continuation after tool results.
+
+To continue a conversation after tool results, a chat request replays the previous assistant turn
+with `toolCalls` (id, name, JSON-encoded arguments, in original order) and follows it with `tool`
+messages carrying `toolCallId` and `toolName`. Both fields are optional, so a single-turn client is
+unaffected.
 
 Streaming responses use server-sent events:
 
@@ -172,7 +195,7 @@ Streaming responses use server-sent events:
 | `tool_call` | Compatibility immediate tool call |
 | `model.tool_call.completed` | Completed normalized tool call |
 | `usage` and `model.usage` | Token, cache, and reasoning usage |
-| `model.completed` | Provider finish result |
+| `model.completed` | Provider finish result, including `finishReason` |
 | `tool_calls` | Compatibility aggregate tool-call list |
 | `stream.error` | Normalized terminal stream failure |
 | `stream.completed` | Gateway stream closed |
@@ -206,7 +229,7 @@ Raw provider error bodies are not exposed to clients.
 - `CF_AIG_GATEWAY_NAME`
 - `CF_AIG_BYOK_ALIAS`
 
-`CF_AIG_TOKEN` is a Worker secret:
+`CF_AIG_TOKEN` is a Worker secret and is never committed:
 
 ```bash
 npx wrangler secret put CF_AIG_TOKEN
@@ -232,6 +255,9 @@ npm run build
 npm test
 npm run dev
 ```
+
+Tests use mocked provider SDKs. No real network call, Cloudflare account, or provider credential is
+involved.
 
 To add a model, update `src/domain/catalog` and add focused catalog or route coverage. To add a
 provider, create `src/providers/<provider>`, declare its capabilities, register it in

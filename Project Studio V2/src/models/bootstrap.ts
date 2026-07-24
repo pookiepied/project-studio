@@ -8,27 +8,52 @@ import {
 import type { ProviderConfig } from "./provider-config.js";
 import { ModelRegistry } from "./model-registry.js";
 import { TestModelProviderAdapter } from "./adapters/test-adapter.js";
+import { StudioCloudModelProviderAdapter } from "./adapters/studio-cloud-adapter.js";
+import {
+  assertAccessTokenConfigured,
+  createEnvAccessTokenProvider,
+  type AccessTokenProvider,
+} from "./studio-cloud/auth.js";
+import type { FetchLike } from "./studio-cloud/client.js";
+import {
+  resolveStudioGatewayConfig,
+  type StudioGatewayConfig,
+} from "./studio-cloud/config.js";
 
-const UNAVAILABLE_SOURCE_PHASE: Record<Exclude<ModelSource, "test">, string> = {
-  local: "Phase 7",
-  "studio-cloud": "Phase 8",
-};
+export interface StudioCloudBootstrapOverrides {
+  readonly config?: StudioGatewayConfig;
+  readonly tokenProvider?: AccessTokenProvider;
+  readonly fetchImpl?: FetchLike;
+}
+
+export interface BootstrapOptions {
+  readonly studioCloud?: StudioCloudBootstrapOverrides;
+}
 
 /**
- * Only "test" is operational in Phase 6. Selecting "local" or "studio-cloud"
- * must fail immediately, before any registration or registry work, rather
- * than publishing a placeholder adapter that quietly cannot serve a model.
+ * Creates the adapter for a source.
+ *
+ * `studio-cloud` validates its URL and credentials here, before Flue
+ * registration, registry construction, or OpenTelemetry initialization, so an
+ * unusable configuration is a clean startup failure.
+ *
+ * `local` is recognized but not operational: the BYOK runtime needs
+ * user-controlled provider credentials in secure OS storage, which is the next
+ * phase. There is no placeholder adapter, and selecting it is never quietly
+ * turned into a Studio run.
  */
 export function createModelProviderAdapter(
   source: ModelSource,
+  options: BootstrapOptions = {},
 ): ModelProviderAdapter {
   switch (source) {
     case "test":
       return new TestModelProviderAdapter();
-    case "local":
     case "studio-cloud":
+      return createStudioCloudAdapter(options.studioCloud ?? {});
+    case "local":
       throw new ProviderConfigurationError(
-        `Model source "${source}" is not available until ${UNAVAILABLE_SOURCE_PHASE[source]}. Only "test" is operational in Phase 6.`,
+        'Model source "local" is not available yet. The local BYOK runtime requires secure OS credential storage, which ships in the next phase; it is never substituted with the Studio gateway.',
       );
     default:
       throw new ProviderConfigurationError(
@@ -37,6 +62,29 @@ export function createModelProviderAdapter(
   }
 }
 
+function createStudioCloudAdapter(
+  overrides: StudioCloudBootstrapOverrides,
+): StudioCloudModelProviderAdapter {
+  const config = overrides.config ?? resolveStudioGatewayConfig();
+
+  let tokenProvider = overrides.tokenProvider;
+  if (tokenProvider === undefined) {
+    assertAccessTokenConfigured();
+    tokenProvider = createEnvAccessTokenProvider();
+  }
+
+  return new StudioCloudModelProviderAdapter({
+    config,
+    tokenProvider,
+    ...(overrides.fetchImpl === undefined ? {} : { fetchImpl: overrides.fetchImpl }),
+  });
+}
+
+/**
+ * The configured registry is the handle for everything downstream; the
+ * selected adapter is reachable through `registry.getAdapter(source)` when a
+ * caller needs source-specific behavior such as `loadCatalog()`.
+ */
 export interface BootstrapResult {
   readonly config: ProviderConfig;
   readonly registry: ModelRegistry;
@@ -46,7 +94,10 @@ export interface BootstrapResult {
 export class ProviderBootstrapCoordinator {
   #initialized = false;
 
-  bootstrap(config: ProviderConfig): BootstrapResult {
+  bootstrap(
+    config: ProviderConfig,
+    options: BootstrapOptions = {},
+  ): BootstrapResult {
     if (this.#initialized) {
       throw new ProviderConfigurationError(
         "Model providers have already been bootstrapped; duplicate bootstrap is not allowed.",
@@ -54,7 +105,7 @@ export class ProviderBootstrapCoordinator {
     }
     this.#initialized = true;
 
-    const adapter = createModelProviderAdapter(config.source);
+    const adapter = createModelProviderAdapter(config.source, options);
     adapter.register();
 
     const registry = new ModelRegistry();
@@ -76,6 +127,7 @@ const productionCoordinator = createProviderBootstrapCoordinator();
 
 export function bootstrapModelProviders(
   config: ProviderConfig,
+  options: BootstrapOptions = {},
 ): BootstrapResult {
-  return productionCoordinator.bootstrap(config);
+  return productionCoordinator.bootstrap(config, options);
 }

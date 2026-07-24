@@ -41,6 +41,16 @@ src/
   models/
     adapters/
       test-adapter.ts         Deterministic Pi provider behind the adapter contract
+      studio-cloud-adapter.ts Studio Gateway source and its Pi wire protocol
+    studio-cloud/
+      config.ts               Validated gateway URL, required default model, timeout
+      auth.ts                 Injected access-token provider and header safety
+      client.ts               Origin-scoped HTTPS transport for the gateway
+      sse-parser.ts           Server-sent event framing
+      event-mapper.ts         Gateway events to Pi events, with duplicate collapsing
+      request-mapper.ts       Pi transcript and tools to the gateway chat contract
+      catalog.ts              /v1/models to ModelDescriptor and capabilities
+      errors.ts               Safe typed gateway errors
     bootstrap.ts              Provider bootstrap coordinator and startup validation
     model-registry.ts         Model-source resolver and capability aggregator
     provider-config.ts        Validated model-source configuration
@@ -59,6 +69,8 @@ tests/
   integration/
     harness.test.ts           Real server, SQLite, cancellation, and restart tests
     observability.test.ts     Span hierarchy, metrics, redaction, cancellation
+    studio-gateway.test.ts    Adapter unit slice: catalog, streaming, tools, errors, cancellation
+    studio-flue.test.ts       Real generated Flue server against a mock gateway
   unit/
     architecture.test.ts      Boundary tests
     model-providers.test.ts   Provider config, adapters, registry, bootstrap
@@ -82,18 +94,21 @@ contain an implemented boundary.
 - Process-restart recovery from the same SQLite database.
 - Pi streaming and typed tool-call continuation.
 - Gateway-neutral model contracts with provider adapter composition.
+- Process-level model-source selection with no automatic cross-source fallback.
+- Studio Gateway source with its native Pi wire protocol, streaming, and tool continuation.
 - Context optimization port with a fail-open passthrough implementation.
 - OpenTelemetry foundation with Flue GenAI instrumentation, structured logs, and safe errors.
 
 The deterministic provider is intentionally in-process. It makes the harness fully testable
-without credentials or network calls and sits behind the same `ModelProviderAdapter` contract
-that the future local and studio-cloud gateways will implement. Agent and persistence code will
-not change when those adapters arrive.
+without credentials or network calls and sits behind the same `ModelProviderAdapter` contract the
+Studio Gateway adapter now implements and the future local/BYOK adapter will implement. Agent and
+persistence code do not change when the source changes.
 
 `src/app.ts` validates and bootstraps model providers before initializing observability, then
-mounts Flue's standard application. It does not add business HTTP routes. Authentication must be
-added to the agent route admission middleware before the server is exposed outside a trusted
-local environment.
+mounts Flue's standard application. It does not add business HTTP routes. Inbound authentication
+must be added to the agent route admission middleware before the server is exposed outside a
+trusted local environment; the bearer token described below is outbound authentication to the
+Studio Gateway, not admission control for this harness.
 
 ## Commands
 
@@ -139,24 +154,95 @@ JSON on stdout/stderr with optional `trace_id` / `span_id` fields when a span is
 
 ## Model-Provider Composition
 
-Project Studio selects a model source at bootstrap through `PROJECT_STUDIO_MODEL_SOURCE`
-(default: `test`). Config parsing recognizes all three source identities. A
-`ProviderBootstrapCoordinator` runs once, creates the adapter for the selected source, registers
-it with Flue, builds a `ModelRegistry`, and validates the default model reference through it.
+The model source is a process-level bootstrap decision read from `PROJECT_STUDIO_MODEL_SOURCE`
+(default: `test`). It is deliberately not an account preference or a per-run switch. There is no
+account model and no run router in this phase, so the harness makes no claim that a settings change
+can reroute an accepted run; account-level settings and per-run routing are deferred to product
+integration (see the ADR and the roadmap).
 
 | Source | Operational | Description |
 | --- | --- | --- |
-| `test` | Yes | In-process deterministic Pi provider; network-free |
-| `local` | No | Recognized by config; bootstrap fails immediately with `ProviderConfigurationError` until Phase 7 |
-| `studio-cloud` | No | Recognized by config; bootstrap fails immediately with `ProviderConfigurationError` until Phase 8 |
+| `test` | Yes | In-process deterministic Pi provider; network-free default |
+| `studio-cloud` | Yes | Studio Gateway over its native SSE contract |
+| `local` (BYOK) | No | Recognized by config; bootstrap fails with `ProviderConfigurationError` until secure OS credential storage and the BYOK runtime ship |
 
-Selecting `local` or `studio-cloud` today is a deliberate startup failure, not a silent no-op:
-there is no placeholder adapter that reports success without being able to serve a model.
+A `ProviderBootstrapCoordinator` runs once, creates the adapter for the selected source, registers
+it with Flue, builds a `ModelRegistry`, and validates the default model reference through it.
+Selecting `local`, or selecting `studio-cloud` without a valid URL, default model, and token, is a
+deliberate startup failure, not a silent no-op: there is no placeholder adapter that reports
+success without being able to serve a model, and no source is ever automatically substituted for
+another. Studio configuration is validated before Flue registration, registry construction, and
+OpenTelemetry initialization.
 
 The `studio` agent references `STUDIO_MODEL_ID` (`"project-studio/default"`), a stable,
-gateway-neutral constant that names no source, provider, or implementation. Selecting `test`
-requires only a config change; the agent definition is not edited. Phase 7 and 8 adapters must
-resolve the same alias.
+gateway-neutral constant that names no source, provider, or implementation. Switching sources
+requires only a config change; the agent definition is not edited, and the Studio adapter resolves
+the same alias.
+
+### Studio Gateway Settings
+
+| Setting | Required | Purpose |
+| --- | --- | --- |
+| `PROJECT_STUDIO_GATEWAY_URL` | Yes | Gateway root; HTTPS required except for loopback hosts |
+| `PROJECT_STUDIO_GATEWAY_TOKEN` | Dev only | Development bootstrap access token (see below) |
+| `PROJECT_STUDIO_GATEWAY_DEFAULT_MODEL` | Yes | Gateway model id the stable alias routes to |
+| `PROJECT_STUDIO_GATEWAY_TIMEOUT_MS` | No | Response (connect + headers) timeout, default `120000` (1s to 600s) |
+
+There is no canonical default model in the gateway contract, so `PROJECT_STUDIO_GATEWAY_DEFAULT_MODEL`
+must be set explicitly rather than guessed; when the catalog is loaded it is checked to exist. A
+base URL carrying embedded credentials, a query string, a fragment, or a non-HTTPS scheme on a
+non-loopback host is rejected.
+
+The access token is pulled from an injected `AccessTokenProvider` at request time, never from a
+prompt, a model reference, or mutable global model state, and is attached only to requests whose
+resolved URL is on the configured gateway origin. Redirects are not followed.
+
+The timeout guards establishing the response (connect plus headers) and is cleared once headers
+arrive; from then on the caller's `AbortSignal` governs the body. A long but healthy generation is
+therefore never truncated by the connect budget, while cancelling a run still tears down the
+upstream connection.
+
+`PROJECT_STUDIO_GATEWAY_TOKEN` backs a **development-only** bootstrap token provider. It is a
+convenience for pointing a local harness at a gateway; it is not secure credential storage and not
+the BYOK mechanism. In production the public Project Studio application injects an
+`AccessTokenProvider` backed by the authenticated Studio session; that integration is deferred.
+
+### Studio Gateway Deployment Assumption
+
+Studio Gateway is a **private** Cloudflare Worker: no `workers.dev` subdomain and no custom route.
+It is invoked only through a Cloudflare **service binding** from the public API, and the public API
+owns end-user authentication. The gateway therefore performs no inbound end-user auth of its own
+and must not trust arbitrary public identity headers. Propagating trusted user identity from the
+API to the gateway is deferred until the API proxy contract is implemented.
+
+### Catalog Lifecycle
+
+Production Phase 7 behavior is scoped to the stable default alias, which resolves without a network
+round trip, so bootstrap never blocks on catalog loading. Discovering the full model list is an
+explicit, callable service: `StudioCloudModelProviderAdapter.loadCatalog()` fetches and normalizes
+`/v1/models`, registers per-model context/token limits, and verifies the configured default model
+exists. Wiring an application lifecycle component that calls and refreshes it is deferred to product
+integration.
+
+### Studio Gateway Adapter
+
+The gateway keeps its Vercel AI SDK implementation and no AI SDK type crosses into the harness.
+The adapter registers a dedicated Pi wire protocol, `project-studio-gateway`, and parses the
+gateway's own SSE contract directly rather than treating it as OpenAI streaming. It maps
+`stream.started`, text deltas, reasoning deltas, completed tool calls, usage, `model.completed`,
+`stream.error`, and `[DONE]` into Pi events, preserving tool-call ids and order, usage, and finish
+reason.
+
+The gateway publishes each semantic event twice, under a compatibility name and a canonical
+`model.*` name. The mapper holds a compatibility event for exactly one event: if its canonical
+twin follows with an identical payload the compatibility copy is dropped, otherwise it is released
+unchanged, so a gateway emitting only one form still produces exactly one unit of output. The
+terminal `tool_calls` aggregate is reconciled against already-seen ids rather than re-emitted.
+
+The adapter never executes a tool. A turn containing tool calls settles as `toolUse` and Flue owns
+execution and continuation. Cancellation closes the upstream stream. Gateway failures become typed
+`StudioGatewayError`s built from status and the gateway's own normalized error code; raw upstream
+bodies are never surfaced.
 
 ## Persistence And Recovery
 
@@ -181,14 +267,24 @@ Only one live Node process may own a given agent instance.
 
 The next implementation phase should add adapters, not replace the harness:
 
-1. Local model gateway registration with user-controlled credentials, added as a new
-   `ModelProviderAdapter` selectable via the `local` source.
-2. Studio cloud gateway registration and centralized authentication, added as a new
-   `ModelProviderAdapter` selectable via the `studio-cloud` source.
-3. MCP connection registry for local and authenticated cloud servers.
-4. Skill catalog, subagent profiles, sandbox adapters, and schedules.
-5. Product-owned event projections over Flue envelopes.
-6. Optional Headroom sidecar behind `ContextOptimizer`.
+1. **Production Studio authentication.** Inject an `AccessTokenProvider` backed by the authenticated
+   public-application session (the API proxy contract), replacing the development bootstrap token.
+2. **Account settings and per-run routing.** Product-owned account model/source preference and,
+   only if a real requirement emerges, a run-level routing record. This phase intentionally ships
+   no such abstraction rather than a dead one that tests cover but nothing calls.
+3. **Secure OS credential storage.** A keychain-backed store for user-controlled provider keys,
+   with no plaintext-on-disk fallback and no key ever reaching a model-visible value, log, event,
+   telemetry attribute, or persisted conversation. Prerequisite for the next item.
+4. **Local BYOK provider runtime.** A `LocalModelProviderAdapter` behind the same contract,
+   selectable via the `local` source. Local and Studio gateway internals and catalogs stay separate.
+5. MCP connection registry for local and authenticated cloud servers.
+6. Skill catalog, subagent profiles, sandbox adapters, and schedules.
+7. Product-owned event projections over Flue envelopes.
+8. Optional Headroom sidecar behind `ContextOptimizer`.
+
+Until secure storage and the local runtime land, selecting `local` fails with
+`ProviderConfigurationError` and is never answered by routing the run to the Studio gateway
+instead.
 
 Headroom is not installed in this phase. Its TypeScript package is a client for a separate
 Python/Rust proxy and does not directly wrap Flue's Pi loop. A future adapter must preserve the
@@ -202,3 +298,4 @@ instructions, recent turns, or incomplete tool-call pairs.
 - [Context optimization](docs/decisions/0003-context-optimization.md)
 - [Observability foundation](docs/decisions/0004-observability.md)
 - [Model-provider composition](docs/decisions/0005-model-provider-composition.md)
+- [Studio Gateway integration](docs/decisions/0006-studio-gateway-integration.md)

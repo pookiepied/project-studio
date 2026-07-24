@@ -132,19 +132,22 @@ describe("createModelProviderAdapter", () => {
     );
   });
 
-  it("fails clearly for local before Phase 7", () => {
+  it("fails clearly for local, which is not operational yet", () => {
     expect(() => createModelProviderAdapter("local")).toThrow(
       ProviderConfigurationError,
     );
-    expect(() => createModelProviderAdapter("local")).toThrow(/Phase 7/);
+    expect(() => createModelProviderAdapter("local")).toThrow(
+      /not available yet/,
+    );
   });
 
-  it("fails clearly for studio-cloud before Phase 8", () => {
+  it("fails clearly for studio-cloud when it is not configured", () => {
+    delete process.env.PROJECT_STUDIO_GATEWAY_URL;
     expect(() => createModelProviderAdapter("studio-cloud")).toThrow(
       ProviderConfigurationError,
     );
     expect(() => createModelProviderAdapter("studio-cloud")).toThrow(
-      /Phase 8/,
+      /PROJECT_STUDIO_GATEWAY_URL/,
     );
   });
 
@@ -225,14 +228,15 @@ describe("provider bootstrap coordinator", () => {
     ).not.toThrow();
   });
 
-  it("fails clearly when local is selected before Phase 7", () => {
+  it("fails clearly when local is selected, which is not operational yet", () => {
     const coordinator = createProviderBootstrapCoordinator();
     expect(() => coordinator.bootstrap({ source: "local" })).toThrow(
       ProviderConfigurationError,
     );
   });
 
-  it("fails clearly when studio-cloud is selected before Phase 8", () => {
+  it("fails clearly when studio-cloud is selected without configuration", () => {
+    delete process.env.PROJECT_STUDIO_GATEWAY_URL;
     const coordinator = createProviderBootstrapCoordinator();
     expect(() => coordinator.bootstrap({ source: "studio-cloud" })).toThrow(
       ProviderConfigurationError,

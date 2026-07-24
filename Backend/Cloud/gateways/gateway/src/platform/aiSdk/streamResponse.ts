@@ -23,7 +23,7 @@ export function createAiSdkGatewayStreamResponse(result: { fullStream: AsyncIter
     );
 
     for await (const part of result.fullStream) {
-      const typedPart = part as { type?: string; totalUsage?: unknown };
+      const typedPart = part as { type?: string; totalUsage?: unknown; finishReason?: string };
 
       if (typedPart.type === "text-delta") {
         const chunk = textFromPart(part);
@@ -48,7 +48,12 @@ export function createAiSdkGatewayStreamResponse(result: { fullStream: AsyncIter
           await writer.write(encodeSse({ type: "usage", data: usage }, "usage"));
           await writer.write(encodeSse({ type: "model.usage", data: usage }, "model.usage"));
         }
-        await writer.write(encodeSse({ type: "model.completed" }, "model.completed"));
+        await writer.write(
+          encodeSse(
+            { type: "model.completed", finishReason: typedPart.finishReason ?? null },
+            "model.completed"
+          )
+        );
       }
     }
 

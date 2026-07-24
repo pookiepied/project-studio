@@ -1811,3 +1811,53 @@ describe("gateway worker", () => {
     expect(seen).toHaveBeenCalledOnce();
   });
 });
+
+describe("tool continuation mapping", () => {
+  it("replays assistant tool calls and correlates tool results", async () => {
+    vi.mocked(generateText).mockResolvedValue({ text: "done", finishReason: "stop" } as never);
+
+    const response = await postChat(createEnv(), {
+      model: "openai:gpt-5.6-sol",
+      messages: [
+        { role: "user", content: "summarize the workspace" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            { id: "call-1", name: "workspace_summary", arguments: '{"workspace":"studio"}' },
+            { id: "call-2", name: "workspace_files", arguments: '{"limit":5}' }
+          ]
+        },
+        { role: "tool", content: "ok", toolCallId: "call-1", toolName: "workspace_summary" },
+        { role: "tool", content: "[]", toolCallId: "call-2", toolName: "workspace_files" }
+      ]
+    });
+
+    expect(response.status).toBe(200);
+    const call = vi.mocked(generateText).mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: unknown }>;
+    };
+
+    const assistant = call.messages[1] as {
+      content: Array<{ type: string; toolCallId?: string; toolName?: string; input?: unknown }>;
+    };
+    expect(assistant.content.map((part) => part.toolCallId)).toEqual(["call-1", "call-2"]);
+    expect(assistant.content[0]).toMatchObject({
+      type: "tool-call",
+      toolName: "workspace_summary",
+      input: { workspace: "studio" }
+    });
+
+    const toolResult = call.messages[2] as {
+      role: string;
+      content: Array<{ type: string; toolCallId: string; toolName: string; output: { value: string } }>;
+    };
+    expect(toolResult.role).toBe("tool");
+    expect(toolResult.content[0]).toMatchObject({
+      type: "tool-result",
+      toolCallId: "call-1",
+      toolName: "workspace_summary",
+      output: { type: "text", value: "ok" }
+    });
+  });
+});

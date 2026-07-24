@@ -11,6 +11,6 @@ export type StreamEvent =
   | { type: "tool_calls"; calls: ToolCall[] }
   | { type: "usage"; data: CapturedUsage }
   | { type: "model.usage"; data: CapturedUsage }
-  | { type: "model.completed" }
+  | { type: "model.completed"; finishReason: string | null }
   | { type: "stream.error"; error: { code: string; message: string } }
   | { type: "stream.completed" };

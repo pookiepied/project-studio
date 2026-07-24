@@ -25,6 +25,20 @@ function readEnv(name: string): string | undefined {
   return trimmed === "" ? undefined : trimmed;
 }
 
+/**
+ * Selects the model source for this process.
+ *
+ * The source is a bootstrap-level decision read from
+ * `PROJECT_STUDIO_MODEL_SOURCE` (default: `test`). It is deliberately not an
+ * account preference or a per-run switch: there is no account model or run
+ * router in this phase, and pretending otherwise would be dishonest. Product
+ * account settings and per-run routing are deferred to product integration.
+ *
+ *  - `test`         in-process deterministic provider; network-free default;
+ *  - `studio-cloud` the authenticated Studio Gateway source;
+ *  - `local`        recognized but not operational (BYOK), and never silently
+ *                   substituted with another source.
+ */
 export function resolveProviderConfig(
   input: ProviderConfigInput = {},
 ): ProviderConfig {

@@ -29,17 +29,38 @@ capability path without an architecture decision.
 - Deterministic provider behind the shared adapter contract.
 - Capability metadata, configuration validation, and startup rejection for unavailable sources.
 
+### Phase 7: Studio Gateway Integration
+
+- Operational `studio-cloud` model source, selected at process bootstrap.
+- Native Pi-facing Studio Gateway adapter parsing the gateway's own SSE contract, with streamed
+  reasoning/text, preserved multiple tool calls, tool-result continuation, finish reasons, usage,
+  safe typed errors, and cancellation, proven against a real generated Flue server.
+- Injected `AccessTokenProvider` boundary; `PROJECT_STUDIO_GATEWAY_TOKEN` is a development-only
+  bootstrap token, not credential storage.
+- Required explicit default model; catalog loading is an explicit callable service.
+- No automatic fallback between sources; `local`/BYOK recognized but not operational.
+- Gateway trust boundary documented: private worker behind the public API's service binding; the
+  public API owns end-user authentication.
+
 ## Next
 
-### Phase 7: Local Gateway
+### Phase 8: Product Authentication, Secure Credentials, And Local BYOK
 
-Implement the user-controlled local/BYOK gateway adapter against the Phase 6 contract. Keep keys
-out of model-visible values, logs, events, and persisted conversations.
+Separable pieces:
 
-### Phase 8: Studio Cloud Gateway
+1. **Production Studio authentication.** Inject an `AccessTokenProvider` backed by the authenticated
+   public-application session (the API proxy contract), replacing the development bootstrap token,
+   and define trusted identity propagation from the API to the gateway.
+2. **Account settings and per-run routing.** Product-owned account model/source preference and, only
+   if a real requirement emerges, a run-level routing record. Not built speculatively in Phase 7.
+3. **Secure OS credential storage.** Keychain-backed storage for user-controlled provider keys. No
+   plaintext-on-disk fallback. No key may reach a model-visible value, log line, event, telemetry
+   attribute, or persisted conversation.
+4. **Local BYOK provider runtime.** A `LocalModelProviderAdapter` behind the Phase 6 contract,
+   selectable via the `local` source. Local and Studio gateway internals and catalogs stay separate.
 
-Connect the existing Studio gateway through its own adapter and centralized authentication.
-Do not merge local and cloud gateway internals or catalogs.
+Until secure storage and the local runtime land, `local` remains a deliberate, typed startup
+failure.
 
 ### Phase 9: Capability And Permission Kernel
 
