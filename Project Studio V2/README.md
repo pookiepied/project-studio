@@ -37,6 +37,15 @@ src/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
     models.ts                 Gateway-neutral model references, capability, adapter contract
+  auth/
+    cli.ts                    pnpm auth sign-in / status / sign-out
+    config.ts                 Validated auth service URL and desktop OAuth client id
+    errors.ts                 Typed sign-in errors, never carrying a token or code
+    google-login.ts           PKCE loopback flow against Google
+    auth-client.ts            HTTP boundary for the Studio auth service
+    session.ts                Session storage over the keychain, JWT expiry reading
+    session-token-provider.ts Session-backed AccessTokenProvider, single-flight refresh
+    login.ts                  Sign-in/out orchestration
   credentials/
     credential-store.ts       SecureCredentialStore port, key/secret validation, typed errors
     keyring-store.ts          OS keychain implementation; no plaintext fallback
@@ -77,6 +86,7 @@ tests/
     studio-gateway.test.ts    Adapter unit slice: catalog, streaming, tools, errors, cancellation
     studio-flue.test.ts       Real generated Flue server against a mock gateway
     credential-keyring.test.ts Real OS credential store; skips where none exists
+    auth-login.test.ts        Full PKCE flow against a mock Google and auth service
   unit/
     architecture.test.ts      Boundary tests
     credentials.test.ts       Key namespacing, secret limits, in-memory store

@@ -78,10 +78,12 @@ credential, so wiring login first would have required a temporary plaintext step
    SSE bodies stream through. Covered by typecheck only: the api worker has no test harness.
 2. **Secure OS credential storage.** Done. `SecureCredentialStore` over the platform keychain, with
    no fallback, one entry per secret, and limits validated against the real store. See ADR 0007.
-3. **Harness-owned login.** Next. A loopback Google flow against the existing `auth/` worker,
-   storing the session in the credential store, and an `AccessTokenProvider` backed by that session
-   with refresh — replacing `PROJECT_STUDIO_GATEWAY_TOKEN`. The desktop app later shares this flow
-   rather than owning it.
+3. **Harness-owned login.** Done. A PKCE loopback Google flow, the session stored in the credential
+   store, and a single-flight refreshing `AccessTokenProvider` that replaces
+   `PROJECT_STUDIO_GATEWAY_TOKEN`. `pnpm auth sign-in | status | sign-out`. See ADR 0008.
+   Running against production still needs a Google "Desktop app" OAuth client id, set as
+   `PROJECT_STUDIO_GOOGLE_CLIENT_ID` here and `GOOGLE_DESKTOP_CLIENT_ID` on the auth worker;
+   everything else is implemented and tested against a mock Google.
 4. **Local BYOK provider runtime.** A `LocalModelProviderAdapter` behind the Phase 6 contract,
    selectable via the `local` source. Local and Studio gateway internals and catalogs stay separate.
 5. **Connect/disconnect/select contracts** for settings, plus the product-owned metadata table that

@@ -75,6 +75,19 @@ export function createEnvAccessTokenProvider(
 }
 
 /**
+ * Whether a development bootstrap token is configured at all.
+ *
+ * Used to choose between the development token and the signed-in session. It
+ * only reports presence and never returns or logs the value.
+ */
+export function hasEnvAccessToken(
+  variableName = "PROJECT_STUDIO_GATEWAY_TOKEN",
+): boolean {
+  const raw = process.env[variableName];
+  return raw !== undefined && raw.trim() !== "";
+}
+
+/**
  * Startup check for the development bootstrap token, so a missing or malformed
  * value fails before the harness starts rather than on the first model call.
  */

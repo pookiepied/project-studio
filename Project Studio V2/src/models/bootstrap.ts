@@ -12,8 +12,14 @@ import { StudioCloudModelProviderAdapter } from "./adapters/studio-cloud-adapter
 import {
   assertAccessTokenConfigured,
   createEnvAccessTokenProvider,
+  hasEnvAccessToken,
   type AccessTokenProvider,
 } from "./studio-cloud/access-token.js";
+import { StudioAuthClient } from "../auth/auth-client.js";
+import { resolveStudioAuthConfig } from "../auth/config.js";
+import { SessionStore } from "../auth/session.js";
+import { SessionAccessTokenProvider } from "../auth/session-token-provider.js";
+import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import type { FetchLike } from "./studio-cloud/client.js";
 import {
   resolveStudioGatewayConfig,
@@ -62,21 +68,60 @@ export function createModelProviderAdapter(
   }
 }
 
+/**
+ * How the harness authenticates to the Studio gateway.
+ *
+ * `session` is production: the token comes from the user's signed-in session in
+ * the OS credential store and is renewed automatically. `dev-token` is the
+ * development bootstrap path.
+ *
+ * Setting `PROJECT_STUDIO_GATEWAY_TOKEN` is a deliberate act, so it wins — but
+ * it is reported at startup rather than applied silently, because a stale
+ * variable shadowing a real session would otherwise be invisible.
+ */
+export type GatewayAuthMode = "session" | "dev-token";
+
+export function resolveGatewayAuthMode(): GatewayAuthMode {
+  return hasEnvAccessToken() ? "dev-token" : "session";
+}
+
 function createStudioCloudAdapter(
   overrides: StudioCloudBootstrapOverrides,
 ): StudioCloudModelProviderAdapter {
   const config = overrides.config ?? resolveStudioGatewayConfig();
 
-  let tokenProvider = overrides.tokenProvider;
-  if (tokenProvider === undefined) {
-    assertAccessTokenConfigured();
-    tokenProvider = createEnvAccessTokenProvider();
-  }
+  const tokenProvider =
+    overrides.tokenProvider ?? createConfiguredAccessTokenProvider();
 
   return new StudioCloudModelProviderAdapter({
     config,
     tokenProvider,
     ...(overrides.fetchImpl === undefined ? {} : { fetchImpl: overrides.fetchImpl }),
+  });
+}
+
+/**
+ * Builds the outbound token source for the selected auth mode.
+ *
+ * Both paths validate at startup: the development token is checked for header
+ * safety, and the session path validates the auth service configuration it will
+ * need in order to refresh. Neither reads a stored token here — the session is
+ * loaded lazily on the first call, so starting the harness while signed out
+ * fails at the first model call with a "not signed in" error rather than
+ * refusing to boot.
+ */
+function createConfiguredAccessTokenProvider(): AccessTokenProvider {
+  if (resolveGatewayAuthMode() === "dev-token") {
+    assertAccessTokenConfigured();
+    return createEnvAccessTokenProvider();
+  }
+
+  const authConfig = resolveStudioAuthConfig();
+  const credentials = new KeyringCredentialStore();
+
+  return new SessionAccessTokenProvider({
+    sessions: new SessionStore(credentials),
+    client: new StudioAuthClient(authConfig),
   });
 }
 

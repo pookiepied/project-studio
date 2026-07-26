@@ -6,6 +6,12 @@ export interface Env {
   FRONTEND_URL: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  /**
+   * Public Google OAuth client for the desktop harness, which signs in with
+   * PKCE and no client secret. Optional: unset simply means desktop login is
+   * not enabled for this deployment.
+   */
+  GOOGLE_DESKTOP_CLIENT_ID?: string;
 }
 
 export interface GoogleTokens {

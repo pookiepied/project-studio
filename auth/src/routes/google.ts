@@ -30,7 +30,10 @@ google.post('/google', async (c) => {
       return c.json({ error: 'ID token required' }, 400);
     }
 
-    const googleUser = await verifyGoogleIdToken(idToken, c.env.GOOGLE_CLIENT_ID);
+    const googleUser = await verifyGoogleIdToken(idToken, [
+      c.env.GOOGLE_CLIENT_ID,
+      c.env.GOOGLE_DESKTOP_CLIENT_ID,
+    ]);
     if (!googleUser) {
       emit(c.env, c.executionCtx, { event: 'auth.login.failed', severity: 'warn', data: { reason: 'invalid_token' } });
       return c.json({ error: 'Invalid ID token' }, 400);
