@@ -150,6 +150,20 @@ describe("startup ordering and adapter boundaries", () => {
     expect(source).not.toMatch(/@earendil-works\/pi-ai|@flue\//);
   });
 
+  it("gives the credential store no plaintext fallback", async () => {
+    // The rule is that a secret lives in the OS store or nowhere. Any
+    // filesystem or database access from these modules would be a fallback
+    // path, which is exactly what must not exist.
+    for (const path of [
+      "../../src/credentials/credential-store.ts",
+      "../../src/credentials/keyring-store.ts",
+      "../../src/credentials/memory-store.ts",
+    ]) {
+      const source = await readFile(new URL(path, import.meta.url), "utf8");
+      expect(source).not.toMatch(/node:fs|writeFile|readFile|sqlite|\.db\b/i);
+    }
+  });
+
   it("keeps credentials out of the model contract and provider config modules", async () => {
     for (const path of [
       "../../src/contracts/models.ts",

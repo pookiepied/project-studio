@@ -37,6 +37,10 @@ src/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
     models.ts                 Gateway-neutral model references, capability, adapter contract
+  credentials/
+    credential-store.ts       SecureCredentialStore port, key/secret validation, typed errors
+    keyring-store.ts          OS keychain implementation; no plaintext fallback
+    memory-store.ts           In-memory store for tests, same validation rules
   models/
     adapters/
       test-adapter.ts         Deterministic Pi provider behind the adapter contract
@@ -72,8 +76,10 @@ tests/
     observability.test.ts     Span hierarchy, metrics, redaction, cancellation
     studio-gateway.test.ts    Adapter unit slice: catalog, streaming, tools, errors, cancellation
     studio-flue.test.ts       Real generated Flue server against a mock gateway
+    credential-keyring.test.ts Real OS credential store; skips where none exists
   unit/
     architecture.test.ts      Boundary tests
+    credentials.test.ts       Key namespacing, secret limits, in-memory store
     model-providers.test.ts   Provider config, adapters, registry, bootstrap
     observability.test.ts     Config, init-once, logger, errors, redaction
 docs/

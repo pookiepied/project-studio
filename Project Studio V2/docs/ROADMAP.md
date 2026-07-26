@@ -65,25 +65,32 @@ Recorded, deliberately not changed:
 - `PassthroughContextOptimizer` has no production caller. It is a declared port from ADR 0003, kept
   as a decided seam, and it is exercised only by a unit test today.
 
-## Next
+## In Progress
 
 ### Phase 8: Product Authentication, Secure Credentials, And Local BYOK
 
-Separable pieces:
+Ordered so that storage exists before anything needs to store a secret. A session token is itself a
+credential, so wiring login first would have required a temporary plaintext step.
 
-1. **Production Studio authentication.** Inject an `AccessTokenProvider` backed by the authenticated
-   public-application session (the API proxy contract), replacing the development bootstrap token,
-   and define trusted identity propagation from the API to the gateway.
-2. **Account settings and per-run routing.** Product-owned account model/source preference and, only
-   if a real requirement emerges, a run-level routing record. Not built speculatively in Phase 7.
-3. **Secure OS credential storage.** Keychain-backed storage for user-controlled provider keys. No
-   plaintext-on-disk fallback. No key may reach a model-visible value, log line, event, telemetry
-   attribute, or persisted conversation.
+1. **Public API proxy.** Done. `/studio/gateway/v1/*` on the public API verifies the caller's Studio
+   token and forwards to the private gateway over the existing service binding, attaching the
+   caller's identity as a trusted header and never forwarding the client's Authorization header.
+   SSE bodies stream through. Covered by typecheck only: the api worker has no test harness.
+2. **Secure OS credential storage.** Done. `SecureCredentialStore` over the platform keychain, with
+   no fallback, one entry per secret, and limits validated against the real store. See ADR 0007.
+3. **Harness-owned login.** Next. A loopback Google flow against the existing `auth/` worker,
+   storing the session in the credential store, and an `AccessTokenProvider` backed by that session
+   with refresh — replacing `PROJECT_STUDIO_GATEWAY_TOKEN`. The desktop app later shares this flow
+   rather than owning it.
 4. **Local BYOK provider runtime.** A `LocalModelProviderAdapter` behind the Phase 6 contract,
    selectable via the `local` source. Local and Studio gateway internals and catalogs stay separate.
+5. **Connect/disconnect/select contracts** for settings, plus the product-owned metadata table that
+   answers "which providers are connected" — the keychain cannot enumerate entries. Built with its
+   consumer, not before.
 
-Until secure storage and the local runtime land, `local` remains a deliberate, typed startup
-failure.
+Until the local runtime lands, `local` remains a deliberate, typed startup failure.
+
+## Next
 
 ### Phase 9: Capability And Permission Kernel
 
