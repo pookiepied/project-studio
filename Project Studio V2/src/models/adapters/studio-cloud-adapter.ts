@@ -17,7 +17,7 @@ import {
   type ModelProviderAdapter,
   type ModelReference,
 } from "../../contracts/models.js";
-import type { AccessTokenProvider } from "../studio-cloud/auth.js";
+import type { AccessTokenProvider } from "../studio-cloud/access-token.js";
 import {
   defaultAliasDescriptor,
   descriptorFromStudioModel,

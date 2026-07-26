@@ -17,7 +17,7 @@ import {
 } from "../../src/contracts/models.js";
 import { createProviderBootstrapCoordinator } from "../../src/models/bootstrap.js";
 import { StudioCloudModelProviderAdapter } from "../../src/models/adapters/studio-cloud-adapter.js";
-import { createStaticAccessTokenProvider } from "../../src/models/studio-cloud/auth.js";
+import { createStaticAccessTokenProvider } from "../../src/models/studio-cloud/access-token.js";
 import { resolveStudioGatewayConfig } from "../../src/models/studio-cloud/config.js";
 import { StudioGatewayError } from "../../src/models/studio-cloud/errors.js";
 

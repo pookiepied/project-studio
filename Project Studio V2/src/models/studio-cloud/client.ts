@@ -1,4 +1,4 @@
-import type { AccessTokenProvider } from "./auth.js";
+import type { AccessTokenProvider } from "./access-token.js";
 import type { StudioGatewayConfig } from "./config.js";
 import {
   isAbortError,

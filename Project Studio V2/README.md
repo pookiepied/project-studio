@@ -43,7 +43,8 @@ src/
       studio-cloud-adapter.ts Studio Gateway source and its Pi wire protocol
     studio-cloud/
       config.ts               Validated gateway URL, required default model, timeout
-      auth.ts                 Injected access-token provider and header safety
+      access-token.ts         Injected outbound token provider and header safety
+                              (calling the gateway, not user login)
       client.ts               Origin-scoped HTTPS transport for the gateway
       sse-parser.ts           Server-sent event framing
       stream-events.ts        Gateway SSE vocabulary, parsing, duplicate collapsing

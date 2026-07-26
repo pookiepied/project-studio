@@ -13,7 +13,7 @@ import {
   assertAccessTokenConfigured,
   createEnvAccessTokenProvider,
   type AccessTokenProvider,
-} from "./studio-cloud/auth.js";
+} from "./studio-cloud/access-token.js";
 import type { FetchLike } from "./studio-cloud/client.js";
 import {
   resolveStudioGatewayConfig,
