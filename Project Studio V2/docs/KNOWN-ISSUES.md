@@ -45,19 +45,22 @@ legitimate command — a large `git log`, a wide `rg` — turns out to trip it i
 normal use, in which case the answer is a per-caller limit, not a bigger global
 one.
 
-### P-03 · No `PATH` in the child environment, unverified against git · Open
+### P-03 · No `PATH` in the child environment · Partly answered
 
 The child environment is built from policy plus an allowlist of Windows OS
 plumbing (`SystemRoot`, `windir`, `TEMP`, `TMP`). `PATH` is deliberately
 excluded so a spawned binary cannot find tools the caller never approved.
 
-Git computes its own exec path and should not need `PATH`, but this is
-reasoning, not evidence — **it has not yet been exercised against a real git
-invocation.** Credential helpers and `ssh` are the likely first failures.
+**Now tested for local git.** `git init`, `git config`, `git status`, and
+`git rev-parse` all work without `PATH`, so the reasoning that git computes its
+own exec path holds for local operations.
 
-**Fix when:** the git tool lands (step 5). If a helper genuinely needs a
-directory, the answer is to add that directory explicitly, never to inherit
-`PATH`.
+**Still untested for anything that reaches a remote.** `git fetch` and
+`git push` invoke credential helpers and `ssh`, which are separate executables
+found through `PATH`. Expect that to fail, and expect the fix to be naming the
+specific directory rather than inheriting `PATH`.
+
+**Fix when:** a network git operation is first attempted.
 
 ### P-04 · A failed `taskkill` degrades silently · Open
 
@@ -187,6 +190,31 @@ earlier process did. Failing closed costs one extra read.
 
 ripgrep 14.1.1 is vendored at `vendor/win32-x64/rg.exe` and recorded in
 `vendor/MANIFEST.md`. All seven end-to-end tests now run.
+
+### T-07 · Git hooks run the project's own code · Accepted
+
+`git commit` runs the repository's `pre-commit` hook, `git checkout` runs
+`post-checkout`, and so on. Those are real programs, executing on the user's
+machine, that the harness did not vet.
+
+Accepted rather than prevented. They are the user's own repository
+configuration doing what git is designed to do, and the alternative —
+`--no-verify` — would silently skip the checks the user set up for themselves,
+which is worse than running them.
+
+Worth knowing when the sandbox tier lands: a commit inside a container runs that
+container's hooks, not the host's.
+
+### T-08 · Git output is truncated at 400 lines with no paging · Open
+
+Unlike `read`, `grep`, and `glob`, the git tool has no `limit`/`offset`. A long
+`git log` or a large `git diff` is cut at 400 lines and the model is told to
+narrow the command instead.
+
+**Fix when:** it proves annoying in practice. The honest fix is paging
+parameters like the other tools have, not a bigger ceiling.
+
+---
 
 ---
 

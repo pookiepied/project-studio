@@ -154,7 +154,7 @@ The surface is capped at ten tools, grouped by family, one tool per capability:
 |---|---|---|
 | Filesystem | `read`, `write`, `edit` | Done |
 | Search | `glob`, `grep` | Done, over vendored ripgrep 14.1.1 |
-| Version control | `git` | Complete subcommand coverage, one capability |
+| Version control | `git` | Done — complete subcommand coverage, one capability |
 | Execution | `shell` | Local, bounded by permission |
 | Network | `fetch` | Blocked on the network-effect question |
 | Delegation | `task`, `skill` | Phases 13 and 12 |
