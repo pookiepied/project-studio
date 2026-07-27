@@ -36,6 +36,14 @@ export type StudioErrorDomain =
   | "observability"
   | "permissions"
   | "sandbox"
+  /** Spawning and supervising a child process. */
+  | "process"
+  /**
+   * Locating the third-party binaries the harness runs. Separate from
+   * `process`: "ripgrep is not installed" and "ripgrep crashed" need different
+   * answers from the user, so they must not share a code.
+   */
+  | "vendor"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */
