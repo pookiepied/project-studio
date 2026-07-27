@@ -19,7 +19,15 @@ import { StudioAuthClient } from "../auth/auth-client.js";
 import { resolveStudioAuthConfig } from "../auth/config.js";
 import { SessionStore } from "../auth/session.js";
 import { SessionAccessTokenProvider } from "../auth/session-token-provider.js";
+import type { SecureCredentialStore } from "../credentials/credential-store.js";
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
+import { LocalModelProviderAdapter } from "./adapters/local-adapter.js";
+import {
+  resolveLocalModelConfig,
+  type LocalModelConfig,
+} from "./local/config.js";
+import { PiCredentialStore } from "./local/credential-bridge.js";
+import { createLocalRuntime } from "./local/runtime.js";
 import type { FetchLike } from "./studio-cloud/client.js";
 import {
   resolveStudioGatewayConfig,
@@ -32,8 +40,14 @@ export interface StudioCloudBootstrapOverrides {
   readonly fetchImpl?: FetchLike;
 }
 
+export interface LocalBootstrapOverrides {
+  readonly config?: LocalModelConfig;
+  readonly credentials?: SecureCredentialStore;
+}
+
 export interface BootstrapOptions {
   readonly studioCloud?: StudioCloudBootstrapOverrides;
+  readonly local?: LocalBootstrapOverrides;
 }
 
 /**
@@ -58,9 +72,7 @@ export function createModelProviderAdapter(
     case "studio-cloud":
       return createStudioCloudAdapter(options.studioCloud ?? {});
     case "local":
-      throw new ProviderConfigurationError(
-        'Model source "local" is not available yet. The local BYOK runtime requires secure OS credential storage, which ships in the next phase; it is never substituted with the Studio gateway.',
-      );
+      return createLocalAdapter(options.local ?? {});
     default:
       throw new ProviderConfigurationError(
         `Unknown model source "${source as string}".`,
@@ -98,6 +110,29 @@ function createStudioCloudAdapter(
     tokenProvider,
     ...(overrides.fetchImpl === undefined ? {} : { fetchImpl: overrides.fetchImpl }),
   });
+}
+
+/**
+ * Builds the local BYOK source.
+ *
+ * The user's provider credentials stay in the OS keychain and are read by Pi
+ * during auth resolution; nothing here holds a key. Configuration is validated
+ * eagerly so a bad default model or an unusable custom provider fails at
+ * startup, but the credential store is not consulted, because a user may
+ * legitimately start the harness before connecting any provider.
+ */
+function createLocalAdapter(
+  overrides: LocalBootstrapOverrides,
+): LocalModelProviderAdapter {
+  const config = overrides.config ?? resolveLocalModelConfig();
+  const credentials = overrides.credentials ?? new KeyringCredentialStore();
+
+  const runtime = createLocalRuntime({
+    config,
+    credentials: new PiCredentialStore(credentials),
+  });
+
+  return new LocalModelProviderAdapter({ config, runtime });
 }
 
 /**

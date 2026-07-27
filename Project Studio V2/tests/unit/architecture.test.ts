@@ -158,6 +158,7 @@ describe("startup ordering and adapter boundaries", () => {
       "../../src/credentials/credential-store.ts",
       "../../src/credentials/keyring-store.ts",
       "../../src/credentials/memory-store.ts",
+      "../../src/models/local/credential-bridge.ts",
     ]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).not.toMatch(/node:fs|writeFile|readFile|sqlite|\.db\b/i);

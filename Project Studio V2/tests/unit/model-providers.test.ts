@@ -14,6 +14,7 @@ import {
   createProviderBootstrapCoordinator,
 } from "../../src/models/bootstrap.js";
 import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
+import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 
 const originalEnv = { ...process.env };
 
@@ -132,13 +133,32 @@ describe("createModelProviderAdapter", () => {
     );
   });
 
-  it("fails clearly for local, which is not operational yet", () => {
+  it("fails clearly for local when no default model is configured", () => {
+    // `local` is operational now; what it refuses is starting without knowing
+    // which model the stable alias should route to.
+    delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
     expect(() => createModelProviderAdapter("local")).toThrow(
       ProviderConfigurationError,
     );
     expect(() => createModelProviderAdapter("local")).toThrow(
-      /not available yet/,
+      /PROJECT_STUDIO_LOCAL_DEFAULT_MODEL/,
     );
+  });
+
+  it("creates the operational local adapter when it is configured", () => {
+    const adapter = createModelProviderAdapter("local", {
+      local: {
+        config: {
+          defaultProvider: "openai",
+          defaultModel: "gpt-4o-mini",
+          customProviders: [],
+        },
+        credentials: new InMemoryCredentialStore(),
+      },
+    });
+
+    expect(adapter.source).toBe("local");
+    expect(adapter.operational).toBe(true);
   });
 
   it("fails clearly for studio-cloud when it is not configured", () => {

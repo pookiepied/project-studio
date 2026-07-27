@@ -54,6 +54,13 @@ src/
     adapters/
       test-adapter.ts         Deterministic Pi provider behind the adapter contract
       studio-cloud-adapter.ts Studio Gateway source and its Pi wire protocol
+      local-adapter.ts        Local BYOK source; alias protocol over Pi's Models
+    local/
+      config.ts               Default model and user-declared custom providers
+      credential-bridge.ts    OS keychain presented as Pi's CredentialStore
+      runtime.ts              Pi Models collection: built-ins plus custom providers
+      catalog.ts              Pi models to ModelDescriptor and capabilities
+      cli.ts                  pnpm providers list / connect / disconnect
     studio-cloud/
       config.ts               Validated gateway URL, required default model, timeout
       access-token.ts         Injected outbound token provider and header safety
@@ -87,9 +94,11 @@ tests/
     studio-flue.test.ts       Real generated Flue server against a mock gateway
     credential-keyring.test.ts Real OS credential store; skips where none exists
     auth-login.test.ts        Full PKCE flow against a mock Google and auth service
+    local-byok.test.ts        Stored key to the wire against a mock OpenAI-compatible server
   unit/
     architecture.test.ts      Boundary tests
     credentials.test.ts       Key namespacing, secret limits, in-memory store
+    local-providers.test.ts   Credential chunking, serialized writes, specifiers
     model-providers.test.ts   Provider config, adapters, registry, bootstrap
     observability.test.ts     Config, init-once, logger, errors, redaction
 docs/

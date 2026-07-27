@@ -84,13 +84,16 @@ credential, so wiring login first would have required a temporary plaintext step
    Running against production still needs a Google "Desktop app" OAuth client id, set as
    `PROJECT_STUDIO_GOOGLE_CLIENT_ID` here and `GOOGLE_DESKTOP_CLIENT_ID` on the auth worker;
    everything else is implemented and tested against a mock Google.
-4. **Local BYOK provider runtime.** A `LocalModelProviderAdapter` behind the Phase 6 contract,
-   selectable via the `local` source. Local and Studio gateway internals and catalogs stay separate.
-5. **Connect/disconnect/select contracts** for settings, plus the product-owned metadata table that
-   answers "which providers are connected" — the keychain cannot enumerate entries. Built with its
-   consumer, not before.
+4. **Local BYOK provider runtime.** Done. `LocalModelProviderAdapter` over Pi's `Models`
+   collection, with the OS keychain presented as Pi's `CredentialStore`, 36 built-in providers,
+   and custom OpenAI-compatible providers covering Ollama, LM Studio, and proxy services.
+   `pnpm providers list | connect | disconnect`. See ADR 0009.
+5. **Connect/disconnect/select contracts** for settings. Next. The CLI proves the flows; the
+   product needs them as contracts, along with a place to store custom providers and the chosen
+   default model instead of environment variables.
 
-Until the local runtime lands, `local` remains a deliberate, typed startup failure.
+`local` is now operational. Selecting it without a configured default model is a clean startup
+failure, never a silent fallback to the gateway.
 
 ## Next
 
