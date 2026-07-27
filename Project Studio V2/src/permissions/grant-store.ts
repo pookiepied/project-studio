@@ -7,6 +7,7 @@ import {
 } from "../contracts/capabilities.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { storageErrorFrom } from "../storage/errors.js";
+import { matchesResource, patternSpecificity, type ResourceKind } from "./matcher.js";
 import type { GrantDuration } from "./policy.js";
 
 /**
@@ -29,6 +30,12 @@ export interface PermissionGrant {
   /** Set for a conversation-scoped grant; null for one that persists. */
   readonly conversationId: string | undefined;
   readonly projectId: string | undefined;
+  /**
+   * What the approval was narrowed to — `src/**`, `git:log`. Undefined means
+   * the whole capability, which is what every grant meant before resources
+   * existed.
+   */
+  readonly resourcePattern: string | undefined;
   readonly grantedAt: number;
 }
 
@@ -38,8 +45,12 @@ interface GrantRow {
   agent_id: string;
   conversation_id: string | null;
   project_id: string | null;
+  resource_pattern: string | null;
   granted_at: number;
 }
+
+const COLUMNS = `id, capability_key, agent_id, conversation_id, project_id,
+                 resource_pattern, granted_at`;
 
 function toGrant(row: GrantRow): PermissionGrant {
   return {
@@ -48,6 +59,7 @@ function toGrant(row: GrantRow): PermissionGrant {
     agentId: row.agent_id,
     conversationId: row.conversation_id ?? undefined,
     projectId: row.project_id ?? undefined,
+    resourcePattern: row.resource_pattern ?? undefined,
     grantedAt: row.granted_at,
   };
 }
@@ -66,24 +78,45 @@ export class PermissionGrantStore {
    * two, and preferring the broader one would report a persistent approval
    * where the user only approved this conversation.
    */
-  find(id: CapabilityId, scope: ExecutionScope): PermissionGrant | undefined {
+  find(
+    id: CapabilityId,
+    scope: ExecutionScope,
+    resource?: string,
+    kind: ResourceKind = "path",
+  ): PermissionGrant | undefined {
     const key = capabilityKey(id);
 
-    const row = this.#db.handle
+    const rows = this.#db.handle
       .prepare(
-        `SELECT id, capability_key, agent_id, conversation_id, project_id, granted_at
+        `SELECT ${COLUMNS}
            FROM permission_grant
           WHERE capability_key = ?
             AND agent_id = ?
             AND revoked_at IS NULL
-            AND (conversation_id = ? OR conversation_id IS NULL)
-          ORDER BY conversation_id IS NULL
-          LIMIT 1`,
+            AND (conversation_id = ? OR conversation_id IS NULL)`,
       )
-      .get(key, scope.agentId, scope.conversationId) as unknown as
-      | GrantRow
-      | undefined;
+      .all(key, scope.agentId, scope.conversationId) as unknown as GrantRow[];
 
+    // Pattern matching happens here rather than in SQL: SQLite's GLOB cannot
+    // express the `*` / `**` distinction, and approximating it in SQL would
+    // make the stored rule and the enforced rule two different things.
+    const applicable = rows
+      .filter((row) => matchesResource(row.resource_pattern ?? undefined, resource, kind))
+      .sort((left, right) => {
+        // A conversation-scoped grant is narrower than a standing one, and a
+        // specific pattern is narrower than a wildcard. Preferring the broader
+        // match would report a permission the user never gave.
+        const byScope =
+          Number(left.conversation_id === null) - Number(right.conversation_id === null);
+        if (byScope !== 0) return byScope;
+
+        return (
+          patternSpecificity(right.resource_pattern ?? undefined) -
+          patternSpecificity(left.resource_pattern ?? undefined)
+        );
+      });
+
+    const row = applicable[0];
     return row ? toGrant(row) : undefined;
   }
 
@@ -97,6 +130,7 @@ export class PermissionGrantStore {
     id: CapabilityId,
     scope: ExecutionScope,
     duration: GrantDuration,
+    resourcePattern?: string,
   ): PermissionGrant | undefined {
     if (duration === "once") return undefined;
 
@@ -108,6 +142,7 @@ export class PermissionGrantStore {
       agent_id: scope.agentId,
       conversation_id: conversationId,
       project_id: scope.projectId ?? null,
+      resource_pattern: resourcePattern ?? null,
       granted_at: Date.now(),
     };
 
@@ -115,8 +150,9 @@ export class PermissionGrantStore {
       this.#db.handle
         .prepare(
           `INSERT INTO permission_grant
-                  (id, capability_key, agent_id, conversation_id, project_id, verdict, granted_at)
-                VALUES (?, ?, ?, ?, ?, 'allow', ?)`,
+                  (id, capability_key, agent_id, conversation_id, project_id,
+                   resource_pattern, verdict, granted_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'allow', ?)`,
         )
         .run(
           grant.id,
@@ -124,13 +160,14 @@ export class PermissionGrantStore {
           grant.agent_id,
           grant.conversation_id,
           grant.project_id,
+          grant.resource_pattern,
           grant.granted_at,
         );
     } catch (error) {
       // The unique index makes a repeated approval a conflict. That is the
       // user approving something they already approved, which is a no-op, not
       // a failure to surface.
-      const existing = this.find(id, scope);
+      const existing = this.find(id, scope, resourcePattern);
       if (existing) return existing;
       throw storageErrorFrom(error);
     }
@@ -144,14 +181,14 @@ export class PermissionGrantStore {
       agentId === undefined
         ? this.#db.handle
             .prepare(
-              `SELECT id, capability_key, agent_id, conversation_id, project_id, granted_at
+              `SELECT ${COLUMNS}
                  FROM permission_grant WHERE revoked_at IS NULL
                 ORDER BY granted_at DESC`,
             )
             .all()
         : this.#db.handle
             .prepare(
-              `SELECT id, capability_key, agent_id, conversation_id, project_id, granted_at
+              `SELECT ${COLUMNS}
                  FROM permission_grant WHERE revoked_at IS NULL AND agent_id = ?
                 ORDER BY granted_at DESC`,
             )

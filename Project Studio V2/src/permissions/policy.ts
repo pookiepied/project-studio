@@ -4,6 +4,7 @@ import {
   type CapabilityDescriptor,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
+import { matchesResource, type ResourceKind } from "./matcher.js";
 
 /**
  * What the kernel concluded, and why.
@@ -35,6 +36,14 @@ export interface PermissionDecision {
 export interface PermissionRequest {
   readonly capability: CapabilityDescriptor;
   readonly scope: ExecutionScope;
+  /**
+   * What the call actually touches — a resolved path, or `git:push`.
+   *
+   * Derived by the integrator from the call's arguments, never taken from the
+   * model verbatim. It is `undefined` for a capability whose arguments do not
+   * narrow what it reaches.
+   */
+  readonly resource: string | undefined;
 }
 
 /** How long an approval lasts. */
@@ -77,6 +86,36 @@ export const BASE_POLICY: readonly PolicyRule[] = [
         : undefined,
   },
 ];
+
+/**
+ * Builds a rule that matches a capability and, optionally, what it touches.
+ *
+ * This is the shape user-authored and project-authored rules take: "allow
+ * `native/edit` under `src/**`", "always ask before `native/git` `git:push`".
+ * Writing them by hand as `evaluate` closures would put arbitrary code in the
+ * policy path, where it could not be stored, listed, or shown to a user.
+ */
+export function resourceRule(input: {
+  readonly id: string;
+  readonly capability: string;
+  readonly resource?: string;
+  readonly kind?: ResourceKind;
+  readonly verdict: PermissionVerdict;
+  readonly reason: string;
+}): PolicyRule {
+  const kind: ResourceKind = input.kind ?? "path";
+
+  return {
+    id: input.id,
+    reason: input.reason,
+    evaluate: (request) => {
+      if (capabilityKey(request.capability.id) !== input.capability) return undefined;
+      return matchesResource(input.resource, request.resource, kind)
+        ? input.verdict
+        : undefined;
+    },
+  };
+}
 
 /**
  * The fallback when no rule and no grant matched.

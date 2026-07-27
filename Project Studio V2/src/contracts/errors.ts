@@ -36,6 +36,8 @@ export type StudioErrorDomain =
   | "observability"
   | "permissions"
   | "sandbox"
+  /** Native capabilities and the gate every call passes through. */
+  | "tools"
   /** Spawning and supervising a child process. */
   | "process"
   /**

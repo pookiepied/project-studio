@@ -7,6 +7,7 @@ import {
 import type { ErrorReporter } from "../observability/error-reporter.js";
 import { PermissionError } from "./errors.js";
 import type { PermissionGrantStore } from "./grant-store.js";
+import type { ResourceKind } from "./matcher.js";
 import {
   BASE_POLICY,
   defaultVerdict,
@@ -28,12 +29,36 @@ import {
  * a test.
  */
 
+/**
+ * What the call is about to touch.
+ *
+ * Separate from `ExecutionScope`, which is *who* is calling. This is *what*,
+ * and it is what lets `git:log` and `git:push` be decided differently.
+ */
+export interface CallResource {
+  /** Derived by the integrator from the arguments; never the raw argument. */
+  readonly resource: string | undefined;
+  readonly kind: ResourceKind;
+}
+
 /** Asks the user. Returning `undefined` means no approver was available. */
 export interface PermissionApprover {
   request(
     request: PermissionRequest,
     decision: PermissionDecision,
-  ): Promise<{ verdict: "allow" | "deny"; duration: GrantDuration } | undefined>;
+  ): Promise<
+    | {
+        verdict: "allow" | "deny";
+        duration: GrantDuration;
+        /**
+         * What the approval covers. Offered by us in the prompt and chosen by
+         * the user — never typed by them, and never widened beyond what was
+         * shown. Omitted means this exact resource only.
+         */
+        resourcePattern?: string;
+      }
+    | undefined
+  >;
 }
 
 export interface PermissionKernelOptions {
@@ -97,7 +122,11 @@ export class PermissionKernel {
    * A grant can never overturn a policy rule, so approving something once
    * cannot widen what the rules allow later.
    */
-  evaluate(id: CapabilityId, scope: ExecutionScope): PermissionDecision {
+  evaluate(
+    id: CapabilityId,
+    scope: ExecutionScope,
+    call: CallResource = { resource: undefined, kind: "path" },
+  ): PermissionDecision {
     assertScope(scope);
 
     const capability = this.#registry.get(capabilityKey(id));
@@ -110,7 +139,7 @@ export class PermissionKernel {
       };
     }
 
-    const request: PermissionRequest = { capability, scope };
+    const request: PermissionRequest = { capability, scope, resource: call.resource };
 
     for (const rule of this.#policy) {
       const verdict = rule.evaluate(request);
@@ -121,7 +150,7 @@ export class PermissionKernel {
           return { verdict, source: "policy", reason: rule.reason, grantId: undefined };
         }
 
-        const granted = this.#grants.find(id, scope);
+        const granted = this.#grants.find(id, scope, call.resource, call.kind);
         return granted
           ? {
               verdict: "allow",
@@ -133,7 +162,7 @@ export class PermissionKernel {
       }
     }
 
-    const granted = this.#grants.find(id, scope);
+    const granted = this.#grants.find(id, scope, call.resource, call.kind);
     if (granted) {
       return {
         verdict: "allow",
@@ -153,8 +182,12 @@ export class PermissionKernel {
    * Callers get a value only when execution is authorized, so there is no shape
    * in which a caller can accidentally treat "needs approval" as permission.
    */
-  async authorize(id: CapabilityId, scope: ExecutionScope): Promise<PermissionDecision> {
-    const decision = this.evaluate(id, scope);
+  async authorize(
+    id: CapabilityId,
+    scope: ExecutionScope,
+    call: CallResource = { resource: undefined, kind: "path" },
+  ): Promise<PermissionDecision> {
+    const decision = this.evaluate(id, scope, call);
 
     if (decision.verdict === "allow") return decision;
 
@@ -169,7 +202,10 @@ export class PermissionKernel {
       throw this.#refuse("approval_required", id, decision);
     }
 
-    const answer = await this.#approver.request({ capability, scope }, decision);
+    const answer = await this.#approver.request(
+      { capability, scope, resource: call.resource },
+      decision,
+    );
     if (!answer || answer.verdict === "deny") {
       // Not `decision.reason`: that explains why the user was asked, and
       // repeating it after they answered would report a call the user just
@@ -181,7 +217,14 @@ export class PermissionKernel {
       });
     }
 
-    const grant = this.#grants.grant(id, scope, answer.duration);
+    const grant = this.#grants.grant(
+      id,
+      scope,
+      answer.duration,
+      // Falling back to the exact resource keeps an approval as narrow as what
+      // the user was actually shown.
+      answer.resourcePattern ?? call.resource,
+    );
     return {
       verdict: "allow",
       source: "grant",

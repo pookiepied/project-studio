@@ -89,6 +89,35 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    name: "grant_resource_pattern",
+    up(db) {
+      // A grant now narrows to what the call touched, so "allow editing under
+      // src" is expressible and does not silently become "allow editing
+      // anything". A null pattern keeps the old meaning — the whole capability
+      // — so grants written before this migration still mean what the user
+      // approved.
+      //
+      // The index is dropped and rebuilt because the uniqueness rule itself
+      // changed: the same capability may now be granted twice with different
+      // patterns, and the old index would reject the second as a duplicate.
+      db.exec(`
+        ALTER TABLE permission_grant ADD COLUMN resource_pattern TEXT;
+
+        DROP INDEX permission_grant_scope;
+
+        CREATE UNIQUE INDEX permission_grant_scope
+          ON permission_grant (
+            capability_key,
+            agent_id,
+            IFNULL(conversation_id, ''),
+            IFNULL(resource_pattern, '')
+          )
+          WHERE revoked_at IS NULL;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
