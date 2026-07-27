@@ -142,9 +142,35 @@ Remaining in this phase:
 
 ### Phase 10: Native Agent Tools
 
-Audit Flue sandbox tools and the read-only OpenCode reference before adding anything. Do not
-duplicate capabilities Flue already supplies. Implement only product-required primitives and
-prove them through the Phase 9 policy boundary.
+The audit is done. OpenCode ships 17 registry entries, but never all at once: `apply_patch` and
+`edit`/`write` are mutually exclusive per model, three are behind experimental flags, and `invalid`
+is not a capability. Of the rest, seven are primitives and ten are harness features wearing a tool
+costume. Flue supplies `SessionEnv` and `bash` — plumbing, not model-facing tools — so there is no
+overlap to avoid. See ADR 0013.
+
+The surface is capped at ten tools, grouped by family, one tool per capability:
+
+| Family | Tools | Status |
+|---|---|---|
+| Filesystem | `read`, `write`, `edit` | Done |
+| Search | `glob`, `grep` | Next, over vendored ripgrep |
+| Version control | `git` | Complete subcommand coverage, one capability |
+| Execution | `shell` | Local, bounded by permission |
+| Network | `fetch` | Blocked on the network-effect question |
+| Delegation | `task`, `skill` | Phases 13 and 12 |
+
+Foundations landed first, because every tool stands on them:
+
+- **`src/process/`** — the one place a child process starts. A command is an executable plus an
+  argument vector, never a string, and no shell is involved. That is what lets git and ripgrep be
+  substrate rather than arbitrary execution.
+- **`src/vendor/`** — vendored, then system, then a refusal naming the fix. Which slots are filled
+  is packaging, not code.
+- **`src/tools/gate.ts`** — the single door between a model's request and running code. Registering
+  a tool registers its capability with the kernel in the same call. Resource resolution happens
+  before authorization, so an unresolved `..` can never be matched against a scoped rule.
+- **Argument-level permissions** — policy and grants now match on what a call touches, so `git:log`
+  and `git:push` are decided separately.
 
 ### Phase 11: MCP
 

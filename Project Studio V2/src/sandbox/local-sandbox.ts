@@ -11,6 +11,14 @@ import {
   type SandboxPolicy,
 } from "./policy.js";
 
+export interface SandboxFileStat {
+  readonly isFile: boolean;
+  readonly isDirectory: boolean;
+  readonly size: number;
+  /** Milliseconds since the epoch, for change detection. */
+  readonly modifiedAt: number;
+}
+
 /**
  * Containment on the user's own machine.
  *
@@ -106,6 +114,20 @@ export class LocalSandbox {
 
   async readdir(path: string): Promise<string[]> {
     return readdir(this.resolveRead(path));
+  }
+
+  /**
+   * File metadata, for callers that need to detect a change rather than read
+   * the whole file again.
+   */
+  async stat(path: string): Promise<SandboxFileStat> {
+    const result = await stat(this.resolveRead(path));
+    return {
+      isFile: result.isFile(),
+      isDirectory: result.isDirectory(),
+      size: result.size,
+      modifiedAt: result.mtimeMs,
+    };
   }
 
   async exists(path: string): Promise<boolean> {

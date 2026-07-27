@@ -152,6 +152,31 @@ edits proceed unattended.
 **Fix when:** after the filesystem tools, and before the product needs an
 unattended run.
 
+### T-04 · Nothing can undo a write yet · Open
+
+`write` replaces a file whole and `edit` rewrites one in place. The shadow-git
+snapshot mechanism that makes those reversible **does not exist yet**, so today
+the only protections are the read-before-modify rule and the user approving each
+call.
+
+That is adequate while every write is approved in front of a person. It stops
+being adequate the moment an unattended mode ships, because the safety story for
+Full Auto is "you can undo it", and there is currently nothing to undo with.
+
+**Fix when:** before any mode that writes without asking. Snapshots are the
+prerequisite, not a companion feature.
+
+### T-05 · The read-before-modify record does not survive a restart · Accepted
+
+`FileAccessLog` is in memory. After a harness restart, a conversation that had
+read a file must read it again before modifying it.
+
+Chosen over persisting it: the record's purpose is to prove the model has seen
+the *current* contents, and a record restored from disk proves only that some
+earlier process did. Failing closed costs one extra read.
+
+---
+
 ---
 
 ## Containment (`src/sandbox/`)
