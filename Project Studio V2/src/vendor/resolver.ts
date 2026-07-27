@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { VendorError } from "./errors.js";
 
@@ -59,9 +60,15 @@ export function platformKey(): string {
 /**
  * Where vendored binaries live.
  *
- * Outside `src/` on purpose: these are shipped assets, not source, and putting
- * megabytes of executables inside the tree that typecheck and tests walk slows
- * both of them down for no benefit.
+ * Located relative to this module, **never** relative to the working directory.
+ * The harness runs with the user's project as its working directory, so a
+ * cwd-relative lookup would let any repository ship its own `vendor/win32-x64/
+ * rg.exe` and have us execute it. A shipped asset belongs to the installation,
+ * not to whatever happens to be open.
+ *
+ * Outside `src/` on purpose: these are assets, not source, and megabytes of
+ * executables inside the tree that typecheck and tests walk slows both down for
+ * no benefit.
  */
 export function vendorRoot(options: ResolveBinaryOptions = {}): string {
   if (options.vendorRoot !== undefined) return resolve(options.vendorRoot);
@@ -69,7 +76,8 @@ export function vendorRoot(options: ResolveBinaryOptions = {}): string {
   const configured = process.env.PROJECT_STUDIO_VENDOR_DIR;
   if (configured !== undefined && configured.trim() !== "") return resolve(configured);
 
-  return resolve(process.cwd(), "vendor");
+  // `src/vendor/` and `dist/vendor/` both sit one level below the package root.
+  return resolve(fileURLToPath(new URL("../../vendor/", import.meta.url)));
 }
 
 /** True when the path is a real file we could hand to the OS. */

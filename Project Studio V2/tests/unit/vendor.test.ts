@@ -154,6 +154,27 @@ describe("vendor layout", () => {
     expect(platformKey()).toBe(`${process.platform}-${process.arch}`);
   });
 
+  it("locates itself relative to the installation, not the working directory", () => {
+    // The harness runs with the user's project as its working directory. A
+    // cwd-relative lookup would let any repository ship its own
+    // vendor/win32-x64/rg.exe and have us execute it.
+    const previous = process.cwd();
+    try {
+      process.chdir(base);
+      expect(vendorRoot()).not.toBe(join(base, "vendor"));
+      expect(vendorRoot().replaceAll("\\", "/")).toMatch(/Project Studio V2\/vendor$/);
+    } finally {
+      process.chdir(previous);
+    }
+  });
+
+  it("ships ripgrep, because a user's machine does not have it", () => {
+    const resolved = resolveBinary("rg");
+
+    expect(resolved.source).toBe("vendored");
+    expect(resolved.path.replaceAll("\\", "/")).toContain("/vendor/");
+  });
+
   it("honours the configured vendor directory", () => {
     const previous = process.env.PROJECT_STUDIO_VENDOR_DIR;
     process.env.PROJECT_STUDIO_VENDOR_DIR = vendored;

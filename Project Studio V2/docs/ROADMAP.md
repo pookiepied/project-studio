@@ -153,7 +153,7 @@ The surface is capped at ten tools, grouped by family, one tool per capability:
 | Family | Tools | Status |
 |---|---|---|
 | Filesystem | `read`, `write`, `edit` | Done |
-| Search | `glob`, `grep` | Done, pending the vendored binary |
+| Search | `glob`, `grep` | Done, over vendored ripgrep 14.1.1 |
 | Version control | `git` | Complete subcommand coverage, one capability |
 | Execution | `shell` | Local, bounded by permission |
 | Network | `fetch` | Blocked on the network-effect question |

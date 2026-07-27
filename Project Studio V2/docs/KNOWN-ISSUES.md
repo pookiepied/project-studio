@@ -72,18 +72,24 @@ fixing. It should report through `ErrorReporter` rather than swallow.
 
 ## Vendored Binaries (`src/vendor/`)
 
-### V-01 · No integrity verification · Open
+### V-01 · Vendored binaries are pinned, not independently verified · Open
 
-`resolveBinary` accepts any file at the expected path. There is no checksum and
-no signature check.
+`vendor/MANIFEST.md` records the source URL and SHA-256 of everything shipped,
+and `resolveBinary` accepts whatever file is at the expected path. The hashes
+were computed from our own download, so they pin what we shipped and let a later
+re-vendor be compared — but they are not a check against an upstream signature.
 
-Acceptable while every binary is either the user's own installed git or a file
-we place at build time. **It stops being acceptable the moment we implement
-on-demand download** — fetching an executable over the network and running it
-without verifying it is a supply-chain hole.
+Acceptable while binaries are committed and reviewed. **It stops being
+acceptable the moment anything is fetched on demand**, because that is
+downloading an executable over the network and running it unverified.
 
-**Fix when:** before the first on-demand download ships. Pin a version and
-verify a SHA-256 known at build time.
+**Fix when:** before the first on-demand download ships. Verify the recorded
+hash at fetch time, and prefer a published signature where upstream provides
+one.
+
+Vendor root is resolved relative to the installation rather than the working
+directory, so a repository cannot ship its own `vendor/win32-x64/rg.exe` and
+have the harness run it.
 
 ### V-02 · Resolution is cached for the process lifetime · Accepted
 
@@ -177,21 +183,10 @@ earlier process did. Failing closed costs one extra read.
 
 ---
 
-### T-06 · The search tools are unverified end to end · Open
+### T-06 · The search tools were unverified end to end · Fixed
 
-`glob` and `grep` are fully implemented and their risky parts — argument
-construction and output parsing — are covered by unit tests. But **ripgrep is
-not vendored yet**, so on a machine without it the seven end-to-end tests skip
-and the tools cannot run at all.
-
-Argument building and parsing are the parts where a bug hides, and those are
-tested. What is untested is the assumption that ripgrep behaves as documented
-for these exact flags.
-
-**Fix when:** ripgrep is vendored. Until then `glob` and `grep` are shipped code
-with a hard dependency nobody has.
-
----
+ripgrep 14.1.1 is vendored at `vendor/win32-x64/rg.exe` and recorded in
+`vendor/MANIFEST.md`. All seven end-to-end tests now run.
 
 ---
 
