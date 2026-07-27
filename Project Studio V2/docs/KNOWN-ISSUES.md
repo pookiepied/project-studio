@@ -177,6 +177,22 @@ earlier process did. Failing closed costs one extra read.
 
 ---
 
+### T-06 · The search tools are unverified end to end · Open
+
+`glob` and `grep` are fully implemented and their risky parts — argument
+construction and output parsing — are covered by unit tests. But **ripgrep is
+not vendored yet**, so on a machine without it the seven end-to-end tests skip
+and the tools cannot run at all.
+
+Argument building and parsing are the parts where a bug hides, and those are
+tested. What is untested is the assumption that ripgrep behaves as documented
+for these exact flags.
+
+**Fix when:** ripgrep is vendored. Until then `glob` and `grep` are shipped code
+with a hard dependency nobody has.
+
+---
+
 ---
 
 ## Containment (`src/sandbox/`)
