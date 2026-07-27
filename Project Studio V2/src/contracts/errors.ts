@@ -34,6 +34,7 @@ export type StudioErrorDomain =
   | "gateway"
   | "storage"
   | "observability"
+  | "permissions"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

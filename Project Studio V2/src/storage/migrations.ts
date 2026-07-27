@@ -63,6 +63,32 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 2,
+    name: "permission_grants",
+    up(db) {
+      // A grant is scoped to (agent, conversation-or-null, capability). A null
+      // conversation is an "always" grant; a set one expires with the
+      // conversation. The unique index is what makes a repeated approval an
+      // update rather than a pile of duplicates nobody can revoke.
+      db.exec(`
+        CREATE TABLE permission_grant (
+          id              TEXT PRIMARY KEY,
+          capability_key  TEXT NOT NULL,
+          agent_id        TEXT NOT NULL,
+          conversation_id TEXT,
+          project_id      TEXT,
+          verdict         TEXT NOT NULL,
+          granted_at      INTEGER NOT NULL,
+          revoked_at      INTEGER
+        ) STRICT;
+
+        CREATE UNIQUE INDEX permission_grant_scope
+          ON permission_grant (capability_key, agent_id, IFNULL(conversation_id, ''))
+          WHERE revoked_at IS NULL;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
