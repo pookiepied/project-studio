@@ -207,6 +207,22 @@ sandbox tier adds — WSL2 locally, a remote MicroVM later.
 `IsolationLevel` has three values and only `in-process` is implemented. Until a
 provider lands, any capability requiring `os` isolation is refused.
 
+### H-01 · Only `studio.db` and `bin/` are actually used · Open
+
+`src/platform/paths.ts` names `logs/`, `sessions/`, `projects/`, `cache/`, and
+`tmp/`, but nothing writes to them yet. Observability still logs to stdout and
+Flue owns its own database wherever it was configured.
+
+Named now so the layout is decided once (ADR 0014) rather than negotiated by
+each subsystem as it arrives. The risk is the opposite of the usual one: a
+directory nobody uses invites someone to use it for something it was not meant
+for.
+
+**Fix when:** each subsystem lands. Flue's own database location should be
+brought into the Studio home at the same time.
+
+---
+
 ---
 
 ## Environment

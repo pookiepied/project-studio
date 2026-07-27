@@ -1,7 +1,8 @@
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import { databasePath, resolveConfigured } from "../platform/paths.js";
 import { StorageError, storageErrorFrom } from "./errors.js";
 import { LATEST_SCHEMA_VERSION, migrate } from "./migrations.js";
 
@@ -24,7 +25,6 @@ import { LATEST_SCHEMA_VERSION, migrate } from "./migrations.js";
  * dependency.
  */
 
-const DEFAULT_PATH = "./data/studio.db";
 const BUSY_TIMEOUT_MS = 5_000;
 
 export interface StudioDatabase {
@@ -41,14 +41,27 @@ export interface StudioDatabase {
 }
 
 export interface OpenDatabaseOptions {
-  /** Defaults to `PROJECT_STUDIO_STORE_PATH`, then `./data/studio.db`. */
+  /** Defaults to `PROJECT_STUDIO_STORE_PATH`, then `~/.studio/studio.db`. */
   readonly path?: string;
 }
 
+/**
+ * Where the database file lives.
+ *
+ * In the user's Studio home, never relative to the working directory. The
+ * harness runs with the user's project as its working directory, so a relative
+ * default would create our database inside whatever repository happened to be
+ * open — visible in their `git status`, duplicated per project, and lost when
+ * they switch.
+ */
 export function resolveDatabasePath(options: OpenDatabaseOptions = {}): string {
-  const configured =
-    options.path ?? process.env.PROJECT_STUDIO_STORE_PATH ?? DEFAULT_PATH;
-  return configured === ":memory:" ? configured : resolve(configured);
+  const configured = options.path ?? process.env.PROJECT_STUDIO_STORE_PATH;
+
+  if (configured === undefined || configured.trim() === "") return databasePath();
+  // Callers and tests use `:memory:` for a database with no file at all.
+  if (configured === ":memory:") return configured;
+
+  return resolveConfigured(configured);
 }
 
 export function openDatabase(options: OpenDatabaseOptions = {}): StudioDatabase {

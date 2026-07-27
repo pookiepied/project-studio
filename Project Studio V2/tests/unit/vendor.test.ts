@@ -16,6 +16,7 @@ const EXECUTABLE_SUFFIX = process.platform === "win32" ? ".exe" : "";
 
 let base: string;
 let vendored: string;
+let managed: string;
 let systemDirectory: string;
 
 /** Creates a file that looks like a real binary to the resolver. */
@@ -29,6 +30,7 @@ function placeBinary(directory: string, name: string): string {
 beforeEach(() => {
   base = mkdtempSync(join(tmpdir(), "studio-vendor-"));
   vendored = join(base, "vendor");
+  managed = join(base, "managed");
   systemDirectory = join(base, "system");
   mkdirSync(systemDirectory, { recursive: true });
   clearBinaryCache();
@@ -40,9 +42,9 @@ afterEach(() => {
 });
 
 describe("resolution order", () => {
-  it("prefers a vendored binary over the system one", () => {
-    // The vendored copy is the version we tested against; the machine's copy is
-    // whatever happens to be installed.
+  it("takes ripgrep only from what we shipped", () => {
+    // Search results that vary with whatever version a machine happens to have
+    // are results that cannot be reproduced, so a system copy is not consulted.
     const expected = placeBinary(join(vendored, platformKey()), "rg");
     placeBinary(systemDirectory, "rg");
 
@@ -52,7 +54,36 @@ describe("resolution order", () => {
     });
 
     expect(resolved.path).toBe(expected);
-    expect(resolved.source).toBe("vendored");
+    expect(resolved.source).toBe("shipped");
+  });
+
+  it("prefers the user's own git over one we downloaded", () => {
+    // Theirs is the copy they maintain and update; ours is a fallback for a
+    // machine that has none.
+    const expected = placeBinary(systemDirectory, "git");
+    placeBinary(join(managed, platformKey(), "git", "current"), "git");
+
+    const resolved = resolveBinary("git", {
+      vendorRoot: vendored,
+      managedRoot: managed,
+      searchPath: systemDirectory,
+    });
+
+    expect(resolved.path).toBe(expected);
+    expect(resolved.source).toBe("system");
+  });
+
+  it("falls back to a downloaded git on a machine without one", () => {
+    const expected = placeBinary(join(managed, platformKey(), "git", "current"), "git");
+
+    const resolved = resolveBinary("git", {
+      vendorRoot: vendored,
+      managedRoot: managed,
+      searchPath: systemDirectory,
+    });
+
+    expect(resolved.path).toBe(expected);
+    expect(resolved.source).toBe("managed");
   });
 
   it("falls back to the system binary when nothing is vendored", () => {
@@ -171,7 +202,7 @@ describe("vendor layout", () => {
   it("ships ripgrep, because a user's machine does not have it", () => {
     const resolved = resolveBinary("rg");
 
-    expect(resolved.source).toBe("vendored");
+    expect(resolved.source).toBe("shipped");
     expect(resolved.path.replaceAll("\\", "/")).toContain("/vendor/");
   });
 
