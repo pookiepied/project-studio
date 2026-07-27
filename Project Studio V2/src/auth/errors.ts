@@ -1,3 +1,5 @@
+import { StudioError } from "../contracts/errors.js";
+
 /**
  * Failure categories for Project Studio sign-in.
  *
@@ -38,13 +40,17 @@ const MESSAGE_BY_KIND: Record<StudioAuthErrorKind, string> = {
  * Never carries a token, an authorization code, or a PKCE verifier. Sign-in
  * failures are logged, and every one of those values is a credential.
  */
-export class StudioAuthError extends Error {
-  readonly kind: StudioAuthErrorKind;
+export class StudioAuthError extends StudioError {
+  readonly domain = "auth" as const;
+  declare readonly kind: StudioAuthErrorKind;
 
   constructor(kind: StudioAuthErrorKind, options: { message?: string } = {}) {
-    super(options.message ?? MESSAGE_BY_KIND[kind]);
+    super(kind, options.message ?? MESSAGE_BY_KIND[kind], {
+      // Only `unavailable` describes a condition that can clear on its own.
+      // Re-running sign-in after `session_expired` is a new flow, not a retry.
+      retryable: kind === "unavailable",
+    });
     this.name = "StudioAuthError";
-    this.kind = kind;
   }
 }
 

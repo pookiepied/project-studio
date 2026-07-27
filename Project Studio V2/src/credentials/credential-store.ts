@@ -9,6 +9,8 @@
  * downgrading the user's security.
  */
 
+import { StudioError } from "../contracts/errors.js";
+
 export type CredentialErrorKind =
   /** The OS credential store is missing, locked, or refused access. */
   | "unavailable"
@@ -31,13 +33,19 @@ const MESSAGE_BY_KIND: Record<CredentialErrorKind, string> = {
  * Never carries the secret, the key, or the platform's own error text: platform
  * messages have been observed to echo the value being stored.
  */
-export class CredentialStoreError extends Error {
-  readonly kind: CredentialErrorKind;
+export class CredentialStoreError extends StudioError {
+  readonly domain = "credentials" as const;
+  declare readonly kind: CredentialErrorKind;
 
   constructor(kind: CredentialErrorKind, options: { message?: string } = {}) {
-    super(options.message ?? MESSAGE_BY_KIND[kind]);
+    super(kind, options.message ?? MESSAGE_BY_KIND[kind], {
+      // A locked keychain can be unlocked; a rejected key or an oversized
+      // secret will be rejected identically forever.
+      retryable: kind === "unavailable",
+      // `cause` is deliberately not accepted: platform errors echo the value
+      // being stored. See the class comment.
+    });
     this.name = "CredentialStoreError";
-    this.kind = kind;
   }
 }
 

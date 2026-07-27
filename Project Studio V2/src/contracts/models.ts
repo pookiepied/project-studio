@@ -1,5 +1,7 @@
 import * as v from "valibot";
 
+import { StudioError } from "./errors.js";
+
 export const modelSourceSchema = v.picklist([
   "local",
   "studio-cloud",
@@ -80,16 +82,29 @@ export function defaultModelReference(source: ModelSource): ModelReference {
   };
 }
 
-export class ProviderConfigurationError extends Error {
+/**
+ * A model source was selected that cannot start: missing configuration, an
+ * unknown source, or an invalid value. Never retryable — the process must be
+ * reconfigured.
+ */
+export class ProviderConfigurationError extends StudioError {
+  readonly domain = "models" as const;
+
   constructor(message: string) {
-    super(message);
+    super("configuration", message);
     this.name = "ProviderConfigurationError";
   }
 }
 
-export class ModelResolutionError extends Error {
+/**
+ * A model reference could not be resolved to a descriptor. Raised instead of
+ * substituting a different source, provider, or model.
+ */
+export class ModelResolutionError extends StudioError {
+  readonly domain = "models" as const;
+
   constructor(message: string) {
-    super(message);
+    super("resolution", message);
     this.name = "ModelResolutionError";
   }
 }
