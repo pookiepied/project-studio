@@ -40,14 +40,33 @@ home, subdivided by concern. There is no reason to be different, and there is a
 real cost to being different: users already know where to look, and so do the
 agents operating on their own configuration.
 
+Inside the home, directories are grouped by **what happens if you delete them**.
+Every other property follows from that one question: what to back up, what to
+sync, what a "clear caches" button may remove, and what support can safely tell
+a user to throw away.
+
 ```
 ~/.studio/
-  studio.db         application database
-  bin/              programs we downloaded
-  snapshots/        per-project undo history
-  projects/         per-project state
-  sessions/  logs/  cache/  tmp/
+  config/   settings.json                    user-authored — losing it loses preferences
+  data/     studio.db  snapshots/            durable — losing it loses work
+            projects/  sessions/
+  tools/    bin/<platform>/<name>/current    re-downloadable
+  logs/                                      disposable, but findable
+  cache/                                     disposable
+  tmp/                                       cleared between runs
 ```
+
+A flat home does not survive contact with a real product: `~/.codex` has over
+forty entries at its top level and nothing about it says which of them matter.
+
+The rule is that a new directory must belong to one of these six. If it
+genuinely fits none, the category set is wrong and should be changed
+deliberately — the failure mode to avoid is a seventh sibling quietly appearing
+at the top level, then an eighth.
+
+`durableDirectories()` derives the backup set from the same accessors everything
+else uses, so a new durable directory cannot be added and then forgotten by the
+backup.
 
 `PROJECT_STUDIO_HOME` relocates the whole tree, which is what tests use and what
 lets a user move state to another drive.

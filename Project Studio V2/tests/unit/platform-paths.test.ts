@@ -1,19 +1,25 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   cacheDirectory,
   databasePath,
+  durableDirectories,
   installationRoot,
+  logsDirectory,
   managedBinaryDirectory,
+  projectsDirectory,
   resolveConfigured,
+  sessionsDirectory,
+  settingsPath,
   shippedBinaryDirectory,
   snapshotsDirectory,
   studioHome,
   studioPath,
+  temporaryDirectory,
 } from "../../src/platform/paths.js";
 import { resolveDatabasePath } from "../../src/storage/database.js";
 
@@ -44,16 +50,53 @@ describe("the Studio home", () => {
     process.env.PROJECT_STUDIO_HOME = workspace;
 
     expect(studioHome()).toBe(workspace);
-    expect(studioPath("bin")).toBe(join(workspace, "bin"));
+    expect(studioPath("tools", "bin")).toBe(join(workspace, "tools", "bin"));
   });
 
-  it("keeps everything the application owns in one place", () => {
+  it("groups by what happens if you delete it", () => {
+    // The question every other property follows from: what to back up, what to
+    // sync, and what a "clear caches" button may remove.
     process.env.PROJECT_STUDIO_HOME = workspace;
 
-    expect(databasePath()).toBe(join(workspace, "studio.db"));
-    expect(managedBinaryDirectory()).toBe(join(workspace, "bin"));
-    expect(snapshotsDirectory()).toBe(join(workspace, "snapshots"));
+    expect(databasePath()).toBe(join(workspace, "data", "studio.db"));
+    expect(snapshotsDirectory()).toBe(join(workspace, "data", "snapshots"));
+    expect(settingsPath()).toBe(join(workspace, "config", "settings.json"));
+    expect(managedBinaryDirectory()).toBe(join(workspace, "tools", "bin"));
     expect(cacheDirectory()).toBe(join(workspace, "cache"));
+  });
+
+  it("keeps every top-level directory inside the agreed categories", () => {
+    // A seventh sibling appearing at the top level is how a home becomes the
+    // forty-entry mess this layout exists to avoid.
+    process.env.PROJECT_STUDIO_HOME = workspace;
+    const categories = new Set(["config", "data", "tools", "logs", "cache", "tmp"]);
+
+    for (const path of [
+      databasePath(),
+      snapshotsDirectory(),
+      settingsPath(),
+      managedBinaryDirectory(),
+      projectsDirectory(),
+      sessionsDirectory(),
+      logsDirectory(),
+      cacheDirectory(),
+      temporaryDirectory(),
+    ]) {
+      const top = relative(workspace, path).split(/[\\/]/)[0];
+      expect(categories).toContain(top);
+    }
+  });
+
+  it("can enumerate what a backup must keep", () => {
+    // Derived from the same accessors everything else uses, so a new durable
+    // directory cannot be added and then forgotten by the backup.
+    process.env.PROJECT_STUDIO_HOME = workspace;
+
+    expect(durableDirectories()).toEqual([
+      join(workspace, "config"),
+      join(workspace, "data"),
+    ]);
+    expect(durableDirectories()).not.toContain(cacheDirectory());
   });
 });
 
@@ -62,11 +105,19 @@ describe("nothing is resolved against the working directory", () => {
     // The harness runs with the user's project as its working directory. A
     // relative default would create our database inside their repository,
     // visible in their git status and duplicated per project.
+    // The home and the working directory must be *different* here, or the
+    // assertion passes for the wrong reason.
+    const project = mkdtempSync(join(tmpdir(), "studio-project-"));
     process.env.PROJECT_STUDIO_HOME = workspace;
-    process.chdir(workspace);
+    process.chdir(project);
 
-    expect(resolveDatabasePath()).toBe(join(workspace, "studio.db"));
-    expect(resolveDatabasePath()).not.toContain(join(workspace, "data"));
+    try {
+      expect(resolveDatabasePath()).toBe(join(workspace, "data", "studio.db"));
+      expect(resolveDatabasePath()).not.toContain(project);
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 
   it("keeps :memory: as a database with no file at all", () => {
@@ -100,7 +151,7 @@ describe("shipped and downloaded binaries are kept apart", () => {
     // an app bundle elsewhere — so anything acquired at runtime cannot go there.
     process.env.PROJECT_STUDIO_HOME = workspace;
 
-    expect(managedBinaryDirectory()).toBe(join(workspace, "bin"));
+    expect(managedBinaryDirectory()).toBe(join(workspace, "tools", "bin"));
     expect(shippedBinaryDirectory()).not.toContain(workspace);
   });
 });

@@ -24,9 +24,23 @@ import { fileURLToPath } from "node:url";
  * lookup and the database path — which is why this module exists rather than
  * each subsystem deciding for itself.
  *
- * The layout follows what comparable tools converged on (`~/.claude`,
- * `~/.codex`): one dotted directory per product, subdirectories by concern,
- * versioned filenames for anything downloaded.
+ * Inside the Studio home, directories are grouped by **what happens if you
+ * delete them**. That is the one question every other property follows from:
+ * what to back up, what to sync, what a "clear caches" button may remove, and
+ * what support may safely ask a user to throw away.
+ *
+ *   config/   user-authored settings        losing it loses their preferences
+ *   data/     durable state                 losing it loses work
+ *   tools/    programs we downloaded        re-downloadable
+ *   logs/     diagnostics                   disposable, but findable
+ *   cache/    derived data                  disposable
+ *   tmp/      scratch                       cleared between runs
+ *
+ * A flat home does not survive contact with a real product — `~/.codex` has
+ * over forty entries at its top level, and nothing about it says which of them
+ * matter. The rule here: a new directory must belong to one of these six. If it
+ * genuinely fits none of them, the category set is wrong and should be changed
+ * deliberately, rather than a seventh sibling appearing at the top level.
  */
 
 const HOME_DIRECTORY_NAME = ".studio";
@@ -73,12 +87,21 @@ export function shippedBinaryDirectory(): string {
  * answerable question.
  */
 export function managedBinaryDirectory(): string {
-  return studioPath("bin");
+  return studioPath("tools", "bin");
 }
 
 /** The application database. One file, in the user's home, never in a project. */
 export function databasePath(): string {
-  return studioPath("studio.db");
+  return studioPath("data", "studio.db");
+}
+
+/** User-authored settings. Backed up, synced, and safe to hand-edit. */
+export function configDirectory(): string {
+  return studioPath("config");
+}
+
+export function settingsPath(): string {
+  return join(configDirectory(), "settings.json");
 }
 
 /**
@@ -89,7 +112,7 @@ export function databasePath(): string {
  * very `rm -rf` it exists to recover from.
  */
 export function snapshotsDirectory(): string {
-  return studioPath("snapshots");
+  return studioPath("data", "snapshots");
 }
 
 export function logsDirectory(): string {
@@ -107,11 +130,21 @@ export function temporaryDirectory(): string {
 
 /** Per-project state the application owns, keyed by project id. */
 export function projectsDirectory(): string {
-  return studioPath("projects");
+  return studioPath("data", "projects");
 }
 
 export function sessionsDirectory(): string {
-  return studioPath("sessions");
+  return studioPath("data", "sessions");
+}
+
+/**
+ * Everything that must survive, for a backup or export to enumerate.
+ *
+ * Derived from the same accessors the rest of the application uses, so a new
+ * durable directory cannot be added and then forgotten by the backup.
+ */
+export function durableDirectories(): readonly string[] {
+  return [configDirectory(), studioPath("data")];
 }
 
 /**
