@@ -36,6 +36,7 @@ src/
   context/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
+    capabilities.ts           Capability identity, effects, provenance, execution scope
     errors.ts                 StudioError base, domain taxonomy, safe report shape
     models.ts                 Gateway-neutral model references, capability, adapter contract
   auth/
@@ -79,6 +80,16 @@ src/
     bootstrap.ts              Provider bootstrap coordinator and startup validation
     model-registry.ts         Model-source resolver and capability aggregator
     provider-config.ts        Validated model-source configuration
+  permissions/
+    kernel.ts                 The single source of authority for every capability
+    policy.ts                 Verdicts, decision sources, base rules, defaults
+    grant-store.ts            Persisted, listable, revocable user approvals
+    errors.ts                 Typed permission errors, never carrying arguments
+  sandbox/
+    policy.ts                 Closed-by-default containment policy and isolation levels
+    paths.ts                  Path containment: traversal, symlinks, prefixes, Windows
+    local-sandbox.ts          In-process containment; refuses exec and network
+    errors.ts                 Typed sandbox errors, never echoing the attempted path
   storage/
     database.ts               Application-owned SQLite connection and transactions
     migrations.ts             Versioned schema, applied once, with a no-secrets guard

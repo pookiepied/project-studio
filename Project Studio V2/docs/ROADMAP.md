@@ -110,19 +110,35 @@ needs both:
 `local` is now operational. Selecting it without a configured default model is a clean startup
 failure, never a silent fallback to the gateway.
 
-## Next
-
 ### Phase 9: Capability And Permission Kernel
 
-Define the shared execution policy used by native tools and MCP tools:
+Foundation done. See ADR 0012.
 
-- capability identity and provenance;
-- trusted application-bound scope;
-- permission decisions and approval states;
-- cancellation, timeout, and concurrency policy;
-- idempotency and unknown-outcome handling;
-- safe result/error serialization;
-- audit and telemetry attributes.
+- `PermissionKernel` is the single source of authority for native, MCP, and
+  skill capabilities. It decides but never executes and never prompts; the
+  approver is injected. Policy beats grants beats default, so a grant can never
+  overturn a rule. An unregistered capability is denied, not asked about.
+- Capability identity, effects, and provenance are declared by the integrator,
+  never by the model or by a server describing itself.
+- `ExecutionScope` carries authority and is refused when incomplete, so grants
+  cannot leak across conversations or from a parent agent to a subagent.
+- Grants are persisted, listable, and revocable; revoking marks rather than
+  deletes.
+- `LocalSandbox` contains the filesystem and withholds the host environment,
+  and declares `in-process` isolation honestly — `execute` and `network` are
+  refused rather than approximated.
+
+Remaining in this phase:
+
+- **Remote sandbox provider** for the `os`/`remote-vm` tier, over Flue's
+  `SandboxFactory` seam. Tencent CubeSandbox (Apache 2.0, E2B-compatible) is the
+  intended target; it needs x86_64 Linux with KVM, so it is a remote service
+  rather than something that runs on the user's desktop.
+- Cancellation, timeout, and concurrency policy.
+- Idempotency and unknown-outcome handling on top of `CapabilityDescriptor`.
+- Audit surface for grants.
+
+## Next
 
 ### Phase 10: Native Agent Tools
 
