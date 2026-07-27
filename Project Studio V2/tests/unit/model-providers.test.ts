@@ -15,10 +15,17 @@ import {
 } from "../../src/models/bootstrap.js";
 import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
+import { ProviderSettingsStore } from "../../src/models/local/settings-store.js";
+import { closeDatabase, getDatabase } from "../../src/storage/database.js";
+
+// Bootstrapping `local` reads provider settings. Point the store at memory so
+// these tests never touch — or depend on — the developer's real settings.
+process.env.PROJECT_STUDIO_STORE_PATH = ":memory:";
 
 const originalEnv = { ...process.env };
 
 afterEach(() => {
+  closeDatabase();
   for (const key of Object.keys(process.env)) {
     if (!(key in originalEnv)) {
       delete process.env[key];
@@ -248,11 +255,36 @@ describe("provider bootstrap coordinator", () => {
     ).not.toThrow();
   });
 
-  it("fails clearly when local is selected, which is not operational yet", () => {
+  it("fails clearly when local is selected with no default model chosen", () => {
+    delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
     const coordinator = createProviderBootstrapCoordinator();
     expect(() => coordinator.bootstrap({ source: "local" })).toThrow(
       ProviderConfigurationError,
     );
+  });
+
+  it("bootstraps local from a stored default model, with no environment variable", () => {
+    // The subphase 5 payoff: what the user chose in settings is what the
+    // harness starts on.
+    delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
+    const settings = new ProviderSettingsStore(getDatabase());
+    settings.upsertCustomProvider({
+      id: "ollama",
+      name: "Ollama",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      api: "openai-completions",
+      models: ["llama3.1:8b"],
+      contextWindow: undefined,
+      maxTokens: undefined,
+    });
+    settings.setDefaultModel({ provider: "ollama", model: "llama3.1:8b" });
+
+    const result = createProviderBootstrapCoordinator().bootstrap({
+      source: "local",
+    });
+
+    expect(result.descriptor.operational).toBe(true);
+    expect(result.descriptor.resolvedModelId).toBe(STUDIO_MODEL_ID);
   });
 
   it("fails clearly when studio-cloud is selected without configuration", () => {

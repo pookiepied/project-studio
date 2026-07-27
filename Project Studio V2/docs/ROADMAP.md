@@ -65,8 +65,6 @@ Recorded, deliberately not changed:
 - `PassthroughContextOptimizer` has no production caller. It is a declared port from ADR 0003, kept
   as a decided seam, and it is exercised only by a unit test today.
 
-## In Progress
-
 ### Phase 8: Product Authentication, Secure Credentials, And Local BYOK
 
 Ordered so that storage exists before anything needs to store a secret. A session token is itself a
@@ -88,9 +86,26 @@ credential, so wiring login first would have required a temporary plaintext step
    collection, with the OS keychain presented as Pi's `CredentialStore`, 36 built-in providers,
    and custom OpenAI-compatible providers covering Ollama, LM Studio, and proxy services.
    `pnpm providers list | connect | disconnect`. See ADR 0009.
-5. **Connect/disconnect/select contracts** for settings. Next. The CLI proves the flows; the
-   product needs them as contracts, along with a place to store custom providers and the chosen
-   default model instead of environment variables.
+5. **Connect/disconnect/select contracts.** Done. `LocalProviderService` exposes list, connect
+   (API key or interactive), disconnect, add/remove custom provider, list models, and select
+   default model; the CLI is now a thin caller over the same methods a settings screen will use.
+   Custom providers and the chosen default model live in the application database, with the
+   environment variables demoted to a development override. `pnpm providers list | models |
+   connect | disconnect | add | remove | select | default`.
+
+Two cross-cutting foundations were established here rather than deferred, because subphase 5 was
+the first product state that had to outlive a process, and because every subsystem from Phase 9 on
+needs both:
+
+- **The application-owned database** (`src/storage/`). A separate SQLite file from Flue's, on the
+  same `node:sqlite` driver, with versioned append-only migrations and a guard that fails a
+  migration whose column names look like credential storage. Secrets stay in the OS keychain; the
+  database holds what the keychain cannot enumerate. See ADR 0010.
+- **The shared error contract** (`src/contracts/errors.ts`, `src/observability/error-reporter.ts`).
+  One base class with a `${domain}.${kind}` code, per-subsystem vocabulary preserved, a safe report
+  shape carrying no stack or cause, and one reporting path that logs, annotates the span, and
+  counts. Unclassified throws are reported as such so the gap stays measurable. Every existing
+  error class was rebased with no call-site changes. See ADR 0011.
 
 `local` is now operational. Selecting it without a configured default model is a clean startup
 failure, never a silent fallback to the gateway.
@@ -166,3 +181,7 @@ product-owned read models for agents, projects, capabilities, telemetry, and adm
 6. Never place credentials or tenant authority in model-selected arguments.
 7. Use OpenCode only as a behavioral reference, not as the harness architecture.
 8. Add no empty subsystem directories or speculative abstractions.
+9. Every new subsystem registers a `StudioErrorDomain`, raises `StudioError`, and reports through
+   `ErrorReporter`. A subsystem that throws raw errors shows up as `unclassified` in telemetry.
+10. Durable product state goes in the application database with a migration. Secrets go in the OS
+    credential store, never in a database column.

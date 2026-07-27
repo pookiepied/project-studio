@@ -22,10 +22,13 @@ import { SessionAccessTokenProvider } from "../auth/session-token-provider.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import { LocalModelProviderAdapter } from "./adapters/local-adapter.js";
+import { getDatabase } from "../storage/database.js";
 import {
+  mergeCustomProviders,
   resolveLocalModelConfig,
   type LocalModelConfig,
 } from "./local/config.js";
+import { ProviderSettingsStore } from "./local/settings-store.js";
 import { PiCredentialStore } from "./local/credential-bridge.js";
 import { createLocalRuntime } from "./local/runtime.js";
 import type { FetchLike } from "./studio-cloud/client.js";
@@ -57,10 +60,9 @@ export interface BootstrapOptions {
  * registration, registry construction, or OpenTelemetry initialization, so an
  * unusable configuration is a clean startup failure.
  *
- * `local` is recognized but not operational: the BYOK runtime needs
- * user-controlled provider credentials in secure OS storage, which is the next
- * phase. There is no placeholder adapter, and selecting it is never quietly
- * turned into a Studio run.
+ * `local` validates the user's provider settings the same way, so a missing
+ * default model or an unusable custom provider is a startup failure. Selecting
+ * a source is never quietly turned into a run on a different one.
  */
 export function createModelProviderAdapter(
   source: ModelSource,
@@ -124,7 +126,7 @@ function createStudioCloudAdapter(
 function createLocalAdapter(
   overrides: LocalBootstrapOverrides,
 ): LocalModelProviderAdapter {
-  const config = overrides.config ?? resolveLocalModelConfig();
+  const config = overrides.config ?? resolveLocalModelConfigFromSettings();
   const credentials = overrides.credentials ?? new KeyringCredentialStore();
 
   const runtime = createLocalRuntime({
@@ -133,6 +135,24 @@ function createLocalAdapter(
   });
 
   return new LocalModelProviderAdapter({ config, runtime });
+}
+
+/**
+ * Reads the local configuration the user actually chose.
+ *
+ * Provider settings are the source of truth; the environment variables are the
+ * override for development and for runs with no settings database. An
+ * unreadable settings database is not swallowed — a user who configured
+ * providers in the UI must not silently start on stale environment values.
+ */
+function resolveLocalModelConfigFromSettings(): LocalModelConfig {
+  const settings = new ProviderSettingsStore(getDatabase());
+  const selection = settings.getDefaultModel();
+
+  return resolveLocalModelConfig({
+    ...(selection ? { defaultSelection: selection } : {}),
+    customProviders: mergeCustomProviders(settings.listCustomProviders()),
+  });
 }
 
 /**

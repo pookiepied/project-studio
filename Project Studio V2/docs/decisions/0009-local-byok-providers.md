@@ -86,10 +86,10 @@ provider `openrouter`.
   provider-qualified ids so the credential owner remains visible.
 - Capabilities are mapped honestly: Pi's model record has no tool-calling flag,
   so `toolCalling` is `"unknown"` rather than guessed.
-- Custom providers are declared through `PROJECT_STUDIO_LOCAL_PROVIDERS`. This is
-  interim: provider connection belongs in product settings with a real store,
-  which is the next subphase. Environment configuration keeps the runtime honest
-  without inventing a settings surface no UI consumes yet.
+- Custom providers and the default model now live in the application database
+  behind `LocalProviderService` (ADR 0010). `PROJECT_STUDIO_LOCAL_PROVIDERS` and
+  `PROJECT_STUDIO_LOCAL_DEFAULT_MODEL` are demoted to a development override,
+  consulted only when settings supply nothing.
 - The ceiling: a provider with a bespoke, non-OpenAI-shaped protocol that Pi does
   not implement cannot be added by configuration alone. In practice the industry
   has converged on the OpenAI wire format, but that is the real limit.

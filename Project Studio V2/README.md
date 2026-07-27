@@ -36,6 +36,7 @@ src/
   context/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
   contracts/
+    errors.ts                 StudioError base, domain taxonomy, safe report shape
     models.ts                 Gateway-neutral model references, capability, adapter contract
   auth/
     cli.ts                    pnpm auth sign-in / status / sign-out
@@ -56,11 +57,14 @@ src/
       studio-cloud-adapter.ts Studio Gateway source and its Pi wire protocol
       local-adapter.ts        Local BYOK source; alias protocol over Pi's Models
     local/
+      apis.ts                 Supported custom-provider wire protocols
       config.ts               Default model and user-declared custom providers
       credential-bridge.ts    OS keychain presented as Pi's CredentialStore
       runtime.ts              Pi Models collection: built-ins plus custom providers
       catalog.ts              Pi models to ModelDescriptor and capabilities
-      cli.ts                  pnpm providers list / connect / disconnect
+      settings-store.ts       Durable provider settings; the non-secret half of BYOK
+      provider-service.ts     Connect/disconnect/select contracts for settings
+      cli.ts                  pnpm providers list / models / connect / add / select
     studio-cloud/
       config.ts               Validated gateway URL, required default model, timeout
       access-token.ts         Injected outbound token provider and header safety
@@ -75,8 +79,13 @@ src/
     bootstrap.ts              Provider bootstrap coordinator and startup validation
     model-registry.ts         Model-source resolver and capability aggregator
     provider-config.ts        Validated model-source configuration
+  storage/
+    database.ts               Application-owned SQLite connection and transactions
+    migrations.ts             Versioned schema, applied once, with a no-secrets guard
+    errors.ts                 Typed storage errors and driver-failure classification
   observability/
     config.ts                 Validated exporter and content-capture config
+    error-reporter.ts         The one path a failure takes: log, span, counter
     errors.ts                 Safe error normalization/serialization
     flue.ts                   One-time Flue OpenTelemetry registration
     index.ts                  initialize/shutdown boundary
@@ -272,8 +281,18 @@ bodies are never surfaced.
 
 ## Persistence And Recovery
 
-`src/db.ts` defaults to `./data/flue.db`. Set `PROJECT_STUDIO_DB_PATH` to use another file.
-The database and accepted-run record are both required for recovery:
+There are two databases, deliberately.
+
+`src/db.ts` is Flue's, defaulting to `./data/flue.db` and overridden by `PROJECT_STUDIO_DB_PATH`.
+It holds the canonical transcript, the submission journal, and run state, behind an opaque
+persistence adapter Flue owns.
+
+`src/storage/` is the product's, defaulting to `./data/studio.db` and overridden by
+`PROJECT_STUDIO_STORE_PATH`. It holds provider settings today and the registries later phases add.
+Secrets never go in it — those are in the OS keychain, and a migration fails if a column name
+looks like credential storage. See ADR 0010.
+
+The Flue database and accepted-run record are both required for recovery:
 
 ```ts
 {

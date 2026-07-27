@@ -1,6 +1,7 @@
 import * as v from "valibot";
 
 import { ProviderConfigurationError } from "../../contracts/models.js";
+import { DEFAULT_CUSTOM_API, supportedCustomApis } from "./apis.js";
 import { assertValidProviderId } from "./credential-bridge.js";
 
 /**
@@ -30,7 +31,7 @@ export interface LocalModelConfig {
   readonly customProviders: readonly CustomProviderConfig[];
 }
 
-const DEFAULT_API = "openai-completions";
+const DEFAULT_API = DEFAULT_CUSTOM_API;
 
 const customProviderSchema = v.object({
   id: v.pipe(v.string(), v.minLength(1)),
@@ -74,34 +75,41 @@ export function parseModelSpecifier(raw: string): {
 }
 
 /**
- * Local providers are declared through the environment for now.
+ * Resolves the local source's configuration.
  *
- * This is deliberately interim. Provider connection belongs in product settings
- * with a real store behind it, which is the next subphase; encoding it as
- * environment configuration keeps the runtime honest without inventing a
- * settings surface that has no UI consuming it yet.
+ * Settings are the real source: `defaultSelection` and `customProviders` come
+ * from the provider settings store. The environment variables remain as an
+ * override for development and for headless runs that have no settings
+ * database, and they are only consulted when settings supply nothing.
  */
 export function resolveLocalModelConfig(
   input: {
     readonly defaultModel?: string | undefined;
+    readonly defaultSelection?:
+      | { readonly provider: string; readonly model: string }
+      | undefined;
     readonly customProviders?: readonly CustomProviderConfig[] | undefined;
   } = {},
 ): LocalModelConfig {
-  const rawDefault =
-    input.defaultModel ?? readEnv("PROJECT_STUDIO_LOCAL_DEFAULT_MODEL");
-  if (rawDefault === undefined) {
+  const selection = input.defaultSelection ?? resolveDefaultSelection(input.defaultModel);
+  if (selection === undefined) {
     throw new ProviderConfigurationError(
-      'Local default model is required. Set PROJECT_STUDIO_LOCAL_DEFAULT_MODEL to "<provider>/<model>".',
+      'No default model is selected. Choose one in provider settings, or set PROJECT_STUDIO_LOCAL_DEFAULT_MODEL to "<provider>/<model>".',
     );
   }
 
-  const { provider, model } = parseModelSpecifier(rawDefault);
-
   return {
-    defaultProvider: provider,
-    defaultModel: model,
+    defaultProvider: selection.provider,
+    defaultModel: selection.model,
     customProviders: input.customProviders ?? readCustomProviders(),
   };
+}
+
+function resolveDefaultSelection(
+  explicit: string | undefined,
+): { provider: string; model: string } | undefined {
+  const raw = explicit ?? readEnv("PROJECT_STUDIO_LOCAL_DEFAULT_MODEL");
+  return raw === undefined ? undefined : parseModelSpecifier(raw);
 }
 
 /**
@@ -110,6 +118,23 @@ export function resolveLocalModelConfig(
  */
 export function resolveCustomProviders(): readonly CustomProviderConfig[] {
   return readCustomProviders();
+}
+
+/**
+ * Combines stored providers with any declared in the environment.
+ *
+ * Stored providers win on an id collision: settings are what the user edited
+ * most recently, and a stale environment variable silently overriding the UI
+ * would be indistinguishable from the edit not saving.
+ */
+export function mergeCustomProviders(
+  stored: readonly CustomProviderConfig[],
+  fromEnvironment: readonly CustomProviderConfig[] = readCustomProviders(),
+): readonly CustomProviderConfig[] {
+  const merged = new Map<string, CustomProviderConfig>();
+  for (const entry of fromEnvironment) merged.set(entry.id, entry);
+  for (const entry of stored) merged.set(entry.id, entry);
+  return [...merged.values()];
 }
 
 function readCustomProviders(): readonly CustomProviderConfig[] {
@@ -132,27 +157,57 @@ function readCustomProviders(): readonly CustomProviderConfig[] {
     );
   }
 
-  return result.output.map((entry) => {
-    try {
-      assertValidProviderId(entry.id);
-    } catch {
-      throw new ProviderConfigurationError(
-        `Custom provider id "${entry.id}" must be lowercase letters, digits, and hyphens.`,
-      );
-    }
+  return result.output.map((entry) => normalizeCustomProvider(entry));
+}
 
-    validateBaseUrl(entry.id, entry.baseUrl);
+export interface CustomProviderInput {
+  readonly id: string;
+  readonly name?: string | undefined;
+  readonly baseUrl: string;
+  readonly api?: string | undefined;
+  readonly models?: readonly string[] | undefined;
+  readonly contextWindow?: number | undefined;
+  readonly maxTokens?: number | undefined;
+}
 
-    return {
-      id: entry.id,
-      name: entry.name ?? entry.id,
-      baseUrl: entry.baseUrl.replace(/\/+$/, ""),
-      api: entry.api ?? DEFAULT_API,
-      models: entry.models ?? [],
-      contextWindow: entry.contextWindow,
-      maxTokens: entry.maxTokens,
-    };
-  });
+/**
+ * Validates and canonicalizes one user-declared provider.
+ *
+ * Shared by the environment path and the settings store so a provider cannot be
+ * accepted through one door under rules the other would reject.
+ */
+export function normalizeCustomProvider(
+  entry: CustomProviderInput,
+): CustomProviderConfig {
+  try {
+    assertValidProviderId(entry.id);
+  } catch {
+    throw new ProviderConfigurationError(
+      `Custom provider id "${entry.id}" must be lowercase letters, digits, and hyphens.`,
+    );
+  }
+
+  validateBaseUrl(entry.id, entry.baseUrl);
+
+  const api = entry.api ?? DEFAULT_API;
+  // The runtime can only build a provider for a wire protocol it can load.
+  // Without this check an unknown value produces a provider that silently does
+  // not exist, which reads to the user as the connection having vanished.
+  if (!supportedCustomApis().includes(api)) {
+    throw new ProviderConfigurationError(
+      `Custom provider "${entry.id}" declares unsupported api "${api}". Supported: ${supportedCustomApis().join(", ")}.`,
+    );
+  }
+
+  return {
+    id: entry.id,
+    name: entry.name ?? entry.id,
+    baseUrl: entry.baseUrl.replace(/\/+$/, ""),
+    api,
+    models: entry.models ?? [],
+    contextWindow: entry.contextWindow,
+    maxTokens: entry.maxTokens,
+  };
 }
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);

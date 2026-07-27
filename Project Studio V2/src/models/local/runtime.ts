@@ -8,32 +8,11 @@ import {
   type CredentialStore,
   type Model,
   type MutableModels,
-  type ProviderStreams,
 } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
+import { API_LOADERS } from "./apis.js";
 import type { CustomProviderConfig, LocalModelConfig } from "./config.js";
-
-/**
- * Wire protocols a custom provider may declare. Anything OpenAI-shaped is the
- * common case by a wide margin: Ollama, LM Studio, vLLM, LiteLLM, and most
- * proxy services all speak it, which is what lets one configuration path cover
- * providers Project Studio has never heard of.
- */
-const API_LOADERS: Record<string, () => Promise<ProviderStreams>> = {
-  "openai-completions": () =>
-    import("@earendil-works/pi-ai/api/openai-completions") as Promise<ProviderStreams>,
-  "openai-responses": () =>
-    import("@earendil-works/pi-ai/api/openai-responses") as Promise<ProviderStreams>,
-  "anthropic-messages": () =>
-    import("@earendil-works/pi-ai/api/anthropic-messages") as Promise<ProviderStreams>,
-  "google-generative-ai": () =>
-    import("@earendil-works/pi-ai/api/google-generative-ai") as Promise<ProviderStreams>,
-};
-
-export function supportedCustomApis(): readonly string[] {
-  return Object.keys(API_LOADERS);
-}
 
 /** Env var a custom provider's key may come from, e.g. `ollama` -> `OLLAMA_API_KEY`. */
 export function customProviderEnvVar(id: string): string {
