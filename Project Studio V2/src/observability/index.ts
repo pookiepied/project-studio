@@ -24,6 +24,7 @@ export {
   safeSerializeError,
   safeSerializeValue,
 } from "./errors.js";
+import { TelemetryError } from "./telemetry-errors.js";
 export { createLogger, type Logger, type LogFields, type LogLevel } from "./logger.js";
 export { redactGenAiContent } from "./redaction.js";
 export { resolveObservabilityConfig } from "./config.js";
@@ -47,7 +48,7 @@ export function initializeObservability(
   input: ObservabilityConfigInput = {},
 ): ObservabilityHandle {
   if (handle) {
-    throw new Error("Observability has already been initialized.");
+    throw new TelemetryError("already_initialized");
   }
 
   const config = resolveObservabilityConfig(input);
@@ -87,7 +88,7 @@ export function initializeObservability(
 
 export function getObservability(): ObservabilityHandle {
   if (!handle) {
-    throw new Error("Observability has not been initialized.");
+    throw new TelemetryError("not_initialized");
   }
   return handle;
 }

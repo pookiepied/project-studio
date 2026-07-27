@@ -26,7 +26,14 @@ export type StudioErrorDomain =
   | "auth"
   | "credentials"
   | "models"
+  /**
+   * The Studio gateway transport. Separate from `models` on purpose: both have
+   * a `configuration` failure, and collapsing them would give two unrelated
+   * conditions the same code.
+   */
+  | "gateway"
   | "storage"
+  | "observability"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

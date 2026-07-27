@@ -1,3 +1,5 @@
+import { StudioError } from "../../contracts/errors.js";
+
 /**
  * Failure categories the harness can act on. They are derived from HTTP status
  * and the gateway's own normalized error code only — never from a raw upstream
@@ -60,8 +62,14 @@ const MESSAGE_BY_KIND: Record<StudioGatewayErrorKind, string> = {
   internal: "The Studio gateway hit an unexpected error.",
 };
 
-export class StudioGatewayError extends Error {
-  readonly kind: StudioGatewayErrorKind;
+/**
+ * `status` and `gatewayCode` are kept for local handling and are deliberately
+ * absent from the reported shape: an upstream status is transport detail, and
+ * the kind already carries everything a caller should branch on.
+ */
+export class StudioGatewayError extends StudioError {
+  readonly domain = "gateway" as const;
+  declare readonly kind: StudioGatewayErrorKind;
   readonly status: number | undefined;
   readonly gatewayCode: string | undefined;
 
@@ -69,9 +77,14 @@ export class StudioGatewayError extends Error {
     kind: StudioGatewayErrorKind,
     options: { status?: number; gatewayCode?: string; message?: string } = {},
   ) {
-    super(options.message ?? MESSAGE_BY_KIND[kind]);
+    super(kind, options.message ?? MESSAGE_BY_KIND[kind], {
+      // Retrying is only meaningful where the same request could succeed
+      // unchanged. A rejected token, an unknown model, and an invalid request
+      // will fail identically every time.
+      retryable:
+        kind === "rate_limited" || kind === "timeout" || kind === "unavailable",
+    });
     this.name = "StudioGatewayError";
-    this.kind = kind;
     this.status = options.status;
     this.gatewayCode = options.gatewayCode;
   }

@@ -1,3 +1,4 @@
+import type { ErrorReporter } from "../observability/error-reporter.js";
 import type { AccessTokenProvider } from "../models/studio-cloud/access-token.js";
 import type { StudioAuthClient } from "./auth-client.js";
 import { StudioAuthError } from "./errors.js";
@@ -13,6 +14,7 @@ export interface SessionAccessTokenProviderOptions {
   readonly client: StudioAuthClient;
   /** How long before expiry a token is renewed. */
   readonly skewMs?: number;
+  readonly reporter?: ErrorReporter;
 }
 
 /**
@@ -38,10 +40,13 @@ export class SessionAccessTokenProvider implements AccessTokenProvider {
    */
   #refreshing: Promise<StudioSession> | undefined;
 
+  readonly #reporter: ErrorReporter | undefined;
+
   constructor(options: SessionAccessTokenProviderOptions) {
     this.#sessions = options.sessions;
     this.#client = options.client;
     this.#skewMs = options.skewMs ?? 60_000;
+    this.#reporter = options.reporter;
   }
 
   async getAccessToken(signal?: AbortSignal): Promise<string> {
@@ -66,6 +71,11 @@ export class SessionAccessTokenProvider implements AccessTokenProvider {
         await this.#sessions.save(renewed);
         return renewed;
       } catch (error) {
+        // Reported here because this is where the decision is made. The caller
+        // sees only a failed model call, so without this the difference between
+        // "the network blipped" and "the user was signed out" is invisible.
+        this.#reporter?.report(error, { operation: "auth.refresh" });
+
         // A rejected refresh token cannot be recovered from, and keeping it
         // would make every later call fail the same way. Clearing it makes the
         // state honest: the user is signed out and must sign in again.

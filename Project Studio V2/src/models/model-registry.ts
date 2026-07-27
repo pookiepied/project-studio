@@ -6,6 +6,7 @@ import type {
 } from "../contracts/models.js";
 import {
   ModelResolutionError,
+  ProviderConfigurationError,
   type ModelSource,
 } from "../contracts/models.js";
 
@@ -14,7 +15,7 @@ export class ModelRegistry implements ModelProviderPort {
 
   registerAdapter(adapter: ModelProviderAdapter): void {
     if (this.#adapters.has(adapter.source)) {
-      throw new Error(
+      throw new ProviderConfigurationError(
         `Model source "${adapter.source}" is already registered.`,
       );
     }

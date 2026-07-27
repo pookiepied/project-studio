@@ -30,6 +30,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { ObservabilityConfig } from "./config.js";
+import { TelemetryError } from "./telemetry-errors.js";
 
 export interface TelemetrySnapshot {
   readonly spans: readonly ReadableSpan[];
@@ -242,7 +243,9 @@ export function isObservabilitySdkStarted(): boolean {
 
 export function startObservabilitySdk(config: ObservabilityConfig): ObservabilitySdk {
   if (state) {
-    throw new Error("Observability SDK has already been initialized.");
+    throw new TelemetryError("already_initialized", {
+      message: "Observability SDK has already been initialized.",
+    });
   }
 
   const resource = createResource(config);
@@ -319,7 +322,9 @@ export function startObservabilitySdk(config: ObservabilityConfig): Observabilit
 export function getObservabilitySdk(): ObservabilitySdk {
   const active = state;
   if (!active) {
-    throw new Error("Observability SDK has not been initialized.");
+    throw new TelemetryError("not_initialized", {
+      message: "Observability SDK has not been initialized.",
+    });
   }
 
   return {

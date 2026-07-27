@@ -308,6 +308,8 @@ main()
     process.exitCode = code;
   })
   .catch((error: unknown) => {
+    createDomainReporter("models").report(error, { operation: "providers.cli" });
+
     // Never print a stack here: this path handles credentials.
     process.stderr.write(
       `${error instanceof Error ? error.message : "Provider command failed."}\n`,

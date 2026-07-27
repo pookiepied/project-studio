@@ -10,6 +10,7 @@
  * running, so the harness can be used headless or from a terminal. The desktop
  * app will later drive the same flow rather than reimplementing it.
  */
+import { createDomainReporter } from "../observability/error-reporter.js";
 import { StudioAuthError } from "./errors.js";
 import { isSignedIn, signIn, signOut } from "./login.js";
 
@@ -59,6 +60,10 @@ main()
     process.exitCode = code;
   })
   .catch((error: unknown) => {
+    // Reported before it is printed, so a sign-in failure is counted even
+    // though this command exits without a telemetry pipeline attached.
+    createDomainReporter("auth").report(error, { operation: "auth.cli" });
+
     // Sign-in failures are user-facing, so the typed message is printed and the
     // stack is not: it would carry no useful detail and this path handles
     // credentials.

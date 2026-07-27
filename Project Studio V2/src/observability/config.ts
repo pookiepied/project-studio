@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { TelemetryError } from "./telemetry-errors.js";
 
 const booleanFromEnv = v.pipe(
   v.string(),
@@ -84,9 +85,10 @@ export function resolveObservabilityConfig(
   }
 
   if (exporter === "otlp" && !otlpEndpoint) {
-    throw new Error(
-      "OTLP exporter requires PROJECT_STUDIO_OTEL_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT.",
-    );
+    throw new TelemetryError("configuration", {
+      message:
+        "OTLP exporter requires PROJECT_STUDIO_OTEL_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT.",
+    });
   }
 
   return v.parse(observabilityConfigSchema, {

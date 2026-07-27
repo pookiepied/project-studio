@@ -1,4 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -64,7 +66,8 @@ describe("model-provider composition", () => {
     );
   });
 
-  it("does not create an adapter for local, which is not operational yet", () => {
+  it("does not create a local adapter until a default model is chosen", () => {
+    delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
     expect(() => createModelProviderAdapter("local")).toThrow();
   });
 
@@ -174,5 +177,100 @@ describe("startup ordering and adapter boundaries", () => {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).not.toMatch(/authorization|bearer|accessToken|apiKey|secret/i);
     }
+  });
+});
+
+const SRC_ROOT = fileURLToPath(new URL("../../src", import.meta.url));
+
+async function sourceFiles(root = SRC_ROOT): Promise<string[]> {
+  const entries = await readdir(root, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await sourceFiles(path)));
+    } else if (entry.name.endsWith(".ts")) {
+      files.push(path);
+    }
+  }
+
+  return files;
+}
+
+describe("the failure taxonomy is actually adopted", () => {
+  // These are the rules that keep the error contract from decaying back into
+  // per-module improvisation. They are enforced here rather than in review
+  // because the previous convention lasted exactly as long as someone
+  // remembered it.
+
+  it("routes every error class in src through StudioError", async () => {
+    const offenders: string[] = [];
+
+    for (const path of await sourceFiles()) {
+      const source = await readFile(path, "utf8");
+      for (const match of source.matchAll(
+        /export class (\w*Error) extends (\w+)/g,
+      )) {
+        const [, name, base] = match;
+        if (base !== "StudioError") {
+          offenders.push(`${name} extends ${base} in ${path}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("throws no unclassified errors from src", async () => {
+    // A raw `throw new Error` lands in the `unclassified` domain, which is
+    // meant to measure code that has not been onboarded — not to be the
+    // permanent home of code that simply never was.
+    const offenders: string[] = [];
+
+    for (const path of await sourceFiles()) {
+      const source = await readFile(path, "utf8");
+      if (/throw new (Error|TypeError|RangeError)\(/.test(source)) {
+        offenders.push(path);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps every declared domain reachable from a real error class", async () => {
+    const { StudioAuthError } = await import("../../src/auth/errors.js");
+    const { CredentialStoreError } = await import(
+      "../../src/credentials/credential-store.js"
+    );
+    const { StorageError } = await import("../../src/storage/errors.js");
+    const { StudioGatewayError } = await import(
+      "../../src/models/studio-cloud/errors.js"
+    );
+    const { TelemetryError } = await import(
+      "../../src/observability/telemetry-errors.js"
+    );
+    const { ProviderConfigurationError } = await import(
+      "../../src/contracts/models.js"
+    );
+
+    const domains = new Set([
+      new StudioAuthError("internal").domain,
+      new CredentialStoreError("internal").domain,
+      new StorageError("internal").domain,
+      new StudioGatewayError("internal").domain,
+      new TelemetryError("configuration").domain,
+      new ProviderConfigurationError("x").domain,
+    ]);
+
+    // `unclassified` is intentionally absent: nothing may raise it on purpose.
+    expect([...domains].sort()).toEqual([
+      "auth",
+      "credentials",
+      "gateway",
+      "models",
+      "observability",
+      "storage",
+    ]);
   });
 });
