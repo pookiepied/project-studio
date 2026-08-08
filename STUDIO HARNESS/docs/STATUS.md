@@ -7,8 +7,8 @@ answers "how far along are we, and what is actually blocking what".
 Refresh it at a phase boundary. If it disagrees with the other two documents,
 they are right and this one is stale.
 
-Last refreshed: Phase 10 in progress, 6 of 10 native tools shipped, undo history
-and call bounds landed (ADRs 0016 and 0017).
+Last refreshed: Phase 10 in progress, 6 of 10 native tools shipped. Undo, call
+bounds, and trust/modes landed (ADRs 0016–0018). `shell` is unblocked.
 
 ---
 
@@ -74,9 +74,15 @@ credential column.
 one path, so an unclassified throw is visible in telemetry rather than silent.
 
 **Permissions.** A kernel that decides but never executes and never prompts.
-Policy beats grants beats default. Decisions match on the *resource*, so
-`git:log` and `git:push` are separate questions. Grants persist and are
-revocable.
+Trust beats policy beats grants beats default. Decisions match on the
+*resource*, so `git:log` and `git:push` are separate questions. Grants persist
+and are revocable.
+
+**Trust and modes.** Trust is per folder, decided once, and denies rather than
+asks — reading an untrusted folder is allowed so it can be looked at; writing,
+running, and the network are not. Manual / Auto Edit / Full Auto resolve a
+*default* `ask` and never a policy one, so Full Auto still prompts before a
+connected server runs code. Full Auto requires a working undo. See ADR 0018.
 
 **Tools.** Six of ten, all behind one `CallGate` that authorizes before it
 executes:
@@ -114,10 +120,13 @@ the project belongs to the user. Nothing resolves against the working directory.
 
 ~~**Gate bounds (T-02).**~~ Done — ADR 0017.
 
-**Trust and modes (T-03).** Workspace trust as a precondition; Manual / Auto
-Edit / Full Auto resolving what an `ask` verdict means. Unblocked now that undo
-exists. Must also flip `T-09` — a snapshot failure has to become blocking once
-writes stop being approved one at a time.
+~~**Trust and modes (T-03, T-09).**~~ Done — ADR 0018.
+
+**`shell`.** Both prerequisites are in place. This is the next build.
+
+**`fetch`.** Needs an ADR on the network-effect question before any code —
+SSRF is not containment, so the real question is what a network capability
+means while isolation is `in-process`.
 
 ### The remaining four tools
 

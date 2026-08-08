@@ -8,7 +8,13 @@ import type { ErrorReporter } from "../observability/error-reporter.js";
 import { PermissionError } from "./errors.js";
 import type { PermissionGrantStore } from "./grant-store.js";
 import type { ResourceKind } from "./matcher.js";
+import { describeMode, resolveAsk } from "./mode.js";
 import { offerScopes, resolveScope } from "./scopes.js";
+import {
+  allowedWhileUntrusted,
+  UNGATED_POSTURE,
+  type ExecutionPosture,
+} from "./trust.js";
 import {
   BASE_POLICY,
   defaultVerdict,
@@ -85,6 +91,12 @@ export interface PermissionKernelOptions {
   readonly reporter?: ErrorReporter;
   /** Overridable for tests; production uses `BASE_POLICY`. */
   readonly policy?: readonly PolicyRule[];
+  /**
+   * Workspace trust and the execution mode. Omitted means `UNGATED_POSTURE` —
+   * every folder trusted, every `ask` asked — which is the pre-trust behaviour
+   * and is correct for a fixture, not for the application.
+   */
+  readonly posture?: ExecutionPosture;
 }
 
 export class PermissionKernel {
@@ -93,8 +105,10 @@ export class PermissionKernel {
   readonly #approver: PermissionApprover | undefined;
   readonly #reporter: ErrorReporter | undefined;
   readonly #policy: readonly PolicyRule[];
+  readonly #posture: ExecutionPosture;
 
   constructor(options: PermissionKernelOptions) {
+    this.#posture = options.posture ?? UNGATED_POSTURE;
     this.#grants = options.grants;
     this.#approver = options.approver;
     this.#reporter = options.reporter;
@@ -157,6 +171,26 @@ export class PermissionKernel {
       };
     }
 
+    // Trust is a precondition, not a rule, so it sits ahead of the policy list
+    // *and* ahead of grants. A grant collected while a folder was trusted must
+    // not outlive the user changing their mind about the folder.
+    //
+    // Denied, never asked. Asking would let a model that keeps trying collect
+    // the same authority one click at a time, which is exactly what answering
+    // the question once, about the folder, is for.
+    const trust = this.#posture.trust(call.root);
+    if (trust !== "trusted" && !allowedWhileUntrusted(capability)) {
+      return {
+        verdict: "deny",
+        source: "policy",
+        reason:
+          trust === "undecided"
+            ? "This folder has not been trusted yet, so only reading is allowed."
+            : "This folder is marked as not trusted, so only reading is allowed.",
+        grantId: undefined,
+      };
+    }
+
     const request: PermissionRequest = {
       capability,
       scope,
@@ -199,7 +233,24 @@ export class PermissionKernel {
       };
     }
 
-    return defaultVerdict(capability);
+    const fallback = defaultVerdict(capability);
+    if (fallback.verdict !== "ask") return fallback;
+
+    // The mode resolves *this* `ask` and no other. An `ask` from a policy rule
+    // returned above and never reaches here, which is the invariant that keeps
+    // BASE_POLICY from becoming advisory: Full Auto still prompts before a
+    // connected server runs code.
+    const mode = this.#posture.mode();
+    if (resolveAsk(mode, capability) === "allow") {
+      return {
+        verdict: "allow",
+        source: "default",
+        reason: describeMode(mode),
+        grantId: undefined,
+      };
+    }
+
+    return fallback;
   }
 
   /**

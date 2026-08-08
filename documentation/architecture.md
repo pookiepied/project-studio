@@ -112,13 +112,12 @@ The harness continues on its own roadmap; the app connects at the end.
 | 14–17 | projects, memory, workflows, evals | |
 | 18 | product integration — the frontend seam | |
 
-**Snapshots and call bounds are done** (ADRs 0016 and 0017), which unblocks the
-chain. What is left in Phase 10, in order:
+**The chain is clear** — snapshots, call bounds, and trust/modes are all done
+(ADRs 0016–0018). What is left in Phase 10, in order:
 
 1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
-2. **Trust and modes** (`T-03`) — Manual / Auto Edit / Full Auto. Full Auto also
-   flips the snapshot hook to blocking (`T-09`).
-3. **`shell`** — needs both of the above.
+2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
+3. **`shell`** — unblocked. Next.
 4. **`fetch`** — needs an ADR on the network-effect question first.
 
 **Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with

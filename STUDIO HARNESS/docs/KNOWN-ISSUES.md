@@ -165,17 +165,26 @@ to check the current state before repeating the call.
 The narrowing fix, if it ever matters, is moving long pure-JS work into a
 worker — not a cleverer race.
 
-### T-03 · Trust and execution modes are not enforced yet · Open
+### T-03 · Trust and execution modes are not enforced · Fixed
 
-The design agreed for local execution — workspace trust as a precondition, and
-Manual / Auto Edit / Full Auto resolving what `ask` means — is not implemented.
-The kernel still prompts for every `ask`, so there is currently no mode in which
-edits proceed unattended.
+Closed by ADR 0018. Workspace trust is a precondition stored per folder, ahead
+of policy and grants; an untrusted folder is denied rather than asked about, and
+reading is still allowed so the folder can be looked at. Manual / Auto Edit /
+Full Auto resolve a *default* `ask` only — a policy `ask` is never resolved by a
+mode, so Full Auto still prompts before a connected server runs code.
 
-**Prerequisite met.** T-04 is closed, so there is now something to undo with.
-This also has to flip `T-09`.
+### T-12 · The application does not wire a real posture · Open
 
-**Fix when:** next, together with T-02. Both gate `shell`.
+`PermissionKernel` falls back to `UNGATED_POSTURE` when none is supplied — every
+folder trusted, every `ask` asked. That is the pre-trust behaviour, correct for
+a fixture and wrong for the application.
+
+Nothing in `src/app.ts` constructs a kernel yet, so there is currently no place
+this is wrong. It becomes wrong the moment the application does.
+
+**Fix when:** the application constructs the gate — Phase 18, or sooner if
+`shell` is wired to a real session first. The posture must come from
+`WorkspaceTrustStore` and the user's selected mode.
 
 ### T-04 · Nothing can undo a write · Fixed
 
@@ -185,18 +194,13 @@ takes a snapshot before the first write of each turn, keyed on the declared
 `write` effect rather than on each tool remembering. Scope is the project minus
 ignored files, plus every path a write tool touched.
 
-### T-09 · A failed snapshot does not block the write · Accepted, must be revisited
+### T-09 · A failed snapshot does not block the write · Fixed
 
-`TurnSnapshots` reports a capture failure and lets the write proceed. Chosen
-because every write is currently approved by a person, so undo is a safety net
-rather than the safety story, and an unavailable net should not become an
-outage.
-
-**This must become blocking for any unattended mode.** Full Auto's whole
-argument is "you can undo it". `TurnSnapshots` takes a `required` flag for
-exactly this; Full Auto sets it.
-
-**Fix when:** T-03 lands. This is part of that work, not separate from it.
+Closed by ADR 0018. `TurnSnapshots.required` is now a function rather than a
+boolean, so it follows the live execution mode instead of a value captured at
+construction. `requiresUndo(mode)` supplies it: false while a person approves
+each write, true under Full Auto, where "you can undo it" is the safety story
+rather than a safety net.
 
 ### T-10 · Snapshot history is never pruned · Open
 

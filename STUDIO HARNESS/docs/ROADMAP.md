@@ -177,6 +177,8 @@ Foundations landed first, because every tool stands on them:
   snapshot before each turn's first write, keyed on the declared `write` effect. This is a
   prerequisite rather than a feature: modes need undo, and `shell` needs modes. See ADR 0016.
 
+- **`src/permissions/trust.ts` and `mode.ts`** — workspace trust as a precondition ahead of policy
+  and grants, and three modes that resolve a *default* `ask` and never a policy one. See ADR 0018.
 - **`src/tools/bounds.ts`** — a deadline, real mid-call cancellation, and a concurrency queue on
   every call. `runProcess` bounded a subprocess; this bounds a call, which is what a tool hanging in
   pure JavaScript needs. See ADR 0017.
@@ -184,9 +186,8 @@ Foundations landed first, because every tool stands on them:
 The remaining order in this phase is fixed by that chain:
 
 1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
-2. **Trust and modes** (`T-03`) — workspace trust as a precondition, Manual / Auto Edit / Full Auto
-   resolving what `ask` means. Also flips `T-09`, since Full Auto's safety story is the snapshot.
-3. **`shell`** — unblocked by 1 and 2. The one tool where the model names the program.
+2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
+3. **`shell`** — unblocked. The one tool where the model names the program.
 4. **`fetch`** — needs an ADR on the network-effect question first. SSRF is not containment, so the
    real question is what a network capability means while isolation is `in-process`.
 

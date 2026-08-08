@@ -34,22 +34,27 @@ export interface TurnSnapshotsOptions {
   /**
    * Whether a failed snapshot blocks the write.
    *
-   * `false` today, and that is a real trade rather than an oversight. Every
-   * write is currently approved by a person in front of the screen, so undo is
-   * a safety net rather than the safety story, and refusing to work because
-   * the net is unavailable turns a degraded feature into an outage.
+   * A function, not a boolean, because the answer changes with the execution
+   * mode and the mode changes mid-session. It is read at the moment of the
+   * write rather than captured at construction, so switching into Full Auto
+   * takes effect on the next write instead of the next session.
    *
-   * **This must become `true` for any unattended mode.** Full Auto's entire
-   * argument is "you can undo it", and a Full Auto write with no snapshot
-   * behind it is exactly the situation that argument rules out.
+   * While a person approves each write, a snapshot failure is reported and the
+   * write proceeds: undo is a safety net rather than the safety story, and
+   * refusing to work because the net is unavailable turns a degraded feature
+   * into an outage.
+   *
+   * Under Full Auto nobody is approving anything, "you can undo it" *is* the
+   * safety story, and a write with no snapshot behind it is exactly what that
+   * argument rules out. `requiresUndo(mode)` supplies this.
    */
-  readonly required?: boolean;
+  readonly required?: boolean | (() => boolean);
 }
 
 export class TurnSnapshots implements SnapshotHook {
   readonly #store: SnapshotStore;
   readonly #reporter: ErrorReporter | undefined;
-  readonly #required: boolean;
+  readonly #required: () => boolean;
   #label = "turn 1";
   #turn = 1;
   /**
@@ -63,7 +68,8 @@ export class TurnSnapshots implements SnapshotHook {
   constructor(options: TurnSnapshotsOptions) {
     this.#store = options.store;
     this.#reporter = options.reporter;
-    this.#required = options.required ?? false;
+    const required = options.required ?? false;
+    this.#required = typeof required === "function" ? required : () => required;
   }
 
   /**
@@ -102,7 +108,7 @@ export class TurnSnapshots implements SnapshotHook {
         operation: "snapshots.capture",
         ...(error instanceof SnapshotError ? { error_code: error.code } : {}),
       });
-      if (this.#required) throw error;
+      if (this.#required()) throw error;
       return undefined;
     }
   }

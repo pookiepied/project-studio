@@ -118,6 +118,26 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    name: "workspace_trust",
+    up(db) {
+      // Trust is per folder and deliberately not per conversation: opening the
+      // same repository again must not re-ask, and trusting it in one
+      // conversation must not leave it untrusted in the next.
+      //
+      // The absence of a row is meaningful — it means "never decided", which is
+      // untrusted. So a revoked trust is stored as `trusted = 0` rather than
+      // deleted, to keep "declined" distinguishable from "never asked".
+      db.exec(`
+        CREATE TABLE workspace_trust (
+          root        TEXT PRIMARY KEY,
+          trusted     INTEGER NOT NULL,
+          decided_at  INTEGER NOT NULL
+        ) STRICT;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
