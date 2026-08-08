@@ -26,7 +26,7 @@ delete it — change it to `[~]` and write why.
 
 ## Group 1 — A model can run any program (do these first)
 
-### [x] 1. `git` long options can be shortened past the blocklist · `T-23` · `PENDING1`
+### [x] 1. `git` long options can be shortened past the blocklist · `T-23` · `2c7bdc0`
 
 **Where:** `STUDIO HARNESS/src/tools/git/argv.ts:105-112`
 
@@ -68,7 +68,7 @@ Reverting the check to the old exact match fails 2 of them.
 
 ---
 
-### [x] 2. A chained git alias defeats the shell-alias check · `T-24` · `PENDING1`
+### [x] 2. A chained git alias defeats the shell-alias check · `T-24` · `2c7bdc0`
 
 **Where:** `STUDIO HARNESS/src/tools/git/index.ts:60-79`
 
