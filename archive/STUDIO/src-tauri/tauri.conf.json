@@ -1,0 +1,72 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "STUDIO",
+  "version": "0.1.4",
+  "identifier": "com.pookiepied.studio",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build && node scripts/mcp-build.mjs",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "STUDIO",
+        "width": 1500,
+        "height": 940,
+        "minWidth": 760,
+        "minHeight": 540,
+        "resizable": true,
+        "maximizable": true,
+        "decorations": false,
+        "shadow": false,
+        "transparent": true,
+        "center": true,
+        "visible": false,
+        "focus": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://api.pookiepied.dev wss://api.pookiepied.dev https://auth.pookiepied.dev https://accounts.google.com https://oauth2.googleapis.com http://localhost:11434 http://127.0.0.1:11434 http://localhost:10110 http://127.0.0.1:10110 http://ipc.localhost ipc: https://tauri.localhost tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; media-src 'self' blob:; frame-src https://accounts.google.com;"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEQTk5NURBN0JERTJFQkYKUldTL0x0NTcycFdwN2RlMDV3Rk9iYmNCbHFsdXl6YTY1dlJkTFpyK1dkOTd2NDlFNURackYyOUwK",
+      "endpoints": [
+        "https://api.pookiepied.dev/v1/updates/latest"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../library/mcp-servers/harness/studio-harness/dist": "library/mcp-servers/harness/studio-harness/dist",
+      "../library/mcp-servers/harness/studio-harness/node_modules": "library/mcp-servers/harness/studio-harness/node_modules",
+      "../library/mcp-servers/desktop/computer-use/dist": "library/mcp-servers/desktop/computer-use/dist",
+      "../library/mcp-servers/desktop/computer-use/node_modules": "library/mcp-servers/desktop/computer-use/node_modules",
+      "../library/mcp-servers/system/mcp-management/dist": "library/mcp-servers/system/mcp-management/dist",
+      "../library/mcp-servers/system/skill-management/dist": "library/mcp-servers/system/skill-management/dist",
+      "../library/mcp-servers/system/skill-execution/dist": "library/mcp-servers/system/skill-execution/dist",
+      "../vendor": "vendor"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "installer-assets/header.bmp",
+        "sidebarImage": "installer-assets/sidebar.bmp"
+      }
+    }
+  }
+}

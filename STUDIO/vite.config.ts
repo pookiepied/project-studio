@@ -1,85 +1,33 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { resolve } from "path";
+import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+const host = process.env.TAURI_DEV_HOST
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react()],
-
-  // Path alias — @/* -> src/* (mirrors tsconfig.json paths; web config has its own)
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": resolve(__dirname, "src"),
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
 
-  // Define environment flags for platform detection
-  define: {
-    __WEB_VERSION__: false,
-    __TAURI__: true,
-  },
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
+  // Tauri expects a fixed dev port and no terminal clearing.
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
     host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
-      : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
+    hmr: host ? { protocol: 'ws', host, port: 1421 } : undefined,
   },
-  
-  // Pre-bundle Tauri API sub-paths so Vite doesn't trigger a mid-session reload
-  // when they're first dynamically imported (which crashes the WebView2 window).
-  optimizeDeps: {
-    include: [
-      '@tauri-apps/api/app',
-      '@tauri-apps/plugin-updater',
-      '@tauri-apps/plugin-process',
-    ],
-  },
-
-  // Build optimizations
+  envPrefix: ['VITE_', 'TAURI_ENV_*'],
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // React core
-          'react-vendor': ['react', 'react-dom'],
-          // Animation library
-          'framer-motion': ['framer-motion'],
-          // Markdown rendering (largest dependency)
-          'markdown': ['react-markdown', 'remark-gfm'],
-          // Icons
-          'icons': ['@phosphor-icons/react'],
-          // Tauri plugins
-          'tauri-plugins': [
-            '@tauri-apps/api',
-            '@tauri-apps/plugin-autostart',
-            '@tauri-apps/plugin-fs',
-            '@tauri-apps/plugin-global-shortcut',
-            '@tauri-apps/plugin-notification',
-            '@tauri-apps/plugin-opener',
-          ],
-        },
-      },
-    },
-    // Desktop app — large chunks load from local disk, not the network.
-    chunkSizeWarningLimit: 10000,
+    // Tauri on Windows uses WebView2 (Chromium); elsewhere WKWebView (Safari).
+    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
+    // Vite 8 minifies with oxc; only skipped for Tauri debug builds.
+    minify: !process.env.TAURI_ENV_DEBUG,
+    sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
-}));
+})
