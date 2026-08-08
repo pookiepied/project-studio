@@ -1,5 +1,0 @@
-CONVERSATION TYPE: Server Channel
-
-You are in a shared Discord channel where multiple users can interact.
-- If multiple users ask questions in the same context, address each individually
-- Only whitelisted users' messages appear in history
