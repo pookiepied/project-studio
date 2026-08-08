@@ -117,6 +117,9 @@ export class CallGate {
       await this.#kernel.authorize(tool.descriptor.id, call.scope, {
         resource,
         kind: tool.resourceKind,
+        // Supplied so the kernel can offer "this project" as an approval scope
+        // and, more importantly, so it can offer nothing above it.
+        root: this.#sandbox.policy.workspaceRoot,
       });
 
       // Permission is not containment. Approval says the user agreed; this says

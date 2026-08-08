@@ -8,6 +8,7 @@ import type { ErrorReporter } from "../observability/error-reporter.js";
 import { PermissionError } from "./errors.js";
 import type { PermissionGrantStore } from "./grant-store.js";
 import type { ResourceKind } from "./matcher.js";
+import { offerScopes, resolveScope } from "./scopes.js";
 import {
   BASE_POLICY,
   defaultVerdict,
@@ -39,6 +40,35 @@ export interface CallResource {
   /** Derived by the integrator from the arguments; never the raw argument. */
   readonly resource: string | undefined;
   readonly kind: ResourceKind;
+  /**
+   * The workspace root, used to cap how wide an approval may be offered.
+   *
+   * Without it the widest rung is still the resource's own folder, which is
+   * safe but repetitive. With it, "this project" becomes offerable — and,
+   * importantly, nothing above it ever is.
+   */
+  readonly root?: string;
+}
+
+/**
+ * What the user answered.
+ *
+ * Two independent axes, and keeping them independent is deliberate: breadth is
+ * *what* is covered, duration is *how long*. Collapsing them into one list of
+ * options would produce a six-item dialog and would quietly drop the
+ * combinations people actually want, like "this whole folder, but only for now".
+ */
+export interface PermissionAnswer {
+  readonly verdict: "allow" | "deny";
+  readonly duration: GrantDuration;
+  /**
+   * The `id` of one of the scopes offered in the request.
+   *
+   * Not a pattern. An approver picks from what it was given and cannot author
+   * anything, so a dialog is incapable of granting more than it showed. Omitted
+   * means the narrowest offered scope.
+   */
+  readonly scopeId?: string;
 }
 
 /** Asks the user. Returning `undefined` means no approver was available. */
@@ -46,19 +76,7 @@ export interface PermissionApprover {
   request(
     request: PermissionRequest,
     decision: PermissionDecision,
-  ): Promise<
-    | {
-        verdict: "allow" | "deny";
-        duration: GrantDuration;
-        /**
-         * What the approval covers. Offered by us in the prompt and chosen by
-         * the user — never typed by them, and never widened beyond what was
-         * shown. Omitted means this exact resource only.
-         */
-        resourcePattern?: string;
-      }
-    | undefined
-  >;
+  ): Promise<PermissionAnswer | undefined>;
 }
 
 export interface PermissionKernelOptions {
@@ -139,7 +157,16 @@ export class PermissionKernel {
       };
     }
 
-    const request: PermissionRequest = { capability, scope, resource: call.resource };
+    const request: PermissionRequest = {
+      capability,
+      scope,
+      resource: call.resource,
+      scopes: offerScopes({
+        resource: call.resource,
+        kind: call.kind,
+        root: call.root,
+      }),
+    };
 
     for (const rule of this.#policy) {
       const verdict = rule.evaluate(request);
@@ -202,8 +229,14 @@ export class PermissionKernel {
       throw this.#refuse("approval_required", id, decision);
     }
 
+    const scopes = offerScopes({
+      resource: call.resource,
+      kind: call.kind,
+      root: call.root,
+    });
+
     const answer = await this.#approver.request(
-      { capability, scope, resource: call.resource },
+      { capability, scope, resource: call.resource, scopes },
       decision,
     );
     if (!answer || answer.verdict === "deny") {
@@ -217,14 +250,23 @@ export class PermissionKernel {
       });
     }
 
-    const grant = this.#grants.grant(
-      id,
-      scope,
-      answer.duration,
-      // Falling back to the exact resource keeps an approval as narrow as what
-      // the user was actually shown.
-      answer.resourcePattern ?? call.resource,
-    );
+    const { scope: chosen, recognized } = resolveScope(scopes, answer.scopeId);
+
+    if (!recognized) {
+      // An approver answering with something we did not offer is a bug in the
+      // approver, and it has already been handled safely — `resolveScope`
+      // narrowed it. Reported so a broken UI shows up as repetitive prompting
+      // with a cause, rather than as a mystery.
+      this.#reporter?.report(
+        new PermissionError("internal", {
+          message: `Approver chose an unoffered scope "${answer.scopeId}".`,
+          capability: capabilityKey(id),
+        }),
+        { operation: "permissions.authorize", capability: capabilityKey(id) },
+      );
+    }
+
+    const grant = this.#grants.grant(id, scope, answer.duration, chosen?.pattern);
     return {
       verdict: "allow",
       source: "grant",

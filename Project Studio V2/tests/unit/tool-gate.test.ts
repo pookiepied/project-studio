@@ -85,15 +85,12 @@ function writeTool(calls: string[]): ToolDefinition<{ path: string }, void> {
   });
 }
 
-function approver(
-  verdict: "allow" | "deny",
-  resourcePattern?: string,
-): PermissionApprover {
+function approver(verdict: "allow" | "deny", scopeId?: string): PermissionApprover {
   return {
     request: async () => ({
       verdict,
       duration: "always" as const,
-      ...(resourcePattern !== undefined ? { resourcePattern } : {}),
+      ...(scopeId !== undefined ? { scopeId } : {}),
     }),
   };
 }
@@ -271,9 +268,10 @@ describe("permissions see what the call touches", () => {
     expect(calls).toEqual(["log"]);
   });
 
-  it("stores an approval narrowed to what the user was shown", async () => {
-    const pattern = join(workspace, "src", "**").replaceAll("\\", "/");
-    const instance = gate({ approver: approver("allow", pattern) });
+  it("stores an approval narrowed to the scope the user chose", async () => {
+    // The user picks "this folder"; the pattern is ours to derive, so no dialog
+    // can store something wider than the option it displayed.
+    const instance = gate({ approver: approver("allow", "this-folder") });
     instance.register(writeTool(calls));
 
     await instance.call({
@@ -283,18 +281,53 @@ describe("permissions see what the call touches", () => {
     });
 
     const [stored] = grants.list();
-    expect(stored?.resourcePattern).toBe(pattern);
+    expect(stored?.resourcePattern).toBe(
+      join(workspace, "src", "**").replaceAll("\\", "/"),
+    );
+  });
+
+  it("defaults to the narrowest scope when the approver names none", async () => {
+    const instance = gate({ approver: approver("allow") });
+    instance.register(writeTool(calls));
+
+    await instance.call({
+      name: "native/write",
+      input: { path: "src/one.ts" },
+      scope: SCOPE,
+    });
+
+    const [stored] = grants.list();
+    expect(stored?.resourcePattern).toBe(join(workspace, "src", "one.ts"));
+  });
+
+  it("narrows rather than widens when the approver names a scope we never offered", async () => {
+    // A broken UI must degrade into asking too often, never into granting too
+    // much.
+    const instance = gate({ approver: approver("allow", "everything-everywhere") });
+    instance.register(writeTool(calls));
+
+    await instance.call({
+      name: "native/write",
+      input: { path: "src/one.ts" },
+      scope: SCOPE,
+    });
+
+    const [stored] = grants.list();
+    expect(stored?.resourcePattern).toBe(join(workspace, "src", "one.ts"));
   });
 
   it("reuses a narrowed grant inside its pattern and asks again outside it", async () => {
-    const pattern = join(workspace, "src", "**").replaceAll("\\", "/");
     let prompts = 0;
     const kernel = new PermissionKernel({
       grants,
       approver: {
         request: async () => {
           prompts += 1;
-          return { verdict: "allow" as const, duration: "always" as const, resourcePattern: pattern };
+          return {
+            verdict: "allow" as const,
+            duration: "always" as const,
+            scopeId: "this-folder",
+          };
         },
       },
     });
