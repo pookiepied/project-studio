@@ -112,11 +112,10 @@ The harness continues on its own roadmap; the app connects at the end.
 | 14–17 | projects, memory, workflows, evals | |
 | 18 | product integration — the frontend seam | |
 
-**Snapshots are done** (ADR 0016), which unblocks the chain. What is left in
-Phase 10, in order:
+**Snapshots and call bounds are done** (ADRs 0016 and 0017), which unblocks the
+chain. What is left in Phase 10, in order:
 
-1. **Gate bounds** (`T-02`) — timeout, mid-call cancellation, concurrency.
-   Independent, so it can run alongside the next item.
+1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
 2. **Trust and modes** (`T-03`) — Manual / Auto Edit / Full Auto. Full Auto also
    flips the snapshot hook to blocking (`T-09`).
 3. **`shell`** — needs both of the above.

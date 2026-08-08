@@ -134,9 +134,11 @@ Remaining in this phase:
   `SandboxFactory` seam. Tencent CubeSandbox (Apache 2.0, E2B-compatible) is the
   intended target; it needs x86_64 Linux with KVM, so it is a remote service
   rather than something that runs on the user's desktop.
-- Cancellation, timeout, and concurrency policy.
-- Idempotency and unknown-outcome handling on top of `CapabilityDescriptor`.
-- Audit surface for grants.
+- ~~Cancellation, timeout, and concurrency policy.~~ Done — ADR 0017.
+- ~~Idempotency and unknown-outcome handling on top of `CapabilityDescriptor`.~~
+  Done, in the same work. An abandoned call is the moment `idempotent` exists
+  for, and the error now says whether a retry is safe.
+- Audit surface for grants. `CallGate.inFlight` is the first piece.
 
 ## Next
 
@@ -175,10 +177,13 @@ Foundations landed first, because every tool stands on them:
   snapshot before each turn's first write, keyed on the declared `write` effect. This is a
   prerequisite rather than a feature: modes need undo, and `shell` needs modes. See ADR 0016.
 
+- **`src/tools/bounds.ts`** — a deadline, real mid-call cancellation, and a concurrency queue on
+  every call. `runProcess` bounded a subprocess; this bounds a call, which is what a tool hanging in
+  pure JavaScript needs. See ADR 0017.
+
 The remaining order in this phase is fixed by that chain:
 
-1. **Gate bounds** (`T-02`) — timeout, mid-call cancellation, concurrency limit. Independent of the
-   rest, so it can run in parallel.
+1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
 2. **Trust and modes** (`T-03`) — workspace trust as a precondition, Manual / Auto Edit / Full Auto
    resolving what `ask` means. Also flips `T-09`, since Full Auto's safety story is the snapshot.
 3. **`shell`** — unblocked by 1 and 2. The one tool where the model names the program.

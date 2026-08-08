@@ -8,6 +8,7 @@ import type { ErrorReporter } from "../observability/error-reporter.js";
 import type { PermissionKernel } from "../permissions/kernel.js";
 import type { LocalSandbox } from "../sandbox/local-sandbox.js";
 import type { SnapshotHook } from "../snapshots/turn.js";
+import { CallBounds, type CallBoundsOptions } from "./bounds.js";
 import { ToolError } from "./errors.js";
 import type { ToolContext, ToolDefinition } from "./types.js";
 
@@ -42,6 +43,12 @@ export interface CallGateOptions {
    * for any unattended mode.
    */
   readonly snapshots?: SnapshotHook;
+  /**
+   * Deadline, cancellation, and concurrency. Always applied — the options only
+   * tune it, because a gate with no bound on how long a call may take is the
+   * gap this exists to close.
+   */
+  readonly bounds?: CallBoundsOptions;
 }
 
 export interface ToolCall {
@@ -58,8 +65,10 @@ export class CallGate {
   readonly #sandbox: LocalSandbox;
   readonly #reporter: ErrorReporter | undefined;
   readonly #snapshots: SnapshotHook | undefined;
+  readonly #bounds: CallBounds;
 
   constructor(options: CallGateOptions) {
+    this.#bounds = new CallBounds(options.bounds);
     this.#kernel = options.kernel;
     this.#sandbox = options.sandbox;
     this.#reporter = options.reporter;
@@ -87,6 +96,11 @@ export class CallGate {
     // One cast, at the one boundary where the parameter types are erased. The
     // functions are only ever called with values `parse` produced.
     this.#tools.set(key, tool as unknown as RegisteredTool);
+  }
+
+  /** How much is running or waiting right now. For the audit surface. */
+  get inFlight(): { active: number; queued: number } {
+    return this.#bounds.inFlight;
   }
 
   /** What the model may be told about. */
@@ -140,8 +154,8 @@ export class CallGate {
       }
 
       if (call.signal?.aborted) {
-        throw new ToolError("execution_failed", {
-          message: "The call was cancelled.",
+        throw new ToolError("cancelled", {
+          message: "The call was stopped before it started, so nothing was done.",
           tool: call.name,
         });
       }
@@ -159,7 +173,13 @@ export class CallGate {
         );
       }
 
-      return await tool.execute(input, context);
+      // Bounds wrap execution and nothing before it. Authorization can put a
+      // question in front of a person, and a human deciding is not a call
+      // running slowly — putting approval under the deadline would cancel
+      // calls for the offence of being thought about.
+      return await this.#bounds.run(tool.descriptor, call.signal, (signal) =>
+        tool.execute(input, { ...context, signal }),
+      );
     } catch (error) {
       throw this.#report(error, call.name);
     }

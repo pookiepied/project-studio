@@ -116,6 +116,10 @@ and `git:push` are decided separately.
 Recorded in ADR 0012. A long-running approved operation is authorized at the
 start and not re-authorized partway through.
 
+Partly mitigated by ADR 0017: a long call is now bounded by a deadline and can
+be cancelled while running, so "approved once, then ran forever" is no longer
+possible even though re-authorization still is not.
+
 ### K-03 · Nothing calls the kernel yet · Fixed
 
 `CallGate` is now the single caller. Registering a tool registers its capability
@@ -137,17 +141,29 @@ and picking "this folder" once covers every file beneath it.
 The approval UI renders `request.scopes` and returns an id. No permission logic
 and no pattern syntax belong in it.
 
-### T-02 · No timeout, cancellation, or concurrency policy at the gate · Open
+### T-02 · No timeout, cancellation, or concurrency policy at the gate · Fixed
 
-`runProcess` bounds a subprocess, but the gate itself does not bound a tool
-call. A tool that hangs in pure JavaScript hangs the call, and nothing limits
-how many calls run at once.
+Closed by ADR 0017. `src/tools/bounds.ts` applies a deadline covering queue
+time and execution, a composed signal so cancellation reaches the tool mid-call,
+and a FIFO permit queue. Applied to every call; the options tune it rather than
+switch it off.
 
-The `signal` is threaded through and checked once before execution, so
-cancellation works at the boundary but not during a long call.
+Bounds wrap execution only. Authorization stays outside, because a person
+deciding is not a call running slowly.
 
-**Fix when:** before `shell` ships. Recorded in the roadmap as remaining Phase 9
-work.
+### T-11 · An abandoned call may still be running · Accepted
+
+A tool that reaches a subprocess is genuinely interrupted — the signal is
+forwarded to `runProcess`. A tool that hangs in pure JavaScript is
+**abandoned**: the caller is released and the work may run to completion.
+
+There is no way to interrupt a synchronous loop in userland JavaScript, so this
+is a limit rather than a bug. It is accepted rather than hidden: the error tells
+the model the outcome is unknown, and for a non-idempotent capability tells it
+to check the current state before repeating the call.
+
+The narrowing fix, if it ever matters, is moving long pure-JS work into a
+worker — not a cleverer race.
 
 ### T-03 · Trust and execution modes are not enforced yet · Open
 

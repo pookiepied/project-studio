@@ -9,6 +9,10 @@ export type ToolErrorKind =
   | "name_conflict"
   /** The tool ran and failed on its own terms. */
   | "execution_failed"
+  /** The call passed its deadline and was abandoned. */
+  | "timed_out"
+  /** The caller withdrew the call. */
+  | "cancelled"
   | "internal";
 
 const MESSAGE_BY_KIND: Record<ToolErrorKind, string> = {
@@ -16,6 +20,8 @@ const MESSAGE_BY_KIND: Record<ToolErrorKind, string> = {
   invalid_input: "The tool was called with arguments it cannot accept.",
   name_conflict: "Two tools are registered under the same name.",
   execution_failed: "The tool could not complete.",
+  timed_out: "The tool took too long and was stopped.",
+  cancelled: "The call was stopped.",
   internal: "The tool failed unexpectedly.",
 };
 

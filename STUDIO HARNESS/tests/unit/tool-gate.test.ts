@@ -117,12 +117,33 @@ afterEach(() => {
   rmSync(workspace, { recursive: true, force: true });
 });
 
-function gate(options: { approver?: PermissionApprover; policy?: never } = {}) {
+function gate(
+  options: {
+    approver?: PermissionApprover;
+    policy?: never;
+    bounds?: ConstructorParameters<typeof CallGate>[0]["bounds"];
+  } = {},
+) {
   const kernel = new PermissionKernel({
     grants,
     ...(options.approver ? { approver: options.approver } : {}),
   });
-  return new CallGate({ kernel, sandbox });
+  return new CallGate({
+    kernel,
+    sandbox,
+    ...(options.bounds ? { bounds: options.bounds } : {}),
+  });
+}
+
+/** A tool that hangs in pure JavaScript, which no subprocess bound catches. */
+function hangingTool(): ToolDefinition<Record<string, never>, string> {
+  return defineStudioTool({
+    descriptor: capability("hang", ["read"]),
+    resourceKind: "path",
+    parse: () => ({}) as Record<string, never>,
+    resource: () => undefined,
+    execute: () => new Promise<string>(() => undefined),
+  });
 }
 
 describe("nothing runs without passing the gate", () => {
@@ -342,6 +363,51 @@ describe("permissions see what the call touches", () => {
     // src" would silently have meant "allow edits anywhere".
     await instance.call({ name: "native/write", input: { path: "root.ts" }, scope: SCOPE });
     expect(prompts).toBe(2);
+  });
+});
+
+describe("the gate bounds the call, not just the subprocess", () => {
+  it("gives up on a tool that hangs in pure JavaScript", async () => {
+    const instance = gate({ bounds: { timeoutMs: 40 } });
+    instance.register(hangingTool());
+
+    const error = await instance
+      .call({ name: "native/hang", input: {}, scope: SCOPE })
+      .then(() => undefined)
+      .catch((thrown: unknown) => thrown as ToolError);
+
+    expect(error).toBeInstanceOf(ToolError);
+    expect(error?.kind).toBe("timed_out");
+  });
+
+  it("does not put a waiting approval under the deadline", async () => {
+    // A person thinking is not a call running slowly. If approval were inside
+    // the bound, a user who paused would have their call cancelled for it.
+    const instance = gate({
+      bounds: { timeoutMs: 60 },
+      approver: {
+        request: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 120));
+          return { verdict: "allow" as const, duration: "always" as const };
+        },
+      },
+    });
+    instance.register(readTool(calls));
+
+    await expect(
+      instance.call({ name: "native/read", input: { path: "src/app.ts" }, scope: SCOPE }),
+    ).resolves.toBe("source");
+  });
+
+  it("reports nothing in flight once a bounded call has ended", async () => {
+    const instance = gate({ bounds: { timeoutMs: 40, maxConcurrent: 1 } });
+    instance.register(hangingTool());
+
+    await instance
+      .call({ name: "native/hang", input: {}, scope: SCOPE })
+      .catch(() => undefined);
+
+    expect(instance.inFlight).toEqual({ active: 0, queued: 0 });
   });
 });
 

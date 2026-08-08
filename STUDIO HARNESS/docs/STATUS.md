@@ -8,7 +8,7 @@ Refresh it at a phase boundary. If it disagrees with the other two documents,
 they are right and this one is stale.
 
 Last refreshed: Phase 10 in progress, 6 of 10 native tools shipped, undo history
-landed (ADR 0016).
+and call bounds landed (ADRs 0016 and 0017).
 
 ---
 
@@ -41,7 +41,7 @@ process it talks to; neither contains the other.
 | 7 | Studio Gateway integration | Done |
 | 7.5 | Architecture review | Done |
 | 8 | Auth, credentials, local BYOK | Done |
-| 9 | Permission and containment kernel | Foundation done, 4 items open |
+| 9 | Permission and containment kernel | Foundation done, 2 items open |
 | 10 | Native agent tools | **In progress — 6 of 10** |
 | 11 | MCP | Not started |
 | 12 | Skills | Not started |
@@ -87,6 +87,12 @@ executes:
 | Search | `glob`, `grep` | Over vendored ripgrep 14.1.1 |
 | Version control | `git` | Complete subcommand coverage, one capability |
 
+**Call bounds.** Every call has a deadline covering queue time and execution, a
+signal that reaches the tool so cancellation works mid-call, and a FIFO
+concurrency queue. An abandoned call tells the model whether repeating it is
+safe, which is what `CapabilityDescriptor.idempotent` was declared for. See ADR
+0017.
+
 **Undo.** A shadow git repository per project in `~/.studio/data/snapshots/`,
 work tree pointed at the project. The gate snapshots before each turn's first
 write, keyed on the declared `write` effect — so a tool cannot be added that
@@ -106,8 +112,7 @@ the project belongs to the user. Nothing resolves against the working directory.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 
-**Gate bounds (T-02).** Timeout, mid-call cancellation, concurrency limit.
-Independent of everything else here, so it can run in parallel. Blocks `shell`.
+~~**Gate bounds (T-02).**~~ Done — ADR 0017.
 
 **Trust and modes (T-03).** Workspace trust as a precondition; Manual / Auto
 Edit / Full Auto resolving what an `ask` verdict means. Unblocked now that undo
@@ -118,7 +123,7 @@ writes stop being approved one at a time.
 
 | Tool | Blocked by |
 |---|---|
-| `shell` | Modes (T-03) + gate bounds (T-02) |
+| `shell` | Modes (T-03) — gate bounds are done |
 | `fetch` | The network-effect question — SSRF is not containment |
 | `task` | Phase 13 |
 | `skill` | Phase 12 |
