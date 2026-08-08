@@ -12,11 +12,13 @@ bounds, trust/modes, and `shell` landed (ADRs 0016–0019). Only `fetch` remains
 before Phase 11.
 
 Then a cross-reference audit over everything shipped, which is why this file now
-contradicts itself less and admits more. It found eight real defects — `T-14`
+contradicts itself less and admits more. It found eleven real defects — `T-14`
 through `T-21`, `K-04`, `P-05`, `P-06` — and the two that matter are that
-`shell` writes without an undo point and that `edit` silently corrupts any
+`shell` writes without an undo point and that `edit` silently corrupted any
 replacement containing `$`. Nothing found was a regression; all of it was
 shipped believing otherwise.
+
+`T-16` is fixed. The rest are open.
 
 ---
 
@@ -142,10 +144,15 @@ the project belongs to the user. Nothing resolves against the working directory.
 
 ### Immediately next
 
-**The audit findings come before `fetch`.** `T-16` is a data-loss bug in a
-shipped tool and is a one-line fix. `T-14` and `T-15` mean `shell` does not yet
-do the job it was built for. Adding the last tool on top of that is building on
-a floor we know has a hole in it.
+**The audit findings come before `fetch`.** Adding the last tool on top of known
+holes is building on a floor we know has one.
+
+~~**`T-16`** — `edit` corrupting `$` in a replacement.~~ Fixed.
+
+**`T-14` and `T-15`** — `shell` writes with no undo point, and its ten-minute
+ceiling is overridden by the gate's two-minute one. Together they mean `shell`
+does not yet do the job it was built for. `T-17` belongs in the same change,
+since fixing `T-14` makes snapshots more frequent.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 

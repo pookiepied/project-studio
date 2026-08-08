@@ -246,6 +246,61 @@ describe("edit", () => {
       edit({ path: "unread.ts", oldString: "value", newString: "other" }),
     ).rejects.toThrow(/has not been read/i);
   });
+
+  // `String.replace` treats the replacement as a pattern even when the search
+  // value is a plain string, so these all used to write something other than
+  // what was asked for and report success. `$` is ordinary content in a file.
+  describe("writes the replacement exactly as given", () => {
+    const cases: readonly (readonly [name: string, newString: string])[] = [
+      ["$& (the whole match)", "cost + $&"],
+      ["$` (everything before)", "cost + $`"],
+      ["$' (everything after)", "cost + $'"],
+      ["$$ (an escaped dollar)", "cost + $$"],
+      // These two are already inert, because a string search value has no
+      // capture groups for them to refer to. Kept anyway: they become live the
+      // moment anyone reaches for a RegExp here, and this is where that shows
+      // up as a failure rather than as a corrupted file.
+      ["$1 (a capture group)", "cost + $1"],
+      ["$<name> (a named group)", "cost + $<total>"],
+    ];
+
+    for (const [name, newString] of cases) {
+      it(`does not interpret ${name}`, async () => {
+        writeFileSync(join(workspace, "money.ts"), "const price = 10;\n");
+        await read({ path: "money.ts" });
+
+        await edit({ path: "money.ts", oldString: "10", newString });
+
+        expect(await read({ path: "money.ts" })).toContain(`const price = ${newString};`);
+      });
+
+      it(`does not interpret ${name} under replaceAll`, async () => {
+        writeFileSync(join(workspace, "money.ts"), "a = 10;\nb = 10;\n");
+        await read({ path: "money.ts" });
+
+        await edit({ path: "money.ts", oldString: "10", newString, replaceAll: true });
+
+        const after = await read({ path: "money.ts" });
+        expect(after).toContain(`a = ${newString};`);
+        expect(after).toContain(`b = ${newString};`);
+      });
+    }
+
+    it("keeps a shell variable in a script intact", async () => {
+      // The realistic version: nothing here looks like a regular expression to
+      // a person, and two of these tokens are substitution patterns.
+      writeFileSync(join(workspace, "run.sh"), "echo old\n");
+      await read({ path: "run.sh" });
+
+      await edit({
+        path: "run.sh",
+        oldString: "echo old",
+        newString: 'echo "$@ ${HOME} $$ $1"',
+      });
+
+      expect(await read({ path: "run.sh" })).toContain('echo "$@ ${HOME} $$ $1"');
+    });
+  });
 });
 
 describe("the three tools share one record of what was read", () => {

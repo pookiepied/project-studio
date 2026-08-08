@@ -36,6 +36,28 @@ export const EDIT_DESCRIPTOR: CapabilityDescriptor = {
   idempotent: false,
 };
 
+/**
+ * Inserts the replacement exactly as written.
+ *
+ * `String.replace` treats the *replacement* as a pattern even when the thing
+ * being searched for is a plain string, so `$&`, `` $` ``, `$'`, `$$`, `$1`, and
+ * `$<name>` are substituted rather than inserted. That is a rule about regular
+ * expressions leaking into a call that involves no regular expression at all.
+ *
+ * The text here is whatever the model wants to put in a file, and `$` is
+ * ordinary content — shell variables, regex source, CSS, a `sed` example, any
+ * documentation of a capture group. Interpreting it wrote something other than
+ * what was asked for and reported success, which is the failure this tool's
+ * whole design is meant to make impossible.
+ *
+ * A replacer function is the fix rather than escaping `$` as `$$`: escaping is
+ * a transformation that has to be correct, and a function is specified to
+ * insert its return value verbatim.
+ */
+function literal(replacement: string): () => string {
+  return () => replacement;
+}
+
 function countOccurrences(haystack: string, needle: string): number {
   let count = 0;
   let index = haystack.indexOf(needle);
@@ -120,8 +142,8 @@ export function createEditTool(log: FileAccessLog): ToolDefinition<EditInput, st
       }
 
       const updated = input.replaceAll
-        ? content.replaceAll(input.oldString, input.newString)
-        : content.replace(input.oldString, input.newString);
+        ? content.replaceAll(input.oldString, literal(input.newString))
+        : content.replace(input.oldString, literal(input.newString));
 
       await context.sandbox.writeFile(input.path, updated);
 

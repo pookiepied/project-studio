@@ -378,7 +378,7 @@ work it was built for". The fix is a `timeoutByCapability` entry for
 `native/shell` at the tool's own ceiling — not a higher global default, which
 would give `read` ten minutes of patience it has no use for.
 
-### T-16 · `edit` interprets `$` in the replacement text · Open
+### T-16 · `edit` interpreted `$` in the replacement text · Fixed
 
 `content.replace(oldString, newString)` and `replaceAll` treat the *replacement*
 as a pattern even when the search value is a plain string. `$&`, `` $` ``, `$'`,
@@ -398,12 +398,18 @@ template literals, CSS `$` variables, anything documenting a capture group. This
 is exactly the failure the tool's own doc comment rules out: "a mistaken edit
 fails loudly instead of landing somewhere unintended."
 
-**Fix:** pass a replacer function — `content.replace(oldString, () => newString)`
-— which is specified to insert the string verbatim. Both call sites, plus a test
-using `$&` and `` $` ``.
+**Fixed** by passing a replacer function at both call sites — specified to
+insert its return value verbatim — rather than by escaping `$` as `$$`, since
+escaping is a transformation that has to be correct and a function simply is.
 
-**Fix when:** immediately. It is one line each, it is a data-loss bug, and the
-undo history is the only thing that currently catches it.
+Thirteen tests cover it, and nine of them were confirmed to fail against the
+old code before the fix landed. The other four are `$1` and `$<name>`, which a
+string search value leaves inert; they are kept because they become live the
+moment anyone reaches for a `RegExp` here.
+
+`edit.ts` was the only site in `src/` taking a caller-supplied replacement.
+Everywhere else the replacement is a literal, and the two places that do use
+`$&`/`$1` — `matcher.ts` and `redaction.ts` — mean it.
 
 ### T-17 · Nothing serialises access to the shadow repository · Open
 
