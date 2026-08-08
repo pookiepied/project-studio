@@ -1,7 +1,7 @@
 import { readdir, readFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import type { CapabilityEffect } from "../contracts/capabilities.js";
+import type { CapabilityDescriptor } from "../contracts/capabilities.js";
 import { SandboxError } from "./errors.js";
 import { resolveContainedPath } from "./paths.js";
 import {
@@ -30,8 +30,10 @@ export interface SandboxFileStat {
  * code does on the agent's behalf. It is effective against an agent that goes
  * off-track — the realistic failure — and it is not a boundary against code
  * that is actively hostile, because a real subprocess is outside our checks
- * entirely. That is why `execute` and `network` are refused here rather than
- * approximated, and belong to an OS-isolated or remote sandbox.
+ * entirely.
+ *
+ * It never claims otherwise. Where it admits `execute`, it admits it as
+ * *uncontained by consent* rather than as containment — see `assertSupports`.
  */
 export class LocalSandbox {
   readonly isolation: IsolationLevel = "in-process";
@@ -46,25 +48,48 @@ export class LocalSandbox {
   }
 
   /**
-   * Refuses an effect this sandbox cannot actually contain.
+   * Refuses a capability this sandbox cannot honestly admit.
    *
-   * Checked before the work starts, so the caller can route to a stronger
-   * sandbox instead of discovering the gap after something has already run.
+   * Takes the descriptor rather than a bare effect, because the answer depends
+   * on **who chose the code**, not only on what it does. Containing hostile
+   * code needs OS isolation, and that has not changed. Running a program the
+   * user chose, in a folder the user trusted, with their approval is not
+   * containment — it is doing as asked, and the requirement there is
+   * authorization.
+   *
+   * So the line is provenance, and it is absolute in one direction:
+   *
+   * - **Native, and the policy opted in** — allowed, and honestly *uncontained*.
+   *   Permission, trust, and the mode are what bound it.
+   * - **Anything a user connected** — refused until a real isolation tier
+   *   exists. We do not run a program a third party chose without a boundary,
+   *   whatever the permissions say.
+   *
+   * ADR 0012 refused `execute` outright, and was right at the time: there was
+   * no workspace trust and no execution modes, so authorization was too weak to
+   * carry the weight. ADR 0018 changed that. See ADR 0019.
    */
-  assertSupports(effect: CapabilityEffect): void {
-    if (effect === "execute" && !this.#policy.allowExec) {
-      throw new SandboxError("not_permitted", {
-        message: "This agent is not allowed to run commands.",
-      });
-    }
-    if (effect === "network" && !this.#policy.allowNetwork) {
-      throw new SandboxError("not_permitted", {
-        message: "This agent is not allowed to reach the network.",
-      });
-    }
+  assertSupports(capability: CapabilityDescriptor): void {
+    for (const effect of capability.effects) {
+      if (satisfiesIsolation(this.isolation, requiredIsolation(effect))) continue;
 
-    if (!satisfiesIsolation(this.isolation, requiredIsolation(effect))) {
-      throw new SandboxError("unsupported_isolation");
+      if (!capability.provenance.trusted) {
+        throw new SandboxError("unsupported_isolation", {
+          message:
+            "Running code or reaching the network from a connected server needs a sandbox, and none is available yet.",
+        });
+      }
+
+      if (effect === "execute" && !this.#policy.allowExec) {
+        throw new SandboxError("not_permitted", {
+          message: "This agent is not allowed to run commands.",
+        });
+      }
+      if (effect === "network" && !this.#policy.allowNetwork) {
+        throw new SandboxError("not_permitted", {
+          message: "This agent is not allowed to reach the network.",
+        });
+      }
     }
   }
 

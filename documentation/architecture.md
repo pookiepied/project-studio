@@ -65,7 +65,7 @@ process/         exec.ts — the only place a child process starts
 sandbox/         isolation tiers
 snapshots/       shadow git per project — the undo history
 storage/         SQLite, versioned migrations
-tools/           filesystem, search, git — all behind one CallGate
+tools/           filesystem, search, git, shell — all behind one CallGate
 vendor/          bundled binaries, installation-relative resolution
 ```
 
@@ -105,7 +105,7 @@ The harness continues on its own roadmap; the app connects at the end.
 |---|---|---|
 | 1–8 | foundation, loop, persistence, observability, providers, gateway, auth | done |
 | 9 | permission and containment kernel | foundation done |
-| 10 | native tools — 6 of 10 | **in progress** |
+| 10 | native tools — 7 of 10 | **in progress** |
 | 11 | MCP | next |
 | 12 | Skills | |
 | 13 | Subagents and tasks | |
@@ -117,8 +117,8 @@ The harness continues on its own roadmap; the app connects at the end.
 
 1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
 2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
-3. **`shell`** — unblocked. Next.
-4. **`fetch`** — needs an ADR on the network-effect question first.
+3. ~~**`shell`**.~~ Done — ADR 0019.
+4. **`fetch`** — needs an ADR on the network-effect question first. Last one.
 
 **Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with
 discovery can run. They measure whether the Flue/Pi bet holds, and they are

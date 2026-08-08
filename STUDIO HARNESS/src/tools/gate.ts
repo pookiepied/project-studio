@@ -149,9 +149,7 @@ export class CallGate {
       // we can actually hold the boundary. Both are required, and the sandbox
       // is asked second so an unapproved call is refused before we consider
       // whether we could have contained it.
-      for (const effect of tool.descriptor.effects) {
-        this.#sandbox.assertSupports(effect);
-      }
+      this.#sandbox.assertSupports(tool.descriptor);
 
       if (call.signal?.aborted) {
         throw new ToolError("cancelled", {

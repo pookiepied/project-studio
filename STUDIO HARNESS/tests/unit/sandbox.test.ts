@@ -4,6 +4,10 @@ import { join, resolve } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type {
+  CapabilityDescriptor,
+  CapabilityEffect,
+} from "../../src/contracts/capabilities.js";
 import { SandboxError } from "../../src/sandbox/errors.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { isInsideRoot } from "../../src/sandbox/paths.js";
@@ -12,6 +16,24 @@ import {
   requiredIsolation,
   satisfiesIsolation,
 } from "../../src/sandbox/policy.js";
+
+function descriptor(
+  effects: CapabilityEffect[],
+  trusted = true,
+): CapabilityDescriptor {
+  return {
+    id: { namespace: trusted ? "native" : "mcp:example", name: "thing" },
+    title: "thing",
+    description: "thing",
+    effects,
+    provenance: {
+      origin: trusted ? "native" : "mcp",
+      sourceId: trusted ? "project-studio" : "example-server",
+      trusted,
+    },
+    idempotent: true,
+  };
+}
 
 let base: string;
 let workspace: string;
@@ -190,23 +212,48 @@ describe("isolation is claimed honestly", () => {
     expect(requiredIsolation("write")).toBe("in-process");
   });
 
-  it("refuses effects it cannot contain rather than approximating them", () => {
-    expect(() => sandbox.assertSupports("execute")).toThrow(SandboxError);
-    expect(() => sandbox.assertSupports("network")).toThrow(SandboxError);
-    expect(() => sandbox.assertSupports("read")).not.toThrow();
-    expect(() => sandbox.assertSupports("write")).not.toThrow();
+  it("allows what it can actually contain", () => {
+    expect(() => sandbox.assertSupports(descriptor(["read"]))).not.toThrow();
+    expect(() => sandbox.assertSupports(descriptor(["write"]))).not.toThrow();
   });
 
-  it("still refuses exec when a policy allows it, because isolation is missing", () => {
-    // Permission is not isolation. Allowing exec in policy does not give the
-    // in-process sandbox the ability to contain it.
+  it("refuses to run code unless the policy opted in", () => {
+    expect(() => sandbox.assertSupports(descriptor(["execute"]))).toThrow(
+      SandboxError,
+    );
+    expect(() => sandbox.assertSupports(descriptor(["network"]))).toThrow(
+      SandboxError,
+    );
+  });
+
+  it("runs a native program when the policy opted in, uncontained and said so", () => {
+    // ADR 0019. Containing hostile code needs OS isolation and still does.
+    // Running a program the user chose, in a folder they trusted, with their
+    // approval is not containment — it is doing as asked.
     const permissive = new LocalSandbox(
       createSandboxPolicy({ workspaceRoot: workspace, allowExec: true }),
     );
 
-    expect(() => permissive.assertSupports("execute")).toThrow(
-      /stronger isolation/i,
+    expect(() => permissive.assertSupports(descriptor(["execute"]))).not.toThrow();
+  });
+
+  it("never runs a connected server's code, whatever the policy says", () => {
+    // The line is provenance, and it is absolute in this direction. This is
+    // what S-02 keeps closed until a real isolation tier exists.
+    const permissive = new LocalSandbox(
+      createSandboxPolicy({
+        workspaceRoot: workspace,
+        allowExec: true,
+        allowNetwork: true,
+      }),
     );
+
+    expect(() =>
+      permissive.assertSupports(descriptor(["execute"], false)),
+    ).toThrow(/needs a sandbox/i);
+    expect(() =>
+      permissive.assertSupports(descriptor(["network"], false)),
+    ).toThrow(/needs a sandbox/i);
   });
 
   it("ranks isolation so a stronger sandbox satisfies a weaker requirement", () => {

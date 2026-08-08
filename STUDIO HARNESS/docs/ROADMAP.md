@@ -157,7 +157,7 @@ The surface is capped at ten tools, grouped by family, one tool per capability:
 | Filesystem | `read`, `write`, `edit` | Done, and reversible — see ADR 0016 |
 | Search | `glob`, `grep` | Done, over vendored ripgrep 14.1.1 |
 | Version control | `git` | Done — complete subcommand coverage, one capability |
-| Execution | `shell` | Local, bounded by permission |
+| Execution | `shell` | Done — native only, uncontained by consent, ADR 0019 |
 | Network | `fetch` | Blocked on the network-effect question |
 | Delegation | `task`, `skill` | Phases 13 and 12 |
 
@@ -187,7 +187,8 @@ The remaining order in this phase is fixed by that chain:
 
 1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
 2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
-3. **`shell`** — unblocked. The one tool where the model names the program.
+3. ~~**`shell`**.~~ Done — ADR 0019. The one tool where the model names the program, so it gives up
+   the first of ADR 0013's three properties and keeps the other two.
 4. **`fetch`** — needs an ADR on the network-effect question first. SSRF is not containment, so the
    real question is what a network capability means while isolation is `in-process`.
 

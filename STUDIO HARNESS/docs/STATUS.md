@@ -7,8 +7,9 @@ answers "how far along are we, and what is actually blocking what".
 Refresh it at a phase boundary. If it disagrees with the other two documents,
 they are right and this one is stale.
 
-Last refreshed: Phase 10 in progress, 6 of 10 native tools shipped. Undo, call
-bounds, and trust/modes landed (ADRs 0016–0018). `shell` is unblocked.
+Last refreshed: Phase 10 in progress, 7 of 10 native tools shipped. Undo, call
+bounds, trust/modes, and `shell` landed (ADRs 0016–0019). Only `fetch` remains
+before Phase 11.
 
 ---
 
@@ -42,7 +43,7 @@ process it talks to; neither contains the other.
 | 7.5 | Architecture review | Done |
 | 8 | Auth, credentials, local BYOK | Done |
 | 9 | Permission and containment kernel | Foundation done, 2 items open |
-| 10 | Native agent tools | **In progress — 6 of 10** |
+| 10 | Native agent tools | **In progress — 7 of 10** |
 | 11 | MCP | Not started |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
@@ -84,14 +85,15 @@ running, and the network are not. Manual / Auto Edit / Full Auto resolve a
 *default* `ask` and never a policy one, so Full Auto still prompts before a
 connected server runs code. Full Auto requires a working undo. See ADR 0018.
 
-**Tools.** Six of ten, all behind one `CallGate` that authorizes before it
+**Tools.** Seven of ten, all behind one `CallGate` that authorizes before it
 executes:
 
 | Family | Tools | Notes |
 |---|---|---|
-| Filesystem | `read`, `write`, `edit` | Read-before-modify enforced |
+| Filesystem | `read`, `write`, `edit` | Read-before-modify enforced, and reversible |
 | Search | `glob`, `grep` | Over vendored ripgrep 14.1.1 |
 | Version control | `git` | Complete subcommand coverage, one capability |
+| Execution | `shell` | One program, one argument vector, no shell. Native only |
 
 **Call bounds.** Every call has a deadline covering queue time and execution, a
 signal that reaches the tool so cancellation works mid-call, and a FIFO
@@ -122,17 +124,16 @@ the project belongs to the user. Nothing resolves against the working directory.
 
 ~~**Trust and modes (T-03, T-09).**~~ Done — ADR 0018.
 
-**`shell`.** Both prerequisites are in place. This is the next build.
+~~**`shell`.**~~ Done — ADR 0019.
 
 **`fetch`.** Needs an ADR on the network-effect question before any code —
 SSRF is not containment, so the real question is what a network capability
 means while isolation is `in-process`.
 
-### The remaining four tools
+### The remaining three tools
 
 | Tool | Blocked by |
 |---|---|
-| `shell` | Modes (T-03) — gate bounds are done |
 | `fetch` | The network-effect question — SSRF is not containment |
 | `task` | Phase 13 |
 | `skill` | Phase 12 |

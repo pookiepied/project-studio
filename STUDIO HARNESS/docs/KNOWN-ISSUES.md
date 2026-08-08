@@ -261,8 +261,26 @@ parameters like the other tools have, not a bigger ceiling.
 ### S-01 · `LocalSandbox` is `in-process` isolation · Accepted
 
 Recorded in ADR 0012. It constrains what our own code does on the agent's
-behalf and is **not** a boundary against actively hostile code. `execute` and
-`network` are refused there rather than approximated.
+behalf and is **not** a boundary against actively hostile code.
+
+Amended by ADR 0019: it now admits `execute` for a **native** capability when
+the policy opted in, as *uncontained by consent* rather than as containment.
+Anything a user connected is still refused outright. The sandbox never claims
+to contain what it admits.
+
+### T-13 · `shell` cannot run npm-family tools on Windows · Accepted
+
+`npm`, `pnpm`, `yarn`, `tsc`, and most npm-installed tools are `.cmd` shims,
+and `runProcess` refuses those (CVE-2024-27980) because running them needs
+`cmd.exe`, which would reintroduce metacharacter parsing of our arguments.
+
+`node`, `python`, `cargo`, `go`, `docker`, and anything shipping a real `.exe`
+work normally. A shim is detected and explained rather than reported as
+missing, since "not found" is misleading when the file is right there.
+
+**The candidate fix** is resolving a shim to its underlying `node` entry point.
+Deliberately not done yet: it is version-dependent guesswork, and it should wait
+for evidence that it is needed rather than be built on the assumption.
 
 The plan of record (ADR 0012, and the local/sandbox split agreed after it) is
 that local execution is bounded by *permission*, and isolation is what the
@@ -272,6 +290,11 @@ sandbox tier adds — WSL2 locally, a remote MicroVM later.
 
 `IsolationLevel` has three values and only `in-process` is implemented. Until a
 provider lands, any capability requiring `os` isolation is refused.
+
+**Now load-bearing rather than theoretical.** Since ADR 0019, this is the only
+thing standing between a connected MCP server and `execute` on the host. A
+native `shell` runs uncontained by consent; a server's does not run at all, and
+that distinction is enforced here.
 
 ### H-01 · Only `studio.db` and `bin/` are actually used · Open
 
@@ -295,6 +318,21 @@ brought into the Studio home at the same time.
 ---
 
 ## Environment
+
+### E-02 · The harness integration test times out under load · Open
+
+`tests/integration/harness.test.ts` waits 15 seconds for the harness to accept
+connections. It passes alone and passes on a rerun, and it has now failed once
+in a full-suite run — the suite starts a real server while 480 other tests
+compete for the machine.
+
+**Not a regression, and not to be "fixed" by raising the timeout blindly.** The
+honest fix is for the wait to poll a readiness signal the harness actually
+emits, rather than racing a fixed budget. A longer timeout only moves the
+threshold.
+
+**Fix when:** it fails twice, or before this suite runs on shared CI — whichever
+comes first.
 
 ### E-01 · Node version is below the declared engine · Open
 
