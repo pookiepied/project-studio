@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { SandboxError } from "./errors.js";
+import { isInsideRoot } from "./paths.js";
 
 /**
  * Isolation levels and the effect-to-isolation mapping now live in
@@ -79,8 +80,13 @@ export function createSandboxPolicy(input: SandboxPolicyInput): SandboxPolicy {
 
   // A writable root outside every readable root would let an agent modify what
   // it is not allowed to look at, which is never what anyone intends.
+  //
+  // Through `isInsideRoot`, not a string prefix. `/home/u/work` is a prefix of
+  // `/home/u/work-secrets`, so the prefix form accepted a writable root that
+  // sits outside every readable one — the exact case `paths.ts` was written to
+  // solve, ten lines away.
   for (const root of writeRoots) {
-    if (!readRoots.some((readable) => root === readable || root.startsWith(readable))) {
+    if (!readRoots.some((readable) => isInsideRoot(readable, root))) {
       throw new SandboxError("invalid_policy", {
         message: "A writable root must sit inside a readable root.",
       });

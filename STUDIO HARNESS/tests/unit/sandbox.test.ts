@@ -157,6 +157,27 @@ describe("read and write roots are separate", () => {
       }),
     ).toThrow(/readable/i);
   });
+
+  it("refuses a sibling that merely shares the root's name as a prefix", () => {
+    // The case a string prefix cannot see: `…/work` is a prefix of
+    // `…/work-secrets`. The test above only used a sibling with an unrelated
+    // name, so it passed either way.
+    expect(() =>
+      createSandboxPolicy({
+        workspaceRoot: join(base, "work"),
+        writeRoots: [join(base, "work-secrets")],
+      }),
+    ).toThrow(/readable/i);
+  });
+
+  it("still accepts a writable root genuinely inside a readable one", () => {
+    expect(() =>
+      createSandboxPolicy({
+        workspaceRoot: join(base, "work"),
+        writeRoots: [join(base, "work", "src")],
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe("the policy is closed by default", () => {

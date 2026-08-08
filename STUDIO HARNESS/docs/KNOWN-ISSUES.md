@@ -647,6 +647,33 @@ The plan of record (ADR 0012, and the local/sandbox split agreed after it) is
 that local execution is bounded by *permission*, and isolation is what the
 sandbox tier adds — WSL2 locally, a remote MicroVM later.
 
+### S-03 · A writable root was checked with a string prefix · Fixed
+
+`createSandboxPolicy` accepted a writable root if it *started with* a readable
+one, so `workspaceRoot: …/work` with `writeRoots: […/work-secrets]` passed. A
+writable root then sat outside every readable root, which the check exists to
+prevent.
+
+This is the anti-pattern `sandbox/paths.ts` names in its own header and solves
+ten lines away. Closed in task 001 item 6 by calling `isInsideRoot`.
+
+The old test passed either way, because it used a sibling with an unrelated
+name. A test that cannot fail is worth naming: the shape to watch is a negative
+test whose input does not exercise the mechanism it names.
+
+---
+
+## Observability (`src/observability/`)
+
+### O-01 · An Anthropic API key was not redacted · Fixed
+
+`/\bsk-[A-Za-z0-9]{10,}\b/g` allowed no hyphen after `sk-`, so it stopped at the
+first segment and the trailing boundary failed. `sk-ant-api03-…` and `sk-proj-…`
+reached the logs in full — the two shapes this product is most likely to see.
+
+Closed in task 001 item 5 by allowing hyphens in the body. Prose is unaffected:
+the leading `\b` means the word must start at `sk-`.
+
 ---
 
 ## Where Things Live (`src/platform/`)

@@ -11,6 +11,10 @@ import {
   safeSerializeValue,
   shutdownObservability,
 } from "../../src/observability/index.js";
+// Not re-exported from the barrel: the string form is an implementation detail
+// of `redactGenAiContent`, and testing it directly is what keeps the pattern
+// itself covered.
+import { redactSensitiveString } from "../../src/observability/redaction.js";
 
 afterEach(async () => {
   await shutdownObservability();
@@ -177,6 +181,29 @@ describe("content redaction", () => {
     expect(serialized).not.toContain("token=xyz");
     expect(serialized).not.toContain("plain-value-without-a-prefix");
     expect(serialized).toContain("[REDACTED]");
+  });
+
+  it("redacts a segmented key, which is the shape this product will see", () => {
+    // The old pattern allowed no hyphen after `sk-`, so it stopped at the first
+    // segment and the trailing word boundary then failed. An Anthropic key
+    // passed through in full.
+    const keys = [
+      "sk-ant-api03-AbCdEfGh1234567890abcdefXYZ",
+      "sk-proj-AbCdEfGh1234567890",
+      "sk-abcdefghijklmnopqrst",
+    ];
+
+    for (const key of keys) {
+      const redacted = redactSensitiveString(`the key is ${key} ok`);
+      expect(redacted, key).not.toContain(key);
+      expect(redacted, key).toContain("[REDACTED]");
+    }
+  });
+
+  it("leaves an ordinary hyphenated word alone", () => {
+    // A redactor that eats prose gets switched off.
+    const text = "the task-manager and ask-me-anything services are fine";
+    expect(redactSensitiveString(text)).toBe(text);
   });
 });
 

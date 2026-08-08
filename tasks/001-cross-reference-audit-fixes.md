@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 4 of 20 done
+**State:** open — 6 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -179,7 +179,7 @@ old regex fails the first group.
 
 ---
 
-### [ ] 5. An Anthropic API key is not redacted · `O-01`
+### [x] 5. An Anthropic API key is not redacted · `O-01` · `PENDING5`
 
 **Where:** `STUDIO HARNESS/src/observability/redaction.ts:4`
 
@@ -199,9 +199,17 @@ format most likely to reach these logs is the one the redactor cannot see.
 **Fix:** Allow hyphens inside the body. Test the Anthropic and project-key
 shapes, and keep a test proving an ordinary hyphenated word is not redacted.
 
+**Done.** The body allows hyphens: `/sk-[A-Za-z0-9-]{10,}/g`. Prose is not
+at risk, because `` before `sk-` means the word has to start there —
+`task-manager` and `ask-me-anything` do not match.
+
+**Tested by:** the Anthropic, project, and plain shapes are all redacted, and a
+sentence of hyphenated words comes back unchanged. Restoring the old pattern
+fails the first test.
+
 ---
 
-### [ ] 6. A writable root is checked with a string prefix · `S-03`
+### [x] 6. A writable root is checked with a string prefix · `S-03` · `PENDING5`
 
 **Where:** `STUDIO HARNESS/src/sandbox/policy.ts:92`
 
@@ -216,6 +224,13 @@ readable root, which the function's own comment says must never happen.
 
 **Fix:** Use `isInsideRoot`. Test the sibling-with-shared-prefix case, which the
 current test misses because it only uses a sibling with an unrelated name.
+
+**Done.** `createSandboxPolicy` now calls `isInsideRoot`, the primitive written
+for exactly this ten lines away.
+
+**Tested by:** `…/work` with a writable `…/work-secrets` must be refused, and a
+writable `…/work/src` must still be accepted. Restoring the prefix form fails
+the first.
 
 ---
 
