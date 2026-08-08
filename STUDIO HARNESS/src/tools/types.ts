@@ -46,6 +46,22 @@ export interface ToolDefinition<Input, Output> {
    */
   readonly resource: (input: Input, context: ToolContext) => string | undefined;
   readonly execute: (input: Input, context: ToolContext) => Promise<Output>;
+  /**
+   * How long this tool may take, when the shared default is wrong for it.
+   *
+   * Declared next to the tool because the tool is what knows. `shell` exists to
+   * run builds and test suites, and the gate's two-minute default is not a
+   * deadline for those — it is a guarantee they fail.
+   *
+   * That was a real bug rather than a hypothetical: `shell` clamped its own
+   * `timeoutMs` to ten minutes while the gate abandoned every call at two, so
+   * the clamp promised time it could not give. Two bounds disagreed because
+   * neither could see the other. See `T-15`.
+   *
+   * An operator's `timeoutByCapability` still wins over this. The tool states
+   * what it needs; whoever runs the harness has the last word.
+   */
+  readonly deadlineMs?: number;
 }
 
 /** Any tool, for storage in the registry where the parameters are unknown. */

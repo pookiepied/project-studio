@@ -204,4 +204,67 @@ describe("when a snapshot is taken", () => {
       turns.beforeWrite(join(workspace, "a.txt"), "path"),
     ).rejects.toBeInstanceOf(SnapshotError);
   });
+
+  it("numbers the first turn 1", async () => {
+    const store = new SnapshotStore({ workspaceRoot: workspace, root: snapshotRoot });
+    const turns = new TurnSnapshots({ store });
+    write("a.txt", "one");
+
+    // Every real caller opens a turn before the turn's first write. Starting
+    // the counter at 1 and incrementing first labelled that "turn 2".
+    turns.beginTurn();
+    await turns.beforeWrite(join(workspace, "a.txt"), "path");
+    turns.beginTurn();
+    await turns.beforeWrite(join(workspace, "b.txt"), "path");
+
+    expect((await store.list()).map((entry) => entry.label)).toStrictEqual([
+      "turn 2",
+      "turn 1",
+    ]);
+  });
+});
+
+describe("the repository serialises whole operations", () => {
+  it("keeps concurrent captures from folding into one another", async () => {
+    const store = new SnapshotStore({ workspaceRoot: workspace, root: snapshotRoot });
+    write("a.txt", "one");
+
+    // Eight at once is what the gate admits by default. Before the lock these
+    // raced on git's index and some of them failed on `index.lock`.
+    const labels = ["one", "two", "three", "four", "five", "six", "seven", "eight"];
+    await Promise.all(labels.map((label) => store.capture(label)));
+
+    const taken = await store.list();
+    expect(taken).toHaveLength(8);
+    // Every label present exactly once: none was lost, none was recorded twice.
+    expect([...taken.map((entry) => entry.label)].sort()).toStrictEqual(
+      [...labels].sort(),
+    );
+  });
+
+  it("lets the next capture run after one fails", async () => {
+    const store = new SnapshotStore({ workspaceRoot: workspace, root: snapshotRoot });
+    write("a.txt", "one");
+
+    // The chain records completion, not success. A rejected link that stayed
+    // in the chain would stop every later capture.
+    await expect(store.restore("0000000000000000000000000000000000000000")).rejects.toThrow();
+    await expect(store.capture("after the failure")).resolves.toBeDefined();
+  });
+
+  it("captures the undo point inside the restore that needs it", async () => {
+    const store = new SnapshotStore({ workspaceRoot: workspace, root: snapshotRoot });
+    const target = write("a.txt", "first");
+    const first = await store.capture("first");
+
+    writeFileSync(target, "second", "utf8");
+
+    // `restore` captures before it restores, and both happen under one lock.
+    // A nested lock here would deadlock instead of returning.
+    const { undo } = await store.restore(first.id);
+
+    expect(readFileSync(target, "utf8")).toBe("first");
+    await store.restore(undo.id);
+    expect(readFileSync(target, "utf8")).toBe("second");
+  });
 });

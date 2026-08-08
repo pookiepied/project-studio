@@ -3,6 +3,7 @@ import {
   type CapabilityDescriptor,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
+import { requiresUndoPoint } from "../contracts/effects.js";
 import { isStudioError } from "../contracts/errors.js";
 import type { ErrorReporter } from "../observability/error-reporter.js";
 import type { PermissionKernel } from "../permissions/kernel.js";
@@ -93,6 +94,9 @@ export class CallGate {
     }
 
     this.#kernel.register(tool.descriptor);
+    // Registered here too, so a tool's deadline arrives with the tool rather
+    // than having to be repeated in whatever constructs the gate.
+    this.#bounds.declare(tool.descriptor, tool.deadlineMs);
     // One cast, at the one boundary where the parameter types are erased. The
     // functions are only ever called with values `parse` produced.
     this.#tools.set(key, tool as unknown as RegisteredTool);
@@ -101,6 +105,17 @@ export class CallGate {
   /** How much is running or waiting right now. For the audit surface. */
   get inFlight(): { active: number; queued: number } {
     return this.#bounds.inFlight;
+  }
+
+  /**
+   * How long this capability may take, after every source has been considered.
+   *
+   * Exposed because two limits that disagree is what `T-15` was, and the only
+   * way to see the answer was to reach inside `CallBounds`. A number a caller
+   * can read is a number a caller can check.
+   */
+  deadlineFor(descriptor: CapabilityDescriptor): number {
+    return this.#bounds.deadlineFor(descriptor);
   }
 
   /** What the model may be told about. */
@@ -158,13 +173,19 @@ export class CallGate {
         });
       }
 
-      // Last, and here rather than in each tool. A tool that writes is a tool
-      // that must be undoable, and that is a property of the effect it
-      // declares — not something every author has to remember. Placed after
-      // authorization so a refused call leaves no snapshot behind, and before
-      // execution because a snapshot taken afterwards records the damage
-      // instead of the state to return to.
-      if (this.#snapshots && tool.descriptor.effects.includes("write")) {
+      // Last, and here rather than in each tool. A tool that changes the
+      // project is a tool that must be undoable, and that is a property of the
+      // effects it declares — not something every author has to remember.
+      // Placed after authorization so a refused call leaves no snapshot behind,
+      // and before execution because a snapshot taken afterwards records the
+      // damage instead of the state to return to.
+      //
+      // Asked of the effect table rather than tested for `write` here. Testing
+      // for `write` is what let `shell` through: it declares `execute`, writes
+      // anyway, and nothing noticed. `execute` earns a restore point for the
+      // same reason it earns an approval — we did not choose the program, so we
+      // cannot know what it touched. See `T-14`.
+      if (this.#snapshots && requiresUndoPoint(tool.descriptor)) {
         await this.#snapshots.beforeWrite(
           resource,
           resource === undefined ? "none" : tool.resourceKind,

@@ -161,6 +161,8 @@ export class CallBounds {
   readonly #permits: Permits;
   readonly #timeoutMs: number;
   readonly #timeoutByCapability: Readonly<Record<string, number>>;
+  /** What each tool asked for at registration. Operator options still win. */
+  readonly #declared = new Map<string, number>();
 
   constructor(options: CallBoundsOptions = {}) {
     this.#permits = new Permits(options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT);
@@ -173,8 +175,21 @@ export class CallBounds {
     return { active: this.#permits.active, queued: this.#permits.queued };
   }
 
+  /**
+   * Records what a tool says it needs.
+   *
+   * Kept separate from `timeoutByCapability` so precedence stays readable:
+   * operator, then tool, then the shared default. An operator who sets a limit
+   * meant it, and a tool asking for more must not quietly overrule them.
+   */
+  declare(descriptor: CapabilityDescriptor, deadlineMs: number | undefined): void {
+    if (deadlineMs === undefined) return;
+    this.#declared.set(capabilityKey(descriptor.id), deadlineMs);
+  }
+
   deadlineFor(descriptor: CapabilityDescriptor): number {
-    return this.#timeoutByCapability[capabilityKey(descriptor.id)] ?? this.#timeoutMs;
+    const key = capabilityKey(descriptor.id);
+    return this.#timeoutByCapability[key] ?? this.#declared.get(key) ?? this.#timeoutMs;
   }
 
   /**

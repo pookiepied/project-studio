@@ -1,9 +1,9 @@
 import {
   capabilityKey,
-  hasElevatedEffect,
   type CapabilityDescriptor,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
+import { hasElevatedEffect, isReadOnly } from "../contracts/effects.js";
 import { matchesResource, type ResourceKind } from "./matcher.js";
 import type { PermissionScope } from "./scopes.js";
 
@@ -135,9 +135,7 @@ export function resourceRule(input: {
  * has already run.
  */
 export function defaultVerdict(capability: CapabilityDescriptor): PermissionDecision {
-  const readOnly = capability.effects.every((effect) => effect === "read");
-
-  if (readOnly && capability.provenance.trusted) {
+  if (isReadOnly(capability) && capability.provenance.trusted) {
     return {
       verdict: "allow",
       source: "default",

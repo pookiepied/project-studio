@@ -89,6 +89,11 @@ function report(
 export function createShellTool(): ToolDefinition<ShellInput, string> {
   return defineStudioTool({
     descriptor: SHELL_DESCRIPTOR,
+    // The gate's default is two minutes, which is not a deadline for a build —
+    // it is a guarantee the build fails. Declared here so the tool's own
+    // ceiling and the gate's agree, instead of the shorter one winning
+    // silently.
+    deadlineMs: MAX_TIMEOUT_MS,
     // Matched like `git:push`, so a rule can allow `shell:node` without
     // allowing every program on the machine. A path-shaped match would glob
     // across separators and mean something nobody intended.

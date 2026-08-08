@@ -55,7 +55,7 @@ agents/          agent definitions (defineAgent)
 application/     harness client
 auth/            sign-in, sessions
 context/         context assembly
-contracts/       shared types, model ids
+contracts/       shared types, model ids, and the one effect table (ADR 0020)
 credentials/     keychain-backed, via @napi-rs/keyring
 models/          registry, adapters (test / local BYOK / studio-cloud), catalog
 observability/   OpenTelemetry, error contract
@@ -121,11 +121,10 @@ The harness continues on its own roadmap; the app connects at the end.
 4. **`fetch`** — needs an ADR on the network-effect question first. The question
    is written out in `check-later.md` as `C-10`. Last one.
 
-**But not before the audit findings.** A cross-reference pass over everything
-shipped found that `shell` writes with no undo point behind it (`T-14`), that
-its ten-minute ceiling is overridden by the gate's two-minute one (`T-15`), and
-that `edit` silently corrupts any replacement containing `$` (`T-16`). Those
-come first.
+**The audit findings came first, and are done.** `T-16`, then `T-14`, `T-15` and
+`T-17` under ADR 0020. That ADR also named the shape behind three of the eleven
+findings: hand-written metadata that several subsystems trust and nobody
+verifies. `K-04` and `T-19` are the same shape, still open.
 
 **Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with
 discovery can run. They measure whether the Flue/Pi bet holds, and they are

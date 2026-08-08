@@ -55,8 +55,16 @@ export class TurnSnapshots implements SnapshotHook {
   readonly #store: SnapshotStore;
   readonly #reporter: ErrorReporter | undefined;
   readonly #required: () => boolean;
+  /**
+   * Zero until the first `beginTurn`, so the first turn is labelled "turn 1".
+   *
+   * `beginTurn` increments before it labels, so starting at 1 made the first
+   * turn "turn 2" for any caller that opened every turn — which is every
+   * caller. A history whose numbers do not match the conversation is a history
+   * nobody can navigate, which is the one job it has.
+   */
+  #turn = 0;
   #label = "turn 1";
-  #turn = 1;
   /**
    * The snapshot for the current turn, as a promise.
    *

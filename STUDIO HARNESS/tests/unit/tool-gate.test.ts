@@ -23,6 +23,7 @@ import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { ToolError } from "../../src/tools/errors.js";
 import { CallGate } from "../../src/tools/gate.js";
+import type { SnapshotHook } from "../../src/snapshots/turn.js";
 import { defineStudioTool, type ToolDefinition } from "../../src/tools/types.js";
 
 const SCOPE: ExecutionScope = {
@@ -122,6 +123,7 @@ function gate(
     approver?: PermissionApprover;
     policy?: never;
     bounds?: ConstructorParameters<typeof CallGate>[0]["bounds"];
+    snapshots?: SnapshotHook;
   } = {},
 ) {
   const kernel = new PermissionKernel({
@@ -132,6 +134,32 @@ function gate(
     kernel,
     sandbox,
     ...(options.bounds ? { bounds: options.bounds } : {}),
+    ...(options.snapshots ? { snapshots: options.snapshots } : {}),
+  });
+}
+
+/** Records what the gate asked for a snapshot of, and when. */
+function recordingSnapshots(): SnapshotHook & { readonly taken: string[] } {
+  const taken: string[] = [];
+  return {
+    taken,
+    beforeWrite: async (resource, kind) => {
+      taken.push(`${kind}:${resource ?? "-"}`);
+    },
+  };
+}
+
+/** A tool that runs a program, declared the way `shell` declares itself. */
+function executeTool(calls: string[]): ToolDefinition<Record<string, never>, string> {
+  return defineStudioTool({
+    descriptor: capability("run", ["execute"]),
+    resourceKind: "command",
+    parse: () => ({}) as Record<string, never>,
+    resource: () => "shell:node",
+    execute: async () => {
+      calls.push("run");
+      return "ran";
+    },
   });
 }
 
@@ -441,5 +469,99 @@ describe("resource patterns", () => {
 
   it("accepts either slash on Windows paths", () => {
     expect(matchesResource("src/**", "src\\deep\\app.ts", "path")).toBe(true);
+  });
+});
+
+describe("a restore point is taken from the effect table, not from a list of names", () => {
+  it("takes one before a write", async () => {
+    const snapshots = recordingSnapshots();
+    const instance = gate({ approver: approver("allow"), snapshots });
+    instance.register(writeTool(calls));
+
+    await instance.call({ name: "native/write", input: { path: "new.txt" }, scope: SCOPE });
+
+    expect(snapshots.taken).toHaveLength(1);
+  });
+
+  // T-14. `shell` declares execute and writes anyway, and the gate used to
+  // test `effects.includes("write")` — so the tool that can do the most damage
+  // was the one with nothing to return to.
+  it("takes one before a program runs", async () => {
+    const snapshots = recordingSnapshots();
+    // A policy that permits running programs, which is the only state in which
+    // this question arises at all.
+    sandbox = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: workspace, allowExec: true }),
+    );
+    const instance = gate({ approver: approver("allow"), snapshots });
+    instance.register(executeTool(calls));
+
+    await instance.call({ name: "native/run", input: {}, scope: SCOPE });
+
+    expect(calls).toStrictEqual(["run"]);
+    expect(snapshots.taken).toStrictEqual(["command:shell:node"]);
+  });
+
+  it("takes none before a read", async () => {
+    const snapshots = recordingSnapshots();
+    const instance = gate({ snapshots });
+    instance.register(readTool(calls));
+
+    await instance.call({
+      name: "native/read",
+      input: { path: "src/app.ts" },
+      scope: SCOPE,
+    });
+
+    expect(snapshots.taken).toStrictEqual([]);
+  });
+
+  it("takes none when the call is refused", async () => {
+    const snapshots = recordingSnapshots();
+    const instance = gate({ approver: approver("deny"), snapshots });
+    instance.register(writeTool(calls));
+
+    await expect(
+      instance.call({ name: "native/write", input: { path: "new.txt" }, scope: SCOPE }),
+    ).rejects.toBeInstanceOf(PermissionError);
+
+    expect(snapshots.taken).toStrictEqual([]);
+  });
+});
+
+describe("a tool states its own deadline", () => {
+  it("uses the tool's deadline over the shared default", () => {
+    // T-15. `shell` allowed ten minutes while the gate abandoned every call at
+    // two, so the longer limit was never reachable.
+    const instance = gate();
+    const descriptor = capability("slow", ["read"]);
+    instance.register({
+      ...readTool(calls),
+      descriptor,
+      deadlineMs: 600_000,
+    } as unknown as ToolDefinition<{ path: string }, string>);
+
+    expect(instance.deadlineFor(descriptor)).toBe(600_000);
+  });
+
+  it("lets an operator's limit win over the tool's", () => {
+    // Whoever runs the harness has the last word. A tool asking for more must
+    // not quietly overrule a limit somebody set on purpose.
+    const instance = gate({ bounds: { timeoutByCapability: { "native/slow": 5_000 } } });
+    const descriptor = capability("slow", ["read"]);
+    instance.register({
+      ...readTool(calls),
+      descriptor,
+      deadlineMs: 600_000,
+    } as unknown as ToolDefinition<{ path: string }, string>);
+
+    expect(instance.deadlineFor(descriptor)).toBe(5_000);
+  });
+
+  it("falls back to the shared default when a tool says nothing", () => {
+    const instance = gate({ bounds: { timeoutMs: 30_000 } });
+    instance.register(readTool(calls));
+
+    expect(instance.deadlineFor(capability("read", ["read"]))).toBe(30_000);
   });
 });

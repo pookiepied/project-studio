@@ -1,7 +1,18 @@
 import { resolve } from "node:path";
 
-import type { CapabilityEffect } from "../contracts/capabilities.js";
 import { SandboxError } from "./errors.js";
+
+/**
+ * Isolation levels and the effect-to-isolation mapping now live in
+ * `contracts/effects.ts`, with every other rule about what an effect requires.
+ * Re-exported here because this is where callers have always looked for them,
+ * and moving the import site would be churn for its own sake.
+ */
+export {
+  requiredIsolation,
+  satisfiesIsolation,
+  type IsolationLevel,
+} from "../contracts/effects.js";
 
 /**
  * What an agent may reach.
@@ -11,26 +22,6 @@ import { SandboxError } from "./errors.js";
  * containment is an approval to do anything, and containment without approval
  * is a boundary nobody agreed to.
  */
-
-/**
- * How strongly a sandbox isolates.
- *
- * This is a capability claim the provider makes about itself, and it is what
- * lets the harness refuse work that needs isolation it does not have — rather
- * than running it anyway and calling the result sandboxed.
- */
-export type IsolationLevel =
-  /**
-   * In-process enforcement only: paths are checked, ambient environment is
-   * withheld. Effective against an agent that goes off-track. Not a boundary
-   * against code that is actively hostile, because anything that reaches a
-   * real subprocess is outside our checks.
-   */
-  | "in-process"
-  /** OS-level isolation: separate kernel or supervised namespace. */
-  | "os"
-  /** Hardware isolation on another machine. */
-  | "remote-vm";
 
 export interface SandboxPolicy {
   /** The agent's own directory. Relative paths resolve against it. */
@@ -106,27 +97,3 @@ export function createSandboxPolicy(input: SandboxPolicyInput): SandboxPolicy {
   };
 }
 
-/**
- * The isolation an effect requires.
- *
- * Running code and reaching the network cannot be contained from inside our
- * own process: once a subprocess exists, our path checks are irrelevant to it,
- * and nothing in userspace Node can stop it opening a socket. Saying so
- * explicitly is what keeps "sandboxed" from becoming a word we use loosely.
- */
-export function requiredIsolation(effect: CapabilityEffect): IsolationLevel {
-  return effect === "execute" || effect === "network" ? "os" : "in-process";
-}
-
-const ISOLATION_RANK: Record<IsolationLevel, number> = {
-  "in-process": 0,
-  os: 1,
-  "remote-vm": 2,
-};
-
-export function satisfiesIsolation(
-  provided: IsolationLevel,
-  required: IsolationLevel,
-): boolean {
-  return ISOLATION_RANK[provided] >= ISOLATION_RANK[required];
-}

@@ -18,7 +18,10 @@ through `T-21`, `K-04`, `P-05`, `P-06` — and the two that matter are that
 replacement containing `$`. Nothing found was a regression; all of it was
 shipped believing otherwise.
 
-`T-16` is fixed. The rest are open.
+Four are fixed: `T-16`, then `T-14`, `T-15`, and `T-17` together under ADR 0020.
+That ADR also named the shape behind three of the findings — hand-written
+metadata that several subsystems trust and nobody verifies — and removed it in
+one of the three places. `K-04` and `T-19` are the other two, still open.
 
 ---
 
@@ -83,6 +86,12 @@ credential column.
 **Errors.** One contract. Every subsystem declares a domain and reports through
 one path, so an unclassified throw is visible in telemetry rather than silent.
 
+**What an effect means.** One table, `src/contracts/effects.ts`, answering four
+questions for four effects: which isolation it needs, whether it needs a restore
+point, whether it may ever be silent, and whether an untrusted folder allows it.
+Six files used to hold their own copy of that and one of them disagreed. See
+ADR 0020.
+
 **Permissions.** A kernel that decides but never executes and never prompts.
 Trust beats policy beats grants beats default. Decisions match on the
 *resource*, so `git:log` and `git:push` are separate questions. Grants persist
@@ -129,10 +138,14 @@ write, keyed on the declared `write` effect. Scope is the project minus ignored
 files, plus every path a write tool touched. Restore is itself snapshotted
 first. See ADR 0016.
 
-**It does not currently cover `shell`**, which declares `execute` and not
-`write`, so a program the model runs writes without a snapshot behind it —
-`T-14`. That is the gap between what the mechanism promises and what it
-delivers, and it has to close before Full Auto means anything.
+Since ADR 0020 the gate asks the effect table rather than testing for `write`,
+so `execute` earns a restore point too. A program the model runs is a program we
+did not choose, which means we cannot know what it touched — and that is the
+same fact, not a second one.
+
+It still cannot return two things, by construction: files git ignores that a
+subprocess created, and the user's own git history (`T-20`). The UI must say so
+— *undo returns your files, not your build and not your branch*.
 
 **Where things live.** Three locations, decided once (ADR 0014): the
 installation is read-only, `~/.studio` is ours and writable in six categories,
@@ -149,10 +162,11 @@ holes is building on a floor we know has one.
 
 ~~**`T-16`** — `edit` corrupting `$` in a replacement.~~ Fixed.
 
-**`T-14` and `T-15`** — `shell` writes with no undo point, and its ten-minute
-ceiling is overridden by the gate's two-minute one. Together they mean `shell`
-does not yet do the job it was built for. `T-17` belongs in the same change,
-since fixing `T-14` makes snapshots more frequent.
+~~**`T-14`, `T-15`, `T-17`** — `shell` writing with no undo point, its
+unreachable ten-minute ceiling, and the missing shadow-repo lock.~~ Fixed —
+ADR 0020.
+
+**`fetch`** is next, and `C-10` is the question it waits on.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 

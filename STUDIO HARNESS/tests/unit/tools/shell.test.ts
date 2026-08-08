@@ -13,7 +13,13 @@ import { SandboxError } from "../../../src/sandbox/errors.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
-import { registerShellTools, resolveProgram, shellResource } from "../../../src/tools/shell/index.js";
+import { requiresUndoPoint } from "../../../src/contracts/effects.js";
+import {
+  registerShellTools,
+  resolveProgram,
+  shellResource,
+  SHELL_DESCRIPTOR,
+} from "../../../src/tools/shell/index.js";
 
 const SCOPE: ExecutionScope = {
   conversationId: "conv-1",
@@ -60,6 +66,20 @@ function gate(options: { allowExec?: boolean } = {}) {
 function run(instance: CallGate, input: unknown) {
   return instance.call({ name: "native/shell", input, scope: SCOPE });
 }
+
+describe("how long a program may run", () => {
+  // T-15. `shell` clamped its own timeoutMs to ten minutes while the gate
+  // abandoned every call at two, so a build was cut off long before the limit
+  // the tool advertised. The tool now states its ceiling and the gate uses it.
+  it("gives the gate the same ceiling the tool clamps to", () => {
+    expect(gate().deadlineFor(SHELL_DESCRIPTOR)).toBe(600_000);
+  });
+
+  it("takes a restore point before it runs, because we chose no program", () => {
+    // T-14, as a property of the descriptor rather than of the gate wiring.
+    expect(requiresUndoPoint(SHELL_DESCRIPTOR)).toBe(true);
+  });
+});
 
 describe("running a program", () => {
   it("runs it and returns its output", async () => {

@@ -111,10 +111,47 @@ export class ShadowRepository {
   readonly gitDir: string;
   #git: string | undefined;
   #initialized = false;
+  /**
+   * A queue of one.
+   *
+   * Git keeps a single index per repository and locks it with `index.lock`, so
+   * two overlapping `add` or `commit` runs do not interleave — one of them
+   * simply fails. Three callers can overlap: a new turn clears the pending
+   * capture while the old one is still running, `restore` captures before it
+   * restores, and the gate admits eight calls at once.
+   *
+   * The result was an undo point that silently did not exist, or under Full
+   * Auto a write refused for a reason unrelated to the write. So every command
+   * joins one chain. See `T-17`.
+   */
+  #queue: Promise<unknown> = Promise.resolve();
 
   constructor(options: ShadowRepositoryOptions) {
     this.workspaceRoot = options.workspaceRoot;
     this.gitDir = options.gitDir;
+  }
+
+  /**
+   * Runs a whole operation with the repository to itself.
+   *
+   * The unit is the operation, not the command. A capture is `add`, then
+   * `commit`, then `rev-parse`, and a second capture starting between the
+   * `add` and the `commit` would fold two states into one snapshot — which
+   * `index.lock` does not prevent, because each individual command succeeds.
+   *
+   * Not re-entrant: `work` must call `run` and `expect`, never `transaction`.
+   * A nested call would wait for the outer one and neither would finish.
+   *
+   * The chain records completion rather than success. A failed capture must
+   * not stop the next one from being attempted, which a rejected link would do.
+   */
+  async transaction<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.#queue.then(work, work);
+    this.#queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   /**

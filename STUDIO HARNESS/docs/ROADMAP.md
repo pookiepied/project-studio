@@ -179,6 +179,10 @@ Foundations landed first, because every tool stands on them:
   snapshot before each turn's first write, keyed on the declared `write` effect. This is a
   prerequisite rather than a feature: modes need undo, and `shell` needs modes. See ADR 0016.
 
+- **`src/contracts/effects.ts`** — one table saying what each effect requires: isolation, a restore
+  point, whether it may ever be silent, and whether an untrusted folder allows it. Six files used to
+  hold their own copy of that rule inline, and one of them disagreed — which is how `shell` came to
+  write with no undo behind it. See ADR 0020.
 - **`src/permissions/trust.ts` and `mode.ts`** — workspace trust as a precondition ahead of policy
   and grants, and three modes that resolve a *default* `ask` and never a policy one. See ADR 0018.
 - **`src/tools/bounds.ts`** — a deadline, real mid-call cancellation, and a concurrency queue on

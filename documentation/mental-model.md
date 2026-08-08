@@ -6,7 +6,7 @@ refuses to be, and the decisions that span both halves of the repo.
 Detail lives one level down and is authoritative where it disagrees with this
 file:
 
-- `STUDIO HARNESS/docs/decisions/` — 19 ADRs, the real reasoning
+- `STUDIO HARNESS/docs/decisions/` — 20 ADRs, the real reasoning
 - `STUDIO HARNESS/docs/STATUS.md` — how far along we are
 - `STUDIO HARNESS/docs/ROADMAP.md` — what order to build in
 - `STUDIO HARNESS/docs/KNOWN-ISSUES.md` — what is currently untrue
@@ -88,6 +88,24 @@ that share the parent's durability envelope, MCP transports, and skills.
 An escape ladder in cost order, if cache measurement ever comes back bad:
 configure → `pnpm patch` → upstream PR (Apache-2.0) → bypass Flue for the
 request path.
+
+### The rule the first audit produced
+
+**A meaning kept in six places is a meaning that will differ in one of them.**
+
+Six files each held their own copy of what a tool's declared `effects` mean.
+Five agreed. The sixth looked for `write`, did not find it on `shell`, and took
+no undo snapshot — so the tool that can do the most damage had nothing to return
+to. Two more findings had the same shape.
+
+So: **where several subsystems depend on one idea, the idea gets one table and
+they look it up.** Not a shared helper each caller may ignore — the only place
+the answer exists. See ADR 0020.
+
+The related weakness is still open, and worth naming because it will recur:
+we made hand-written metadata load-bearing without making it verifiable. Three
+subsystems trust `effects` completely, and nothing checks a declaration against
+what the code does. `K-04` and `T-19` are both that.
 
 ---
 

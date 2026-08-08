@@ -105,18 +105,11 @@ export class WorkspaceTrustStore {
 /**
  * What an untrusted folder still allows.
  *
- * Reading is permitted. A harness that refuses to open a folder until it is
- * trusted cannot help anyone decide whether to trust it, and "let me look at
- * this repository first" is the normal reason the question is being asked at
- * all.
- *
- * Everything else is refused — writing, running, and the network — because
- * those are what turn someone else's repository into an instruction our machine
- * follows.
+ * The answer is `safeUntrusted` in `contracts/effects.ts`, and it is only
+ * `read`. Re-exported here so this module still reads as the whole story of
+ * trust, while the rule itself stays in the one table every other reader uses.
  */
-export function allowedWhileUntrusted(capability: CapabilityDescriptor): boolean {
-  return capability.effects.every((effect) => effect === "read");
-}
+export { allowedWhileUntrusted } from "../contracts/effects.js";
 
 /**
  * The trust and mode state a decision is made under.

@@ -93,6 +93,17 @@ export class SnapshotStore {
    * to reason about why.
    */
   async capture(label: string, signal?: AbortSignal): Promise<Snapshot> {
+    return this.#repo.transaction(() => this.#capture(label, signal));
+  }
+
+  /**
+   * The capture itself, without taking the lock.
+   *
+   * Split out because `restore` has to capture *inside* its own transaction —
+   * an undo point taken under a separate lock could have another turn's write
+   * land between it and the restore it exists to protect.
+   */
+  async #capture(label: string, signal?: AbortSignal): Promise<Snapshot> {
     await this.#repo.ensure(signal);
 
     await this.#repo.expect(["add", "--all", "--", "."], "capture_failed", signal);
@@ -127,6 +138,10 @@ export class SnapshotStore {
 
   /** The most recent points, newest first. */
   async list(limit = 50, signal?: AbortSignal): Promise<readonly Snapshot[]> {
+    return this.#repo.transaction(() => this.#list(limit, signal));
+  }
+
+  async #list(limit: number, signal?: AbortSignal): Promise<readonly Snapshot[]> {
     await this.#repo.ensure(signal);
 
     const result = await this.#repo.run(
@@ -158,6 +173,10 @@ export class SnapshotStore {
    * already in the situation where that matters.
    */
   async restore(id: string, signal?: AbortSignal): Promise<{ undo: Snapshot }> {
+    return this.#repo.transaction(() => this.#restore(id, signal));
+  }
+
+  async #restore(id: string, signal?: AbortSignal): Promise<{ undo: Snapshot }> {
     await this.#repo.ensure(signal);
 
     const exists = await this.#repo.run(["cat-file", "-e", `${id}^{commit}`], signal);
@@ -167,7 +186,9 @@ export class SnapshotStore {
       });
     }
 
-    const undo = await this.capture(`before restoring ${id.slice(0, 8)}`, signal);
+    // The unlocked capture: we already hold the repository, and taking it
+    // again here would wait for a lock this call is holding.
+    const undo = await this.#capture(`before restoring ${id.slice(0, 8)}`, signal);
 
     // Files that exist now and did not then. `restore` below rewrites and
     // recreates, but it has nothing to say about a file the target commit

@@ -101,9 +101,17 @@ export interface ExecutionScope {
   readonly agentId: string;
 }
 
-/** Effects that are never granted silently, whatever a stored grant says. */
-export const ELEVATED_EFFECTS: readonly CapabilityEffect[] = ["execute", "network"];
-
-export function hasElevatedEffect(descriptor: CapabilityDescriptor): boolean {
-  return descriptor.effects.some((effect) => ELEVATED_EFFECTS.includes(effect));
-}
+/**
+ * What each effect *means* lives in `effects.ts`, not here.
+ *
+ * This file declares the vocabulary — the four effects, and the shape a
+ * capability takes. That file holds the one table saying what each effect
+ * requires. Re-exported so callers reading a descriptor do not have to know
+ * which of the two files to import from.
+ */
+export {
+  allowedWhileUntrusted,
+  hasElevatedEffect,
+  isReadOnly,
+  requiresUndoPoint,
+} from "./effects.js";

@@ -179,6 +179,16 @@ is a decision about whether effects may vary per call, and that is an ADR.
 (`T-12`) the mode is never anything but `manual`, so this is not currently
 reachable — it becomes reachable in the same change that makes `T-12` matter.
 
+**Not closed by ADR 0020, deliberately.** The effect table makes every reader
+agree about what `network` requires. It cannot make `git`'s declaration true,
+because effects are per capability and `push` is one subcommand. Per-call
+effects is a real decision with real cost, and folding it into that change
+would have made it about two things.
+
+`tests/unit/effect-rules.test.ts` asserts the *wrong* answer on purpose — that
+`git` has no `network` effect and that Auto Edit allows it. Fixing git turns
+that test red, and the test names this issue as the explanation.
+
 ### K-03 · Nothing calls the kernel yet · Fixed
 
 `CallGate` is now the single caller. Registering a tool registers its capability
@@ -320,7 +330,7 @@ knowable before the feature has been used in anger.
 
 **Fix when:** a real project's history is large enough to measure.
 
-### T-14 · `shell` writes are not snapshotted · Open
+### T-14 · `shell` writes were not snapshotted · Fixed
 
 `SHELL_DESCRIPTOR` declares `effects: ["execute"]`. The gate takes a snapshot
 when `descriptor.effects.includes("write")`. `shell` therefore writes to the
@@ -338,27 +348,23 @@ It also makes `STATUS.md` untrue where it says a tool cannot be added that
 writes without being reversible. That sentence was accurate when it was written
 and stopped being accurate one ADR later.
 
-**Two candidate fixes, and they are not equivalent:**
+**Fixed** by ADR 0020, and by the second of the two candidates rather than the
+first. The gate no longer tests for `write`. It asks the effect table whether
+any declared effect needs a restore point, and `execute` does.
 
-1. **Declare `["execute", "write"]`.** One line, and the snapshot appears
-   immediately. But it also changes the permission answer: `resolveAsk` reads
-   effects, and adding `write` to a capability that already has `execute` does
-   not widen anything there — `execute` already forces an `ask` under Auto Edit
-   — so this is safe in that direction. Verify before shipping rather than
-   assuming.
-2. **Snapshot on `execute` as well as `write`.** Broader and more honest: a
-   program we did not write may do anything, so "we do not know what this
-   touched" is the actual state. Costs a commit per turn that runs any program,
-   including read-only ones like `node --version`.
+The reasoning is ADR 0019's own, applied one step further. That ADR admitted
+`execute` because *we did not choose the program*. The same sentence answers
+reversibility: if we did not choose it, we cannot know what it touched.
+"Unknown extent" and "unchosen program" are one fact.
 
-The second is probably right and the first is probably not enough. Decide with
-an ADR amendment rather than in a commit message, because it changes what "keyed
-on the declared effect" means.
+Declaring `["execute", "write"]` on `shell` would have closed today's hole and
+left the shape that produced it intact — the next `execute` tool would have the
+same gap, and nothing in review would show it.
 
-**Fix when:** before `shell` is reachable from a real session — which is the
-same moment `T-12` becomes urgent. Neither should ship without the other.
+Cost is one commit per turn that runs any program. Empty commits are already
+allowed by design, and git compresses them to about a hundred bytes.
 
-### T-15 · `shell`'s timeout ceiling cannot be delivered · Open
+### T-15 · `shell`'s timeout ceiling could not be delivered · Fixed
 
 `shell` clamps `timeoutMs` to at most 600 000 ms and documents ten minutes as
 the point of the tool: "a build or a test run is the reason this tool exists."
@@ -373,10 +379,14 @@ model that asks for ten minutes is told yes and gets two.
 "took too long and was abandoned" rather than with anything pointing at the
 cause. The clamp is not merely ineffective, it is misleading.
 
-**Fix when:** with `T-14`, since both are "shell is not actually wired for the
-work it was built for". The fix is a `timeoutByCapability` entry for
-`native/shell` at the tool's own ceiling — not a higher global default, which
-would give `read` ten minutes of patience it has no use for.
+**Fixed** by ADR 0020. `ToolDefinition.deadlineMs` travels with the tool and
+reaches `CallBounds` at registration, so `shell` states its own ceiling once
+instead of two bounds disagreeing.
+
+Precedence is operator, then tool, then shared default. A tool asking for more
+must not overrule a limit somebody set on purpose. `CallGate.deadlineFor`
+exposes the result, because the only way to see the answer before was to reach
+inside `CallBounds`.
 
 ### T-16 · `edit` interpreted `$` in the replacement text · Fixed
 
@@ -411,7 +421,7 @@ moment anyone reaches for a `RegExp` here.
 Everywhere else the replacement is a literal, and the two places that do use
 `$&`/`$1` — `matcher.ts` and `redaction.ts` — mean it.
 
-### T-17 · Nothing serialises access to the shadow repository · Open
+### T-17 · Nothing serialised access to the shadow repository · Fixed
 
 `ShadowRepository` has no lock. `SnapshotStore.capture` runs `add`, then
 `commit`, then `rev-parse` against one git index, and three callers can start
@@ -432,9 +442,33 @@ where `required` is true — a write refused for a reason that has nothing to do
 with the write. The dedupe in `TurnSnapshots` covers the common case, which is
 why this has not been seen; it does not cover the three above.
 
-**Fix when:** with `T-14`, since that change increases how often snapshots are
-taken. A single promise chain on `ShadowRepository` is enough — the operations
-are already all `await`ed.
+**Fixed** by ADR 0020, with the unit being the whole operation rather than the
+command. That distinction turned out to matter: `index.lock` does not protect
+`add` → `commit` → `rev-parse`, because each command succeeds on its own. A
+second capture starting between the `add` and the `commit` folds two states
+into one snapshot, and nothing reports an error.
+
+`ShadowRepository.transaction` is not re-entrant, so `restore` uses an unlocked
+internal capture — the undo point has to be taken inside the restore that
+depends on it, not under a separate lock.
+
+The chain records completion rather than success. A rejected link would stop
+every later capture, and one failed snapshot must not disable snapshots.
+
+The off-by-one in `TurnSnapshots` went with it: `#turn` started at 1 and
+`beginTurn` incremented before labelling, so the first turn was recorded as
+"turn 2" for every caller that opens a turn — which is every caller.
+
+### T-22 · Six copies of one meaning · Fixed
+
+Six files each held their own rule for what `descriptor.effects` means, and
+nothing compared them. Five handled `shell` correctly and the sixth did not,
+which is `T-14`. The same shape produced `K-04`.
+
+Closed by ADR 0020: `src/contracts/effects.ts` holds one table, and every reader
+looks it up. Recorded even though it shipped fixed, because the *shape* is the
+thing to watch for — hand-written metadata that three subsystems trust and
+nobody verifies. `T-19` is the same shape still open.
 
 ### T-18 · A rejected capture poisons the rest of the turn · Open
 

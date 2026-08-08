@@ -1,4 +1,5 @@
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
+import { hasElevatedEffect } from "../contracts/effects.js";
 
 /**
  * What `ask` means right now.
@@ -71,7 +72,8 @@ export function resolveAsk(
   if (mode === "manual") return "ask";
   if (mode === "full-auto") return "allow";
 
-  return capability.effects.every((effect) => effect === "read" || effect === "write")
-    ? "allow"
-    : "ask";
+  // Auto Edit is exactly "nothing elevated". Asked of the table rather than by
+  // listing `read` and `write` here, so this cannot drift from what the sandbox
+  // and the policy consider elevated. It is one meaning, in one place.
+  return hasElevatedEffect(capability) ? "ask" : "allow";
 }
