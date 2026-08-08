@@ -124,6 +124,52 @@ honouring `.gitignore`, the first snapshot swallows `node_modules`.
 
 ---
 
+## C-09 — Which compaction shape does Flue actually use
+
+**Status:** open. **Gates:** the real cost of every compaction. **Measure with C-01.**
+
+There are two ways to summarise a conversation, and they differ by roughly 10×
+in token cost:
+
+- **Cache-safe fork.** Keep `tools`, `system`, and the full transcript
+  byte-identical and append one instruction — *"summarise this conversation."*
+  The prefix matches, so the whole history is billed at 10% and the only new
+  tokens are the instruction and the summary.
+- **Separate loop.** A fresh request with its own small system prompt and the
+  transcript pasted in as content. No prefix match, so the entire conversation
+  is re-read at full price. This is what OpenCode does, and it is what a
+  different summariser model *forces* — a different model has a different cache
+  entirely.
+
+`CompactionConfig` lets us override the summariser model *"for cost optimization
+(cheap summariser on an expensive session model)"*, which implies Flue supports
+the second shape. It does not tell us what it does when the model is **not**
+overridden.
+
+**Check:** during the C-01 fixture, capture the compaction request and compare
+its serialised prefix against the preceding turn's. Identical prefix means fork;
+a fresh short system prompt means separate loop.
+
+**Why it matters, with numbers.** At a 150k-token conversation on a
+Sonnet-class model:
+
+| Shape | Billed |
+|---|---|
+| Fork, same model | ~15k effective |
+| Separate loop, same model | 150k at full price |
+| Separate loop, cheap model | ~150k at roughly a tenth the rate |
+
+Fork and cheap-separate-loop land in the same place. Separate loop on the
+*session* model is the one to avoid, and it is the default we would get by
+accident.
+
+**Note either way:** the compaction call is a one-off. The larger unavoidable
+cost is that rewritten history invalidates the prefix for the turn *after*
+compaction. That is the real price, and it is why a breakpoint goes immediately
+after the boundary.
+
+---
+
 ## C-08 — Folder names contain spaces
 
 **Status:** open, low priority.
