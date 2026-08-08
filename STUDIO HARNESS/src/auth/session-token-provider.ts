@@ -18,6 +18,31 @@ export interface SessionAccessTokenProviderOptions {
 }
 
 /**
+ * Resolves with `work`, or rejects as soon as `signal` aborts.
+ *
+ * `work` is left running either way. That is the point: it is shared, and one
+ * caller walking away must not end it for the others.
+ */
+async function untilAborted<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) {
+    // The shared promise still needs a handler, or an eventual failure it
+    // nobody is waiting on becomes an unhandled rejection.
+    void work.catch(() => undefined);
+    throw signal.reason;
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    work.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+}
+
+/**
  * Supplies the Studio access token for outbound gateway calls from the stored
  * session, renewing it when it is close to expiry.
  *
@@ -37,6 +62,16 @@ export class SessionAccessTokenProvider implements AccessTokenProvider {
    * on an expiring token would each start their own refresh. The service
    * rotates refresh tokens, so the second exchange would be redeeming a token
    * the first had already invalidated, and the user would be signed out.
+   *
+   * **No caller's signal governs it.** The refresh belongs to the provider, not
+   * to whichever call happened to arrive first. Passing that caller's signal in
+   * meant cancelling call A failed call B, which was never cancelled. Each
+   * caller now races this promise against its own signal instead, so a
+   * cancellation reaches only the caller who asked for it.
+   *
+   * The consequence is deliberate: if every caller cancels, the refresh still
+   * runs to completion and the renewed session is saved. That is the useful
+   * outcome — the work is nearly done and the next call needs it.
    */
   #refreshing: Promise<StudioSession> | undefined;
 
@@ -56,18 +91,16 @@ export class SessionAccessTokenProvider implements AccessTokenProvider {
       return session.accessToken;
     }
 
-    return (await this.#refresh(session, signal)).accessToken;
+    const renewed = await untilAborted(this.#refresh(session), signal);
+    return renewed.accessToken;
   }
 
-  async #refresh(
-    session: StudioSession,
-    signal?: AbortSignal,
-  ): Promise<StudioSession> {
+  async #refresh(session: StudioSession): Promise<StudioSession> {
     if (this.#refreshing) return this.#refreshing;
 
     const attempt = (async () => {
       try {
-        const renewed = await this.#client.refresh(session.refreshToken, signal);
+        const renewed = await this.#client.refresh(session.refreshToken);
         await this.#sessions.save(renewed);
         return renewed;
       } catch (error) {

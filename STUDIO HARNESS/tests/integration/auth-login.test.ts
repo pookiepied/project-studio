@@ -324,6 +324,40 @@ describe("session access token provider", () => {
     expect(new Set(tokens).size).toBe(1);
   });
 
+  it("lets one caller cancel without failing the others", async () => {
+    // The refresh is shared, so it used to run under whichever caller arrived
+    // first. Cancelling that one failed everybody who had joined it.
+    const { sessions, provider } = await providerWithSession();
+    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
+
+    const first = new AbortController();
+    const cancelled = provider.getAccessToken(first.signal);
+    const survivor = provider.getAccessToken();
+    first.abort();
+
+    await expect(cancelled).rejects.toBeDefined();
+    await expect(survivor).resolves.toBeTypeOf("string");
+    expect(mock.refreshCalls).toHaveLength(1);
+  });
+
+  it("cancels the caller who asked, not the refresh itself", async () => {
+    // The refresh belongs to the provider. If everyone walks away it still
+    // finishes and saves, because the next call needs the result.
+    const { sessions, provider } = await providerWithSession();
+    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
+
+    const controller = new AbortController();
+    const cancelled = provider.getAccessToken(controller.signal);
+    controller.abort();
+
+    await expect(cancelled).rejects.toBeDefined();
+
+    const token = await provider.getAccessToken();
+    expect(token).toBeTypeOf("string");
+    // One refresh: the abandoned one completed and its result was reused.
+    expect(mock.refreshCalls).toHaveLength(1);
+  });
+
   it("clears the session when the refresh token is rejected", async () => {
     const { sessions, provider } = await providerWithSession();
     await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });

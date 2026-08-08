@@ -138,7 +138,36 @@ A git uninstalled or installed *during* a session is not noticed.
 
 ---
 
+## Authentication (`src/auth/`)
+
+### A-01 · One cancelled call killed every other caller's token refresh · Fixed
+
+The refresh is shared by every concurrent caller — it has to be, because the
+service rotates refresh tokens and a second exchange would redeem a token the
+first had spent. But the fetch inside it ran under the signal of whichever
+caller arrived first. Cancelling call A therefore failed call B, which nobody
+had cancelled.
+
+Closed in task 001 item 7. `#refresh` takes no signal. Each caller races the
+shared promise against its own signal instead.
+
+If every caller cancels, the refresh still completes and saves. That is
+deliberate: the work is nearly done, the next call needs it, and abandoning it
+would spend a rotated token for nothing.
+
+---
+
 ## Permissions (`src/permissions/`)
+
+### K-05 · A capability with no effects was the most privileged thing there was · Fixed
+
+Every rule of the form "do all of its effects allow this?" is vacuously true for
+an empty list. So `effects: []` read as read-only, allowed in an untrusted
+folder, and auto-allowed by default — all earned by declaring nothing.
+
+Closed in task 001 item 8. `PermissionKernel.register` refuses it. Refused at
+the door rather than defended against in each reader, for the same reason the
+effect table exists: one place decides, and nobody else has to remember.
 
 ### K-01 · Policy matched on capability id only · Fixed
 

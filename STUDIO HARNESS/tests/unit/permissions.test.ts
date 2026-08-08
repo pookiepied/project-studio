@@ -116,6 +116,16 @@ describe("the kernel is the only source of permission", () => {
       }),
     ).toThrow(PermissionError);
   });
+
+  it("refuses a capability that declares no effects", () => {
+    // Declaring nothing was the most permissive thing a capability could do:
+    // every "do all of its effects allow this?" question is true for nothing,
+    // so it read as read-only, untrusted-safe, and auto-allowed.
+    const kernel = new PermissionKernel({ grants });
+
+    expect(() => kernel.register(capability("empty", []))).toThrow(PermissionError);
+    expect(() => kernel.register(capability("empty", []))).toThrow(/no effects/i);
+  });
 });
 
 describe("authority comes from the application, never the model", () => {

@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 6 of 20 done
+**State:** open — 8 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -236,7 +236,7 @@ the first.
 
 ## Group 3 — Wrong behaviour
 
-### [ ] 7. A cancelled call kills every other caller's token refresh · `A-01`
+### [x] 7. A cancelled call kills every other caller's token refresh · `A-01` · `PENDING7`
 
 **Where:** `STUDIO HARNESS/src/auth/session-token-provider.ts:66-70`
 
@@ -252,9 +252,20 @@ token.
 caller race the shared promise against its own signal, so cancelling A affects
 only A. Test with two callers and one signal.
 
+**Done.** `#refresh` takes no signal at all. Each caller wraps the shared
+promise in `untilAborted`, which rejects on that caller's own signal and leaves
+the shared work running.
+
+**Deliberate consequence:** if every caller cancels, the refresh still finishes
+and saves the renewed session. The work is nearly done and the next call needs
+it, so ending it would waste a rotated refresh token.
+
+**Tested by:** two callers and one signal — the cancelled one rejects, the other
+gets a token, and only one refresh happens. Restoring the signal fails it.
+
 ---
 
-### [ ] 8. A capability with no effects is treated as safe · `K-05`
+### [x] 8. A capability with no effects is treated as safe · `K-05` · `PENDING7`
 
 **Where:** `STUDIO HARNESS/src/contracts/effects.ts:166-178`
 
@@ -266,6 +277,15 @@ belongs to the capability that declared nothing.
 **Fix:** Refuse `effects: []` at registration in `PermissionKernel.register`. A
 capability that does nothing does not need to exist, and one that does something
 must say so. Test that registration throws.
+
+**Done.** `PermissionKernel.register` refuses `effects: []`.
+
+Refused at the door rather than defended against in each reader, which is the
+same principle as the one effect table: one place decides and nobody else has to
+remember.
+
+**Tested by:** registration throws a `PermissionError` naming the problem.
+Removing the guard fails it.
 
 ---
 

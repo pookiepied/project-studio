@@ -125,6 +125,24 @@ export class PermissionKernel {
    */
   register(descriptor: CapabilityDescriptor): void {
     const key = capabilityKey(descriptor.id);
+
+    // An empty effect list is the most permissive thing a capability can
+    // declare. Every rule of the form "do all of its effects allow this?" is
+    // vacuously true for nothing, so it would be read-only, allowed in an
+    // untrusted folder, and auto-allowed by default — all earned by declaring
+    // nothing at all.
+    //
+    // Refused here rather than defended against in each reader, which is the
+    // same principle as the one table in `contracts/effects.ts`: one place
+    // decides, and nobody else has to remember. A capability that does nothing
+    // does not need to exist, and one that does something has to say so.
+    if (descriptor.effects.length === 0) {
+      throw new PermissionError("internal", {
+        message: `Capability "${key}" declares no effects. Every capability must declare what it does.`,
+        capability: key,
+      });
+    }
+
     const existing = this.#registry.get(key);
 
     if (existing && existing.provenance.sourceId !== descriptor.provenance.sourceId) {
