@@ -1,3 +1,5 @@
+mod window;
+
 use tauri::{AppHandle, Manager};
 
 /// The frontend invokes this once it has mounted and painted. The window
@@ -23,6 +25,9 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+      }
+      if let Some(main_window) = app.get_webview_window("main") {
+        window::apply_rounded_corners(&main_window);
       }
       Ok(())
     })

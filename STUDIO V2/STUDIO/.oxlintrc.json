@@ -3,6 +3,41 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/chat/demo/**", "@/features/chat/demo/**"],
+            "message": "Demo code is deleted at ship. Only features/chat/session/useChatSession.ts may import it, so the whole directory can be removed with one edit."
+          },
+          {
+            "group": ["@phosphor-icons/react"],
+            "message": "Import the concept from @/components/icons, never the raw glyph. One icon library, one size scale."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/features/chat/session/useChatSession.ts", "src/features/chat/demo/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/components/icons/index.tsx", "src/app/navigation/views.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/components/icons/index.tsx"],
+      "rules": {
+        "react/only-export-components": "off"
+      }
+    }
+  ]
 }
