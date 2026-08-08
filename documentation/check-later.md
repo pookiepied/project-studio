@@ -5,8 +5,14 @@ conversation that produced them. Not a bug list — `STUDIO HARNESS/docs/KNOWN-I
 is for what is currently untrue about the system. This is for what we chose not
 to resolve yet.
 
-Each entry says what to check, what a pass looks like, and what it gates. Delete
-an entry when it is settled, and record the answer in the relevant ADR.
+Each entry says what to check, what a pass looks like, and what it gates. When
+an entry is settled, record the answer in the relevant ADR and cut this entry
+down to a pointer — keep the pointer rather than deleting outright, so a
+question that was asked and answered does not get asked again from scratch.
+`C-07` is the model.
+
+Numbered in the order they were raised, which is not the order they are listed
+in. Do not renumber; the ids are referenced from `KNOWN-ISSUES.md` and the ADRs.
 
 ---
 
@@ -160,6 +166,79 @@ accident.
 cost is that rewritten history invalidates the prefix for the turn *after*
 compaction. That is the real price, and it is why a breakpoint goes immediately
 after the boundary.
+
+---
+
+## C-10 — What a network effect means at `in-process` isolation
+
+**Status:** open. **Gates:** `fetch`, and therefore the close of Phase 10.
+
+This is named as the blocker for `fetch` in `ROADMAP.md`, `STATUS.md`, and
+`architecture.md`, but the question itself was never written down anywhere — it
+existed as the phrase *"SSRF is not containment"* and nothing else. Written out
+here so the ADR can be argued rather than reconstructed.
+
+**The question.** ADR 0019 drew the line for `execute` at *provenance*: native
+and opted-in runs uncontained by consent, anything a user connected is refused
+outright. The obvious move is to reuse that line for `network`. The reason to
+doubt it is that the two effects fail differently.
+
+`execute` risks *the machine*. Containment is the missing thing, the user
+chose the program, and consent is a coherent answer.
+
+`network` risks *the context window*. A fetch pulls text we did not write into a
+prompt that drives tool calls, so the hazard is what the response says, not what
+the request reached. Consent does not address that at all — a user approving
+`fetch https://docs.example.com` is not approving the instructions on that page.
+`allowNetwork` would be `allowExec`'s shape applied to a problem of a different
+kind.
+
+**What SSRF is and is not.** Refusing loopback, link-local (`169.254.0.0/16`,
+including the cloud metadata endpoint), and private ranges is worth doing and is
+not containment — it stops the agent reaching *our own* internals, which is a
+real class of accident. It does nothing about the returned bytes.
+
+**The three candidates:**
+
+1. **Provenance, as ADR 0019.** Symmetrical, and probably wrong for the reason
+   above.
+2. **Provenance plus destination.** A network capability is admitted natively,
+   but the *resource* is the host — `fetch:docs.example.com` — so the approval
+   ladder and grants work exactly as they do for `shell:node` and `git:push`.
+   This is the symmetrical answer that is also correct, and it is the current
+   favourite.
+3. **Treat fetched content as untrusted input rather than as a permission
+   problem.** Orthogonal to 1 and 2 and probably needed regardless: mark it in
+   the transcript, never let it widen a scope, never let it be the source of a
+   path or a command.
+
+**Decide before writing code**, per the plan of record. 2 and 3 together are
+most likely right, and the thing to argue is whether 3 needs machinery or only a
+rule.
+
+---
+
+## C-11 — Large tool output is truncated, not offloaded
+
+**Status:** open. **Gates:** cache behaviour once sessions get long.
+
+`mental-model.md` §3.5 is explicit: decide at execution time, and anything over
+~8 KB is written to `~/.studio/` with a summary, a head/tail preview, and a
+handle placed in the transcript *from the start*. "Then there is no rewrite and
+therefore no invalidation, ever."
+
+**Every shipped tool does the other thing.** `git` and `shell` clip at 400
+lines, `grep` and `read` page, and none of them writes a result anywhere. The
+rule is stated as settled architecture and is implemented nowhere.
+
+Recorded because it is the largest gap between `mental-model.md` and `src/`, and
+because it will not announce itself — a truncated result is a worse answer, not
+an error, and the cache cost it was meant to avoid only shows up in a bill.
+
+**Check:** whether any shipped tool actually produces results large enough to
+matter, before building the offload path. If they never exceed 8 KB in practice,
+§3.5 is a rule for MCP results rather than for native tools, and it should say
+so.
 
 ---
 

@@ -108,10 +108,27 @@ Tracked as `T-13`. The candidate fix is resolving a shim to its underlying
 `node` entry point; it is deliberately not in this change, because it is
 version-dependent guesswork and belongs behind evidence that it is needed.
 
+## What this ADR did not consider
+
+Found by the cross-reference audit after it was accepted, and recorded here
+rather than in a new ADR because both are consequences of decisions made above.
+
+**`shell` declares `execute` and not `write`.** The gate snapshots on the
+declared `write` effect, so a program the model runs writes to the project with
+no undo point behind it. The reasoning above is about *authorization* throughout
+and never asks what reversibility means for a tool whose effects we cannot know
+in advance — which is the harder question, because "we did not choose this
+program" and "we cannot know what it touched" are the same fact. `T-14`, and it
+needs an amendment to this ADR rather than a patch.
+
+**The ten-minute clamp is unreachable.** `CallBounds` applies a two-minute
+deadline to every call and nothing raises it for `native/shell`, so the clamp
+described under *Consequences* below never takes effect. `T-15`.
+
 ## Consequences
 
-- Phase 10 reaches eight of ten tools. Only `fetch` remains before `task` and
-  `skill`, which belong to Phases 13 and 12.
+- Phase 10 reaches **seven** of ten tools. `fetch` makes eight; `task` and
+  `skill` belong to Phases 13 and 12.
 - `S-02` is now load-bearing rather than theoretical: it is the only thing
   standing between an MCP server and `execute` on the host.
 - A non-zero exit is reported, not thrown. A failing test suite is the answer to

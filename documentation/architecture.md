@@ -118,7 +118,14 @@ The harness continues on its own roadmap; the app connects at the end.
 1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
 2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
 3. ~~**`shell`**.~~ Done — ADR 0019.
-4. **`fetch`** — needs an ADR on the network-effect question first. Last one.
+4. **`fetch`** — needs an ADR on the network-effect question first. The question
+   is written out in `check-later.md` as `C-10`. Last one.
+
+**But not before the audit findings.** A cross-reference pass over everything
+shipped found that `shell` writes with no undo point behind it (`T-14`), that
+its ten-minute ceiling is overridden by the gate's two-minute one (`T-15`), and
+that `edit` silently corrupts any replacement containing `$` (`T-16`). Those
+come first.
 
 **Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with
 discovery can run. They measure whether the Flue/Pi bet holds, and they are

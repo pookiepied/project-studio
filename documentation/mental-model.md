@@ -182,6 +182,10 @@ Then there is no rewrite and therefore no invalidation, ever. Post-hoc
 compaction remains for conversation length, where Flue handles it — and there
 the rule is: never mutate history except at an explicit compaction boundary.
 
+**Not implemented.** Every shipped tool truncates instead — `git` and `shell` at
+400 lines, `grep` and `read` by paging. Tracked as `C-11`, including the
+possibility that this rule belongs to MCP results rather than to native tools.
+
 ---
 
 ## 4. Tool visibility: two states, not two taxonomies

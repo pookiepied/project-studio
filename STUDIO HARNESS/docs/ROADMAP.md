@@ -125,8 +125,10 @@ Foundation done. See ADR 0012.
 - Grants are persisted, listable, and revocable; revoking marks rather than
   deletes.
 - `LocalSandbox` contains the filesystem and withholds the host environment,
-  and declares `in-process` isolation honestly — `execute` and `network` are
-  refused rather than approximated.
+  and declares `in-process` isolation honestly. Superseded in part by ADR 0019:
+  `execute` is now admitted for a **native** capability when the policy opted
+  in, as *uncontained by consent* rather than as containment. `network` is still
+  refused, and anything a user connected is still refused for both.
 
 Remaining in this phase:
 

@@ -71,6 +71,34 @@ survive.
 **Impact:** low, but it is invisible when it happens, which is the part worth
 fixing. It should report through `ErrorReporter` rather than swallow.
 
+### P-05 · `taskkill` is found through the inherited `PATH` · Open
+
+`killTree` spawns `taskkill` by bare name with no `env`, so the child inherits
+`process.env` and Windows resolves the name through `PATH`. Both halves
+contradict the rule stated at the top of the same file: absolute executables
+only, and the environment is built rather than inherited.
+
+**Impact:** a `taskkill.exe` earlier on the harness's own `PATH` runs instead of
+the system one, during teardown, when a call is already being cancelled. It is
+our `PATH` rather than the agent's, which is what keeps this moderate rather
+than severe — but it is the one place `runProcess` breaks its own invariant.
+
+**Fix when:** next touch of `src/process/`. Resolve
+`%SystemRoot%\System32\taskkill.exe` and pass an explicit environment, the same
+way every other spawn in the harness does.
+
+### P-06 · `child.stdin.end()` is unguarded · Open
+
+A child that has already exited makes the write fail with `EPIPE`, which the
+stream emits as an `error` event. Nothing listens on `child.stdin`, so it
+surfaces as an unhandled error rather than as a normal process result.
+
+**Impact:** rare — it needs a child that exits before the harness closes stdin —
+but the failure is an uncaught exception rather than a bounded one.
+
+**Fix when:** next touch of `src/process/`. A no-op `error` listener on
+`child.stdin` is the whole fix.
+
 ---
 
 ## Vendored Binaries (`src/vendor/`)
@@ -120,6 +148,37 @@ Partly mitigated by ADR 0017: a long call is now bounded by a deadline and can
 be cancelled while running, so "approved once, then ran forever" is no longer
 possible even though re-authorization still is not.
 
+### K-04 · `git` does not declare `network`, so Auto Edit pushes silently · Open
+
+`GIT_DESCRIPTOR` declares `effects: ["read", "write"]`. `git push`, `git fetch`,
+`git pull`, and `git clone` all reach the network.
+
+`resolveAsk("auto-edit", capability)` allows anything whose effects are only
+`read` or `write`. So in Auto Edit, `git push` is allowed with no prompt — and
+so are `git reset --hard` and `git clean -fd`, which are not network operations
+but are the other things a user would expect to be asked about.
+
+The mode's own documentation says the opposite, in two places:
+
+- `mode.ts`: *"Reading and writing proceed. Running code and reaching the
+  network ask."*
+- `STATUS.md`, `ADR 0018`: the same claim, in the same words.
+
+The declaration is what makes it false. `hasElevatedEffect(git)` is also false
+for the same reason, so `BASE_POLICY`'s `untrusted-elevated` rule would not
+catch a git capability from a connected server either.
+
+**Why it is not simply "add `network`":** a `network` effect makes
+`requiredIsolation` return `os` for every git call, and `assertSupports` would
+then refuse `git log` on a `LocalSandbox`. The declaration is per capability and
+the effect is per subcommand, which is the actual mismatch. `src/tools/git/
+classify.ts` already sorts subcommands, so the material exists; what is missing
+is a decision about whether effects may vary per call, and that is an ADR.
+
+**Fix when:** before Auto Edit is selectable in the UI. Until a posture is wired
+(`T-12`) the mode is never anything but `manual`, so this is not currently
+reachable — it becomes reachable in the same change that makes `T-12` matter.
+
 ### K-03 · Nothing calls the kernel yet · Fixed
 
 `CallGate` is now the single caller. Registering a tool registers its capability
@@ -165,6 +224,15 @@ to check the current state before repeating the call.
 The narrowing fix, if it ever matters, is moving long pure-JS work into a
 worker — not a cleverer race.
 
+**One consequence not stated when this was written:** the permit is released
+when the call is abandoned, not when the work stops. So an abandoned
+non-cooperative call keeps running *outside* the concurrency limit, and enough
+of them exceed it. The limit bounds calls the gate is tracking, not processes on
+the machine. Accepted on the same reasoning — holding the permit instead would
+convert one hung call into a stalled gate, which is worse — but the claim in
+`bounds.ts` that concurrency answers "the machine fell over" is weaker than it
+reads.
+
 ### T-03 · Trust and execution modes are not enforced · Fixed
 
 Closed by ADR 0018. Workspace trust is a precondition stored per folder, ahead
@@ -202,6 +270,45 @@ construction. `requiresUndo(mode)` supplies it: false while a person approves
 each write, true under Full Auto, where "you can undo it" is the safety story
 rather than a safety net.
 
+### T-20 · Undo does not cover everything in the project · Accepted
+
+Two things a restore cannot return, both structural rather than oversights:
+
+- **Ignored files a subprocess created.** The `#touched` set records paths that
+  *write tools* touched, so an ignored file the agent wrote through `edit` is
+  force-added. A `dist/` produced by `node build.js` is neither tracked nor
+  touched, so it survives a restore that was meant to undo the build.
+- **The user's own git state.** Git never adds a nested `.git` directory, so the
+  project's history is outside the shadow repository by construction. An agent
+  that runs `git reset --hard` cannot be undone by a snapshot; it has to be
+  undone with git.
+
+Accepted rather than fixed. Snapshotting `.git` would double the storage and
+create two histories that can disagree, and tracking build output would put
+`node_modules`-sized directories in the undo history — which is what
+`EXCLUDE_FLOOR` exists to prevent.
+
+Worth stating plainly in the UI when undo is offered: it returns your files, not
+your build and not your branch.
+
+### T-21 · Small edges in `shell` and the shadow repo · Open
+
+Grouped because each is a few lines and none is worth its own entry.
+
+- **`resolveProgram` does not check executability.** On POSIX,
+  `RUNNABLE_EXTENSIONS` is `[""]` and the candidate is accepted on `isFile`
+  alone. A non-executable file named `node` earlier on `PATH` wins over the real
+  one, and the failure appears later as a spawn error. Needs an `X_OK` check.
+- **The program is resolved three times per call** — in `parse`, in `resource`,
+  and again in `execute`. Three `PATH` walks, and the binary that runs is
+  re-resolved *after* approval, so what was authorized and what runs are two
+  separate lookups. Resolve once and carry the path through the parsed input.
+- **The exit code can be clipped away.** `clip` runs after `[exit code N]` is
+  appended, so on output over 400 lines the model loses the one field that says
+  whether the command succeeded. Clip the output, then append the code.
+- **`info/exclude` is rewritten on every `ensure()`.** Harmless today because we
+  are the only writer, and a trap the moment anything else wants a line in it.
+
 ### T-10 · Snapshot history is never pruned · Open
 
 One commit per writing turn, delta-compressed, so growth is slow — but nothing
@@ -212,6 +319,143 @@ someone needed is worse than a directory that grows, and the right cutoff is not
 knowable before the feature has been used in anger.
 
 **Fix when:** a real project's history is large enough to measure.
+
+### T-14 · `shell` writes are not snapshotted · Open
+
+`SHELL_DESCRIPTOR` declares `effects: ["execute"]`. The gate takes a snapshot
+when `descriptor.effects.includes("write")`. `shell` therefore writes to the
+project — `node build.js`, `python migrate.py`, a generator, a formatter,
+anything at all — with **no snapshot behind it**, and nothing in the code
+notices, because the tool never claimed to write.
+
+This is the largest live gap in the harness, and it lands precisely where the
+argument for Full Auto sits. ADR 0018 says undo *is* the safety story once
+nobody is approving each write, and `requiresUndo(mode)` enforces that for every
+tool that declares `write`. The one tool that can do the most damage is the one
+that declaration does not reach.
+
+It also makes `STATUS.md` untrue where it says a tool cannot be added that
+writes without being reversible. That sentence was accurate when it was written
+and stopped being accurate one ADR later.
+
+**Two candidate fixes, and they are not equivalent:**
+
+1. **Declare `["execute", "write"]`.** One line, and the snapshot appears
+   immediately. But it also changes the permission answer: `resolveAsk` reads
+   effects, and adding `write` to a capability that already has `execute` does
+   not widen anything there — `execute` already forces an `ask` under Auto Edit
+   — so this is safe in that direction. Verify before shipping rather than
+   assuming.
+2. **Snapshot on `execute` as well as `write`.** Broader and more honest: a
+   program we did not write may do anything, so "we do not know what this
+   touched" is the actual state. Costs a commit per turn that runs any program,
+   including read-only ones like `node --version`.
+
+The second is probably right and the first is probably not enough. Decide with
+an ADR amendment rather than in a commit message, because it changes what "keyed
+on the declared effect" means.
+
+**Fix when:** before `shell` is reachable from a real session — which is the
+same moment `T-12` becomes urgent. Neither should ship without the other.
+
+### T-15 · `shell`'s timeout ceiling cannot be delivered · Open
+
+`shell` clamps `timeoutMs` to at most 600 000 ms and documents ten minutes as
+the point of the tool: "a build or a test run is the reason this tool exists."
+`CallBounds` applies a 120 000 ms deadline to every call and nothing sets
+`timeoutByCapability["native/shell"]`.
+
+The gate's deadline is the shorter one and covers the whole call, so **every
+shell call is abandoned at two minutes** regardless of what was asked for. A
+model that asks for ten minutes is told yes and gets two.
+
+**Impact:** any real build or test suite over two minutes fails, and fails with
+"took too long and was abandoned" rather than with anything pointing at the
+cause. The clamp is not merely ineffective, it is misleading.
+
+**Fix when:** with `T-14`, since both are "shell is not actually wired for the
+work it was built for". The fix is a `timeoutByCapability` entry for
+`native/shell` at the tool's own ceiling — not a higher global default, which
+would give `read` ten minutes of patience it has no use for.
+
+### T-16 · `edit` interprets `$` in the replacement text · Open
+
+`content.replace(oldString, newString)` and `replaceAll` treat the *replacement*
+as a pattern even when the search value is a plain string. `$&`, `` $` ``, `$'`,
+`$$`, `$1`, and `$<name>` are all substituted rather than inserted literally.
+
+Confirmed, not theorised:
+
+```
+oldString "10", newString "$&$&"  →  "const price = 1010;"
+oldString "10", newString "$`"    →  "const price = const price = ;"
+oldString "10", newString "$$"    →  "const price = $;"
+```
+
+**Impact:** silent file corruption, reported to the model as `Edited <path>`.
+It fires on ordinary content — shell scripts, `sed` examples, regex source,
+template literals, CSS `$` variables, anything documenting a capture group. This
+is exactly the failure the tool's own doc comment rules out: "a mistaken edit
+fails loudly instead of landing somewhere unintended."
+
+**Fix:** pass a replacer function — `content.replace(oldString, () => newString)`
+— which is specified to insert the string verbatim. Both call sites, plus a test
+using `$&` and `` $` ``.
+
+**Fix when:** immediately. It is one line each, it is a data-loss bug, and the
+undo history is the only thing that currently catches it.
+
+### T-17 · Nothing serialises access to the shadow repository · Open
+
+`ShadowRepository` has no lock. `SnapshotStore.capture` runs `add`, then
+`commit`, then `rev-parse` against one git index, and three callers can start
+that sequence concurrently:
+
+- `TurnSnapshots.beginTurn()` clears `#pending` while a capture may still be in
+  flight, so the next write starts a second one
+- `SnapshotStore.restore()` calls `capture()` internally, which can overlap a
+  turn snapshot
+- `CallBounds` admits eight calls at once, so several writes can reach
+  `beforeWrite` together on the first turn
+
+Concurrent git operations on one index fail on `index.lock`, surfacing as
+`capture_failed`.
+
+**Impact:** an undo point that silently does not exist, or — under Full Auto,
+where `required` is true — a write refused for a reason that has nothing to do
+with the write. The dedupe in `TurnSnapshots` covers the common case, which is
+why this has not been seen; it does not cover the three above.
+
+**Fix when:** with `T-14`, since that change increases how often snapshots are
+taken. A single promise chain on `ShadowRepository` is enough — the operations
+are already all `await`ed.
+
+### T-18 · A rejected capture poisons the rest of the turn · Open
+
+`#pending ??= this.#capture()` stores the promise, so a rejection is stored too.
+Every later write in the same turn awaits the same rejected promise and fails
+with the original error, without retrying.
+
+Under `required` that is fail-closed and defensible. It is recorded because the
+behaviour is invisible in the code — it reads as "retry next write" and is not —
+and because a transient failure (a lock, a full disk that cleared) stays fatal
+until the next turn.
+
+### T-19 · A tool can be registered outside the gate · Open
+
+`CallGate` says everything executable passes through it. Nothing enforces that.
+`src/agents/studio.ts` registers `workspace_summary` directly with Flue via
+`defineTool`, so it reaches the model without a `CapabilityDescriptor`, without
+the kernel, and without bounds.
+
+`workspace_summary` itself is harmless — it echoes its input and touches
+nothing. The problem is that it is a working precedent for the shape, sitting in
+the tree, and it is currently the agent's **only** tool.
+
+**Fix when:** Phase 11, when MCP makes a second registration path real. An
+architecture test asserting that the agent's tool array contains only
+gate-registered capabilities is the cheap version, and the same test is what
+keeps MCP honest.
 
 ### T-05 · The read-before-modify record does not survive a restart · Accepted
 
@@ -252,21 +496,9 @@ narrow the command instead.
 **Fix when:** it proves annoying in practice. The honest fix is paging
 parameters like the other tools have, not a bigger ceiling.
 
----
-
----
-
-## Containment (`src/sandbox/`)
-
-### S-01 · `LocalSandbox` is `in-process` isolation · Accepted
-
-Recorded in ADR 0012. It constrains what our own code does on the agent's
-behalf and is **not** a boundary against actively hostile code.
-
-Amended by ADR 0019: it now admits `execute` for a **native** capability when
-the policy opted in, as *uncontained by consent* rather than as containment.
-Anything a user connected is still refused outright. The sandbox never claims
-to contain what it admits.
+Note that this is also the shape `mental-model.md` §3.5 rules out — large tool
+output should be written to `~/.studio/` with a handle in the transcript, never
+truncated. Every shipped tool truncates. Tracked as `C-11`.
 
 ### T-13 · `shell` cannot run npm-family tools on Windows · Accepted
 
@@ -282,9 +514,19 @@ missing, since "not found" is misleading when the file is right there.
 Deliberately not done yet: it is version-dependent guesswork, and it should wait
 for evidence that it is needed rather than be built on the assumption.
 
-The plan of record (ADR 0012, and the local/sandbox split agreed after it) is
-that local execution is bounded by *permission*, and isolation is what the
-sandbox tier adds — WSL2 locally, a remote MicroVM later.
+---
+
+## Containment (`src/sandbox/`)
+
+### S-01 · `LocalSandbox` is `in-process` isolation · Accepted
+
+Recorded in ADR 0012. It constrains what our own code does on the agent's
+behalf and is **not** a boundary against actively hostile code.
+
+Amended by ADR 0019: it now admits `execute` for a **native** capability when
+the policy opted in, as *uncontained by consent* rather than as containment.
+Anything a user connected is still refused outright. The sandbox never claims
+to contain what it admits.
 
 ### S-02 · No isolation provider exists yet · Open
 
@@ -295,6 +537,14 @@ provider lands, any capability requiring `os` isolation is refused.
 thing standing between a connected MCP server and `execute` on the host. A
 native `shell` runs uncontained by consent; a server's does not run at all, and
 that distinction is enforced here.
+
+The plan of record (ADR 0012, and the local/sandbox split agreed after it) is
+that local execution is bounded by *permission*, and isolation is what the
+sandbox tier adds — WSL2 locally, a remote MicroVM later.
+
+---
+
+## Where Things Live (`src/platform/`)
 
 ### H-01 · Only `studio.db` and `bin/` are actually used · Open
 
@@ -312,8 +562,6 @@ for.
 
 **Fix when:** each subsystem lands. Flue's own database location should be
 brought into the Studio home at the same time.
-
----
 
 ---
 

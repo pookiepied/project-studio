@@ -11,6 +11,13 @@ Last refreshed: Phase 10 in progress, 7 of 10 native tools shipped. Undo, call
 bounds, trust/modes, and `shell` landed (ADRs 0016–0019). Only `fetch` remains
 before Phase 11.
 
+Then a cross-reference audit over everything shipped, which is why this file now
+contradicts itself less and admits more. It found eight real defects — `T-14`
+through `T-21`, `K-04`, `P-05`, `P-06` — and the two that matter are that
+`shell` writes without an undo point and that `edit` silently corrupts any
+replacement containing `$`. Nothing found was a regression; all of it was
+shipped believing otherwise.
+
 ---
 
 ## The destination
@@ -62,7 +69,7 @@ the user actually sees.
 ## What exists and works
 
 **Model access.** Three sources behind one registry: the Studio Gateway
-(curated, paid), local BYOK (35 built-in providers, 1,072 models, plus custom
+(curated, paid), local BYOK (36 built-in providers, 1,072 models, plus custom
 OpenAI-compatible providers covering Ollama and LM Studio), and a deterministic
 test adapter. The agent only ever names `project-studio/default`; the registry
 resolves it. Keys live in the OS keychain, never a file.
@@ -85,6 +92,12 @@ running, and the network are not. Manual / Auto Edit / Full Auto resolve a
 *default* `ask` and never a policy one, so Full Auto still prompts before a
 connected server runs code. Full Auto requires a working undo. See ADR 0018.
 
+Auto Edit is bounded by declared effect, which means it is only as accurate as
+the declarations. `git` declares `read`/`write` and reaches the network anyway,
+so Auto Edit would push without asking — `K-04`. Not reachable today, because no
+posture is wired and the mode is always `manual` (`T-12`); reachable in the same
+change that fixes that.
+
 **Tools.** Seven of ten, all behind one `CallGate` that authorizes before it
 executes:
 
@@ -95,6 +108,13 @@ executes:
 | Version control | `git` | Complete subcommand coverage, one capability |
 | Execution | `shell` | One program, one argument vector, no shell. Native only |
 
+**None of them is reachable by the running agent yet.** `src/app.ts` builds no
+gate, and `src/agents/studio.ts` registers exactly one tool —
+`workspace_summary`, a fixture that echoes its input and goes around the gate
+entirely (`T-19`). Everything in the table is built, tested, and unwired. The
+wiring is `T-12`, and several open issues stop being theoretical the moment it
+lands.
+
 **Call bounds.** Every call has a deadline covering queue time and execution, a
 signal that reaches the tool so cancellation works mid-call, and a FIFO
 concurrency queue. An abandoned call tells the model whether repeating it is
@@ -103,10 +123,14 @@ safe, which is what `CapabilityDescriptor.idempotent` was declared for. See ADR
 
 **Undo.** A shadow git repository per project in `~/.studio/data/snapshots/`,
 work tree pointed at the project. The gate snapshots before each turn's first
-write, keyed on the declared `write` effect — so a tool cannot be added that
-writes without being reversible. Scope is the project minus ignored files, plus
-every path a write tool touched. Restore is itself snapshotted first. See ADR
-0016.
+write, keyed on the declared `write` effect. Scope is the project minus ignored
+files, plus every path a write tool touched. Restore is itself snapshotted
+first. See ADR 0016.
+
+**It does not currently cover `shell`**, which declares `execute` and not
+`write`, so a program the model runs writes without a snapshot behind it —
+`T-14`. That is the gap between what the mechanism promises and what it
+delivers, and it has to close before Full Auto means anything.
 
 **Where things live.** Three locations, decided once (ADR 0014): the
 installation is read-only, `~/.studio` is ours and writable in six categories,
@@ -117,6 +141,11 @@ the project belongs to the user. Nothing resolves against the working directory.
 ## What is left, and what blocks it
 
 ### Immediately next
+
+**The audit findings come before `fetch`.** `T-16` is a data-loss bug in a
+shipped tool and is a one-line fix. `T-14` and `T-15` mean `shell` does not yet
+do the job it was built for. Adding the last tool on top of that is building on
+a floor we know has a hole in it.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 
