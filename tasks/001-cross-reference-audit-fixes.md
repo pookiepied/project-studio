@@ -236,7 +236,7 @@ the first.
 
 ## Group 3 — Wrong behaviour
 
-### [x] 7. A cancelled call kills every other caller's token refresh · `A-01` · `PENDING7`
+### [x] 7. A cancelled call kills every other caller's token refresh · `A-01` · `ebb2a9b`
 
 **Where:** `STUDIO HARNESS/src/auth/session-token-provider.ts:66-70`
 
@@ -265,7 +265,7 @@ gets a token, and only one refresh happens. Restoring the signal fails it.
 
 ---
 
-### [x] 8. A capability with no effects is treated as safe · `K-05` · `PENDING7`
+### [x] 8. A capability with no effects is treated as safe · `K-05` · `ebb2a9b`
 
 **Where:** `STUDIO HARNESS/src/contracts/effects.ts:166-178`
 
