@@ -289,7 +289,7 @@ Removing the guard fails it.
 
 ---
 
-### [x] 9. A grant is stored with a project and never matched on it · `K-06` · `PENDING9`
+### [x] 9. A grant is stored with a project and never matched on it · `K-06` · `9d3bc99`
 
 **Where:** `STUDIO HARNESS/src/permissions/grant-store.ts:93-98` (query),
 `:144` (write)
