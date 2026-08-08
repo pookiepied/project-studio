@@ -105,7 +105,7 @@ the depth back to one fails 4 tests.
 
 ## Group 2 — A security boundary that does not hold
 
-### [x] 3. The migration guard runs once, then never again · `D-01` · `PENDING3`
+### [x] 3. The migration guard runs once, then never again · `D-01` · `516aead`
 
 **Where:** `STUDIO HARNESS/src/storage/migrations.ts:205-207` and `:237`
 
@@ -137,7 +137,7 @@ must still throw. Reverting the placement fails both.
 
 ---
 
-### [x] 4. The secret-column pattern misses obvious names · `D-02` · `PENDING3`
+### [x] 4. The secret-column pattern misses obvious names · `D-02` · `516aead`
 
 **Where:** `STUDIO HARNESS/src/storage/migrations.ts:161-162`
 
