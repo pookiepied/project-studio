@@ -586,6 +586,41 @@ for evidence that it is needed rather than be built on the assumption.
 
 ---
 
+## Storage (`src/storage/`)
+
+### D-01 · The secret-column guard ran once and then never again · Fixed
+
+`assertNoSecretColumns` was called after the migration loop, and each migration
+committed and bumped `user_version` on its own. So a migration that added a
+credential column committed, the guard threw once, and the column stayed on
+disk. On the next start `current === latest` returned early and the guard never
+ran again. The application then started normally, forever, with the column
+present.
+
+Closed in task 001 item 3. The guard runs inside each migration's transaction,
+so a refusal rolls the column back, and again on every open before the early
+return, so a file poisoned by an older build still fails.
+
+A `StorageError` is now rethrown from the migration catch untouched. It was
+being wrapped by `storageErrorFrom`, which replaced the message naming the
+offending column with the generic one.
+
+### D-02 · The secret-column pattern missed obvious names · Fixed
+
+The pattern anchored the keyword at the end, so any suffix escaped —
+`api_key_hash` and `private_key_pem` both passed — and bare `key` was not a
+keyword, so `secret_key`, `encryption_key`, and `signing_key` passed too.
+
+Closed in task 001 item 4. The name is split into words and any secret word
+refuses it. Two exceptions are explicit: `NOT_SECRET_COLUMNS` for the columns we
+ship that contain `key`, and a measurement rule so `token_count` and
+`total_tokens` pass while `token_secret_count` does not.
+
+The default is now refuse. A future `cache_key` column will fail the check, and
+the correct response is to add it to the allowlist, not to loosen the rule.
+
+---
+
 ## Containment (`src/sandbox/`)
 
 ### S-01 · `LocalSandbox` is `in-process` isolation · Accepted

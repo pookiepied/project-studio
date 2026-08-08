@@ -150,16 +150,88 @@ function readUserVersion(db: DatabaseSync): number {
 }
 
 /**
- * Column names that would mean a secret had been written here. Enforced rather
+ * Words that mean a column holds a secret.
+ *
+ * Matched as **whole words**, anywhere in the name, rather than as a suffix.
+ * The old pattern anchored the keyword at the end, so anything after it escaped
+ * — `api_key_hash` and `private_key_pem` both passed — and bare `key` was not a
+ * keyword at all, so `secret_key`, `encryption_key`, and `signing_key` passed
+ * too.
+ *
+ * Singular `token` is a credential; plural `tokens` is a count. That is why
+ * `max_tokens` is absent from the list rather than excused by the allowlist
+ * below: it never matches in the first place.
+ */
+const SECRET_WORDS = new Set([
+  "secret",
+  "password",
+  "passphrase",
+  "credential",
+  "credentials",
+  "token",
+  "key",
+  "apikey",
+  "privatekey",
+]);
+
+/**
+ * Column names that contain a secret word and are still not secrets.
+ *
+ * Deliberately an allowlist rather than a cleverer pattern. `key` is too common
+ * a word to refuse on sight and too dangerous to ignore, so the default is to
+ * refuse and each exception is written down once, here, where it can be argued
+ * with. A new column named `cache_key` fails the check — and the fix is to add
+ * it to this list on purpose, not to weaken the rule for everything.
+ */
+const NOT_SECRET_COLUMNS = new Set([
+  // `app_setting.key` — the key half of a key/value table.
+  "key",
+  // `permission_grant.capability_key` — a capability identifier, not key material.
+  "capability_key",
+]);
+
+/**
+ * Words that make `token` a measurement rather than a credential.
+ *
+ * Only `token` needs this. Usage accounting is full of `token_count` and
+ * `total_tokens`, and refusing those would be the guard crying wolf. `key`,
+ * `secret`, `password`, and the rest never appear in a measurement, so they get
+ * no such excuse — and `token_secret` is still refused, because the excuse
+ * applies to `token` alone and `secret` is still there.
+ */
+const MEASUREMENT_WORDS = new Set(["count", "total", "usage", "limit", "max", "used"]);
+
+/**
+ * Splits a column name into words on `_`, `-`, and camel-case boundaries.
+ *
+ * The camel-case case is defence rather than need: our own columns are all
+ * snake_case, but the guard must not be defeated by a migration that is not.
+ */
+function words(columnName: string): string[] {
+  return columnName
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[\s_-]+/)
+    .map((word) => word.toLowerCase())
+    .filter((word) => word !== "");
+}
+
+/**
+ * Whether a column name means a secret had been written here. Enforced rather
  * than documented: the keychain/database split is the whole security boundary,
  * and it is one careless column away from being undone.
- *
- * Matched on whole suffixes, not substrings. A substring match reads
- * `max_tokens` as credential storage, and a guard that cries wolf gets deleted.
- * Singular `token` is a credential; plural `tokens` is a count.
  */
-const SECRET_COLUMN =
-  /^(.*_)?(api[_-]?key|secret|password|passphrase|credential|private[_-]?key|token)$/i;
+function looksLikeSecret(columnName: string): boolean {
+  if (NOT_SECRET_COLUMNS.has(columnName.toLowerCase())) return false;
+
+  const parts = words(columnName);
+  const found = parts.filter((word) => SECRET_WORDS.has(word));
+  if (found.length === 0) return false;
+
+  const onlyToken = found.every((word) => word === "token");
+  if (onlyToken && parts.some((word) => MEASUREMENT_WORDS.has(word))) return false;
+
+  return true;
+}
 
 export function assertNoSecretColumns(db: DatabaseSync): void {
   const columns = db
@@ -172,7 +244,7 @@ export function assertNoSecretColumns(db: DatabaseSync): void {
     .all() as { table_name: string; column_name: string }[];
 
   for (const column of columns) {
-    if (SECRET_COLUMN.test(column.column_name)) {
+    if (looksLikeSecret(column.column_name)) {
       throw new StorageError("migration", {
         message: `Schema column ${column.table_name}.${column.column_name} looks like secret storage. Secrets belong in the OS credential store.`,
       });
@@ -185,6 +257,16 @@ export function assertNoSecretColumns(db: DatabaseSync): void {
  *
  * Each migration runs in its own transaction, so a failure leaves the file at
  * the last fully applied version rather than half-migrated.
+ *
+ * The secret-column guard runs in two places, and both are needed:
+ *
+ * 1. **Inside each migration's transaction**, so a migration that adds a
+ *    credential column rolls back instead of committing. Checking after the
+ *    loop was too late — the column and its `user_version` bump were already on
+ *    disk, and only the process that ran the migration ever saw the error.
+ * 2. **On every open**, before the early return. Otherwise a file poisoned by an
+ *    older build passes forever: `current === latest` returns immediately, and
+ *    the application starts normally with the column present.
  */
 export function migrate(
   db: DatabaseSync,
@@ -201,6 +283,9 @@ export function migrate(
       message: `The database was written by a newer version of Project Studio (schema ${current}, this build supports ${latest}).`,
     });
   }
+
+  // Every open, not only one that migrates.
+  assertNoSecretColumns(db);
 
   if (current === latest) {
     return current;
@@ -222,6 +307,8 @@ export function migrate(
     db.exec("BEGIN");
     try {
       migration.up(db);
+      // Inside the transaction: a refusal must undo the column, not report it.
+      assertNoSecretColumns(db);
       db.prepare(
         "INSERT INTO schema_migration (version, name, applied_at) VALUES (?, ?, ?)",
       ).run(migration.version, migration.name, Date.now());
@@ -230,10 +317,13 @@ export function migrate(
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
+      // Our own refusal already says what is wrong and names the column.
+      // `storageErrorFrom` would replace it with the generic schema message,
+      // which is the one thing the person reading it cannot act on.
+      if (error instanceof StorageError) throw error;
       throw storageErrorFrom(error, "migration");
     }
   }
 
-  assertNoSecretColumns(db);
   return latest;
 }

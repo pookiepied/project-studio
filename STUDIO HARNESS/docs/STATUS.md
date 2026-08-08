@@ -81,7 +81,8 @@ resolves it. Keys live in the OS keychain, never a file.
 
 **Persistence.** An application-owned SQLite database with versioned migrations,
 separate from Flue's. A migration guard fails anything that looks like a
-credential column.
+credential column — inside the migration's own transaction, so it rolls back,
+and on every open, so a file poisoned by an older build cannot pass.
 
 **Errors.** One contract. Every subsystem declares a domain and reports through
 one path, so an unclassified throw is visible in telemetry rather than silent.

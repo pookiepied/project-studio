@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 2 of 20 done
+**State:** open — 4 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -105,7 +105,7 @@ the depth back to one fails 4 tests.
 
 ## Group 2 — A security boundary that does not hold
 
-### [ ] 3. The migration guard runs once, then never again · `D-01`
+### [x] 3. The migration guard runs once, then never again · `D-01` · `PENDING3`
 
 **Where:** `STUDIO HARNESS/src/storage/migrations.ts:205-207` and `:237`
 
@@ -122,9 +122,22 @@ open, not only after a migration. Better: call it inside each migration's
 transaction, so a bad migration rolls back instead of committing. Test that a
 second `openDatabase` on a poisoned file still fails.
 
+**Done.** Both, as the item suggested. The guard now runs inside each
+migration's transaction, so a bad migration rolls back instead of committing,
+and again at the top of `migrate()` on every open, before the early return.
+
+**One thing found while fixing it:** the catch block wrapped our refusal in
+`storageErrorFrom`, which replaced the message naming the column with the
+generic "schema could not be prepared". A `StorageError` is now rethrown
+untouched. The guard was reporting the one thing the reader cannot act on.
+
+**Tested by:** a migration that adds `api_key` must leave `user_version` at 0
+and the table absent, and a second `migrate()` on an already-poisoned database
+must still throw. Reverting the placement fails both.
+
 ---
 
-### [ ] 4. The secret-column pattern misses obvious names · `D-02`
+### [x] 4. The secret-column pattern misses obvious names · `D-02` · `PENDING3`
 
 **Where:** `STUDIO HARNESS/src/storage/migrations.ts:161-162`
 
@@ -145,6 +158,24 @@ it escapes, and bare `_key` is not a keyword at all.
 `private_key`. Allow a suffix after the keyword. Keep `max_tokens` passing —
 that exclusion is deliberate and a guard that cries wolf gets deleted. Test
 every name in the list above, in both directions.
+
+**Done.** The regex is replaced by word matching. A column name is split on
+`_`, `-`, and camel-case boundaries, and any word in `SECRET_WORDS` refuses it —
+so a suffix no longer escapes and bare `key` is a keyword now.
+
+Two deliberate exceptions, both written down in code rather than hidden in a
+pattern:
+
+- `NOT_SECRET_COLUMNS` — an allowlist holding `key` and `capability_key`, the
+  two columns we ship that contain the word. `key` is too common to refuse on
+  sight and too dangerous to ignore, so the default is refuse and each exception
+  is argued once.
+- `MEASUREMENT_WORDS` — `token` beside `count`, `total`, `usage`, `limit`,
+  `max`, or `used` is accounting, not a credential. This excuse belongs to
+  `token` alone, so `token_secret_count` is still refused.
+
+**Tested by:** 14 names that must be refused and 6 that must pass. Restoring the
+old regex fails the first group.
 
 ---
 

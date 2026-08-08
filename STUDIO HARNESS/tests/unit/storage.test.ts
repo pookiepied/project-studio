@@ -103,6 +103,88 @@ describe("the keychain/database boundary", () => {
   it("passes for the shipped schema", () => {
     expect(() => assertNoSecretColumns(open().handle)).not.toThrow();
   });
+
+  it("catches a secret word anywhere in the name, not only at the end", () => {
+    // The old pattern anchored the keyword last, so anything appended escaped,
+    // and bare `key` was not a keyword at all.
+    const secrets = [
+      "api_key",
+      "api_key_hash",
+      "secret_key",
+      "encryption_key",
+      "signing_key",
+      "private_key_pem",
+      "auth_token_value",
+      "refresh_token",
+      "access_token",
+      "client_secret",
+      "password",
+      "passphrase",
+      "credential",
+      "apiKey",
+      // The measurement excuse belongs to `token` alone, so `secret` still
+      // refuses this one.
+      "token_secret_count",
+    ];
+
+    for (const name of secrets) {
+      const db = open();
+      db.handle.exec(`CREATE TABLE leaky (id TEXT PRIMARY KEY, ${name} TEXT) STRICT`);
+      expect(() => assertNoSecretColumns(db.handle), name).toThrow(/credential store/i);
+    }
+  });
+
+  it("still passes counts and the names our own schema uses", () => {
+    // A guard that cries wolf gets deleted. Plural `tokens` is a count, and
+    // `key` and `capability_key` are columns we ship.
+    const benign = [
+      "max_tokens",
+      "tokens",
+      "token_count",
+      "total_tokens",
+      "key",
+      "capability_key",
+    ];
+
+    for (const name of benign) {
+      const db = open();
+      db.handle.exec(`CREATE TABLE fine (id TEXT PRIMARY KEY, ${name} TEXT) STRICT`);
+      expect(() => assertNoSecretColumns(db.handle), name).not.toThrow();
+    }
+  });
+
+  it("rolls the migration back rather than reporting a column that is already there", () => {
+    // Checking after the loop was too late: the migration had committed and
+    // bumped user_version, so the column stayed on disk.
+    const handle = new DatabaseSync(":memory:");
+    const leaky: Migration[] = [
+      {
+        version: 1,
+        name: "leaky",
+        up: (db) => db.exec("CREATE TABLE leaky (id TEXT PRIMARY KEY, api_key TEXT) STRICT"),
+      },
+    ];
+
+    expect(() => migrate(handle, leaky)).toThrow(/credential store/i);
+
+    const row = handle.prepare("PRAGMA user_version").get() as { user_version: number };
+    expect(row.user_version).toBe(0);
+    expect(
+      handle.prepare("SELECT name FROM sqlite_master WHERE name = 'leaky'").get(),
+    ).toBeUndefined();
+    handle.close();
+  });
+
+  it("still fails on a later open of a database that is already poisoned", () => {
+    // The guard used to run only after a migration. Once user_version matched,
+    // migrate() returned early and the application started normally, forever.
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle);
+    handle.exec("CREATE TABLE leaky (id TEXT PRIMARY KEY, api_key TEXT) STRICT");
+
+    expect(() => migrate(handle)).toThrow(/credential store/i);
+    handle.close();
+  });
 });
 
 describe("transactions", () => {
