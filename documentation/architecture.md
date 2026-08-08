@@ -63,6 +63,7 @@ permissions/     the kernel — decides, never executes, never prompts
 platform/        OS specifics
 process/         exec.ts — the only place a child process starts
 sandbox/         isolation tiers
+snapshots/       shadow git per project — the undo history
 storage/         SQLite, versioned migrations
 tools/           filesystem, search, git — all behind one CallGate
 vendor/          bundled binaries, installation-relative resolution
@@ -111,9 +112,15 @@ The harness continues on its own roadmap; the app connects at the end.
 | 14–17 | projects, memory, workflows, evals | |
 | 18 | product integration — the frontend seam | |
 
-**Immediately next: snapshots.** It is the only thing blocking the chain —
-modes need undo, `shell` needs modes. Scope and trigger are settled in
-check-later C-07.
+**Snapshots are done** (ADR 0016), which unblocks the chain. What is left in
+Phase 10, in order:
+
+1. **Gate bounds** (`T-02`) — timeout, mid-call cancellation, concurrency.
+   Independent, so it can run alongside the next item.
+2. **Trust and modes** (`T-03`) — Manual / Auto Edit / Full Auto. Full Auto also
+   flips the snapshot hook to blocking (`T-09`).
+3. **`shell`** — needs both of the above.
+4. **`fetch`** — needs an ADR on the network-effect question first.
 
 **Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with
 discovery can run. They measure whether the Flue/Pi bet holds, and they are

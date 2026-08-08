@@ -7,7 +7,8 @@ answers "how far along are we, and what is actually blocking what".
 Refresh it at a phase boundary. If it disagrees with the other two documents,
 they are right and this one is stale.
 
-Last refreshed: Phase 10 in progress, 6 of 10 native tools shipped.
+Last refreshed: Phase 10 in progress, 6 of 10 native tools shipped, undo history
+landed (ADR 0016).
 
 ---
 
@@ -86,6 +87,13 @@ executes:
 | Search | `glob`, `grep` | Over vendored ripgrep 14.1.1 |
 | Version control | `git` | Complete subcommand coverage, one capability |
 
+**Undo.** A shadow git repository per project in `~/.studio/data/snapshots/`,
+work tree pointed at the project. The gate snapshots before each turn's first
+write, keyed on the declared `write` effect — so a tool cannot be added that
+writes without being reversible. Scope is the project minus ignored files, plus
+every path a write tool touched. Restore is itself snapshotted first. See ADR
+0016.
+
 **Where things live.** Three locations, decided once (ADR 0014): the
 installation is read-only, `~/.studio` is ours and writable in six categories,
 the project belongs to the user. Nothing resolves against the working directory.
@@ -96,21 +104,21 @@ the project belongs to the user. Nothing resolves against the working directory.
 
 ### Immediately next
 
-**Snapshots (T-04).** Shadow git in `~/.studio/data/snapshots/`, outside the
-project so it neither pollutes `git status` nor dies with the thing it protects.
-Blocks: trust and modes, and therefore any unattended execution.
+~~**Snapshots (T-04).**~~ Done — ADR 0016.
+
+**Gate bounds (T-02).** Timeout, mid-call cancellation, concurrency limit.
+Independent of everything else here, so it can run in parallel. Blocks `shell`.
 
 **Trust and modes (T-03).** Workspace trust as a precondition; Manual / Auto
-Edit / Full Auto resolving what an `ask` verdict means. Blocked by snapshots,
-because Full Auto's safety story is "you can undo it".
-
-**Gate timeout, cancellation, concurrency (T-02).** Blocks `shell`.
+Edit / Full Auto resolving what an `ask` verdict means. Unblocked now that undo
+exists. Must also flip `T-09` — a snapshot failure has to become blocking once
+writes stop being approved one at a time.
 
 ### The remaining four tools
 
 | Tool | Blocked by |
 |---|---|
-| `shell` | Modes + snapshots + gate policy |
+| `shell` | Modes (T-03) + gate bounds (T-02) |
 | `fetch` | The network-effect question — SSRF is not containment |
 | `task` | Phase 13 |
 | `skill` | Phase 12 |

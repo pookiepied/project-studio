@@ -1,0 +1,109 @@
+import type { ErrorReporter } from "../observability/error-reporter.js";
+import { SnapshotError } from "./errors.js";
+import type { Snapshot, SnapshotStore } from "./store.js";
+
+/**
+ * When a snapshot is taken.
+ *
+ * Per user turn, lazily, immediately before that turn's first write. Two
+ * alternatives were considered and both are worse:
+ *
+ * - **Per write.** Produces a history nobody can navigate — twenty entries for
+ *   one instruction, and no single one of them is "before you asked for this".
+ * - **Per turn, eagerly.** Commits on every turn including the ones that only
+ *   read, filling the history with points nothing happened at.
+ *
+ * "Undo what the agent just did" is the unit people actually think in, and a
+ * turn is that unit.
+ */
+
+export interface SnapshotHook {
+  /**
+   * Called by the gate before anything with a `write` effect executes.
+   *
+   * `resource` is the already-resolved path for a filesystem tool, and the
+   * command for a tool like git. Both trigger a snapshot; only a path is
+   * recorded as touched, since only a path can be force-added.
+   */
+  beforeWrite(resource: string | undefined, kind: "path" | "command" | "none"): Promise<void>;
+}
+
+export interface TurnSnapshotsOptions {
+  readonly store: SnapshotStore;
+  readonly reporter?: ErrorReporter;
+  /**
+   * Whether a failed snapshot blocks the write.
+   *
+   * `false` today, and that is a real trade rather than an oversight. Every
+   * write is currently approved by a person in front of the screen, so undo is
+   * a safety net rather than the safety story, and refusing to work because
+   * the net is unavailable turns a degraded feature into an outage.
+   *
+   * **This must become `true` for any unattended mode.** Full Auto's entire
+   * argument is "you can undo it", and a Full Auto write with no snapshot
+   * behind it is exactly the situation that argument rules out.
+   */
+  readonly required?: boolean;
+}
+
+export class TurnSnapshots implements SnapshotHook {
+  readonly #store: SnapshotStore;
+  readonly #reporter: ErrorReporter | undefined;
+  readonly #required: boolean;
+  #label = "turn 1";
+  #turn = 1;
+  /**
+   * The snapshot for the current turn, as a promise.
+   *
+   * Held as the promise rather than a boolean so two tool calls that start
+   * concurrently share one capture instead of racing to make two.
+   */
+  #pending: Promise<Snapshot | undefined> | undefined;
+
+  constructor(options: TurnSnapshotsOptions) {
+    this.#store = options.store;
+    this.#reporter = options.reporter;
+    this.#required = options.required ?? false;
+  }
+
+  /**
+   * Opens a new turn.
+   *
+   * Nothing is captured here. The next write triggers it, and a turn with no
+   * writes leaves no trace.
+   */
+  beginTurn(label?: string): void {
+    this.#turn += 1;
+    this.#label = label ?? `turn ${this.#turn}`;
+    this.#pending = undefined;
+  }
+
+  async beforeWrite(
+    resource: string | undefined,
+    kind: "path" | "command" | "none",
+  ): Promise<void> {
+    // Ordered deliberately: the snapshot must capture the state *before* this
+    // write, so the path being written is recorded as touched only afterwards.
+    // It is force-added from the following snapshot onward, which is the first
+    // one where it exists.
+    this.#pending ??= this.#capture();
+    await this.#pending;
+
+    if (kind === "path" && resource !== undefined) {
+      this.#store.markTouched(resource);
+    }
+  }
+
+  async #capture(): Promise<Snapshot | undefined> {
+    try {
+      return await this.#store.capture(this.#label);
+    } catch (error) {
+      this.#reporter?.report(error, {
+        operation: "snapshots.capture",
+        ...(error instanceof SnapshotError ? { error_code: error.code } : {}),
+      });
+      if (this.#required) throw error;
+      return undefined;
+    }
+  }
+}

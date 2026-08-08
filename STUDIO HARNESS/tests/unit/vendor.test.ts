@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -193,7 +194,11 @@ describe("vendor layout", () => {
     try {
       process.chdir(base);
       expect(vendorRoot()).not.toBe(join(base, "vendor"));
-      expect(vendorRoot().replaceAll("\\", "/")).toMatch(/Project Studio V2\/vendor$/);
+      // Anchored to this file's own location, not to a literal folder name:
+      // the checkout has been renamed once already.
+      expect(vendorRoot()).toBe(
+        resolve(fileURLToPath(new URL("../../vendor", import.meta.url))),
+      );
     } finally {
       process.chdir(previous);
     }

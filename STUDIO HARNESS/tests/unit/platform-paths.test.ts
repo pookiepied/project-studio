@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -141,7 +142,12 @@ describe("nothing is resolved against the working directory", () => {
     // Were this cwd-relative, any repository could ship its own binaries here
     // and have the harness run them.
     expect(shippedBinaryDirectory()).not.toBe(join(workspace, "vendor"));
-    expect(installationRoot().replaceAll("\\", "/")).toMatch(/Project Studio V2$/);
+    // Compared against this test file's own location rather than a literal
+    // folder name. The name has been changed once already, and a test that
+    // fails when the checkout is renamed is testing the checkout.
+    expect(installationRoot()).toBe(
+      resolve(fileURLToPath(new URL("../../", import.meta.url))),
+    );
   });
 });
 

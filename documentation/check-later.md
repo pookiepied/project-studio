@@ -105,22 +105,15 @@ it is on the critical path for "general-purpose, not a coding agent."
 
 ## C-07 — Snapshot scope: ignored files the agent creates
 
-**Status:** decided, not implemented. Recording the reasoning so it is not
-relitigated.
+**Settled and shipped.** Everything decided here is implemented in
+`STUDIO HARNESS/src/snapshots/` and written up in ADR 0016, which is now the
+authoritative account. The rule survived contact unchanged: *the shadow repo
+contains the project minus ignored files, plus everything the agent touched.*
 
-Shadow git in `~/.studio/data/snapshots/`, one repo per project, outside the
-project so it neither pollutes `git status` nor dies with the thing it protects.
-
-- **Trigger:** per user turn, taken lazily *before the turn's first write*. Turns
-  that write nothing produce no snapshot. "Undo what the agent just did" is the
-  unit people actually think in; per-write gives a history nobody can navigate.
-- **Scope:** honour `.gitignore`, but force-add every path the write/edit tools
-  actually touched. The tools already know what they wrote.
-- **The rule in one line:** the shadow repo contains the project minus ignored
-  files, plus everything the agent touched.
-
-Without the force-add, an agent-created ignored file is not restorable. Without
-honouring `.gitignore`, the first snapshot swallows `node_modules`.
+One thing the implementation added that the decision had not anticipated: the
+touched-path set does not need persisting. Once a path is committed, git updates
+it on every `add --all` regardless of ignore rules, so the set only bridges the
+window between creation and the next snapshot.
 
 ---
 

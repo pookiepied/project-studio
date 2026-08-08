@@ -46,6 +46,12 @@ export type StudioErrorDomain =
    * answers from the user, so they must not share a code.
    */
   | "vendor"
+  /**
+   * The undo history. Separate from `tools`: "the write failed" and "the write
+   * succeeded but could not be made reversible" are different situations and
+   * need different answers.
+   */
+  | "snapshots"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

@@ -7,6 +7,7 @@ import { isStudioError } from "../contracts/errors.js";
 import type { ErrorReporter } from "../observability/error-reporter.js";
 import type { PermissionKernel } from "../permissions/kernel.js";
 import type { LocalSandbox } from "../sandbox/local-sandbox.js";
+import type { SnapshotHook } from "../snapshots/turn.js";
 import { ToolError } from "./errors.js";
 import type { ToolContext, ToolDefinition } from "./types.js";
 
@@ -35,6 +36,12 @@ export interface CallGateOptions {
   readonly kernel: PermissionKernel;
   readonly sandbox: LocalSandbox;
   readonly reporter?: ErrorReporter;
+  /**
+   * Undo history. Optional, and absent means writes are simply not reversible
+   * — which is the honest state for a headless test, and must not be the state
+   * for any unattended mode.
+   */
+  readonly snapshots?: SnapshotHook;
 }
 
 export interface ToolCall {
@@ -50,11 +57,13 @@ export class CallGate {
   readonly #kernel: PermissionKernel;
   readonly #sandbox: LocalSandbox;
   readonly #reporter: ErrorReporter | undefined;
+  readonly #snapshots: SnapshotHook | undefined;
 
   constructor(options: CallGateOptions) {
     this.#kernel = options.kernel;
     this.#sandbox = options.sandbox;
     this.#reporter = options.reporter;
+    this.#snapshots = options.snapshots;
   }
 
   /**
@@ -135,6 +144,19 @@ export class CallGate {
           message: "The call was cancelled.",
           tool: call.name,
         });
+      }
+
+      // Last, and here rather than in each tool. A tool that writes is a tool
+      // that must be undoable, and that is a property of the effect it
+      // declares — not something every author has to remember. Placed after
+      // authorization so a refused call leaves no snapshot behind, and before
+      // execution because a snapshot taken afterwards records the damage
+      // instead of the state to return to.
+      if (this.#snapshots && tool.descriptor.effects.includes("write")) {
+        await this.#snapshots.beforeWrite(
+          resource,
+          resource === undefined ? "none" : tool.resourceKind,
+        );
       }
 
       return await tool.execute(input, context);

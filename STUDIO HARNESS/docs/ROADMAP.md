@@ -152,7 +152,7 @@ The surface is capped at ten tools, grouped by family, one tool per capability:
 
 | Family | Tools | Status |
 |---|---|---|
-| Filesystem | `read`, `write`, `edit` | Done |
+| Filesystem | `read`, `write`, `edit` | Done, and reversible — see ADR 0016 |
 | Search | `glob`, `grep` | Done, over vendored ripgrep 14.1.1 |
 | Version control | `git` | Done — complete subcommand coverage, one capability |
 | Execution | `shell` | Local, bounded by permission |
@@ -171,6 +171,21 @@ Foundations landed first, because every tool stands on them:
   before authorization, so an unresolved `..` can never be matched against a scoped rule.
 - **Argument-level permissions** — policy and grants now match on what a call touches, so `git:log`
   and `git:push` are decided separately.
+- **`src/snapshots/`** — a shadow git repository per project, outside the project. The gate takes a
+  snapshot before each turn's first write, keyed on the declared `write` effect. This is a
+  prerequisite rather than a feature: modes need undo, and `shell` needs modes. See ADR 0016.
+
+The remaining order in this phase is fixed by that chain:
+
+1. **Gate bounds** (`T-02`) — timeout, mid-call cancellation, concurrency limit. Independent of the
+   rest, so it can run in parallel.
+2. **Trust and modes** (`T-03`) — workspace trust as a precondition, Manual / Auto Edit / Full Auto
+   resolving what `ask` means. Also flips `T-09`, since Full Auto's safety story is the snapshot.
+3. **`shell`** — unblocked by 1 and 2. The one tool where the model names the program.
+4. **`fetch`** — needs an ADR on the network-effect question first. SSRF is not containment, so the
+   real question is what a network capability means while isolation is `in-process`.
+
+`task` and `skill` stay in Phases 13 and 12, so Phase 10 closes with eight of ten.
 
 ### Phase 11: MCP
 

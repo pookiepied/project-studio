@@ -156,22 +156,42 @@ Manual / Auto Edit / Full Auto resolving what `ask` means — is not implemented
 The kernel still prompts for every `ask`, so there is currently no mode in which
 edits proceed unattended.
 
-**Fix when:** after the filesystem tools, and before the product needs an
-unattended run.
+**Prerequisite met.** T-04 is closed, so there is now something to undo with.
+This also has to flip `T-09`.
 
-### T-04 · Nothing can undo a write yet · Open
+**Fix when:** next, together with T-02. Both gate `shell`.
 
-`write` replaces a file whole and `edit` rewrites one in place. The shadow-git
-snapshot mechanism that makes those reversible **does not exist yet**, so today
-the only protections are the read-before-modify rule and the user approving each
-call.
+### T-04 · Nothing can undo a write · Fixed
 
-That is adequate while every write is approved in front of a person. It stops
-being adequate the moment an unattended mode ships, because the safety story for
-Full Auto is "you can undo it", and there is currently nothing to undo with.
+Closed by ADR 0016. A shadow git repository per project, in
+`~/.studio/data/snapshots/`, work tree pointed at the project. The call gate
+takes a snapshot before the first write of each turn, keyed on the declared
+`write` effect rather than on each tool remembering. Scope is the project minus
+ignored files, plus every path a write tool touched.
 
-**Fix when:** before any mode that writes without asking. Snapshots are the
-prerequisite, not a companion feature.
+### T-09 · A failed snapshot does not block the write · Accepted, must be revisited
+
+`TurnSnapshots` reports a capture failure and lets the write proceed. Chosen
+because every write is currently approved by a person, so undo is a safety net
+rather than the safety story, and an unavailable net should not become an
+outage.
+
+**This must become blocking for any unattended mode.** Full Auto's whole
+argument is "you can undo it". `TurnSnapshots` takes a `required` flag for
+exactly this; Full Auto sets it.
+
+**Fix when:** T-03 lands. This is part of that work, not separate from it.
+
+### T-10 · Snapshot history is never pruned · Open
+
+One commit per writing turn, delta-compressed, so growth is slow — but nothing
+removes anything, ever.
+
+Left deliberately for now: a retention policy that discards the snapshot
+someone needed is worse than a directory that grows, and the right cutoff is not
+knowable before the feature has been used in anger.
+
+**Fix when:** a real project's history is large enough to measure.
 
 ### T-05 · The read-before-modify record does not survive a restart · Accepted
 
@@ -238,6 +258,9 @@ provider lands, any capability requiring `os` isolation is refused.
 `src/platform/paths.ts` names `logs/`, `sessions/`, `projects/`, `cache/`, and
 `tmp/`, but nothing writes to them yet. Observability still logs to stdout and
 Flue owns its own database wherever it was configured.
+
+`data/snapshots/` is now real — ADR 0016 put the undo history there, and it is
+the first directory in this list to get a user.
 
 Named now so the layout is decided once (ADR 0014) rather than negotiated by
 each subsystem as it arrives. The risk is the opposite of the usual one: a
