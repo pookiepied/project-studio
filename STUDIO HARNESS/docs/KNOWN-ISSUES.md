@@ -14,6 +14,12 @@ An entry is removed only when the code changes, never because it got old.
 Decisions with lasting rationale belong in `decisions/`; this file is the
 running list of what is currently not true about the system.
 
+**Twenty defects are being fixed right now under `tasks/001-cross-reference-audit-fixes.md`.**
+They are not yet listed below, because an entry here describes shipped code and
+those fixes are in flight. Each one moves here as Fixed when its box is ticked.
+Two of them let a model run any program through the `git` tool — `T-23` and
+`T-24` — and both are proven against real git rather than argued.
+
 ---
 
 ## Process Execution (`src/process/`)

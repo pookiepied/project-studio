@@ -12,6 +12,7 @@ in [mental-model.md](./mental-model.md); the harness's own ADRs in
 STUDIO/                  desktop app — React 19, Vite, Tailwind v4, Tauri v2
 STUDIO HARNESS/          the harness — TypeScript, Flue + Pi, Hono
 documentation/           this layer: meta docs spanning both halves
+tasks/                   batches of work in progress, with checklists
 archive/                 previous attempts and superseded work, kept for mining
 README.md
 ```

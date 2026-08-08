@@ -157,6 +157,14 @@ the project belongs to the user. Nothing resolves against the working directory.
 
 ### Immediately next
 
+**Task 001 is open.** A second audit — five reviewers over all 21,274 lines —
+raised 22 complaints. 20 were verified valid. They are listed with their
+evidence in `tasks/001-cross-reference-audit-fixes.md`.
+
+Two of them let a model run any program on the machine through the `git` tool,
+which declares `read`/`write` and therefore needs no execution permission. Both
+are proven against real git. Nothing else starts until those two are closed.
+
 **The audit findings come before `fetch`.** Adding the last tool on top of known
 holes is building on a floor we know has one.
 

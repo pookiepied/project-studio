@@ -11,6 +11,7 @@ file:
 - `STUDIO HARNESS/docs/ROADMAP.md` — what order to build in
 - `STUDIO HARNESS/docs/KNOWN-ISSUES.md` — what is currently untrue
 - `documentation/check-later.md` — things deliberately deferred
+- `tasks/` — work in progress, as a checklist
 
 ---
 

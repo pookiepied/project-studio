@@ -1,0 +1,405 @@
+# Task 001 — Fix Everything The Cross-Reference Audit Found
+
+**Opened:** 2026-08-09
+**State:** open — 0 of 20 done
+**Baseline commit:** `423999e`
+**Closes when:** every box is ticked, `pnpm check` is green, and each item is
+recorded in `KNOWN-ISSUES.md`.
+
+## What this task is
+
+Five reviewers read all 21,274 lines of the harness — 11,736 source, 6,804
+test, 2,734 documentation. They raised 22 complaints. I verified each one
+against the code. **20 were valid. 2 were rejected.**
+
+Nothing here is a regression. Every item shipped while we believed otherwise.
+
+Two of the twenty let a model run any program on the machine. Those go first.
+
+## How to use this file
+
+Tick a box only when the code is changed **and** a test covers it. Add the
+commit hash next to the box. If an item turns out to be wrong after all, do not
+delete it — change it to `[~]` and write why.
+
+---
+
+## Group 1 — A model can run any program (do these first)
+
+### [ ] 1. `git` long options can be shortened past the blocklist · `T-23`
+
+**Where:** `STUDIO HARNESS/src/tools/git/argv.ts:105-112`
+
+**What is wrong:** Git accepts a shortened long option when the short form is
+unambiguous. `BLOCKED_OPTIONS` is a `Set` and `optionName()` returns the option
+verbatim, so the check is an exact string match. `--upload-pac` is not in the
+set. Git expands it to `--upload-pack` and runs the named program.
+
+**Proven by running:**
+```
+git fetch --upload-pac=cmdthatdoesnotexist999 origin
+  → cmdthatdoesnotexist999 'origin': command not found      it RAN
+git fetch --zzzznope=1 origin
+  → error: unknown option `zzzznope=1'                      control
+```
+
+**Why it is the worst item here:** `GIT_DESCRIPTOR` declares `read`/`write`, so
+this is not gated as execution. It needs no sandbox permission. Under Auto Edit
+it would need no prompt.
+
+**Fix:** Stop matching whole names. Refuse any option that is a prefix of a
+blocked option, and refuse any blocked option that is a prefix of the argument.
+Cover `--exec`, which is itself a prefix of `--exec-path`. Add a test for every
+blocked option truncated to each length that is still unambiguous.
+
+---
+
+### [ ] 2. A chained git alias defeats the shell-alias check · `T-24`
+
+**Where:** `STUDIO HARNESS/src/tools/git/index.ts:60-79`
+
+**What is wrong:** `assertNotShellAlias` reads `alias.<subcommand>` once and
+refuses only if the value starts with `!`. Git follows an alias that names
+another alias.
+
+**Proven by running:**
+```
+alias.y = !echo PWNED_BY_CHAINED_ALIAS
+alias.x = y
+git config --get alias.x   →  y            our check sees this, allows it
+git x                      →  PWNED_BY_CHAINED_ALIAS
+```
+
+**Fix:** Follow the chain. Read `alias.<name>`; if the value does not start with
+`!`, take its first word and read that alias too. Stop at a depth limit — git
+itself stops at 10 — and refuse a loop. Test two levels and a cycle.
+
+---
+
+## Group 2 — A security boundary that does not hold
+
+### [ ] 3. The migration guard runs once, then never again · `D-01`
+
+**Where:** `STUDIO HARNESS/src/storage/migrations.ts:205-207` and `:237`
+
+**What is wrong:** `assertNoSecretColumns` is called after the migration loop.
+`migrate()` returns early at line 205 when `current === latest`. Each migration
+commits and bumps `user_version` on its own (line 229-230). So a migration that
+adds a credential column commits first, the guard throws once, and the column
+and the new version are both on disk. On the next start `current === latest`,
+the function returns at line 205, and the guard never runs again. The
+application starts normally, forever, with the column present.
+
+**Fix:** Call `assertNoSecretColumns` before the early return as well — on every
+open, not only after a migration. Better: call it inside each migration's
+transaction, so a bad migration rolls back instead of committing. Test that a
+second `openDatabase` on a poisoned file still fails.
+
+---
+
+### [ ] 4. The secret-column pattern misses obvious names · `D-02`
+
+**Where:** `STUDIO HARNESS/src/storage/migrations.ts:161-162`
+
+**Proven by running the real regex:**
+```
+CAUGHT   api_key  refresh_token  access_token  password  client_secret
+MISSED   secret_key  encryption_key  signing_key  api_key_hash
+MISSED   private_key_pem  auth_token_value
+```
+
+`max_tokens` and `tokens` are also missed, and that is correct — they are
+counts, and the comment says so.
+
+**What is wrong:** The pattern anchors the keyword at the end. Any suffix after
+it escapes, and bare `_key` is not a keyword at all.
+
+**Fix:** Add `key` as a word anywhere in the name, not only as `api_key` or
+`private_key`. Allow a suffix after the keyword. Keep `max_tokens` passing —
+that exclusion is deliberate and a guard that cries wolf gets deleted. Test
+every name in the list above, in both directions.
+
+---
+
+### [ ] 5. An Anthropic API key is not redacted · `O-01`
+
+**Where:** `STUDIO HARNESS/src/observability/redaction.ts:4`
+
+**Proven by running the real regex:**
+```
+REDACTED  sk-abcdefghijklmnopqrst
+LEAKED    sk-ant-api03-AbCdEfGh1234567890abcdefXYZ
+LEAKED    sk-proj-AbCdEfGh1234567890
+```
+
+**What is wrong:** `/\bsk-[A-Za-z0-9]{10,}\b/g` allows no hyphen after `sk-`.
+Real keys have several.
+
+**Why it matters here more than elsewhere:** This is a Claude product. The key
+format most likely to reach these logs is the one the redactor cannot see.
+
+**Fix:** Allow hyphens inside the body. Test the Anthropic and project-key
+shapes, and keep a test proving an ordinary hyphenated word is not redacted.
+
+---
+
+### [ ] 6. A writable root is checked with a string prefix · `S-03`
+
+**Where:** `STUDIO HARNESS/src/sandbox/policy.ts:92`
+
+**What is wrong:** `root === readable || root.startsWith(readable)`. This is the
+exact anti-pattern `sandbox/paths.ts:14-16` documents and solves — it says in
+so many words that `/work` is a prefix of `/work-secrets`. `isInsideRoot`
+already exists, ten lines away, and does this correctly.
+
+**Failure:** `createSandboxPolicy({ workspaceRoot: "/home/u/work", writeRoots:
+["/home/u/work-secrets"] })` is accepted. A writable root sits outside every
+readable root, which the function's own comment says must never happen.
+
+**Fix:** Use `isInsideRoot`. Test the sibling-with-shared-prefix case, which the
+current test misses because it only uses a sibling with an unrelated name.
+
+---
+
+## Group 3 — Wrong behaviour
+
+### [ ] 7. A cancelled call kills every other caller's token refresh · `A-01`
+
+**Where:** `STUDIO HARNESS/src/auth/session-token-provider.ts:66-70`
+
+**What is wrong:** `#refreshing` is shared, but the fetch inside it uses the
+signal of whichever caller arrived first. Callers 2..N join a promise governed
+by a signal that is not theirs.
+
+**Failure:** Calls A and B both need a token. A starts the refresh. The user
+cancels A. B — never cancelled — fails with `aborted` instead of getting a
+token.
+
+**Fix:** Do not pass any caller's signal into the shared refresh. Let each
+caller race the shared promise against its own signal, so cancelling A affects
+only A. Test with two callers and one signal.
+
+---
+
+### [ ] 8. A capability with no effects is treated as safe · `K-05`
+
+**Where:** `STUDIO HARNESS/src/contracts/effects.ts:166-178`
+
+**What is wrong:** `isReadOnly` and `allowedWhileUntrusted` use `every()`, which
+is `true` for an empty array. So `effects: []` is read-only, allowed in an
+untrusted folder, and auto-allowed by `defaultVerdict`. The most permissive path
+belongs to the capability that declared nothing.
+
+**Fix:** Refuse `effects: []` at registration in `PermissionKernel.register`. A
+capability that does nothing does not need to exist, and one that does something
+must say so. Test that registration throws.
+
+---
+
+### [ ] 9. A grant is stored with a project and never matched on it · `K-06`
+
+**Where:** `STUDIO HARNESS/src/permissions/grant-store.ts:93-98` (query),
+`:144` (write)
+
+**What is wrong:** `project_id` is written on every grant. The `find` query
+filters on `capability_key`, `agent_id`, `revoked_at` and `conversation_id`
+only. The column is written and never read.
+
+**Failure:** "Always allow `git:push`" approved in project A also applies in
+project B. Path grants hide this because the stored pattern is an absolute path
+under the old root. Command grants have no such boundary.
+
+**Fix:** Decide whether a grant is project-scoped. If yes, add `project_id` to
+the `WHERE`. If no, stop writing the column. Do not leave it written and unread.
+Test an "always" command grant across two project ids.
+
+---
+
+### [ ] 10. An SSE frame splits when a chunk ends in `\r` · `M-01`
+
+**Where:** `STUDIO HARNESS/src/models/studio-cloud/sse-parser.ts:35`
+
+**What is wrong:** The line rewrites a trailing lone `\r` to `\n` before the
+next chunk arrives. If the `\n` of a `\r\n` pair is in the next chunk, one line
+break becomes two, so one frame becomes two. The first has no `data:` line and
+is dropped, taking the `event:` name with it.
+
+**Fix:** Hold a trailing `\r` back until the next chunk arrives, or the stream
+ends. Test a CRLF frame split exactly on the `\r`.
+
+---
+
+### [ ] 11. Flue's database defaults to the working directory · `H-02`
+
+**Where:** `STUDIO HARNESS/src/db.ts:3`
+
+**What is wrong:** `sqlite(process.env.PROJECT_STUDIO_DB_PATH ?? "./data/flue.db")`.
+`platform/paths.ts:21-25` names the database path as one of two bugs that "have
+already happened once". This is that bug, still present, for Flue's own
+canonical journal.
+
+**Failure:** Start the harness in `~/repo-a` and again in `~/repo-b`. Two
+separate databases, each inside the user's project, each visible in their
+`git status`.
+
+**Fix:** Default to the Studio home through `platform/paths.ts`. Keep the
+environment variable as an override.
+
+---
+
+### [ ] 12. A configured relative path can leave the Studio home · `H-03`
+
+**Where:** `STUDIO HARNESS/src/platform/paths.ts:169-171`
+
+**Proven by running:** `PROJECT_STUDIO_STORE_PATH=../../elsewhere/studio.db`
+resolves to `C:\Users\elsewhere\studio.db`. `join()` normalises `..` away
+instead of refusing it.
+
+**Fix:** After joining, check the result is inside the home and refuse if it is
+not. Test a `..` value.
+
+---
+
+### [ ] 13. `shell` cannot run a program named with its extension · `T-25`
+
+**Where:** `STUDIO HARNESS/src/tools/shell/resolve.ts:84` and `:116-118`
+
+**What is wrong:** Line 84 strips the extension into `name`, but the search loop
+appends an extension to the raw `program`. `command: "node.exe"` searches for
+`node.exe.exe`.
+
+**Failure:** A caller who spells the extension out — reasonable, since the tool
+talks about `.exe` — is told the program is not installed.
+
+**Fix:** Search using the stripped `name`, and accept an exact match when the
+caller already supplied a runnable extension. Test `node` and `node.exe` both
+resolving to the same path. Fold in the `T-21` note that the program is resolved
+three times per call: resolve once in `parse` and carry the path through.
+
+---
+
+## Group 4 — Small and real
+
+### [ ] 14. `glob` promises an order it does not always give · `T-26`
+
+**Where:** `STUDIO HARNESS/src/tools/search/glob.ts:54` and `:1`
+
+Two things. Above 1,000 results it sorts alphabetically while its description
+tells the model "most recently modified first", with no signal that the order
+changed. And its `stat` is imported straight from `node:fs/promises`, so it
+reads the modification time of a symlink target outside the workspace instead of
+going through the sandbox like every other filesystem call.
+
+**Fix:** Say in the result when the order is alphabetical. Route `stat` through
+`context.sandbox`.
+
+---
+
+### [ ] 15. `FileAccessLog` separates its key with a space · `T-27`
+
+**Where:** `STUDIO HARNESS/src/tools/filesystem/access-log.ts:29-32`
+
+Conversation `"a"` with path `"b c"` and conversation `"a b"` with path `"c"`
+produce the same key. The class exists to keep one conversation's read record
+away from another's.
+
+**Fix:** Use a separator that cannot appear in either part — a null character.
+
+---
+
+### [ ] 16. `capabilityKey` joins with an unescaped `/` · `K-07`
+
+**Where:** `STUDIO HARNESS/src/contracts/capabilities.ts:51-53`
+
+`{namespace: "mcp:a", name: "b/c"}` and `{namespace: "mcp:a/b", name: "c"}` make
+the same key. A tool name from a connected server is untrusted input, and this
+key is what every grant, rule and registry lookup uses.
+
+**Fix:** Reject `/` in a namespace or a name at registration. Do this before
+Phase 11, when server-supplied names become real.
+
+---
+
+### [ ] 17. A failed stream leaves a content block open · `M-02`
+
+**Where:** `STUDIO HARNESS/src/models/studio-cloud/event-mapper.ts:167-180`
+
+`complete()` closes the open block first. `fail()` does not, so a consumer that
+tracks block start and end sees a block that never closes.
+
+**Fix:** Call `#closeOpenBlock()` in `fail()` too.
+
+---
+
+### [ ] 18. No test stops a tool bypassing the gate · part of `T-19`
+
+**Where:** `STUDIO HARNESS/tests/unit/architecture.test.ts`
+
+That file exists because "the previous convention lasted exactly as long as
+someone remembered it". Tool gating is now exactly that kind of convention, and
+`src/agents/studio.ts:13` already breaks it.
+
+**Fix:** Add a rule asserting every tool reachable from an agent came from a
+`CallGate` registration. This does not fix `T-19`; it stops it spreading.
+
+---
+
+## Group 5 — Documents
+
+### [ ] 19. The provider count is wrong in three places, and I made it worse
+
+**Proven by running the vendored catalog:** `providers: 35`, `models: 1072`.
+
+`ROADMAP.md:86` and `ADR 0009:33` say 36 and always did. `STATUS.md` said 35 and
+was right — **I changed it to 36 during the last audit** because two documents
+agreed with each other. I trusted documents over code. That was the wrong way
+round.
+
+**Fix:** Set all three to 35. Add a line to `C-04` requiring the count be
+re-checked against the vendored package on every dependency bump, since nothing
+in our code computes it.
+
+---
+
+### [ ] 20. `mental-model.md` §3.4 and §4 read as built, and are not
+
+**Where:** `documentation/mental-model.md:161-189` and `:220-228`
+
+`expandedTools` and `tool_discover` appear nowhere in `src/` or `tests/`. Both
+sections are written in the present tense as current behaviour. §3.5 right
+below them says "**Not implemented.**" for the same kind of gap, so the contrast
+makes these two read as built.
+
+**Fix:** Mark both as landing with Phase 11.
+
+---
+
+## Rejected, with the reason
+
+**A 404 from the gateway is reported as a model error.**
+`src/models/studio-cloud/errors.ts:93-103`. The reviewer marked this low
+confidence itself and noted the gateway sends its own error code, which takes
+precedence over the status fallback. It only misleads when the error body is
+already malformed. Not worth a change.
+
+**`Observation.existed` has a dead branch.**
+`src/tools/filesystem/access-log.ts:21-26`. Correct that nothing ever writes
+`existed: false`. But it is defensive code, not a defect — it does not misbehave,
+it simply never runs. Handle it by deleting the unused field during item 15,
+not as a bug in its own right.
+
+---
+
+## Verification standard for this task
+
+The last round proved this is worth writing down. A test that passes against
+fixed code proves nothing on its own. For every item:
+
+1. Write the test.
+2. Revert the fix.
+3. Confirm the test fails.
+4. Restore the fix.
+
+Items 1 and 2 are already proven against real git. Items 3, 4, 5, 12 and 19 are
+proven by running the real pattern or path logic. The rest need step 2 before
+their box is ticked.
