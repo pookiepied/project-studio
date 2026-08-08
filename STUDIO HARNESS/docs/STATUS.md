@@ -95,8 +95,10 @@ ADR 0020.
 
 **Permissions.** A kernel that decides but never executes and never prompts.
 Trust beats policy beats grants beats default. Decisions match on the
-*resource*, so `git:log` and `git:push` are separate questions. Grants persist
-and are revocable.
+*resource*, so `git:log` and `git:push` are separate questions. Grants persist,
+are revocable, and apply only in the project they were approved in (ADR 0021).
+A capability that declares no effects is refused at registration, because an
+empty effect list was the most permissive thing one could declare.
 
 **Trust and modes.** Trust is per folder, decided once, and denies rather than
 asks — reading an untrusted folder is allowed so it can be looked at; writing,

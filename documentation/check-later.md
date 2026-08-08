@@ -242,6 +242,54 @@ so.
 
 ---
 
+## C-12 — Redaction is log-only, hard-coded, and has no switch
+
+**Status:** open, low priority. Decided not to build an engine now.
+
+**What redaction is today, so nobody has to re-derive it.** Every caller of
+`redactSensitiveString` and `redactGenAiContent` is inside
+`src/observability/`. There are three: log messages (`logger.ts`), error
+messages and fields (`errors.ts`), and content copied into an OpenTelemetry span
+(`flue.ts`).
+
+**It never touches what the model sees.** Nothing in the model request path and
+nothing in the tool path calls it. If a user pastes an API key and asks the
+agent to use it, the model receives the real key and a tool receives the real
+key. Only the log copy shows `[REDACTED]`. This is the intended behaviour: the
+agent keeps its full ability, and the copy that could leave the machine is the
+one that is cleaned.
+
+It is also inert by default. `flue.ts` only redacts when `captureContent` is
+true, and the default is false, so prompt content is not captured at all.
+Redaction is the second line of defence for when someone turns capture on to
+debug something.
+
+**The two real weaknesses:**
+
+1. The patterns are hard-coded constants. Adding one means editing code.
+2. There is no switch finer than `captureContent` on or off. It cannot say
+   "redact keys but keep file paths".
+
+**The decision.** Not a configurable redaction engine with user-facing scopes.
+That is a settings surface for a feature that is off by default and has no UI,
+and "extended, not configured" says no. Instead, when it next needs touching:
+keep the one file, turn the patterns into a named list
+(`{ id, pattern, replacement }`), and let config enable or disable rules by id.
+That is the switch and the granularity, with no new subsystem.
+
+**The warning that matters more than the feature.** There is a third job that
+must never be folded into this one:
+
+> stopping the *model* from seeing a secret.
+
+That is not redaction. It is context policy — deciding what goes into the
+request — and it belongs in `context/`, not `observability/`. Putting both
+behind one word called "redaction" would repeat exactly what ADR 0020 fixed:
+one word meaning two things in two places, with one of them wrong. If that
+feature is ever wanted, it gets its own name and its own ADR.
+
+---
+
 ## C-08 — Folder names contain spaces
 
 **Status:** open, low priority.

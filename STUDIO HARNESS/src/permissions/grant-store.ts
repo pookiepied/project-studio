@@ -77,6 +77,17 @@ export class PermissionGrantStore {
    * A conversation-scoped grant is checked first: it is the narrower of the
    * two, and preferring the broader one would report a persistent approval
    * where the user only approved this conversation.
+   *
+   * **A grant belongs to the project it was approved in.** `project_id` was
+   * written on every row from the start and never read, so "always allow
+   * `git:push`" approved in one repository silently applied in every other one.
+   * Path grants hid it, because the stored pattern is an absolute path under
+   * the old root; command grants had no such boundary at all.
+   *
+   * A row with no project applies anywhere, which mirrors how a row with no
+   * conversation applies to any conversation. Nothing in the application writes
+   * one — `scope.projectId` is always set — so this covers fixtures rather than
+   * being a route around the rule.
    */
   find(
     id: CapabilityId,
@@ -93,9 +104,15 @@ export class PermissionGrantStore {
           WHERE capability_key = ?
             AND agent_id = ?
             AND revoked_at IS NULL
-            AND (conversation_id = ? OR conversation_id IS NULL)`,
+            AND (conversation_id = ? OR conversation_id IS NULL)
+            AND (project_id = ? OR project_id IS NULL)`,
       )
-      .all(key, scope.agentId, scope.conversationId) as unknown as GrantRow[];
+      .all(
+        key,
+        scope.agentId,
+        scope.conversationId,
+        scope.projectId ?? null,
+      ) as unknown as GrantRow[];
 
     // Pattern matching happens here rather than in SQL: SQLite's GLOB cannot
     // express the `*` / `**` distinction, and approximating it in SQL would
@@ -109,6 +126,12 @@ export class PermissionGrantStore {
         const byScope =
           Number(left.conversation_id === null) - Number(right.conversation_id === null);
         if (byScope !== 0) return byScope;
+
+        // Same reasoning one level out: a grant tied to this project is
+        // narrower than one tied to no project.
+        const byProject =
+          Number(left.project_id === null) - Number(right.project_id === null);
+        if (byProject !== 0) return byProject;
 
         return (
           patternSpecificity(right.resource_pattern ?? undefined) -

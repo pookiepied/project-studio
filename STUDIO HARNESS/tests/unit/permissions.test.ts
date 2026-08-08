@@ -200,6 +200,39 @@ describe("grants", () => {
     ).toBe("ask");
   });
 
+  it("keeps an always-grant out of another project", async () => {
+    // `project_id` was written on every row and never read, so "always allow"
+    // approved in one repository applied in every other one. Path grants hid
+    // it, because the stored pattern is an absolute path under the old root.
+    const kernel = new PermissionKernel({ grants, approver: approver("allow") });
+    kernel.register(capability("git", ["read", "write"]));
+    const id = { namespace: "native", name: "git" } as const;
+    const call = { resource: "git:push", kind: "command" } as const;
+
+    await kernel.authorize(id, SCOPE, call);
+
+    expect(kernel.evaluate(id, SCOPE, call).verdict).toBe("allow");
+    expect(
+      kernel.evaluate(id, { ...SCOPE, projectId: "proj-2" }, call).verdict,
+    ).toBe("ask");
+  });
+
+  it("lets the same approval be given again in a second project", async () => {
+    // The uniqueness rule had to follow the query. Without `project_id` in the
+    // index the second approval collides with the first and is refused.
+    const kernel = new PermissionKernel({ grants, approver: approver("allow") });
+    kernel.register(capability("git", ["read", "write"]));
+    const id = { namespace: "native", name: "git" } as const;
+    const call = { resource: "git:push", kind: "command" } as const;
+    const other = { ...SCOPE, projectId: "proj-2" };
+
+    await kernel.authorize(id, SCOPE, call);
+    await kernel.authorize(id, other, call);
+
+    expect(kernel.evaluate(id, other, call).verdict).toBe("allow");
+    expect(grants.list()).toHaveLength(2);
+  });
+
   it("does not let one agent inherit another's grant", async () => {
     // A subagent runs under its own identity precisely so this cannot happen.
     const kernel = new PermissionKernel({ grants, approver: approver("allow") });

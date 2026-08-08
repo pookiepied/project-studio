@@ -6,7 +6,7 @@ refuses to be, and the decisions that span both halves of the repo.
 Detail lives one level down and is authoritative where it disagrees with this
 file:
 
-- `STUDIO HARNESS/docs/decisions/` — 20 ADRs, the real reasoning
+- `STUDIO HARNESS/docs/decisions/` — 21 ADRs, the real reasoning
 - `STUDIO HARNESS/docs/STATUS.md` — how far along we are
 - `STUDIO HARNESS/docs/ROADMAP.md` — what order to build in
 - `STUDIO HARNESS/docs/KNOWN-ISSUES.md` — what is currently untrue

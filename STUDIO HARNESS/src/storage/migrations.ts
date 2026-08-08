@@ -138,6 +138,33 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    name: "grant_project_scope",
+    up(db) {
+      // `project_id` was written from the start and never read, so "always allow
+      // git:push" approved in one project applied in every other one. The query
+      // matches on it now, and the uniqueness rule has to follow: without
+      // `project_id` in the index, approving the same thing in a second project
+      // collides with the first row and is rejected as a duplicate.
+      //
+      // No data changes. Existing rows already carry the project they were
+      // approved in, so they narrow to it rather than being lost.
+      db.exec(`
+        DROP INDEX permission_grant_scope;
+
+        CREATE UNIQUE INDEX permission_grant_scope
+          ON permission_grant (
+            capability_key,
+            agent_id,
+            IFNULL(conversation_id, ''),
+            IFNULL(project_id, ''),
+            IFNULL(resource_pattern, '')
+          )
+          WHERE revoked_at IS NULL;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

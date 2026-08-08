@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 8 of 20 done
+**State:** open — 9 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -289,7 +289,7 @@ Removing the guard fails it.
 
 ---
 
-### [ ] 9. A grant is stored with a project and never matched on it · `K-06`
+### [x] 9. A grant is stored with a project and never matched on it · `K-06` · `PENDING9`
 
 **Where:** `STUDIO HARNESS/src/permissions/grant-store.ts:93-98` (query),
 `:144` (write)
@@ -305,6 +305,24 @@ under the old root. Command grants have no such boundary.
 **Fix:** Decide whether a grant is project-scoped. If yes, add `project_id` to
 the `WHERE`. If no, stop writing the column. Do not leave it written and unread.
 Test an "always" command grant across two project ids.
+
+**Decided: project-scoped (option A), by the user.** Written up as ADR 0021.
+The scope ladder never offers a rung above the workspace root and trust is per
+folder, so a grant that applies above the workspace root undoes both at storage
+time.
+
+**Done.** `find` matches `project_id`. A row with no project applies anywhere,
+mirroring conversation handling, and a project-tied grant outranks one without.
+
+**This forced a migration, which the audit did not predict.** The unique index
+did not include `project_id`. With the query narrowed and the index unchanged,
+the second project's approval collides with the first row, the insert fails, and
+the approval the user just gave is thrown as a storage error. Migration 5
+rebuilds the index. No data changes.
+
+**Tested by:** an always-grant for `git:push` in project 1 must read as `ask` in
+project 2, and the same approval must be storable twice. Reverting the query
+fails both — the second one is what catches the index.
 
 ---
 

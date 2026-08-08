@@ -32,7 +32,7 @@ import {
   Moon as MoonGlyph,
   Paperclip as PaperclipGlyph,
   ShieldCheck,
-  SidebarSimple,
+  Rectangle as PanelOutlineGlyph,
   TextAlignLeft,
   SquaresFour,
   Stop as StopGlyph,
@@ -119,7 +119,11 @@ export const Collapse = makeIcon(CaretUp, 'Collapse')
 export const Copy = makeIcon(CopyGlyph, 'Copy')
 export const Permission = makeIcon(ShieldCheck, 'Permission')
 export const Preview = makeIcon(EyeGlyph, 'Preview')
-export const Sidebar = makeIcon(SidebarSimple, 'Sidebar')
+// Sidebar (panel outline) — was `SidebarSimple` (Phosphor's panel with
+// internal divider). We now use `Rectangle` which is the same outer rounded
+// rect but without the vertical line, per Task 1. Both rails share this
+// single concept; no mirroring needed (see SideRail.tsx comment).
+export const Sidebar = makeIcon(PanelOutlineGlyph, 'Sidebar')
 export const WordWrap = makeIcon(TextAlignLeft, 'WordWrap')
 export const Expand = makeIcon(CaretDown, 'Expand')
 export const Microphone = makeIcon(MicrophoneGlyph, 'Microphone')

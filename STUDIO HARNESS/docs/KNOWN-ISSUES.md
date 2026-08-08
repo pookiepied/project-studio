@@ -169,6 +169,24 @@ Closed in task 001 item 8. `PermissionKernel.register` refuses it. Refused at
 the door rather than defended against in each reader, for the same reason the
 effect table exists: one place decides, and nobody else has to remember.
 
+### K-06 · A grant was stored with a project and never matched on it · Fixed
+
+`project_id` was written on every row and read by nothing, so "always allow
+`git:push`" approved in one repository applied in every other one. Path grants
+hid it, because their stored pattern is an absolute path under the old root;
+command grants had no such accident to protect them.
+
+Closed in task 001 item 9 by ADR 0021. A grant now applies only in the project
+it was approved in.
+
+The query change forced a migration. The unique index did not include
+`project_id`, so narrowing the query alone made the second project's approval
+collide with the first and fail. Migration 5 rebuilds the index.
+
+**Worth carrying forward:** when a query narrows, its uniqueness rule narrows
+with it. They describe one relation from two directions, and changing one alone
+makes the row that should exist unrepresentable.
+
 ### K-01 · Policy matched on capability id only · Fixed
 
 Closed by the call gate. `PermissionRequest` now carries a `resource`,
