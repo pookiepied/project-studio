@@ -17,7 +17,8 @@ import { ToolError } from "../errors.js";
  * Options that turn git into a way to run something else.
  *
  * Matched on the option name, so `--upload-pack=sh` is refused as surely as
- * `--upload-pack sh`.
+ * `--upload-pack sh`, and matched by prefix in both directions, so the
+ * abbreviations git itself accepts are refused too. See `reachesBlockedOption`.
  *
  * `-c` and `--config-env` are absent deliberately: as *git's own* options they
  * set `core.pager`, `core.editor`, or `credential.helper` and are lethal, but
@@ -53,6 +54,30 @@ const BLOCKED_OPTIONS = new Set([
 
 /** Subcommands whose whole purpose is to run a command the caller supplies. */
 const BLOCKED_SUBCOMMANDS = new Set(["filter-branch"]);
+
+/**
+ * Whether an option name reaches a blocked option.
+ *
+ * Git's own `parse-options` accepts any unambiguous abbreviation of a long
+ * option, so `--upload-pa=sh` runs exactly what `--upload-pack=sh` runs. An
+ * exact-match set therefore blocks the spelling, not the behaviour.
+ *
+ * Both directions matter. `--upl` is an abbreviation *of* a blocked option;
+ * `--exec-path` is a blocked option (`--exec`) extended. Refusing either way
+ * over-refuses some abbreviations of harmless options — `--wo` is turned down
+ * because it could reach `--work-tree` — and that is the correct trade: the
+ * caller can spell the harmless one in full, and we never have to know which
+ * abbreviations this particular subcommand happens to find unambiguous.
+ *
+ * `--` alone is the end-of-options marker, not an abbreviation of anything.
+ */
+function reachesBlockedOption(name: string): boolean {
+  if (!name.startsWith("--") || name.length <= 2) return false;
+  for (const blocked of BLOCKED_OPTIONS) {
+    if (blocked.startsWith(name) || name.startsWith(blocked)) return true;
+  }
+  return false;
+}
 
 /**
  * Options we always apply.
@@ -103,7 +128,7 @@ export function buildGitArgs(command: GitCommand): string[] {
     }
 
     const name = optionName(argument);
-    if (name !== undefined && BLOCKED_OPTIONS.has(name)) {
+    if (name !== undefined && (BLOCKED_OPTIONS.has(name) || reachesBlockedOption(name))) {
       // Named rather than silently dropped: dropping it would run a command the
       // caller did not ask for, which is worse than refusing the one they did.
       throw new ToolError("invalid_input", {

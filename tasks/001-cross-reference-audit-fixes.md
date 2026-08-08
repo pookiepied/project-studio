@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 0 of 20 done
+**State:** open — 2 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -26,7 +26,7 @@ delete it — change it to `[~]` and write why.
 
 ## Group 1 — A model can run any program (do these first)
 
-### [ ] 1. `git` long options can be shortened past the blocklist · `T-23`
+### [x] 1. `git` long options can be shortened past the blocklist · `T-23` · `PENDING1`
 
 **Where:** `STUDIO HARNESS/src/tools/git/argv.ts:105-112`
 
@@ -52,9 +52,23 @@ blocked option, and refuse any blocked option that is a prefix of the argument.
 Cover `--exec`, which is itself a prefix of `--exec-path`. Add a test for every
 blocked option truncated to each length that is still unambiguous.
 
+**Done.** `reachesBlockedOption()` in `argv.ts` matches in both directions: the
+argument is refused if it is a prefix of a blocked option or if a blocked option
+is a prefix of it. `--` alone is excluded, because it is the end-of-options
+marker and an abbreviation of nothing.
+
+This over-refuses some abbreviations of harmless options — `--wo` is turned down
+because it could reach `--work-tree`. That is the intended trade. The caller can
+spell the harmless option in full, and we never have to track which
+abbreviations a given subcommand happens to find unambiguous.
+
+**Tested by:** three cases in `tests/unit/tools/git.test.ts`, one of them
+exhaustive — every blocked option truncated to every length above `--`.
+Reverting the check to the old exact match fails 2 of them.
+
 ---
 
-### [ ] 2. A chained git alias defeats the shell-alias check · `T-24`
+### [x] 2. A chained git alias defeats the shell-alias check · `T-24` · `PENDING1`
 
 **Where:** `STUDIO HARNESS/src/tools/git/index.ts:60-79`
 
@@ -73,6 +87,19 @@ git x                      →  PWNED_BY_CHAINED_ALIAS
 **Fix:** Follow the chain. Read `alias.<name>`; if the value does not start with
 `!`, take its first word and read that alias too. Stop at a depth limit — git
 itself stops at 10 — and refuse a loop. Test two levels and a cycle.
+
+**Done.** `assertNotShellAlias` now loops to `MAX_ALIAS_DEPTH` (10), keeps a
+`seen` set, and refuses a cycle by name. It stops at the first known subcommand
+or at a name that is not an alias.
+
+**One thing the audit did not name, fixed with it:** the expansion's own
+arguments are now put through `buildGitArgs` as well. `alias.a = log
+--upload-pack=sh` reaches a blocked option by a route that never passes the
+normal check, because the caller only ever typed `a`.
+
+**Tested by:** four cases — a two-level chain ending in `!sh`, a cycle, an alias
+reaching a blocked option, and a two-level chain that must still work. Cutting
+the depth back to one fails 4 tests.
 
 ---
 

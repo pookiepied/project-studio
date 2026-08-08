@@ -18,7 +18,8 @@ running list of what is currently not true about the system.
 They are not yet listed below, because an entry here describes shipped code and
 those fixes are in flight. Each one moves here as Fixed when its box is ticked.
 Two of them let a model run any program through the `git` tool — `T-23` and
-`T-24` — and both are proven against real git rather than argued.
+`T-24` — and both were proven against real git rather than argued. **Both are
+now fixed**, and listed below; eighteen remain in the task file.
 
 ---
 
@@ -475,6 +476,29 @@ Closed by ADR 0020: `src/contracts/effects.ts` holds one table, and every reader
 looks it up. Recorded even though it shipped fixed, because the *shape* is the
 thing to watch for — hand-written metadata that three subsystems trust and
 nobody verifies. `T-19` is the same shape still open.
+
+### T-23 · A shortened git option walked past the blocklist · Fixed
+
+`BLOCKED_OPTIONS` was matched as an exact string, but git's `parse-options`
+accepts any unambiguous abbreviation of a long option. `--upload-pac=cmd`
+therefore ran `cmd`, proven against real git. It needed no execution permission,
+because `GIT_DESCRIPTOR` declares `read`/`write`.
+
+Closed in task 001 item 1. `reachesBlockedOption()` matches by prefix in both
+directions. It over-refuses abbreviations of harmless options on purpose — the
+alternative is tracking which abbreviations each subcommand finds unambiguous,
+which is a copy of git's own parser that would rot.
+
+### T-24 · A chained git alias walked past the alias check · Fixed
+
+`assertNotShellAlias` read `alias.<name>` once. Git expands the result again, so
+`alias.x = y` with `alias.y = !echo` ran the shell while our check saw the plain
+word `y`.
+
+Closed in task 001 item 2. The chain is followed to depth 10, a cycle is refused
+by name, and the expansion's own arguments are now validated too — which closes
+a second route the audit did not name: `alias.a = log --upload-pack=sh` never
+passed through the normal option check, because the caller only typed `a`.
 
 ### T-18 · A rejected capture poisons the rest of the turn · Open
 

@@ -163,7 +163,8 @@ evidence in `tasks/001-cross-reference-audit-fixes.md`.
 
 Two of them let a model run any program on the machine through the `git` tool,
 which declares `read`/`write` and therefore needs no execution permission. Both
-are proven against real git. Nothing else starts until those two are closed.
+were proven against real git. **Both are fixed** — `T-23` and `T-24`, task 001
+items 1 and 2. Eighteen remain, none of them an execution escape.
 
 **The audit findings come before `fetch`.** Adding the last tool on top of known
 holes is building on a floor we know has one.

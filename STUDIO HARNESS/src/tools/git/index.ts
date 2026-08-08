@@ -49,6 +49,14 @@ export const GIT_DESCRIPTOR: CapabilityDescriptor = {
 };
 
 /**
+ * How far an alias chain is followed before we give up and refuse.
+ *
+ * Git's own limit is the same idea: an alias that never lands on a real
+ * subcommand is a loop, and a loop is not something to keep resolving.
+ */
+const MAX_ALIAS_DEPTH = 10;
+
+/**
  * Refuses a subcommand that resolves to a shell alias.
  *
  * A repository's own config can define `alias.x = !sh -c '…'`, which would make
@@ -56,26 +64,74 @@ export const GIT_DESCRIPTOR: CapabilityDescriptor = {
  * aliases that shadow built-in commands, so only an unrecognised subcommand can
  * possibly be one — which is also why this costs an extra git call almost
  * never.
+ *
+ * **Aliases chain.** `alias.a = b` with `alias.b = !sh` runs the shell, because
+ * git expands the result again. Reading one level therefore proves nothing:
+ * level one is a plain word, and the shell is at level two. So follow the chain
+ * to its end.
+ *
+ * The expansion's own arguments are checked too. `alias.a = log --upload-pack=sh`
+ * would otherwise reach a blocked option by a route that never passes through
+ * `buildGitArgs`, since the caller only ever typed `a`.
  */
 async function assertNotShellAlias(
   executable: string,
   cwd: string,
   subcommand: string,
 ): Promise<void> {
-  if (isKnownSubcommand(subcommand)) return;
+  const seen = new Set<string>();
+  let current = subcommand;
 
-  const result = await runProcess({
-    executable,
-    args: ["config", "--get", `alias.${subcommand}`],
-    cwd,
-    timeoutMs: 10_000,
-  });
+  for (let depth = 0; depth < MAX_ALIAS_DEPTH; depth += 1) {
+    if (isKnownSubcommand(current)) return;
+    if (seen.has(current)) {
+      throw new ToolError("invalid_input", {
+        message: `git ${subcommand} is an alias that refers back to itself, and cannot run.`,
+      });
+    }
+    seen.add(current);
 
-  if (result.exitCode === 0 && result.stdout.trim().startsWith("!")) {
-    throw new ToolError("invalid_input", {
-      message: `git ${subcommand} is an alias that runs a shell command, and is not available.`,
+    const result = await runProcess({
+      executable,
+      args: ["config", "--get", `alias.${current}`],
+      cwd,
+      timeoutMs: 10_000,
     });
+
+    // Not an alias and not a known subcommand: git will reject it itself, and
+    // its own message says more than ours would.
+    if (result.exitCode !== 0) return;
+
+    const expansion = result.stdout.trim();
+    if (expansion.startsWith("!")) {
+      throw new ToolError("invalid_input", {
+        message: `git ${subcommand} is an alias that runs a shell command, and is not available.`,
+      });
+    }
+
+    const tokens = expansion.split(/\s+/).filter((token) => token !== "");
+    if (tokens.length === 0) return;
+
+    // Whitespace splitting is coarse for a shell-quoted string, but it cannot
+    // hide an option name: a blocked option that survives git's own parsing has
+    // to appear as its own word here too.
+    const head = tokens[0] as string;
+    if (head.startsWith("-")) {
+      // An expansion that begins with an option adds arguments to whatever the
+      // caller wrote. There is no further name to follow.
+      buildGitArgs({ subcommand: "log", args: tokens });
+      return;
+    }
+
+    // Validated as a command so the expansion is held to every rule the caller
+    // is held to, blocked subcommands included.
+    buildGitArgs({ subcommand: head, args: tokens.slice(1) });
+    current = head;
   }
+
+  throw new ToolError("invalid_input", {
+    message: `git ${subcommand} is an alias chain too long to follow, and is not available.`,
+  });
 }
 
 function clip(output: string): string {

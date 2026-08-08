@@ -106,6 +106,72 @@ describe("options that run other programs are refused", () => {
     );
   });
 
+  it("refuses the abbreviations git itself accepts", () => {
+    // git's parse-options takes any unambiguous abbreviation of a long option,
+    // so --upload-pa=sh runs exactly what --upload-pack=sh runs. Matching whole
+    // names blocks the spelling and not the behaviour.
+    const abbreviations = [
+      "--upload-pa=sh",
+      "--upload=sh",
+      "--upl=sh",
+      "--receive-pa=sh",
+      "--exec-pat=/tmp/evil",
+      "--tree-filt=rm -rf /",
+      "--git-di=/other",
+      "--work-tr=/other",
+      "--namesp=x",
+    ];
+
+    for (const option of abbreviations) {
+      expect(() => buildGitArgs({ subcommand: "clone", args: [option] })).toThrow(
+        /can run other programs/i,
+      );
+    }
+  });
+
+  it("refuses every blocked option truncated to every shorter length", () => {
+    // Exhaustive rather than sampled: an abbreviation that is safe today
+    // becomes unambiguous the day git adds or removes an option elsewhere.
+    const blocked = [
+      "--upload-pack",
+      "--receive-pack",
+      "--exec",
+      "--exec-path",
+      "--config",
+      "--git-dir",
+      "--work-tree",
+      "--namespace",
+      "--tree-filter",
+      "--index-filter",
+      "--parent-filter",
+      "--msg-filter",
+      "--commit-filter",
+      "--env-filter",
+      "--tag-name-filter",
+    ];
+
+    for (const option of blocked) {
+      // Down to "--x". "--" alone is the end-of-options marker, not an
+      // abbreviation, and is excluded on purpose.
+      for (let length = option.length; length > 2; length -= 1) {
+        const truncated = option.slice(0, length);
+        expect(() => buildGitArgs({ subcommand: "clone", args: [truncated] })).toThrow(
+          /can run other programs/i,
+        );
+      }
+    }
+  });
+
+  it("still allows the end-of-options marker and unrelated options", () => {
+    // The prefix rule must not swallow `--`, which is a prefix of every blocked
+    // option as a string and an abbreviation of none of them.
+    expect(() =>
+      buildGitArgs({ subcommand: "log", args: ["--oneline", "--", "src/a.ts"] }),
+    ).not.toThrow();
+    expect(() => buildGitArgs({ subcommand: "log", args: ["--word-diff"] })).not.toThrow();
+    expect(() => buildGitArgs({ subcommand: "commit", args: ["--no-verify"] })).not.toThrow();
+  });
+
   it("names what it refused instead of dropping it", () => {
     // Silently dropping an option would run a command the caller did not ask
     // for, which is worse than refusing the one they did.
@@ -248,6 +314,72 @@ describe("the tool", () => {
     });
 
     await expect(git({ subcommand: "pwn", args: [] })).rejects.toThrow(/shell command/i);
+  });
+
+  it.runIf(GIT)("follows an alias chain to the shell at its end", async () => {
+    // Reading one level proves nothing: level one is a plain word, and the
+    // shell is at level two. git expands the result again, so we must too.
+    await runProcess({ executable: GIT!, args: ["init"], cwd: workspace });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.outer", "middle"],
+      cwd: workspace,
+    });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.middle", "!sh -c 'echo owned'"],
+      cwd: workspace,
+    });
+
+    await expect(git({ subcommand: "outer", args: [] })).rejects.toThrow(/shell command/i);
+  });
+
+  it.runIf(GIT)("refuses an alias that reaches a blocked option", async () => {
+    // The caller only ever typed the alias name, so the expansion's own
+    // arguments never pass through buildGitArgs on the normal route.
+    await runProcess({ executable: GIT!, args: ["init"], cwd: workspace });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.sneak", "fetch --upload-pack=sh"],
+      cwd: workspace,
+    });
+
+    await expect(git({ subcommand: "sneak", args: [] })).rejects.toThrow(
+      /can run other programs/i,
+    );
+  });
+
+  it.runIf(GIT)("refuses an alias that refers back to itself", async () => {
+    await runProcess({ executable: GIT!, args: ["init"], cwd: workspace });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.ping", "pong"],
+      cwd: workspace,
+    });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.pong", "ping"],
+      cwd: workspace,
+    });
+
+    await expect(git({ subcommand: "ping", args: [] })).rejects.toThrow(/itself/i);
+  });
+
+  it.runIf(GIT)("still allows an alias chain that ends in a real subcommand", async () => {
+    await runProcess({ executable: GIT!, args: ["init"], cwd: workspace });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.s", "st"],
+      cwd: workspace,
+    });
+    await runProcess({
+      executable: GIT!,
+      args: ["config", "--local", "alias.st", "status --porcelain"],
+      cwd: workspace,
+    });
+    writeFileSync(join(workspace, "a.txt"), "hello");
+
+    expect(await git({ subcommand: "s", args: [] })).toContain("a.txt");
   });
 
   it.runIf(GIT)("still allows an ordinary alias", async () => {
