@@ -179,7 +179,7 @@ old regex fails the first group.
 
 ---
 
-### [x] 5. An Anthropic API key is not redacted · `O-01` · `PENDING5`
+### [x] 5. An Anthropic API key is not redacted · `O-01` · `afcc448`
 
 **Where:** `STUDIO HARNESS/src/observability/redaction.ts:4`
 
@@ -209,7 +209,7 @@ fails the first test.
 
 ---
 
-### [x] 6. A writable root is checked with a string prefix · `S-03` · `PENDING5`
+### [x] 6. A writable root is checked with a string prefix · `S-03` · `afcc448`
 
 **Where:** `STUDIO HARNESS/src/sandbox/policy.ts:92`
 
