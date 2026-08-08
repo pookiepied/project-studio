@@ -242,9 +242,9 @@ so.
 
 ---
 
-## C-12 — Redaction is log-only, hard-coded, and has no switch
+## C-12 — What redaction is, and what it is not
 
-**Status:** open, low priority. Decided not to build an engine now.
+**Status:** the catalog is built. The warning at the end stays open.
 
 **What redaction is today, so nobody has to re-derive it.** Every caller of
 `redactSensitiveString` and `redactGenAiContent` is inside
@@ -264,18 +264,32 @@ true, and the default is false, so prompt content is not captured at all.
 Redaction is the second line of defence for when someone turns capture on to
 debug something.
 
-**The two real weaknesses:**
+**Redaction itself is always on and has no off switch.** `logger.ts` and
+`errors.ts` redact unconditionally. A log line that left the machine cannot be
+recalled, so there is nothing to gain from a setting that removes the net.
 
-1. The patterns are hard-coded constants. Adding one means editing code.
-2. There is no switch finer than `captureContent` on or off. It cannot say
-   "redact keys but keep file paths".
+**`captureContent` stays off by default, and that is not the same question.**
+Turning it on copies prompts and replies into telemetry and then cleans them.
+Not copying them is stronger than copying and cleaning. Redaction is the safety
+net for a developer who turns capture on to debug something — not a reason to
+turn it on.
 
-**The decision.** Not a configurable redaction engine with user-facing scopes.
-That is a settings surface for a feature that is off by default and has no UI,
-and "extended, not configured" says no. Instead, when it next needs touching:
-keep the one file, turn the patterns into a named list
-(`{ id, pattern, replacement }`), and let config enable or disable rules by id.
-That is the switch and the granularity, with no new subsystem.
+**Built:** `src/observability/redaction-rules.ts` is the catalog. Every rule is
+one entry with an `id`, a one-line `summary`, an `enabledByDefault` flag, a
+pattern, and a replacement. Adding a secret shape means adding an entry.
+Turning one off means naming its id, in code or in
+`PROJECT_STUDIO_REDACTION_RULES="email:on,jwt:off"`.
+
+Eleven rules ship. Ten are on: private key blocks, bearer tokens, URL
+credentials, `sk-` keys, GitHub tokens, Google API keys, Slack tokens, AWS
+access key ids, JWTs, and the key/value catch-all. One ships off — `email`,
+because the signed-in user's address is how a support log is tied to a user, and
+removing it takes away most of what the log is for.
+
+**Not a TOML or YAML file, on purpose.** That needs a parser dependency, a
+file-location decision, and handling for a malformed file, to configure
+something with no UI. The typed catalog gives the same single place to look. If
+users ever edit it, the shape is already right and only the loader changes.
 
 **The warning that matters more than the feature.** There is a third job that
 must never be folded into this one:

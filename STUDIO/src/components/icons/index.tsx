@@ -32,7 +32,6 @@ import {
   Moon as MoonGlyph,
   Paperclip as PaperclipGlyph,
   ShieldCheck,
-  Rectangle as PanelOutlineGlyph,
   TextAlignLeft,
   SquaresFour,
   Stop as StopGlyph,
@@ -43,6 +42,7 @@ import {
   type IconWeight,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { SidebarOutline } from '@/components/icons/SidebarOutline'
 
 /**
  * Icon size scale, aligned with the type scale.
@@ -119,11 +119,13 @@ export const Collapse = makeIcon(CaretUp, 'Collapse')
 export const Copy = makeIcon(CopyGlyph, 'Copy')
 export const Permission = makeIcon(ShieldCheck, 'Permission')
 export const Preview = makeIcon(EyeGlyph, 'Preview')
-// Sidebar (panel outline) — was `SidebarSimple` (Phosphor's panel with
-// internal divider). We now use `Rectangle` which is the same outer rounded
-// rect but without the vertical line, per Task 1. Both rails share this
-// single concept; no mirroring needed (see SideRail.tsx comment).
-export const Sidebar = makeIcon(PanelOutlineGlyph, 'Sidebar')
+// Sidebar — custom outline (see `SidebarOutline.tsx`). Replaces Phosphor
+// `SidebarSimple` (which embeds a vertical divider). This is a true
+// component-based fix: dedicated `SidebarOutline` component, no `<line>`,
+// inspired by `archive/STUDIO/src/ui/icons/WorkspaceIcons.tsx:NavToggleIcon`
+// but with own metrics (rx 2.5, stroke 1.25) — not a direct copy. Both rails
+// share this single concept; no mirroring (see SideRail.tsx).
+export const Sidebar = SidebarOutline
 export const WordWrap = makeIcon(TextAlignLeft, 'WordWrap')
 export const Expand = makeIcon(CaretDown, 'Expand')
 export const Microphone = makeIcon(MicrophoneGlyph, 'Microphone')

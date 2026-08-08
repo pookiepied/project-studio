@@ -14,7 +14,13 @@ import {
 // Not re-exported from the barrel: the string form is an implementation detail
 // of `redactGenAiContent`, and testing it directly is what keeps the pattern
 // itself covered.
-import { redactSensitiveString } from "../../src/observability/redaction.js";
+import {
+  activeRedactionRuleIds,
+  configureRedaction,
+  redactSensitiveString,
+  resetRedaction,
+} from "../../src/observability/redaction.js";
+import { REDACTION_RULES } from "../../src/observability/redaction-rules.js";
 
 afterEach(async () => {
   await shutdownObservability();
@@ -204,6 +210,131 @@ describe("content redaction", () => {
     // A redactor that eats prose gets switched off.
     const text = "the task-manager and ask-me-anything services are fine";
     expect(redactSensitiveString(text)).toBe(text);
+  });
+
+  it("catches the token shapes a Claude product actually meets", () => {
+    // Every one of these passed straight through before the catalog existed.
+    const secrets = [
+      "ghp_AbCdEfGh1234567890AbCdEfGh1234567890",
+      "github_pat_11ABCDEFG0abcdefghijkl_mnopqrstuvwxyz",
+      // AIza plus exactly 35 characters, which is the real shape.
+      "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+      "xoxb-1234567890-abcdefghijklmnop",
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.c2lnbmF0dXJl",
+    ];
+
+    for (const secret of secrets) {
+      const redacted = redactSensitiveString(`value ${secret} end`);
+      expect(redacted, secret).not.toContain(secret);
+    }
+  });
+
+  it("removes a whole private key block, not just its first line", () => {
+    const key = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAxyz123",
+      "abc456def789",
+      "-----END RSA PRIVATE KEY-----",
+    ].join("\n");
+
+    const redacted = redactSensitiveString(`config:\n${key}\ndone`);
+    expect(redacted).not.toContain("MIIEowIBAAKCAQEAxyz123");
+    expect(redacted).not.toContain("abc456def789");
+    expect(redacted).toContain("done");
+  });
+
+  it("keeps the host but drops credentials in a URL", () => {
+    // Which service was reached is most of a log line's value, and it is not
+    // the secret.
+    const redacted = redactSensitiveString("postgres://admin:hunter2@db.example.com/app");
+
+    expect(redacted).not.toContain("hunter2");
+    expect(redacted).not.toContain("admin");
+    expect(redacted).toContain("db.example.com");
+  });
+
+  it("redacts every occurrence on a line, not only the first", () => {
+    // A shared global regex keeps `lastIndex` between calls, so a rule can
+    // resume mid-string and miss matches unless it is reset.
+    const redacted = redactSensitiveString("sk-aaaaaaaaaaaa and sk-bbbbbbbbbbbb");
+
+    expect(redacted).not.toContain("sk-aaaaaaaaaaaa");
+    expect(redacted).not.toContain("sk-bbbbbbbbbbbb");
+  });
+
+  it("is stable when the same rule runs many times", () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect(redactSensitiveString("key sk-abcdefghijklmnop here")).toBe(
+        "key [REDACTED] here",
+      );
+    }
+  });
+});
+
+describe("the redaction catalog", () => {
+  afterEach(() => {
+    resetRedaction();
+  });
+
+  it("ships email redaction off, because a support log needs the user", () => {
+    expect(activeRedactionRuleIds()).not.toContain("email");
+    expect(redactSensitiveString("from user@example.com")).toContain("user@example.com");
+  });
+
+  it("turns a rule on by id without touching code", () => {
+    configureRedaction({ email: true });
+
+    expect(activeRedactionRuleIds()).toContain("email");
+    expect(redactSensitiveString("from user@example.com")).not.toContain(
+      "user@example.com",
+    );
+  });
+
+  it("turns a rule off by id", () => {
+    configureRedaction({ "sk-key": false });
+
+    expect(redactSensitiveString("sk-abcdefghijklmnop")).toContain(
+      "sk-abcdefghijklmnop",
+    );
+  });
+
+  it("ignores an unknown id rather than refusing to start", () => {
+    // A stale entry in someone's environment must not stop the harness. The
+    // cost is that a rule they wanted off stays on, which fails safely.
+    expect(() => configureRedaction({ "no-such-rule": false })).not.toThrow();
+    expect(activeRedactionRuleIds()).toContain("sk-key");
+  });
+
+  it("every rule is global, or it would replace only the first match", () => {
+    for (const rule of REDACTION_RULES) {
+      expect(rule.pattern.flags, rule.id).toContain("g");
+    }
+  });
+
+  it("every rule id is unique, because the id is how one is disabled", () => {
+    const ids = REDACTION_RULES.map((rule) => rule.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("reads rule state from the environment", () => {
+    process.env.PROJECT_STUDIO_REDACTION_RULES = "email:on,jwt:off";
+    try {
+      expect(resolveObservabilityConfig().redactionRules).toEqual({
+        email: true,
+        jwt: false,
+      });
+    } finally {
+      delete process.env.PROJECT_STUDIO_REDACTION_RULES;
+    }
+  });
+
+  it("skips a malformed environment entry instead of throwing", () => {
+    process.env.PROJECT_STUDIO_REDACTION_RULES = "email,jwt:off,:on,bad:maybe";
+    try {
+      expect(resolveObservabilityConfig().redactionRules).toEqual({ jwt: false });
+    } finally {
+      delete process.env.PROJECT_STUDIO_REDACTION_RULES;
+    }
   });
 });
 

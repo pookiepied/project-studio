@@ -29,6 +29,14 @@ const observabilityConfigSchema = v.object({
   otlpEndpoint: v.optional(v.pipe(v.string(), v.url())),
   captureContent: v.boolean(),
   memoryDumpPath: v.optional(v.pipe(v.string(), v.minLength(1))),
+  /**
+   * Redaction rules turned on or off by id. Anything absent keeps the default
+   * declared in `redaction-rules.ts`.
+   *
+   * There is no "redaction off" setting, and there will not be one. A log line
+   * that left the machine cannot be recalled.
+   */
+  redactionRules: v.record(v.string(), v.boolean()),
 });
 
 export type ObservabilityConfig = v.InferOutput<typeof observabilityConfigSchema>;
@@ -42,6 +50,30 @@ export interface ObservabilityConfigInput {
   readonly otlpEndpoint?: string;
   readonly captureContent?: boolean;
   readonly memoryDumpPath?: string;
+  readonly redactionRules?: Readonly<Record<string, boolean>>;
+}
+
+/**
+ * Reads `PROJECT_STUDIO_REDACTION_RULES`, written as `email:on,jwt:off`.
+ *
+ * `on`/`off`, `true`/`false`, and `1`/`0` all work. A malformed entry is
+ * skipped rather than thrown on, because a typo in an environment variable
+ * must not stop the harness from starting — and skipping leaves the rule at its
+ * default, which for every secret-shaped rule means on.
+ */
+function parseRedactionRules(): Record<string, boolean> {
+  const raw = readEnv("PROJECT_STUDIO_REDACTION_RULES");
+  if (raw === undefined) return {};
+
+  const rules: Record<string, boolean> = {};
+  for (const entry of raw.split(",")) {
+    const [id, state] = entry.split(":").map((part) => part.trim().toLowerCase());
+    if (!id || !state) continue;
+
+    if (state === "on" || state === "true" || state === "1") rules[id] = true;
+    else if (state === "off" || state === "false" || state === "0") rules[id] = false;
+  }
+  return rules;
 }
 
 function readEnv(name: string): string | undefined {
@@ -113,6 +145,7 @@ export function resolveObservabilityConfig(
         "PROJECT_STUDIO_OTEL_CAPTURE_CONTENT",
         parseBoolean("OTEL_GENAI_CAPTURE_CONTENT", false),
       ),
+    redactionRules: { ...parseRedactionRules(), ...(input.redactionRules ?? {}) },
     ...(input.memoryDumpPath || readEnv("PROJECT_STUDIO_OTEL_MEMORY_DUMP_PATH")
       ? {
           memoryDumpPath:

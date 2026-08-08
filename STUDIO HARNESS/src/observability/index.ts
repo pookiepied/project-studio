@@ -26,7 +26,14 @@ export {
 } from "./errors.js";
 import { TelemetryError } from "./telemetry-errors.js";
 export { createLogger, type Logger, type LogFields, type LogLevel } from "./logger.js";
-export { redactGenAiContent } from "./redaction.js";
+export {
+  activeRedactionRuleIds,
+  redactGenAiContent,
+  redactSensitiveString,
+  resetRedaction,
+} from "./redaction.js";
+import { configureRedaction, resetRedaction } from "./redaction.js";
+export { REDACTION_RULES, type RedactionRule } from "./redaction-rules.js";
 export { resolveObservabilityConfig } from "./config.js";
 
 export interface ObservabilityHandle {
@@ -52,6 +59,10 @@ export function initializeObservability(
   }
 
   const config = resolveObservabilityConfig(input);
+
+  // Before anything can emit. A rule enabled after the first log line would
+  // have missed that line, and the first lines are the start-up ones.
+  configureRedaction(config.redactionRules);
 
   // SDK must be configured before Flue instrumentation registration.
   const sdk = startObservabilitySdk(config);
@@ -102,6 +113,9 @@ export async function shutdownObservability(): Promise<void> {
     await unregisterFlueInstrumentation();
   } finally {
     await shutdownObservabilitySdk();
+    // Back to the shipped defaults, so a later start does not inherit the last
+    // one's overrides. Module-level state has to be returned as well as set.
+    resetRedaction();
     handle = undefined;
   }
 }

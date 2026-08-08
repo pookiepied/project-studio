@@ -87,6 +87,15 @@ and on every open, so a file poisoned by an older build cannot pass.
 **Errors.** One contract. Every subsystem declares a domain and reports through
 one path, so an unclassified throw is visible in telemetry rather than silent.
 
+**Redaction.** One catalog, `src/observability/redaction-rules.ts`. Eleven named
+rules; ten on, `email` off. Always applied to logs and errors, with no switch to
+remove it. Rules turn on or off by id, in code or through
+`PROJECT_STUDIO_REDACTION_RULES`.
+
+It cleans the log copy only. The model and the tools always receive the real
+text — deciding what the *model* may see is context policy and is a different
+subsystem. See `check-later.md` C-12.
+
 **What an effect means.** One table, `src/contracts/effects.ts`, answering four
 questions for four effects: which isolation it needs, whether it needs a restore
 point, whether it may ever be silent, and whether an untrusted folder allows it.

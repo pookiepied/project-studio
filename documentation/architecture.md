@@ -59,7 +59,7 @@ context/         context assembly
 contracts/       shared types, model ids, and the one effect table (ADR 0020)
 credentials/     keychain-backed, via @napi-rs/keyring
 models/          registry, adapters (test / local BYOK / studio-cloud), catalog
-observability/   OpenTelemetry, error contract
+observability/   OpenTelemetry, error contract, the redaction catalog
 permissions/     the kernel — decides, never executes, never prompts
 platform/        OS specifics
 process/         exec.ts — the only place a child process starts
