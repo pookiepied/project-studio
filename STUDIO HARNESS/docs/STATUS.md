@@ -142,8 +142,16 @@ no vendor name appears in either tool's schema. See ADR 0023 and `src/retrieval/
 gate, and `src/agents/studio.ts` registers exactly one tool —
 `workspace_summary`, a fixture that echoes its input and goes around the gate
 entirely (`T-19`). Everything in the table is built, tested, and unwired. The
-wiring is `T-12`, and several open issues stop being theoretical the moment it
-lands.
+wiring is `T-12`, and it has collected three other issues that all become real
+in the same change: `K-04` (git reaches the network without declaring it),
+`T-19` (the agent's only tool bypasses the gate), and `T-28` (the model is shown
+tools the sandbox will refuse).
+
+**Containment is not one of them.** Every path in every tool already goes
+through `resolveContainedPath`, which refuses anything outside the opened
+folder — including `..`, symlinks pointing out, sibling folders whose names
+share a prefix, and other drive letters. That wall holds today and has no
+"approve anyway" option.
 
 That bypass is now **contained rather than open**: `architecture.test.ts` refuses
 any import of a tool module from outside `src/tools/`, and names

@@ -318,6 +318,19 @@ this is wrong. It becomes wrong the moment the application does.
 `shell` is wired to a real session first. The posture must come from
 `WorkspaceTrustStore` and the user's selected mode.
 
+**It has collected three others.** This is now the largest single piece of open
+work, because it is the first code that builds a real posture *and* a real
+sandbox policy:
+
+- `K-04` — `git` declares `read`/`write` and reaches the network anyway, so Auto
+  Edit would push without asking.
+- `T-19` — the agent's only tool goes around the gate. Contained by a test; the
+  fixture is replaced here.
+- `T-28` — the model is shown tools the sandbox will refuse, because `list()`
+  and `assertSupports` answer different questions.
+
+None of them is reachable today and all three become real in the same change.
+
 ### T-04 · Nothing can undo a write · Fixed
 
 Closed by ADR 0016. A shadow git repository per project, in
@@ -573,6 +586,38 @@ Under `required` that is fail-closed and defensible. It is recorded because the
 behaviour is invisible in the code — it reads as "retry next write" and is not —
 and because a transient failure (a lock, a full disk that cleared) stays fatal
 until the next turn.
+
+### T-28 · The model is shown tools the sandbox will refuse · Open
+
+`CallGate.list()` returns every registered tool. `LocalSandbox.assertSupports`
+runs later, when the tool is actually called. So a policy with `allowNetwork:
+false` produces this sequence:
+
+1. The model is shown `fetch`.
+2. The model calls it.
+3. The sandbox refuses it.
+4. The model tries something else, one attempt wasted.
+
+Two costs, and the smaller one is the failed call. The larger is that the
+schema sits in the prompt on **every turn**, billed every time, for a tool that
+can never run. `mental-model.md` §3.2 puts tools in the cached prefix precisely
+because that list is supposed to be worth its space.
+
+`allowExec` has the same shape and the same effect on `shell`.
+
+**Why it is not fixed yet.** The fix is to make what the model is shown match
+what can actually run — `list()` filtered by the sandbox, or the tool not
+registered at all. Which of those is right depends on the caller that builds the
+policy, and **no such caller exists**: `createSandboxPolicy` has no call site in
+`src/`. Choosing now would be designing against an imagined consumer.
+
+**Fix when:** `T-12`, the same change that first builds a real policy and wires
+the gate to the agent. Both switches become `true` for ordinary native use
+there; they stay for an operator who wants a locked-down agent.
+
+**Note on the defaults themselves.** They are correct and should not change. A
+policy that had to be tightened rather than loosened starts every new call site
+over-permissioned, and only becomes safe if someone remembers.
 
 ### T-19 · A tool can be registered outside the gate · Contained
 
