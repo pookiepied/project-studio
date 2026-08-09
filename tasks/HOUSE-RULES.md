@@ -231,9 +231,23 @@ warning that is expected and not your problem.
 
 ## 11. Git
 
-Work on the branch your task names. One commit. Imperative subject line, and a
-body that says **why**, not what — read `git log` first. No `Co-Authored-By`
-lines.
+**Create the branch your task names, from `main`, before you touch anything.**
+
+```
+git checkout main
+git checkout -b task/<the-name-your-task-gives>
+```
+
+**Never commit to `main`.** Not once, not for a small fix, not to correct your
+own mistake. `main` is merged by the reviewer and by nobody else. If you find
+yourself on `main`, stop and say so in your report rather than tidying it up.
+
+One commit. Imperative subject line, and a body that says **why**, not what —
+read `git log` first. No `Co-Authored-By` lines.
+
+**Leave the branch behind when you finish.** Do not merge it, do not rebase it,
+do not delete it. The reviewer reads the diff, applies any corrections on top,
+and merges. A branch you merged yourself is a review that did not happen.
 
 Leave `MCP/studio-web-mcp/src/validation/url.ts` alone. Its changes are nobody's
 and stay unstaged.
