@@ -413,7 +413,7 @@ the first.
 
 ---
 
-### [x] 13. `shell` cannot run a program named with its extension · `T-25` · `PENDING13`
+### [x] 13. `shell` cannot run a program named with its extension · `T-25` · `035da0a`
 
 **Where:** `STUDIO HARNESS/src/tools/shell/resolve.ts:84` and `:116-118`
 
