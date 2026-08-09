@@ -80,9 +80,13 @@ answer, and this ADR is where it will be recorded.
 
 ## What this refuses
 
-**An `allowNetwork` sandbox flag.** It is `allowExec`'s shape applied to a
-problem of a different kind — one switch answering a question that is per
-destination, and answering nothing at all about the response.
+**`allowNetwork` as the permission mechanism.** The flag exists and stays,
+exactly as `allowExec` does: it is an operator's off switch, answering "may this
+agent reach the network at all". It is not an answer to "may it reach *this
+host*", and it says nothing whatever about the response. Treating one boolean as
+the permission model is the mistake this ADR is written to prevent — the flag is
+the outer gate, the destination is the decision, and rule 2 is the part neither
+of them covers.
 
 **A blocklist of bad sites.** It cannot be kept current and it makes the absence
 of a block read as an endorsement.

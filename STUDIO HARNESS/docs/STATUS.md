@@ -7,9 +7,10 @@ answers "how far along are we, and what is actually blocking what".
 Refresh it at a phase boundary. If it disagrees with the other two documents,
 they are right and this one is stale.
 
-Last refreshed: Phase 10 in progress, 7 of 10 native tools shipped. Undo, call
-bounds, trust/modes, and `shell` landed (ADRs 0016–0019). Only `fetch` remains
-before Phase 11.
+Last refreshed: Phase 10 in progress, 9 of 10 native tools shipped. Undo, call
+bounds, trust/modes, `shell`, and the web pair landed (ADRs 0016–0019, 0022,
+0023). Only `task` and `skill` remain, and both belong to later phases, so
+Phase 10 is effectively closed.
 
 Then a cross-reference audit over everything shipped, which is why this file now
 contradicts itself less and admits more. It found eleven real defects — `T-14`
@@ -55,7 +56,7 @@ process it talks to; neither contains the other.
 | 7.5 | Architecture review | Done |
 | 8 | Auth, credentials, local BYOK | Done |
 | 9 | Permission and containment kernel | Foundation done, 2 items open |
-| 10 | Native agent tools | **In progress — 7 of 10** |
+| 10 | Native agent tools | **In progress — 9 of 10** |
 | 11 | MCP | Not started |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
@@ -121,7 +122,7 @@ so Auto Edit would push without asking — `K-04`. Not reachable today, because 
 posture is wired and the mode is always `manual` (`T-12`); reachable in the same
 change that fixes that.
 
-**Tools.** Seven of ten, all behind one `CallGate` that authorizes before it
+**Tools.** Nine of ten, all behind one `CallGate` that authorizes before it
 executes:
 
 | Family | Tools | Notes |
@@ -130,6 +131,12 @@ executes:
 | Search | `glob`, `grep` | Over vendored ripgrep 14.1.1 |
 | Version control | `git` | Complete subcommand coverage, one capability |
 | Execution | `shell` | One program, one argument vector, no shell. Native only |
+| Web | `web_search`, `fetch` | The resource is the destination host. See ADR 0022 |
+
+**The web pair needs a key before it does anything.** `fetch` reads through
+Jina Reader and `web_search` through Tavily by default, and each has one
+optional fallback slot — never a pool. Which service fills a slot is settings;
+no vendor name appears in either tool's schema. See ADR 0023 and `src/retrieval/`.
 
 **None of them is reachable by the running agent yet.** `src/app.ts` builds no
 gate, and `src/agents/studio.ts` registers exactly one tool —
@@ -201,7 +208,14 @@ top of known holes is building on a floor we know has one.
 unreachable ten-minute ceiling, and the missing shadow-repo lock.~~ Fixed —
 ADR 0020.
 
-**`fetch`** is next, and `C-10` is the question it waits on.
+~~**`fetch`** is next, and `C-10` is the question it waits on.~~ Done — ADRs
+0022 and 0023. `C-10` is closed.
+
+**Phase 11 (MCP) is next.** Two things landed with the web tools that it
+inherits rather than re-decides: `src/net/destination.ts`, which every HTTP
+destination goes through, and `K-07`'s rule that a capability id may not contain
+a `/` — which becomes load-bearing the moment a server supplies its own tool
+names.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 

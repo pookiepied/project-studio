@@ -52,6 +52,13 @@ export type StudioErrorDomain =
    * need different answers.
    */
   | "snapshots"
+  /**
+   * Web search and page reading, and the third-party services behind them.
+   * Separate from `tools`: "the search tool was refused" and "Tavily says your
+   * plan is used up" need different answers from the user, and only the second
+   * one is fixed by opening a billing page.
+   */
+  | "retrieval"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

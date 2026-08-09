@@ -152,7 +152,13 @@ is not a capability. Of the rest, seven are primitives and ten are harness featu
 costume. Flue supplies `SessionEnv` and `bash` — plumbing, not model-facing tools — so there is no
 overlap to avoid. See ADR 0013.
 
-The surface is capped at ten tools, grouped by family, one tool per capability:
+The surface is capped at eleven tools, grouped by family, one tool per capability.
+
+**It was ten, and the eleventh is `web_search`.** Searching and reading a page are two
+capabilities, not one: the model has a question in the first case and an address in the second, and
+one tool taking either would be a single schema hiding two jobs. The cap is a discipline against
+tools that are harness features in costume — it is not a number to defend by merging two real
+capabilities.
 
 | Family | Tools | Status |
 |---|---|---|
@@ -160,7 +166,7 @@ The surface is capped at ten tools, grouped by family, one tool per capability:
 | Search | `glob`, `grep` | Done, over vendored ripgrep 14.1.1 |
 | Version control | `git` | Done — complete subcommand coverage, one capability |
 | Execution | `shell` | Done — native only, uncontained by consent, ADR 0019 |
-| Network | `fetch` | Blocked on the network-effect question |
+| Network | `fetch`, `web_search` | Done — ADRs 0022 and 0023 |
 | Delegation | `task`, `skill` | Phases 13 and 12 |
 
 Foundations landed first, because every tool stands on them:
@@ -195,10 +201,14 @@ The remaining order in this phase is fixed by that chain:
 2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
 3. ~~**`shell`**.~~ Done — ADR 0019. The one tool where the model names the program, so it gives up
    the first of ADR 0013's three properties and keeps the other two.
-4. **`fetch`** — needs an ADR on the network-effect question first. SSRF is not containment, so the
-   real question is what a network capability means while isolation is `in-process`.
+4. ~~**`fetch`**.~~ Done — ADRs 0022 and 0023, and it arrived with `web_search` beside it. The
+   network-effect question is answered in two parts: the resource is the destination host, so
+   `fetch:example.com` uses the approval ladder unchanged; and what comes back is untrusted
+   content, which no permission dialog addresses and which ships as a rule and a label rather than
+   as taint machinery.
 
-`task` and `skill` stay in Phases 13 and 12, so Phase 10 closes with eight of ten.
+`task` and `skill` stay in Phases 13 and 12, so **Phase 10 is closed at nine of ten** — every tool
+that belongs to this phase.
 
 ### Phase 11: MCP
 

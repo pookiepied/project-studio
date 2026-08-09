@@ -321,6 +321,32 @@ feature is ever wanted, it gets its own name and its own ADR.
 
 ---
 
+## C-14 — Which reader fills the fallback slot
+
+**Status:** open, and shipped with a working answer. **Gates:** nothing.
+
+`fetch` reads through Jina Reader. The fallback slot holds Firecrawl today,
+because it is the one candidate that fails *differently* rather than failing the
+same way for less money — it renders pages and gets past bot checks that turn
+Jina away. A fallback that fails wherever the primary fails is decoration.
+
+**What the search found, for the record.** The reader market splits three ways:
+
+| Kind | Examples | Why it might fill the slot |
+|---|---|---|
+| Rendering readers | Firecrawl, ScrapeGraphAI | Closest peers to Jina. Different rendering, different bot handling |
+| Self-hosted | Crawl4AI | Free, no third party learns the URL. Costs a running service |
+| Search providers with an extract endpoint | Tavily Extract, Exa contents | One account instead of two, when search is already connected |
+
+The last row is the interesting one and is not built. If the user has a Tavily
+key for search, using its extract endpoint as the reader fallback costs them
+nothing extra and no second account. Worth doing once someone is in that state.
+
+**Check:** when a real page defeats both Jina and Firecrawl, or when the
+one-account argument gets raised by an actual user.
+
+---
+
 ## C-13 — The final shape of a provider failure
 
 **Status:** open. **Gates:** nothing. ADR 0023 ships a provisional shape.

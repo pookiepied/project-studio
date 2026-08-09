@@ -351,6 +351,9 @@ describe("the gate is the only way a tool runs", () => {
     const { registerGitTools } = await import("../../src/tools/git/index.js");
     const { registerSearchTools } = await import("../../src/tools/search/index.js");
     const { registerShellTools } = await import("../../src/tools/shell/index.js");
+    const { registerWebTools } = await import("../../src/tools/web/index.js");
+    const { RetrievalService } = await import("../../src/retrieval/service.js");
+    const { RetrievalSettingsStore } = await import("../../src/retrieval/settings.js");
 
     const db = openDatabase({ path: ":memory:" });
     try {
@@ -364,6 +367,17 @@ describe("the gate is the only way a tool runs", () => {
       registerGitTools(gate);
       registerSearchTools(gate);
       registerShellTools(gate);
+      registerWebTools(
+        gate,
+        new RetrievalService({
+          settings: new RetrievalSettingsStore(db),
+          credentials: {
+            get: async () => null,
+            set: async () => undefined,
+            delete: async () => false,
+          },
+        }),
+      );
 
       const listed = gate.list().map((tool) => tool.id);
       expect(listed.length).toBeGreaterThan(0);

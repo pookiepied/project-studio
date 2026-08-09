@@ -59,14 +59,16 @@ context/         context assembly
 contracts/       shared types, model ids, and the one effect table (ADR 0020)
 credentials/     keychain-backed, via @napi-rs/keyring
 models/          registry, adapters (test / local BYOK / studio-cloud), catalog
+net/             destination.ts - every outbound address is checked here first
 observability/   OpenTelemetry, error contract, the redaction catalog
 permissions/     the kernel — decides, never executes, never prompts
 platform/        OS specifics
 process/         exec.ts — the only place a child process starts
+retrieval/       web search and page reading providers - two slots, never a pool
 sandbox/         isolation tiers
 snapshots/       shadow git per project — the undo history
 storage/         SQLite, versioned migrations
-tools/           filesystem, search, git, shell — all behind one CallGate
+tools/           filesystem, search, git, shell, web — all behind one CallGate
 vendor/          bundled binaries, installation-relative resolution
 ```
 
