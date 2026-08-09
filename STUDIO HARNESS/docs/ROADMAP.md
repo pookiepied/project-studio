@@ -220,11 +220,18 @@ Design and protocol research: `tasks/002-phase-11-mcp.md`. The protocol split in
 2026-07-28 — a stateless core with no `initialize` handshake, no session id, and no
 server-initiated requests. We speak the modern revision by default and probe for the legacy one.
 
-That research also found five collisions with what is already shipped, and the first one blocks
-everything else: a connected capability declaring `execute` or `network` is refused absolutely
-(ADR 0019, ADR 0024), and the only honest declaration for a server tool we did not write is
-exactly those two. Per-server trust, built the way folder trust is built, is the proposed answer.
-See §3 of the task file. Open questions are `C-15` and `C-16`.
+That research found five collisions with what is already shipped. The first one blocked everything
+else: a connected capability declaring `execute` or `network` is refused absolutely (ADR 0019,
+ADR 0024), and the only honest declaration for a server tool we did not write is exactly those
+two. See §3 of the task file.
+
+All blocking questions were settled on 9 August 2026 (§8). The shape is three layers — installed
+once on the machine, enabled per project and off by default, approved per call by the kernel
+unchanged. Enabling can only subtract; it never grants. Both protocol eras ship together, because
+a modern-only client connects to almost nothing published today. `C-15` and `C-16` are answered.
+
+Phase 12 and the connector work inherit the same three layers. Only the first one differs, and
+only because a skill grants no authority.
 
 ### Phase 12: Skills
 

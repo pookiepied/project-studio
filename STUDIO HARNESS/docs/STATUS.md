@@ -239,14 +239,29 @@ protocol split into two eras on 2026-07-28: the modern revision has no
 deprecates Roots, Sampling, and Logging outright. We speak modern by default and
 probe for legacy.
 
-**One finding blocks the phase.** A connected capability declaring `execute` or
-`network` is refused absolutely (ADR 0019, ADR 0024), and those two are the only
-honest declaration for a tool we did not write. As written, no MCP tool could
-ever run. The proposed answer is per-server trust, built the way folder trust is
-built — per server, decided once, denying rather than asking. Four smaller
-collisions are in §3 of the task file, including that `npx` cannot be spawned
-under our own execution rules on Windows, and that the SSRF guard refuses
-`localhost`, where local MCP servers normally live.
+**One finding blocked the phase, and is now decided.** A connected capability
+declaring `execute` or `network` is refused absolutely (ADR 0019, ADR 0024), and
+those two are the only honest declaration for a tool we did not write. As
+written, no MCP tool could ever run.
+
+The answer is three layers, and it collapses rather than adds. **Installed** —
+accepting once that this program runs outside the folder wall, recorded at the
+moment the server is added. **Enabled** — which servers *this project* uses,
+defaulting to off, checked before anything is spawned or probed. **Approved** —
+the permission kernel, untouched. Enabling can only subtract: it never approves
+a call, and disabling hides a server from discovery rather than refusing it
+later. This mirrors ADR 0021 — trust is global, selection belongs to a project —
+and the same three layers cover skills and connectors.
+
+Four smaller collisions are in §3 of the task file. `npx` is resolved to an
+interpreter plus an absolute script path rather than refused, which keeps
+`shell: false` and never reaches `cmd.exe`, so CVE-2024-27980 stays closed. The
+SSRF guard gains an explicit per-purpose `allowPrivate`, because local MCP
+servers legitimately live on `localhost` while `fetch` follows a URL the model
+chose.
+
+**Both protocol eras ship together.** Modern-only would connect to almost
+nothing that exists today.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 

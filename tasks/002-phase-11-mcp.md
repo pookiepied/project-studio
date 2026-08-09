@@ -408,13 +408,138 @@ architecture.
 
 ---
 
-## 8. Open, and blocking
+## 8. Decisions taken, 9 August 2026
 
-1. **F-1** — per-server trust. Nothing runs until this is decided.
-2. **F-2** — the `npx` resolution.
-3. **F-3** — `allowPrivate` at the destination guard.
-4. The folder name: `src/extend/` versus `src/plugins/`.
-5. Whether the first cut ships modern-only, with the legacy module second.
+The owner settled every blocking question in one pass. Recorded here; these
+become ADR 0025 when the code lands.
+
+### D-1 — Three layers, not four
+
+**F-1 is accepted, and it collapses rather than adds.** Trust is not a separate
+wall that a server passes through at call time. It is the *act of adding the
+server*, recorded. That is the one moment where the consequence in F-4 can be
+put in front of a person who is already thinking about this specific server.
+
+The owner also specified a layer that was missing: a server is installed once on
+the machine, and then chosen **per project**, defaulting to off.
+
+| Layer | Question | Where it is decided | Default |
+|---|---|---|---|
+| **Installed** | Do I accept that this program runs outside the folder wall? | once, when added | not installed |
+| **Enabled** | Does *this project* use it? | per project | **off** |
+| **Approved** | May this call happen? | the permission kernel | ask |
+
+Checked in that order. Enabled is checked first, and it is checked before
+anything connects — a server a project did not select is never spawned, never
+probed, and never appears in `tools/list`. It costs no process, no token, and no
+prompt-cache space.
+
+**Enabled can only subtract.** Selecting a server for a project does not approve
+one call it makes; the kernel is untouched. De-selecting one is absolute: hidden
+from discovery, not refused at call time. That asymmetry is what makes it safe
+to put behind a plain checkbox in the project screen.
+
+This mirrors ADR 0021 exactly. Folder trust is per folder and global; a grant
+belongs to a project. Server trust is per server and global; server enablement
+belongs to a project. Same shape, second application.
+
+Native tools are not in this system at all. `read`, `shell`, `fetch`, and the
+rest are not extensions, do not appear on the extensions page, and cannot be
+switched off there. If we ever ship an MCP server ourselves, it is listed and is
+not de-selectable.
+
+The same three layers apply to skills and to connectors. Skills skip the first
+layer's warning, because a skill grants no authority (§2.2), but the per-project
+selection is identical — the reason there is prompt cost and attention, not
+safety.
+
+`WorkspaceTrustStore` in `src/permissions/trust.ts` is the model to copy:
+`trusted | untrusted | undecided`, one row keyed by root, a store rather than a
+flag.
+
+### D-2 — The folder is `src/extend/`
+
+Chosen over `src/plugins/` for one forward-looking reason. Every comparable tool
+converges on *plugin* meaning a **bundle** — one installable unit containing
+skills, agents, hooks, and MCP servers together, distributed through a
+marketplace. Claude Code already uses the word that way, and this product will
+want the same thing. Spending the word now on the categories leaves nothing to
+call the bundle later except `plugins/plugins`.
+
+`extensions/` is unavailable: the 2026-07-28 revision uses that word for a
+specific protocol mechanism, and grep would stop working inside the one subtree
+that needs it most.
+
+`extend` is a verb, collides with nothing, and reads correctly at the import
+site: `extend/mcp`, `extend/skills`.
+
+The product surface can still be called the Extensions page. What the user sees
+and what the folder is called do not have to be the same word, and here they
+must not be.
+
+### D-3 — `npx` is resolved, not refused
+
+**Resolving is not a weakening of the rule.** CVE-2024-27980 lives entirely in
+the `.bat`/`.cmd` path, where Windows routes the spawn through `cmd.exe` and the
+argument escaping is broken. Spawning `node.exe` with `[<abs>/npx-cli.js,
+...args]` never touches `cmd.exe`, passes an argument vector, and keeps
+`shell: false`. It is exactly as safe as refusing, and it accepts the
+configuration printed in every server's README.
+
+The procedure:
+
+1. Take the configuration as written.
+2. Resolve `npx`, `npm`, `pnpm`, `yarn`, `bunx` to the interpreter plus the
+   absolute path of the CLI script. Never a shell, never a `.cmd`.
+3. If it cannot be resolved, refuse and print the exact line that would work.
+
+One thing this does **not** solve, and which belongs in the install dialog
+rather than in the spawn code: `npx -y package` fetches code from the network
+and runs it. That is the user's own decision, the same as `npm install`, and it
+is not `V-01` — `V-01` is about binaries *we* vouch for. But it is precisely the
+consequence D-1's first layer exists to state.
+
+The settings screen should encourage a pinned `package@version`. Encouraged,
+not enforced: enforcing it would refuse most published configurations.
+
+### D-4 — Dual-era ships in version one
+
+Reversed from §1.4's suggestion that legacy could follow. The owner asked the
+question that settles it: *if I download a popular MCP server today, does it
+work?*
+
+**Modern-only, it does not.** The revision is twelve days old. The compatibility
+matrix says modern client plus legacy server **fails** — not degrades. Every
+server installed on this machine today is legacy. Every server published before
+28 July 2026 is legacy.
+
+So both eras land together, behind one seam.
+
+Legacy coverage, split by transport, because the cost is not the same on each:
+
+- **stdio** — accept any legacy revision we can complete an `initialize`
+  handshake with. Across the four legacy revisions the stdio handshake barely
+  differs; the differences are in HTTP and in optional features we are not
+  implementing anyway. Breadth here is nearly free.
+- **HTTP** — require Streamable HTTP, which means `2025-03-26` or later. Do not
+  implement HTTP+SSE. That excludes only remote servers still on `2024-11-05`,
+  a transport deprecated for seventeen months and now under a removal clock.
+
+`C-16` is answered by this.
+
+### D-5 — Firecrawl
+
+Deferred again, at the owner's request. `C-14` is unchanged.
+
+## 9. Still open
+
+1. **F-3** — `allowPrivate` at the destination guard. Mine to implement; no
+   decision needed, recorded so it is not forgotten.
+2. Whether a project may enable a server that is installed but whose trust was
+   later revoked. Proposed: no, and it disappears from the project's list with a
+   reason rather than failing at call time.
+3. What the extensions page shows for a server that is installed, enabled, and
+   failing. Health belongs in the row; the wording does not exist yet.
 
 Sources: the 2026-07-28 changelog, versioning, and stdio transport pages on
 modelcontextprotocol.io; the 2026-07-28 release post; the Agent Skills

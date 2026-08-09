@@ -417,8 +417,12 @@ ADR 0020 exists to prevent.
 "nothing under here reaches the model except through the gate" a rule the suite
 can fail on.
 
-**Check:** decide the name before the first file lands. Renaming a subtree after
-imports exist is the change nobody makes.
+**Answered, 9 August 2026.** `src/extend/`. See `tasks/002-phase-11-mcp.md` D-2.
+Not `plugins/`, which every comparable tool spends on a *bundle* of skills,
+agents, hooks, and servers distributed together — a thing this product will want
+and would then have no word for. Not `extensions/`, which the 2026-07-28
+revision has taken. The product surface is still called the Extensions page;
+the folder and the page do not have to share a word, and here they must not.
 
 ---
 
@@ -433,12 +437,18 @@ Settled by that research: modern is the default, HTTP+SSE is not implemented,
 and Roots, Sampling, and Logging are not implemented — all three are deprecated
 in the revision we are adopting and all three have named migrations.
 
-**Not decided:** whether the first cut ships modern-only with the legacy module
-second. The era seam has to exist from the first commit either way; retrofitting
-one into a client written as though a single wire format existed is the change
-that never happens cleanly.
+**Answered, 9 August 2026.** Both eras ship together. See
+`tasks/002-phase-11-mcp.md` D-4.
 
-**Check:** when the first server connects end to end.
+Modern-only was tempting and is wrong. The revision is twelve days old, the
+compatibility matrix says a modern client against a legacy server *fails* rather
+than degrades, and every server published before 28 July 2026 — including both
+installed on this machine — is legacy.
+
+Legacy coverage differs by transport, because the cost does. On stdio, accept
+any revision we can complete a handshake with; the handshake barely varies and
+breadth is nearly free. On HTTP, require Streamable HTTP (`2025-03-26` or
+later) and never implement HTTP+SSE.
 
 ---
 
