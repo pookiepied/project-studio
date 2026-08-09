@@ -57,7 +57,7 @@ process it talks to; neither contains the other.
 | 8 | Auth, credentials, local BYOK | Done |
 | 9 | Permission and containment kernel | Foundation done, 2 items open |
 | 10 | Native agent tools | **In progress — 9 of 10** |
-| 11 | MCP | Not started |
+| 11 | MCP | Design — no code |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
 | 14 | Projects, workspaces, sandboxes | Not started |
@@ -227,11 +227,26 @@ ADR 0020.
 ~~**`fetch`** is next, and `C-10` is the question it waits on.~~ Done — ADRs
 0022 and 0023. `C-10` is closed.
 
-**Phase 11 (MCP) is next.** Two things landed with the web tools that it
-inherits rather than re-decides: `src/net/destination.ts`, which every HTTP
-destination goes through, and `K-07`'s rule that a capability id may not contain
-a `/` — which becomes load-bearing the moment a server supplies its own tool
-names.
+**Phase 11 (MCP) is next, and is in design.** Two things landed with the web
+tools that it inherits rather than re-decides: `src/net/destination.ts`, which
+every HTTP destination goes through, and `K-07`'s rule that a capability id may
+not contain a `/` — which becomes load-bearing the moment a server supplies its
+own tool names.
+
+Research and design are in `tasks/002-phase-11-mcp.md`. No code yet. The
+protocol split into two eras on 2026-07-28: the modern revision has no
+`initialize` handshake, no session id, and no server-initiated requests, and it
+deprecates Roots, Sampling, and Logging outright. We speak modern by default and
+probe for legacy.
+
+**One finding blocks the phase.** A connected capability declaring `execute` or
+`network` is refused absolutely (ADR 0019, ADR 0024), and those two are the only
+honest declaration for a tool we did not write. As written, no MCP tool could
+ever run. The proposed answer is per-server trust, built the way folder trust is
+built — per server, decided once, denying rather than asking. Four smaller
+collisions are in §3 of the task file, including that `npx` cannot be spawned
+under our own execution rules on Windows, and that the SSRF guard refuses
+`localhost`, where local MCP servers normally live.
 
 ~~**Snapshots (T-04).**~~ Done — ADR 0016.
 

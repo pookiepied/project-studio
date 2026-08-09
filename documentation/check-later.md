@@ -398,6 +398,50 @@ provider needs the same words.
 
 ---
 
+## C-15 — Where pluggable subsystems live
+
+**Status:** open. **Gates:** the first commit of Phase 11.
+
+MCP, skills, hooks, and later teams all arrive the same way — declared,
+validated, scoped, enabled, reloaded — and all four would otherwise land flat in
+`src/` beside `db.ts`. The proposal in `tasks/002-phase-11-mcp.md` §2 is
+`src/extend/` with a shared `registry/` inside it, and `agents/` staying out
+because a subagent consumes the other three rather than being one of them.
+
+Not `extensions/`: that word now names a specific MCP mechanism in the
+2026-07-28 revision, and one word with two meanings inside one subsystem is what
+ADR 0020 exists to prevent.
+
+**What makes it worth a folder** is not that the things are similar. It is that
+`architecture.test.ts` enforces boundaries by path, so a parent folder makes
+"nothing under here reaches the model except through the gate" a rule the suite
+can fail on.
+
+**Check:** decide the name before the first file lands. Renaming a subtree after
+imports exist is the change nobody makes.
+
+---
+
+## C-16 — Which MCP revisions we speak
+
+**Status:** open. **Gates:** nothing yet; narrows Phase 11's first cut.
+
+The 2026-07-28 revision split MCP into two eras. Research and the full
+compatibility procedure are in `tasks/002-phase-11-mcp.md` §1.
+
+Settled by that research: modern is the default, HTTP+SSE is not implemented,
+and Roots, Sampling, and Logging are not implemented — all three are deprecated
+in the revision we are adopting and all three have named migrations.
+
+**Not decided:** whether the first cut ships modern-only with the legacy module
+second. The era seam has to exist from the first commit either way; retrofitting
+one into a client written as though a single wire format existed is the change
+that never happens cleanly.
+
+**Check:** when the first server connects end to end.
+
+---
+
 ## C-08 — Folder names contain spaces
 
 **Status:** open, low priority.

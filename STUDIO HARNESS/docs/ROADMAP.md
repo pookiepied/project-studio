@@ -216,6 +216,16 @@ Add a registry and separate transports for local MCP and authenticated cloud MCP
 capability, permission, cancellation, telemetry, and result policy as native tools. Include tool
 provenance, collision handling, health, reconnect, and connection teardown.
 
+Design and protocol research: `tasks/002-phase-11-mcp.md`. The protocol split into two eras on
+2026-07-28 — a stateless core with no `initialize` handshake, no session id, and no
+server-initiated requests. We speak the modern revision by default and probe for the legacy one.
+
+That research also found five collisions with what is already shipped, and the first one blocks
+everything else: a connected capability declaring `execute` or `network` is refused absolutely
+(ADR 0019, ADR 0024), and the only honest declaration for a server tool we did not write is
+exactly those two. Per-server trust, built the way folder trust is built, is the proposed answer.
+See §3 of the task file. Open questions are `C-15` and `C-16`.
+
 ### Phase 12: Skills
 
 Add application-owned and workspace-discovered skills, validation, catalog metadata, and agent
