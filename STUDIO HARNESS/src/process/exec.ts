@@ -29,9 +29,12 @@ const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
  * policy, never from `process.env`". Without `SystemRoot` many Windows
  * executables fail to initialise the socket and crypto layers; without a temp
  * directory git cannot write its index lock. The list is an allowlist of OS
- * plumbing, and nothing here can carry a credential — `PATH` in particular is
- * deliberately absent, because inheriting it is how a spawned binary finds
- * tools the caller never approved.
+ * plumbing, and nothing here can carry a credential.
+ *
+ * `PATH` is absent from this list and then **explicitly blanked below**, which
+ * is not the same thing. Inheriting `PATH` is how a spawned binary finds tools
+ * the caller never approved, and on Windows leaving it out does not leave it
+ * out — see the comment on that line.
  */
 const OS_REQUIRED_VARIABLES = ["SystemRoot", "windir", "TEMP", "TMP"] as const;
 
@@ -70,6 +73,22 @@ export function buildEnvironment(
     if (value !== undefined) environment[name] = value;
   }
 
+  // Windows hands a child `PATH` whether or not we pass one. Measured, not
+  // assumed: spawning with `env: {}` still delivers PATH, USERPROFILE,
+  // USERNAME, HOMEDRIVE, HOMEPATH, LOGONSERVER, and USERDOMAIN, because libuv
+  // merges a set of variables the platform treats as mandatory.
+  //
+  // Leaving it there would make this file's central claim false — a spawned
+  // binary could resolve any tool on the machine, which is the exact thing
+  // building an environment from policy is meant to prevent. An explicitly
+  // empty value does override the injected one, so it is set rather than
+  // omitted. Omission is not refusal on this platform.
+  //
+  // The other injected variables are left alone: they name the user rather
+  // than granting reach, and blanking a home directory breaks programs for no
+  // security gain.
+  environment.PATH = "";
+
   // The caller's policy wins, so a policy that pins TEMP is honoured rather
   // than silently overwritten by the host's.
   return { ...environment, ...supplied };
@@ -81,8 +100,11 @@ export function buildEnvironment(
  * Every check here is a case where the OS would otherwise reinterpret our
  * intent rather than fail loudly.
  */
-function assertRunnable(options: RunProcessOptions): void {
-  if (!isAbsolute(options.executable)) {
+export function assertRunnableCommand(
+  executable: string,
+  args: readonly string[],
+): void {
+  if (!isAbsolute(executable)) {
     // A bare name would be resolved through PATH by the OS, which puts the
     // choice of binary in the hands of whatever is on the machine.
     throw new ProcessError("invalid_argument", {
@@ -91,7 +113,7 @@ function assertRunnable(options: RunProcessOptions): void {
   }
 
   if (process.platform === "win32") {
-    const extension = extname(options.executable).toLowerCase();
+    const extension = extname(executable).toLowerCase();
     if (extension !== ".exe" && extension !== ".com") {
       // `.bat` and `.cmd` cannot be run without a shell, and running them
       // through `cmd.exe` reintroduces metacharacter parsing of our arguments
@@ -103,7 +125,7 @@ function assertRunnable(options: RunProcessOptions): void {
     }
   }
 
-  for (const argument of options.args) {
+  for (const argument of args) {
     if (typeof argument !== "string") {
       throw new ProcessError("invalid_argument", {
         message: "Every command argument must be text.",
@@ -125,8 +147,13 @@ function assertRunnable(options: RunProcessOptions): void {
  * `child.kill()` signals only the process we spawned. Git in particular spawns
  * helpers, so killing just the parent on a timeout leaves those running and
  * holding the repository's index lock.
+ *
+ * Exported for the MCP stdio channel, which has the same problem in a worse
+ * form: an MCP server is usually `node` running someone else's entry point, and
+ * that entry point may start whatever it likes. A second implementation of this
+ * would be a second chance to forget `/T`.
  */
-function killTree(pid: number | undefined, kill: () => void): void {
+export function killProcessTree(pid: number | undefined, kill: () => void): void {
   if (pid === undefined) {
     kill();
     return;
@@ -148,7 +175,7 @@ function killTree(pid: number | undefined, kill: () => void): void {
 }
 
 export async function runProcess(options: RunProcessOptions): Promise<ProcessResult> {
-  assertRunnable(options);
+  assertRunnableCommand(options.executable, options.args);
 
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
@@ -198,7 +225,7 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
       outcome = error;
       clearTimeout(timer);
       options.signal?.removeEventListener("abort", onAbort);
-      killTree(child.pid, () => child.kill("SIGKILL"));
+      killProcessTree(child.pid, () => child.kill("SIGKILL"));
       graceTimer = setTimeout(() => settle(() => reject(error)), 2_000);
     };
 

@@ -132,8 +132,24 @@ describe("the environment is built, not inherited", () => {
     }
   });
 
-  it("does not pass PATH, so a child cannot find unapproved tools", () => {
-    expect(buildEnvironment()).not.toHaveProperty("PATH");
+  it("gives a child an empty PATH, so it cannot find unapproved tools", async () => {
+    // This used to assert that `buildEnvironment()` had no PATH key, and it
+    // passed while the guarantee was false. It inspected our own object rather
+    // than the child: on Windows libuv merges PATH into a spawned process even
+    // when the environment we pass has none, so omitting it is not refusing it.
+    //
+    // Asserted against a real child now, because the child is where the claim
+    // has to hold.
+    const result = await node("process.stdout.write(process.env.PATH ?? 'absent')");
+
+    expect(result.stdout).toBe("");
+  });
+
+  it("blanks PATH explicitly rather than leaving it out", () => {
+    // The mechanism behind the test above, asserted directly so that deleting
+    // the line fails with an explanation rather than only failing a
+    // spawn-based test that could be misread as flaky.
+    expect(buildEnvironment().PATH).toBe("");
   });
 
   it("passes what the caller supplies", async () => {

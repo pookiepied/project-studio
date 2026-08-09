@@ -945,6 +945,36 @@ every pnpm command prints an unsupported-engine warning.
 `node:sqlite` is experimental in this version and warns on every test run. Worth
 resolving before anything depends on a 22.19+ behaviour.
 
+### S-04 · Windows delivered `PATH` to every child we spawned · Fixed
+
+`buildEnvironment` built the child's environment from an allowlist and left
+`PATH` out, and the comment said inheriting it "is how a spawned binary finds
+tools the caller never approved". **On Windows it was inherited anyway.**
+
+Measured rather than assumed. Spawning with `env: {}` still delivered `PATH`,
+`USERPROFILE`, `USERNAME`, `HOMEDRIVE`, `HOMEPATH`, `LOGONSERVER`, and
+`USERDOMAIN` — libuv merges a set the platform treats as mandatory. Every
+process the harness has ever started, `git` and `ripgrep` and `shell` included,
+could resolve any program on the machine by name.
+
+**Why nothing caught it.** `process.test.ts` asserted
+`expect(buildEnvironment()).not.toHaveProperty("PATH")`. That inspected *our
+object*, never a child, so it passed for as long as the guarantee was false.
+The same shape as `S-03`: a test whose input does not exercise the mechanism it
+names.
+
+**The fix is one line.** An explicit empty value does override the injected one,
+so `PATH` is now set to `""` rather than omitted — **omission is not refusal on
+this platform**. The test asserts it against a real spawned child, and a second
+test asserts the mechanism so deleting the line fails with an explanation.
+
+The other injected variables are deliberately left: they name the user rather
+than granting reach, and blanking a home directory breaks programs for no
+security gain.
+
+Found while building the MCP stdio channel, where the same claim would have been
+inherited unexamined.
+
 ### E-02 · The setup CLI raises errors with no domain · Open
 
 `src/models/local/cli.ts:59` and `:66` reject with a bare `Error`. Every failure
