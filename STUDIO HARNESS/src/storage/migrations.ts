@@ -193,6 +193,45 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    name: "mcp_server",
+    up(db) {
+      // An installed MCP server: how to reach it, and nothing about whether it
+      // is allowed. Selection lives in `extension_selection` and approvals live
+      // in `permission_grant`, because those answer different questions and a
+      // row here must never imply either.
+      //
+      // **No column holds a secret, and the guard enforces it.** A bearer token
+      // or a password lives in the OS credential store under the server's id.
+      // `auth_env_var` is the *name* of the environment variable the secret is
+      // injected into at spawn time -- a name is configuration, the value never
+      // touches this file. An earlier draft called it `secret_env_name` and the
+      // migration guard refused it, correctly, which is the guard doing exactly
+      // what it is for.
+      //
+      // `args` and `env` are JSON arrays and objects. A command is an
+      // executable plus an argument vector, never a string, so there is no
+      // column that could hold `node server.js --flag` and be re-split by
+      // something later.
+      db.exec(`
+        CREATE TABLE mcp_server (
+          id            TEXT PRIMARY KEY,
+          title         TEXT NOT NULL,
+          transport     TEXT NOT NULL,
+          command       TEXT,
+          args          TEXT NOT NULL DEFAULT '[]',
+          env           TEXT NOT NULL DEFAULT '{}',
+          url           TEXT,
+          auth_kind     TEXT NOT NULL DEFAULT 'none',
+          auth_header   TEXT,
+          auth_env_var  TEXT,
+          installed_at  INTEGER NOT NULL,
+          updated_at    INTEGER NOT NULL
+        ) STRICT;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

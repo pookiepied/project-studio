@@ -53,11 +53,17 @@ export class CredentialStoreError extends StudioError {
  * What a stored secret belongs to.
  *
  * `session` holds the Studio access/refresh tokens. `provider` holds one BYOK
- * credential for one provider. Keeping them in separate entries rather than one
- * serialized bundle is a platform requirement, not a preference: see
- * `MAX_SECRET_LENGTH`.
+ * credential for one provider. `mcp` holds the one secret an MCP server needs
+ * — a bearer token for a remote endpoint, or the value of an environment
+ * variable a local server reads a key from. Keeping them in separate entries
+ * rather than one serialized bundle is a platform requirement, not a
+ * preference: see `MAX_SECRET_LENGTH`.
+ *
+ * `mcp` is a scope here rather than a column in `mcp_server` because that is
+ * the whole keychain/database split: the row says a secret exists and what it
+ * is called, and the store is the only thing that holds what it is.
  */
-export type CredentialScope = "session" | "provider";
+export type CredentialScope = "session" | "provider" | "mcp";
 
 export interface CredentialKey {
   readonly scope: CredentialScope;
