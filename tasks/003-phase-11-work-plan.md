@@ -478,10 +478,35 @@ the process writing into it; a server that logs enough would hang rather than
 fail. It is bounded to the last lines, because the failure is at the end, and a
 death quotes the last line rather than reporting only "it stopped".
 
-**Still to build:** the child-process channel adapter — spawn with the argv
-rules, startup timeout, tree kill via `taskkill /T` as `exec.ts` already does —
-then the supervisor that joins `lifecycle.ts` and `backoff.ts` to it, and the
-reconciler that finally has something live to reconcile.
+**The stdio channel — done.** `stdio-channel.ts`. 914 passing, up seven.
+
+It reuses the spawn contract rather than restating it: `assertRunnableCommand`,
+`buildEnvironment`, and `killProcessTree` are the same ones `git` and `shell`
+use, now exported. The tree kill matters more here than anywhere — an MCP server
+is usually `node` running someone else's entry point, and that entry point may
+start whatever it likes.
+
+**Two defects found by building it, and the second is the important one.**
+
+*Output before a listener was dropped.* The process starts, survives the startup
+window, and only then does a connection subscribe. Everything a fast server said
+in that gap had no reader — which is precisely the output that explains a bad
+start. Buffered now, and handed over in order when a listener attaches.
+
+*`S-04`: Windows delivered `PATH` to every child we have ever spawned.*
+`buildEnvironment` left it out of its allowlist and the comment claimed that
+mattered. libuv merges it back in regardless — measured with `env: {}`, which
+still delivers `PATH` and six more. So `git`, `ripgrep`, `shell`, and MCP could
+all resolve any program on the machine by name.
+
+Nothing caught it because the test inspected **our object** rather than a child.
+The same shape as `S-03`. Fixed by setting `PATH` to `""` rather than omitting
+it — **omission is not refusal on this platform** — and the test now asserts
+against a real spawned child. Full detail in `KNOWN-ISSUES.md`.
+
+**Still to build:** the supervisor that joins `lifecycle.ts` and `backoff.ts` to
+a real channel, then the reconciler, which finally has something live to
+reconcile.
 
 ### 003.6 — original notes
 
