@@ -451,9 +451,37 @@ deleting either left the suite green. The first now uses a path that only the
 absolute rule can refuse; the second asserts the *message*, since the message is
 the whole value of the shim rule.
 
-**Still to build here:** the transport itself, the era probe, and process
-lifetime — drained `stderr`, startup timeout, tree kill, backoff with a give-up
-state. Waiting on `004.A`–`004.E`.
+**The era probe and the connection — done.** `wire/era.ts` and `connection.ts`.
+907 passing, up twenty-five.
+
+`readEraProbe` is a pure function from one answer to a named era, so every shape
+a server might send is testable without one running. The middle row is the one
+worth having written down: a modern server that refuses our protocol version
+answers with an *error*, so treating any error as "not modern" downgrades a
+server that just told us what it was — and the legacy attempt then fails and
+reports the wrong thing. It keys on the whole `-32020`..`-32099` reserved band
+rather than `-32022` alone, because raising any of them demonstrates modern
+vocabulary.
+
+`McpConnection` owns the two things the wire layer cannot: what happens when the
+other end goes away, and what happens to everyone waiting when it does. A dead
+channel with requests still in the map means promises that never settle, which
+presents as an agent hanging with nothing in any log.
+
+**The channel is injected**, so a misbehaving server is provoked exactly and in
+order without spawning anything — the same reason the wire layer is pure. One
+adapter is left that cannot be tested this way, and it is deliberately the
+smallest part.
+
+`stderr` is always drained, because a pipe nobody reads fills and then blocks
+the process writing into it; a server that logs enough would hang rather than
+fail. It is bounded to the last lines, because the failure is at the end, and a
+death quotes the last line rather than reporting only "it stopped".
+
+**Still to build:** the child-process channel adapter — spawn with the argv
+rules, startup timeout, tree kill via `taskkill /T` as `exec.ts` already does —
+then the supervisor that joins `lifecycle.ts` and `backoff.ts` to it, and the
+reconciler that finally has something live to reconcile.
 
 ### 003.6 — original notes
 
