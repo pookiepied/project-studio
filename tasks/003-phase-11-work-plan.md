@@ -409,7 +409,53 @@ redirect" by refusing redirects outright to fixed provider endpoints. An MCP
 client talking to a user-supplied host cannot do that, so DNS-rebinding and
 redirect validation are new.
 
-### 003.6 — MCP transport and protocol
+### 003.6 — MCP transport and protocol — **the registry done**
+
+`src/extend/mcp/registry.ts`, migration 7, and a third credential scope.
+`pnpm check` green, 717 passing, up eighteen.
+
+**Why this half and not the transport.** The transport's wire layer is exactly
+what `004.A` to `004.E` are, and they are out with a delegate. Writing my own
+framing, JSON-RPC types, correlation, backoff, and lifecycle would mean two of
+each to reconcile. So this turn built everything the transport stands on and
+nothing it shares.
+
+**What the record holds, and what it must not.** How to reach a server, and
+nothing about whether it is allowed. Selection is `extension_selection`,
+approval is the kernel. A row here implies neither.
+
+**No column holds a secret.** A bearer token, or the value a local server reads
+a key from, lives in the OS credential store under a new `mcp` scope. The row
+holds `auth_env_var`, the *name* of the variable the value is injected into at
+spawn time. An earlier draft named that column `secret_env_name` and the
+migration guard refused the migration — the guard doing exactly its job, on the
+first real chance it had.
+
+**A command is checked when it is added, not when it is spawned.** A refusal at
+spawn time reaches nobody who can act on it and leaves a row that looks
+installed and can never run. Relative paths are refused, and so are `.cmd`,
+`.bat`, and `.ps1` — running one needs a shell, and a shell reintroduces the
+argument parsing we removed on purpose. That refusal carries the fix, because
+most npm-installed servers arrive as a `.cmd` on Windows and it is the message a
+user is most likely to meet.
+
+**The endpoint guard is deliberately not `fetch`'s.** A user typed this URL into
+a settings form, and a local server is the ordinary case. The *shape* is checked
+here — `http` or `https`, well formed — and where it points is judged where the
+connection is made, which is the only place that can also judge a redirect.
+`C-17` still owns the policy.
+
+**Two tests were passing against broken code and were fixed.** On Windows the
+`.exe`-only rule masks both the absolute-path rule and the shim rule, so
+deleting either left the suite green. The first now uses a path that only the
+absolute rule can refuse; the second asserts the *message*, since the message is
+the whole value of the shim rule.
+
+**Still to build here:** the transport itself, the era probe, and process
+lifetime — drained `stderr`, startup timeout, tree kill, backoff with a give-up
+state. Waiting on `004.A`–`004.E`.
+
+### 003.6 — original notes
 
 stdio and Streamable HTTP; the era probe; modern and legacy behind one seam.
 Process lifetime per §13.8 — drained `stderr`, per-server startup timeout, tree

@@ -50,6 +50,28 @@ fast-forward — the branch is one commit, so there is nothing to untangle.
 **Delete the branch on merge.** The commits are on `main`; the branch name is
 now a second, ageing answer to where the work is.
 
+**One working tree, so branches do not isolate anyone.** The delegate and the
+reviewer check out branches in the same folder. A branch protects the *history*;
+it does nothing about the files on disk, and switching a branch under someone
+else's uncommitted work is how a file ends up in the wrong commit.
+
+This has already happened once: a delegate left the tree on its own branch, work
+continued on top of it, and a delegate's in-progress file was swept into a
+reviewer commit by a directory-wide `git add`. Caught by reading
+`git show --stat` and amended out.
+
+Three rules follow, and the third is the one that actually prevents it:
+
+1. **Check `git branch --show-current` before committing.** Every time.
+2. **Read `git show --stat` after committing.** A commit is not done until you
+   have seen its file list.
+3. **Never `git add` a directory.** Name the files. A directory grows between
+   the moment you decide to commit and the moment you type it.
+
+If the two of you start overlapping often, the real fix is `git worktree` — a
+second folder for the delegate, sharing one history. Not needed while tasks are
+handed out one at a time.
+
 **Do not keep working on a branch after merging it.** This has already gone
 wrong once: review finished on `task/003-5-destination-guard`, three unrelated
 commits followed on the same branch, and the branch name went on claiming to be
