@@ -159,6 +159,33 @@ describe("choosing the program", () => {
     expect(resolved.name).toBe("node");
   });
 
+  it("finds the same program whether or not the extension is spelled out", () => {
+    // The extension was appended to the raw command, so `node.exe` searched for
+    // `node.exe.exe` and the caller was told node was not installed — for
+    // spelling out the extension this tool's own messages talk about.
+    if (process.platform !== "win32") return;
+
+    const bare = resolveProgram("node", { searchPath: dirname(NODE) });
+    const spelled = resolveProgram("node.exe", { searchPath: dirname(NODE) });
+
+    expect(spelled.path).toBe(bare.path);
+    // The same permission resource either way, or `shell:node` would not cover
+    // both spellings and one approval would not match the next call.
+    expect(spelled.name).toBe("node");
+    expect(shellResource(spelled.name)).toBe(shellResource(bare.name));
+  });
+
+  it("refuses a shim named in full for what it is, not as missing", () => {
+    // `npm.cmd` is what a user types after being told `npm` is a shim.
+    if (process.platform !== "win32") return;
+
+    writeFileSync(join(workspace, "faketool.cmd"), "@echo off");
+
+    expect(() => resolveProgram("faketool.cmd", { searchPath: workspace })).toThrow(
+      /needs a command shell/i,
+    );
+  });
+
   it("refuses a path relative to the project", () => {
     // `./build.sh` would mean "run whatever this repository ships", which is
     // what an untrusted checkout must not be able to arrange by being opened.

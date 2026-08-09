@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 12 of 20 done
+**State:** open — 13 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -413,7 +413,7 @@ the first.
 
 ---
 
-### [ ] 13. `shell` cannot run a program named with its extension · `T-25`
+### [x] 13. `shell` cannot run a program named with its extension · `T-25` · `PENDING13`
 
 **Where:** `STUDIO HARNESS/src/tools/shell/resolve.ts:84` and `:116-118`
 
@@ -428,6 +428,27 @@ talks about `.exe` — is told the program is not installed.
 caller already supplied a runnable extension. Test `node` and `node.exe` both
 resolving to the same path. Fold in the `T-21` note that the program is resolved
 three times per call: resolve once in `parse` and carry the path through.
+
+**Done.** Both halves.
+
+The search now uses the stripped `name`, and a caller who already supplied a
+runnable extension is looked up verbatim. `node` and `node.exe` resolve to the
+same file and to the same permission resource, `shell:node` — otherwise one
+approval would not have covered the next call.
+
+**One more found while there:** a shim named in full — `npm.cmd` — was searched
+for as `npm.cmd.exe` and reported missing. That is the exact thing a user types
+after being told `npm` is a shim, so it now gets the shim message.
+
+`T-21`, folded in: `parse`, `resource`, and `execute` each called
+`resolveProgram`, which walks `PATH` and stats every candidate. Three times per
+call for an answer that cannot change between them — and worse than the cost, it
+could disagree with itself if `PATH` changed mid-call, so the program authorized
+would not be the program run. `ShellInput` now carries the resolution.
+
+**Tested by:** `node` and `node.exe` give the same path, name, and resource, and
+`faketool.cmd` gets the shim message. Restoring the raw-program search fails the
+first.
 
 ---
 

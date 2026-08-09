@@ -82,6 +82,7 @@ export function resolveProgram(
   }
 
   const name = basename(program).replace(/\.(exe|com|cmd|bat|ps1)$/i, "");
+  const supplied = extname(program).toLowerCase();
 
   if (isAbsolute(program)) {
     if (SHIM_EXTENSIONS.includes(extname(program).toLowerCase())) {
@@ -106,15 +107,36 @@ export function resolveProgram(
     });
   }
 
+  // A shim named in full is refused for what it is, rather than searched for
+  // and reported missing. `npm.cmd` is the most likely thing a Windows user
+  // types after being told `npm` is a shim.
+  if (SHIM_EXTENSIONS.includes(supplied)) {
+    throw shimRefusal(program, program);
+  }
+
   const searchPath = options.searchPath ?? process.env.PATH ?? "";
+
+  /**
+   * What to look for in each directory.
+   *
+   * The extension was being appended to the *raw* program, so `node.exe`
+   * searched for `node.exe.exe` and the caller was told node was not
+   * installed — for spelling out the extension the tool's own message talks
+   * about. A caller who already supplied a runnable extension is looked up
+   * verbatim; everyone else gets the stripped name plus each extension.
+   */
+  const candidates = RUNNABLE_EXTENSIONS.includes(supplied)
+    ? [program]
+    : RUNNABLE_EXTENSIONS.map((extension) => `${name}${extension}`);
+
   let shim: string | undefined;
 
   for (const entry of searchPath.split(delimiter)) {
     const directory = entry.trim().replace(/^"|"$/g, "");
     if (directory === "" || !isAbsolute(directory)) continue;
 
-    for (const extension of RUNNABLE_EXTENSIONS) {
-      const candidate = join(directory, `${program}${extension}`);
+    for (const candidateName of candidates) {
+      const candidate = join(directory, candidateName);
       if (isFile(candidate)) return { path: candidate, name };
     }
 
@@ -123,7 +145,7 @@ export function resolveProgram(
     // executable sits later on the path.
     if (shim === undefined && process.platform === "win32") {
       shim = SHIM_EXTENSIONS.map((extension) =>
-        join(directory, `${program}${extension}`),
+        join(directory, `${name}${extension}`),
       ).find(isFile);
     }
   }

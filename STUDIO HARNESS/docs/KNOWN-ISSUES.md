@@ -355,6 +355,21 @@ create two histories that can disagree, and tracking build output would put
 Worth stating plainly in the UI when undo is offered: it returns your files, not
 your build and not your branch.
 
+### T-25 · `shell` could not run a program named with its extension · Fixed
+
+The extension was appended to the raw command while the permission name was
+taken from the stripped one, so `node.exe` searched for `node.exe.exe` and the
+caller was told node was not installed — for spelling out the extension the
+tool's own messages talk about.
+
+Closed in task 001 item 13. The search uses the stripped name, and a caller who
+supplied a runnable extension is looked up verbatim. Both spellings resolve to
+one file and one resource, `shell:node`, so an approval covers the next call.
+
+Found with it: a shim named in full — `npm.cmd` — was searched for as
+`npm.cmd.exe` and reported missing. That is exactly what a user types after
+being told `npm` is a shim, so it now gets the shim message.
+
 ### T-21 · Small edges in `shell` and the shadow repo · Open
 
 Grouped because each is a few lines and none is worth its own entry.
@@ -363,10 +378,11 @@ Grouped because each is a few lines and none is worth its own entry.
   `RUNNABLE_EXTENSIONS` is `[""]` and the candidate is accepted on `isFile`
   alone. A non-executable file named `node` earlier on `PATH` wins over the real
   one, and the failure appears later as a spawn error. Needs an `X_OK` check.
-- **The program is resolved three times per call** — in `parse`, in `resource`,
-  and again in `execute`. Three `PATH` walks, and the binary that runs is
-  re-resolved *after* approval, so what was authorized and what runs are two
-  separate lookups. Resolve once and carry the path through the parsed input.
+- ~~**The program is resolved three times per call.**~~ Fixed in task 001 item
+  13. `ShellInput` carries the resolution from `parse`, so `resource` and
+  `execute` reuse it. The cost was three `PATH` walks; the real problem was that
+  the binary was re-resolved *after* approval, so what was authorized and what
+  ran were two separate lookups.
 - **The exit code can be clipped away.** `clip` runs after `[exit code N]` is
   appended, so on output over 400 lines the model loses the one field that says
   whether the command succeeded. Clip the output, then append the code.

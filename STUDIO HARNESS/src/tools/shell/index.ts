@@ -4,7 +4,11 @@ import { runProcess } from "../../process/exec.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
-import { resolveProgram, shellResource } from "./resolve.js";
+import {
+  resolveProgram,
+  shellResource,
+  type ResolvedProgram,
+} from "./resolve.js";
 
 export { resolveProgram, shellResource } from "./resolve.js";
 
@@ -35,6 +39,16 @@ export interface ShellInput {
   /** A directory inside the project. Defaults to the project root. */
   readonly cwd: string | undefined;
   readonly timeoutMs: number | undefined;
+  /**
+   * The program, resolved once during parsing.
+   *
+   * Carried rather than re-derived. `parse`, `resource`, and `execute` each
+   * used to call `resolveProgram`, which walks `PATH` and stats every
+   * candidate — three times per call, for an answer that cannot change between
+   * them. Worse than the cost: it could disagree with itself if `PATH` changed
+   * mid-call, so the program authorized would not be the program run.
+   */
+  readonly program: ResolvedProgram;
 }
 
 export const SHELL_DESCRIPTOR: CapabilityDescriptor = {
@@ -142,24 +156,26 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
       }
 
       // Resolved during parsing so an unrunnable program fails before the user
-      // is asked to approve something that cannot work.
-      resolveProgram(value.command);
+      // is asked to approve something that cannot work — and kept, so the
+      // program that was authorized is the program that runs.
+      const program = resolveProgram(value.command);
 
       return {
         command: value.command,
         args: args as readonly string[],
         cwd: value.cwd as string | undefined,
         timeoutMs,
+        program,
       };
     },
 
     // The program, not the arguments. `shell:node` is a decision a person can
     // make; "node with these particular flags" is not, and offering it would
     // produce an approval that never matches the next call.
-    resource: (input) => shellResource(resolveProgram(input.command).name),
+    resource: (input) => shellResource(input.program.name),
 
     execute: async (input, context) => {
-      const program = resolveProgram(input.command);
+      const program = input.program;
 
       // Through the sandbox, so a cwd escaping the project is refused here
       // rather than becoming the working directory of a real process.
