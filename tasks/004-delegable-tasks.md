@@ -5,8 +5,12 @@ imports almost nothing, and I will wire it in when I reach it. That is what
 makes them safe to run while the spine, the grant lifecycle, and the MCP
 transport are being built here.
 
-**Give out one at a time.** Each has a branch of its own. They do not depend on
-each other and can land in any order.
+**Give out one at a time.** Each has a branch of its own, created from `main` by
+the delegate, and merged by the reviewer — `tasks/README.md` has the rule. They
+do not depend on each other and can land in any order.
+
+**Every finished task gets an entry in `tasks/DELEGATION-LOG.md`**, written
+after review. That log, not this file, is the record of what actually happened.
 
 **Every one of them starts the same way:**
 

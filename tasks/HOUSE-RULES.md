@@ -264,5 +264,6 @@ Plain and short. Six things:
    it.
 6. Anything in the instructions that was wrong or impossible. Say so plainly
    rather than working around it silently.
+7. The branch name, and confirmation that you made no commit on `main`.
 
 Do not claim a verification you did not run. The reviewer re-runs them.
