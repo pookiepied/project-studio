@@ -238,6 +238,33 @@ describe("the failure taxonomy is actually adopted", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("constructs no unclassified error anywhere in src", async () => {
+    // The rule above only looked at `throw`, and that is not the only way an
+    // unclassified error reaches a caller. `reject(new Error(...))` lands in
+    // exactly the same place through a promise instead of a stack, and the MCP
+    // wire layer arrived with three of them — two `DOMException`s and an
+    // `Error` — none of which the `throw` rule could see.
+    //
+    // `DOMException` is included because it is what the platform hands back for
+    // an abort, and taking the platform's default is the most natural way to
+    // acquire an error with no domain.
+    const offenders: string[] = [];
+
+    for (const path of await sourceFiles()) {
+      const source = await readFile(path, "utf8");
+      if (/new (Error|TypeError|RangeError|DOMException)\(/.test(source)) {
+        offenders.push(path);
+      }
+    }
+
+    // `src/models/local/cli.ts` is an interactive setup script, not the
+    // harness. Named rather than skipped: an exact list means a fourth
+    // offender fails here, and this one is `E-02`.
+    expect(offenders.map((path) => path.split(/[\\/]/).pop())).toEqual([
+      "cli.ts",
+    ]);
+  });
+
   it("keeps every declared domain reachable from a real error class", async () => {
     const { StudioAuthError } = await import("../../src/auth/errors.js");
     const { CredentialStoreError } = await import(

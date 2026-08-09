@@ -91,7 +91,7 @@ describe("pending requests", () => {
       const pending = new PendingRequests();
       const id = pending.nextId();
       const promise = pending.register(id, { timeoutMs: 5 });
-      await expect(promise).rejects.toThrow("timed out");
+      await expect(promise).rejects.toThrow(/did not answer in time/);
       expect(pending.size).toBe(0);
       // Late arrival — must not throw and must not re-add an entry.
       expect(pending.resolve(id, "late")).toBe(false);
@@ -116,7 +116,7 @@ describe("pending requests", () => {
       const pending = new PendingRequests();
       const id = pending.nextId();
       const promise = pending.register(id, { timeoutMs: 10 });
-      await expect(promise).rejects.toThrow("timed out");
+      await expect(promise).rejects.toThrow(/did not answer in time/);
       expect(pending.size).toBe(0);
     });
 
@@ -127,7 +127,7 @@ describe("pending requests", () => {
       const p1 = pending.register(id1, { timeoutMs: 10 });
       const p2 = pending.register(id2, { timeoutMs: 50 });
       expect(pending.size).toBe(2);
-      await expect(p1).rejects.toThrow("timed out");
+      await expect(p1).rejects.toThrow(/did not answer in time/);
       expect(pending.size).toBe(1);
       pending.resolve(id2, "ok");
       await expect(p2).resolves.toBe("ok");

@@ -12,6 +12,19 @@ import { ExtendError } from "../../errors.js";
 
 export type PendingId = string | number;
 
+/**
+ * What a cancelled request rejects with when the caller supplied no reason.
+ *
+ * An `ExtendError` rather than the `DOMException` the platform would hand us.
+ * Every failure this harness raises carries a domain and a kind so telemetry
+ * has one identity to group by, and an error without one is counted as
+ * `unclassified` — a measurable gap, not a category. A caller's own
+ * `signal.reason` is still passed through untouched.
+ */
+function cancelled(): ExtendError {
+  return new ExtendError("cancelled");
+}
+
 export interface PendingOptions {
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
@@ -31,8 +44,7 @@ interface Entry {
  * Ids are unique for the life of the connection — `nextId` increments and is
  * never reused, even after `rejectAll`. Registering a request returns a
  * promise that settles when a response arrives, when its timeout fires, when
- * its AbortSignal aborts, or when `rejectAll` is called for a dead
- * connection.
+ * its AbortSignal aborts, or when `rejectAll` is called for a dead connection.
  */
 export class PendingRequests {
   #nextId = 1;
@@ -69,95 +81,75 @@ export class PendingRequests {
     // immediately need to be removed — reject right away and keep the map
     // empty, which is the invariant every terminal path must preserve.
     if (options.signal?.aborted) {
-      return Promise.reject(
-        options.signal.reason ??
-          new DOMException("The request was aborted.", "AbortError"),
-      );
+      return Promise.reject(options.signal.reason ?? cancelled());
     }
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let abortHandler: (() => void) | undefined;
-
-    const promise = new Promise<unknown>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       const entry: Entry = {
-        resolve: (value: unknown) => {
-          // Clear the other termination path so it cannot fire after we have
-          // already settled. A timed-out request that stays in the map is a
-          // leak, and an abort handler that fires after resolution is a second
-          // rejection.
-          if (timer !== undefined) clearTimeout(timer);
-          if (options.signal && abortHandler !== undefined) {
-            options.signal.removeEventListener("abort", abortHandler);
-          }
-          this.#pending.delete(id);
-          resolve(value);
-        },
-        reject: (reason: unknown) => {
-          if (timer !== undefined) clearTimeout(timer);
-          if (options.signal && abortHandler !== undefined) {
-            options.signal.removeEventListener("abort", abortHandler);
-          }
-          this.#pending.delete(id);
-          reject(reason);
-        },
+        resolve,
+        reject,
         timer: undefined,
         signal: options.signal,
         abortHandler: undefined,
       };
 
-      // Store first so a synchronous abort or timeout that fires on the next
-      // tick sees the entry.
+      // Stored first, so a timeout or abort that fires on the next tick finds
+      // the entry it has to remove.
       this.#pending.set(id, entry);
 
       if (options.timeoutMs !== undefined) {
-        timer = setTimeout(() => {
-          const current = this.#pending.get(id);
-          if (current === undefined) return;
-          if (current.signal && current.abortHandler !== undefined) {
-            current.signal.removeEventListener("abort", current.abortHandler);
-          }
-          this.#pending.delete(id);
-          current.reject(new Error("The request timed out."));
+        entry.timer = setTimeout(() => {
+          this.#settle(id, "reject", new ExtendError("timed_out"));
         }, options.timeoutMs);
-        entry.timer = timer;
       }
 
       if (options.signal !== undefined) {
-        abortHandler = () => {
-          const current = this.#pending.get(id);
-          if (current === undefined) return;
-          if (current.timer !== undefined) clearTimeout(current.timer);
-          this.#pending.delete(id);
-          current.reject(
-            options.signal?.reason ??
-              new DOMException("The request was aborted.", "AbortError"),
-          );
+        const signal = options.signal;
+        entry.abortHandler = () => {
+          this.#settle(id, "reject", signal.reason ?? cancelled());
         };
-        entry.abortHandler = abortHandler;
-        options.signal.addEventListener("abort", abortHandler, { once: true });
+        signal.addEventListener("abort", entry.abortHandler, { once: true });
       }
     });
+  }
 
-    return promise;
+  /**
+   * The one way a request leaves the map.
+   *
+   * Every terminal path — a response, an error, a timeout, an abort, a dead
+   * connection — clears the timer, drops the abort listener, removes the entry,
+   * and only then settles the promise. Written once because it was written five
+   * times: each copy was a chance for one of the four steps to be forgotten,
+   * and a forgotten step is either a timer firing after the answer arrived or
+   * an entry that never leaves.
+   *
+   * Removing before settling matters. Code waiting on the promise must not
+   * observe a map that still contains the request it was just told about.
+   */
+  #settle(id: PendingId, how: "resolve" | "reject", value: unknown): boolean {
+    const entry = this.#pending.get(id);
+    if (entry === undefined) return false;
+
+    if (entry.timer !== undefined) clearTimeout(entry.timer);
+    if (entry.signal !== undefined && entry.abortHandler !== undefined) {
+      entry.signal.removeEventListener("abort", entry.abortHandler);
+    }
+    this.#pending.delete(id);
+
+    if (how === "resolve") entry.resolve(value);
+    else entry.reject(value);
+    return true;
   }
 
   /**
    * Settles a pending request with a result.
    *
    * Returns true when an entry was found and settled, false for an unknown id.
-   * A late response for something already timed out or aborted is ignored rather
-   * than thrown — it is normal when the server is slow.
+   * A late response for something already timed out or aborted is ignored
+   * rather than thrown — it is normal when the server is slow.
    */
   resolve(id: PendingId, value: unknown): boolean {
-    const entry = this.#pending.get(id);
-    if (entry === undefined) return false;
-    if (entry.timer !== undefined) clearTimeout(entry.timer);
-    if (entry.signal && entry.abortHandler !== undefined) {
-      entry.signal.removeEventListener("abort", entry.abortHandler);
-    }
-    this.#pending.delete(id);
-    entry.resolve(value);
-    return true;
+    return this.#settle(id, "resolve", value);
   }
 
   /**
@@ -166,32 +158,21 @@ export class PendingRequests {
    * Returns true when an entry was found and settled, false for an unknown id.
    */
   reject(id: PendingId, reason: unknown): boolean {
-    const entry = this.#pending.get(id);
-    if (entry === undefined) return false;
-    if (entry.timer !== undefined) clearTimeout(entry.timer);
-    if (entry.signal && entry.abortHandler !== undefined) {
-      entry.signal.removeEventListener("abort", entry.abortHandler);
-    }
-    this.#pending.delete(id);
-    entry.reject(reason);
-    return true;
+    return this.#settle(id, "reject", reason);
   }
 
   /**
    * Rejects every outstanding request and empties the map.
    *
    * Called when the connection dies — the transport is gone, so no more
-   * responses will arrive for anything that is still pending.
+   * responses will arrive for anything still pending.
    */
-  rejectAll(reason: unknown): void {
-    const entries = [...this.#pending.values()];
-    this.#pending.clear();
-    for (const entry of entries) {
-      if (entry.timer !== undefined) clearTimeout(entry.timer);
-      if (entry.signal && entry.abortHandler !== undefined) {
-        entry.signal.removeEventListener("abort", entry.abortHandler);
-      }
-      entry.reject(reason);
+  rejectAll(reason: unknown = new ExtendError("disconnected")): void {
+    // Ids are taken first: settling one may run waiting code synchronously, and
+    // iterating the live map while that code could register a new request is
+    // how a brand-new request gets rejected by a failure it never saw.
+    for (const id of [...this.#pending.keys()]) {
+      this.#settle(id, "reject", reason);
     }
   }
 }

@@ -239,26 +239,49 @@ describe("NDJSON framing", () => {
       expect(DEFAULT_MAX_MESSAGE_BYTES).toBe(1_048_576);
     });
 
-    it("drops a single complete line that exceeds the limit", () => {
+    it("reports a complete line that exceeds the limit rather than dropping it silently", () => {
+      // The message is still discarded — that is what the limit is for. What
+      // changed on review is that the caller is told. A vanished message is
+      // indistinguishable from a server that said nothing, and the caller is
+      // waiting on a request id that will now never be answered.
       const decoder = new NdjsonDecoder({ maxMessageBytes: 10 });
       const out = decoder.feed('{"a":"hello world"}\n');
-      expect(out).toEqual([]);
+
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ ok: false, reason: "oversize" });
     });
 
-    it("drops an oversize line and still delivers the next valid one in the same chunk", () => {
+    it("keeps the report small, so it does not undo the limit", () => {
+      const decoder = new NdjsonDecoder({ maxMessageBytes: 10 });
+      const out = decoder.feed(`"${"x".repeat(5_000)}"\n`);
+
+      expect(out).toHaveLength(1);
+      const first = out[0];
+      if (first?.ok === false) expect(first.raw.length).toBeLessThanOrEqual(200);
+    });
+
+    it("reports an oversize line and still delivers the next valid one in the same chunk", () => {
       const decoder = new NdjsonDecoder({ maxMessageBytes: 10 });
       const out = decoder.feed('{"a":"hello world"}\n{"b":1}\n');
-      expect(out).toEqual([{ ok: true, value: { b: 1 } }]);
+
+      expect(out).toHaveLength(2);
+      expect(out[0]).toMatchObject({ ok: false, reason: "oversize" });
+      expect(out[1]).toEqual({ ok: true, value: { b: 1 } });
     });
 
     it("drops an incomplete line that grows past the limit without a newline", () => {
       const decoder = new NdjsonDecoder({ maxMessageBytes: 10 });
-      // No newline — the buffer grows past the limit.
-      expect(decoder.feed('{"a":"hello')).toEqual([]);
-      // The next chunk still has no newline; the decoder is dropping.
+      // No newline — the buffer grows past the limit, and the decoder says so
+      // at the moment it gives up rather than at the terminator, which may
+      // never come.
+      const out = decoder.feed('{"a":"hello');
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ ok: false, reason: "oversize" });
+
+      // Once abandoned, the rest of that line is consumed in silence rather
+      // than reported again per chunk.
       expect(decoder.feed(" world")).toEqual([]);
-      // The newline that terminates the oversize line is seen — the line is
-      // discarded and the decoder recovers.
+      // The terminator of the discarded line is consumed, not reported twice.
       expect(decoder.feed('"\n')).toEqual([]);
       // The next valid message comes through.
       expect(decoder.feed('{"b":1}\n')).toEqual([{ ok: true, value: { b: 1 } }]);
@@ -266,12 +289,14 @@ describe("NDJSON framing", () => {
 
     it("prevents unbounded growth when a server never sends a newline", () => {
       const decoder = new NdjsonDecoder({ maxMessageBytes: 16 });
-      // Feed many chunks without a newline, each just under the limit but
-      // together they would exceed it if the buffer were grown forever.
+      // Feed many chunks without a newline. The buffer must not grow forever,
+      // and the caller is told once when the line is abandoned rather than on
+      // every chunk that follows.
+      let reports = 0;
       for (let i = 0; i < 20; i += 1) {
-        const out = decoder.feed("x".repeat(10));
-        expect(out).toEqual([]);
+        reports += decoder.feed("x".repeat(10)).length;
       }
+      expect(reports).toBe(1);
       // Even after many chunks the decoder still recovers for a valid line
       // once a newline appears. The oversize content is dropped at its
       // terminator and the next message is not lost.
@@ -282,7 +307,12 @@ describe("NDJSON framing", () => {
     it("drops an oversize line split across chunks", () => {
       const decoder = new NdjsonDecoder({ maxMessageBytes: 10 });
       expect(decoder.feed('{"a":"hel')).toEqual([]);
-      expect(decoder.feed('lo world"}\n')).toEqual([]);
+      // The chunk that pushes it past the limit is where it is abandoned, and
+      // where the caller is told.
+      const out = decoder.feed('lo world"}\n');
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ ok: false, reason: "oversize" });
+
       expect(decoder.feed('{"b":1}\n')).toEqual([{ ok: true, value: { b: 1 } }]);
     });
 
@@ -293,9 +323,12 @@ describe("NDJSON framing", () => {
       const decoder = new NdjsonDecoder({ maxMessageBytes: 10 });
       // `{"t":"é"}` is 10 bytes, so at limit 10 it fits.
       expect(decoder.feed('{"t":"é"}\n')).toEqual([{ ok: true, value: { t: "é" } }]);
-      // With limit 9 it should be dropped (10 > 9).
+      // With limit 9 it is over, because the measurement is bytes and not the
+      // nine characters it looks like.
       const small = new NdjsonDecoder({ maxMessageBytes: 9 });
-      expect(small.feed('{"t":"é"}\n')).toEqual([]);
+      const out = small.feed('{"t":"é"}\n');
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ ok: false, reason: "oversize" });
     });
   });
 

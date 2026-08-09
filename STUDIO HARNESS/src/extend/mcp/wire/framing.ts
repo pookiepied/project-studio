@@ -15,12 +15,35 @@ export interface NdjsonDecoderOptions {
 
 export type NdjsonMessage =
   | { readonly ok: true; readonly value: unknown }
-  | { readonly ok: false; readonly raw: string; readonly error: unknown };
+  /**
+   * A line that could not become a message, and why.
+   *
+   * `oversize` reports rather than stays quiet on purpose. A dropped message is
+   * indistinguishable from a server that said nothing, and the caller is
+   * waiting on a request id that will now never be answered — so the one
+   * observer who can turn that into a useful failure is the one this told
+   * nothing. `raw` is truncated for an oversize line, because carrying the
+   * megabyte we refused to keep would undo the limit.
+   */
+  | {
+      readonly ok: false;
+      readonly reason: "malformed" | "oversize";
+      readonly raw: string;
+      readonly error?: unknown;
+    };
+
+/** How much of an oversize line is kept, so a report is diagnosable but bounded. */
+const RAW_PREVIEW_CHARS = 200;
+
+// One encoder, not one per call. `byteLength` runs on every line and on every
+// chunk that has not yet completed one, so allocating here allocates in the
+// hottest path this module has.
+const ENCODER = new TextEncoder();
 
 function byteLength(value: string): number {
-  // TextEncoder is available in Node 22 and avoids a Node-specific Buffer
-  // import for a measurement that is only used to bound memory.
-  return new TextEncoder().encode(value).length;
+  // TextEncoder avoids a Node-specific Buffer import for a measurement that is
+  // only used to bound memory.
+  return ENCODER.encode(value).length;
 }
 
 /**
@@ -97,6 +120,11 @@ export class NdjsonDecoder {
       // without first exhausting memory, so drop it and wait for its newline.
       if (nl === -1) {
         if (byteLength(this.#buffer) > this.#maxBytes) {
+          out.push({
+            ok: false,
+            reason: "oversize",
+            raw: this.#buffer.slice(0, RAW_PREVIEW_CHARS),
+          });
           this.#buffer = "";
           this.#dropping = true;
         }
@@ -116,6 +144,11 @@ export class NdjsonDecoder {
       }
 
       if (byteLength(line) > this.#maxBytes) {
+        out.push({
+          ok: false,
+          reason: "oversize",
+          raw: line.slice(0, RAW_PREVIEW_CHARS),
+        });
         continue;
       }
 
@@ -123,7 +156,7 @@ export class NdjsonDecoder {
         const value: unknown = JSON.parse(line);
         out.push({ ok: true, value });
       } catch (error: unknown) {
-        out.push({ ok: false, raw: line, error });
+        out.push({ ok: false, reason: "malformed", raw: line, error });
       }
     }
 
