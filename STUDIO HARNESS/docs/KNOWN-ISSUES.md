@@ -326,10 +326,11 @@ sandbox policy:
   Edit would push without asking.
 - `T-19` — the agent's only tool goes around the gate. Contained by a test; the
   fixture is replaced here.
-- `T-28` — the model is shown tools the sandbox will refuse, because `list()`
-  and `assertSupports` answer different questions.
+- ~~`T-28`~~ — fixed ahead of the wiring by ADR 0024, because the fix turned out
+  not to need the caller at all: one rule asked twice, rather than a decision
+  about how a policy gets built.
 
-None of them is reachable today and all three become real in the same change.
+The first two are not reachable today and both become real in the same change.
 
 ### T-04 · Nothing can undo a write · Fixed
 
@@ -587,37 +588,29 @@ behaviour is invisible in the code — it reads as "retry next write" and is not
 and because a transient failure (a lock, a full disk that cleared) stays fatal
 until the next turn.
 
-### T-28 · The model is shown tools the sandbox will refuse · Open
+### T-28 · The model was shown tools the sandbox would refuse · Fixed
 
-`CallGate.list()` returns every registered tool. `LocalSandbox.assertSupports`
-runs later, when the tool is actually called. So a policy with `allowNetwork:
-false` produces this sequence:
+`CallGate.list()` returned every registered tool. `LocalSandbox.assertSupports`
+ran later, at call time. So with a capability switched off the model was shown
+`fetch`, called it, and was refused — one wasted attempt, and the whole schema
+sitting in the cached prefix on every turn, paid for, to advertise a refusal.
 
-1. The model is shown `fetch`.
-2. The model calls it.
-3. The sandbox refuses it.
-4. The model tries something else, one attempt wasted.
+One meaning in two places, which is the shape ADR 0020 named.
 
-Two costs, and the smaller one is the failed call. The larger is that the
-schema sits in the prompt on **every turn**, billed every time, for a tool that
-can never run. `mental-model.md` §3.2 puts tools in the cached prefix precisely
-because that list is supposed to be worth its space.
+Closed by ADR 0024. `LocalSandbox.supports()` is `assertSupports()` without the
+exception, and `list()` filters through it, so the list and the decision come
+from one rule asked twice. Writing the check out again inside `list()` would
+have been the same defect wearing a fix.
 
-`allowExec` has the same shape and the same effect on `shell`.
+Permission is deliberately not consulted — "not approved yet" is a question with
+an answer, and hiding the tool would remove the user's chance to give it. Only
+what can never run is hidden. `listAll()` keeps everything, for a settings
+screen that has to show a switched-off capability to offer switching it on.
 
-**Why it is not fixed yet.** The fix is to make what the model is shown match
-what can actually run — `list()` filtered by the sandbox, or the tool not
-registered at all. Which of those is right depends on the caller that builds the
-policy, and **no such caller exists**: `createSandboxPolicy` has no call site in
-`src/`. Choosing now would be designing against an imagined consumer.
-
-**Fix when:** `T-12`, the same change that first builds a real policy and wires
-the gate to the agent. Both switches become `true` for ordinary native use
-there; they stay for an operator who wants a locked-down agent.
-
-**Note on the defaults themselves.** They are correct and should not change. A
-policy that had to be tightened rather than loosened starts every new call site
-over-permissioned, and only becomes safe if someone remembers.
+**The defaults changed with it.** `allowExec` and `allowNetwork` are now on.
+They were never the wall that protects the user — containment is, and it stays
+closed with no override. Both switches remain, reachable per workspace, by
+environment variable, or in one line for a fork.
 
 ### T-19 · A tool can be registered outside the gate · Contained
 

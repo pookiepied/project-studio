@@ -142,10 +142,18 @@ no vendor name appears in either tool's schema. See ADR 0023 and `src/retrieval/
 gate, and `src/agents/studio.ts` registers exactly one tool —
 `workspace_summary`, a fixture that echoes its input and goes around the gate
 entirely (`T-19`). Everything in the table is built, tested, and unwired. The
-wiring is `T-12`, and it has collected three other issues that all become real
-in the same change: `K-04` (git reaches the network without declaring it),
-`T-19` (the agent's only tool bypasses the gate), and `T-28` (the model is shown
-tools the sandbox will refuse).
+wiring is `T-12`, and it has collected two other issues that become real in the
+same change: `K-04` (git reaches the network without declaring it) and `T-19`
+(the agent's only tool bypasses the gate).
+
+**Both capability switches are on.** `allowExec` and `allowNetwork` default to
+true, so all nine tools work out of the box. They were never the wall that
+protects the user — containment is — and an agent that cannot run a command or
+reach the network is a text box. The switches remain for a locked-down
+deployment: per workspace, by `PROJECT_STUDIO_ALLOW_EXEC` /
+`PROJECT_STUDIO_ALLOW_NETWORK`, or one line in `policy.ts` for a fork. A
+capability that is switched off disappears from what the model is shown, so
+nothing is advertised that cannot run. See ADR 0024.
 
 **Containment is not one of them.** Every path in every tool already goes
 through `resolveContainedPath`, which refuses anything outside the opened

@@ -245,12 +245,15 @@ describe("containment runs before the tool, not inside it", () => {
   });
 
   it("refuses an effect the sandbox cannot contain, even when approved", async () => {
-    // Permission is not isolation. An approved `execute` still fails in an
-    // in-process sandbox, because approval does not create a boundary.
+    // Permission is not isolation. An approved `execute` from a *connected*
+    // provider still fails in an in-process sandbox, because approval does not
+    // create a boundary. This is the direction that is absolute: the capability
+    // switches move the line for native code and never for code a third party
+    // chose. See ADR 0019.
     const instance = gate({ approver: approver("allow") });
     instance.register(
       defineStudioTool({
-        descriptor: capability("shell", ["execute"]),
+        descriptor: capability("shell", ["execute"], false),
         resourceKind: "command",
         parse: (input) => input as { command: string },
         resource: (input) => `shell:${input.command}`,
@@ -263,7 +266,7 @@ describe("containment runs before the tool, not inside it", () => {
 
     await expect(
       instance.call({
-        name: "native/shell",
+        name: "mcp:example/shell",
         input: { command: "ls" },
         scope: SCOPE,
       }),
@@ -469,6 +472,51 @@ describe("resource patterns", () => {
 
   it("accepts either slash on Windows paths", () => {
     expect(matchesResource("src/**", "src\\deep\\app.ts", "path")).toBe(true);
+  });
+});
+
+describe("the model is shown only what can actually run", () => {
+  // T-28. `list()` and `assertSupports` used to answer different questions, so
+  // a switched-off capability still appeared in the prompt: the model called
+  // it, was refused, and the schema was billed on every turn for the privilege.
+
+  function gateWith(allowExec: boolean): CallGate {
+    return new CallGate({
+      kernel: new PermissionKernel({ grants }),
+      sandbox: new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace, allowExec })),
+    });
+  }
+
+  it("hides a capability the policy switched off", () => {
+    const locked = gateWith(false);
+    locked.register(executeTool([]));
+    locked.register(readTool([]));
+
+    expect(locked.list().map((tool) => tool.id.name)).toEqual(["read"]);
+  });
+
+  it("shows it when the policy allows it", () => {
+    const open = gateWith(true);
+    open.register(executeTool([]));
+
+    expect(open.list().map((tool) => tool.id.name)).toEqual(["run"]);
+  });
+
+  it("still lists it for a settings screen, which has to offer switching it on", () => {
+    const locked = gateWith(false);
+    locked.register(executeTool([]));
+
+    expect(locked.list()).toHaveLength(0);
+    expect(locked.listAll().map((tool) => tool.id.name)).toEqual(["run"]);
+  });
+
+  it("does not hide a tool merely because it has not been approved", () => {
+    // "You have not approved this yet" is a question with an answer. Hiding the
+    // tool would take away the user's chance to give it.
+    const instance = gate();
+    instance.register(executeTool([]));
+
+    expect(instance.list().map((tool) => tool.id.name)).toContain("run");
   });
 });
 

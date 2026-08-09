@@ -321,9 +321,31 @@ feature is ever wanted, it gets its own name and its own ADR.
 
 ---
 
-## C-14 — Which reader fills the fallback slot
+## C-14 — Which providers we actually support
 
 **Status:** open, and shipped with a working answer. **Gates:** nothing.
+
+**Settled, and not up for review:** Tavily for search and Jina Reader for
+reading are the product owner's choice. They stay.
+
+**Not settled:** everything else in the two registries. Brave, Exa, and
+Firecrawl are there because they are the services people actually use, not
+because anyone finished deciding. A round of research is owed before that list
+is called final.
+
+**One doubt already raised, and worth keeping.** Firecrawl is a crawler that can
+also read one page. The other four each do one job — Tavily searches, Brave
+searches, Exa searches, Jina reads — and that is the property the harness is
+supposed to have: small pieces that do one thing well. A crawler in the reader
+slot may be the wrong shape even though it works, and the better home for it may
+be an MCP server, where a user who wants crawling connects it and nobody else
+carries it.
+
+Not removed today. It is the only reader that fails *differently* from Jina,
+which is the only property that makes a fallback worth having, and removing it
+before a replacement is chosen would leave the slot empty.
+
+### The fallback reader question specifically
 
 `fetch` reads through Jina Reader. The fallback slot holds Firecrawl today,
 because it is the one candidate that fails *differently* rather than failing the

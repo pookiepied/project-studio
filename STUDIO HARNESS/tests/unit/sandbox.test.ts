@@ -180,13 +180,46 @@ describe("read and write roots are separate", () => {
   });
 });
 
-describe("the policy is closed by default", () => {
-  it("starts with no environment, no exec, and no network", () => {
+describe("the policy is closed where closure is the protection", () => {
+  it("starts with no environment, and with both capabilities on", () => {
+    // The roots are the wall, and they are closed. The two capability switches
+    // are not that wall and were never doing its job: an agent that cannot run
+    // a command or reach the network is a text box. They exist so a
+    // locked-down deployment has an answer without forking the code.
     const policy = createSandboxPolicy({ workspaceRoot: workspace });
 
     expect(policy.environment).toEqual({});
-    expect(policy.allowExec).toBe(false);
-    expect(policy.allowNetwork).toBe(false);
+    expect(policy.allowExec).toBe(true);
+    expect(policy.allowNetwork).toBe(true);
+  });
+
+  it("turns a capability off from the environment", () => {
+    process.env.PROJECT_STUDIO_ALLOW_NETWORK = "off";
+    try {
+      expect(createSandboxPolicy({ workspaceRoot: workspace }).allowNetwork).toBe(false);
+    } finally {
+      delete process.env.PROJECT_STUDIO_ALLOW_NETWORK;
+    }
+  });
+
+  it("ignores a misspelled switch rather than disabling half the agent", () => {
+    process.env.PROJECT_STUDIO_ALLOW_EXEC = "flase";
+    try {
+      expect(createSandboxPolicy({ workspaceRoot: workspace }).allowExec).toBe(true);
+    } finally {
+      delete process.env.PROJECT_STUDIO_ALLOW_EXEC;
+    }
+  });
+
+  it("lets an explicit argument beat the environment", () => {
+    process.env.PROJECT_STUDIO_ALLOW_EXEC = "off";
+    try {
+      expect(
+        createSandboxPolicy({ workspaceRoot: workspace, allowExec: true }).allowExec,
+      ).toBe(true);
+    } finally {
+      delete process.env.PROJECT_STUDIO_ALLOW_EXEC;
+    }
   });
 
   it("never hands the agent the host environment", () => {
@@ -238,13 +271,31 @@ describe("isolation is claimed honestly", () => {
     expect(() => sandbox.assertSupports(descriptor(["write"]))).not.toThrow();
   });
 
-  it("refuses to run code unless the policy opted in", () => {
-    expect(() => sandbox.assertSupports(descriptor(["execute"]))).toThrow(
-      SandboxError,
+  it("refuses a capability the policy switched off", () => {
+    // Both are on by default now, so this is about the switch doing its job
+    // when someone uses it, not about the default.
+    const locked = new LocalSandbox(
+      createSandboxPolicy({
+        workspaceRoot: workspace,
+        allowExec: false,
+        allowNetwork: false,
+      }),
     );
-    expect(() => sandbox.assertSupports(descriptor(["network"]))).toThrow(
-      SandboxError,
-    );
+
+    expect(() => locked.assertSupports(descriptor(["execute"]))).toThrow(SandboxError);
+    expect(() => locked.assertSupports(descriptor(["network"]))).toThrow(SandboxError);
+    expect(locked.supports(descriptor(["execute"]))).toBe(false);
+    // Reading is untouched by either switch.
+    expect(locked.supports(descriptor(["read"]))).toBe(true);
+  });
+
+  it("answers `supports` with the same rule `assertSupports` uses", () => {
+    // Two copies of one meaning is what T-28 was. The list the model is shown
+    // and the decision on the call have to come from the same place.
+    const open = new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace }));
+
+    expect(open.supports(descriptor(["network"]))).toBe(true);
+    expect(open.supports(descriptor(["execute"], false))).toBe(false);
   });
 
   it("runs a native program when the policy opted in, uncontained and said so", () => {

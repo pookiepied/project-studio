@@ -69,6 +69,26 @@ export class LocalSandbox {
    * no workspace trust and no execution modes, so authorization was too weak to
    * carry the weight. ADR 0018 changed that. See ADR 0019.
    */
+  /**
+   * The same question as `assertSupports`, asked without the exception.
+   *
+   * It exists so the list the model is shown can be built from the rule that
+   * decides the call. Those used to be two questions with two answers: a tool
+   * appeared in the prompt, was called, and was refused — one wasted attempt,
+   * and a schema billed on every turn for something that could never run.
+   *
+   * One rule asked twice, rather than the check written out again here. Two
+   * copies of a meaning is what `T-28` was.
+   */
+  supports(capability: CapabilityDescriptor): boolean {
+    try {
+      this.assertSupports(capability);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   assertSupports(capability: CapabilityDescriptor): void {
     for (const effect of capability.effects) {
       if (satisfiesIsolation(this.isolation, requiredIsolation(effect))) continue;

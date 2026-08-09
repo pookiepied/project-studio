@@ -118,8 +118,32 @@ export class CallGate {
     return this.#bounds.deadlineFor(descriptor);
   }
 
-  /** What the model may be told about. */
+  /**
+   * What the model may be told about.
+   *
+   * Only tools this sandbox can actually admit. A tool the model can see but
+   * never use costs one wasted attempt when it tries, and costs its whole
+   * schema in the cached prefix on **every turn** — paid for, forever, to
+   * advertise a refusal. See `T-28`.
+   *
+   * Asked of the sandbox rather than decided here, so the list and the call can
+   * never disagree. Permission is deliberately *not* consulted: "you have not
+   * approved this yet" is a question with an answer, and hiding the tool would
+   * take away the user's chance to give it.
+   */
   list(): readonly CapabilityDescriptor[] {
+    return [...this.#tools.values()]
+      .map((tool) => tool.descriptor)
+      .filter((descriptor) => this.#sandbox.supports(descriptor));
+  }
+
+  /**
+   * Everything registered, admissible or not.
+   *
+   * For a settings screen, which has to render a capability that is switched
+   * off in order to offer switching it back on. The model never sees this.
+   */
+  listAll(): readonly CapabilityDescriptor[] {
     return [...this.#tools.values()].map((tool) => tool.descriptor);
   }
 

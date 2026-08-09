@@ -56,11 +56,53 @@ export interface SandboxPolicyInput {
 }
 
 /**
- * Builds a policy that is closed by default.
+ * The two capability switches, and the one place their defaults live.
  *
- * Every field defaults to the most restrictive value. A policy that had to be
- * tightened rather than loosened would mean each new call site starts life
- * over-permissioned and only becomes safe if someone remembers.
+ * **Both are on.** Running commands and reaching the network are what a
+ * general-purpose agent is for, and an agent that cannot do them is a text box.
+ * The wall that actually protects the user is containment — `readRoots` and
+ * `writeRoots`, enforced in `paths.ts` — and that one is closed by default and
+ * has no override. These two are not that wall and were never doing its job.
+ *
+ * **Why they still exist.** Someone running this in a locked-down environment
+ * needs a way to say no, and having to fork the code to get it is not a way.
+ * Flipping either one here disables the capability everywhere at once — the
+ * tool disappears from what the model is shown, and a direct call is refused —
+ * so there is no second place to remember.
+ *
+ * **For anyone building a UI on top:** these are the two values to bind a
+ * toggle to. Pass them to `createSandboxPolicy` per workspace, or set
+ * `PROJECT_STUDIO_ALLOW_EXEC` / `PROJECT_STUDIO_ALLOW_NETWORK` to `off` for a
+ * process-wide answer that needs no code change at all.
+ */
+export const DEFAULT_CAPABILITY_SWITCHES = {
+  allowExec: true,
+  allowNetwork: true,
+} as const;
+
+/**
+ * Reads a switch from the environment.
+ *
+ * Only an explicit `off`, `false`, or `0` turns something off. An unset or
+ * misspelled variable leaves the default alone, because a typo in a deployment
+ * script must not silently disable half the agent.
+ */
+function switchFromEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return fallback;
+  if (raw === "off" || raw === "false" || raw === "0" || raw === "no") return false;
+  if (raw === "on" || raw === "true" || raw === "1" || raw === "yes") return true;
+  return fallback;
+}
+
+/**
+ * Builds a policy.
+ *
+ * The roots are closed by default: a policy that had to be tightened rather
+ * than loosened would mean each new call site starts life able to reach the
+ * whole disk, and only becomes safe if someone remembers. The capability
+ * switches are the opposite, and deliberately so — see
+ * `DEFAULT_CAPABILITY_SWITCHES`.
  */
 export function createSandboxPolicy(input: SandboxPolicyInput): SandboxPolicy {
   const workspaceRoot = resolve(input.workspaceRoot);
@@ -98,8 +140,15 @@ export function createSandboxPolicy(input: SandboxPolicyInput): SandboxPolicy {
     readRoots,
     writeRoots,
     environment: { ...(input.environment ?? {}) },
-    allowExec: input.allowExec ?? false,
-    allowNetwork: input.allowNetwork ?? false,
+    allowExec:
+      input.allowExec ??
+      switchFromEnv("PROJECT_STUDIO_ALLOW_EXEC", DEFAULT_CAPABILITY_SWITCHES.allowExec),
+    allowNetwork:
+      input.allowNetwork ??
+      switchFromEnv(
+        "PROJECT_STUDIO_ALLOW_NETWORK",
+        DEFAULT_CAPABILITY_SWITCHES.allowNetwork,
+      ),
   };
 }
 
