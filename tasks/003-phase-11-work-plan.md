@@ -173,7 +173,93 @@ Hot reload is a repeat registration and a removal, so neither exists yet.
 `#tools`, the kernel registry, and `CallBounds.declare` must move together or
 drift.
 
-### 003.3 — The extend spine
+### 003.3a — How state is actually held
+
+Asked before writing the spine, because the answer decides its shape.
+
+**We already have a state store and no state system.** SQLite is the store, with
+real transactions (`storage/database.ts:39`). What does not exist anywhere in
+`src/` is a single event emitter, observer, or subscription — the only `emit` in
+the codebase is the logger's. In-memory state lives in plain unwatched `Map`s:
+`gate.ts:65`, `kernel.ts:104`, `bounds.ts:165`.
+
+That has been fine because nothing changed at runtime. Phase 11 is the first
+thing that does.
+
+#### Three kinds of state, and each already has a home
+
+| Kind | Example | Where it lives | Rule |
+|---|---|---|---|
+| Durable, user-set | installed servers, per-project selection, grants | SQLite | the source of truth |
+| Derived | health, admissibility, protocol era | computed on demand | never stored |
+| Live objects | a running process, an open connection | the supervisor, keyed by id | never durable |
+
+The rule from the review holds and is what keeps the state count at three:
+**store what the user sets, never store what the system computes.**
+
+#### What is missing is the edge, not the store
+
+When durable state changes, the derived and live layers have to catch up. That
+is the only gap, and it needs exactly one mechanism.
+
+**A reconciler, not events.** The desired set is computed from SQLite, compared
+against what is live, and the difference is applied.
+
+Events were the obvious alternative and are the wrong one here:
+
+- **An event system is fragile in one direction only, and it is the bad one.**
+  Miss one — a crash between the write and the notify, a listener registered a
+  moment late, a row edited by a migration — and the live state is wrong
+  permanently, with nothing to correct it. Reconciling recomputes from the
+  truth every time, so a missed change costs one cycle of staleness rather than
+  a permanent lie.
+- **It is idempotent**, so running it twice is safe, which means it can be run
+  on a timer, at startup, after a crash, and on demand, with one implementation.
+- **It is testable without a process**: give it a desired set and a live set and
+  assert the difference. An event chain has to be observed to be tested.
+
+The cost is honest: a change is applied at the next reconcile rather than
+instantly. That is not a cost here, because the design already requires the
+delay for a different reason — the tool list sits in the cached prompt prefix,
+so it may only change at a turn boundary.
+
+#### Where it runs, and what stops it running twice
+
+Reconcile is called at a turn boundary and at startup. It is **single-flight**:
+one in progress, a second request coalesced into it. Two concurrent reconciles
+would spawn the same server twice.
+
+A generation counter tells a cheap "has anything changed" from a full pass, so
+the common case — nothing changed — costs one integer comparison.
+
+#### The reconciler must not learn what MCP is
+
+Same rule as the spine itself, and the same architecture test protects it. The
+spine holds reconcilers by kind and calls them; it never names one. The type it
+stores is `(desired, live) => Promise<void>` with no MCP types in it, so a
+fourth kind adds a folder and edits nothing.
+
+#### The one place a state machine is warranted
+
+A single server's lifecycle has genuinely illegal transitions — `ready` cannot
+follow `stopping`, `starting` cannot be entered twice — and those are the bugs
+that produce two processes for one server.
+
+```
+idle → starting → ready → stopping → idle
+          ↓         ↓
+        failed ← ───┘  (with backoff, and a give-up state)
+```
+
+A union type and one transition function that refuses an illegal move. Not a
+library, and not a general state-machine abstraction for the whole harness: this
+is the only place where the illegal transitions are real.
+
+**Nothing else changes.** No event bus, no observables, no subscriptions, no
+store framework. The one mechanism is reconcile, called at one moment, and the
+one state machine is per connection.
+
+### 003.3b — The extend spine
 
 `inventory.ts` and `selection.ts` at the root of `src/extend/`. One stored
 column per pair: `unlisted | off | on`.
