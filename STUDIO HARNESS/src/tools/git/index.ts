@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { runProcess } from "../../process/exec.js";
 import { resolveBinary } from "../../vendor/resolver.js";
 import { ToolError } from "../errors.js";
@@ -42,7 +45,7 @@ export const GIT_DESCRIPTOR: CapabilityDescriptor = {
     "for example subcommand \"log\" with args [\"--oneline\", \"-n\", \"20\"]. " +
     "Arguments are passed directly to git; no shell is involved.",
   effects: ["read", "write"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   // `git commit` twice makes two commits; `git push` twice is a no-op. The
   // capability as a whole cannot promise a safe retry.
   idempotent: false,

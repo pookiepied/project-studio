@@ -86,11 +86,20 @@ export interface PolicyRule {
  */
 export const BASE_POLICY: readonly PolicyRule[] = [
   {
-    id: "untrusted-elevated",
+    id: "third-party-elevated",
     reason:
       "Running code or reaching the network from a connected server always needs approval.",
+    /**
+     * The only thing standing between an unattended mode and third-party code.
+     *
+     * It must stay a **policy** `ask`: ADR 0018 lets a mode resolve a *default*
+     * `ask` and never a policy one, so a verdict reached here survives Full
+     * Auto and a verdict reached by `defaultVerdict` does not. Keying this on
+     * anything a connected server could satisfy would make Full Auto plus one
+     * installed server into unattended arbitrary action.
+     */
     evaluate: ({ capability }) =>
-      !capability.provenance.trusted && hasElevatedEffect(capability)
+      capability.provenance.author === "third-party" && hasElevatedEffect(capability)
         ? "ask"
         : undefined,
   },
@@ -135,7 +144,7 @@ export function resourceRule(input: {
  * has already run.
  */
 export function defaultVerdict(capability: CapabilityDescriptor): PermissionDecision {
-  if (isReadOnly(capability) && capability.provenance.trusted) {
+  if (isReadOnly(capability) && capability.provenance.author === "studio") {
     return {
       verdict: "allow",
       source: "default",

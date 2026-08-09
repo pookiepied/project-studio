@@ -95,6 +95,38 @@ export function capabilityIdProblem(id: CapabilityId): string | undefined {
   return undefined;
 }
 
+/**
+ * Who wrote the code behind a capability.
+ *
+ * Answers exactly one question — *did we review this* — and is read only by the
+ * permission policy. A capability we shipped has been through our review; one a
+ * user connected has not, however it describes itself.
+ */
+export type CapabilityAuthor =
+  /** Written, reviewed, and shipped by us. */
+  | "studio"
+  /** Written by someone else. A connected server, a contributed skill. */
+  | "third-party";
+
+/**
+ * Where a capability came from.
+ *
+ * `author` replaced a boolean named `trusted` in Phase 11. That boolean had
+ * three readers asking three different questions — can this be contained, must
+ * a human see it, may it run unattended — and it answered all of them only
+ * while *we wrote it*, *it runs in our process*, and *it is safe unattended*
+ * were the same fact.
+ *
+ * An MCP server breaks that in both directions at once: a server the user
+ * installs is unreviewed code they consented to, and a server we bundle is
+ * reviewed code running outside our process. Whichever value the boolean took,
+ * two of its three readers would have been wrong. See ADR 0025.
+ *
+ * There is deliberately no second field for *where* the code runs. Nothing
+ * reads it: what isolation an effect needs is the effect table's question, and
+ * whether a program sits outside the folder wall is something the install
+ * dialog reads from the server record, not from a descriptor.
+ */
 export interface CapabilityProvenance {
   readonly origin: CapabilityOrigin;
   /**
@@ -102,13 +134,23 @@ export interface CapabilityProvenance {
    * `project-studio` for native capabilities.
    */
   readonly sourceId: string;
-  /**
-   * Whether the provider is part of the application's own trust boundary.
-   * Only native capabilities are trusted; anything a user connected is not,
-   * regardless of how it describes itself.
-   */
-  readonly trusted: boolean;
+  /** Did we review this code? Read by `BASE_POLICY` and `defaultVerdict`. */
+  readonly author: CapabilityAuthor;
 }
+
+/**
+ * Provenance for a capability that ships with the harness and runs inside it.
+ *
+ * The overwhelmingly common case, and worth a name: nine native tools repeated
+ * the same object literal, and a literal repeated nine times is a default that
+ * has not been written down. A tenth tool now inherits the right answer instead
+ * of copying whichever neighbour it was pasted from.
+ */
+export const NATIVE_PROVENANCE: CapabilityProvenance = {
+  origin: "native",
+  sourceId: "project-studio",
+  author: "studio",
+};
 
 export interface CapabilityDescriptor {
   readonly id: CapabilityId;

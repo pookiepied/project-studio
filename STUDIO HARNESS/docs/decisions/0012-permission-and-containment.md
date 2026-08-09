@@ -2,6 +2,10 @@
 
 Status: Accepted
 
+**Amended by ADR 0025.** Where this document says a capability is *trusted*,
+read `provenance.author === "studio"`. The boolean it named was answering
+three questions at once, and Phase 11 broke the equivalence that let it.
+
 ## Context
 
 Phases 10-13 add native tools, MCP servers, skills, and subagents. Each of them

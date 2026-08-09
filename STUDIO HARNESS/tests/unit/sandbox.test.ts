@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type {
+  CapabilityAuthor,
   CapabilityDescriptor,
   CapabilityEffect,
 } from "../../src/contracts/capabilities.js";
@@ -19,17 +20,18 @@ import {
 
 function descriptor(
   effects: CapabilityEffect[],
-  trusted = true,
+  author: CapabilityAuthor = "studio",
 ): CapabilityDescriptor {
+  const ours = author === "studio";
   return {
-    id: { namespace: trusted ? "native" : "mcp:example", name: "thing" },
+    id: { namespace: ours ? "native" : "mcp:example", name: "thing" },
     title: "thing",
     description: "thing",
     effects,
     provenance: {
-      origin: trusted ? "native" : "mcp",
-      sourceId: trusted ? "project-studio" : "example-server",
-      trusted,
+      origin: ours ? "native" : "mcp",
+      sourceId: ours ? "project-studio" : "example-server",
+      author,
     },
     idempotent: true,
   };
@@ -295,7 +297,13 @@ describe("isolation is claimed honestly", () => {
     const open = new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace }));
 
     expect(open.supports(descriptor(["network"]))).toBe(true);
-    expect(open.supports(descriptor(["execute"], false))).toBe(false);
+
+    const locked = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: workspace, allowExec: false }),
+    );
+
+    expect(locked.supports(descriptor(["execute"]))).toBe(false);
+    expect(() => locked.assertSupports(descriptor(["execute"]))).toThrow(SandboxError);
   });
 
   it("runs a native program when the policy opted in, uncontained and said so", () => {
@@ -309,9 +317,17 @@ describe("isolation is claimed honestly", () => {
     expect(() => permissive.assertSupports(descriptor(["execute"]))).not.toThrow();
   });
 
-  it("never runs a connected server's code, whatever the policy says", () => {
-    // The line is provenance, and it is absolute in this direction. This is
-    // what S-02 keeps closed until a real isolation tier exists.
+  it("does not ask who wrote the code, because that is not a containment fact", () => {
+    // This used to refuse anything connected outright, and that refusal was
+    // never about containment — it stood in for a consent path that did not
+    // exist. ADR 0025 builds one, and moves the question to `BASE_POLICY`,
+    // where a third-party elevated capability draws a policy `ask` that no
+    // unattended mode can resolve. `trust-and-modes.test.ts` holds that
+    // guarantee now.
+    //
+    // Asserted rather than deleted: "the sandbox is provenance-blind" is a
+    // property of the new design, and a property nobody tests is a property
+    // that comes back.
     const permissive = new LocalSandbox(
       createSandboxPolicy({
         workspaceRoot: workspace,
@@ -320,12 +336,30 @@ describe("isolation is claimed honestly", () => {
       }),
     );
 
+    for (const effects of [["execute"], ["network"]] as const) {
+      expect(permissive.supports(descriptor([...effects]))).toBe(
+        permissive.supports(descriptor([...effects], "third-party")),
+      );
+    }
+  });
+
+  it("applies the operator's switch to a connected server too", () => {
+    // The switch check used to sit *behind* the provenance refusal, so it never
+    // ran for the code it most obviously describes.
+    const locked = new LocalSandbox(
+      createSandboxPolicy({
+        workspaceRoot: workspace,
+        allowExec: false,
+        allowNetwork: false,
+      }),
+    );
+
     expect(() =>
-      permissive.assertSupports(descriptor(["execute"], false)),
-    ).toThrow(/needs a sandbox/i);
+      locked.assertSupports(descriptor(["execute"], "third-party")),
+    ).toThrow(/not allowed to run commands/i);
     expect(() =>
-      permissive.assertSupports(descriptor(["network"], false)),
-    ).toThrow(/needs a sandbox/i);
+      locked.assertSupports(descriptor(["network"], "third-party")),
+    ).toThrow(/not allowed to reach the network/i);
   });
 
   it("ranks isolation so a stronger sandbox satisfies a weaker requirement", () => {

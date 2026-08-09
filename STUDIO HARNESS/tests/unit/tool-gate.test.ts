@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type {
+  CapabilityAuthor,
   CapabilityDescriptor,
   CapabilityEffect,
   ExecutionScope,
@@ -35,17 +36,18 @@ const SCOPE: ExecutionScope = {
 function capability(
   name: string,
   effects: CapabilityEffect[],
-  trusted = true,
+  author: CapabilityAuthor = "studio",
 ): CapabilityDescriptor {
+  const ours = author === "studio";
   return {
-    id: { namespace: trusted ? "native" : "mcp:example", name },
+    id: { namespace: ours ? "native" : "mcp:example", name },
     title: name,
     description: name,
     effects,
     provenance: {
-      origin: trusted ? "native" : "mcp",
-      sourceId: trusted ? "project-studio" : "example-server",
-      trusted,
+      origin: ours ? "native" : "mcp",
+      sourceId: ours ? "project-studio" : "example-server",
+      author,
     },
     idempotent: true,
   };
@@ -244,16 +246,26 @@ describe("containment runs before the tool, not inside it", () => {
     expect(calls).toEqual([]);
   });
 
-  it("refuses an effect the sandbox cannot contain, even when approved", async () => {
-    // Permission is not isolation. An approved `execute` from a *connected*
-    // provider still fails in an in-process sandbox, because approval does not
-    // create a boundary. This is the direction that is absolute: the capability
-    // switches move the line for native code and never for code a third party
-    // chose. See ADR 0019.
-    const instance = gate({ approver: approver("allow") });
+  it("refuses an effect the sandbox will not admit, even when approved", async () => {
+    // Permission is not containment, and the gate has to ask both. Approval
+    // says the user agreed; the sandbox says we can hold the boundary. An
+    // approved call still stops here when the sandbox says no.
+    //
+    // The condition used to be provenance — a connected server's `execute` was
+    // refused outright. ADR 0025 moved that question to `BASE_POLICY`, where it
+    // is a policy `ask` no mode can resolve, so the sandbox no longer answers
+    // it. The switch is what the sandbox still refuses on, and the property
+    // under test here is unchanged: the gate asks, and a refusal stops the call
+    // before the tool runs.
+    const instance = new CallGate({
+      kernel: new PermissionKernel({ grants, approver: approver("allow") }),
+      sandbox: new LocalSandbox(
+        createSandboxPolicy({ workspaceRoot: workspace, allowExec: false }),
+      ),
+    });
     instance.register(
       defineStudioTool({
-        descriptor: capability("shell", ["execute"], false),
+        descriptor: capability("shell", ["execute"], "third-party"),
         resourceKind: "command",
         parse: (input) => input as { command: string },
         resource: (input) => `shell:${input.command}`,

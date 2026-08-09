@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { buildFilesArgs, runRipgrep, toRelative } from "./ripgrep.js";
@@ -37,7 +40,7 @@ export const GLOB_DESCRIPTOR: CapabilityDescriptor = {
   // `read`, for the same reason as grep: ripgrep runs, but with an argument
   // vector this code built. See ADR 0013.
   effects: ["read"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   idempotent: true,
 };
 

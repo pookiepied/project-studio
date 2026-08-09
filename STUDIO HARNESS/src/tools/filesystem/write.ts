@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { SandboxError } from "../../sandbox/errors.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
@@ -24,7 +27,7 @@ export const WRITE_DESCRIPTOR: CapabilityDescriptor = {
   description:
     "Writes a file, creating it or replacing it entirely. Read an existing file before replacing it. Prefer edit for changing part of a file.",
   effects: ["write"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   // Writing the same content twice lands the same file, so a retry after an
   // unknown outcome is safe.
   idempotent: true,

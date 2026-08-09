@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { parseDestination } from "../../net/destination.js";
 import type { RetrievalService } from "../../retrieval/service.js";
 import { ToolError } from "../errors.js";
@@ -20,7 +23,7 @@ export const FETCH_DESCRIPTOR: CapabilityDescriptor = {
     "Reads one web page and returns its text. Give a full https address. " +
     "Use web_search first when you do not already have the address.",
   effects: ["network"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   // Reading the same page twice is safe. Retrying a failed read is not a
   // second purchase or a second message.
   idempotent: true,

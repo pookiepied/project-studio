@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type {
+  CapabilityAuthor,
   CapabilityDescriptor,
   CapabilityEffect,
   ExecutionScope,
@@ -33,17 +34,18 @@ const ROOT = "/work/project";
 function capability(
   name: string,
   effects: CapabilityEffect[],
-  trusted = true,
+  author: CapabilityAuthor = "studio",
 ): CapabilityDescriptor {
+  const ours = author === "studio";
   return {
-    id: { namespace: trusted ? "native" : "mcp:example", name },
+    id: { namespace: ours ? "native" : "mcp:example", name },
     title: name,
     description: name,
     effects,
     provenance: {
-      origin: trusted ? "native" : "mcp",
-      sourceId: trusted ? "project-studio" : "example-server",
-      trusted,
+      origin: ours ? "native" : "mcp",
+      sourceId: ours ? "project-studio" : "example-server",
+      author,
     },
     idempotent: true,
   };
@@ -52,7 +54,7 @@ function capability(
 const READ = capability("read", ["read"]);
 const WRITE = capability("write", ["write"]);
 const SHELL = capability("shell", ["execute"]);
-const CONNECTED_SHELL = capability("run", ["execute"], false);
+const CONNECTED_SHELL = capability("run", ["execute"], "third-party");
 
 let db: StudioDatabase;
 let grants: PermissionGrantStore;
@@ -194,7 +196,7 @@ describe("the mode resolver on its own", () => {
   it("does not check provenance, because the policy already did", () => {
     // A connected server's write tool is resolved like any other write here.
     // What protects it is the policy rule above, in one place rather than two.
-    expect(resolveAsk("auto-edit", capability("w", ["write"], false))).toBe("allow");
+    expect(resolveAsk("auto-edit", capability("w", ["write"], "third-party"))).toBe("allow");
   });
 
   it("requires undo only where nobody is watching", () => {

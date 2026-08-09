@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import {
@@ -61,7 +64,7 @@ export const GREP_DESCRIPTOR: CapabilityDescriptor = {
   // vector this code built from structured parameters — the model cannot supply
   // a flag. See ADR 0013.
   effects: ["read"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   idempotent: true,
 };
 

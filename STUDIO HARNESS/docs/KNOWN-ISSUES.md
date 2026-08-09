@@ -944,3 +944,25 @@ every pnpm command prints an unsupported-engine warning.
 
 `node:sqlite` is experimental in this version and warns on every test run. Worth
 resolving before anything depends on a 22.19+ behaviour.
+
+### P-07 · A `shell` grant matches a program name, not a program · Accepted
+
+`resolveProgram` builds the permission resource from the executable's basename
+alone — `src/tools/shell/resolve.ts:49` returns `shell:${name.toLowerCase()}`.
+
+So an `always` grant for `shell:node` in a project authorizes running **any**
+Node script through `shell`, including the entry point of any MCP server on the
+machine, whether or not it is installed, selected for that project, or trusted.
+The same is true of `shell:python` and every other interpreter. Found while
+reviewing the Phase 11 extension layers: those layers gate our *connection* to a
+server and never the server's binary.
+
+**Accepted, not open**, because it is the trade `shell` already makes rather
+than something Phase 11 introduces. A tool that runs a program the model chose
+is dangerous in exactly this way, which is why it asks, why it is bounded by
+folder trust, and why it earns a restore point.
+
+**Revisit when** either an interpreter's script path can be part of the
+resource without making the approval dialog unreadable, or `S-02` gives us a
+real isolation tier — whichever lands first. Recorded in
+`tasks/003-phase-11-work-plan.md` under "Recorded, not scheduled".

@@ -4,6 +4,10 @@
 **Closes:** `T-28`.
 **Amends:** ADR 0019's default, not its rule.
 **Builds on:** ADR 0012 (permission and containment), ADR 0019 (running a chosen program), ADR 0022 (network).
+**Amended by:** ADR 0025. "Provenance stays absolute" below described a
+sandbox refusal that has moved to the policy. The list rule here is
+untouched: `supports()` is still `assertSupports()` minus the exception, and
+is still the only filter on what the model sees.
 
 ## Context
 

@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import type { FileAccessLog } from "./access-log.js";
@@ -30,7 +33,7 @@ export const EDIT_DESCRIPTOR: CapabilityDescriptor = {
   description:
     "Replaces an exact string in a file. The string must appear exactly once unless replaceAll is set. Read the file first.",
   effects: ["write"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   // Applying the same edit twice fails the second time, because the old string
   // is gone. That is a correct refusal, not a safe retry.
   idempotent: false,

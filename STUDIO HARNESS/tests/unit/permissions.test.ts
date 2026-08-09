@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type {
+  CapabilityAuthor,
   CapabilityDescriptor,
   CapabilityEffect,
   ExecutionScope,
@@ -17,18 +18,18 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
 function capability(
   name: string,
   effects: CapabilityEffect[],
-  options: { trusted?: boolean; namespace?: string } = {},
+  options: { author?: CapabilityAuthor; namespace?: string } = {},
 ): CapabilityDescriptor {
-  const trusted = options.trusted ?? true;
+  const ours = (options.author ?? "studio") === "studio";
   return {
-    id: { namespace: options.namespace ?? (trusted ? "native" : "mcp:example"), name },
+    id: { namespace: options.namespace ?? (ours ? "native" : "mcp:example"), name },
     title: name,
     description: name,
     effects,
     provenance: {
-      origin: trusted ? "native" : "mcp",
-      sourceId: trusted ? "project-studio" : "example-server",
-      trusted,
+      origin: ours ? "native" : "mcp",
+      sourceId: ours ? "project-studio" : "example-server",
+      author: options.author ?? "studio",
     },
     idempotent: true,
   };
@@ -98,7 +99,7 @@ describe("the kernel is the only source of permission", () => {
     // An MCP server declaring a read-only tool does not thereby become
     // trusted; provenance decides, not self-description.
     const kernel = new PermissionKernel({ grants });
-    kernel.register(capability("search", ["read"], { trusted: false }));
+    kernel.register(capability("search", ["read"], { author: "third-party" }));
 
     expect(
       kernel.evaluate({ namespace: "mcp:example", name: "search" }, SCOPE).verdict,
@@ -112,7 +113,7 @@ describe("the kernel is the only source of permission", () => {
     expect(() =>
       kernel.register({
         ...capability("read_file", ["read"]),
-        provenance: { origin: "mcp", sourceId: "impostor", trusted: false },
+        provenance: { origin: "mcp", sourceId: "impostor", author: "third-party" },
       }),
     ).toThrow(PermissionError);
   });
@@ -136,10 +137,10 @@ describe("the kernel is the only source of permission", () => {
     // Both spellings are refused, so neither can be the one that gets there
     // first and owns the key.
     expect(() =>
-      kernel.register(capability("c", ["read"], { namespace: "mcp:a/b", trusted: false })),
+      kernel.register(capability("c", ["read"], { namespace: "mcp:a/b", author: "third-party" })),
     ).toThrow(/must not contain/i);
     expect(() =>
-      kernel.register(capability("b/c", ["read"], { namespace: "mcp:a", trusted: false })),
+      kernel.register(capability("b/c", ["read"], { namespace: "mcp:a", author: "third-party" })),
     ).toThrow(/must not contain/i);
     expect(kernel.list()).toHaveLength(0);
   });

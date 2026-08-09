@@ -3,6 +3,10 @@
 **Status:** accepted
 **Closes:** `T-03`, `T-09`. **Unblocks:** `shell`.
 **Builds on:** ADR 0012 (permission kernel), ADR 0016 (undo).
+**Amended by:** ADR 0025 — the rule below is unchanged, its key is now
+`provenance.author`. The guarantee that Full Auto still prompts before a
+connected server runs code depends on that `ask` being reached in
+`BASE_POLICY` and not in `defaultVerdict`, which ADR 0025 makes explicit.
 
 ## Context
 

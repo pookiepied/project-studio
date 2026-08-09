@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import type { RetrievalService } from "../../retrieval/service.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
@@ -18,7 +21,7 @@ export const WEB_SEARCH_DESCRIPTOR: CapabilityDescriptor = {
     "Searches the web and returns the best matches with a short extract of each page. " +
     "Use fetch afterwards to read one of them in full.",
   effects: ["network"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   idempotent: true,
 };
 

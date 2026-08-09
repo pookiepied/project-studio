@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { CapabilityDescriptor } from "../../src/contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../src/contracts/capabilities.js";
 import { CallBounds } from "../../src/tools/bounds.js";
 import { ToolError } from "../../src/tools/errors.js";
 
@@ -10,7 +13,7 @@ function capability(name: string, idempotent: boolean): CapabilityDescriptor {
     title: name,
     description: name,
     effects: ["read"],
-    provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+    provenance: NATIVE_PROVENANCE,
     idempotent,
   };
 }

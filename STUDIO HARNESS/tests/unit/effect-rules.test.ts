@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  CapabilityDescriptor,
-  CapabilityEffect,
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+  type CapabilityEffect,
 } from "../../src/contracts/capabilities.js";
 import {
   allowedWhileUntrusted,
@@ -36,7 +37,7 @@ function descriptor(effects: readonly CapabilityEffect[]): CapabilityDescriptor 
     title: "Sample",
     description: "For tests.",
     effects,
-    provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+    provenance: NATIVE_PROVENANCE,
     idempotent: true,
   };
 }

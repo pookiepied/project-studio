@@ -4,6 +4,10 @@
 **Amends:** ADR 0012 (which refused `execute` outright).
 **Builds on:** ADR 0013 (execution substrate), ADR 0018 (trust and modes).
 **Delivers:** the `shell` tool.
+**Amended by:** ADR 0025. The provenance table here stays true of *who may
+run without asking*. What changed is where it is enforced: the sandbox no
+longer refuses connected code, because that refusal stood in for a consent
+path that now exists. The refusal moved to `BASE_POLICY`; it did not lift.
 
 ## Context
 

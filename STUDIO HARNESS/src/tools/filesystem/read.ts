@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import type { FileAccessLog } from "./access-log.js";
@@ -34,7 +37,7 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
   description:
     "Reads a file from the project, returning numbered lines. Use offset and limit to page through a long file.",
   effects: ["read"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   idempotent: true,
 };
 

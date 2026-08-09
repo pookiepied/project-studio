@@ -1,4 +1,7 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import {
+  NATIVE_PROVENANCE,
+  type CapabilityDescriptor,
+} from "../../contracts/capabilities.js";
 import { ProcessError } from "../../process/errors.js";
 import { runProcess } from "../../process/exec.js";
 import { ToolError } from "../errors.js";
@@ -59,7 +62,7 @@ export const SHELL_DESCRIPTOR: CapabilityDescriptor = {
     'for example command "node" with args ["build.js"]. There is no shell, so pipes, ' +
     "redirects, &&, and quotes are not interpreted. Run one program per call.",
   effects: ["execute"],
-  provenance: { origin: "native", sourceId: "project-studio", trusted: true },
+  provenance: NATIVE_PROVENANCE,
   // Running a program twice does whatever the program does twice.
   idempotent: false,
 };

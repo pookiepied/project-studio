@@ -48,7 +48,33 @@ skills carry no trust step and their selection is not a security control.
 
 ## The order
 
-### 003.1 — Split `CapabilityProvenance.trusted` — **blocking, do first**
+### 003.1 — Split `CapabilityProvenance.trusted` — **done**
+
+Shipped as ADR 0025. `trusted: boolean` became `author: "studio" |
+"third-party"`, the sandbox stopped asking who wrote the code, and the switch
+check moved ahead of the isolation check so it reaches connected code at last.
+
+`pnpm check` green — 634 passing, up one. Verified both ways: keying
+`BASE_POLICY` on `false` fails two Full Auto tests, and dropping the `author`
+check from `defaultVerdict` fails one.
+
+Three tests changed meaning rather than being deleted, and one was added. The
+review's claim that the existing fixtures "hard-code `trusted` to false" was
+wrong — they take it as a parameter with a default, and the Full Auto guarantee
+was genuinely asserted. What was true is the part that mattered: those fixtures
+build their own descriptor, so they test the *rule* and not the *wiring*, and
+the wiring is what would have been given the wrong value.
+
+The second field the review proposed — `in-process` versus `external` — was not
+added. Nothing reads it: isolation requirements are the effect table's question
+and the folder-wall warning is read from the server record. A field with no
+reader is what this codebase keeps deleting.
+
+Also recorded: `P-07`, `shell`'s resource is a program's basename.
+
+<details>
+<summary>Original analysis</summary>
+
 
 One boolean answers three unrelated questions, and Phase 11 breaks the
 equivalence that let it:
@@ -106,6 +132,8 @@ Also in this item, because they are the same edit:
 - A new test: Full Auto must not silently run a third-party external capability.
 - ADR 0025, plus an amendment note on ADRs 0012, 0018, 0019, 0022, and 0024 —
   all five state their rule in terms of the one word.
+
+</details>
 
 ### 003.2 — Registration must be reversible
 

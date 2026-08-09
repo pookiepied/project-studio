@@ -89,17 +89,33 @@ export class LocalSandbox {
     }
   }
 
+  /**
+   * Whether this sandbox can admit a capability at all.
+   *
+   * Asks two questions and deliberately not a third. It asks whether the
+   * operator has switched this effect off, and whether we have the isolation
+   * the effect wants. It does **not** ask who wrote the code.
+   *
+   * That third question used to live here, as `!provenance.trusted` refusing
+   * anything connected. It was never a containment fact — it was a stand-in for
+   * a consent path that did not exist yet, written when the only possible
+   * answer to "a user connected this" was "we have nowhere safe to put it".
+   *
+   * Phase 11 builds that path: a server is installed by hand behind a dialog
+   * that states the consequence, selected into a specific project, and asked
+   * about on every call by a **policy** `ask` that no unattended mode can
+   * resolve. The refusal moved to where it can be argued with; it did not
+   * disappear. See ADR 0025.
+   *
+   * `S-02` is what makes the isolation branch below start refusing rather than
+   * falling through — and it would then relax the per-call approval, which is
+   * the opposite direction from what this file used to imply.
+   */
   assertSupports(capability: CapabilityDescriptor): void {
     for (const effect of capability.effects) {
-      if (satisfiesIsolation(this.isolation, requiredIsolation(effect))) continue;
-
-      if (!capability.provenance.trusted) {
-        throw new SandboxError("unsupported_isolation", {
-          message:
-            "Running code or reaching the network from a connected server needs a sandbox, and none is available yet.",
-        });
-      }
-
+      // The operator's off switch, asked first and of every capability. It used
+      // to sit behind the provenance check, so it never applied to the code it
+      // most obviously describes. See ADR 0024 for why these default to on.
       if (effect === "execute" && !this.#policy.allowExec) {
         throw new SandboxError("not_permitted", {
           message: "This agent is not allowed to run commands.",
@@ -110,6 +126,13 @@ export class LocalSandbox {
           message: "This agent is not allowed to reach the network.",
         });
       }
+
+      if (satisfiesIsolation(this.isolation, requiredIsolation(effect))) continue;
+
+      // No isolation for this effect, and we run it anyway. What makes that
+      // acceptable is decided in two other places, on purpose: our own code was
+      // reviewed before it shipped, and connected code was installed by hand
+      // and asks again on every single call.
     }
   }
 
