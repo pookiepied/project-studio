@@ -135,7 +135,35 @@ Also in this item, because they are the same edit:
 
 </details>
 
-### 003.2 — Registration must be reversible
+### 003.2 — Registration must be reversible — **done**
+
+`CallGate.unregister`, `CallGate.unregisterSource`, `PermissionKernel.unregister`,
+`CallBounds.undeclare`. All three registries move together, for the reason
+`register` is one call.
+
+**The two halves now agree by tightening, not by loosening.** The kernel used to
+allow a same-provider repeat as an update. Every native tool shares one
+`sourceId`, so that rule silently swallowed the collision it looked like it was
+catching. Both halves refuse a duplicate now, and reload goes through an
+explicit `unregister` — which cannot happen by accident, which is the whole
+difference between an update and a bug.
+
+`unregisterSource` exists because that is the operation that actually happens: a
+server is switched off and all of its tools go at once. Removing them key by key
+would mean the caller keeping its own list of what that server registered.
+
+A call already admitted runs to completion — `call` captures the tool before it
+does anything. Waiting for in-flight work before teardown belongs to the
+provider, which is the only thing that knows what teardown means for it. Not
+built here, and not needed until 003.6.
+
+Grants are deliberately untouched by unregistering. A server switched off in one
+project keeps its approvals in the others; which events revoke is 003.4.
+
+`pnpm check` green — 647 passing, up thirteen. Verified: dropping the kernel
+line fails 3, dropping the bounds line fails 1.
+
+### 003.2b — original notes
 
 `CallGate.register` throws on a duplicate key (`gate.ts:89`); `kernel.register`
 silently replaces when `sourceId` matches (`kernel.ts:156`). Two halves of one

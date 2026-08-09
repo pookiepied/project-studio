@@ -187,6 +187,17 @@ export class CallBounds {
     this.#declared.set(capabilityKey(descriptor.id), deadlineMs);
   }
 
+  /**
+   * Forgets what a tool asked for, when the tool itself goes away.
+   *
+   * A declaration left behind would be picked up by whatever registers that key
+   * next — so a server removed after asking for a five-minute deadline would
+   * hand that patience to its replacement, which never asked for it.
+   */
+  undeclare(descriptor: CapabilityDescriptor): void {
+    this.#declared.delete(capabilityKey(descriptor.id));
+  }
+
   deadlineFor(descriptor: CapabilityDescriptor): number {
     const key = capabilityKey(descriptor.id);
     return this.#timeoutByCapability[key] ?? this.#declared.get(key) ?? this.#timeoutMs;

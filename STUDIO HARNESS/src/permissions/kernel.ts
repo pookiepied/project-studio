@@ -155,16 +155,48 @@ export class PermissionKernel {
 
     const existing = this.#registry.get(key);
 
-    if (existing && existing.provenance.sourceId !== descriptor.provenance.sourceId) {
-      // Two providers claiming one name is a collision, not an update. Silently
-      // replacing would let a connected server shadow a native capability.
+    if (existing) {
+      // Refused either way, and the message says which problem it is.
+      //
+      // A different provider is a collision: silently replacing would let a
+      // connected server shadow a native capability. The same provider used to
+      // be treated as an update and allowed through — but an update and an
+      // accidental double-registration are indistinguishable here, and two
+      // native tools share one `sourceId`, so the lenient rule silently
+      // swallowed exactly the bug it looked like it was catching.
+      //
+      // Reload goes through `unregister` first. An explicit removal cannot
+      // happen by accident, which is the whole difference.
       throw new PermissionError("internal", {
-        message: `Capability "${key}" is already registered by a different provider.`,
+        message:
+          existing.provenance.sourceId === descriptor.provenance.sourceId
+            ? `Capability "${key}" is already registered. Unregister it before registering it again.`
+            : `Capability "${key}" is already registered by a different provider.`,
         capability: key,
       });
     }
 
     this.#registry.set(key, descriptor);
+  }
+
+  /**
+   * Forgets a capability, so nothing can be decided about it any more.
+   *
+   * Needed because a capability's existence is no longer permanent: an MCP
+   * server can be switched off for a project, edited, or removed, and a
+   * registry that only grows would keep offering tools whose provider is gone.
+   *
+   * **Grants are deliberately untouched.** Unregistering is not revoking —
+   * a server switched off for one project must keep its approvals for the
+   * others, and a capability that comes back must not silently come back
+   * approved either. Which events revoke is decided in one place, and it is
+   * not this one.
+   *
+   * Returns whether anything was actually removed, so a caller reconciling a
+   * changed tool list can tell a removal from a no-op.
+   */
+  unregister(id: CapabilityId): boolean {
+    return this.#registry.delete(capabilityKey(id));
   }
 
   get(id: CapabilityId): CapabilityDescriptor | undefined {

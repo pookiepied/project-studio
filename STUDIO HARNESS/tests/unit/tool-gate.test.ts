@@ -4,11 +4,12 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type {
-  CapabilityAuthor,
-  CapabilityDescriptor,
-  CapabilityEffect,
-  ExecutionScope,
+import {
+  capabilityKey,
+  type CapabilityAuthor,
+  type CapabilityDescriptor,
+  type CapabilityEffect,
+  type ExecutionScope,
 } from "../../src/contracts/capabilities.js";
 import { PermissionError } from "../../src/permissions/errors.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
@@ -623,5 +624,155 @@ describe("a tool states its own deadline", () => {
     instance.register(readTool(calls));
 
     expect(instance.deadlineFor(capability("read", ["read"]))).toBe(30_000);
+  });
+});
+
+describe("a tool can be taken away again", () => {
+  /** A tool from a named provider, so a whole source can be removed at once. */
+  function serverTool(
+    name: string,
+    calls: string[],
+  ): ToolDefinition<{ path: string }, string> {
+    return defineStudioTool({
+      descriptor: {
+        ...capability(name, ["read"], "third-party"),
+        provenance: {
+          origin: "mcp",
+          sourceId: "blender",
+          author: "third-party",
+        },
+      },
+      resourceKind: "path",
+      parse: (input) => input as { path: string },
+      resource: (input) => input.path,
+      execute: async () => {
+        calls.push(name);
+        return "ran";
+      },
+    });
+  }
+
+  it("stops offering a tool once it is unregistered", () => {
+    const instance = gate();
+    instance.register(readTool(calls));
+
+    expect(instance.unregister({ namespace: "native", name: "read" })).toBe(true);
+    expect(instance.list()).toEqual([]);
+    expect(instance.listAll()).toEqual([]);
+  });
+
+  it("refuses a call to a tool that has been removed", async () => {
+    const instance = gate({ approver: approver("allow") });
+    instance.register(readTool(calls));
+    instance.unregister({ namespace: "native", name: "read" });
+
+    await expect(
+      instance.call({ name: "native/read", input: { path: "a.txt" }, scope: SCOPE }),
+    ).rejects.toThrow(/no tool named/i);
+    expect(calls).toEqual([]);
+  });
+
+  it("takes the kernel with it, so nothing is decidable that is not callable", () => {
+    // The pair `register` keeps together has to come apart together too. A
+    // capability the kernel still knows is one a stale grant could still match.
+    const kernel = new PermissionKernel({ grants });
+    const instance = new CallGate({ kernel, sandbox });
+    instance.register(readTool(calls));
+
+    expect(kernel.get({ namespace: "native", name: "read" })).toBeDefined();
+
+    instance.unregister({ namespace: "native", name: "read" });
+
+    expect(kernel.get({ namespace: "native", name: "read" })).toBeUndefined();
+  });
+
+  it("reports whether anything was actually removed", () => {
+    const instance = gate();
+
+    expect(instance.unregister({ namespace: "native", name: "read" })).toBe(false);
+  });
+
+  it("allows registering the same key again afterwards, which is the reload path", () => {
+    const instance = gate();
+    instance.register(readTool(calls));
+    instance.unregister({ namespace: "native", name: "read" });
+
+    expect(() => instance.register(readTool(calls))).not.toThrow();
+    expect(instance.listAll()).toHaveLength(1);
+  });
+
+  it("still refuses a duplicate, because reload is explicit and a collision is not", () => {
+    const instance = gate();
+    instance.register(readTool(calls));
+
+    expect(() => instance.register(readTool(calls))).toThrow(ToolError);
+  });
+
+  it("drops the tool's declared deadline, so its successor does not inherit it", () => {
+    // A five-minute deadline left behind would be handed to whatever registers
+    // that key next, which never asked for it.
+    const instance = gate();
+    const descriptor = capability("slow", ["read"]);
+    instance.register({
+      ...readTool(calls),
+      descriptor,
+      deadlineMs: 600_000,
+    } as unknown as ToolDefinition<{ path: string }, string>);
+
+    expect(instance.deadlineFor(descriptor)).toBe(600_000);
+
+    instance.unregister(descriptor.id);
+    instance.register({ ...readTool(calls), descriptor } as unknown as ToolDefinition<
+      { path: string },
+      string
+    >);
+
+    expect(instance.deadlineFor(descriptor)).not.toBe(600_000);
+  });
+
+  it("removes every tool one provider contributed, and only those", () => {
+    const instance = gate();
+    instance.register(readTool(calls));
+    instance.register(serverTool("render", calls));
+    instance.register(serverTool("export", calls));
+
+    expect(instance.unregisterSource("blender")).toBe(2);
+    expect(instance.listAll().map((d) => capabilityKey(d.id))).toEqual(["native/read"]);
+  });
+
+  it("lets a call that already started finish", async () => {
+    // Removing a tool stops the next call, not the one in progress. Waiting for
+    // in-flight work belongs to whatever is being torn down.
+    const instance = gate({ approver: approver("allow") });
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    instance.register(
+      defineStudioTool({
+        descriptor: capability("slow", ["read"]),
+        resourceKind: "path",
+        parse: (input) => input as { path: string },
+        resource: (input) => input.path,
+        execute: async () => {
+          await started;
+          calls.push("finished");
+          return "done";
+        },
+      }),
+    );
+
+    const inFlight = instance.call({
+      name: "native/slow",
+      input: { path: "a.txt" },
+      scope: SCOPE,
+    });
+
+    expect(instance.unregister({ namespace: "native", name: "slow" })).toBe(true);
+    release();
+
+    await expect(inFlight).resolves.toBe("done");
+    expect(calls).toEqual(["finished"]);
   });
 });

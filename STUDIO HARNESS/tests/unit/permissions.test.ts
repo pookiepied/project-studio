@@ -399,3 +399,50 @@ describe("authorize", () => {
     expect(error?.code).toBe("permissions.denied");
   });
 });
+
+describe("a capability can be forgotten again", () => {
+  it("refuses a duplicate from the same provider too", () => {
+    // This used to be treated as an update and allowed through. Two native
+    // tools share one `sourceId`, so the lenient rule silently swallowed the
+    // collision it looked like it was catching. Reload goes through
+    // `unregister`, which cannot happen by accident.
+    const kernel = new PermissionKernel({ grants });
+    kernel.register(capability("read_file", ["read"]));
+
+    expect(() => kernel.register(capability("read_file", ["read"]))).toThrow(
+      /already registered/i,
+    );
+  });
+
+  it("stops deciding about a capability once it is unregistered", () => {
+    const kernel = new PermissionKernel({ grants });
+    const id = { namespace: "native", name: "read_file" };
+    kernel.register(capability("read_file", ["read"]));
+
+    expect(kernel.unregister(id)).toBe(true);
+    expect(kernel.get(id)).toBeUndefined();
+    expect(kernel.list()).toEqual([]);
+    expect(kernel.evaluate(id, SCOPE).verdict).toBe("deny");
+  });
+
+  it("reports whether anything was removed", () => {
+    const kernel = new PermissionKernel({ grants });
+
+    expect(kernel.unregister({ namespace: "native", name: "absent" })).toBe(false);
+  });
+
+  it("leaves grants alone, because unregistering is not revoking", () => {
+    // A server switched off for one project keeps its approvals for the others.
+    // Which events revoke is decided in one place, and it is not this one.
+    const kernel = new PermissionKernel({ grants });
+    const id = { namespace: "mcp:example", name: "search" };
+    kernel.register(capability("search", ["read"], { author: "third-party" }));
+
+    grants.grant(id, SCOPE, "always");
+    expect(grants.find(id, SCOPE)).toBeDefined();
+
+    kernel.unregister(id);
+
+    expect(grants.find(id, SCOPE)).toBeDefined();
+  });
+});

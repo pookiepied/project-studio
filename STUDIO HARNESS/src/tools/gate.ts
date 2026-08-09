@@ -1,6 +1,7 @@
 import {
   capabilityKey,
   type CapabilityDescriptor,
+  type CapabilityId,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
 import { requiresUndoPoint } from "../contracts/effects.js";
@@ -100,6 +101,61 @@ export class CallGate {
     // One cast, at the one boundary where the parameter types are erased. The
     // functions are only ever called with values `parse` produced.
     this.#tools.set(key, tool as unknown as RegisteredTool);
+  }
+
+  /**
+   * Removes a tool, through the same one door that added it.
+   *
+   * Registration used to be permanent, which was fine while every tool was ours
+   * and shipped in the binary. From Phase 11 a tool's provider can be switched
+   * off for a project, edited, or removed, and a gate that only grows would keep
+   * offering tools whose server is gone.
+   *
+   * All three registries move together, for the same reason `register` is one
+   * call: a tool the gate can reach but the kernel has never heard of is exactly
+   * the state neither is allowed to be in.
+   *
+   * **A call already admitted runs to completion.** `call` captures the tool
+   * before it does anything, so removing it mid-flight neither cancels nor
+   * corrupts that call — it only stops the next one. Waiting for in-flight work
+   * before tearing a provider down belongs to the provider, which is the only
+   * thing that knows what teardown means for it.
+   */
+  unregister(id: CapabilityId): boolean {
+    const key = capabilityKey(id);
+    const tool = this.#tools.get(key);
+    if (!tool) return false;
+
+    // Removed from here first, so no further call can be admitted while the
+    // other two are still catching up.
+    this.#tools.delete(key);
+    this.#kernel.unregister(id);
+    this.#bounds.undeclare(tool.descriptor);
+    return true;
+  }
+
+  /**
+   * Removes every tool one provider contributed.
+   *
+   * The operation that actually happens — a server is switched off and all of
+   * its tools go at once. Doing it key by key from outside would mean the caller
+   * holding its own list of what that server registered, which is a second copy
+   * of something this map already knows.
+   *
+   * `project-studio` is a `sourceId` like any other, so this removes the native
+   * tools if asked. Deliberate: a guard against that would be a special case
+   * defending against a call nobody makes by accident.
+   */
+  unregisterSource(sourceId: string): number {
+    const doomed = [...this.#tools.values()]
+      .filter((tool) => tool.descriptor.provenance.sourceId === sourceId)
+      .map((tool) => tool.descriptor.id);
+
+    let removed = 0;
+    for (const id of doomed) {
+      if (this.unregister(id)) removed += 1;
+    }
+    return removed;
   }
 
   /** How much is running or waiting right now. For the audit surface. */
