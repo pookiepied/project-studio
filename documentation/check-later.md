@@ -424,6 +424,42 @@ and would then have no word for. Not `extensions/`, which the 2026-07-28
 revision has taken. The product surface is still called the Extensions page;
 the folder and the page do not have to share a word, and here they must not.
 
+The shared part is a **spine, not an engine**: two files at the root of
+`src/extend/` holding identity, origin, per-project on/off, and a change signal.
+MCP, skills, and hooks depend on it; it knows none of them. That direction is
+enforced by one architecture rule — nothing at `src/extend/*.ts` may import from
+a subdirectory — so a fourth kind adds a folder and edits nothing. See
+`tasks/002-phase-11-mcp.md` §10.
+
+Three runtime kinds only. A connector is a remote MCP server with OAuth and a
+good icon, not a fourth subsystem. A plugin is a bundle that installs into the
+three and does not exist at runtime.
+
+---
+
+## C-17 — The destination guard follows the URL's author
+
+**Status:** answered in design, not built. **Refines:** ADR 0022.
+
+`src/net/destination.ts` was built for `fetch` and refuses every private
+address. That is right for a URL the *model* chose and wrong for a URL the
+*user typed into a settings form*, which is how a local MCP server arrives.
+
+The axis is who wrote the URL, not what the address is. Full table in
+`tasks/002-phase-11-mcp.md` §9. In short: an MCP endpoint needs a well-formed
+`http`/`https` URL and nothing more; `fetch` keeps a strict guard, but "private"
+splits three ways — link-local and cloud metadata are refused and never offered,
+LAN ranges are refused by default, and **loopback goes through the normal
+approval ladder** so a user can approve their own dev server once.
+
+**The part that changes ADR 0022:** for loopback the permission resource must be
+**host and port**. `localhost:3000` is a dev site and `localhost:11434` is Ollama
+with no authentication; approving one must not approve the other. Outside
+loopback the host remains the resource.
+
+**Check:** when the guard is split. The ADR gets an amendment note then, the way
+ADR 0024 amended ADR 0019's default.
+
 ---
 
 ## C-16 — Which MCP revisions we speak

@@ -531,15 +531,230 @@ Legacy coverage, split by transport, because the cost is not the same on each:
 
 Deferred again, at the owner's request. `C-14` is unchanged.
 
-## 9. Still open
+## 9. The destination guard, settled (closes F-3)
 
-1. **F-3** — `allowPrivate` at the destination guard. Mine to implement; no
-   decision needed, recorded so it is not forgotten.
-2. Whether a project may enable a server that is installed but whose trust was
+The question was asked as "may `fetch` reach my own dev site on
+`localhost:3000`", and it is the right question, because it exposes that the
+guard was built on the wrong axis.
+
+**The strictness follows who wrote the URL, not what the address is.**
+
+| Caller | URL author | Rule |
+|---|---|---|
+| `fetch` | the model | strict |
+| an MCP endpoint | the user, in a settings form | permissive |
+
+An MCP endpoint the user typed needs a well-formed URL and an `http`/`https`
+scheme, and nothing else. There is no escalation to prevent: the user could open
+that address in a browser. A local HTTP MCP server on `localhost` is the normal
+case, not the exception.
+
+The model-authored side is not one rule either. "Private" was too coarse.
+
+| Range | Rule | Why |
+|---|---|---|
+| `169.254.0.0/16`, cloud metadata | **refused, never offered** | this is the actual SSRF prize, and it is worth credentials on a VPS |
+| `10/8`, `172.16/12`, `192.168/16`, `100.64/10` | refused by default | other people's routers, printers, and machines; the user gains nothing |
+| loopback — `127.0.0.0/8`, `::1`, `localhost` | **allowed through the normal gate** | this is the user's own machine and their own dev server |
+| our own harness ports | **refused, never offered** | the model calling our control plane is escalation, full stop |
+
+Loopback is not blanket-allowed. It goes through the approval ladder like any
+other destination, so the answer is *yes, after you approve it once*.
+
+**One refinement to ADR 0022.** For loopback the permission resource must be
+**host and port**, not host alone. `localhost:3000` is a dev site;
+`localhost:11434` is Ollama with no authentication. Approving one must not
+approve the other. Outside loopback the host remains the resource, unchanged.
+
+The "never offered" rows work like the approver's existing rule that nothing
+above the workspace root is ever offered as a scope. Not a default that can be
+answered around — an address the dialog cannot express.
+
+---
+
+## 10. Is there an `extend` engine?
+
+Yes, and it is a **spine, not an engine**. The distinction decides whether the
+folder ages well.
+
+### 10.1 What is actually shared
+
+Taking each candidate honestly rather than by resemblance:
+
+| | Truly identical across MCP, skills, hooks? |
+|---|---|
+| Identity — `kind` and `id` | yes |
+| Origin — shipped by us, or added by the user | yes |
+| Per-project on/off | yes — one boolean against a pair of ids |
+| Change signal and reload timing | yes — one counter, re-read at a turn boundary |
+| The row a settings screen renders | yes in shape |
+| What the thing *is* — transport, auth, parsing, spawning, effects | **no** |
+
+The shared part is four fields and a signal. Everything expensive is
+type-specific. So the shared thing must stay small on purpose, and the way to
+keep it small is not discipline — it is the direction of the dependency.
+
+### 10.2 The rule that keeps it from growing
+
+**MCP, skills, and hooks depend on the spine. The spine knows none of them.**
+
+If `extend/inventory.ts` imported `extend/mcp/`, then adding a fourth kind would
+edit the spine, and the spine would accumulate one branch per kind until it was
+the engine nobody wanted. That is "one place that knows six things" — the
+inversion of the fault ADR 0020 named.
+
+Inverted, a fourth kind adds a folder and edits nothing.
+
+This is testable, which is why it is the rule rather than a preference.
+`architecture.test.ts` gains one line: **nothing at `src/extend/*.ts` may import
+from a subdirectory of `src/extend/`.** A hub cannot form without failing the
+suite.
+
+### 10.3 It is not on the call path
+
+The spine decides **presence**, never **permission**. It answers "does this
+project use Blender", and it answers it *before* anything connects. Once a
+server is connected, its tools are ordinary `CapabilityDescriptor`s in the gate,
+and the spine is not consulted again.
+
+So it cannot become a second door. There is still one door, and it is
+`CallGate`. This is the strongest evidence that the shared part is not an
+engine: an engine would be in the middle of every call, and this is in the
+middle of none.
+
+### 10.4 Shape
+
+Two files, not a folder:
+
+```
+src/extend/
+  inventory.ts    what exists: kind, id, origin, name, icon
+  selection.ts    what this project uses: default off, on/off, change counter
+  mcp/
+  skills/
+  hooks/
+```
+
+Two files do not need a folder, and Working Rule 8 forbids inventing one for
+them. It can become `extend/inventory/` the day it earns it. Placing them at the
+root of `extend/` also makes the architecture rule in §10.2 trivially
+expressible.
+
+**Not `registry`.** `src/retrieval/registry.ts` already exists and
+`extend/mcp/registry.ts` will, and three registries meaning three things is how
+a word stops carrying information.
+
+---
+
+## 11. How many kinds are there
+
+Fewer than the list suggests, because two of the words on it are not kinds.
+
+| | What it is | Where |
+|---|---|---|
+| **MCP server** | adds tools | `extend/mcp/` — this phase |
+| **Skill** | adds instructions | `extend/skills/` — Phase 12 |
+| **Hook** | adds behaviour at a point in the loop | `extend/hooks/` — later |
+| Connector | **not a kind** | a remote MCP server with OAuth and a good icon |
+| Plugin | **not a kind** | a *bundle* of the three above; a distribution format |
+| Subagent, team | not extensions | `src/agents/` — they consume the three |
+
+**Three runtime kinds.** That is the whole surface.
+
+A connector being a remote MCP server removes an entire subsystem that looked
+necessary. Gmail, Notion, and Linear all ship remote MCP servers with OAuth, and
+we already have to build remote MCP with OAuth. What "connector" adds is
+presentation: a name, an icon, and a sign-in button instead of a URL field. That
+is a settings screen, not a subsystem.
+
+A plugin installs into the three kinds and then stops existing at runtime.
+Nothing in `src/` needs to know what a plugin was — which is exactly why the
+word had to stay free (D-2).
+
+---
+
+## 12. What we ship ourselves
+
+We will bundle MCP servers and skills with the application. An image generator
+was the example given. Two questions follow: where the files sit, and what makes
+one of ours different from one the user added.
+
+### 12.1 Where
+
+ADR 0014 already answers this. The installation is read-only and is where
+shipped assets live; `platform/` already exposes `installationRoot()` and
+`vendorRoot()`. A bundled extension is a shipped asset.
+
+```
+<installation>/
+  vendor/     third-party binaries we pinned — ripgrep today
+  library/    extensions we wrote and ship
+    mcp/
+    skills/
+```
+
+A sibling of `vendor/`, not inside it. `vendor/` means third-party code we
+pinned; a skill we wrote is not vendored, and collapsing the two would make the
+`V-01` hash rule ambiguous about what it covers.
+
+Nothing resolves against the working directory. That rule is already enforced
+and this inherits it.
+
+### 12.2 What makes one ours
+
+`CapabilityProvenance.trusted` says only native capabilities are trusted, and
+anything the user connected is not. A server we wrote, pinned, and shipped is
+**native** by that definition. The test is "did we review this code", not "does
+it run in our process".
+
+So a bundled server is trusted, skips the install warning, and is not subject to
+the connected-capability refusal in D-1.
+
+That is a real door, so it must be narrow:
+
+**The bundled list is compiled in, never a directory scan.** If `library/` were
+enumerated at startup, dropping a folder into it would mint a trusted MCP
+server, and an installer, an unpacker, or a careless script could do that. The
+manifest lives in the binary and the files are hash-checked, which is `V-01`'s
+rule applied to extensions rather than to binaries.
+
+### 12.3 Identity
+
+Every extension needs one id that is stable, unique across the machine, and
+readable in a stored grant.
+
+**Bundled ids use a reserved `studio.` prefix; user ids may not.** So
+`studio.image-gen` and `blender`, and a capability key of
+`mcp:studio.image-gen/generate`. One uniqueness rule, no collision possible in
+either direction, and nothing ugly in a log line.
+
+The alternative — an origin column and unprefixed ids — allows a user to add a
+server named `image-gen` and collide with a future bundled one. A reserved
+prefix costs one dot.
+
+### 12.4 One disagreement, stated
+
+The instruction was that bundled servers are non-negotiable. I propose they are
+**listed, on by default, not removable, but switchable off per project.**
+
+The reason is prompt cost, not safety. An image generator's tool schemas sit in
+the cached prefix of every turn in every project, including projects that will
+never generate an image. That is the same argument that produced ADR 0024's
+filtered list, and it does not stop applying because the tool is ours.
+
+Not removable and not editable, because it is ours. Off-switchable, because the
+user pays for it on every turn.
+
+---
+
+## 13. Still open
+
+1. Whether a project may enable a server that is installed but whose trust was
    later revoked. Proposed: no, and it disappears from the project's list with a
    reason rather than failing at call time.
-3. What the extensions page shows for a server that is installed, enabled, and
+2. What the extensions page shows for a server that is installed, enabled, and
    failing. Health belongs in the row; the wording does not exist yet.
+3. §12.4 — whether a bundled server may be switched off per project.
 
 Sources: the 2026-07-28 changelog, versioning, and stdio transport pages on
 modelcontextprotocol.io; the 2026-07-28 release post; the Agent Skills

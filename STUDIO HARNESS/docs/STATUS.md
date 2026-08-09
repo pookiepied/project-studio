@@ -255,10 +255,29 @@ and the same three layers cover skills and connectors.
 
 Four smaller collisions are in §3 of the task file. `npx` is resolved to an
 interpreter plus an absolute script path rather than refused, which keeps
-`shell: false` and never reaches `cmd.exe`, so CVE-2024-27980 stays closed. The
-SSRF guard gains an explicit per-purpose `allowPrivate`, because local MCP
-servers legitimately live on `localhost` while `fetch` follows a URL the model
-chose.
+`shell: false` and never reaches `cmd.exe`, so CVE-2024-27980 stays closed.
+
+The destination guard splits by **who wrote the URL**, not by what the address
+is (`C-17`). A URL the user typed into a settings form needs only to be
+well-formed. A URL the model chose keeps a strict guard, but "private" was too
+coarse: cloud metadata is refused and never offered, LAN ranges are refused by
+default, and loopback goes through the normal approval ladder — with host *and
+port* as the resource, so approving a dev server does not approve an unsecured
+Ollama on the next port.
+
+**The shared part of `src/extend/` is a spine, not an engine.** Two files —
+identity and origin, per-project on/off — that MCP, skills, and hooks depend on
+and that knows none of them. One architecture rule enforces the direction, so a
+fourth kind adds a folder and edits nothing. It decides presence, never
+permission, and is off the call path entirely, so `CallGate` is still the only
+door. There are three runtime kinds: a connector is a remote MCP server with a
+good icon, and a plugin is a bundle that does not exist at runtime.
+
+**Extensions we ship ourselves** live in `<installation>/library/`, a read-only
+sibling of `vendor/` under ADR 0014. They count as native provenance, so the
+bundled list is compiled in and hash-checked rather than scanned from a
+directory — otherwise dropping a folder into `library/` would mint a trusted MCP
+server. Their ids use a reserved `studio.` prefix that user ids may not take.
 
 **Both protocol eras ship together.** Modern-only would connect to almost
 nothing that exists today.
