@@ -183,7 +183,12 @@ after the boundary.
 
 ## C-10 — What a network effect means at `in-process` isolation
 
-**Status:** open. **Gates:** `fetch`, and therefore the close of Phase 10.
+**Status:** closed by ADR 0022. **Answer:** candidates 2 and 3 together — the
+resource is the destination host, and everything that comes back is untrusted
+content. Rule 3 ships as a rule and a label, not as taint machinery; the ADR
+says what would make us build the machinery.
+
+The rest of this entry is kept as the argument the ADR was made from.
 
 This is named as the blocker for `fetch` in `ROADMAP.md`, `STATUS.md`, and
 `architecture.md`, but the question itself was never written down anywhere — it
@@ -313,6 +318,35 @@ request — and it belongs in `context/`, not `observability/`. Putting both
 behind one word called "redaction" would repeat exactly what ADR 0020 fixed:
 one word meaning two things in two places, with one of them wrong. If that
 feature is ever wanted, it gets its own name and its own ADR.
+
+---
+
+## C-13 — The final shape of a provider failure
+
+**Status:** open. **Gates:** nothing. ADR 0023 ships a provisional shape.
+
+Every provider that costs money fails in the same few ways: the key is wrong,
+the plan is used up, the rate limit is hit, the service is down. Model
+providers, search providers, reader services, and MCP servers over HTTP will all
+need to say those things, and today only `retrieval` has words for them.
+
+**What ships now:** the `retrieval` domain with seven kinds — `unauthorized`,
+`rate_limited`, `quota_exhausted`, `unavailable`, `timeout`, `invalid_request`,
+`blocked`. Each provider adapter maps its own wire errors onto them, in one
+place per provider.
+
+**What is not decided:** whether this becomes one shared vocabulary across every
+paid provider, what the UI shows for each kind, whether a `retryAfter` belongs in
+the shape, and how a "you have no credit" state reaches the user rather than only
+the model.
+
+Deliberately not answered now. There is no consumer yet — no settings screen, no
+error surface in the UI — and a shape designed without one is a shape designed
+twice. Because the mapping is one file per provider, changing it later is an
+edit to `src/retrieval/`, not a sweep.
+
+**Check:** when the settings screen exists, or when the second family of paid
+provider needs the same words.
 
 ---
 
