@@ -59,6 +59,13 @@ export type StudioErrorDomain =
    * one is fixed by opening a billing page.
    */
   | "retrieval"
+  /**
+   * What can be added to STUDIO — MCP servers, skills, hooks — and the spine
+   * that decides which of them a project gets. Separate from `tools`: "the gate
+   * refused this call" and "this server is not switched on for this project"
+   * are different situations, and only the second one is fixed in settings.
+   */
+  | "extend"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

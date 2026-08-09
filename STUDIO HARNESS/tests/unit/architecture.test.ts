@@ -275,6 +275,58 @@ describe("the failure taxonomy is actually adopted", () => {
   });
 });
 
+describe("the spine does not know what a kind is", () => {
+  // `src/extend/*.ts` decides presence for every kind of extension. The moment
+  // it imports one, it has learned what that kind is, and the next kind has to
+  // be taught the same way — which is how a shared mechanism becomes three
+  // mechanisms wearing one name.
+  //
+  // Enforced here rather than in review because the import that breaks it is
+  // one line and looks helpful.
+
+  it("lets nothing at the root of src/extend import from a subdirectory", async () => {
+    const root = join(SRC_ROOT, "extend");
+    const entries = await readdir(root, { withFileTypes: true });
+    const offenders: string[] = [];
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
+      const source = await readFile(join(root, entry.name), "utf8");
+
+      for (const [, specifier] of source.matchAll(/from "(\.\/[^"]+)"/g)) {
+        // `./thing.js` is a sibling. `./mcp/thing.js` is a subdirectory, and
+        // a subdirectory is a kind.
+        if ((specifier as string).slice(2).includes("/")) {
+          offenders.push(`${entry.name} imports ${specifier}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("names no kind's vocabulary in the spine", async () => {
+    const root = join(SRC_ROOT, "extend");
+    const entries = await readdir(root, { withFileTypes: true });
+    const offenders: string[] = [];
+
+    // The kind identifiers themselves are allowed — they are keys, and
+    // `inventory.ts` has to spell them to have a union at all. What is refused
+    // is a kind's *vocabulary*: the words that only mean something once you
+    // know what that kind does.
+    const vocabulary =
+      /\b(stdio|jsonrpc|json-rpc|tools\/call|transport|serverId|prompt|frontmatter|hookEvent)\b/i;
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
+      const source = await readFile(join(root, entry.name), "utf8");
+      if (vocabulary.test(source)) offenders.push(entry.name);
+    }
+
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("the gate is the only way a tool runs", () => {
   // The gate owns authorization, containment, snapshots, and deadlines. A tool
   // an agent can reach without going through it has none of those, and nothing

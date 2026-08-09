@@ -165,6 +165,34 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    name: "extension_selection",
+    up(db) {
+      // Which extensions a project has switched on. One row per decision the
+      // user made, and nothing else: absence means off, which is the default
+      // for every kind, so a project that has chosen nothing has no rows.
+      //
+      // This is scoping, not permission. A row here does not authorize
+      // anything — it decides whether the extension is present at all, and
+      // everything present still goes through the kernel per call. The two are
+      // kept apart deliberately: a selection that could grant would be a second
+      // permission system with none of the first one's rules.
+      //
+      // `kind` is stored rather than split into a table per kind. The spine
+      // does not know what a kind is, and a table per kind would force it to.
+      db.exec(`
+        CREATE TABLE extension_selection (
+          kind          TEXT NOT NULL,
+          extension_id  TEXT NOT NULL,
+          project_id    TEXT NOT NULL,
+          enabled       INTEGER NOT NULL,
+          decided_at    INTEGER NOT NULL,
+          PRIMARY KEY (kind, extension_id, project_id)
+        ) STRICT;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

@@ -259,7 +259,44 @@ is the only place where the illegal transitions are real.
 store framework. The one mechanism is reconcile, called at one moment, and the
 one state machine is per connection.
 
-### 003.3b — The extend spine
+### 003.3b — The extend spine — **done**
+
+`src/extend/inventory.ts`, `selection.ts`, `errors.ts`, migration 6, and two
+architecture tests. `pnpm check` green, 693 passing, up sixteen.
+
+**Two things changed from the plan while building, both toward less.**
+
+**The stored column is a boolean, not `unlisted | off | on`.** Those three are
+what a settings screen *renders*, and only one of them is a decision the user
+made. `unlisted` means the extension is not installed, which the provider
+already answers by not listing it, and storing it would be storing what the
+system computes. So the store holds `enabled`, absence means off, and the third
+state is derived by the thing that renders it. The rule that produced this is
+the same one that cut the review's 32 states to 3.
+
+**There is no reconciler yet.** 003.3a decided its shape and that stands, but
+nothing live exists for it to reconcile — the spine touches no process and no
+connection. Building it now would be an abstraction with one imaginary caller,
+which Working Rule 8 refuses. It arrives in 003.6, with the first thing that can
+actually drift.
+
+**What the architecture tests hold.** Nothing at `src/extend/*.ts` may import
+from a subdirectory, and no kind's *vocabulary* may appear there — `stdio`,
+`jsonrpc`, `transport`, `frontmatter`, `hookEvent`. The kind identifiers
+themselves are allowed, because they are keys and `inventory.ts` must spell them
+to have a union at all. The distinction is the point: naming a kind is not
+knowing what it does.
+
+**`extend` is a new error domain.** The closed union in `contracts/errors.ts`
+invites this — "a new subsystem adds its domain here". It earns one because the
+answers differ: a refused call sends a person to an approval dialog, and a
+switched-off server sends them to settings.
+
+Verified three ways: dropping the `enabled` filter in `active` fails 3 tests,
+breaking the project term in the selection query fails 1, and adding a
+subdirectory import to `inventory.ts` fails the architecture test by name.
+
+### 003.3b — original notes
 
 `inventory.ts` and `selection.ts` at the root of `src/extend/`. One stored
 column per pair: `unlisted | off | on`.
