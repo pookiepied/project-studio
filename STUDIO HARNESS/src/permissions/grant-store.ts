@@ -234,6 +234,41 @@ export class PermissionGrantStore {
     return Number(result.changes) > 0;
   }
 
+  /**
+   * Revokes every grant belonging to one namespace.
+   *
+   * The operation that actually happens when an extension goes away. A server
+   * removed, uninstalled, or edited in the way it is reached takes its
+   * approvals with it: the user approved `mcp:blender/render` after reading
+   * what that tool said it did, and a different server answering to the same
+   * name is a different tool wearing an approval it was never given.
+   *
+   * Matched by exact prefix rather than `LIKE`, because a namespace is
+   * user-influenced text and `%` and `_` are wildcards. `mcp:a_b` written as a
+   * `LIKE` pattern also matches `mcp:axb`, which would revoke a server the user
+   * never touched — a quiet failure in the safe direction today, and the wrong
+   * habit to leave in a query that one day revokes less than it should.
+   *
+   * **Marks rather than deletes**, like every other revoke here. Reinstalling
+   * something must re-ask rather than silently inherit, and the record of what
+   * was once approved is the thing that makes that reviewable.
+   *
+   * Deliberately not the same call as removing the tools. `CallGate.unregister`
+   * takes a capability away; this takes the approval away. They happen together
+   * and mean different things, and a single call that did both would make
+   * "unregistering is not revoking" impossible to say.
+   */
+  revokeNamespace(namespace: string): number {
+    const prefix = `${namespace}/`;
+    const result = this.#db.handle
+      .prepare(
+        `UPDATE permission_grant SET revoked_at = ?
+          WHERE substr(capability_key, 1, ?) = ? AND revoked_at IS NULL`,
+      )
+      .run(Date.now(), prefix.length, prefix);
+    return Number(result.changes);
+  }
+
   /** Drops conversation-scoped grants when a conversation ends. */
   revokeConversation(conversationId: string): number {
     const result = this.#db.handle

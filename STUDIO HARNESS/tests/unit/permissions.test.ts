@@ -446,3 +446,82 @@ describe("a capability can be forgotten again", () => {
     expect(grants.find(id, SCOPE)).toBeDefined();
   });
 });
+
+describe("an extension takes its approvals with it", () => {
+  // The other half of the sentence above. Unregistering is not revoking;
+  // removing the thing itself is. These are the events that revoke.
+
+  it("revokes every grant a namespace holds", () => {
+    const render = { namespace: "mcp:blender", name: "render" };
+    const scene = { namespace: "mcp:blender", name: "scene" };
+
+    grants.grant(render, SCOPE, "always");
+    grants.grant(scene, SCOPE, "always");
+
+    expect(grants.revokeNamespace("mcp:blender")).toBe(2);
+
+    expect(grants.find(render, SCOPE)).toBeUndefined();
+    expect(grants.find(scene, SCOPE)).toBeUndefined();
+  });
+
+  it("leaves every other namespace alone", () => {
+    const mine = { namespace: "mcp:blender", name: "render" };
+    const other = { namespace: "mcp:figma", name: "render" };
+    const native = { namespace: "native", name: "read_file" };
+
+    grants.grant(mine, SCOPE, "always");
+    grants.grant(other, SCOPE, "always");
+    grants.grant(native, SCOPE, "always");
+
+    grants.revokeNamespace("mcp:blender");
+
+    expect(grants.find(other, SCOPE)).toBeDefined();
+    expect(grants.find(native, SCOPE)).toBeDefined();
+  });
+
+  it("does not treat a namespace as a pattern", () => {
+    // `_` and `%` are wildcards to LIKE, and a namespace is user-influenced
+    // text. Revoking `mcp:a_b` must not reach `mcp:axb`, which is a different
+    // server the user never touched.
+    const underscore = { namespace: "mcp:a_b", name: "run" };
+    const wildcarded = { namespace: "mcp:axb", name: "run" };
+
+    grants.grant(underscore, SCOPE, "always");
+    grants.grant(wildcarded, SCOPE, "always");
+
+    expect(grants.revokeNamespace("mcp:a_b")).toBe(1);
+    expect(grants.find(wildcarded, SCOPE)).toBeDefined();
+  });
+
+  it("does not revoke a namespace that merely starts the same", () => {
+    // `mcp:blender` and `mcp:blender-beta` are two servers. Without the
+    // separator in the prefix, removing the first takes the second with it.
+    const one = { namespace: "mcp:blender", name: "render" };
+    const two = { namespace: "mcp:blender-beta", name: "render" };
+
+    grants.grant(one, SCOPE, "always");
+    grants.grant(two, SCOPE, "always");
+
+    expect(grants.revokeNamespace("mcp:blender")).toBe(1);
+    expect(grants.find(two, SCOPE)).toBeDefined();
+  });
+
+  it("marks rather than deletes, so the record survives", () => {
+    grants.grant({ namespace: "mcp:blender", name: "render" }, SCOPE, "always");
+
+    grants.revokeNamespace("mcp:blender");
+
+    const row = db.handle
+      .prepare("SELECT revoked_at FROM permission_grant WHERE capability_key = ?")
+      .get("mcp:blender/render") as { revoked_at: number | null } | undefined;
+
+    expect(row?.revoked_at).toBeTypeOf("number");
+  });
+
+  it("revokes nothing the second time", () => {
+    grants.grant({ namespace: "mcp:blender", name: "render" }, SCOPE, "always");
+
+    expect(grants.revokeNamespace("mcp:blender")).toBe(1);
+    expect(grants.revokeNamespace("mcp:blender")).toBe(0);
+  });
+});

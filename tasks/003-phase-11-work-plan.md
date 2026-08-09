@@ -316,7 +316,40 @@ uninstalled at every observable point. Installation is the consent record.
 One architecture rule: nothing at `src/extend/*.ts` may import from a
 subdirectory of `src/extend/`.
 
-### 003.4 — Grant lifecycle
+### 003.4 — Grant lifecycle — **the revoking half done**
+
+`PermissionGrantStore.revokeNamespace`. `pnpm check` green, 699 passing, up six.
+
+**Why a namespace and not a source id.** A grant is keyed on `capability_key`,
+which is `namespace/name`, and an MCP server's namespace is `mcp:<serverId>`.
+Revoking by namespace needs nothing new stored; revoking by `sourceId` would
+need a column that repeats what the key already says.
+
+**Matched by exact prefix, not `LIKE`.** A namespace is user-influenced text and
+`%` and `_` are `LIKE` wildcards, so `mcp:a_b` would also match `mcp:axb`. The
+separator is part of the prefix for the same class of reason: without it,
+removing `mcp:blender` takes `mcp:blender-beta` with it. Both are tested, and
+swapping the query to `LIKE` fails exactly those two.
+
+**Marks rather than deletes**, like every other revoke here, so reinstalling
+re-asks instead of silently inheriting.
+
+**It is not the same call as `CallGate.unregister`.** Those happen together and
+mean different things, and one call doing both would make "unregistering is not
+revoking" impossible to say.
+
+**What is deferred, and why it is not a gap.**
+
+- *The tool-definition hash.* Delegated as `004.F`. The column and the
+  comparison land when the function does; writing my own now would mean two
+  hashes to reconcile.
+- *Revoking on edit and on uninstall.* The mechanism exists; the callers do not.
+  An MCP server cannot be edited yet because it cannot be added yet. Wired in
+  `003.8`, with the management surface.
+- *An MCP tool's resource is `undefined`.* A rule for `003.6` to obey, not code
+  to write here. `capabilityKey` already encodes the server.
+
+### 003.4 — original notes
 
 Revoked on remove, on uninstall, and on any edit to command, arguments,
 transport, or URL — `revoke` marks rather than deletes
