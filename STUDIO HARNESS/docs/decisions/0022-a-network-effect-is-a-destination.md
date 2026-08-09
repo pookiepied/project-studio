@@ -4,8 +4,21 @@
 **Closes:** `C-10`.
 **Builds on:** ADR 0015 (approval scope), ADR 0019 (running a chosen program), ADR 0020 (the effect table).
 **Delivers:** `fetch` and `web_search`, and the rule every future networked tool follows.
-**Amended by:** ADR 0025 (provenance is now `author`), and pending on `C-17`
-— for a loopback destination the resource must be host *and* port.
+**Amended by:** ADR 0025 (provenance is now `author`), and by `C-17` — for a
+loopback destination the resource is host *and* port.
+
+The mechanism for that shipped in Phase 11. `destinationResource` in
+`src/net/destination.ts` returns `host` for a public destination and
+`host:port` for a loopback one, and `classifyHostPort` names *why* a
+destination is refused — `public`, `loopback`, `private`, `own-port` — rather
+than answering yes or no. **No policy in this ADR changed.** Loopback, private
+ranges, and our own listening ports are all still refused before the permission
+question is asked. The split only makes the loopback case expressible; whether
+to allow it is `C-17`, still open.
+
+`own-port` is new and is stronger than the rest: a port this process listens on
+is refused even if loopback is later allowed. Reaching our own control plane is
+escalation, not fetching.
 
 ## Context
 

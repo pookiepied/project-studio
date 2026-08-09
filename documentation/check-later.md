@@ -439,7 +439,19 @@ three and does not exist at runtime.
 
 ## C-17 — The destination guard follows the URL's author
 
-**Status:** answered in design, not built. **Refines:** ADR 0022.
+**Status:** half built. The *mechanism* shipped in Phase 11 item 003.5; the
+*policy* is still open. **Refines:** ADR 0022.
+
+**What is built.** `classifyHostPort` names why a destination is refused, and
+`destinationResource` gives a loopback destination a `host:port` resource. An
+`own-ports` registry marks the ports we listen on, and those are refused
+however the policy lands. ADR 0022 carries the amendment note.
+
+**What is not.** Nothing allows loopback yet. All four classes still refuse. The
+remaining decision is the one this entry was opened for — whether a
+user-supplied MCP URL follows a different guard from a model-supplied `fetch`
+URL — and it is answered when the local HTTP client is written, which is where
+the second caller finally exists.
 
 `src/net/destination.ts` was built for `fetch` and refuses every private
 address. That is right for a URL the *model* chose and wrong for a URL the
@@ -457,8 +469,9 @@ approval ladder** so a user can approve their own dev server once.
 with no authentication; approving one must not approve the other. Outside
 loopback the host remains the resource.
 
-**Check:** when the guard is split. The ADR gets an amendment note then, the way
-ADR 0024 amended ADR 0019's default.
+**Check:** when the local HTTP client is written, in Phase 11 item 003.5 part B.
+That is the first caller that has a user-supplied URL to judge, and a policy
+with one caller is a policy nobody has tested.
 
 ---
 

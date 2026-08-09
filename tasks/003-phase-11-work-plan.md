@@ -296,7 +296,35 @@ re-derivation of every grant's meaning later.
 resource string would encode the same fact a second time into
 `resource_pattern`. `tasks/002` §7 says this loosely and is corrected here.
 
-### 003.5 — The destination guard
+### 003.5 — The destination guard — **part A done**
+
+Shipped: `classifyHostPort`, `destinationResource`, `src/net/own-ports.ts`, and
+a port-aware split of the IPv4 and IPv6 checks. `isPrivateHost` keeps its
+signature and delegates. Nothing observable changed — all four non-public
+classes are still refused with the same kind and message.
+
+`pnpm check` green, 677 passing, up thirty. ADR 0022 amended, `C-17` moved to
+half built.
+
+**Written by a delegated model against `tasks/handoff-003.5.md`, and reviewed
+here.** Recorded because the result decides whether we do it again.
+
+The work was correct. What review added: `.localhost` is loopback under
+RFC 6761 and had **no test** — a rule the delegate added on its own initiative
+and did not cover, which is the predictable shape of the failure. An IPv6
+resource is now bracketed, because `::1` plus port 443 reads as `::1:443`, which
+is another valid address, and a resource string is compared against a stored
+grant. The second parse of the same URL is gone with its unreachable `catch`.
+
+**The structural finding is about documentation, not code.** The handoff
+forbade touching `docs/` on purpose — a delegate does not hold the reasons ADRs
+record, and a wrong amendment note is worse than a missing one. So delegated
+work always arrives with its documentation undone, and that half stays here.
+That is a property of the method, not a fault of the delegate, and it is the
+line along which work can be split at all: **rule work can go out, and the
+record of why cannot.**
+
+### 003.5 — part B, still to do
 
 The split in `tasks/002` §9, plus two things the review found:
 
