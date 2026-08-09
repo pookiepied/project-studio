@@ -161,7 +161,11 @@ subprocess created, and the user's own git history (`T-20`). The UI must say so
 
 **Where things live.** Three locations, decided once (ADR 0014): the
 installation is read-only, `~/.studio` is ours and writable in six categories,
-the project belongs to the user. Nothing resolves against the working directory.
+the project belongs to the user. Nothing resolves against the working directory
+— including Flue's own journal, which used to default to `./data/flue.db` and
+therefore landed in whichever project was open (`H-02`, fixed). A configured
+relative path that climbs out of the home is refused rather than normalised
+(`H-03`, fixed).
 
 ---
 

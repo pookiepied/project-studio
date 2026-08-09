@@ -1,7 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { StorageError } from "../storage/errors.js";
 
 /**
  * Where things live on this machine.
@@ -95,6 +97,20 @@ export function databasePath(): string {
   return studioPath("data", "studio.db");
 }
 
+/**
+ * Flue's own database — the durable execution journal.
+ *
+ * Separate file from `databasePath()` on purpose. That one is ours and its
+ * schema is ours to migrate; this one belongs to Flue and its shape is Flue's
+ * business. Sharing a file would make a Flue upgrade a migration problem for
+ * our tables.
+ *
+ * Both live in `data/`, because losing either loses work.
+ */
+export function flueDatabasePath(): string {
+  return studioPath("data", "flue.db");
+}
+
 /** User-authored settings. Backed up, synced, and safe to hand-edit. */
 export function configDirectory(): string {
   return studioPath("config");
@@ -165,7 +181,41 @@ export function ensureDirectory(path: string): string {
  * A relative value is taken as relative to the Studio home rather than the
  * working directory, so configuration means the same thing regardless of where
  * the process was started.
+ *
+ * **`..` is refused, not normalised away.** `join` resolves `..` silently, so
+ * `../../elsewhere/studio.db` used to land outside the Studio home while still
+ * looking like a relative setting. That is not an attack — nobody is defending
+ * against the user, who can write an absolute path and is entitled to. It is
+ * that "relative to the Studio home" and "somewhere else entirely" must not be
+ * the same expression. Anyone who means outside the home says so with an
+ * absolute path, and then it is visible in the setting rather than hidden in
+ * its resolution.
  */
 export function resolveConfigured(value: string): string {
-  return isAbsolute(value) ? value : studioPath(value);
+  if (isAbsolute(value)) return value;
+
+  const home = studioHome();
+  const resolved = resolve(home, value);
+  if (!isInsideHome(home, resolved)) {
+    // Classified rather than a raw `Error`: every throw in `src` belongs to a
+    // domain, and a configured location that cannot be used is a storage
+    // problem whatever the caller intended to keep there.
+    throw new StorageError("invalid", {
+      message:
+        `The configured path "${value}" resolves outside the Studio home. ` +
+        "Use an absolute path if that is what you meant.",
+    });
+  }
+
+  return resolved;
+}
+
+/** Path-segment containment, not a string prefix: `~/.studio-old` is outside. */
+function isInsideHome(home: string, candidate: string): boolean {
+  const difference = relative(home, candidate);
+  return (
+    difference !== "" &&
+    !difference.startsWith("..") &&
+    !isAbsolute(difference)
+  );
 }

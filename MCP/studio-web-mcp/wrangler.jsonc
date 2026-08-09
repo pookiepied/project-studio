@@ -1,0 +1,22 @@
+{
+  "name": "studio-web-mcp",
+  "main": "src/server/handler.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "SEARCH_PRIMARY": "tavily",
+    "SEARCH_FALLBACK": "brave",
+    "FETCH_PRIMARY": "jina",
+    "FETCH_FALLBACK": "tavily",
+    "MCP_SERVER_NAME": "studio-web",
+    "MCP_SERVER_VERSION": "0.1.0"
+  }
+  // Secrets (never committed):
+  // wrangler secret put TAVILY_API_KEY
+  // wrangler secret put JINA_API_KEY
+  // wrangler secret put BRAVE_API_KEY
+}

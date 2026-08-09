@@ -723,7 +723,47 @@ the leading `\b` means the word must start at `sk-`.
 
 ---
 
+## Models (`src/models/`)
+
+### M-01 · An SSE frame split when a chunk ended on a carriage return · Fixed
+
+A lone trailing `\r` was rewritten to `\n` before its `\n` arrived, so one line
+break became two and one frame became two. The first half had no `data:` line,
+so it was dropped — taking the `event:` name with it.
+
+Closed in task 001 item 10. The `\r` is held back until the next chunk resolves
+it, and the end of the stream flushes it.
+
+**Worth carrying forward:** the hand-picked split position passed *without* the
+fix. Only the test that cuts at every position in the stream caught it. A single
+chosen boundary is a guess about where the network splits.
+
+---
+
 ## Where Things Live (`src/platform/`)
+
+### H-02 · Flue's journal defaulted to the working directory · Fixed
+
+`src/db.ts` used `"./data/flue.db"`. The harness runs with the user's project as
+its working directory, so Flue's durable journal landed inside whatever
+repository was open — a separate database per project, each visible in the
+user's own `git status`.
+
+This module's own header names the database path as one of two bugs that "have
+already happened once". This was the second of them, still present.
+
+Closed in task 001 item 11 by `flueDatabasePath()`. Separate file from ours on
+purpose: Flue's schema is not ours to migrate.
+
+### H-03 · A configured relative path could leave the Studio home · Fixed
+
+`resolveConfigured` used `join`, which resolves `..` silently, so
+`../../elsewhere/studio.db` landed outside the home while still looking like a
+relative setting.
+
+Closed in task 001 item 12. It is not a defence against the user — anyone may
+write an absolute path and is entitled to. It is that "relative to the Studio
+home" and "somewhere else entirely" must not be the same expression.
 
 ### H-01 · Only `studio.db` and `bin/` are actually used · Open
 

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   cacheDirectory,
   databasePath,
+  flueDatabasePath,
   durableDirectories,
   installationRoot,
   logsDirectory,
@@ -134,6 +135,39 @@ describe("nothing is resolved against the working directory", () => {
     expect(resolveConfigured(join(workspace, "absolute.db"))).toBe(
       join(workspace, "absolute.db"),
     );
+  });
+
+  it("refuses a relative setting that climbs out of the Studio home", () => {
+    // `join` resolves `..` silently, so this used to land outside the home
+    // while still looking like a relative setting. Anyone who means outside
+    // says so with an absolute path, where it is visible.
+    process.env.PROJECT_STUDIO_HOME = workspace;
+
+    expect(() => resolveConfigured("../../elsewhere/studio.db")).toThrow(
+      /outside the Studio home/i,
+    );
+    expect(() => resolveConfigured("data/../../escape.db")).toThrow(
+      /outside the Studio home/i,
+    );
+  });
+
+  it("still allows a relative setting that stays inside", () => {
+    process.env.PROJECT_STUDIO_HOME = workspace;
+
+    expect(resolveConfigured("data/../cache/thing.db")).toBe(
+      join(workspace, "cache", "thing.db"),
+    );
+  });
+
+  it("puts Flue's journal in the Studio home, not the open project", () => {
+    // The default was `./data/flue.db` against the working directory, which is
+    // the user's project — a different database per repository, each one
+    // visible in their own `git status`.
+    process.env.PROJECT_STUDIO_HOME = workspace;
+
+    expect(flueDatabasePath()).toBe(join(workspace, "data", "flue.db"));
+    // Ours and Flue's are separate files: its schema is not ours to migrate.
+    expect(flueDatabasePath()).not.toBe(databasePath());
   });
 
   it("finds shipped assets in the installation, not the open project", () => {

@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 9 of 20 done
+**State:** open — 12 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -326,7 +326,7 @@ fails both — the second one is what catches the index.
 
 ---
 
-### [ ] 10. An SSE frame splits when a chunk ends in `\r` · `M-01`
+### [x] 10. An SSE frame splits when a chunk ends in `\r` · `M-01` · `PENDING10`
 
 **Where:** `STUDIO HARNESS/src/models/studio-cloud/sse-parser.ts:35`
 
@@ -338,9 +338,27 @@ is dropped, taking the `event:` name with it.
 **Fix:** Hold a trailing `\r` back until the next chunk arrives, or the stream
 ends. Test a CRLF frame split exactly on the `\r`.
 
+**Done.** A trailing `\r` is held back until the next chunk arrives. At the end
+of a chunk it is ambiguous — a CR line break, or half of a `\r\n` — and
+normalising it immediately resolves that the wrong way.
+
+**Two things this turned up:**
+
+1. My hand-picked split position **passed without the fix**. Only the test that
+   cuts at *every* position in the stream caught it. One chosen cut is a guess
+   about where the network splits; every cut is not.
+2. Holding the `\r` back created a new bug: a stream whose last bytes are `…\r`
+   lost its final frame, because the boundary it completes never reached the
+   buffer. The end-of-stream case now flushes it. My own test caught that, not a
+   later audit.
+
+**Tested by:** 11 cases in a new `tests/unit/sse-parser.test.ts`, including
+every cut position and a multi-byte character split across chunks. Reverting the
+hold-back fails the exhaustive one.
+
 ---
 
-### [ ] 11. Flue's database defaults to the working directory · `H-02`
+### [x] 11. Flue's database defaults to the working directory · `H-02` · `PENDING10`
 
 **Where:** `STUDIO HARNESS/src/db.ts:3`
 
@@ -356,9 +374,19 @@ separate databases, each inside the user's project, each visible in their
 **Fix:** Default to the Studio home through `platform/paths.ts`. Keep the
 environment variable as an override.
 
+**Done.** `flueDatabasePath()` in `platform/paths.ts`, next to `databasePath()`
+and deliberately a separate file — Flue's schema is not ours to migrate.
+`PROJECT_STUDIO_DB_PATH` still overrides, and now goes through
+`resolveConfigured`, so a relative override means "inside the Studio home"
+rather than "wherever this process started". `db.ts` creates the directory,
+because Flue opens the file and does not build the tree.
+
+**Tested by:** the journal resolves inside the Studio home and is not the same
+file as ours. Restoring the relative default fails it.
+
 ---
 
-### [ ] 12. A configured relative path can leave the Studio home · `H-03`
+### [x] 12. A configured relative path can leave the Studio home · `H-03` · `PENDING10`
 
 **Where:** `STUDIO HARNESS/src/platform/paths.ts:169-171`
 
@@ -368,6 +396,20 @@ instead of refusing it.
 
 **Fix:** After joining, check the result is inside the home and refuse if it is
 not. Test a `..` value.
+
+**Done.** `resolveConfigured` resolves, then checks containment by path segment
+and refuses. Nobody is being defended against here — a user may write an
+absolute path and is entitled to. The point is that "relative to the Studio
+home" and "somewhere else entirely" must not be the same expression.
+
+**One thing this turned up:** my first version threw a raw `Error`, and the
+architecture test refused it — every throw in `src` belongs to a domain. It is a
+`StorageError("invalid")` now. The rule caught me the same way it would catch
+anyone.
+
+**Tested by:** `../../elsewhere/studio.db` and `data/../../escape.db` are both
+refused, while `data/../cache/thing.db` still resolves. Restoring `join` fails
+the first.
 
 ---
 

@@ -3,16 +3,17 @@ import { cn } from '@/lib/utils'
 
 /**
  * SidebarOutline — panel toggle glyph, inspired by `archive/STUDIO/src/ui/icons/WorkspaceIcons.tsx:NavToggleIcon`
- * but **without** the internal vertical divider.
+ * but as a proper **sidebar/workspace** icon.
  *
- * - Same outer rounded rect concept (stroke `currentColor`, `regular` weight feel)
- * - No `<line>` element; pure outline so both rails read as open-panel controls
- * - Drawn at 16×16 viewBox to match the 11×11 rect logic, with own metrics (rx=2.5, stroke 1.25)
- *   so it is *inspired* not a direct copy of the reference SVG.
- * - Carries the same size scale (`xs`/`sm`/`md`/`lg`/`xl`) and Tailwind `size-*` class
- *   as the Phosphor barrel (`src/components/icons/index.tsx:ICON_SIZE`) so `Button`
- *   sizing stays authoritative. Kept as a standalone component for true component-based
- *   organization (not monolithic inline SVG in `SideRail.tsx`).
+ * - Outer rounded rect + internal divider (so it reads as "sidebar" / "workspace",
+ *   not a plain box). The *external* decorative line that was rendered
+ *   **beside** each toggle (sibling `border`/`Separator`) has been removed —
+ *   that's the Task 1 "line beside each sidebar icon" fix.
+ * - Metrics are own (rx 2.5, stroke 1.25, divider at ~1/3) so it's inspired,
+ *   not a direct copy of the reference `rect(2.5,2.5,11,11,rx3)+line(6.2)` .
+ * - Same size scale (`xs`/`sm`/`md`/`lg`/`xl`) and Tailwind `size-*` as the
+ *   Phosphor barrel, kept as a standalone component (not monolithic inline
+ *   SVG in `SideRail.tsx`).
  */
 
 type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
@@ -46,8 +47,10 @@ export const SidebarOutline = forwardRef<SVGSVGElement, Props>(({ size = 'md', c
       aria-hidden="true"
       {...rest}
     >
-      {/* Outer panel frame only — no internal divider line */}
+      {/* Outer frame */}
       <rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2.5" />
+      {/* Internal divider — makes it read as sidebar/workspace, not plain box. */}
+      <line x1="6.1" y1="2.75" x2="6.1" y2="13.25" strokeOpacity={0.95} />
     </svg>
   )
 })

@@ -26,22 +26,58 @@ export async function* parseSseFrames(
   const decoder = new TextDecoder();
   let buffer = "";
 
+  /**
+   * A trailing `\r` held back until the next chunk arrives.
+   *
+   * At the end of a chunk a lone `\r` is ambiguous: it is either a CR line
+   * break, or the first half of a `\r\n` whose `\n` is in the next chunk.
+   * Normalising it immediately resolves the ambiguity the wrong way — one line
+   * break becomes two, the frame splits in half, and the first half has no
+   * `data:` line, so it is dropped and takes the `event:` name with it.
+   *
+   * Holding it back costs one character of latency and removes the guess.
+   */
+  let carriageReturn = "";
+
+  /** Emits every complete frame sitting in the buffer, and keeps the rest. */
+  function* drainFrames(): Generator<SseFrame> {
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const frame = parseSseBlock(block);
+      if (frame) yield frame;
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, DECODER_STREAM_OPTIONS);
-      buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-
-      let boundary = buffer.indexOf("\n\n");
-      while (boundary !== -1) {
-        const block = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-        const frame = parseSseBlock(block);
-        if (frame) yield frame;
-        boundary = buffer.indexOf("\n\n");
+      if (done) {
+        // Nothing is coming to disambiguate the held-back `\r`, so it was a CR
+        // line break after all. Without this, a stream whose last bytes are
+        // `…\r` loses its final frame, because the boundary it completes never
+        // gets written to the buffer.
+        if (carriageReturn) {
+          buffer += "\n";
+          carriageReturn = "";
+          yield* drainFrames();
+        }
+        break;
       }
+
+      let chunk = carriageReturn + decoder.decode(value, DECODER_STREAM_OPTIONS);
+      carriageReturn = "";
+
+      if (chunk.endsWith("\r")) {
+        carriageReturn = "\r";
+        chunk = chunk.slice(0, -1);
+      }
+
+      buffer += chunk.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+      yield* drainFrames();
     }
   } finally {
     reader.releaseLock();
