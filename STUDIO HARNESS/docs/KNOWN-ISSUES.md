@@ -945,6 +945,24 @@ every pnpm command prints an unsupported-engine warning.
 `node:sqlite` is experimental in this version and warns on every test run. Worth
 resolving before anything depends on a 22.19+ behaviour.
 
+### E-02 · The setup CLI raises errors with no domain · Open
+
+`src/models/local/cli.ts:59` and `:66` reject with a bare `Error`. Every failure
+in the harness carries a domain and a kind so telemetry has one identity to
+group by, and these two arrive as `unclassified` — the bucket meant to measure
+code nobody has onboarded.
+
+Found while widening the architecture rule after the MCP wire layer arrived with
+three of the same. The rule previously inspected only `throw`, so
+`reject(new Error(...))` was invisible to it. It now refuses the *construction*
+of `Error`, `TypeError`, `RangeError`, and `DOMException` anywhere in `src/`,
+and asserts an exact list of exceptions — this entry is that list, and a fourth
+offender fails the suite.
+
+**Why it is open rather than fixed:** `cli.ts` is an interactive setup script
+rather than part of the harness, and nothing reports its failures. Low harm, and
+worth doing when that CLI is next touched.
+
 ### P-07 · A `shell` grant matches a program name, not a program · Accepted
 
 `resolveProgram` builds the permission resource from the executable's basename

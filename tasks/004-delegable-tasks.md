@@ -1,5 +1,10 @@
 # Task 004 — work that can be done alongside the main line
 
+> **All six are done, reviewed, and merged.** See `tasks/DELEGATION-LOG.md` for
+> what review changed. This file stays as the record of what was asked for, in
+> the same way an ADR stays after the decision is made.
+
+
 Six independent pieces. Each one is a **leaf**: it has no callers yet, it
 imports almost nothing, and I will wire it in when I reach it. That is what
 makes them safe to run while the spine, the grant lifecycle, and the MCP
