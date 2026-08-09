@@ -747,14 +747,188 @@ user pays for it on every turn.
 
 ---
 
-## 13. Still open
+## 13. Edge cases worked before any code
 
-1. Whether a project may enable a server that is installed but whose trust was
-   later revoked. Proposed: no, and it disappears from the project's list with a
-   reason rather than failing at call time.
-2. What the extensions page shows for a server that is installed, enabled, and
-   failing. Health belongs in the row; the wording does not exist yet.
-3. §12.4 — whether a bundled server may be switched off per project.
+Written deliberately before implementation, because the owner's stated fear is
+the right one: a gate system with too many layers becomes impossible to reason
+about, and by then the cost of changing it is a rewrite.
+
+### 13.1 Turning a server off while it is being used
+
+Two clocks, and they are not the same clock.
+
+- **New calls stop immediately.** The moment selection changes, the gate refuses
+  that server. No turn boundary, no grace.
+- **In-flight calls are cancelled** through the signal path `CallBounds` already
+  carries, and teardown waits for them to settle.
+- **The tool list changes at the next turn boundary**, because it lives in the
+  cached prompt prefix.
+
+So there is a window where the model can still see a tool that will now refuse.
+That is acceptable and honest — it is the same window ADR 0024 already accepts
+for "not approved yet" — and the refusal message says the server was switched
+off, not that it failed.
+
+### 13.2 Hiding is mechanical, not a policy choice
+
+ADR 0024 says only what can *never* run is hidden, and that permission is
+deliberately not consulted. Selection looks like it contradicts that. It does
+not, and the reason matters:
+
+**An unselected server is never connected, so we never learn its tool names.**
+There is nothing to list. Hiding is not a decision we make; it is the absence of
+information.
+
+That also means the three rules stay distinct rather than competing:
+
+| Condition | In the model's list? |
+|---|---|
+| Sandbox cannot contain the effect | no — ADR 0024 |
+| Not selected for this project | no — never connected |
+| Selected, but not approved yet | **yes** — ADR 0024 |
+
+### 13.3 What happens to grants
+
+Four events, four different answers. Getting these wrong is the difference
+between a scope toggle and a security hole.
+
+| Event | Grants |
+|---|---|
+| Disabled for a project | **kept** — this is scope, not a security action, and losing approvals on every toggle teaches people to approve everything |
+| Untrusted | revoked |
+| Removed | **revoked** |
+| Its command, arguments, or URL edited | **revoked** |
+
+The last two are load-bearing.
+
+**Revoking on removal is what makes id reuse safe.** Otherwise removing
+`blender` and adding a different server also called `blender` inherits every
+approval the first one earned. The alternative — an internal random id — makes
+every stored grant and every log line unreadable, which this project has
+repeatedly refused to do.
+
+**Revoking on edit is the other half of a rule already written.** D-1 says
+editing a command always asks. Asking is not enough on its own: an approved
+`mcp:blender/render` whose command is quietly repointed at another program keeps
+its approval and runs the new program. A different command is a different
+program, so it is a different server.
+
+### 13.4 A server can change a tool after you approve it
+
+MCP servers may change their tool list at any time. A tool approved as "search
+the docs" can be re-described later, and the grant still matches on the name.
+This is a known attack shape against MCP clients and it is not theoretical.
+
+**Fix: hash the tool definition — name, description, and input schema — and
+store the hash with the grant.** A changed definition is a different tool and
+asks again. Cheap, local, and it needs no cooperation from the server.
+
+### 13.5 `fetch` can reach an MCP server directly
+
+This one is a real hole created by §9, and it is worth stating plainly.
+
+Once loopback is reachable by `fetch`, the model can `POST` a `tools/call`
+straight at `http://localhost:8080/mcp` and skip the gate, the selection layer,
+and the permission kernel completely. Every configured HTTP MCP endpoint is a
+back door into itself.
+
+**Fix: every configured MCP endpoint joins the never-offered list**, beside the
+cloud metadata address and our own harness ports. `fetch` cannot reach an
+address we run MCP on, and the dialog cannot express the approval.
+
+`shell` is a different story and is not fixable here. A model with approved
+`shell` can `curl` anything or run the server binary itself. That is a known and
+accepted property — it is why `shell` asks every time — and pretending otherwise
+would be worse than naming it.
+
+### 13.6 Effects should follow the transport
+
+§3's blunt answer was `execute` plus `network` for every MCP tool. That is more
+than the truth for half of them.
+
+| Server | Effects | Because |
+|---|---|---|
+| Remote, over HTTP | `network` | it cannot touch this disk; it is a request to another machine |
+| Local, over stdio | `execute`, `network` | it is a process on this machine, and we cannot know what it reaches |
+
+Both still ask, because both are elevated. But a remote call no longer takes a
+shadow-repository snapshot before every request, which it had no way of needing.
+
+Bundled servers we wrote declare their real effects, like any native tool.
+
+### 13.7 The migration guard forbids the obvious column name
+
+`src/storage/migrations.ts:192` refuses any column whose words include `key`,
+`token`, `secret`, or `credential`. So `keyring_id`, `credential_ref`, and
+`auth_token` are all refused, and the allowlist exists to be argued with rather
+than extended casually.
+
+The guard is right, and it points at a better design: **store no reference at
+all.** The credential entry's name is derived from the server id —
+`studio.mcp.<serverId>` — so the row holds only the auth *shape*
+(`none | bearer | header | oauth`). There is nothing to name, nothing to leak,
+and the guard never has to be argued with.
+
+### 13.8 Process lifetime on Windows
+
+`src/process/exec.ts` runs a process to completion. A stdio MCP server is
+long-lived, so this needs new machinery beside it rather than a change to it.
+`buildEnvironment` is reusable as-is.
+
+Three failures to handle, all of which are the usual way this goes wrong:
+
+- **`stderr` must be drained.** An undrained pipe fills and the child blocks
+  forever, looking like a hang with no error.
+- **Startup needs a timeout**, per server and stored in the row. Codex has one
+  for the same reason.
+- **Teardown must kill the tree.** `npx` spawns `node` which spawns the server.
+  Killing the parent on Windows orphans the rest. Job Objects is the mechanism,
+  and the stdio transport page names it.
+
+Restarts need backoff and a give-up state that the settings screen can show. A
+server that crashes on start must not be respawned in a loop.
+
+### 13.9 Prompt cache stability
+
+Legacy servers make no promise about tool ordering, and a list that changes
+order between turns invalidates the cached prefix for no reason.
+
+**We sort tools ourselves before building the prompt.** The modern revision asks
+servers to be deterministic; sorting locally makes it true for every server,
+including the legacy ones, and costs nothing.
+
+`tools/list` is re-fetched on `ttlMs` where the server gives one, on a
+`listChanged` notification, and otherwise on a default interval — never
+mid-turn.
+
+### 13.10 Full Auto must still stop at a connected server
+
+ADR 0018: Full Auto resolves a *default* `ask` and never a policy one. MCP
+capabilities must therefore carry a **policy** `ask`, not a default one.
+Otherwise Full Auto plus one connected server is unattended arbitrary action,
+which is the exact thing ADR 0018 was written to prevent.
+
+### 13.11 An untrusted folder switches MCP off entirely
+
+Folder trust already denies `write`, `execute`, and `network` in an untrusted
+folder, and every MCP tool has at least one of those. So MCP is off there, with
+no new rule needed.
+
+The only work is the message. It must say the folder is not trusted, not that
+the server failed.
+
+---
+
+## 14. Still open
+
+Both earlier items are answered. An untrusted server stays in the project's list
+and says so — *untrusted* is a state with a name, not an absence — and a server
+that is switched off is unavailable to the model rather than merely refused,
+which §13.1 and §13.2 spell out.
+
+1. §12.4 — whether a bundled server may be switched off per project. The owner
+   said non-negotiable; the counter-argument is prompt cost on every turn of
+   every project.
 
 Sources: the 2026-07-28 changelog, versioning, and stdio transport pages on
 modelcontextprotocol.io; the 2026-07-28 release post; the Agent Skills
