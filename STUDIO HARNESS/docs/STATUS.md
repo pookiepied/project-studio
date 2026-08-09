@@ -138,6 +138,12 @@ entirely (`T-19`). Everything in the table is built, tested, and unwired. The
 wiring is `T-12`, and several open issues stop being theoretical the moment it
 lands.
 
+That bypass is now **contained rather than open**: `architecture.test.ts` refuses
+any import of a tool module from outside `src/tools/`, and names
+`workspace-summary.js` in an exact list of the bypasses that exist. A second one
+fails the suite. Removing the fixture waits for the real wiring, because seven
+integration tests use it as their end-to-end tool.
+
 **Call bounds.** Every call has a deadline covering queue time and execution, a
 signal that reaches the tool so cancellation works mid-call, and a FIFO
 concurrency queue. An abandoned call tells the model whether repeating it is
@@ -173,17 +179,21 @@ relative path that climbs out of the home is refused rather than normalised
 
 ### Immediately next
 
-**Task 001 is open.** A second audit — five reviewers over all 21,274 lines —
-raised 22 complaints. 20 were verified valid. They are listed with their
-evidence in `tasks/001-cross-reference-audit-fixes.md`.
+**Task 001 is closed — all 20 items.** A second audit — five reviewers over all
+21,274 lines — raised 22 complaints, 20 verified valid. Each one is recorded
+with its evidence, its fix, and the number of tests that fail without it in
+`tasks/001-cross-reference-audit-fixes.md`.
 
 Two of them let a model run any program on the machine through the `git` tool,
 which declares `read`/`write` and therefore needs no execution permission. Both
-were proven against real git. **Both are fixed** — `T-23` and `T-24`, task 001
-items 1 and 2. Eighteen remain, none of them an execution escape.
+were proven against real git, and both are fixed (`T-23`, `T-24`).
 
-**The audit findings come before `fetch`.** Adding the last tool on top of known
-holes is building on a floor we know has one.
+Every fix was verified the same way: write the test, revert the fix, confirm the
+test fails, restore. One item — 19 — turned out to be the audit being wrong, and
+is recorded as such rather than changed to match.
+
+**The audit findings came before `fetch`** on purpose. Adding the last tool on
+top of known holes is building on a floor we know has one.
 
 ~~**`T-16`** — `edit` corrupting `$` in a replacement.~~ Fixed.
 

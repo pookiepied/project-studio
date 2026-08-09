@@ -166,6 +166,16 @@ export class StudioPiEventMapper {
   /** Settles the turn as a failure. Safe to call more than once. */
   fail(error: unknown, reason: Extract<StopReason, "error" | "aborted"> = "error"): void {
     if (this.#settled) return;
+
+    // A failure mid-sentence still has to close the block it was writing into.
+    // Every `text_start` a consumer sees is a promise of a matching `text_end`,
+    // and a UI that opens a bubble on the first and closes it on the second
+    // leaves that bubble streaming forever when the second never comes.
+    //
+    // Before `#settled`, because `#closeOpenBlock` emits an event, and after
+    // settling this mapper is closed for writing. `complete()` closes first and
+    // then calls us, so the second close is a no-op.
+    this.#closeOpenBlock();
     this.#settled = true;
 
     const message = this.#createMessage(reason);

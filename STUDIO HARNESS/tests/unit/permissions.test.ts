@@ -126,6 +126,32 @@ describe("the kernel is the only source of permission", () => {
     expect(() => kernel.register(capability("empty", []))).toThrow(PermissionError);
     expect(() => kernel.register(capability("empty", []))).toThrow(/no effects/i);
   });
+
+  it("refuses two ids that would collapse into one key", () => {
+    // `capabilityKey` joins with an unescaped "/", so a server naming its tool
+    // "b/c" under "mcp:a" lands on the key that "mcp:a/b" + "c" already owns —
+    // and grants, policy rules and audit lines are all keyed by that string.
+    const kernel = new PermissionKernel({ grants });
+
+    // Both spellings are refused, so neither can be the one that gets there
+    // first and owns the key.
+    expect(() =>
+      kernel.register(capability("c", ["read"], { namespace: "mcp:a/b", trusted: false })),
+    ).toThrow(/must not contain/i);
+    expect(() =>
+      kernel.register(capability("b/c", ["read"], { namespace: "mcp:a", trusted: false })),
+    ).toThrow(/must not contain/i);
+    expect(kernel.list()).toHaveLength(0);
+  });
+
+  it("refuses a capability with an empty namespace or name", () => {
+    const kernel = new PermissionKernel({ grants });
+
+    expect(() => kernel.register(capability("", ["read"]))).toThrow(/must not be empty/i);
+    expect(() =>
+      kernel.register(capability("thing", ["read"], { namespace: "   " })),
+    ).toThrow(/must not be empty/i);
+  });
 });
 
 describe("authority comes from the application, never the model", () => {

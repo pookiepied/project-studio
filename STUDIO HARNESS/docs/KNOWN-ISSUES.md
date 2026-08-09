@@ -574,9 +574,9 @@ behaviour is invisible in the code — it reads as "retry next write" and is not
 and because a transient failure (a lock, a full disk that cleared) stays fatal
 until the next turn.
 
-### T-19 · A tool can be registered outside the gate · Open
+### T-19 · A tool can be registered outside the gate · Contained
 
-`CallGate` says everything executable passes through it. Nothing enforces that.
+`CallGate` says everything executable passes through it. Nothing enforced that.
 `src/agents/studio.ts` registers `workspace_summary` directly with Flue via
 `defineTool`, so it reaches the model without a `CapabilityDescriptor`, without
 the kernel, and without bounds.
@@ -585,10 +585,25 @@ the kernel, and without bounds.
 nothing. The problem is that it is a working precedent for the shape, sitting in
 the tree, and it is currently the agent's **only** tool.
 
-**Fix when:** Phase 11, when MCP makes a second registration path real. An
-architecture test asserting that the agent's tool array contains only
-gate-registered capabilities is the cheap version, and the same test is what
-keeps MCP honest.
+Task 001 item 18 added three rules to `tests/unit/architecture.test.ts`:
+
+1. Every exported `create*Tool` factory is passed to `gate.register`. An orphan
+   factory is a tool reachable by import and by nothing else — the shape a
+   future agent wiring would pick up as a shortcut.
+2. Nothing outside `src/tools/` imports a tool module. Only `gate`, `types`,
+   `errors`, and `bounds` are importable, so no caller can get hold of an
+   `execute` with no kernel in the way.
+3. Registering all four tool groups leaves the kernel knowing every key the
+   gate will answer for. Registration is one call so the two cannot drift; this
+   asserts that the one call really does both.
+
+Rule 2 asserts an **exact list** of known bypasses rather than skipping them,
+and `workspace-summary.js` is named in it. A second bypass fails the test. Rule
+2 found this one on its first run.
+
+**Still open:** removing the fixture. It is the end-to-end tool in seven
+integration tests, so replacing it is its own change, and it belongs with the
+Phase 11 wiring that gives the agent real gate-registered tools.
 
 ### T-05 · The read-before-modify record does not survive a restart · Accepted
 
@@ -619,6 +634,43 @@ which is worse than running them.
 
 Worth knowing when the sandbox tier lands: a commit inside a container runs that
 container's hooks, not the host's.
+
+### K-07 · Two capability ids could collapse into one key · Fixed
+
+`capabilityKey` joins the namespace and the name with an unescaped `/`, so
+`{namespace: "mcp:a", name: "b/c"}` and `{namespace: "mcp:a/b", name: "c"}`
+produced the identical key `mcp:a/b/c` — and grants, policy rules and audit
+lines are all keyed by that string. A server picking the name `b/c` would have
+landed on another server's key and inherited its grants.
+
+Unreachable today, because every namespace and name is written by us. Real from
+Phase 11, when a connected MCP server supplies its own tool names.
+
+Closed in task 001 item 16. `capabilityIdProblem` in `contracts/capabilities.ts`
+refuses a `/` in either half, and an empty half with it; `PermissionKernel.register`
+is where it is enforced, because that is the one door capabilities come through.
+
+Refused rather than escaped. Escaping would keep the ids distinct but make the
+key unreadable in every log line and every stored grant row, to permit a name
+nobody has a reason to use.
+
+It returns the problem instead of throwing it: `contracts/` sits below every
+subsystem, so it cannot reach `PermissionError` without a cycle, and a raw
+`Error` from `src/` is what the error taxonomy forbids. The caller knows which
+domain it is failing in.
+
+### M-02 · A failed stream left a content block open · Fixed
+
+`StudioPiEventMapper.fail()` settled the turn without closing the block it was
+writing into, so a stream that died mid-sentence emitted `text_start` with no
+matching `text_end`. Every `start` a consumer sees is a promise of an `end`: a
+UI that opens a bubble on the first and closes it on the second leaves that
+bubble streaming forever, next to an error the user has already read.
+
+Closed in task 001 item 17. `fail()` closes the open block before settling —
+before, because closing emits an event and a settled mapper is closed for
+writing. `complete()` already closed first and then delegates to `fail()`, so
+the second close is a no-op and the consumer never sees two ends for one start.
 
 ### T-26 · `glob` promised an order it did not always give · Fixed
 

@@ -1,4 +1,5 @@
 import {
+  capabilityIdProblem,
   capabilityKey,
   type CapabilityDescriptor,
   type CapabilityId,
@@ -125,6 +126,15 @@ export class PermissionKernel {
    */
   register(descriptor: CapabilityDescriptor): void {
     const key = capabilityKey(descriptor.id);
+
+    // The key is a plain join, so an id containing the separator would produce
+    // a key another id already owns — and grants, policy rules and audit lines
+    // are all keyed by that string. Refused at the only door capabilities come
+    // through, which is why nothing downstream has to re-check it.
+    const problem = capabilityIdProblem(descriptor.id);
+    if (problem) {
+      throw new PermissionError("internal", { message: problem, capability: key });
+    }
 
     // An empty effect list is the most permissive thing a capability can
     // declare. Every rule of the form "do all of its effects allow this?" is

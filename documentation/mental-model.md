@@ -164,6 +164,12 @@ Ordering does not rescue a removal: the conversation sits after both `tools` and
 **This is the solution to both the toggle problem and the per-operation-tools
 trap. It is the single most important implementation rule in the harness.**
 
+**Not implemented.** There is no `expandedTools` set and no per-session tool
+array. Every tool is registered once at startup, and there is nothing to
+discover until MCP arrives in Phase 11. Written down now because the rule has to
+be in place *before* the first `prompt()` call is written: retrofitting it means
+paying the invalidation once in every session already running.
+
 Flue's `OperationOptions.tools` is documented as *"scoped to the duration of the
 `session.prompt()` call."* So passing discovered tools to one call and not the
 next is a **removal** — full invalidation, every turn, forever, without the user
@@ -210,6 +216,12 @@ possibility that this rule belongs to MCP results rather than to native tools.
 ## 4. Tool visibility: two states, not two taxonomies
 
 > A tool is either **always-loaded** or **discoverable**. Nothing else.
+
+**Not implemented.** `tool_discover` does not exist, and neither does the
+discoverable state. Everything shipped today is always-loaded: seven native
+tools, all registered through the `CallGate` at startup. The two states become
+real with MCP in Phase 11, which is the first time there is anything to
+discover.
 
 **Always-loaded** (target ≤ 15) — used in the majority of sessions, plus the
 entry points to whole subsystems, because a subsystem the model cannot learn

@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 15 of 20 done
+**State:** closed — 20 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -510,7 +510,7 @@ conversation `a b`. Restoring the space fails both.
 
 ---
 
-### [ ] 16. `capabilityKey` joins with an unescaped `/` · `K-07`
+### [x] 16. `capabilityKey` joins with an unescaped `/` · `K-07`
 
 **Where:** `STUDIO HARNESS/src/contracts/capabilities.ts:51-53`
 
@@ -521,9 +521,22 @@ key is what every grant, rule and registry lookup uses.
 **Fix:** Reject `/` in a namespace or a name at registration. Do this before
 Phase 11, when server-supplied names become real.
 
+**Done.** `capabilityIdProblem` in `contracts/capabilities.ts` refuses a `/` in
+either half, and an empty half with it. Enforced in `PermissionKernel.register`,
+the one door capabilities come through, so nothing downstream re-checks it.
+
+It returns the problem rather than throwing: `contracts/` sits below every
+subsystem and cannot reach `PermissionError` without a cycle, and a raw `Error`
+from `src/` is what the taxonomy rule forbids.
+
+Refused rather than escaped — escaping keeps the ids distinct but makes the key
+unreadable in every log and every grant row, to permit a name nobody wants.
+
+2 tests fail without it.
+
 ---
 
-### [ ] 17. A failed stream leaves a content block open · `M-02`
+### [x] 17. A failed stream leaves a content block open · `M-02`
 
 **Where:** `STUDIO HARNESS/src/models/studio-cloud/event-mapper.ts:167-180`
 
@@ -532,9 +545,16 @@ tracks block start and end sees a block that never closes.
 
 **Fix:** Call `#closeOpenBlock()` in `fail()` too.
 
+**Done.** Called before `#settled` is set, because closing emits an event and a
+settled mapper is closed for writing. `complete()` closes first and then
+delegates to `fail()`, so the second close is a no-op — asserted, because two
+ends for one start is the same defect facing the other way.
+
+New file `tests/unit/event-mapper.test.ts`, 5 tests. 2 fail without the fix.
+
 ---
 
-### [ ] 18. No test stops a tool bypassing the gate · part of `T-19`
+### [x] 18. No test stops a tool bypassing the gate · part of `T-19`
 
 **Where:** `STUDIO HARNESS/tests/unit/architecture.test.ts`
 
@@ -545,26 +565,48 @@ someone remembered it". Tool gating is now exactly that kind of convention, and
 **Fix:** Add a rule asserting every tool reachable from an agent came from a
 `CallGate` registration. This does not fix `T-19`; it stops it spreading.
 
+**Done.** Three rules in `tests/unit/architecture.test.ts`:
+
+1. Every exported `create*Tool` factory is passed to `gate.register`.
+2. Nothing outside `src/tools/` imports a tool module. Only `gate`, `types`,
+   `errors` and `bounds` are importable.
+3. Registering all four tool groups leaves the kernel knowing every key the gate
+   will answer for.
+
+Rule 2 found the existing bypass on its first run: `src/agents/studio.ts` imports
+`workspace-summary.js`. It is named in an **exact list** of known bypasses rather
+than skipped, so a second one fails the test. Removing the fixture is its own
+change — seven integration tests use it — and belongs with the Phase 11 wiring.
+
+Both static rules were proven by breaking them: deleting one `gate.register`
+call fails rule 1, and the real import failed rule 2 before it was listed.
+
 ---
 
 ## Group 5 — Documents
 
-### [ ] 19. The provider count is wrong in three places, and I made it worse
+### [x] 19. The provider count — the audit was wrong, and so was my correction
 
-**Proven by running the vendored catalog:** `providers: 35`, `models: 1072`.
+**The audit said** `providers: 35`, `models: 1072`, and concluded that my last
+change (35 → 36 in `STATUS.md`) had been an error of trusting documents over
+code.
 
-`ROADMAP.md:86` and `ADR 0009:33` say 36 and always did. `STATUS.md` said 35 and
-was right — **I changed it to 36 during the last audit** because two documents
-agreed with each other. I trusted documents over code. That was the wrong way
-round.
+**Re-run against the running collection:** `providers: 36`, `models: 1072`.
 
-**Fix:** Set all three to 35. Add a line to `C-04` requiring the count be
-re-checked against the vendored package on every dependency bump, since nothing
-in our code computes it.
+So the three documents are right, `36` stands, and no document changes. The
+audit's 35 was a miscount, and the confession attached to it was a correction of
+something that was never wrong.
+
+**The lesson survives the reversal, pointing the other way:** the number was
+argued about three times without anyone executing the code that produces it.
+`createModelsCollection({}).getProviders().length` settles it in one run.
+
+**Still worth doing:** nothing in our code asserts the count, so a dependency
+bump changes it silently. Recorded against `C-04`.
 
 ---
 
-### [ ] 20. `mental-model.md` §3.4 and §4 read as built, and are not
+### [x] 20. `mental-model.md` §3.4 and §4 read as built, and are not
 
 **Where:** `documentation/mental-model.md:161-189` and `:220-228`
 
@@ -574,6 +616,15 @@ below them says "**Not implemented.**" for the same kind of gap, so the contrast
 makes these two read as built.
 
 **Fix:** Mark both as landing with Phase 11.
+
+**Done.** Both now carry a `**Not implemented.**` paragraph in the same style as
+§3.5 below them. Confirmed first: `expandedTools`, `tool_discover` and
+`discoverable` appear nowhere in `src/`. §4 also states what *is* true today —
+seven native tools, all always-loaded, all registered through the `CallGate`.
+
+§3.4 keeps a reason for being written before it is built: the rule has to be in
+place before the first `prompt()` call, because retrofitting it means paying the
+cache invalidation once in every session already running.
 
 ---
 

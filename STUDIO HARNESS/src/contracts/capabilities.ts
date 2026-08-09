@@ -48,8 +48,51 @@ export interface CapabilityId {
   readonly name: string;
 }
 
+/**
+ * The one string that identifies a capability everywhere: in the registry, in a
+ * stored grant, in a policy rule, in a log line.
+ *
+ * The join is unescaped, so the two halves must not contain the separator. See
+ * `assertValidCapabilityId`, which is what makes that safe to rely on.
+ */
 export function capabilityKey(id: CapabilityId): string {
   return `${id.namespace}/${id.name}`;
+}
+
+/** The character `capabilityKey` joins with, and therefore the one neither half may contain. */
+const KEY_SEPARATOR = "/";
+
+/**
+ * Refuses an id that cannot be turned into a key unambiguously.
+ *
+ * `{namespace: "mcp:a", name: "b/c"}` and `{namespace: "mcp:a/b", name: "c"}`
+ * produce the identical key `mcp:a/b/c`. Today every namespace and name is
+ * written by us, so the collision is unreachable. From Phase 11 a connected MCP
+ * server supplies its own tool names, and a server that picks `b/c` would land
+ * on another server's key — inheriting its grants.
+ *
+ * Refused at registration rather than escaped at the join. Escaping would keep
+ * the ids distinct but make the key unreadable in every log and every stored
+ * grant row, to permit a name nobody has a reason to use.
+ *
+ * Returns the problem instead of throwing: this file sits below every
+ * subsystem, so it cannot reach `PermissionError` without a cycle, and a raw
+ * `Error` from `src/` is exactly what the error taxonomy forbids. The caller
+ * knows which domain it is failing in.
+ */
+export function capabilityIdProblem(id: CapabilityId): string | undefined {
+  for (const [part, value] of [
+    ["namespace", id.namespace],
+    ["name", id.name],
+  ] as const) {
+    if (typeof value !== "string" || value.trim() === "") {
+      return `A capability ${part} must not be empty.`;
+    }
+    if (value.includes(KEY_SEPARATOR)) {
+      return `A capability ${part} must not contain "${KEY_SEPARATOR}": received "${value}".`;
+    }
+  }
+  return undefined;
 }
 
 export interface CapabilityProvenance {

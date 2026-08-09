@@ -84,6 +84,18 @@ version. A new flag in an upgraded binary that runs a preprocessor is a hole.
 
 **Trigger:** any bump to a binary in `vendor/`.
 
+**The same obligation covers the provider count.** Three documents state "36
+built-in providers, 1,072 models" and nothing in our code asserts it, so a bump
+to `@earendil-works/pi-ai` changes the true number silently. Task 001 item 19
+was two rounds of arguing about 35 versus 36 without anyone running the code.
+One line settles it:
+
+```
+createModelsCollection({ customProviders: [], credentials }).getProviders().length
+```
+
+**Trigger:** any bump to `@earendil-works/pi-ai`.
+
 ---
 
 ## C-05 — Hash verification before on-demand git install

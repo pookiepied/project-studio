@@ -274,3 +274,105 @@ describe("the failure taxonomy is actually adopted", () => {
     ]);
   });
 });
+
+describe("the gate is the only way a tool runs", () => {
+  // The gate owns authorization, containment, snapshots, and deadlines. A tool
+  // an agent can reach without going through it has none of those, and nothing
+  // in review shows the omission — which is why it is a test and not a rule.
+
+  /** Files that define or wire tools. Everything else is "outside". */
+  const TOOLS_PREFIX = join("src", "tools");
+
+  it("registers every tool factory it defines", async () => {
+    // An exported `createXTool` that no `register*Tools` function passes to the
+    // gate is a tool reachable by import and by nothing else — the exact shape
+    // a future agent wiring would pick up as a shortcut.
+    const defined = new Set<string>();
+    const registered = new Set<string>();
+
+    for (const path of await sourceFiles(join(SRC_ROOT, "tools"))) {
+      const source = await readFile(path, "utf8");
+      for (const [, name] of source.matchAll(/export function (create\w*Tool)\b/g)) {
+        defined.add(name as string);
+      }
+      for (const [, name] of source.matchAll(/gate\.register\((create\w*Tool)\(/g)) {
+        registered.add(name as string);
+      }
+    }
+
+    expect(defined.size).toBeGreaterThan(0);
+    expect([...defined].filter((name) => !registered.has(name))).toEqual([]);
+  });
+
+  it("lets nothing outside src/tools reach a tool directly", async () => {
+    // The gate and the tool contracts are the public surface. Importing a tool
+    // module itself gives a caller an `execute` it can invoke with no kernel in
+    // the way, so the import is refused rather than the call.
+    const allowed = new Set(["gate.js", "types.js", "errors.js", "bounds.js"]);
+
+    // The one bypass that exists today, named rather than excused. It is
+    // `T-19`: `workspace-summary.ts` is a Flue tool handed straight to the
+    // agent, with no descriptor, no kernel and no sandbox. It is harmless — it
+    // echoes its input — but it is also the end-to-end fixture seven
+    // integration tests depend on, so removing it is its own change.
+    //
+    // Asserted as an exact list, not skipped. A second bypass fails here.
+    const known = ["workspace-summary.js"];
+    const bypasses: string[] = [];
+
+    for (const path of await sourceFiles()) {
+      if (path.includes(TOOLS_PREFIX)) continue;
+      const source = await readFile(path, "utf8");
+
+      for (const [, specifier] of source.matchAll(/from "([^"]*tools\/[^"]+)"/g)) {
+        const file = (specifier as string).split("/").pop() as string;
+        if (!allowed.has(file)) bypasses.push(file);
+      }
+    }
+
+    expect([...new Set(bypasses)].sort()).toEqual(known);
+  });
+
+  it("gives the kernel every capability the gate will answer for", async () => {
+    // Registration is one call so the two cannot drift. This is the assertion
+    // that the one call really does both: a key the gate lists but the kernel
+    // has never heard of would be denied at best and unaudited at worst.
+    const { CallGate } = await import("../../src/tools/gate.js");
+    const { PermissionKernel } = await import("../../src/permissions/kernel.js");
+    const { PermissionGrantStore } = await import(
+      "../../src/permissions/grant-store.js"
+    );
+    const { openDatabase } = await import("../../src/storage/database.js");
+    const { LocalSandbox } = await import("../../src/sandbox/local-sandbox.js");
+    const { createSandboxPolicy } = await import("../../src/sandbox/policy.js");
+    const { registerFilesystemTools } = await import(
+      "../../src/tools/filesystem/index.js"
+    );
+    const { registerGitTools } = await import("../../src/tools/git/index.js");
+    const { registerSearchTools } = await import("../../src/tools/search/index.js");
+    const { registerShellTools } = await import("../../src/tools/shell/index.js");
+
+    const db = openDatabase({ path: ":memory:" });
+    try {
+      const kernel = new PermissionKernel({ grants: new PermissionGrantStore(db) });
+      const gate = new CallGate({
+        kernel,
+        sandbox: new LocalSandbox(createSandboxPolicy({ workspaceRoot: process.cwd() })),
+      });
+
+      registerFilesystemTools(gate);
+      registerGitTools(gate);
+      registerSearchTools(gate);
+      registerShellTools(gate);
+
+      const listed = gate.list().map((tool) => tool.id);
+      expect(listed.length).toBeGreaterThan(0);
+      for (const id of listed) {
+        expect(kernel.get(id), `${id.namespace}/${id.name} is unknown to the kernel`)
+          .toBeDefined();
+      }
+    } finally {
+      db.close();
+    }
+  });
+});
