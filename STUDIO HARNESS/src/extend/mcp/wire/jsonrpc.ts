@@ -8,7 +8,11 @@
  */
 
 // JSON-RPC 2.0 requires `jsonrpc` to be exactly "2.0".
-const JSONRPC_VERSION = "2.0" as const;
+//
+// Exported because whatever sends a message needs the same literal the guards
+// check for. Two spellings of "2.0" is one typo away from a client that refuses
+// its own messages.
+export const JSONRPC_VERSION = "2.0" as const;
 
 export type JsonRpcId = string | number;
 
