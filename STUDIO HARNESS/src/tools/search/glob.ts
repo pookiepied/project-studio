@@ -1,5 +1,3 @@
-import { stat } from "node:fs/promises";
-
 import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
@@ -43,27 +41,53 @@ export const GLOB_DESCRIPTOR: CapabilityDescriptor = {
   idempotent: true,
 };
 
+interface OrderedPaths {
+  readonly paths: readonly string[];
+  /** What the order actually is, so the caller can say so. */
+  readonly order: "recency" | "name";
+}
+
 /**
  * Orders by most recently modified.
  *
  * The file someone touched an hour ago is far more likely to be the one the
  * agent is looking for than an alphabetically earlier one it has never seen.
  * Files that cannot be stat'd sort last rather than failing the search.
+ *
+ * Above the ceiling it orders by name instead, and **says so** in the returned
+ * `order`. The tool description promises "most recently modified first"; a
+ * result that silently means something else on large searches is a lie the
+ * model has no way to detect.
+ *
+ * `stat` goes through the sandbox rather than `node:fs/promises`, like every
+ * other filesystem call in the harness. Directly, it would follow a symlink and
+ * read the modification time of a target outside the workspace — a small leak,
+ * but a leak through the one path that skipped containment.
  */
-async function byRecency(paths: readonly string[]): Promise<string[]> {
-  if (paths.length > RECENCY_SORT_CEILING) return [...paths].sort();
+async function byRecency(
+  paths: readonly string[],
+  sandbox: { stat(path: string): Promise<{ modifiedAt: number }> },
+): Promise<OrderedPaths> {
+  if (paths.length > RECENCY_SORT_CEILING) {
+    return { paths: [...paths].sort(), order: "name" };
+  }
 
   const timed = await Promise.all(
     paths.map(async (path) => {
       try {
-        return { path, modifiedAt: (await stat(path)).mtimeMs };
+        return { path, modifiedAt: (await sandbox.stat(path)).modifiedAt };
       } catch {
         return { path, modifiedAt: 0 };
       }
     }),
   );
 
-  return timed.sort((left, right) => right.modifiedAt - left.modifiedAt).map((entry) => entry.path);
+  return {
+    paths: timed
+      .sort((left, right) => right.modifiedAt - left.modifiedAt)
+      .map((entry) => entry.path),
+    order: "recency",
+  };
 }
 
 export function createGlobTool(): ToolDefinition<GlobInput, string> {
@@ -135,13 +159,26 @@ export function createGlobTool(): ToolDefinition<GlobInput, string> {
         .map((line) => line.trim())
         .filter((line) => line !== "");
 
-      const ordered = await byRecency(found);
+      const { paths: ordered, order } = await byRecency(found, context.sandbox);
       const page = ordered.slice(input.offset, input.offset + input.limit);
       const shown = page.map((path) => toRelative(root, path)).join("\n");
 
-      return ordered.length > input.offset + page.length
-        ? `${shown}\n\n[showing ${page.length} of ${ordered.length} files; raise limit or use offset for more]`
-        : shown;
+      const notes: string[] = [];
+      if (ordered.length > input.offset + page.length) {
+        notes.push(
+          `showing ${page.length} of ${ordered.length} files; raise limit or use offset for more`,
+        );
+      }
+      // Only when it is not what the description promised. Saying "sorted by
+      // recency" on every ordinary result would be a token cost paid for
+      // nothing.
+      if (order === "name") {
+        notes.push(
+          `sorted by name, not by modified time: ${ordered.length} matches is above the ${RECENCY_SORT_CEILING} limit for reading modification times`,
+        );
+      }
+
+      return notes.length === 0 ? shown : `${shown}\n\n[${notes.join("; ")}]`;
     },
   });
 }

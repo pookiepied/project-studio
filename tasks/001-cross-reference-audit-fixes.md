@@ -1,7 +1,7 @@
 # Task 001 — Fix Everything The Cross-Reference Audit Found
 
 **Opened:** 2026-08-09
-**State:** open — 13 of 20 done
+**State:** open — 15 of 20 done
 **Baseline commit:** `423999e`
 **Closes when:** every box is ticked, `pnpm check` is green, and each item is
 recorded in `KNOWN-ISSUES.md`.
@@ -454,7 +454,7 @@ first.
 
 ## Group 4 — Small and real
 
-### [ ] 14. `glob` promises an order it does not always give · `T-26`
+### [x] 14. `glob` promises an order it does not always give · `T-26` · `PENDING14`
 
 **Where:** `STUDIO HARNESS/src/tools/search/glob.ts:54` and `:1`
 
@@ -467,9 +467,19 @@ going through the sandbox like every other filesystem call.
 **Fix:** Say in the result when the order is alphabetical. Route `stat` through
 `context.sandbox`.
 
+**Done.** `byRecency` returns the order it actually used, and the result says so
+only when it is not what the description promised — saying "sorted by recency"
+on every ordinary result would be a token cost paid for nothing. `stat` goes
+through `context.sandbox`, which resolves the real path, so a symlink can no
+longer report the modification time of a target outside the workspace.
+
+**Tested by:** newest-first ordering with modification times set explicitly, a
+1,001-file directory that must say "sorted by name", and an ordinary result that
+must stay quiet. Reverting the reported order fails the middle one.
+
 ---
 
-### [ ] 15. `FileAccessLog` separates its key with a space · `T-27`
+### [x] 15. `FileAccessLog` separates its key with a space · `T-27` · `PENDING14`
 
 **Where:** `STUDIO HARNESS/src/tools/filesystem/access-log.ts:29-32`
 
@@ -478,6 +488,25 @@ produce the same key. The class exists to keep one conversation's read record
 away from another's.
 
 **Fix:** Use a separator that cannot appear in either part — a null character.
+
+**Done** — but not as expected, and this is worth recording.
+
+The null separator was **already on disk**, written as a *literal NUL byte
+inside the source file*. Every viewer renders it as a space, which is why the
+audit read it as one, and `git` and `grep` treat the whole file as binary. It is
+now a two-character escape in a named `SEPARATOR` constant, so the runtime
+string is unchanged and the file is plain text again.
+
+**The lesson:** a fix that is invisible in the source is not a fix anyone can
+review. The audit was right about the file and wrong about the cause, and both
+halves came from the same invisible byte.
+
+Also deleted `Observation.existed`, the dead field from the rejected-items list.
+All three call sites passed `true`, so the branch guarded by it never varied.
+
+**Tested by:** conversation `a` with path `b c` must not collide with
+conversation `a b` with path `c`, and `forget("a")` must not sweep away
+conversation `a b`. Restoring the space fails both.
 
 ---
 

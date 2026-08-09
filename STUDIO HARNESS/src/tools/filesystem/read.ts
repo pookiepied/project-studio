@@ -132,7 +132,6 @@ export function createReadTool(log: FileAccessLog): ToolDefinition<ReadInput, st
       // file differently still counts as having read it.
       log.record(context.scope, absolute, {
         modifiedAt: stat.modifiedAt,
-        existed: true,
       });
 
       return formatNumbered(content, input.offset, input.limit);

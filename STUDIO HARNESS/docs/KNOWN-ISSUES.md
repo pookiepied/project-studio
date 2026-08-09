@@ -620,6 +620,36 @@ which is worse than running them.
 Worth knowing when the sandbox tier lands: a commit inside a container runs that
 container's hooks, not the host's.
 
+### T-26 · `glob` promised an order it did not always give · Fixed
+
+Above 1,000 results it sorted by name while its description told the model "most
+recently modified first", with nothing to say the order had changed. Its `stat`
+also came straight from `node:fs/promises`, so a symlink reported the
+modification time of a target outside the workspace — the one filesystem call in
+the tools that skipped the sandbox.
+
+Closed in task 001 item 14. The result names the order when it is not the
+promised one, and stays quiet when it is. `stat` goes through the sandbox.
+
+### T-27 · `FileAccessLog` keys collided across conversations · Fixed
+
+Conversation `a` with path `b c` and conversation `a b` with path `c` produced
+one key, and keeping one conversation's read record away from another's is the
+class's whole job. `forget` had the same flaw: it swept away any conversation
+whose id started with the one it was given.
+
+Closed in task 001 item 15 — with a twist worth keeping. The null separator was
+**already there**, written as a literal NUL byte inside the source file. Every
+viewer renders that as a space, which is why the audit read it as one, and it
+made `git` and `grep` treat the file as binary. It is a named `SEPARATOR`
+constant using a two-character escape now.
+
+**The rule:** a fix that is invisible in the source is not a fix anyone can
+review.
+
+`Observation.existed` went with it. All three call sites passed `true`, so the
+branch it guarded never varied.
+
 ### T-08 · Git output is truncated at 400 lines with no paging · Open
 
 Unlike `read`, `grep`, and `glob`, the git tool has no `limit`/`offset`. A long

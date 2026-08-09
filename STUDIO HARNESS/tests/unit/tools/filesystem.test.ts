@@ -324,10 +324,38 @@ describe("the three tools share one record of what was read", () => {
 
   it("forgets a conversation when it ends", () => {
     const standalone = new FileAccessLog();
-    standalone.record(SCOPE, "C:/x/a.ts", { modifiedAt: 1, existed: true });
+    standalone.record(SCOPE, "C:/x/a.ts", { modifiedAt: 1 });
     standalone.forget(SCOPE.conversationId);
 
     expect(standalone.get(SCOPE, "C:/x/a.ts")).toBeUndefined();
+  });
+
+  it("does not confuse two conversations whose ids and paths overlap", () => {
+    // With a space between the two halves, conversation "a" with path "b c"
+    // and conversation "a b" with path "c" were one key — and keeping one
+    // conversation's reads away from another's is the whole job.
+    const standalone = new FileAccessLog();
+    const first = { ...SCOPE, conversationId: "a" };
+    const second = { ...SCOPE, conversationId: "a b" };
+
+    standalone.record(first, "b c", { modifiedAt: 1 });
+
+    expect(standalone.get(first, "b c")?.modifiedAt).toBe(1);
+    expect(standalone.get(second, "c")).toBeUndefined();
+  });
+
+  it("forgets only the conversation it was asked about", () => {
+    const standalone = new FileAccessLog();
+    const first = { ...SCOPE, conversationId: "a" };
+    const second = { ...SCOPE, conversationId: "a b" };
+
+    standalone.record(first, "x.ts", { modifiedAt: 1 });
+    standalone.record(second, "x.ts", { modifiedAt: 2 });
+    standalone.forget("a");
+
+    expect(standalone.get(first, "x.ts")).toBeUndefined();
+    // A space-prefixed match would have swept this away too.
+    expect(standalone.get(second, "x.ts")?.modifiedAt).toBe(2);
   });
 });
 

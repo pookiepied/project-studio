@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -308,5 +308,40 @@ describe("the tools themselves", () => {
 
   it.runIf(HAS_RIPGREP)("matches by extension across the tree", async () => {
     expect(await glob({ pattern: "**/*.ts" })).toContain("src/app.ts");
+  });
+
+  it.runIf(HAS_RIPGREP)("orders by modification time, newest first", async () => {
+    const older = join(workspace, "src", "older.ts");
+    const newer = join(workspace, "src", "newer.ts");
+    writeFileSync(older, "");
+    writeFileSync(newer, "");
+    // Set explicitly rather than written in order: two writes in the same
+    // millisecond would make the assertion pass or fail by timing.
+    utimesSync(older, new Date(1_000_000), new Date(1_000_000));
+    utimesSync(newer, new Date(2_000_000), new Date(2_000_000));
+
+    const output = await glob({ pattern: "src/*.ts" });
+
+    expect(output.indexOf("newer.ts")).toBeLessThan(output.indexOf("older.ts"));
+  });
+
+  it.runIf(HAS_RIPGREP)("says so when it sorts by name instead", async () => {
+    // The description promises "most recently modified first". Above the
+    // ceiling it sorts by name, and a result that silently means something else
+    // is a lie the model cannot detect.
+    const many = join(workspace, "many");
+    mkdirSync(many, { recursive: true });
+    for (let index = 0; index <= 1_000; index += 1) {
+      writeFileSync(join(many, `file-${String(index).padStart(5, "0")}.ts`), "");
+    }
+
+    const output = await glob({ pattern: "many/*.ts", limit: 5 });
+
+    expect(output).toMatch(/sorted by name/i);
+    expect(output).toContain("file-00000.ts");
+  });
+
+  it.runIf(HAS_RIPGREP)("stays quiet about ordering when it kept its promise", async () => {
+    expect(await glob({ pattern: "src/*" })).not.toMatch(/sorted by name/i);
   });
 });

@@ -150,7 +150,6 @@ export function createEditTool(log: FileAccessLog): ToolDefinition<EditInput, st
       const after = await context.sandbox.stat(input.path);
       log.record(context.scope, absolute, {
         modifiedAt: after.modifiedAt,
-        existed: true,
       });
 
       return occurrences === 1

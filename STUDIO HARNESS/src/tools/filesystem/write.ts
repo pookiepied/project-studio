@@ -94,7 +94,6 @@ export function createWriteTool(log: FileAccessLog): ToolDefinition<WriteInput, 
       const written = await context.sandbox.stat(input.path);
       log.record(context.scope, absolute, {
         modifiedAt: written.modifiedAt,
-        existed: true,
       });
 
       return state.exists ? `Replaced ${input.path}` : `Created ${input.path}`;
