@@ -326,7 +326,7 @@ fails both — the second one is what catches the index.
 
 ---
 
-### [x] 10. An SSE frame splits when a chunk ends in `\r` · `M-01` · `PENDING10`
+### [x] 10. An SSE frame splits when a chunk ends in `\r` · `M-01` · `b446250`
 
 **Where:** `STUDIO HARNESS/src/models/studio-cloud/sse-parser.ts:35`
 
@@ -358,7 +358,7 @@ hold-back fails the exhaustive one.
 
 ---
 
-### [x] 11. Flue's database defaults to the working directory · `H-02` · `PENDING10`
+### [x] 11. Flue's database defaults to the working directory · `H-02` · `b446250`
 
 **Where:** `STUDIO HARNESS/src/db.ts:3`
 
@@ -386,7 +386,7 @@ file as ours. Restoring the relative default fails it.
 
 ---
 
-### [x] 12. A configured relative path can leave the Studio home · `H-03` · `PENDING10`
+### [x] 12. A configured relative path can leave the Studio home · `H-03` · `b446250`
 
 **Where:** `STUDIO HARNESS/src/platform/paths.ts:169-171`
 
