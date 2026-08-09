@@ -454,7 +454,7 @@ first.
 
 ## Group 4 — Small and real
 
-### [x] 14. `glob` promises an order it does not always give · `T-26` · `PENDING14`
+### [x] 14. `glob` promises an order it does not always give · `T-26` · `87f1179`
 
 **Where:** `STUDIO HARNESS/src/tools/search/glob.ts:54` and `:1`
 
@@ -479,7 +479,7 @@ must stay quiet. Reverting the reported order fails the middle one.
 
 ---
 
-### [x] 15. `FileAccessLog` separates its key with a space · `T-27` · `PENDING14`
+### [x] 15. `FileAccessLog` separates its key with a space · `T-27` · `87f1179`
 
 **Where:** `STUDIO HARNESS/src/tools/filesystem/access-log.ts:29-32`
 
