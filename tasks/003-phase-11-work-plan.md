@@ -427,8 +427,17 @@ a transport limit is never mistaken for a judgement about the address.
 Verified by inverting the author test: refusing a person their private network
 instead of a model fails 2.
 
+**A dead guard was found while checking what has callers.** `registerOwnPort` was
+never called by anything in `src/`, so the `own-port` class could never be
+returned and the rule protected nothing — while `google-login.ts` was binding a
+loopback port to receive an OAuth authorization code. Recorded as `A-02` and
+fixed, deliberately *before* the client lands, because the client is what makes
+loopback reachable and a registration added afterwards would have been missing
+for exactly as long as it mattered.
+
 **Still to build:** the client. Until it exists the relaxation above is a policy
-nothing exercises.
+nothing exercises. Tracked with everything else unfinished in
+`tasks/005-phase-11-loose-ends.md`.
 
 The split in `tasks/002` §9, plus two things the review found:
 

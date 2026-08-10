@@ -610,6 +610,39 @@ opens.
 
 ---
 
+## C-19 — STUDIO away from the machine
+
+**Status:** open, and deliberately not being answered during Phase 11.
+**Gates:** a separate repository, after Phase 13. Blocks nothing before then.
+
+Raised by the owner on 10 August 2026 and simplified the same day: not "run the
+whole system in the cloud", but a separate Cloudflare project that stores notes,
+tasks, and transcripts, and — the important half — **relays a phone or browser to
+the user's own machine**, which keeps doing the work.
+
+The plan, what is strong about it, the one part that is not, and the naming
+question are in `documentation/local-and-cloud.md`. In three lines:
+
+- The relay is the good idea and needs no compromises, because nothing is
+  duplicated: the machine keeps the keys, the grants, and the processes.
+- The **cloud-only agent loop** is the weak part, and everything awkward follows
+  from it — a second product, a second implementation of security rules, and
+  managed API keys, which is a business commitment rather than a technical one.
+  If "my laptop is off" turns out to be real demand, a **hosted installation** of
+  the real harness answers it better than a smaller second agent.
+- **The name should not be "Cloud."** It promises that the product runs there,
+  which is the exact confusion the owner disliked. `STUDIO Link` is the
+  recommendation, with `STUDIO Web` for the front end.
+
+**One habit to keep in the meantime, at no cost:** do not add a column, a store,
+or an identifier that assumes one machine. Anything that becomes portable later
+needs an identity not derived from a filesystem path or a process id.
+
+**Check when:** Phase 13 is designed, because the relay needs the same capability
+seam subagents need, and building it earlier means designing that seam twice.
+
+---
+
 ## C-08 — Folder names contain spaces
 
 **Status:** open, low priority.

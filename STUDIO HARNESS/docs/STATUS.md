@@ -241,6 +241,17 @@ registry, the extend spine, the wire layer, the connection, the child-process
 channel, the handshake, the supervisor, and the reconciler — and nothing calls
 it. Wiring it to the kernel and to settings is 003.7 and 003.8.
 
+**Every Phase 11 module has zero callers in `src/`.** Measured, not assumed. That
+is the shape the phase was built in on purpose — each piece tested against a
+fake, wiring last — but it means the honest summary is *a complete MCP client
+that nothing has ever run*, and one class of bug cannot have been found yet: the
+kind that only appears once the pieces are assembled against a real server. `S-04`
+was exactly that shape and appeared the moment a real process was spawned.
+
+Everything unfinished in the phase is listed in
+`tasks/005-phase-11-loose-ends.md`, and **the phase is not finished while that
+file has an open item.**
+
 The protocol split into two eras on 2026-07-28: the modern revision has no
 `initialize` handshake, no session id, and no server-initiated requests, and it
 deprecates Roots, Sampling, and Logging outright. We speak modern by default and

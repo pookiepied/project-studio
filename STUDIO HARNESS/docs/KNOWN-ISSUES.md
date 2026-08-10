@@ -155,6 +155,33 @@ If every caller cancels, the refresh still completes and saves. That is
 deliberate: the work is nearly done, the next call needs it, and abandoning it
 would spend a rotated token for nothing.
 
+### A-02 · The sign-in callback port was not guarded · Fixed
+
+`src/net/own-ports.ts` exists so the destination guard can refuse a port this
+process is listening on — reaching our own control plane is escalation rather
+than a network call. Nothing in `src/` ever called `registerOwnPort`, so the set
+was always empty and `classifyHostPort` could never return `own-port`. The rule
+was written, tested, and enforced against nothing.
+
+`google-login.ts` binds a loopback port to receive an OAuth **authorization
+code**, which is the one listener most worth guarding, and did not register it.
+
+**Not exploitable when found**, because `fetch` refuses every loopback address
+whatever the port, so nothing could reach it. It would have stopped being safe
+the moment `003.5` part B made loopback reachable for a model-chosen URL — and a
+registration added at that point would have been missing for exactly as long as
+it mattered.
+
+Fixed by registering the port when it is bound and unregistering it in the
+`finally` that closes the server. Releasing it matters as much as taking it: a
+port left in the set outlives its listener and would then refuse a destination
+that belongs to somebody else, which turns the guard into a false accusation.
+
+**The standing rule this leaves:** anything that binds a port registers it.
+
+This is the third of the same shape — a guarantee asserted against our own
+object rather than against the world. See `S-03` and `S-04`.
+
 ---
 
 ## Permissions (`src/permissions/`)
@@ -934,8 +961,31 @@ honest fix is for the wait to poll a readiness signal the harness actually
 emits, rather than racing a fixed budget. A longer timeout only moves the
 threshold.
 
-**Fix when:** it fails twice, or before this suite runs on shared CI — whichever
-comes first.
+**It failed a second time on 10 August 2026**, which is the trigger this entry
+named. It passes alone and passed on a rerun, again.
+
+**What was done, and what was deliberately not.** The cause is still unknown, and
+that is the finding: **two failures produced no evidence between them.** The wait
+reported only that a number had been exceeded — no exit code, no signal, no
+child output, no reason from the last connection attempt — so nothing could be
+concluded either time and this entry could only guess.
+
+The wait now reports all of it: elapsed time, `pid`, `exitCode`, `signalCode`,
+the last probe's own error, and the tail of the child's `stdout` and `stderr`.
+Verified by pointing the probe at a port nothing listens on and reading the
+message. Note the two guesses this distinguishes on the next failure: a slow
+boot looks nothing like a port taken between allocation and use, and the
+message now says which.
+
+The budget moved from 15s to 60s at the same time, and **that is not the fix.** A
+healthy start is well under a second; the number is now far enough beyond any
+plausible boot that expiry means the machine was genuinely wedged, rather than
+being a threshold a loaded machine can cross. Said in a comment at the constant
+so it is not read as the repair.
+
+**Status stays Open** because the cause is not known. It closes when a failure
+report says why, or when the suite has run enough times without one to call it
+gone.
 
 ### E-01 · Node version is below the declared engine · Open
 

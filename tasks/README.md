@@ -16,6 +16,17 @@ A task file exists while the work is open. When every box is ticked, the file
 stays as the record of what was done and why — the same way an ADR stays after
 the decision is made.
 
+**One file per phase may be a loose-ends file, and a phase is not finished while
+its loose-ends file has an open item.** `tasks/005-phase-11-loose-ends.md` is the
+first. It exists because a work plan records *why* each piece was built, which
+makes it a poor place to see what is missing: a long entry about a finished piece
+reads exactly like a long entry about a half-finished one. The loose-ends file
+asks the shorter, harsher question and answers it in a few lines each.
+
+The bar there is stricter than "the code exists": something in `src/` calls it, a
+test proves the rule it enforces, and the documentation says why. Two of three is
+still a loose end.
+
 ## Rules
 
 1. Number files in order: `001-`, `002-`. Never renumber.
