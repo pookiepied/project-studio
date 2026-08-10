@@ -499,6 +499,17 @@ any revision we can complete a handshake with; the handshake barely varies and
 breadth is nearly free. On HTTP, require Streamable HTTP (`2025-03-26` or
 later) and never implement HTTP+SSE.
 
+**Built, 10 August 2026** — `src/extend/mcp/handshake.ts`. The version lists live
+there, one modern and four legacy, and that is the only place either era's
+revisions are spelled.
+
+One consequence is worth knowing before somebody meets it. We speak exactly one
+modern revision, so a modern server supporting only a *newer* one fails outright
+rather than negotiating down — there is nothing to negotiate down to. The failure
+names both lists, which is the most useful thing it can do, and the fix is to add
+the revision. Not a defect, and it is the reason `MODERN_PROTOCOL_VERSIONS` is
+written as a list while it has one entry.
+
 ---
 
 ## C-08 — Folder names contain spaces

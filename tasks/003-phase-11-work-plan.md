@@ -504,9 +504,70 @@ The same shape as `S-03`. Fixed by setting `PATH` to `""` rather than omitting
 it — **omission is not refusal on this platform** — and the test now asserts
 against a real spawned child. Full detail in `KNOWN-ISSUES.md`.
 
-**Still to build:** the supervisor that joins `lifecycle.ts` and `backoff.ts` to
-a real channel, then the reconciler, which finally has something live to
-reconcile.
+**The handshake and the supervisor — done.** `handshake.ts` and `supervisor.ts`.
+951 passing, up thirty-seven.
+
+**Two files, not one, because they have different subjects.** The supervisor's
+subject is a process — start it, retry it, give up on it. The handshake's is a
+conversation. A server that runs perfectly and speaks a protocol we do not have
+is a different failure from a server that will not start, and merging them would
+report the first as the second.
+
+**Joining the pieces found the gap `era.ts` could not see.** `readEraProbe`
+needs the whole JSON-RPC answer, because the *code* is what separates a modern
+refusal from a legacy server that does not know the method. `McpConnection`
+unwraps — a success becomes its `result` and an error becomes a rejection with
+the code discarded. So the probe as written could not be run over the connection
+built for it.
+
+Fixed with one extra method, `requestEnvelope`, used by exactly one caller.
+Unwrapping is right for every ordinary call and wrong for this one; unwrapping
+first and re-deciding after would mean reconstructing what was just thrown away.
+Transport failures still reject — for this caller an error *is* the answer, but
+a dead connection is not an answer at all.
+
+**A timeout on the probe is legacy; a death is not.** Silence is exactly what
+`era.ts` calls `no_answer`, and an old server that has never heard of
+`server/discover` is the ordinary case. A connection that *died* is not
+translated: sending `initialize` to a server that is gone replaces an accurate
+failure with a confusing one.
+
+**Fail fast, recover quietly.** `ensure` waits for the attempt in progress and no
+longer, so a tool call never sits through fifteen seconds of backoff; the retry
+is scheduled behind it, so the next caller finds a server that has recovered.
+Single-flight, because two processes for one server is the failure that is
+hardest to see — both work, and nothing looks wrong until something counts them.
+
+**Stopping forgets the server rather than remembering it stopped.** A stopped
+server has no attempt count worth keeping and no failure worth showing. It also
+means a server that had given up gets a clean start when it is switched back on,
+which is what a person switching it back on is asking for — and it is why
+`lifecycle.ts` needed no new transitions. Stop-while-starting is handled by a
+generation counter, not by a `starting --stop--> stopping` edge: the process was
+already spawned and cannot be un-spawned, so what is actually needed is for the
+attempt to find its generation stale and close what it built. Widening the state
+machine would not have given that.
+
+**Nothing is closed in the failure path**, because on both paths that reach it
+the connection is already closed — a start that failed closed what it built, and
+a connection reports its end only after ending. Closing again is the one call
+that could re-enter it, and a second `failed` from a state that has already
+recorded one is an illegal transition. Written down because it reads like a
+missing line.
+
+**Verified by breaking six rules.** Removing single-flight fails 1; removing the
+close on a failed start fails 2, both about a process left running; passing
+`attempts` instead of `attempts - 1` to backoff fails the give-up count;
+disabling envelope routing fails 8 in the supervisor alone; dropping the immediate call for a listener
+that arrives after the end fails 1; falling back to legacy when no modern
+version is in common fails 1.
+
+**Still to build:** the reconciler, which finally has something live to
+reconcile, and a launcher — the supervisor takes one rather than spawning,
+because starting a real server needs a project root and, for a server that reads
+a key from its environment, a secret fetched from the credential store at that
+moment. Neither belongs in a class that holds live objects. That wiring is
+003.8. Streamable HTTP is still open and waits on `003.5` part B.
 
 ### 003.6 — original notes
 

@@ -57,7 +57,7 @@ process it talks to; neither contains the other.
 | 8 | Auth, credentials, local BYOK | Done |
 | 9 | Permission and containment kernel | Foundation done, 2 items open |
 | 10 | Native agent tools | **In progress — 9 of 10** |
-| 11 | MCP | Design — no code |
+| 11 | MCP | **In progress — the client works, nothing is wired to it yet** |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
 | 14 | Projects, workspaces, sandboxes | Not started |
@@ -233,8 +233,15 @@ every HTTP destination goes through, and `K-07`'s rule that a capability id may
 not contain a `/` — which becomes load-bearing the moment a server supplies its
 own tool names.
 
-Research and design are in `tasks/002-phase-11-mcp.md`. No code yet. The
-protocol split into two eras on 2026-07-28: the modern revision has no
+Research and design are in `tasks/002-phase-11-mcp.md`, and the running record of
+what has been built is `tasks/003-phase-11-work-plan.md`. This section describes
+the design; it is not a progress report, and the work plan is the one that says
+where the code has reached. As of this note a client exists end to end — the
+registry, the extend spine, the wire layer, the connection, the child-process
+channel, the handshake, and the supervisor — and nothing calls it. Wiring it to
+the kernel and to settings is 003.7 and 003.8.
+
+The protocol split into two eras on 2026-07-28: the modern revision has no
 `initialize` handshake, no session id, and no server-initiated requests, and it
 deprecates Roots, Sampling, and Logging outright. We speak modern by default and
 probe for legacy.
