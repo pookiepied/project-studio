@@ -10,15 +10,28 @@ loopback destination the resource is host *and* port.
 The mechanism for that shipped in Phase 11. `destinationResource` in
 `src/net/destination.ts` returns `host` for a public destination and
 `host:port` for a loopback one, and `classifyHostPort` names *why* a
-destination is refused — `public`, `loopback`, `private`, `own-port` — rather
-than answering yes or no. **No policy in this ADR changed.** Loopback, private
-ranges, and our own listening ports are all still refused before the permission
-question is asked. The split only makes the loopback case expressible; whether
-to allow it is `C-17`, still open.
+destination is refused — `public`, `loopback`, `private`, `metadata`,
+`own-port` — rather than answering yes or no.
 
-`own-port` is new and is stronger than the rest: a port this process listens on
-is refused even if loopback is later allowed. Reaching our own control plane is
-escalation, not fetching.
+**`C-17` is now answered, and what `fetch` can reach did not change.** The guard
+follows who wrote the address. A model that produced a URL inside a turn gets
+what this ADR always gave it, with one relaxation: **loopback is allowed and
+goes through the normal approval ladder**, with host *and* port as the resource.
+A person who typed an address into a settings form may also reach their own
+private network, because that is a decision they made rather than one a page
+persuaded them into.
+
+**`fetch` itself is unchanged.** It refuses every non-public address still — not
+by this policy, but because it reads a page through a service that is not on this
+machine and cannot serve one. That is a limit of one transport, written as its
+own check so it is never mistaken for a judgement about the address.
+
+**Two classes are refused whoever asked.** `own-port` is a port this process
+listens on: reaching our own control plane is escalation, not fetching, and a
+person typing it has misunderstood rather than decided. `metadata` is a cloud
+instance's credential service, split out of `private` at the moment `private`
+became reachable for somebody — no decision a user can make turns that endpoint
+into a legitimate destination.
 
 ## Context
 

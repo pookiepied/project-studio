@@ -5,6 +5,7 @@ import {
   classifyHostPort,
   destinationResource,
   isPrivateHost,
+  judgeDestination,
   parseDestination,
   parseHostPort,
 } from "../../src/net/destination.js";
@@ -148,12 +149,28 @@ describe("classification names why a destination is refused", () => {
     expect(classifyHostPort({ host: "172.32.0.1", port: 443 })).toBe("public");
   });
 
-  it("classifies the cloud metadata address as private", () => {
+  it("classifies cloud metadata as its own class, not merely private", () => {
     // 169.254.169.254 serves instance credentials to anything that asks. It is
-    // the single most valuable address to be tricked into fetching.
+    // the single most valuable address to be tricked into fetching, and it is
+    // separated from `private` because the answers differ: a private address is
+    // an ordinary place for a person to run something, and this is never a
+    // legitimate destination for anything here.
     expect(classifyHostPort({ host: "169.254.169.254", port: 443 })).toBe(
-      "private",
+      "metadata",
     );
+    // The whole link-local block, not one address, because nothing here has a
+    // reason to reach any of it.
+    expect(classifyHostPort({ host: "169.254.1.1", port: 443 })).toBe("metadata");
+    expect(classifyHostPort({ host: "[fe80::1]", port: 443 })).toBe("metadata");
+  });
+
+  it("classifies the metadata endpoints that sit outside link-local", () => {
+    // Alibaba's is inside carrier-grade NAT and Oracle's inside IETF protocol
+    // assignments, so neither is caught by a range rule and both would
+    // otherwise be classified as ordinary private addresses.
+    expect(classifyHostPort({ host: "100.100.100.200", port: 80 })).toBe("metadata");
+    expect(classifyHostPort({ host: "192.0.0.192", port: 80 })).toBe("metadata");
+    expect(classifyHostPort({ host: "[fd00:ec2::254]", port: 80 })).toBe("metadata");
   });
 
   it("classifies carrier-grade NAT as private", () => {
@@ -284,8 +301,13 @@ describe("the permission resource is host and sometimes port", () => {
   });
 });
 
-describe("no behaviour is changed that anyone can observe", () => {
-  it("refuses loopback, private, and own-port all with kind private", () => {
+describe("what `fetch` can reach is unchanged", () => {
+  it("refuses every non-public address with kind private", () => {
+    // `C-17` relaxed the *policy* for loopback. `fetch` reads a page through a
+    // reading service, and that service is not on this machine, so it still
+    // cannot serve one however the permission question is answered. The kind
+    // stays the same for all of them; only the wording differs where a more
+    // useful sentence exists.
     registerOwnPort(7334);
     try {
       for (const url of [
@@ -305,13 +327,83 @@ describe("no behaviour is changed that anyone can observe", () => {
         expect(thrown, url).toBeInstanceOf(DestinationError);
         if (thrown instanceof DestinationError) {
           expect(thrown.kind, url).toBe("private");
-          expect(thrown.message, url).toBe(
-            "That address is on this machine or this private network, so it cannot be fetched.",
-          );
         }
       }
     } finally {
       unregisterOwnPort(7334);
+    }
+  });
+});
+
+describe("the C-17 policy follows who wrote the address", () => {
+  it("lets a person reach their own machine and their own network", () => {
+    // The ordinary case. A local MCP server is the normal kind, and refusing a
+    // person their own machine refuses the thing they most want to do.
+    expect(judgeDestination("http://127.0.0.1:3000/mcp", "user").host).toBe(
+      "127.0.0.1:3000",
+    );
+    expect(judgeDestination("http://10.0.0.5:8080/mcp", "user").host).toBe("10.0.0.5");
+  });
+
+  it("lets a model reach loopback, and names the port in the resource", () => {
+    // Allowed is not approved: this still goes to the kernel. Two ports on one
+    // host are two services, so approving a development server must not
+    // approve an unsecured database beside it.
+    const judged = judgeDestination("http://127.0.0.1:3000/", "model");
+
+    expect(judged.hostClass).toBe("loopback");
+    expect(judged.host).toBe("127.0.0.1:3000");
+  });
+
+  it("refuses a model an address on the private network", () => {
+    // A model producing this has decided nothing — the address may have come
+    // from a page it read a moment earlier.
+    expect(() => judgeDestination("http://10.0.0.5/", "model")).toThrow(DestinationError);
+    expect(() => judgeDestination("http://192.168.1.1/", "model")).toThrow(
+      DestinationError,
+    );
+  });
+
+  it("refuses cloud metadata to a person as firmly as to a model", () => {
+    for (const author of ["model", "user"] as const) {
+      let thrown: unknown;
+      try {
+        judgeDestination("http://169.254.169.254/latest/meta-data/", author);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown, author).toBeInstanceOf(DestinationError);
+      expect((thrown as DestinationError).message, author).toMatch(/credential service/);
+    }
+  });
+
+  it("refuses our own service to a person as firmly as to a model", () => {
+    // Reaching our own control plane is escalation rather than a network call.
+    // A person typing it has misunderstood rather than decided.
+    registerOwnPort(7334);
+    try {
+      for (const author of ["model", "user"] as const) {
+        expect(() => judgeDestination("http://127.0.0.1:7334/", author), author).toThrow(
+          /Project Studio's own service/,
+        );
+      }
+    } finally {
+      unregisterOwnPort(7334);
+    }
+  });
+
+  it("drops credentials from the address whoever wrote it", () => {
+    // They would otherwise travel into a log line and into the request itself.
+    const judged = judgeDestination("http://user:secret@example.com/x", "user");
+
+    expect(judged.url).not.toContain("secret");
+  });
+
+  it("refuses a scheme that is not http or https from either author", () => {
+    for (const author of ["model", "user"] as const) {
+      expect(() => judgeDestination("file:///etc/passwd", author), author).toThrow(
+        DestinationError,
+      );
     }
   });
 });

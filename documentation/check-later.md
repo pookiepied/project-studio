@@ -439,8 +439,8 @@ three and does not exist at runtime.
 
 ## C-17 — The destination guard follows the URL's author
 
-**Status:** half built. The *mechanism* shipped in Phase 11 item 003.5; the
-*policy* is still open. **Refines:** ADR 0022.
+**Status:** the mechanism and the policy are both built; the client that
+exercises the relaxed half is not. **Refines:** ADR 0022.
 
 **What is built.** `classifyHostPort` names why a destination is refused, and
 `destinationResource` gives a loopback destination a `host:port` resource. An
@@ -469,9 +469,44 @@ approval ladder** so a user can approve their own dev server once.
 with no authentication; approving one must not approve the other. Outside
 loopback the host remains the resource.
 
-**Check:** when the local HTTP client is written, in Phase 11 item 003.5 part B.
-That is the first caller that has a user-supplied URL to judge, and a policy
-with one caller is a policy nobody has tested.
+**Answered, 10 August 2026** — `judgeDestination(raw, author)` in
+`src/net/destination.ts`. The policy is the table above, built as written:
+
+| Class | A model chose it | A person typed it |
+|---|---|---|
+| public | allowed | allowed |
+| loopback | allowed, resource is host **and port** | allowed |
+| private | refused | allowed |
+| metadata | refused | refused |
+| own-port | refused | refused |
+
+**`metadata` became its own class.** It used to be folded into `private`, and
+that stopped being right the moment `private` became reachable for anybody: a
+person typing an address is deciding about their own network, and no decision
+they can make turns a cloud credential endpoint into a legitimate destination.
+The whole link-local block is refused rather than the one famous address, plus
+the three endpoints that sit outside it — Alibaba's inside carrier-grade NAT,
+Oracle's inside IETF protocol assignments, and AWS's IPv6 one inside
+unique-local. A range rule catches none of those three.
+
+**`own-port` is refused for a person too.** Reaching our own service is
+escalation rather than a network call, and someone typing it has misunderstood
+rather than decided. It would also be a loop.
+
+**Allowed is not approved.** Nothing in this function grants anything; every
+destination still goes through the kernel with the resource it returns. What the
+policy decides is what may be *offered*, which is the distinction the whole entry
+was opened for.
+
+**`fetch` is unchanged, and that is deliberate.** It refuses every non-public
+address still — not by policy, but because it reads a page through a service
+that is not on this machine and therefore cannot serve one. Written as a
+separate check with its own comment, so the transport limit is not mistaken for
+the judgement.
+
+**Still to build:** the client that makes loopback actually reachable, with the
+address pinned after resolution and re-judged on every redirect. Without it, the
+relaxation above is a policy nothing exercises.
 
 ---
 

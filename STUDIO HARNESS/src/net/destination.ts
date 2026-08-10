@@ -55,6 +55,17 @@ export type HostClass =
   | "public"
   | "loopback"
   | "private"
+  /**
+   * A cloud instance's metadata service, which hands instance credentials to
+   * anything on the machine that asks for them.
+   *
+   * Separate from `private` because the answers differ. A private address is
+   * refused by policy and is a perfectly ordinary place for a user to run
+   * something — a server on their own network. This one is never a legitimate
+   * destination for anything this harness does, so it is refused whoever wrote
+   * the address.
+   */
+  | "metadata"
   | "own-port";
 
 /**
@@ -92,11 +103,20 @@ function classifyIpv4(host: string): HostClass {
     return "public";
   }
 
+  // Named metadata endpoints that sit outside link-local and would otherwise be
+  // classified as ordinary private addresses. Alibaba's is inside the
+  // carrier-grade NAT range and Oracle's inside IETF protocol assignments, so
+  // neither is caught by a range rule.
+  if (host === "100.100.100.200" || host === "192.0.0.192") return "metadata";
+
   const [a = 0, b = 0] = octets;
   if (a === 127) return "loopback";
   if (a === 0) return "private"; // "this network"
   if (a === 10) return "private";
-  if (a === 169 && b === 254) return "private"; // link-local, incl. cloud metadata
+  // Link-local. AWS, GCP, and Azure all serve instance credentials from
+  // 169.254.169.254, and nothing this harness does has a reason to reach any
+  // address in the block, so the whole block is refused rather than one address.
+  if (a === 169 && b === 254) return "metadata";
   if (a === 172 && b >= 16 && b <= 31) return "private";
   if (a === 192 && b === 168) return "private";
   if (a === 100 && b >= 64 && b <= 127) return "private"; // carrier-grade NAT
@@ -115,9 +135,13 @@ function classifyIpv6(host: string): HostClass {
 
   if (address === "::1") return "loopback";
   if (address === "::") return "private";
-  // Unique local (fc00::/7) and link-local (fe80::/10).
+  // AWS serves instance credentials here over IPv6, and it sits inside the
+  // unique-local block that the next line would otherwise call private.
+  if (address === "fd00:ec2::254") return "metadata";
+  // Unique local (fc00::/7).
   if (/^f[cd]/.test(address)) return "private";
-  if (/^fe[89ab]/.test(address)) return "private";
+  // Link-local (fe80::/10), the IPv6 counterpart of 169.254.0.0/16.
+  if (/^fe[89ab]/.test(address)) return "metadata";
 
   // IPv4-mapped addresses have two spellings, and `new URL` rewrites the
   // readable one into the other: `::ffff:127.0.0.1` comes back as
@@ -205,7 +229,20 @@ export interface Destination {
   readonly url: string;
   /** The permission resource, e.g. `docs.example.com`. */
   readonly host: string;
+  /** What the address turned out to be. */
+  readonly hostClass: HostClass;
 }
+
+/**
+ * Who chose this address.
+ *
+ * `C-17`: the guard follows the URL's **author**, not the address. A person who
+ * typed an address into a settings form has already decided to reach it, and
+ * refusing them their own machine is refusing the ordinary case — a local MCP
+ * server is the normal kind. A model that produced an address inside a turn has
+ * decided nothing; the address may have come from a web page it just read.
+ */
+export type UrlAuthor = "model" | "user";
 
 function portFromUrl(url: URL): number {
   if (url.port !== "") return Number(url.port);
@@ -255,19 +292,72 @@ export function parseHostPort(raw: string): HostPort {
  * model can widen.
  */
 export function parseDestination(raw: string): Destination {
-  const { url, hostPort } = parseUrl(raw);
-  const hostClass = classifyHostPort(hostPort);
-  // All three non-public classes are refused with the same kind and message
-  // today. The split makes a future loopback policy expressible; acting on it
-  // is a different item, and own-port stays refused even then.
-  if (hostClass !== "public") {
+  const destination = judgeDestination(raw, "model");
+
+  // `fetch` reaches a page through a reading service, so it cannot serve an
+  // address on this machine or this network however the permission question is
+  // answered — the service is not on this machine. Refused here rather than
+  // by the policy above, because this is a limit of one transport and not a
+  // judgement about the address. `C-17` relaxed the *policy* for loopback; a
+  // client that can actually open a local connection is what makes that
+  // reachable, and it is not this one.
+  if (destination.hostClass !== "public") {
     throw new DestinationError("private");
   }
 
-  // Credentials in a URL would travel into a log line and into the provider's
-  // request. Dropped rather than refused: the address is still fetchable.
+  return destination;
+}
+
+/**
+ * The `C-17` policy: judges an address against who chose it.
+ *
+ * | Class | A model chose it | A person typed it |
+ * |---|---|---|
+ * | public | allowed | allowed |
+ * | loopback | allowed, and approval is still asked for host **and port** | allowed |
+ * | private | refused | allowed |
+ * | metadata | refused | refused |
+ * | own-port | refused | refused |
+ *
+ * **Allowed is not approved.** Nothing here grants anything. Every destination
+ * still goes through the kernel with the resource this returns, and the reason
+ * loopback carries its port is that two ports on one host are two services —
+ * approving a development server must not approve an unsecured database on the
+ * same machine.
+ *
+ * **Two classes are refused whoever asked.** A metadata endpoint hands out
+ * instance credentials and is never a legitimate destination for anything here.
+ * An own-port is our own control plane, and reaching it is escalation rather
+ * than a network call — a person typing it has misunderstood rather than
+ * decided, and it would be a loop even if they had.
+ *
+ * **A private address is refused for a model and allowed for a person**,
+ * because those are genuinely different situations. A user pointing a server at
+ * a machine on their own network is ordinary. A model producing the same
+ * address inside a turn has decided nothing — the address may have come from a
+ * page it just read a moment earlier.
+ */
+export function judgeDestination(raw: string, author: UrlAuthor): Destination {
+  const { url, hostPort } = parseUrl(raw);
+  const hostClass = classifyHostPort(hostPort);
+
+  if (hostClass === "metadata" || hostClass === "own-port") {
+    throw new DestinationError("private", {
+      message:
+        hostClass === "metadata"
+          ? "That address belongs to a cloud provider's credential service, so nothing here may reach it."
+          : "That address is Project Studio's own service, so nothing may reach it through the network.",
+    });
+  }
+
+  if (hostClass === "private" && author === "model") {
+    throw new DestinationError("private");
+  }
+
+  // Credentials in a URL would travel into a log line and into the request
+  // itself. Dropped rather than refused: the address is still reachable.
   url.username = "";
   url.password = "";
 
-  return { url: url.toString(), host: destinationResource(hostPort) };
+  return { url: url.toString(), host: destinationResource(hostPort), hostClass };
 }

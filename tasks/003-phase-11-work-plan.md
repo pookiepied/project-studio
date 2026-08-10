@@ -395,7 +395,40 @@ That is a property of the method, not a fault of the delegate, and it is the
 line along which work can be split at all: **rule work can go out, and the
 record of why cannot.**
 
-### 003.5 — part B, still to do
+### 003.5 — part B — **the policy done, the client still to build**
+
+**`C-17` is answered and built.** `judgeDestination(raw, author)`. The guard
+follows who wrote the address, and the full table is in `check-later.md`. What is
+worth repeating here is the part that changed while building it.
+
+**`metadata` became its own host class.** It used to be folded into `private`,
+and that stopped being right the moment `private` became reachable for somebody:
+a person typing an address is deciding about their own network, and no decision
+they can make turns a cloud credential endpoint into a legitimate destination.
+The whole link-local block is refused rather than the one famous address, plus
+the three endpoints outside it — Alibaba's inside carrier-grade NAT, Oracle's
+inside IETF protocol assignments, AWS's IPv6 one inside unique-local. A range
+rule catches none of those three.
+
+**`own-port` is refused for a person too.** Reaching our own service is
+escalation rather than a network call; someone typing it has misunderstood
+rather than decided, and it would be a loop even if they had not.
+
+**Allowed is not approved.** Nothing in this function grants anything. Every
+destination still goes through the kernel with the resource it returns. The
+policy decides what may be *offered*, which is the distinction `C-17` existed
+for.
+
+**`fetch` is unchanged on purpose.** It still refuses every non-public address —
+not by policy, but because it reads through a service that is not on this
+machine and cannot serve one. Written as its own check with its own comment, so
+a transport limit is never mistaken for a judgement about the address.
+
+Verified by inverting the author test: refusing a person their private network
+instead of a model fails 2.
+
+**Still to build:** the client. Until it exists the relaxation above is a policy
+nothing exercises.
 
 The split in `tasks/002` §9, plus two things the review found:
 
