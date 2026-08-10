@@ -241,6 +241,14 @@ registry, the extend spine, the wire layer, the connection, **both** channels,
 the handshake, the supervisor, and the reconciler — and nothing calls it. Wiring
 it to the kernel and to settings is 003.7 and 003.8.
 
+**One process per launch, not per server** (`C-18`, closed). Two projects share
+a process only when the command, the arguments, the environment, and the working
+directory are identical; a remote server has no working directory, so two
+projects reaching one endpoint share one connection. The launcher owns that key
+because it is the only thing that varies it, and `McpServerRegistry.reachKey` is
+the one spelling of "the fields that matter" — the same list that decides
+whether an edit revokes a grant.
+
 **A launcher now turns a stored row into a live server.** It holds the two
 things the supervisor must not: the project root that becomes a local server's
 working directory, and the secret, read from the credential store at the moment

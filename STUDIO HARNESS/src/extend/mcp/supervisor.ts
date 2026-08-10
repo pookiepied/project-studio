@@ -45,7 +45,23 @@ import { transition, type LifecycleEvent, type LifecycleState } from "./wire/lif
  * rule below be tested against a server that fails on the third attempt, which
  * no real program can be relied on to do.
  */
-export type McpLauncher = (record: McpServerRecord) => Promise<McpChannel>;
+export interface McpLauncher {
+  /**
+   * What makes two launches the same launch.
+   *
+   * The supervisor holds one process per key, and this is the whole of `C-18`'s
+   * second half. Two projects may share a process **only** when the command,
+   * the arguments, the environment, and the working directory are identical. A
+   * filesystem server started in project A and handed to project B would give B
+   * a server rooted in A — the folder wall failing with correct tools, the wrong
+   * project, and no error anywhere.
+   *
+   * It belongs to the launcher because the launcher is what varies it. The
+   * supervisor does not know what a project root is and must not learn.
+   */
+  key(record: McpServerRecord): string;
+  open(record: McpServerRecord): Promise<McpChannel>;
+}
 
 export interface McpSupervisorOptions {
   readonly launch: McpLauncher;
@@ -57,6 +73,14 @@ export interface McpSupervisorOptions {
 /** What is true about a server right now. All of it derived, none of it stored. */
 export interface McpServerStatus {
   readonly id: string;
+  /**
+   * Which launch this is. Two entries may share an id and never a key.
+   *
+   * Exposed because "one server" is no longer the same statement as "one
+   * process", and a caller counting processes has to be able to tell them
+   * apart.
+   */
+  readonly key: string;
   readonly state: LifecycleState["kind"];
   /** Failed starts so far. Zero unless the state is `failed` or `given-up`. */
   readonly attempts: number;
@@ -70,6 +94,8 @@ export interface McpServerStatus {
 
 interface Entry {
   readonly record: McpServerRecord;
+  /** The launcher's answer, kept so an entry can report and remove itself. */
+  readonly key: string;
   state: LifecycleState;
   connection: McpConnection | undefined;
   session: McpSession | undefined;
@@ -138,13 +164,26 @@ export class McpSupervisor {
     return entry.starting ?? this.#beginStart(entry);
   }
 
-  /** What is true about a server right now, or `undefined` if it is not running. */
+  /**
+   * What is true about a server right now, or `undefined` if it is not running.
+   *
+   * A server may have more than one process — the same program, started for two
+   * projects with different roots — so this answers about the first one found.
+   * `statuses()` is what a caller that needs all of them uses. Kept because
+   * almost every caller has exactly one and asking it to know about keys would
+   * be making them carry `C-18` for no benefit.
+   */
   status(id: string): McpServerStatus | undefined {
-    const entry = this.#entries.get(id);
-    if (entry === undefined) return undefined;
+    for (const entry of this.#entries.values()) {
+      if (entry.record.id === id) return this.#statusOf(entry);
+    }
+    return undefined;
+  }
 
+  #statusOf(entry: Entry): McpServerStatus {
     return {
-      id,
+      id: entry.record.id,
+      key: entry.key,
       state: entry.state.kind,
       attempts: entry.state.kind === "failed" ? entry.state.attempts : 0,
       ...(entry.session === undefined
@@ -158,17 +197,18 @@ export class McpSupervisor {
     };
   }
 
+  /** Every running process, one entry each. Two may share an id. */
   statuses(): readonly McpServerStatus[] {
-    const all: McpServerStatus[] = [];
-    for (const id of this.#entries.keys()) {
-      const status = this.status(id);
-      if (status !== undefined) all.push(status);
-    }
-    return all;
+    return [...this.#entries.values()].map((entry) => this.#statusOf(entry));
   }
 
   /**
    * Stops a server and forgets it.
+   *
+   * **Every process of that server**, because the caller is uninstalling it,
+   * editing it, or switching it off — and none of those mean "the copy rooted in
+   * one particular folder". A `stop` that left a sibling running would be a
+   * server the user believes is gone.
    *
    * Forgetting is deliberate. A stopped server has no attempt count worth
    * keeping and no failure worth showing — the user turned it off, and
@@ -180,10 +220,13 @@ export class McpSupervisor {
    * Safe from every state, including part-way through starting.
    */
   stop(id: string): void {
-    const entry = this.#entries.get(id);
-    if (entry === undefined) return;
+    for (const entry of [...this.#entries.values()]) {
+      if (entry.record.id === id) this.#stopEntry(entry);
+    }
+  }
 
-    this.#entries.delete(id);
+  #stopEntry(entry: Entry): void {
+    this.#entries.delete(entry.key);
     // Before anything else: an attempt still in flight, and a close callback
     // from the connection we are about to end, both check this and stop.
     entry.generation += 1;
@@ -207,11 +250,12 @@ export class McpSupervisor {
 
   /** Stops every server. Called when the harness itself is shutting down. */
   stopAll(): void {
-    for (const id of [...this.#entries.keys()]) this.stop(id);
+    for (const entry of [...this.#entries.values()]) this.#stopEntry(entry);
   }
 
   #entryFor(record: McpServerRecord): Entry {
-    const existing = this.#entries.get(record.id);
+    const key = this.#launch.key(record);
+    const existing = this.#entries.get(key);
     if (existing !== undefined) return existing;
 
     const entry: Entry = {
@@ -223,8 +267,9 @@ export class McpSupervisor {
       retryTimer: undefined,
       lastError: undefined,
       generation: 0,
+      key,
     };
-    this.#entries.set(record.id, entry);
+    this.#entries.set(key, entry);
     return entry;
   }
 
@@ -274,7 +319,7 @@ export class McpSupervisor {
     let started: { close(): void } | undefined;
 
     try {
-      const channel = await this.#launch(entry.record);
+      const channel = await this.#launch.open(entry.record);
       started = channel;
 
       // Stopped while the process was spawning. The process exists and has to

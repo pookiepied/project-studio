@@ -299,22 +299,43 @@ export class McpServerRegistry {
   }
 
   /**
+   * Everything about how this server is reached, as one comparable string.
+   *
+   * **The list of fields that matter, written once.** Three questions read it
+   * and they must never disagree: does an edit invalidate the approvals, does an
+   * edit require a restart, and are two launches the same launch. Three copies
+   * of a field list is how one of them quietly stops including a field, and the
+   * symptom is an approval that survives an edit or a process shared between two
+   * things that are not the same.
+   *
+   * `title` is absent because the user approved a tool, not a label. `id` is
+   * present because two servers are two servers, however alike their commands.
+   */
+  static reachKey(record: McpServerRecord): string {
+    return JSON.stringify([
+      record.id,
+      record.transport,
+      record.command ?? null,
+      record.args,
+      // Sorted, so two records that set the same variables in a different order
+      // are the same reach. Object key order is not meaningful and would
+      // otherwise decide whether a server restarts.
+      Object.entries(record.env).sort(([a], [b]) => a.localeCompare(b)),
+      record.url ?? null,
+      record.auth,
+      record.authHeader ?? null,
+      record.authEnvVar ?? null,
+    ]);
+  }
+
+  /**
    * Whether an edit changed how the server is reached.
    *
-   * The events that invalidate an approval, listed once. Renaming a server or
-   * changing its title does not: the user approved a tool, not a label.
+   * The events that invalidate an approval. Renaming a server or changing its
+   * title does not: the user approved a tool, not a label.
    */
   static reachChanged(before: McpServerRecord, after: McpServerRecord): boolean {
-    return (
-      before.transport !== after.transport ||
-      before.command !== after.command ||
-      before.url !== after.url ||
-      before.auth !== after.auth ||
-      before.authHeader !== after.authHeader ||
-      before.authEnvVar !== after.authEnvVar ||
-      JSON.stringify(before.args) !== JSON.stringify(after.args) ||
-      JSON.stringify(before.env) !== JSON.stringify(after.env)
-    );
+    return McpServerRegistry.reachKey(before) !== McpServerRegistry.reachKey(after);
   }
 
   /**

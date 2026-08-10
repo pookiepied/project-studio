@@ -227,6 +227,27 @@ describe("the MCP server registry", () => {
         expect(McpServerRegistry.reachChanged(before, after), after.url).toBe(true);
       }
     });
+
+    it("does not call a reordered environment a change", () => {
+      const before = registry.save({ ...REMOTE, env: { ALPHA: "1", BETA: "2" } });
+      const after = registry.save({ ...REMOTE, env: { BETA: "2", ALPHA: "1" } });
+
+      // The order keys were written in is not something the server can observe,
+      // and it must not be what decides whether a process restarts or an
+      // approval is revoked.
+      expect(McpServerRegistry.reachChanged(before, after)).toBe(false);
+    });
+
+    it("gives two servers two keys, however alike their commands", () => {
+      const first = registry.save({ ...REMOTE, id: "one" });
+      const second = registry.save({ ...REMOTE, id: "two" });
+
+      // The key decides which process is which. Two servers configured
+      // identically are still two servers.
+      expect(McpServerRegistry.reachKey(first)).not.toBe(
+        McpServerRegistry.reachKey(second),
+      );
+    });
   });
 
   describe("what the spine is told", () => {

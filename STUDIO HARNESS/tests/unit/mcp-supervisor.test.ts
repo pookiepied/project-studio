@@ -4,7 +4,11 @@ import { ExtendError } from "../../src/extend/errors.js";
 import type { McpChannel } from "../../src/extend/mcp/connection.js";
 import { LEGACY_PROTOCOL_VERSIONS } from "../../src/extend/mcp/handshake.js";
 import type { McpServerRecord } from "../../src/extend/mcp/registry.js";
-import { McpSupervisor } from "../../src/extend/mcp/supervisor.js";
+import {
+  McpSupervisor,
+  type McpLauncher,
+  type McpSupervisorOptions,
+} from "../../src/extend/mcp/supervisor.js";
 
 /**
  * A channel that answers a handshake and nothing else.
@@ -92,11 +96,32 @@ async function settle(times = 8): Promise<void> {
 /** Backoff with no waiting and no randomness, so a retry is observable. */
 const IMMEDIATE = { random: () => 0 } as const;
 
+/**
+ * A supervisor whose launches are told apart by server id.
+ *
+ * This file's subject is what happens *around* a server — starting, failing,
+ * waiting, giving up, being switched off half way — and one process per id is
+ * the arrangement every one of those rules was written against. The launch key
+ * that distinguishes two projects (`C-18`) is the launcher's, and it is
+ * exercised where it is decided, in the launcher's own tests.
+ */
+function scriptedSupervisor(options: {
+  launch: McpLauncher["open"];
+  backoff?: McpSupervisorOptions["backoff"];
+  connection?: McpSupervisorOptions["connection"];
+}): McpSupervisor {
+  return new McpSupervisor({
+    launch: { key: (record) => record.id, open: options.launch },
+    ...(options.backoff === undefined ? {} : { backoff: options.backoff }),
+    ...(options.connection === undefined ? {} : { connection: options.connection }),
+  });
+}
+
 describe("supervising MCP servers", () => {
   describe("starting", () => {
     it("starts a server on first use and reports it ready", async () => {
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           return new ScriptedChannel();
@@ -112,7 +137,7 @@ describe("supervising MCP servers", () => {
     });
 
     it("starts nothing until something asks", () => {
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           throw new Error("must not be launched");
         },
@@ -126,7 +151,7 @@ describe("supervising MCP servers", () => {
       // Two processes for one server is the failure that is hardest to see:
       // both work, so nothing looks wrong until something counts them.
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           await new Promise((resolve) => setTimeout(resolve, 5));
@@ -145,7 +170,7 @@ describe("supervising MCP servers", () => {
 
     it("reuses a running server rather than starting a second one", async () => {
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           return new ScriptedChannel();
@@ -162,7 +187,7 @@ describe("supervising MCP servers", () => {
 
   describe("failing", () => {
     it("reports the failure to the caller waiting on it", async () => {
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           throw new ExtendError("internal", { message: "no such program" });
         },
@@ -176,7 +201,7 @@ describe("supervising MCP servers", () => {
     it("fails fast rather than waiting for every retry", async () => {
       // A tool call must not sit through fifteen seconds of backoff. The caller
       // gets the attempt in progress; the retries happen behind it.
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           throw new ExtendError("internal", { message: "broken" });
         },
@@ -191,7 +216,7 @@ describe("supervising MCP servers", () => {
 
     it("retries in the background, so the next caller finds it running", async () => {
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           if (launches === 1) throw new ExtendError("internal", { message: "not yet" });
@@ -209,7 +234,7 @@ describe("supervising MCP servers", () => {
 
     it("stops retrying a server that always fails", async () => {
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           throw new ExtendError("internal", { message: "always broken" });
@@ -230,7 +255,7 @@ describe("supervising MCP servers", () => {
     });
 
     it("tells a caller how to give a given-up server another chance", async () => {
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           throw new ExtendError("internal", { message: "always broken" });
         },
@@ -249,7 +274,7 @@ describe("supervising MCP servers", () => {
       // The ordinary case on a machine with an old server installed. The
       // process is running, holds our stdin, and will not exit on its own.
       const channel = new ScriptedChannel("silent");
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => channel,
         backoff: { random: () => 0, maxAttempts: 1 },
         connection: { requestTimeoutMs: 20 },
@@ -262,7 +287,7 @@ describe("supervising MCP servers", () => {
 
     it("treats a ready server that dies as a failure and starts it again", async () => {
       const channels: ScriptedChannel[] = [];
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           const channel = new ScriptedChannel();
           channels.push(channel);
@@ -287,7 +312,7 @@ describe("supervising MCP servers", () => {
   describe("stopping", () => {
     it("closes a running server and forgets it", async () => {
       const channel = new ScriptedChannel();
-      const supervisor = new McpSupervisor({ launch: async () => channel });
+      const supervisor = scriptedSupervisor({ launch: async () => channel });
 
       const connection = await supervisor.ensure(RECORD);
       supervisor.stop("blender");
@@ -299,7 +324,7 @@ describe("supervising MCP servers", () => {
 
     it("gives a server that had given up a clean start when it is switched on again", async () => {
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           if (launches === 1) throw new ExtendError("internal", { message: "broken" });
@@ -320,7 +345,7 @@ describe("supervising MCP servers", () => {
 
     it("cancels a scheduled retry", async () => {
       let launches = 0;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           launches += 1;
           throw new ExtendError("internal", { message: "broken" });
@@ -340,7 +365,7 @@ describe("supervising MCP servers", () => {
       // created it has to end it, and nothing else has a handle to it.
       const channel = new ScriptedChannel();
       let release: (() => void) | undefined;
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           await new Promise<void>((resolve) => {
             release = resolve;
@@ -361,7 +386,7 @@ describe("supervising MCP servers", () => {
 
     it("stops everything at once", async () => {
       const channels: ScriptedChannel[] = [];
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => {
           const channel = new ScriptedChannel();
           channels.push(channel);
@@ -380,7 +405,7 @@ describe("supervising MCP servers", () => {
     });
 
     it("does nothing for a server it never started", () => {
-      const supervisor = new McpSupervisor({
+      const supervisor = scriptedSupervisor({
         launch: async () => new ScriptedChannel(),
       });
 

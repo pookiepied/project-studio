@@ -782,6 +782,43 @@ a secret for a server that wants none fails 1; and the scope revert fails 6.
 project is open at a time. `L-05` — the supervisor keyed on the launch rather
 than the id — is now unblocked, and `projectRoot()` is the thing that varies.
 
+### 003.6 — One process per launch — **done, and `C-18` is closed**
+
+The supervisor held one process per server **id**. It now holds one per **launch
+key**, and `C-18`'s second half is answered: two projects share a process only
+when the command, the arguments, the environment, and the working directory are
+identical.
+
+**The launcher owns the key.** `McpLauncher` became `{ key, open }` rather than a
+bare function, because a supervisor that computed the key would have to know
+what a project root is — and a supervisor that guessed one is the bug itself.
+The failure being prevented has no error message: a filesystem server started in
+project A and handed to project B answers every call correctly, with the wrong
+project's files.
+
+**A remote server shares one connection, on purpose.** It has no working
+directory, so nothing project-shaped can be got wrong, and a key that varied on
+something the far end cannot observe would cost a session and buy nothing.
+
+**`stop(id)` stops every process of that server.** Uninstalling, editing, and
+switching off all mean the server, never one folder's copy of it. A sibling left
+running is a server the user believes is gone.
+
+**One list, three readers.** `McpServerRegistry.reachKey` is now the single
+spelling of the fields that matter, and `reachChanged` compares two of them. It
+answers all three questions that could previously disagree: does an edit revoke
+the approvals, does an edit force a restart, and are two launches the same
+launch. The environment is sorted before it is compared, so the order keys were
+written in no longer decides whether a process restarts.
+
+**The test churn was the point.** Twenty call sites passed a bare function as a
+launcher, and every one had to say what its key is. A `key` that could be
+omitted would have been the same defect with a default.
+
+**Verified by breaking three rules:** a key that ignores the project root fails
+1; a key that varies the root for HTTP fails 1; a `stop` that ends only the first
+match fails 1.
+
 ### 003.6 — original notes
 
 stdio and Streamable HTTP; the era probe; modern and legacy behind one seam.

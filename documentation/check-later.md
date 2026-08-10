@@ -566,13 +566,24 @@ between the two transports. What the seam could not express is in ADR 0027.
 
 ## C-18 — One server, two projects, opposite answers
 
-**Status:** answered in part, 10 August 2026. The sharing rule is decided and
-built. **What is left:** whether two projects may share one process at all, which
-cannot be settled until the launcher exists. **Gates:** the launcher, 003.8.
+**Status:** answered in full, 11 August 2026. Both halves are decided and built.
+**Gates:** nothing further.
 
 Selection is per project — `extension_selection` is keyed `(kind, id, project)`.
-The supervisor is not: it holds one process per server id, because one server is
-one program and running two of it would be the bug that class exists to prevent.
+The supervisor was not: it held one process per server **id**, because one
+server is one program and running two of it would be the bug that class exists
+to prevent.
+
+**The second half, answered.** One process per **launch**, not per id. Two
+projects share a process only when the command, the arguments, the environment,
+and the **working directory** are identical, and the launcher owns that key
+because the launcher is the only thing that varies it. A remote server has no
+working directory, so two projects reaching one endpoint share one connection;
+adding the root to that key for symmetry would open a second session for
+something the far end cannot observe.
+
+`stop(id)` stops every process of that server. Uninstalling, editing, and
+switching off all mean the server, never one folder's copy of it.
 
 Those two facts collided the moment a server was switched **on** in project A and
 **off** in project B. Reconciling B stopped a process A was using.

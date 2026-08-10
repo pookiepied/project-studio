@@ -72,11 +72,17 @@ beforeEach(() => {
   launched = [];
   channels = new Map();
   supervisor = new McpSupervisor({
-    launch: async (record) => {
-      launched.push(record.id);
-      const channel = new ScriptedChannel();
-      channels.set(record.id, channel);
-      return channel;
+    launch: {
+      // One process per id, which is the arrangement these rules were written
+      // against. Telling two projects' launches apart is `C-18` and belongs to
+      // the launcher, which has its own tests for it.
+      key: (record) => record.id,
+      open: async (record) => {
+        launched.push(record.id);
+        const channel = new ScriptedChannel();
+        channels.set(record.id, channel);
+        return channel;
+      },
     },
     backoff: { random: () => 0 },
   });
@@ -150,9 +156,12 @@ describe("bringing MCP servers into line with what a project chose", () => {
     // which turns a growing wait into a tight loop.
     registry.save(server("broken", NODE));
     supervisor = new McpSupervisor({
-      launch: async () => {
-        launched.push("broken");
-        throw new ExtendError("internal", { message: "will not start" });
+      launch: {
+        key: (record) => record.id,
+        open: async () => {
+          launched.push("broken");
+          throw new ExtendError("internal", { message: "will not start" });
+        },
       },
       backoff: { random: () => 0, baseDelayMs: 60_000, maxAttempts: 5 },
     });
@@ -171,12 +180,15 @@ describe("bringing MCP servers into line with what a project chose", () => {
     registry.save(server("broken", NODE));
     registry.save(server("blender", NODE));
     supervisor = new McpSupervisor({
-      launch: async (record) => {
-        if (record.id === "broken") {
-          throw new ExtendError("internal", { message: "will not start" });
-        }
-        launched.push(record.id);
-        return new ScriptedChannel();
+      launch: {
+        key: (record) => record.id,
+        open: async (record) => {
+          if (record.id === "broken") {
+            throw new ExtendError("internal", { message: "will not start" });
+          }
+          launched.push(record.id);
+          return new ScriptedChannel();
+        },
       },
       backoff: { random: () => 0, maxAttempts: 0 },
     });

@@ -141,7 +141,7 @@ describe("createMcpLauncher", () => {
         projectRoot: () => project,
       });
 
-      const channel = await launch(
+      const channel = await launch.open(
         record({ command: process.execPath, args: [script] }),
       );
       closers.push(() => channel.close());
@@ -166,7 +166,7 @@ describe("createMcpLauncher", () => {
       });
 
       current = second;
-      const channel = await launch(
+      const channel = await launch.open(
         record({ command: process.execPath, args: [script] }),
       );
       closers.push(() => channel.close());
@@ -191,7 +191,7 @@ describe("createMcpLauncher", () => {
         env: { PROBE_MODE: "test" },
       });
 
-      const channel = await launch(stored);
+      const channel = await launch.open(stored);
       closers.push(() => channel.close());
       const connection = new McpConnection(channel);
 
@@ -224,7 +224,7 @@ describe("createMcpLauncher", () => {
         credentials: new InMemoryCredentialStore(),
         projectRoot: () => project,
       });
-      const channel = await launch(
+      const channel = await launch.open(
         record({ command: process.execPath, args: [script] }),
       );
       closers.push(() => channel.close());
@@ -247,7 +247,7 @@ describe("createMcpLauncher", () => {
         credentials,
         projectRoot: () => process.cwd(),
       });
-      const channel = await launch(
+      const channel = await launch.open(
         record({ transport: "http", url: remote.url, auth: "bearer" }),
       );
       closers.push(() => channel.close());
@@ -266,7 +266,7 @@ describe("createMcpLauncher", () => {
         credentials,
         projectRoot: () => process.cwd(),
       });
-      const channel = await launch(
+      const channel = await launch.open(
         record({
           transport: "http",
           url: remote.url,
@@ -292,7 +292,7 @@ describe("createMcpLauncher", () => {
         credentials,
         projectRoot: () => process.cwd(),
       });
-      const channel = await launch(
+      const channel = await launch.open(
         record({ transport: "http", url: remote.url, auth: "none" }),
       );
       closers.push(() => channel.close());
@@ -311,7 +311,7 @@ describe("createMcpLauncher", () => {
         projectRoot: () => process.cwd(),
       });
 
-      const thrown = await launch(
+      const thrown = await launch.open(
         record({ transport: "http", url: "http://127.0.0.1:1/mcp", auth: "bearer" }),
       ).catch((error: unknown) => error);
 
@@ -330,7 +330,7 @@ describe("createMcpLauncher", () => {
 
       // A refused destination, which is the failure most likely to quote what
       // it was given.
-      const thrown = await launch(
+      const thrown = await launch.open(
         record({ transport: "http", url: "http://169.254.169.254/mcp", auth: "bearer" }),
       ).catch((error: unknown) => error);
 
@@ -384,13 +384,117 @@ describe("createMcpLauncher", () => {
     expect(supervisor.status("probe")?.state).toBe("ready");
   });
 
+  /**
+   * `C-18`, second half: when two projects may share one process.
+   *
+   * The failure this prevents has no error message. A filesystem server started
+   * in project A and handed to project B answers every call correctly, with the
+   * wrong project's files — the folder wall failing silently, which is the one
+   * shape of that failure nobody notices.
+   */
+  describe("what makes two launches the same launch", () => {
+    it("gives two projects two processes for one local server", async () => {
+      const first = await workspace();
+      const second = await workspace();
+      const script = await stdioServerScript(first);
+      let current = first;
+
+      const supervisor = new McpSupervisor({
+        launch: createMcpLauncher({
+          credentials: new InMemoryCredentialStore(),
+          projectRoot: () => current,
+        }),
+      });
+      closers.push(() => supervisor.stopAll());
+
+      const stored = record({ command: process.execPath, args: [script] });
+      const one = await supervisor.ensure(stored);
+      current = second;
+      const two = await supervisor.ensure(stored);
+
+      expect(one).not.toBe(two);
+      expect(supervisor.statuses()).toHaveLength(2);
+
+      const firstRoot = ((await one.request("probe")) as { cwd: string }).cwd;
+      const secondRoot = ((await two.request("probe")) as { cwd: string }).cwd;
+      expect(firstRoot).not.toBe(secondRoot);
+    });
+
+    it("shares one process when nothing about the launch differs", async () => {
+      const project = await workspace();
+      const script = await stdioServerScript(project);
+      const supervisor = new McpSupervisor({
+        launch: createMcpLauncher({
+          credentials: new InMemoryCredentialStore(),
+          projectRoot: () => project,
+        }),
+      });
+      closers.push(() => supervisor.stopAll());
+
+      const stored = record({ command: process.execPath, args: [script] });
+      expect(await supervisor.ensure(stored)).toBe(await supervisor.ensure(stored));
+      expect(supervisor.statuses()).toHaveLength(1);
+    });
+
+    it("shares one connection to a remote server, which has no root", async () => {
+      const remote = await httpServer();
+      let current = "/project/one";
+      const supervisor = new McpSupervisor({
+        launch: createMcpLauncher({
+          credentials: new InMemoryCredentialStore(),
+          projectRoot: () => current,
+        }),
+      });
+      closers.push(() => supervisor.stopAll());
+
+      const stored = record({ transport: "http", url: remote.url });
+      const one = await supervisor.ensure(stored);
+      current = "/project/two";
+      const two = await supervisor.ensure(stored);
+
+      // Nothing project-shaped exists at the far end, so a second connection
+      // would buy nothing and cost a session.
+      expect(one).toBe(two);
+      expect(supervisor.statuses()).toHaveLength(1);
+    });
+
+    it("stops every process of a server, not the one that matched first", async () => {
+      const first = await workspace();
+      const second = await workspace();
+      const script = await stdioServerScript(first);
+      let current = first;
+
+      const supervisor = new McpSupervisor({
+        launch: createMcpLauncher({
+          credentials: new InMemoryCredentialStore(),
+          projectRoot: () => current,
+        }),
+      });
+      closers.push(() => supervisor.stopAll());
+
+      const stored = record({ command: process.execPath, args: [script] });
+      const one = await supervisor.ensure(stored);
+      current = second;
+      const two = await supervisor.ensure(stored);
+
+      // Uninstalling, editing, and switching off all mean the server — never
+      // "the copy rooted in one particular folder". A sibling left running is a
+      // server the user believes is gone.
+      supervisor.stop("probe");
+
+      expect(supervisor.statuses()).toHaveLength(0);
+      expect(one.closed).toBe(true);
+      expect(two.closed).toBe(true);
+    });
+  });
+
   it("refuses a record the registry would never have written", async () => {
     const launch = createMcpLauncher({
       credentials: new InMemoryCredentialStore(),
       projectRoot: () => process.cwd(),
     });
 
-    await expect(launch(record({ transport: "stdio" }))).rejects.toThrow(/command/);
-    await expect(launch(record({ transport: "http" }))).rejects.toThrow(/address/);
+    await expect(launch.open(record({ transport: "stdio" }))).rejects.toThrow(/command/);
+    await expect(launch.open(record({ transport: "http" }))).rejects.toThrow(/address/);
   });
 });

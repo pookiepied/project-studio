@@ -133,21 +133,29 @@ project is open at a time. `L-05` is where that stops being enough.
 
 ---
 
-## L-05 — The supervisor's key is an id, not a launch · **`C-18`, second half**
+## ~~L-05 — The supervisor's key is an id, not a launch~~ · **done**
 
-The union across open projects is built. The remaining half: two projects may
-share one process only when the command, arguments, environment, **and working
-directory** are identical. A filesystem server started in project A and shared
-with B gives B a server rooted in A — the folder wall failing with correct
-tools, the wrong project, and no error.
+`C-18` is now answered in full. The supervisor holds one process per **launch
+key**, and two projects with different roots get two processes — proved by a
+test that reads the working directory each child actually reports.
 
-**Unblocked.** `L-04` built the launcher, and `projectRoot()` is exactly the
-thing that varies the key — a function read at the moment of the launch, whose
-answer today is the same every time only because one project is open.
+**The launcher owns the key**, because the launcher is what varies it.
+`McpLauncher` became `{ key, open }` rather than a bare function, so the
+supervisor cannot guess a key and does not learn what a project is.
 
-**Safe today** because one project is open at a time, so every launch is
-identical by construction. **Done when:** `stop` takes that key, and a test
-proves two projects with different roots get two processes.
+**A remote server shares one connection**, deliberately. It has no working
+directory, so there is nothing project-shaped to get wrong; a key that varied on
+something the far end cannot observe would open a second session for no reason.
+
+**`stop(id)` stops every process of that server.** Uninstalling, editing, and
+switching off all mean the server, never "the copy rooted in one folder". A
+sibling left running is a server the user believes is gone.
+
+**One list, three readers.** `McpServerRegistry.reachKey` is now the single
+spelling of "the fields that matter", and `reachChanged` is a comparison of two
+of them. It answers all three questions that used to be able to disagree: does
+an edit revoke the approvals, does an edit force a restart, and are two launches
+the same launch.
 
 ---
 

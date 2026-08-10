@@ -2,7 +2,7 @@ import type { SecureCredentialStore } from "../../credentials/credential-store.j
 import { ExtendError } from "../errors.js";
 import type { McpChannel } from "./connection.js";
 import { HttpChannel } from "./http-channel.js";
-import type { McpServerRecord } from "./registry.js";
+import { McpServerRegistry, type McpServerRecord } from "./registry.js";
 import { StdioChannel } from "./stdio-channel.js";
 import type { McpLauncher } from "./supervisor.js";
 
@@ -71,7 +71,27 @@ async function readSecret(
 export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
   const { credentials, projectRoot } = options;
 
-  return async (record: McpServerRecord): Promise<McpChannel> => {
+  /**
+   * What makes two launches the same launch — `C-18`'s second half.
+   *
+   * `reachKey` is the registry's one list of the fields that matter, the same
+   * list that decides whether an edit invalidates an approval. The working
+   * directory is added here because it is the one thing that varies without the
+   * record changing at all: the same server, the same command, two projects.
+   *
+   * **A remote server has no working directory**, so two projects reaching one
+   * endpoint are reaching one endpoint and share a connection. There is nothing
+   * project-shaped to get wrong, which is why the root is left out rather than
+   * added for symmetry — a key that varied on something the server cannot
+   * observe would open a second connection for no reason.
+   */
+  const key = (record: McpServerRecord): string => {
+    const reach = McpServerRegistry.reachKey(record);
+    if (record.transport === "http") return reach;
+    return `${reach} ${projectRoot()}`;
+  };
+
+  const open = async (record: McpServerRecord): Promise<McpChannel> => {
     const secret = await readSecret(record, credentials);
 
     if (record.transport === "http") {
@@ -116,4 +136,6 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
         : { startupTimeoutMs: options.startupTimeoutMs }),
     });
   };
+
+  return { key, open };
 }
