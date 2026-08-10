@@ -7,6 +7,7 @@ import {
 } from "node:http";
 import { spawn } from "node:child_process";
 
+import { registerOwnPort, unregisterOwnPort } from "../net/own-ports.js";
 import type { StudioAuthConfig } from "./config.js";
 import { isAbortError } from "./auth-client.js";
 import { StudioAuthError } from "./errors.js";
@@ -91,6 +92,12 @@ export async function loginWithGoogle(
       signal: options.signal,
     });
   } finally {
+    // Unregistered before the close completes, and in a `finally`, because a
+    // port left in the set outlives the listener and would refuse a destination
+    // that is now somebody else's — the guard turning into a false accusation
+    // instead of a defence.
+    const address = server.address();
+    if (address && typeof address !== "string") unregisterOwnPort(address.port);
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
@@ -111,6 +118,18 @@ async function listenOnLoopback(server: Server): Promise<string> {
       message: "Could not open a local port to receive the sign-in redirect.",
     });
   }
+
+  // This port receives an authorization code, so while it is open it is part of
+  // our control plane rather than somewhere on the network. The destination
+  // guard refuses a port we are listening on to every caller and whoever wrote
+  // the address — and it can only do that for ports it has been told about.
+  //
+  // Nothing can reach it today, because `fetch` refuses every loopback address
+  // whatever the port. That stops being true when the direct HTTP client makes
+  // loopback reachable, and a registration added then would have been missing
+  // for exactly as long as it mattered.
+  registerOwnPort(address.port);
+
   return `http://127.0.0.1:${address.port}/callback`;
 }
 

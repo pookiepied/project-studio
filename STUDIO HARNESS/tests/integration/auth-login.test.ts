@@ -15,6 +15,7 @@ import { signIn, isSignedIn, signOut } from "../../src/auth/login.js";
 import { SessionAccessTokenProvider } from "../../src/auth/session-token-provider.js";
 import { SessionStore } from "../../src/auth/session.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
+import { isOwnPort } from "../../src/net/own-ports.js";
 
 /**
  * Drives the real sign-in flow end to end against a local mock Google and a
@@ -203,6 +204,33 @@ describe("sign-in", () => {
     // A public client sends no secret.
     expect(exchange).not.toHaveProperty("client_secret");
     expect(exchange?.grant_type).toBe("authorization_code");
+  });
+
+  it("guards the callback port while it is open, and releases it after", async () => {
+    // The port receives an authorization code, so while it is listening it is
+    // part of our control plane rather than somewhere on the network. The
+    // destination guard refuses a port we listen on to every caller and to
+    // both authors — and it can only do that for a port it was told about.
+    //
+    // Nothing can reach it today, because `fetch` refuses every loopback
+    // address whatever the port. Asserted now so the registration is not
+    // missing on the day the direct HTTP client makes loopback reachable.
+    let seen = 0;
+    await signIn({
+      config,
+      credentials,
+      openBrowser: browserThatApproves((url) => {
+        const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+        seen = Number(redirect.port);
+        expect(isOwnPort(seen)).toBe(true);
+      }),
+    });
+
+    // Released afterwards. A port left in the set outlives its listener and
+    // would refuse a destination that now belongs to somebody else — the guard
+    // turning into a false accusation instead of a defence.
+    expect(seen).toBeGreaterThan(0);
+    expect(isOwnPort(seen)).toBe(false);
   });
 
   it("stores access and refresh tokens as separate credential entries", async () => {
