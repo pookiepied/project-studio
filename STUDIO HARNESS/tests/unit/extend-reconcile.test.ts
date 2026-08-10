@@ -83,7 +83,7 @@ describe("reconciling a project", () => {
     const reconciler = new ExtensionReconciler(inventory);
     reconciler.register("mcp", mcp.run);
 
-    await expect(reconciler.reconcile("p1")).resolves.toBe(true);
+    await expect(reconciler.reconcile(["p1"])).resolves.toBe(true);
 
     expect(mcp.calls).toEqual([["blender"]]);
   });
@@ -97,8 +97,8 @@ describe("reconciling a project", () => {
     const reconciler = new ExtensionReconciler(inventory);
     reconciler.register("mcp", mcp.run);
 
-    await reconciler.reconcile("p1");
-    await expect(reconciler.reconcile("p1")).resolves.toBe(false);
+    await reconciler.reconcile(["p1"]);
+    await expect(reconciler.reconcile(["p1"])).resolves.toBe(false);
 
     expect(mcp.calls).toHaveLength(1);
   });
@@ -110,9 +110,9 @@ describe("reconciling a project", () => {
     const reconciler = new ExtensionReconciler(inventory);
     reconciler.register("mcp", mcp.run);
 
-    await reconciler.reconcile("p1");
+    await reconciler.reconcile(["p1"]);
     reconciler.changed();
-    await expect(reconciler.reconcile("p1")).resolves.toBe(true);
+    await expect(reconciler.reconcile(["p1"])).resolves.toBe(true);
 
     expect(mcp.calls).toHaveLength(2);
   });
@@ -124,10 +124,76 @@ describe("reconciling a project", () => {
     const reconciler = new ExtensionReconciler(inventory);
     reconciler.register("mcp", mcp.run);
 
-    await reconciler.reconcile("p1");
-    await expect(reconciler.reconcile("p2")).resolves.toBe(true);
+    await reconciler.reconcile(["p1"]);
+    await expect(reconciler.reconcile(["p2"])).resolves.toBe(true);
 
     expect(mcp.calls).toHaveLength(2);
+  });
+
+  it("wants the union of what every open project switched on", async () => {
+    // Switching something off in one project decides what that project sees.
+    // It was never a decision to end a process somebody else is using — see
+    // `C-18`. One project wanting it is enough for it to run.
+    inventory.register("mcp", () => [
+      { id: "blender", title: "Blender", author: "third-party" },
+      { id: "figma", title: "Figma", author: "third-party" },
+    ]);
+    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
+    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p2" }, false);
+    selection.set({ kind: "mcp", extensionId: "figma", projectId: "p2" }, true);
+
+    const mcp = spy();
+    const reconciler = new ExtensionReconciler(inventory);
+    reconciler.register("mcp", mcp.run);
+
+    await reconciler.reconcile(["p1", "p2"]);
+
+    expect([...(mcp.calls[0] ?? [])].sort()).toEqual(["blender", "figma"]);
+  });
+
+  it("counts a project once however many times it is named", async () => {
+    inventory.register("mcp", () => [
+      { id: "blender", title: "Blender", author: "third-party" },
+    ]);
+    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
+
+    const mcp = spy();
+    const reconciler = new ExtensionReconciler(inventory);
+    reconciler.register("mcp", mcp.run);
+
+    await reconciler.reconcile(["p1", "p1"]);
+
+    expect(mcp.calls).toEqual([["blender"]]);
+  });
+
+  it("stops wanting something once no open project does", async () => {
+    inventory.register("mcp", () => [
+      { id: "blender", title: "Blender", author: "third-party" },
+    ]);
+    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
+
+    const mcp = spy();
+    const reconciler = new ExtensionReconciler(inventory);
+    reconciler.register("mcp", mcp.run);
+
+    await reconciler.reconcile(["p1", "p2"]);
+    // p1 closed. Nothing left wants it.
+    await reconciler.reconcile(["p2"]);
+
+    expect(mcp.calls).toEqual([["blender"], []]);
+  });
+
+  it("does not care what order the projects arrive in", async () => {
+    inventory.register("mcp", () => []);
+
+    const mcp = spy();
+    const reconciler = new ExtensionReconciler(inventory);
+    reconciler.register("mcp", mcp.run);
+
+    await reconciler.reconcile(["p1", "p2"]);
+    await expect(reconciler.reconcile(["p2", "p1"])).resolves.toBe(false);
+
+    expect(mcp.calls).toHaveLength(1);
   });
 
   it("treats a change that arrives mid-pass as unhandled", async () => {
@@ -143,8 +209,8 @@ describe("reconciling a project", () => {
       if (calls === 1) reconciler.changed();
     });
 
-    await reconciler.reconcile("p1");
-    await expect(reconciler.reconcile("p1")).resolves.toBe(true);
+    await reconciler.reconcile(["p1"]);
+    await expect(reconciler.reconcile(["p1"])).resolves.toBe(true);
 
     expect(calls).toBe(2);
   });
@@ -162,14 +228,12 @@ describe("one pass at a time", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
-    await Promise.all([reconciler.reconcile("p1"), reconciler.reconcile("p1")]);
+    await Promise.all([reconciler.reconcile(["p1"]), reconciler.reconcile(["p1"])]);
 
     expect(calls).toBe(1);
   });
 
-  it("makes a different project wait rather than race", async () => {
-    // A server switched on in one project and off in another is one process
-    // being asked for opposite things.
+  it("makes a different set of projects wait rather than race", async () => {
     inventory.register("mcp", () => []);
 
     const reconciler = new ExtensionReconciler(inventory);
@@ -183,7 +247,7 @@ describe("one pass at a time", () => {
       running -= 1;
     });
 
-    await Promise.all([reconciler.reconcile("p1"), reconciler.reconcile("p2")]);
+    await Promise.all([reconciler.reconcile(["p1"]), reconciler.reconcile(["p2"])]);
 
     expect(order).toEqual(["start 1", "end", "start 1", "end"]);
   });
@@ -200,8 +264,8 @@ describe("one pass at a time", () => {
       if (calls === 1) throw new Error("first pass fails");
     });
 
-    const first = reconciler.reconcile("p1");
-    const second = reconciler.reconcile("p2");
+    const first = reconciler.reconcile(["p1"]);
+    const second = reconciler.reconcile(["p2"]);
 
     await expect(first).rejects.toThrow(/first pass fails/);
     await expect(second).resolves.toBe(true);
@@ -221,7 +285,7 @@ describe("one kind failing decides nothing for the others", () => {
     reconciler.register("mcp", mcp.run);
     reconciler.register("hook", hook.run);
 
-    await expect(reconciler.reconcile("p1")).rejects.toThrow(/mcp is broken/);
+    await expect(reconciler.reconcile(["p1"])).rejects.toThrow(/mcp is broken/);
 
     expect(hook.calls).toHaveLength(1);
   });
@@ -236,8 +300,8 @@ describe("one kind failing decides nothing for the others", () => {
       if (calls === 1) throw new Error("broken");
     });
 
-    await expect(reconciler.reconcile("p1")).rejects.toThrow();
-    await expect(reconciler.reconcile("p1")).resolves.toBe(true);
+    await expect(reconciler.reconcile(["p1"])).rejects.toThrow();
+    await expect(reconciler.reconcile(["p1"])).resolves.toBe(true);
 
     expect(calls).toBe(2);
   });
@@ -255,6 +319,6 @@ describe("registering", () => {
   it("skips a kind that has no reconciler", async () => {
     const reconciler = new ExtensionReconciler(inventory);
 
-    await expect(reconciler.reconcile("p1")).resolves.toBe(true);
+    await expect(reconciler.reconcile(["p1"])).resolves.toBe(true);
   });
 });

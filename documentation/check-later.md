@@ -514,37 +514,64 @@ written as a list while it has one entry.
 
 ## C-18 — One server, two projects, opposite answers
 
-**Status:** open. **Gates:** nothing today; decide before more than one project
-is live in one harness process.
+**Status:** answered in part, 10 August 2026. The sharing rule is decided and
+built. **What is left:** whether two projects may share one process at all, which
+cannot be settled until the launcher exists. **Gates:** the launcher, 003.8.
 
 Selection is per project — `extension_selection` is keyed `(kind, id, project)`.
 The supervisor is not: it holds one process per server id, because one server is
-one program and running two of it would be the bug the whole class exists to
-prevent.
+one program and running two of it would be the bug that class exists to prevent.
 
-Those two facts collide the moment a server is switched **on** in project A and
-**off** in project B. Reconciling B stops a process A is using; reconciling A
-starts one B just stopped. Neither side is wrong on its own.
+Those two facts collided the moment a server was switched **on** in project A and
+**off** in project B. Reconciling B stopped a process A was using.
 
-**Not a live defect.** Reconciling is one pass at a time harness-wide, so the two
-cannot run concurrently, and the harness serves one project at a time today. The
-result is a server that stops and starts as the project changes — wasteful, not
-incorrect.
+### Answered — off means unseen, not ended
 
-**The three answers, none of them chosen yet.**
+Switching something off in a project is a decision about what that project
+**sees**. It was never a decision to end a process.
 
-- **Reference count.** A server runs while at least one live project wants it.
-  Cheapest, and it means a process outlives the project that started it, which
-  needs saying out loud before it is true.
-- **One supervisor per project.** Honest isolation, and it doubles the processes
-  for a server two projects both use.
-- **One project per harness process.** Already effectively true. Making it a rule
-  removes the question, and forecloses a window-per-project product later.
+That is not a new principle. It is the rule the three layers were built on:
+**enabling can only subtract; it never grants.** A project that switched a server
+off gets no tools from it, because the spine lists only what that project
+switched on, and a tool that is never listed is never registered and never
+reaches the gate. Ending the process was never what made that true.
 
-**Check when:** the desktop application can have two projects open at once, or
-when 003.8 wires selection to a settings screen — whichever comes first. The
-reference count is the likely answer, and it should be a decision rather than a
-default.
+The defect was in the reconciler, not the model: it read **one** project's answer
+as the whole truth. It now takes every open project and wants the union. Something
+runs while at least one project wants it, and stops when none do — reference
+counting, written as a set so there is no count to drift.
+
+Nothing leaks. A shared process serves only the projects that asked for it,
+because what a project can call is decided where the list is built, one layer
+above.
+
+### Not answered — whether one process can serve two projects at all
+
+The union is right and it is not sufficient, because **a process is started
+somewhere**. A local MCP server is spawned with a working directory, and that
+directory is the project root. A filesystem server started in project A's folder
+and then shared with project B would give B a server rooted in A — which is the
+folder wall failing quietly, and it would be the worst kind of failure: correct
+tools, wrong project, no error.
+
+So the sharing rule is not "same server id". It is **same server id and same
+launch**. Two projects share one process when the command, the arguments, the
+environment, and the working directory are identical; they get one process each
+when anything differs.
+
+That makes the supervisor's key a composite rather than an id. It is a small
+change and it cannot be made honestly yet: the record holds no working directory,
+the launcher supplies it, and the launcher does not exist. Building the key
+before the thing that varies it would be guessing at what varies.
+
+**Do this when the launcher lands in 003.8:** key the supervisor on the launch,
+not the id, and make `stop` take that key. The union is already in place and does
+not change.
+
+**Recorded so it is not lost:** until then, one project is open at a time, so
+every launch is identical by construction and the composite key would have one
+member. That is why this is safe today and unsafe the moment a second project
+opens.
 
 ---
 

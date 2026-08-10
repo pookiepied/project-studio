@@ -594,10 +594,31 @@ started is the plan's own `start` list, so a server that is failing is still
 known to the supervisor and left to its own retry, and a server that has given up
 stays given up.
 
-**One pass at a time, harness-wide.** A second call for the same project joins
-the one running. A call for a *different* project waits rather than racing it,
-because a server switched on in one project and off in another is one process
-being asked for opposite things. That cross-project case is recorded as `C-18`.
+**It reconciles every open project, not one — `C-18`.** The first version took a
+single project id, which made a server switched on in project A and off in
+project B into one process being asked for opposite things. That was a defect in
+the reconciler, not in the model: switching something off decides what a project
+**sees**, and it was never a decision to end a process. The rule was already
+written down — *enabling can only subtract; it never grants* — and a tool that is
+never listed is never registered and never reaches the gate, whether or not a
+process is running.
+
+So the desired set is the union across open projects. Something runs while at
+least one project wants it and stops when none do, which is reference counting
+written as a set so there is no count to drift.
+
+**What that does not answer.** A process is started *somewhere*. A local server is
+spawned with the project root as its working directory, so a filesystem server
+started in project A and shared with B would give B a server rooted in A — the
+folder wall failing with correct tools, the wrong project, and no error. The
+sharing rule is therefore *same server id and same launch*, which makes the
+supervisor's key a composite. That cannot be built honestly until the launcher
+exists, because the launcher is what varies it. It lands with 003.8, and the
+union does not change when it does. One project is open at a time today, so every
+launch is identical by construction.
+
+**One pass at a time, harness-wide.** A second call for the same projects joins
+the one running; a different set queues behind it.
 
 **One kind failing decides nothing for the others.** Every kind is attempted and
 the failures are collected. A broken hook that stopped MCP from starting would be

@@ -82,8 +82,8 @@ export class ExtensionReconciler {
    * a counter that began at the settled value would skip the startup pass.
    */
   #generation = 1;
-  #settled: { readonly projectId: string; readonly generation: number } | undefined;
-  #inFlight: { readonly projectId: string; readonly pass: Promise<boolean> } | undefined;
+  #settled: { readonly key: string; readonly generation: number } | undefined;
+  #inFlight: { readonly key: string; readonly pass: Promise<boolean> } | undefined;
 
   constructor(inventory: ExtensionInventory) {
     this.#inventory = inventory;
@@ -123,27 +123,40 @@ export class ExtensionReconciler {
   }
 
   /**
-   * Brings the live set into line with the desired set for one project.
+   * Brings the live set into line with what the open projects chose.
    *
    * Returns whether a pass actually ran. Safe to call at startup, at a turn
    * boundary, on a timer, and after a crash — the same implementation covers
    * all four, which is the whole argument for reconciling rather than
    * reacting.
    *
+   * **It takes every open project, not one.** Switching something off in a
+   * project is a decision about what that project *sees*, and the spine already
+   * enforces that by listing only what a project switched on. It was never a
+   * decision to end a process. Passing one project's answer as the whole truth
+   * is what made a server switched on in one project and off in another into
+   * one process being asked for opposite things — see `C-18`.
+   *
+   * So the desired set is the union across open projects. Something runs while
+   * at least one project wants it, and stops when none do. That is reference
+   * counting, written as a set so there is no count to get wrong.
+   *
    * **One pass at a time, harness-wide.** Two concurrent passes would spawn the
-   * same server twice. A second call for the same project joins the one that is
-   * running; a call for a different project waits for it rather than racing it,
-   * because a server switched on in one project and off in another is one
-   * process being asked for opposite things.
+   * same server twice. A second call for the same projects joins the one that is
+   * running; a call for a different set queues behind it.
    */
-  async reconcile(projectId: string): Promise<boolean> {
+  async reconcile(projectIds: readonly string[]): Promise<boolean> {
+    const projects = [...new Set(projectIds)].sort();
+    // A NUL cannot appear in a project id and cannot be confused with one, so
+    // two different sets can never produce the same key.
+    const key = projects.join("\0");
     const current = this.#inFlight;
 
-    if (current?.projectId === projectId) return current.pass;
+    if (current?.key === key) return current.pass;
 
     if (
       current === undefined &&
-      this.#settled?.projectId === projectId &&
+      this.#settled?.key === key &&
       this.#settled.generation === this.#generation
     ) {
       return false;
@@ -155,9 +168,9 @@ export class ExtensionReconciler {
       () => undefined,
       () => undefined,
     );
-    const pass = (after ?? Promise.resolve()).then(() => this.#pass(projectId));
+    const pass = (after ?? Promise.resolve()).then(() => this.#pass(projects, key));
 
-    this.#inFlight = { projectId, pass };
+    this.#inFlight = { key, pass };
     void pass.then(
       () => this.#finish(pass),
       () => this.#finish(pass),
@@ -170,7 +183,7 @@ export class ExtensionReconciler {
     if (this.#inFlight?.pass === pass) this.#inFlight = undefined;
   }
 
-  async #pass(projectId: string): Promise<boolean> {
+  async #pass(projects: readonly string[], key: string): Promise<boolean> {
     // Read before any work, not after. A change that arrives while this pass is
     // running is recorded as unhandled, so the next call runs again instead of
     // believing this pass covered it.
@@ -181,8 +194,16 @@ export class ExtensionReconciler {
       const run = this.#reconcilers.get(kind);
       if (run === undefined) continue;
 
+      // The union, deduplicated. A `Set` rather than a count: two projects
+      // wanting the same thing is one thing running, and a count that drifted
+      // would either leak a process or end one somebody was using.
+      const desired = new Set<string>();
+      for (const projectId of projects) {
+        for (const entry of this.#inventory.active(kind, projectId)) desired.add(entry.id);
+      }
+
       try {
-        await run(this.#inventory.active(kind, projectId).map((entry) => entry.id));
+        await run([...desired]);
       } catch (error) {
         // Every kind is attempted. One kind failing must not decide anything
         // for the others — a broken hook that stopped MCP from starting would
@@ -199,7 +220,7 @@ export class ExtensionReconciler {
       });
     }
 
-    this.#settled = { projectId, generation };
+    this.#settled = { key, generation };
     return true;
   }
 }
