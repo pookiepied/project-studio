@@ -975,7 +975,7 @@ security gain.
 Found while building the MCP stdio channel, where the same claim would have been
 inherited unexamined.
 
-### E-02 · The setup CLI raises errors with no domain · Open
+### E-03 · The setup CLI raises errors with no domain · Open
 
 `src/models/local/cli.ts:59` and `:66` reject with a bare `Error`. Every failure
 in the harness carries a domain and a kind so telemetry has one identity to

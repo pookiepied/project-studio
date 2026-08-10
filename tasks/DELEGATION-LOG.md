@@ -62,7 +62,7 @@ onboarded.
 *The test was widened rather than the code merely patched.* It now refuses the
 **construction** of `Error`, `TypeError`, `RangeError`, and `DOMException`
 anywhere in `src/`, and asserts the exact list of remaining offenders instead of
-skipping them — `models/local/cli.ts`, recorded as `E-02`. `DOMException` is in
+skipping them — `models/local/cli.ts`, recorded as `E-03`. `DOMException` is in
 the list because it is what the platform gives back for an abort, and taking the
 platform's default is the most natural way to acquire an error with no domain.
 
