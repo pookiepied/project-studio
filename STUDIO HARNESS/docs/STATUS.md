@@ -237,9 +237,15 @@ Research and design are in `tasks/002-phase-11-mcp.md`, and the running record o
 what has been built is `tasks/003-phase-11-work-plan.md`. This section describes
 the design; it is not a progress report, and the work plan is the one that says
 where the code has reached. As of this note a client exists end to end — the
-registry, the extend spine, the wire layer, the connection, the child-process
-channel, the handshake, the supervisor, and the reconciler — and nothing calls
-it. Wiring it to the kernel and to settings is 003.7 and 003.8.
+registry, the extend spine, the wire layer, the connection, **both** channels,
+the handshake, the supervisor, and the reconciler — and nothing calls it. Wiring
+it to the kernel and to settings is 003.7 and 003.8.
+
+**Both transports exist and the connection knows about neither.** A child
+process and a Streamable HTTP endpoint go through one seam, and the framing, the
+era probe, and the handshake are the same code over both. What HTTP could not
+express through a duplex seam — a failed POST is the answer to what it carried,
+and a remote server has no `stderr` — is ADR 0027.
 
 **Every Phase 11 module has zero callers in `src/`.** Measured, not assumed. That
 is the shape the phase was built in on purpose — each piece tested against a

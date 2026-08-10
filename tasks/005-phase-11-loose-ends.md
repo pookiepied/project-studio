@@ -88,15 +88,26 @@ which was only ever true while page reading was its one caller.
 
 ---
 
-## L-03 — Streamable HTTP transport · **003.6, unblocked**
+## ~~L-03 — Streamable HTTP transport~~ · **done**
 
-An `McpChannel` over HTTP, the sibling of `StdioChannel`. HTTP+SSE is never
-implemented — decided in `C-16`. It builds on `src/net/http.ts` and inherits the
-pinning, the redirect rule, the ceiling, and the deadline without restating any
-of them.
+`src/extend/mcp/http-channel.ts`. The condition held: **`McpConnection`, the
+framing, the era probe, and the handshake are unchanged.** The tests drive a
+real connection and a real handshake over a real HTTP server, because a test
+that spoke to the channel directly would have passed while that claim was false.
 
-**Done when:** the same `McpConnection` and the same handshake run over it with
-no MCP-layer changes. If either needs a special case, the channel seam is wrong.
+It reuses `net/http.ts` and adds no address handling of its own, so the pinning,
+the redirect rule, and the deadline are inherited rather than restated.
+
+**One thing it needed from `net/http.ts`:** an unread body. An event stream must
+be acted on as it arrives, and a ceiling applied by the reader would have to
+buffer the whole stream to count it. `requestStream` returns the response with
+the body unread and `requestDirect` became a wrapper around it, so there is one
+judge-and-pin path and not two.
+
+**Two decisions are recorded in ADR 0027**, because both are places this file
+does more than move bytes: a failed POST is answered on the transport's behalf,
+and `onStderr` carries the transport's own complaints because a remote server
+has no diagnostics of its own.
 
 ---
 

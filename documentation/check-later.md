@@ -521,7 +521,8 @@ relaxation above is a policy nothing exercises.
 
 ## C-16 — Which MCP revisions we speak
 
-**Status:** open. **Gates:** nothing yet; narrows Phase 11's first cut.
+**Status:** closed, 11 August 2026. Both eras ship, and both transports now
+exist. **Gates:** nothing further.
 
 The 2026-07-28 revision split MCP into two eras. Research and the full
 compatibility procedure are in `tasks/002-phase-11-mcp.md` §1.
@@ -553,6 +554,13 @@ rather than negotiating down — there is nothing to negotiate down to. The fail
 names both lists, which is the most useful thing it can do, and the fix is to add
 the revision. Not a defect, and it is the reason `MODERN_PROTOCOL_VERSIONS` is
 written as a list while it has one entry.
+
+**The HTTP half is built, 11 August 2026** — `src/extend/mcp/http-channel.ts`,
+Streamable HTTP only, exactly as decided here. HTTP+SSE was not implemented and
+now never will be: it is the older two-endpoint transport, deprecated in the
+revision this client adopts, and nothing in the code refers to it. The seam held
+— the connection, the framing, the era probe, and the handshake are unchanged
+between the two transports. What the seam could not express is in ADR 0027.
 
 ---
 

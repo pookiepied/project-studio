@@ -712,6 +712,43 @@ a key from its environment, a secret fetched from the credential store at that
 moment. Neither belongs in a class that holds live objects. That wiring is
 003.8. Streamable HTTP is still open and waits on `003.5` part B.
 
+### 003.6 — Streamable HTTP — **done, and the seam held**
+
+`src/extend/mcp/http-channel.ts`, the sibling of `StdioChannel` and the second
+transport the connection has never had to know about. `McpConnection`, the
+framing, the era probe, and the handshake are **unchanged**. The tests drive a
+real connection and a real handshake over a real HTTP server, because a test
+that spoke to the channel directly would have passed while that claim was false.
+
+**Two things a duplex seam cannot express, and what was done about them.** Both
+are in ADR 0027, and both are places the channel does more than move bytes.
+
+A **failed POST is the answer**, because no separate response is ever coming in
+this transport. A `502` is turned into a JSON-RPC error for the request that
+POST carried, with code `-32000` — outside the band the era probe reads, so a
+transport failure can never look like a refused protocol version. Recording the
+status and stopping was the more honest option and much worse: every call would
+wait out its full timeout with the reason only in a log. A notification gets no
+answer, and the test asserts the absence.
+
+**`onStderr` carries the transport's own complaints**, because a remote server
+has no diagnostics and `send` cannot throw. An empty method there would mean a
+failed exchange left no trace anywhere.
+
+**A timeout refuses one call; unreachable ends the channel.** A slow answer is
+one call going badly. A server that cannot be reached is the connection being
+over, and only ending it gives the supervisor its backoff.
+
+**`requestStream` was pulled out of `requestDirect`** so a body can be read as it
+arrives. An event stream must be acted on message by message, and a ceiling
+applied by the reader would have to buffer the whole stream to count it. One
+judge-and-pin path, two ways to read the result.
+
+**Verified by breaking six rules:** the event-stream decoder fails 2, the session
+echo 1, ending on unreachable 1, the synthesised answer 1, the ceiling 1. The
+notification guard failed nothing until an assertion was added for it — a guard
+no test can fail is a guard nobody will notice breaking.
+
 ### 003.6 — original notes
 
 stdio and Streamable HTTP; the era probe; modern and legacy behind one seam.

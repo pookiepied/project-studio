@@ -112,6 +112,21 @@ export interface HttpResponse {
 }
 
 /**
+ * A response whose body has not been read yet.
+ *
+ * For a caller that must act on bytes as they arrive. **The caller owns the
+ * body**: it either consumes it or destroys it, and it enforces its own ceiling,
+ * because a ceiling this function applied would have to buffer to count — which
+ * is the one thing this shape exists to avoid.
+ */
+export interface HttpStream {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly url: string;
+  readonly body: IncomingMessage;
+}
+
+/**
  * Resolves a host and judges **every** address it returned.
  *
  * All of them, not the one that will be used. A name that answers with a public
@@ -242,8 +257,7 @@ async function sendOnce(
  * was chosen by whoever the caller says, but a `Location` header was chosen by
  * the far end, and the far end is never the user.
  */
-export async function requestDirect(options: HttpRequestOptions): Promise<HttpResponse> {
-  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+export async function requestStream(options: HttpRequestOptions): Promise<HttpStream> {
   const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
 
   const deadline = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -298,15 +312,29 @@ export async function requestDirect(options: HttpRequestOptions): Promise<HttpRe
       continue;
     }
 
-    const collected = await readBody(response, maxBytes);
     const flat: Record<string, string> = {};
     for (const [name, value] of Object.entries(response.headers)) {
       if (typeof value === "string") flat[name] = value;
       else if (Array.isArray(value)) flat[name] = value.join(", ");
     }
 
-    return { status, headers: flat, body: collected, url: url.toString() };
+    return { status, headers: flat, url: url.toString(), body: response };
   }
 
   throw new HttpError("too_many_redirects");
+}
+
+/**
+ * The same request, with the body read to the end and returned as text.
+ *
+ * What almost every caller wants. The exception is a transport that has to act
+ * on messages as they arrive rather than after the last one — Streamable HTTP
+ * holds a stream open and sends several — and that caller takes `requestStream`
+ * and its own ceiling. Written as a wrapper so there is one judge-and-pin path
+ * and not two.
+ */
+export async function requestDirect(options: HttpRequestOptions): Promise<HttpResponse> {
+  const stream = await requestStream(options);
+  const body = await readBody(stream.body, options.maxBytes ?? DEFAULT_MAX_BYTES);
+  return { status: stream.status, headers: stream.headers, body, url: stream.url };
 }
