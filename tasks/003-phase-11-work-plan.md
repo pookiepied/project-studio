@@ -749,6 +749,39 @@ echo 1, ending on unreachable 1, the synthesised answer 1, the ceiling 1. The
 notification guard failed nothing until an assertion was added for it — a guard
 no test can fail is a guard nobody will notice breaking.
 
+### 003.6 — The launcher — **done**
+
+`src/extend/mcp/launcher.ts`. The supervisor takes a launcher rather than
+starting servers itself, and this is what that was for: starting one needs the
+**project root**, which becomes the child's working directory, and the
+**secret**, read from the credential store at that moment. A supervisor holds
+live objects for a whole session, and a secret must not live that long.
+
+**The record still holds no secret.** It holds the name of the variable a local
+server reads it from, or the name of the header a remote one wants it in. The
+value is read here, once, per launch, into an environment object that is
+discarded when the call returns.
+
+**The strongest test is the end-to-end one.** A row saved through
+`McpServerRegistry` the way settings will save it, started through
+`McpSupervisor` the way the reconciler will start it, answering a request. Every
+piece had been tested against a fake; this is the first time two real ones had
+to fit.
+
+**A dead scope was found while writing it.** `CredentialScope` had `mcp` in the
+type and `assertValidKey` checked against a pair of literals that did not, so
+every store path refused it. The `mcp` scope had never been usable. The check
+now runs against the list the type is derived from, so a fourth scope cannot
+repeat it. Reverting the fix fails six tests.
+
+**Verified by breaking four rules:** starting in our own directory instead of
+the project's fails 2; dropping the secret into the environment fails 1; reading
+a secret for a server that wants none fails 1; and the scope revert fails 6.
+
+**What it deliberately does not do.** It reads one project root, because one
+project is open at a time. `L-05` — the supervisor keyed on the launch rather
+than the id — is now unblocked, and `projectRoot()` is the thing that varies.
+
 ### 003.6 — original notes
 
 stdio and Streamable HTTP; the era probe; modern and legacy behind one seam.

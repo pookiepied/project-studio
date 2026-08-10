@@ -63,7 +63,9 @@ export class CredentialStoreError extends StudioError {
  * the whole keychain/database split: the row says a secret exists and what it
  * is called, and the store is the only thing that holds what it is.
  */
-export type CredentialScope = "session" | "provider" | "mcp";
+export const CREDENTIAL_SCOPES = ["session", "provider", "mcp"] as const;
+
+export type CredentialScope = (typeof CREDENTIAL_SCOPES)[number];
 
 export interface CredentialKey {
   readonly scope: CredentialScope;
@@ -100,9 +102,14 @@ export interface SecureCredentialStore {
 }
 
 export function assertValidKey(key: CredentialKey): CredentialKey {
-  if (key.scope !== "session" && key.scope !== "provider") {
+  // Checked against the list the type is derived from, not against a second
+  // spelling of it. `mcp` was added to the type and not to the pair of literals
+  // that used to be here, so every store path refused it and the scope was
+  // unusable — a type that said yes and a guard that said no. One list is what
+  // stops that happening to the fourth scope.
+  if (!(CREDENTIAL_SCOPES as readonly string[]).includes(key.scope)) {
     throw new CredentialStoreError("invalid", {
-      message: "Credential scope must be \"session\" or \"provider\".",
+      message: `Credential scope must be one of: ${CREDENTIAL_SCOPES.join(", ")}.`,
     });
   }
   if (

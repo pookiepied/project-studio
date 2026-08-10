@@ -241,6 +241,14 @@ registry, the extend spine, the wire layer, the connection, **both** channels,
 the handshake, the supervisor, and the reconciler — and nothing calls it. Wiring
 it to the kernel and to settings is 003.7 and 003.8.
 
+**A launcher now turns a stored row into a live server.** It holds the two
+things the supervisor must not: the project root that becomes a local server's
+working directory, and the secret, read from the credential store at the moment
+of the launch and never stored. It is also the only place a transport is chosen.
+Writing it found `A-03` — the `mcp` credential scope had been in the type and
+absent from the guard since the registry landed, so MCP sign-in could never have
+worked.
+
 **Both transports exist and the connection knows about neither.** A child
 process and a Streamable HTTP endpoint go through one seam, and the framing, the
 era probe, and the handshake are the same code over both. What HTTP could not

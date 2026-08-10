@@ -111,17 +111,25 @@ has no diagnostics of its own.
 
 ---
 
-## L-04 — The launcher · **003.6/003.8**
+## ~~L-04 — The launcher~~ · **done**
 
-`McpSupervisor` takes an `McpLauncher` and nothing constructs a real one. It is
-the piece that needs the two things the supervisor must not hold:
+`src/extend/mcp/launcher.ts`. Both conditions hold. A row saved the way settings
+will save it is started through the supervisor and answers a request, and the
+secret tests assert it reaches the one variable it was asked for, appears in no
+other, is not written back onto the record, and is in neither the message nor
+the report of a failure.
 
-- the project root, which becomes the child's working directory;
-- the secret for `authEnvVar`, read from the OS credential store **at spawn
-  time**, held for the length of the call, and never stored.
+It is also the only place a transport is chosen, which is what keeps ADR 0027's
+promise real: everything above takes a channel and never asks which kind.
 
-**Done when:** a server installed in settings actually starts, and a test proves
-the secret does not appear in the record, the log, or an error message.
+**A dead scope was found while writing it.** `CredentialScope` included `mcp`
+and `assertValidKey` checked against two literals that did not, so every store
+path refused it and the scope was unusable — the type said yes and the guard
+said no. The check now runs against the list the type is derived from. Six tests
+depend on the fix; reverting it fails all six.
+
+**What it does not do, on purpose:** it reads one project root, because one
+project is open at a time. `L-05` is where that stops being enough.
 
 ---
 
@@ -133,7 +141,9 @@ directory** are identical. A filesystem server started in project A and shared
 with B gives B a server rooted in A — the folder wall failing with correct
 tools, the wrong project, and no error.
 
-Deliberately blocked on `L-04`, because the launcher is what varies the key.
+**Unblocked.** `L-04` built the launcher, and `projectRoot()` is exactly the
+thing that varies the key — a function read at the moment of the launch, whose
+answer today is the same every time only because one project is open.
 
 **Safe today** because one project is open at a time, so every launch is
 identical by construction. **Done when:** `stop` takes that key, and a test

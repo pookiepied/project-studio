@@ -179,6 +179,24 @@ that belongs to somebody else, which turns the guard into a false accusation.
 
 **The standing rule this leaves:** anything that binds a port registers it.
 
+### A-03 · The `mcp` credential scope was refused by the store that defines it · Fixed
+
+`CredentialScope` has been `"session" | "provider" | "mcp"` since the MCP
+registry landed, and `assertValidKey` checked against two literals — `session`
+and `provider`. Every store path calls it, so **every attempt to read or write an
+MCP secret would have failed**, on both the keyring store and the in-memory one.
+
+The type said yes and the guard said no, and nothing noticed because nothing had
+tried yet: the launcher is the first caller, and it did not exist. Found while
+writing it.
+
+**Not exploitable.** It fails closed — a refused write, not a secret stored
+somewhere weaker. The cost was that MCP sign-in could not work at all.
+
+Fixed by checking against `CREDENTIAL_SCOPES`, the list the type is now derived
+from, so the two cannot disagree again. **The shape to watch:** a union extended
+in one place and validated in another. Six launcher tests depend on the fix.
+
 This is the third of the same shape — a guarantee asserted against our own
 object rather than against the world. See `S-03` and `S-04`.
 
