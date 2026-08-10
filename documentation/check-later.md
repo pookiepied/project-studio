@@ -512,6 +512,42 @@ written as a list while it has one entry.
 
 ---
 
+## C-18 — One server, two projects, opposite answers
+
+**Status:** open. **Gates:** nothing today; decide before more than one project
+is live in one harness process.
+
+Selection is per project — `extension_selection` is keyed `(kind, id, project)`.
+The supervisor is not: it holds one process per server id, because one server is
+one program and running two of it would be the bug the whole class exists to
+prevent.
+
+Those two facts collide the moment a server is switched **on** in project A and
+**off** in project B. Reconciling B stops a process A is using; reconciling A
+starts one B just stopped. Neither side is wrong on its own.
+
+**Not a live defect.** Reconciling is one pass at a time harness-wide, so the two
+cannot run concurrently, and the harness serves one project at a time today. The
+result is a server that stops and starts as the project changes — wasteful, not
+incorrect.
+
+**The three answers, none of them chosen yet.**
+
+- **Reference count.** A server runs while at least one live project wants it.
+  Cheapest, and it means a process outlives the project that started it, which
+  needs saying out loud before it is true.
+- **One supervisor per project.** Honest isolation, and it doubles the processes
+  for a server two projects both use.
+- **One project per harness process.** Already effectively true. Making it a rule
+  removes the question, and forecloses a window-per-project product later.
+
+**Check when:** the desktop application can have two projects open at once, or
+when 003.8 wires selection to a settings screen — whichever comes first. The
+reference count is the likely answer, and it should be a decision rather than a
+default.
+
+---
+
 ## C-08 — Folder names contain spaces
 
 **Status:** open, low priority.

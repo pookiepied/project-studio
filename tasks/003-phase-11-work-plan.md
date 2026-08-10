@@ -274,11 +274,12 @@ system computes. So the store holds `enabled`, absence means off, and the third
 state is derived by the thing that renders it. The rule that produced this is
 the same one that cut the review's 32 states to 3.
 
-**There is no reconciler yet.** 003.3a decided its shape and that stands, but
-nothing live exists for it to reconcile — the spine touches no process and no
-connection. Building it now would be an abstraction with one imaginary caller,
-which Working Rule 8 refuses. It arrives in 003.6, with the first thing that can
-actually drift.
+**There was no reconciler at this point.** 003.3a decided its shape and that
+stands, but nothing live existed for it to reconcile — the spine touched no
+process and no connection. Building it here would have been an abstraction with
+one imaginary caller, which Working Rule 8 refuses. It arrived in 003.6, with
+the first thing that could actually drift, and waiting is what surfaced the case
+the design had not named: an edited record is invisible in the desired set.
 
 **What the architecture tests hold.** Nothing at `src/extend/*.ts` may import
 from a subdirectory, and no kind's *vocabulary* may appear there — `stdio`,
@@ -562,8 +563,59 @@ disabling envelope routing fails 8 in the supervisor alone; dropping the immedia
 that arrives after the end fails 1; falling back to legacy when no modern
 version is in common fails 1.
 
-**Still to build:** the reconciler, which finally has something live to
-reconcile, and a launcher — the supervisor takes one rather than spawning,
+**The reconciler — done.** `src/extend/reconcile.ts` and
+`src/extend/mcp/reconcile.ts`. 974 passing, up twenty-three.
+
+Built as 003.3a wrote it: desired computed from SQLite, compared against live,
+difference applied. Still no event bus, observable, or subscription anywhere in
+the harness.
+
+**One deviation from the design, and it is the same rule the design is made of.**
+003.3a named the stored type `(desired, live) => Promise<void>`. It takes only
+`desired`, because `live` is the one thing the spine must not hold — a running
+process belongs to whatever started it, and a spine carrying live objects knows
+what a kind is by definition. The difference is still computed against a plain
+set and still tested without a process; that is `planReconcile`, a pure function
+over two lists of ids.
+
+**One case the design did not name: an edited record.** A server whose command,
+address, or environment changed is invisible in the desired *set* — the id is in
+both lists, the plan says do nothing, and the old process keeps running with the
+old configuration until the harness restarts. The MCP reconciler remembers what
+each live server was started with and compares against `reachChanged`, which
+until now had no runtime caller. Deliberately the same field list that
+invalidates a permission grant: if an edit means the approvals no longer apply,
+it also means the process no longer matches. A title change is neither.
+
+**A failing server is not asked for again.** The obvious form — start everything
+desired that we have not started — resets the supervisor's backoff to nothing on
+every turn boundary, which turns a growing wait into a tight loop. What is
+started is the plan's own `start` list, so a server that is failing is still
+known to the supervisor and left to its own retry, and a server that has given up
+stays given up.
+
+**One pass at a time, harness-wide.** A second call for the same project joins
+the one running. A call for a *different* project waits rather than racing it,
+because a server switched on in one project and off in another is one process
+being asked for opposite things. That cross-project case is recorded as `C-18`.
+
+**One kind failing decides nothing for the others.** Every kind is attempted and
+the failures are collected. A broken hook that stopped MCP from starting would be
+a failure nobody could diagnose from either side. A failed pass is not recorded
+as settled, so the next call runs again rather than believing the live set
+matches.
+
+**The architecture guard caught the new file** on its first run — a comment used
+the word `prompt`, which the spine reserves as a kind's vocabulary. The comment
+changed, not the rule.
+
+**Verified by breaking five rules.** Starting from `startedWith` instead of the
+plan fails the retry-storm test; dropping the `reachChanged` comparison fails the
+edited-command test; reading the generation after the pass instead of before
+fails the mid-pass test; removing the single-flight join fails 1; and the guard
+above failed by itself.
+
+**Still to build:** a launcher — the supervisor takes one rather than spawning,
 because starting a real server needs a project root and, for a server that reads
 a key from its environment, a secret fetched from the credential store at that
 moment. Neither belongs in a class that holds live objects. That wiring is
