@@ -264,4 +264,113 @@ describe("one conversation with one MCP server", () => {
       expect(connection.inFlight).toBe(0);
     });
   });
+
+  describe("the whole answer, for the one caller that needs it", () => {
+    it("resolves an error response instead of rejecting it", async () => {
+      // The era probe reads the code to tell a modern refusal from a legacy
+      // server that does not know the method. `request` throws that code away.
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+
+      const waiting = connection.requestEnvelope("server/discover");
+      const sent = channel.lastSent();
+      channel.emit({
+        jsonrpc: "2.0",
+        id: sent.id,
+        error: { code: -32022, message: "Unsupported protocol version" },
+      });
+
+      await expect(waiting).resolves.toEqual({
+        jsonrpc: "2.0",
+        id: sent.id,
+        error: { code: -32022, message: "Unsupported protocol version" },
+      });
+    });
+
+    it("resolves a success response whole, not just its result", async () => {
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+
+      const waiting = connection.requestEnvelope("server/discover");
+      const sent = channel.lastSent();
+      channel.emit({ jsonrpc: "2.0", id: sent.id, result: { tools: [] } });
+
+      await expect(waiting).resolves.toHaveProperty("result", { tools: [] });
+    });
+
+    it("still unwraps every ordinary request", async () => {
+      // The envelope is per request. One asking for it must not change what the
+      // next one gets.
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+
+      const envelope = connection.requestEnvelope("server/discover");
+      const first = channel.lastSent();
+      channel.emit({ jsonrpc: "2.0", id: first.id, result: { ok: true } });
+      await envelope;
+
+      const ordinary = connection.request("tools/list");
+      const second = channel.lastSent();
+      channel.emit({ jsonrpc: "2.0", id: second.id, result: { tools: [] } });
+
+      await expect(ordinary).resolves.toEqual({ tools: [] });
+    });
+
+    it("still rejects when the connection dies with one waiting", async () => {
+      // An error from the server is an answer; a dead connection is not.
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+
+      const waiting = connection.requestEnvelope("server/discover");
+      channel.die();
+
+      await expect(waiting).rejects.toThrow(ExtendError);
+    });
+  });
+
+  describe("something has to learn that the connection ended", () => {
+    it("tells its listener once, with the reason", () => {
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+      const reasons: unknown[] = [];
+      connection.onClose((reason) => reasons.push(reason));
+
+      channel.die(new ExtendError("disconnected", { message: "it crashed" }));
+      channel.die(new ExtendError("disconnected", { message: "again" }));
+
+      expect(reasons).toHaveLength(1);
+      expect((reasons[0] as Error).message).toBe("it crashed");
+    });
+
+    it("tells a listener that arrives after the end", () => {
+      // A connection that died between being built and being watched is
+      // otherwise a server nothing ever restarts.
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+      channel.die();
+
+      let told = false;
+      connection.onClose(() => {
+        told = true;
+      });
+
+      expect(told).toBe(true);
+    });
+
+    it("has already failed everything waiting by the time it tells anyone", () => {
+      // A listener that reacts by starting a replacement must not find a dead
+      // connection that still has requests in its map.
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+      let inFlightWhenTold = -1;
+      connection.onClose(() => {
+        inFlightWhenTold = connection.inFlight;
+      });
+
+      void connection.request("tools/list").catch(() => undefined);
+      channel.die();
+
+      expect(inFlightWhenTold).toBe(0);
+    });
+  });
 });

@@ -1,0 +1,383 @@
+import { ExtendError } from "../errors.js";
+import { McpConnection, type McpChannel, type McpConnectionOptions } from "./connection.js";
+import { handshake, type McpSession } from "./handshake.js";
+import type { McpServerRecord } from "./registry.js";
+import { getBackoffDelay, type BackoffOptions } from "./wire/backoff.js";
+import { transition, type LifecycleEvent, type LifecycleState } from "./wire/lifecycle.js";
+
+/**
+ * The live half of MCP: which servers are running, and what to do when one is
+ * not.
+ *
+ * `lifecycle.ts` knows which transitions are legal and `backoff.ts` knows how
+ * long to wait before trying again; neither has ever seen a process. This joins
+ * them to a real one. It is the only place in the harness that holds a running
+ * server, which is what section 003.3a means by **live objects, never durable**
+ * — nothing here is written down, and everything here can be rebuilt from
+ * SQLite by starting the servers again.
+ *
+ * **Nothing is started that nobody asked for.** An entry appears the first time
+ * something calls `ensure` and disappears when something calls `stop`. A server
+ * installed but never used costs nothing, and there is no background sweep
+ * launching processes on a timer.
+ *
+ * **A failure is fast and a recovery is quiet.** `ensure` waits for the attempt
+ * in progress and no longer — a tool call must not sit through fifteen seconds
+ * of retries — and a failed attempt schedules the next one in the background,
+ * so a server that was briefly broken is running again by the time anyone asks
+ * a second time. `backoff.ts` decides when to stop trying, and a server that has
+ * given up stays given up until someone restarts it, because retrying a
+ * misconfigured command forever hides the misconfiguration.
+ *
+ * **Nothing here decides permission.** A running connection is a conversation,
+ * not an authorization. `CallGate` is still the only door, and a server this
+ * class has never been asked to start is one nothing can reach.
+ */
+
+/**
+ * How a server becomes a channel.
+ *
+ * Injected rather than built here, for two reasons that point the same way.
+ * Starting a real server needs a working directory and, for a server that reads
+ * a key from its environment, a secret fetched from the OS credential store at
+ * this exact moment — neither of which this class should hold or could hold
+ * safely. And a launcher that returns a scripted channel is what lets every
+ * rule below be tested against a server that fails on the third attempt, which
+ * no real program can be relied on to do.
+ */
+export type McpLauncher = (record: McpServerRecord) => Promise<McpChannel>;
+
+export interface McpSupervisorOptions {
+  readonly launch: McpLauncher;
+  /** Passed straight to `backoff.ts`. A test injects `random` here. */
+  readonly backoff?: BackoffOptions;
+  readonly connection?: McpConnectionOptions;
+}
+
+/** What is true about a server right now. All of it derived, none of it stored. */
+export interface McpServerStatus {
+  readonly id: string;
+  readonly state: LifecycleState["kind"];
+  /** Failed starts so far. Zero unless the state is `failed` or `given-up`. */
+  readonly attempts: number;
+  readonly era?: McpSession["era"];
+  readonly protocolVersion?: string;
+  /** Why the last attempt failed, in the words the failure used. */
+  readonly lastError?: string;
+  /** The last of what the server wrote to `stderr`, when one is connected. */
+  readonly diagnostics: readonly string[];
+}
+
+interface Entry {
+  readonly record: McpServerRecord;
+  state: LifecycleState;
+  connection: McpConnection | undefined;
+  session: McpSession | undefined;
+  starting: Promise<McpConnection> | undefined;
+  retryTimer: ReturnType<typeof setTimeout> | undefined;
+  lastError: string | undefined;
+  /**
+   * Bumped every time an attempt begins and every time the server is stopped.
+   *
+   * This is what makes an abandoned attempt harmless. A start that was in
+   * flight when the user switched the server off still finishes — a process was
+   * spawned and cannot be un-spawned — and finds its generation stale, so it
+   * closes what it built instead of installing it. Without it, switching off
+   * during startup leaves a process running that nothing has a handle to.
+   */
+  generation: number;
+}
+
+/** The words a failure used, or the best available description of one. */
+function describe(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  if (typeof reason === "string") return reason;
+  return "The server stopped for an unknown reason.";
+}
+
+export class McpSupervisor {
+  readonly #entries = new Map<string, Entry>();
+  readonly #launch: McpLauncher;
+  readonly #backoff: BackoffOptions;
+  readonly #connectionOptions: McpConnectionOptions;
+
+  constructor(options: McpSupervisorOptions) {
+    this.#launch = options.launch;
+    this.#backoff = options.backoff ?? {};
+    this.#connectionOptions = options.connection ?? {};
+  }
+
+  /**
+   * Returns a live connection to this server, starting it if necessary.
+   *
+   * Single-flight: two callers that arrive while a server is starting wait on
+   * the same attempt and get the same connection. Two processes for one server
+   * is the failure this guards, and it is the one that is hardest to see — both
+   * work, so nothing looks wrong until something counts them.
+   */
+  async ensure(record: McpServerRecord): Promise<McpConnection> {
+    const entry = this.#entryFor(record);
+
+    if (entry.state.kind === "given-up") {
+      // The message names the switch that fixes it, because the alternative is
+      // a user retrying a call that this class has already decided never to
+      // attempt again.
+      throw new ExtendError("internal", {
+        message:
+          `${record.title} failed to start too many times and will not be tried again. ` +
+          `Switch it off and on again to try once more.` +
+          (entry.lastError === undefined ? "" : ` It last said: ${entry.lastError}`),
+      });
+    }
+
+    const live = entry.connection;
+    if (entry.state.kind === "ready" && live !== undefined && !live.closed) {
+      return live;
+    }
+
+    return entry.starting ?? this.#beginStart(entry);
+  }
+
+  /** What is true about a server right now, or `undefined` if it is not running. */
+  status(id: string): McpServerStatus | undefined {
+    const entry = this.#entries.get(id);
+    if (entry === undefined) return undefined;
+
+    return {
+      id,
+      state: entry.state.kind,
+      attempts: entry.state.kind === "failed" ? entry.state.attempts : 0,
+      ...(entry.session === undefined
+        ? {}
+        : {
+            era: entry.session.era,
+            protocolVersion: entry.session.protocolVersion,
+          }),
+      ...(entry.lastError === undefined ? {} : { lastError: entry.lastError }),
+      diagnostics: entry.connection?.diagnostics ?? [],
+    };
+  }
+
+  statuses(): readonly McpServerStatus[] {
+    const all: McpServerStatus[] = [];
+    for (const id of this.#entries.keys()) {
+      const status = this.status(id);
+      if (status !== undefined) all.push(status);
+    }
+    return all;
+  }
+
+  /**
+   * Stops a server and forgets it.
+   *
+   * Forgetting is deliberate. A stopped server has no attempt count worth
+   * keeping and no failure worth showing — the user turned it off, and
+   * reporting last week's crash for something nobody is running is noise. It
+   * also means a server that had given up gets a clean start when it is
+   * switched back on, which is what a person switching it back on is asking
+   * for.
+   *
+   * Safe from every state, including part-way through starting.
+   */
+  stop(id: string): void {
+    const entry = this.#entries.get(id);
+    if (entry === undefined) return;
+
+    this.#entries.delete(id);
+    // Before anything else: an attempt still in flight, and a close callback
+    // from the connection we are about to end, both check this and stop.
+    entry.generation += 1;
+
+    if (entry.retryTimer !== undefined) {
+      clearTimeout(entry.retryTimer);
+      entry.retryTimer = undefined;
+    }
+
+    if (entry.state.kind === "ready") {
+      // Driven through the machine rather than assigned, so the transition it
+      // exists to refuse — a `started` arriving after a stop — stays refused.
+      this.#apply(entry, { kind: "stop" });
+      entry.connection?.close();
+      this.#apply(entry, { kind: "stopped" });
+    }
+
+    entry.connection = undefined;
+    entry.session = undefined;
+  }
+
+  /** Stops every server. Called when the harness itself is shutting down. */
+  stopAll(): void {
+    for (const id of [...this.#entries.keys()]) this.stop(id);
+  }
+
+  #entryFor(record: McpServerRecord): Entry {
+    const existing = this.#entries.get(record.id);
+    if (existing !== undefined) return existing;
+
+    const entry: Entry = {
+      record,
+      state: { kind: "idle" },
+      connection: undefined,
+      session: undefined,
+      starting: undefined,
+      retryTimer: undefined,
+      lastError: undefined,
+      generation: 0,
+    };
+    this.#entries.set(record.id, entry);
+    return entry;
+  }
+
+  /**
+   * Runs the state machine and refuses to continue when it says no.
+   *
+   * An illegal transition here is our bug, not a server's, so it is raised
+   * rather than returned — the state machine's whole value is that a wrong
+   * sequence stops immediately instead of producing a second process.
+   */
+  #apply(entry: Entry, event: LifecycleEvent): void {
+    const result = transition(entry.state, event);
+    if (!result.ok) {
+      throw new ExtendError("internal", { message: result.reason });
+    }
+    entry.state = result.state;
+  }
+
+  #beginStart(entry: Entry): Promise<McpConnection> {
+    this.#apply(entry, { kind: "start" });
+    entry.generation += 1;
+
+    const started: Promise<McpConnection> = this.#bringUp(
+      entry,
+      entry.generation,
+      // Cleared however the attempt ends, and only if it is still the current
+      // one. Written as a link in the returned chain, because an attempt that
+      // fails synchronously would otherwise clear the field before it was set.
+    ).finally(() => {
+      if (entry.starting === started) entry.starting = undefined;
+    });
+
+    entry.starting = started;
+    return started;
+  }
+
+  async #bringUp(entry: Entry, generation: number): Promise<McpConnection> {
+    /**
+     * Held out here so the failure path can end it.
+     *
+     * A handshake can fail while the process is perfectly healthy — a protocol
+     * we do not speak is the ordinary case — and that process is running, has
+     * our stdin, and will not exit on its own. Closing only on the paths that
+     * happen to notice would leave one behind for exactly the failure most
+     * likely to happen on a machine with an old server installed.
+     */
+    let started: { close(): void } | undefined;
+
+    try {
+      const channel = await this.#launch(entry.record);
+      started = channel;
+
+      // Stopped while the process was spawning. The process exists and has to
+      // be ended by whoever created it, which is here.
+      if (entry.generation !== generation) {
+        throw new ExtendError("cancelled", {
+          message: `${entry.record.title} was switched off while it was starting.`,
+        });
+      }
+
+      const connection = new McpConnection(channel, this.#connectionOptions);
+      // From here the connection owns the channel: closing it closes both, and
+      // closing the channel underneath it would leave the connection believing
+      // it is alive.
+      started = connection;
+
+      const session = await handshake(connection);
+
+      if (entry.generation !== generation) {
+        throw new ExtendError("cancelled", {
+          message: `${entry.record.title} was switched off while it was starting.`,
+        });
+      }
+
+      started = undefined;
+      entry.connection = connection;
+      entry.session = session;
+      entry.lastError = undefined;
+      this.#apply(entry, { kind: "started" });
+
+      // Registered after the state says ready, so a server that dies in the
+      // same tick is handled as a running server that died rather than as a
+      // start that never finished — the second would leave the attempt count
+      // where it was and retry forever.
+      connection.onClose((reason) => this.#connectionEnded(entry, generation, reason));
+
+      return connection;
+    } catch (error) {
+      started?.close();
+      if (entry.generation === generation) {
+        entry.lastError = describe(error);
+        this.#failed(entry);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * A connection that was ready is not any more.
+   *
+   * Only a `ready` server reaches here. A death during startup is already the
+   * business of the attempt that is running, and letting both react would count
+   * one failure twice and halve the retries a server actually gets.
+   */
+  #connectionEnded(entry: Entry, generation: number, reason: unknown): void {
+    if (entry.generation !== generation) return;
+    if (entry.state.kind !== "ready") return;
+
+    entry.lastError = describe(reason);
+    this.#failed(entry);
+  }
+
+  /**
+   * Records a failure and decides whether there will be another attempt.
+   *
+   * The retry is scheduled rather than awaited. A caller waiting on `ensure`
+   * gets its failure now, with the reason, instead of after every retry has
+   * been exhausted; the next caller finds a server that has quietly recovered.
+   */
+  #failed(entry: Entry): void {
+    // Nothing is closed here, because on both paths that reach this the
+    // connection is already closed: a start that failed closed what it built,
+    // and a connection reports its end only after ending. Closing again would
+    // be the one call that could re-enter this method, and a second `failed`
+    // from a state that has already recorded one is an illegal transition.
+    entry.connection = undefined;
+    entry.session = undefined;
+    this.#apply(entry, { kind: "failed" });
+
+    if (entry.state.kind !== "failed") return;
+
+    // `attempts` counts failed starts, and `getBackoffDelay` counts retries
+    // already made — one fewer, because the first failure has not been retried
+    // yet. Passing the wrong one of the two shifts every delay by a step and
+    // costs a retry, which is exactly the kind of mistake nothing would notice.
+    const decision = getBackoffDelay(entry.state.attempts - 1, this.#backoff);
+
+    if (decision.kind === "give-up") {
+      this.#apply(entry, { kind: "giveUp" });
+      return;
+    }
+
+    entry.retryTimer = setTimeout(() => {
+      entry.retryTimer = undefined;
+      if (entry.state.kind !== "failed") return;
+      // Nobody is waiting on this one, so its failure is recorded by the
+      // attempt itself and swallowed here. Rethrowing would take down the
+      // process for a server that is allowed to be broken.
+      void this.#beginStart(entry).catch(() => undefined);
+    }, decision.delayMs);
+
+    // A retry for a server nobody has asked about must not hold the process
+    // open when everything else has finished.
+    entry.retryTimer.unref?.();
+  }
+}

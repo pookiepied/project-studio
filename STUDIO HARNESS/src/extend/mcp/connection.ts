@@ -80,6 +80,16 @@ export class McpConnection {
   readonly #timeoutMs: number;
   readonly #stderrLimit: number;
   readonly #stderr: string[] = [];
+  /**
+   * Ids whose caller wants the whole answer rather than its result.
+   *
+   * Only the era probe does, and only once per connection, so this is empty for
+   * the entire working life of a server. An id is removed however its request
+   * settles, including by timeout, so nothing accumulates here.
+   */
+  readonly #wantsEnvelope = new Set<number>();
+  #onClose: ((reason?: unknown) => void) | undefined;
+  #closeReason: unknown;
   #closed = false;
 
   constructor(channel: McpChannel, options: McpConnectionOptions = {}) {
@@ -122,12 +132,58 @@ export class McpConnection {
    * an id nothing is waiting for yet.
    */
   async request(method: string, params?: unknown): Promise<unknown> {
+    return this.#send(method, params, false);
+  }
+
+  /**
+   * Sends a request and returns the whole answer, error responses included.
+   *
+   * `request` unwraps: a JSON-RPC error becomes a rejection and its `code` is
+   * gone. That is right for every ordinary call — a caller asking for a tool
+   * list has no use for a number — and wrong for exactly one, because the era
+   * probe reads the code to tell a modern refusal from a legacy server that
+   * does not know the method. Unwrapping first and re-deciding after would mean
+   * reconstructing what was just discarded.
+   *
+   * Only transport failures reject here: a timeout, a dead channel, a send that
+   * could not happen. An answer of any shape resolves, because for this one
+   * caller an error *is* the answer.
+   */
+  async requestEnvelope(method: string, params?: unknown): Promise<unknown> {
+    return this.#send(method, params, true);
+  }
+
+  /**
+   * Called once when the connection ends, from either side.
+   *
+   * The supervisor needs this and cannot get it from the channel: the channel
+   * carries a single close listener and this class already took it. Registering
+   * after the end still fires, because a connection that died between being
+   * built and being watched is otherwise a server that is never restarted.
+   */
+  onClose(listener: (reason?: unknown) => void): void {
+    this.#onClose = listener;
+    if (this.#closed) listener(this.#closeReason);
+  }
+
+  async #send(
+    method: string,
+    params: unknown,
+    wantsEnvelope: boolean,
+  ): Promise<unknown> {
     if (this.#closed) {
       throw new ExtendError("disconnected");
     }
 
     const id = this.#pending.nextId();
-    const waiting = this.#pending.register(id, { timeoutMs: this.#timeoutMs });
+    const waiting = this.#pending
+      .register(id, { timeoutMs: this.#timeoutMs })
+      // However this settles, the id stops being special. Written as part of
+      // the returned chain rather than as a side effect, so it cannot be
+      // skipped by a path that settles some other way.
+      .finally(() => this.#wantsEnvelope.delete(id));
+
+    if (wantsEnvelope) this.#wantsEnvelope.add(id);
 
     try {
       this.#channel.send(
@@ -187,11 +243,21 @@ export class McpConnection {
       const value = message.value;
 
       if (isJsonRpcSuccessResponse(value)) {
-        if (value.id !== null) this.#pending.resolve(value.id, value.result);
+        if (value.id !== null) {
+          if (this.#wanted(value.id)) this.#pending.resolve(value.id, value);
+          else this.#pending.resolve(value.id, value.result);
+        }
         continue;
       }
 
       if (isJsonRpcErrorResponse(value)) {
+        if (value.id !== null && this.#wanted(value.id)) {
+          // An error is a legitimate answer to the one caller that asked for
+          // the envelope, so it resolves rather than rejects.
+          this.#pending.resolve(value.id, value);
+          continue;
+        }
+
         if (value.id === null) {
           // An error with no id answers no request. It is the server reporting
           // something about the connection itself, and the only useful thing
@@ -213,6 +279,11 @@ export class McpConnection {
       // ignored it" is visible instead of invisible.
       this.#record(`unhandled message from server: ${JSON.stringify(value)}`);
     }
+  }
+
+  /** Whether this id's caller asked for the whole answer. Ids are numbers. */
+  #wanted(id: string | number): boolean {
+    return typeof id === "number" && this.#wantsEnvelope.has(id);
   }
 
   #recordDiagnostics(chunk: string | Uint8Array): void {
@@ -240,14 +311,18 @@ export class McpConnection {
   #ended(reason?: unknown): void {
     if (this.#closed) return;
     this.#closed = true;
-    this.#pending.rejectAll(
+    this.#closeReason =
       reason ??
-        new ExtendError("disconnected", {
-          message:
-            this.#stderr.length === 0
-              ? "The server stopped."
-              : `The server stopped. It last said: ${this.#stderr[this.#stderr.length - 1]}`,
-        }),
-    );
+      new ExtendError("disconnected", {
+        message:
+          this.#stderr.length === 0
+            ? "The server stopped."
+            : `The server stopped. It last said: ${this.#stderr[this.#stderr.length - 1]}`,
+      });
+    // Everything waiting is failed before anyone is told the connection ended,
+    // so a listener that reacts by starting a replacement cannot observe a dead
+    // connection that still has requests in its map.
+    this.#pending.rejectAll(this.#closeReason);
+    this.#onClose?.(this.#closeReason);
   }
 }
