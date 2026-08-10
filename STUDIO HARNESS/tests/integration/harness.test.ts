@@ -45,8 +45,10 @@ async function availablePort(): Promise<number> {
 async function waitUntil(
   predicate: () => Promise<boolean>,
   timeoutMs = 15_000,
+  describe?: () => string,
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
+  const started = Date.now();
+  const deadline = started + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) {
       return;
@@ -54,8 +56,26 @@ async function waitUntil(
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  throw new Error(`Condition was not met within ${timeoutMs}ms.`);
+  // The detail is the point of this change. This condition has now expired
+  // twice in full-suite runs, and both reports said only that a number had been
+  // exceeded — so both times the cause stayed unknown and `E-02` could only
+  // guess at it. A deadline that expires without saying what it was waiting on
+  // is a failure that cannot be diagnosed from its own message.
+  throw new Error(
+    `Condition was not met within ${timeoutMs}ms (waited ${Date.now() - started}ms).` +
+      (describe?.() ?? ""),
+  );
 }
+
+/**
+ * How long the harness gets to accept its first connection.
+ *
+ * A healthy start is well under a second. This is not a threshold anything is
+ * expected to approach, and raising it is explicitly **not** the fix for `E-02`
+ * — the report above is. It is set far beyond any plausible boot so that when it
+ * does expire, the machine was genuinely wedged and the message says so.
+ */
+const STARTUP_BUDGET_MS = 60_000;
 
 async function startHarness(databasePath: string): Promise<RunningHarness> {
   const port = await availablePort();
@@ -74,20 +94,50 @@ async function startHarness(databasePath: string): Promise<RunningHarness> {
   child.stderr?.on("data", (chunk: Buffer) => {
     stderr += chunk.toString();
   });
+  // Captured as well as stderr, because the harness reports its own startup on
+  // stdout. Whether it got as far as saying anything is the first thing worth
+  // knowing about a start that never finished.
+  let stdout = "";
+  child.stdout?.on("data", (chunk: Buffer) => {
+    stdout += chunk.toString();
+  });
+
+  /** The last of a stream, which is where the reason for a bad start is. */
+  const tail = (text: string): string =>
+    text.length > 2_000 ? `…${text.slice(-2_000)}` : text;
 
   const baseUrl = `http://127.0.0.1:${port}`;
-  await waitUntil(async () => {
-    if (child.exitCode !== null) {
-      throw new Error(`Harness exited during startup: ${stderr}`);
-    }
+  /** Kept so the failure can say what the last attempt actually objected to. */
+  let lastProbeError: unknown;
 
-    try {
-      await fetch(baseUrl);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  await waitUntil(
+    async () => {
+      if (child.exitCode !== null) {
+        throw new Error(`Harness exited during startup: ${stderr}`);
+      }
+
+      try {
+        await fetch(baseUrl);
+        return true;
+      } catch (error) {
+        lastProbeError = error;
+        return false;
+      }
+    },
+    STARTUP_BUDGET_MS,
+    () =>
+      [
+        ` The harness on ${baseUrl} never accepted a connection.`,
+        `pid=${String(child.pid)}`,
+        `exitCode=${String(child.exitCode)}`,
+        `signal=${String(child.signalCode)}`,
+        // A port taken between allocation and use is the other way this fails,
+        // and it looks nothing like a slow boot once the message says so.
+        `lastProbe=${lastProbeError instanceof Error ? lastProbeError.message : String(lastProbeError)}`,
+        `stdout=${tail(stdout) || "(nothing)"}`,
+        `stderr=${tail(stderr) || "(nothing)"}`,
+      ].join("\n  "),
+  );
 
   return { baseUrl, process: child };
 }
