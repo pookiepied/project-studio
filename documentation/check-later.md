@@ -439,19 +439,28 @@ three and does not exist at runtime.
 
 ## C-17 — The destination guard follows the URL's author
 
-**Status:** the mechanism and the policy are both built; the client that
-exercises the relaxed half is not. **Refines:** ADR 0022.
+**Status:** answered and closed. The mechanism, the policy, and the client that
+exercises the relaxed half are all built. **Refines:** ADR 0022. **Extended
+by:** ADR 0026, which answers an author this entry did not think to ask about.
 
 **What is built.** `classifyHostPort` names why a destination is refused, and
 `destinationResource` gives a loopback destination a `host:port` resource. An
-`own-ports` registry marks the ports we listen on, and those are refused
-however the policy lands. ADR 0022 carries the amendment note.
+`own-ports` registry marks the ports we listen on — now with a real listener
+registered in it (`A-02`) — and those are refused however the policy lands.
+`judgeDestination(raw, author)` is the policy, and `judgeHostPort` is the same
+policy applied to an address with no URL around it. ADR 0022 carries the
+amendment note.
 
-**What is not.** Nothing allows loopback yet. All four classes still refuse. The
-remaining decision is the one this entry was opened for — whether a
-user-supplied MCP URL follows a different guard from a model-supplied `fetch`
-URL — and it is answered when the local HTTP client is written, which is where
-the second caller finally exists.
+**The second caller now exists.** `src/net/http.ts` opens the connection itself,
+which is what makes the relaxed half reachable rather than theoretical. A person
+may type a private address into a settings form and be connected to it; a model
+producing the same address inside a turn is still refused.
+
+**One author was missing from the question.** This entry asked about the user
+and the model. It did not ask about the **server being talked to**, which writes
+an address every time it answers with a redirect. ADR 0026 decides that hop is
+judged as `model` whoever the caller was, and that credentials do not cross an
+origin.
 
 `src/net/destination.ts` was built for `fetch` and refuses every private
 address. That is right for a URL the *model* chose and wrong for a URL the

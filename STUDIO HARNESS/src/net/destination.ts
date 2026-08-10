@@ -34,7 +34,7 @@ const MESSAGE_BY_REFUSAL: Record<DestinationRefusal, string> = {
 };
 
 export class DestinationError extends StudioError {
-  readonly domain = "retrieval" as const;
+  readonly domain = "network" as const;
   declare readonly kind: DestinationRefusal;
 
   constructor(kind: DestinationRefusal, options: { message?: string } = {}) {
@@ -183,6 +183,35 @@ function classifyHost(host: string): HostClass {
 /** True when the host must never be reached, whatever the permissions say. */
 export function isPrivateHost(host: string): boolean {
   return classifyHost(host) !== "public";
+}
+
+/**
+ * Applies the `C-17` policy to a host and port, and returns what it was.
+ *
+ * Split out of `judgeDestination` because the policy has a second caller that
+ * never sees a URL: the HTTP client judges **every address a name resolved
+ * to**, and an address is a host and a port with no URL around it. The two must
+ * be one function — a name that passes and an address that is never judged is
+ * the rebinding attack, and two copies of this rule is how one of them gets
+ * fixed.
+ */
+export function judgeHostPort(destination: HostPort, author: UrlAuthor): HostClass {
+  const hostClass = classifyHostPort(destination);
+
+  if (hostClass === "metadata" || hostClass === "own-port") {
+    throw new DestinationError("private", {
+      message:
+        hostClass === "metadata"
+          ? "That address belongs to a cloud provider's credential service, so nothing here may reach it."
+          : "That address is Project Studio's own service, so nothing may reach it through the network.",
+    });
+  }
+
+  if (hostClass === "private" && author === "model") {
+    throw new DestinationError("private");
+  }
+
+  return hostClass;
 }
 
 export function classifyHostPort(destination: HostPort): HostClass {
@@ -339,20 +368,7 @@ export function parseDestination(raw: string): Destination {
  */
 export function judgeDestination(raw: string, author: UrlAuthor): Destination {
   const { url, hostPort } = parseUrl(raw);
-  const hostClass = classifyHostPort(hostPort);
-
-  if (hostClass === "metadata" || hostClass === "own-port") {
-    throw new DestinationError("private", {
-      message:
-        hostClass === "metadata"
-          ? "That address belongs to a cloud provider's credential service, so nothing here may reach it."
-          : "That address is Project Studio's own service, so nothing may reach it through the network.",
-    });
-  }
-
-  if (hostClass === "private" && author === "model") {
-    throw new DestinationError("private");
-  }
+  const hostClass = judgeHostPort(hostPort, author);
 
   // Credentials in a URL would travel into a log line and into the request
   // itself. Dropped rather than refused: the address is still reachable.

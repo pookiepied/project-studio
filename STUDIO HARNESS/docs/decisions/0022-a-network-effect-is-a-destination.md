@@ -4,8 +4,10 @@
 **Closes:** `C-10`.
 **Builds on:** ADR 0015 (approval scope), ADR 0019 (running a chosen program), ADR 0020 (the effect table).
 **Delivers:** `fetch` and `web_search`, and the rule every future networked tool follows.
-**Amended by:** ADR 0025 (provenance is now `author`), and by `C-17` — for a
-loopback destination the resource is host *and* port.
+**Amended by:** ADR 0025 (provenance is now `author`), by `C-17` — for a
+loopback destination the resource is host *and* port — and by ADR 0026, which
+says who is treated as having chosen a redirect and requires the resolved
+address to be pinned.
 
 The mechanism for that shipped in Phase 11. `destinationResource` in
 `src/net/destination.ts` returns `host` for a public destination and

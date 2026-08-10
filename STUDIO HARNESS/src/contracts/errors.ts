@@ -36,6 +36,18 @@ export type StudioErrorDomain =
   | "observability"
   | "permissions"
   | "sandbox"
+  /**
+   * Reaching an address at all: judging a destination, pinning the address a
+   * name resolved to, and the connection itself.
+   *
+   * Separate from `retrieval`: "that address is refused" and "Tavily says your
+   * plan is used up" are different situations with different answers, and this
+   * one is asked by three subsystems that share nothing else — page reading,
+   * MCP over HTTP, and connectors. `DestinationError` reports here for the same
+   * reason, having previously reported as `retrieval` when page reading was its
+   * only caller.
+   */
+  | "network"
   /** Native capabilities and the gate every call passes through. */
   | "tools"
   /** Spawning and supervising a child process. */

@@ -62,32 +62,38 @@ this item leaves behind.
 
 ---
 
-## L-02 — The direct HTTP client · **003.5 part B, the remaining half**
+## ~~L-02 — The direct HTTP client~~ · **done**
 
-The `C-17` policy is built and has no client to exercise it. Missing:
+`src/net/http.ts`. Built on `node:http`/`node:https`, no new dependency — and
+that is also what made pinning possible, because a raw request takes the
+address, the `Host` header, and the TLS `servername` as three separate things
+where `fetch` takes them as one string.
 
-- A client that opens a local connection, rather than reading through a service.
-- **DNS pinning.** Resolve, judge every returned address, connect to the address
-  we judged. Judging a name and then letting the stack resolve it again is the
-  rebinding attack written as a race.
-- **Redirect re-judging.** ADR 0022 says every destination is checked; a redirect
-  is a new destination. `retrieval/http.ts` satisfies this by refusing redirects
-  outright to fixed endpoints, which a user-supplied host cannot do.
-- A size ceiling and a deadline, as `exec.ts` has.
+Both of the stated conditions hold, each proved by breaking the code first: a
+name that resolves to a refused address never opens a socket, and a redirect to
+a refused address is refused mid-request.
 
-**Constraint:** no new dependencies, so this is `node:http`/`node:https` rather
-than a custom `fetch` dispatcher. That is also what makes pinning possible —
-connect to the IP, set `Host`, set the TLS `servername`.
+**One question the item did not anticipate, now answered in ADR 0026:** a
+redirect has an author, and it is neither the user nor the model — it is the
+server being talked to. Every hop after the first is judged as `model`, the
+stricter side of the `C-17` table, whoever the caller was. Recorded there rather
+than here because it is a rule and not a task.
 
-**Done when:** a test resolves a name to a refused address and the request never
-opens a socket, and a redirect to a refused address is refused mid-request.
+**A second copy of the policy was avoided** by splitting `judgeHostPort` out of
+`judgeDestination`. An address has no URL around it, and a name that passes with
+an address nobody judged is the exact hole this item existed to close.
+
+`DestinationError` now reports as the `network` domain rather than `retrieval`,
+which was only ever true while page reading was its one caller.
 
 ---
 
-## L-03 — Streamable HTTP transport · **003.6, blocked on L-02**
+## L-03 — Streamable HTTP transport · **003.6, unblocked**
 
 An `McpChannel` over HTTP, the sibling of `StdioChannel`. HTTP+SSE is never
-implemented — decided in `C-16`.
+implemented — decided in `C-16`. It builds on `src/net/http.ts` and inherits the
+pinning, the redirect rule, the ceiling, and the deadline without restating any
+of them.
 
 **Done when:** the same `McpConnection` and the same handshake run over it with
 no MCP-layer changes. If either needs a special case, the channel seam is wrong.

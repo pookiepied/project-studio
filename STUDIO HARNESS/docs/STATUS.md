@@ -283,6 +283,15 @@ default, and loopback goes through the normal approval ladder — with host *and
 port* as the resource, so approving a dev server does not approve an unsecured
 Ollama on the next port.
 
+**A third author appeared once the client was built** (`src/net/http.ts`, ADR
+0026): the server on the other end, which writes an address every time it
+answers with a redirect. Every hop after the first is judged as though a model
+chose it, whoever the caller was, and credentials do not cross an origin. The
+client also pins — resolve once, judge **every** address returned, connect to
+the address that was judged — because a check and a socket that resolve a name
+separately can get two different answers, which is the whole of DNS rebinding.
+It is now the only place the harness opens an outbound connection itself.
+
 **The shared part of `src/extend/` is a spine, not an engine.** Two files —
 identity and origin, per-project on/off — that MCP, skills, and hooks depend on
 and that knows none of them. One architecture rule enforces the direction, so a

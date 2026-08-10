@@ -395,7 +395,7 @@ That is a property of the method, not a fault of the delegate, and it is the
 line along which work can be split at all: **rule work can go out, and the
 record of why cannot.**
 
-### 003.5 — part B — **the policy done, the client still to build**
+### 003.5 — part B — **done: the policy and the client**
 
 **`C-17` is answered and built.** `judgeDestination(raw, author)`. The guard
 follows who wrote the address, and the full table is in `check-later.md`. What is
@@ -435,9 +435,37 @@ fixed, deliberately *before* the client lands, because the client is what makes
 loopback reachable and a registration added afterwards would have been missing
 for exactly as long as it mattered.
 
-**Still to build:** the client. Until it exists the relaxation above is a policy
-nothing exercises. Tracked with everything else unfinished in
-`tasks/005-phase-11-loose-ends.md`.
+**The client is built.** `src/net/http.ts`, on `node:http`/`node:https`. It is
+now the only place the harness opens an outbound connection itself, and the
+relaxation above is exercised rather than asserted.
+
+**The rule the item did not predict.** A `Location` header is an address, and it
+is written by neither the user nor the model — it is written by the server being
+talked to. `C-17` had no answer for that author because it had never had a
+client that could follow one. Every hop after the first is judged as `model`,
+the stricter side of the table, whoever the caller was; `authorization`,
+`cookie`, and `proxy-authorization` are dropped when the origin changes. ADR
+0026.
+
+**Pinning turned out to be two rules, not one.** Resolve once and connect to the
+judged address — otherwise the check and the socket ask the same question twice
+and may get two different answers. And judge **every** address the resolver
+returned, not the one that will be used: a name answering with one public and
+one refused address would otherwise pass by chance of ordering. Removing the
+second half fails 3 tests, which is how it was confirmed to be doing work.
+
+**A field with no reader was deleted mid-build.** The pin first carried an
+address *and* a socket family, plus a custom `lookup` that fed both back to
+Node. Breaking the custom `lookup` failed nothing — `host` already holds the
+literal address, so nothing resolves a second time — and the family had no
+remaining reader. Both removed. A guard no test can fail is a guard nobody will
+notice breaking.
+
+**`DestinationError` moved to a `network` domain.** It reported as `retrieval`,
+which was only true while page reading was its one caller. Three subsystems that
+share nothing else now ask it the same question.
+
+Everything still unfinished is in `tasks/005-phase-11-loose-ends.md`.
 
 The split in `tasks/002` §9, plus two things the review found:
 

@@ -60,6 +60,7 @@ contracts/       shared types, model ids, and the one effect table (ADR 0020)
 credentials/     keychain-backed, via @napi-rs/keyring
 models/          registry, adapters (test / local BYOK / studio-cloud), catalog
 net/             destination.ts - every outbound address is checked here first
+                 http.ts        - the only place we open a connection ourselves
 observability/   OpenTelemetry, error contract, the redaction catalog
 permissions/     the kernel — decides, never executes, never prompts
 platform/        OS specifics

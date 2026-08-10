@@ -9,8 +9,11 @@
  * does; persisting it would keep a port marked as ours after the socket closed
  * or after a restart where nothing is listening.
  *
- * Nothing registers a port yet. The check is complete against an empty set, so
- * the rule is in place before the first server is wired up.
+ * `src/auth/google-login.ts` registers the loopback port it binds for a sign-in
+ * callback, and unregisters it when that server closes. **Any listener added
+ * later registers too** — a listening port that is not in this set is a port the
+ * `own-port` class cannot protect, and the guard then defends nothing while
+ * still looking present. See `L-01`.
  */
 
 const ports = new Set<number>();
