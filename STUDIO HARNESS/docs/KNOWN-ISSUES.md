@@ -14,13 +14,6 @@ An entry is removed only when the code changes, never because it got old.
 Decisions with lasting rationale belong in `decisions/`; this file is the
 running list of what is currently not true about the system.
 
-**Twenty defects are being fixed right now under `tasks/001-cross-reference-audit-fixes.md`.**
-They are not yet listed below, because an entry here describes shipped code and
-those fixes are in flight. Each one moves here as Fixed when its box is ticked.
-Two of them let a model run any program through the `git` tool — `T-23` and
-`T-24` — and both were proven against real git rather than argued. **Both are
-now fixed**, and listed below; eighteen remain in the task file.
-
 ---
 
 ## Process Execution (`src/process/`)
@@ -1081,4 +1074,4 @@ folder trust, and why it earns a restore point.
 **Revisit when** either an interpreter's script path can be part of the
 resource without making the approval dialog unreadable, or `S-02` gives us a
 real isolation tier — whichever lands first. Recorded in
-`tasks/003-phase-11-work-plan.md` under "Recorded, not scheduled".
+`tasks/phase-11-mcp/003-work-plan.md` under "Recorded, not scheduled".

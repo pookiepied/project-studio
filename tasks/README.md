@@ -16,8 +16,36 @@ A task file exists while the work is open. When every box is ticked, the file
 stays as the record of what was done and why — the same way an ADR stays after
 the decision is made.
 
+## Structure
+
+Files are grouped by what kind of thing they are, not left flat. Two folders:
+
+| Folder | Holds | Numbered? |
+|---|---|---|
+| `phase-11-mcp/` | One live phase's own progression — design, then the work plan, then what's left | Yes, within the phase: `002-design.md`, `003-work-plan.md`, `005-loose-ends.md` |
+| `delegation/` | `HOUSE-RULES.md` — the standing rules for any delegated work, live regardless of phase | No |
+
+A finished delegated task's own record — what was sent, what came back, what
+review changed — is not kept as a separate file once the work is merged. That
+narrative still exists in git history, on the commits and the merged branch;
+it is deliberately not duplicated into a living document once the work it
+describes is done. What matters going forward — a defect fixed, a rule
+decided — is recorded permanently in `KNOWN-ISSUES.md` or an ADR regardless.
+
+A future phase gets its own sibling folder, e.g. `phase-12-skills/`, with the
+same `NNN-` numbering restarted inside it — the number is scoped to the
+folder, not to `tasks/` as a whole. That is why `phase-11-mcp/` skips straight
+from `002` to `003` to `005`: those numbers were assigned before the folder
+existed and are kept for continuity with everything that already cites them by
+number; a new phase starts its own folder at `001` if it wants to.
+
+**A closed task file is removable once nothing still points at it.** The bar
+is not "is this history worth having" — git already has it — it is "does a
+current document still name this file." Fix every link before removing a
+file, not after.
+
 **One file per phase may be a loose-ends file, and a phase is not finished while
-its loose-ends file has an open item.** `tasks/005-phase-11-loose-ends.md` is the
+its loose-ends file has an open item.** `phase-11-mcp/005-loose-ends.md` is the
 first. It exists because a work plan records *why* each piece was built, which
 makes it a poor place to see what is missing: a long entry about a finished piece
 reads exactly like a long entry about a half-finished one. The loose-ends file
@@ -27,9 +55,13 @@ The bar there is stricter than "the code exists": something in `src/` calls it, 
 test proves the rule it enforces, and the documentation says why. Two of three is
 still a loose end.
 
+See `documentation/DOC-MAP.md` for how this folder fits the rest of the repo,
+and for where a new fact should go before you consider adding a new file here.
+
 ## Rules
 
-1. Number files in order: `001-`, `002-`. Never renumber.
+1. Within a phase's own folder, number files in order: `001-`, `002-`. Never
+   renumber.
 2. One checkbox per item. An item is one commit-sized piece of work.
 3. Every item says what is wrong, where, how it was proven, and what the fix is.
 4. **"How it was proven" is required.** An item nobody verified is a guess, and

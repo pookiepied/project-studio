@@ -404,7 +404,7 @@ provider needs the same words.
 
 MCP, skills, hooks, and later teams all arrive the same way — declared,
 validated, scoped, enabled, reloaded — and all four would otherwise land flat in
-`src/` beside `db.ts`. The proposal in `tasks/002-phase-11-mcp.md` §2 is
+`src/` beside `db.ts`. The proposal in `tasks/phase-11-mcp/002-design.md` §2 is
 `src/extend/` with a shared `registry/` inside it, and `agents/` staying out
 because a subagent consumes the other three rather than being one of them.
 
@@ -417,7 +417,7 @@ ADR 0020 exists to prevent.
 "nothing under here reaches the model except through the gate" a rule the suite
 can fail on.
 
-**Answered, 9 August 2026.** `src/extend/`. See `tasks/002-phase-11-mcp.md` D-2.
+**Answered, 9 August 2026.** `src/extend/`. See `tasks/phase-11-mcp/002-design.md` D-2.
 Not `plugins/`, which every comparable tool spends on a *bundle* of skills,
 agents, hooks, and servers distributed together — a thing this product will want
 and would then have no word for. Not `extensions/`, which the 2026-07-28
@@ -429,7 +429,7 @@ The shared part is a **spine, not an engine**: two files at the root of
 MCP, skills, and hooks depend on it; it knows none of them. That direction is
 enforced by one architecture rule — nothing at `src/extend/*.ts` may import from
 a subdirectory — so a fourth kind adds a folder and edits nothing. See
-`tasks/002-phase-11-mcp.md` §10.
+`tasks/phase-11-mcp/002-design.md` §10.
 
 Three runtime kinds only. A connector is a remote MCP server with OAuth and a
 good icon, not a fourth subsystem. A plugin is a bundle that installs into the
@@ -467,7 +467,7 @@ address. That is right for a URL the *model* chose and wrong for a URL the
 *user typed into a settings form*, which is how a local MCP server arrives.
 
 The axis is who wrote the URL, not what the address is. Full table in
-`tasks/002-phase-11-mcp.md` §9. In short: an MCP endpoint needs a well-formed
+`tasks/phase-11-mcp/002-design.md` §9. In short: an MCP endpoint needs a well-formed
 `http`/`https` URL and nothing more; `fetch` keeps a strict guard, but "private"
 splits three ways — link-local and cloud metadata are refused and never offered,
 LAN ranges are refused by default, and **loopback goes through the normal
@@ -525,14 +525,14 @@ relaxation above is a policy nothing exercises.
 exist. **Gates:** nothing further.
 
 The 2026-07-28 revision split MCP into two eras. Research and the full
-compatibility procedure are in `tasks/002-phase-11-mcp.md` §1.
+compatibility procedure are in `tasks/phase-11-mcp/002-design.md` §1.
 
 Settled by that research: modern is the default, HTTP+SSE is not implemented,
 and Roots, Sampling, and Logging are not implemented — all three are deprecated
 in the revision we are adopting and all three have named migrations.
 
 **Answered, 9 August 2026.** Both eras ship together. See
-`tasks/002-phase-11-mcp.md` D-4.
+`tasks/phase-11-mcp/002-design.md` D-4.
 
 Modern-only was tempting and is wrong. The revision is twelve days old, the
 compatibility matrix says a modern client against a legacy server *fails* rather
@@ -649,7 +649,7 @@ tasks, and transcripts, and — the important half — **relays a phone or brows
 the user's own machine**, which keeps doing the work.
 
 The plan, what is strong about it, the one part that is not, and the naming
-question are in `documentation/local-and-cloud.md`. In three lines:
+question, in three lines:
 
 - The relay is the good idea and needs no compromises, because nothing is
   duplicated: the machine keeps the keys, the grants, and the processes.

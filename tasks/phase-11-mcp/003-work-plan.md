@@ -1,6 +1,6 @@
 # Task 003 — Phase 11 work plan
 
-Design lives in `tasks/002-phase-11-mcp.md`. This file is the order of work and
+Design lives in `tasks/phase-11-mcp/002-design.md`. This file is the order of work and
 the record of what an adversarial review changed.
 
 **Rule for every item below:** write the test, revert the fix, confirm the test
@@ -377,7 +377,7 @@ classes are still refused with the same kind and message.
 `pnpm check` green, 677 passing, up thirty. ADR 0022 amended, `C-17` moved to
 half built.
 
-**Written by a delegated model against `tasks/handoff-003.5.md`, and reviewed
+**Written by a delegated model against a bounded task spec, and reviewed
 here.** Recorded because the result decides whether we do it again.
 
 The work was correct. What review added: `.localhost` is loopback under
@@ -465,7 +465,7 @@ notice breaking.
 which was only true while page reading was its one caller. Three subsystems that
 share nothing else now ask it the same question.
 
-Everything still unfinished is in `tasks/005-phase-11-loose-ends.md`.
+Everything still unfinished is in `tasks/phase-11-mcp/005-loose-ends.md`.
 
 The split in `tasks/002` §9, plus two things the review found:
 

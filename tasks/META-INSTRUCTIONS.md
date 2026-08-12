@@ -8,52 +8,24 @@ working; that one is the one to read to understand.
 
 ## 1. What to read, and in what order
 
-Before touching code:
+See `documentation/DOC-MAP.md` for the full tree and where a new fact goes.
+The short version, almost always the whole of it:
 
-1. `tasks/HOUSE-RULES.md` — the rules that fail the work outright if broken.
-2. `documentation/mental-model.md` — what STUDIO is and is not.
-3. `documentation/architecture.md` — the directory map and what owns what.
+1. `tasks/delegation/HOUSE-RULES.md` — the constraints.
+2. `tasks/phase-11-mcp/003-work-plan.md` — newest section only, what was just built.
+3. `tasks/phase-11-mcp/005-loose-ends.md` — what to do next.
+4. `STUDIO HARNESS/docs/STATUS.md` — the current snapshot, to sanity-check 2 and 3.
 
-Before touching Phase 11 specifically:
+Everything else — ADRs, `check-later.md`, `KNOWN-ISSUES.md`, `mental-model.md`,
+`architecture.md` — is reference, opened only when one of the four above names
+it. `DOC-MAP.md` has the full tree and the routing table; this file does not
+repeat it.
 
-4. `tasks/003-phase-11-work-plan.md` — the running record of what was built and
-   why. Read the most recent numbered section first; it is written newest-last.
-5. `tasks/005-phase-11-loose-ends.md` — the shorter, harsher list of what is
-   NOT done. **This is the file that says what to do next.** A phase is not
-   finished while it has an open item.
-6. `documentation/check-later.md` — open questions (`C-NN`), most with a
-   status line saying answered/open/closed.
-7. `STUDIO HARNESS/docs/KNOWN-ISSUES.md` — defects (`A-NN`, `T-NN`, `P-NN`,
-   etc.), each Fixed / Open / Accepted / Contained / Partly answered.
-8. `STUDIO HARNESS/docs/STATUS.md` — the current snapshot. If it disagrees
-   with the other documents, they are right and this one is stale.
-9. `STUDIO HARNESS/docs/decisions/*.md` — ADRs, numbered, each says why a
-   rule exists and what it amends. Read the ones a loose-ends item names.
-
-## 2. The document map, one line each
-
-| File | What it answers |
-|---|---|
-| `STUDIO HARNESS/docs/ROADMAP.md` | What order to build in |
-| `STUDIO HARNESS/docs/KNOWN-ISSUES.md` | What is currently untrue about the system |
-| `STUDIO HARNESS/docs/STATUS.md` | How far along are we right now |
-| `documentation/check-later.md` | Questions deliberately deferred, and their answers once found |
-| `documentation/architecture.md` | The directory map, what owns what |
-| `documentation/mental-model.md` | What STUDIO is, read once |
-| `tasks/003-phase-11-work-plan.md` | The running record — what was built, why, in what order |
-| `tasks/005-phase-11-loose-ends.md` | What is NOT done — the next-action list |
-| `tasks/HOUSE-RULES.md` | Rules for anyone doing delegated work here |
-| `STUDIO HARNESS/docs/decisions/*.md` | Why a rule exists, numbered, ADRs amend each other |
-
-None of these is a second issue tracker. Each keeps exactly its own job. If a
-fact could go in two of them, it goes in the one whose job it is and the other
-one links to it.
-
-## 3. How Phase 11 is organized
+## 2. How Phase 11 is organized
 
 Phase 11 is "MCP" and is broken into numbered sub-items, `003.1` through
-`003.8`, tracked in `tasks/003-phase-11-work-plan.md`. Loose ends within it are
-`L-01` through `L-11` in `tasks/005-phase-11-loose-ends.md`.
+`003.8`, tracked in `tasks/phase-11-mcp/003-work-plan.md`. Loose ends within it
+are `L-01` through `L-11` in `tasks/phase-11-mcp/005-loose-ends.md`.
 
 **The rule for calling something done**, from the loose-ends file header:
 something in `src/` calls it, a test proves the rule it exists to enforce, and
@@ -77,10 +49,10 @@ session:
 | `L-11` `E-03` raw errors in setup CLI | open, small |
 
 Verify this table yourself before trusting it — read
-`tasks/005-phase-11-loose-ends.md` directly. This table is a snapshot and will
-go stale the moment another item closes.
+`tasks/phase-11-mcp/005-loose-ends.md` directly. This table is a snapshot and
+will go stale the moment another item closes.
 
-## 4. What "done" requires, every time, no exceptions
+## 3. What "done" requires, every time, no exceptions
 
 1. Write the test first (or alongside), matching a neighbouring test file's
    style exactly.
@@ -93,7 +65,7 @@ go stale the moment another item closes.
 A test that never failed against broken code proves nothing. This is not
 optional and is checked, not assumed.
 
-## 5. What happens to a defect found along the way
+## 4. What happens to a defect found along the way
 
 **Found defects get fixed in the same pass, or explicitly filed — never
 silently carried.** Three outcomes, and only three:
@@ -110,9 +82,10 @@ something and are not fixing it now, it must exist in `KNOWN-ISSUES.md` before
 you move to the next task, or it did not happen as far as the next person is
 concerned.
 
-## 6. How an issue, block, or open question gets routed
+## 5. How an issue, block, or open question gets routed
 
-Ask these in order:
+Same table as `documentation/DOC-MAP.md`, with the id-series detail that table
+leaves out. Ask these in order:
 
 1. **Is it a defect in existing, already-shipped code?** →
    `STUDIO HARNESS/docs/KNOWN-ISSUES.md`. Give it the next id in its letter
@@ -122,7 +95,7 @@ Ask these in order:
    now?** → `documentation/check-later.md` as the next `C-NN`. Gate it against
    whatever has to happen before it can be answered.
 3. **Is it a known-incomplete piece of Phase 11 work?** →
-   `tasks/005-phase-11-loose-ends.md` as the next `L-NN`, or fold into an
+   `tasks/phase-11-mcp/005-loose-ends.md` as the next `L-NN`, or fold into an
    existing one if it is the same item.
 4. **Is it a decision that changes how a rule works, once made?** → a new
    numbered ADR in `STUDIO HARNESS/docs/decisions/`, stating what it amends.
@@ -134,7 +107,7 @@ If genuinely blocked — a decision only the project owner can make, not a
 technical unknown — say so plainly and stop rather than guessing and writing
 it down as settled.
 
-## 7. Commit discipline for this repository
+## 6. Commit discipline for this repository
 
 - One commit per closed item, imperative subject, body says **why** not what.
 - Update the loose-ends file, the work-plan file, `check-later.md` (if it
@@ -148,9 +121,9 @@ it down as settled.
   hand. This has been stated as a hard constraint by the project owner more
   than once.
 
-## 8. Before reporting anything "done" to the project owner
+## 7. Before reporting anything "done" to the project owner
 
-- Re-open `tasks/005-phase-11-loose-ends.md` and confirm the item's own entry
+- Re-open `tasks/phase-11-mcp/005-loose-ends.md` and confirm the item's own entry
   says done, with the reasoning, not just that you believe it.
 - Re-run the full suite once more, fresh, and quote the pass count.
 - State plainly which defects were found and fixed in the same breath, so

@@ -3,7 +3,7 @@
 Everything in Phase 11 that is started and not finished, in one place, so that
 "we built the MCP client" cannot be mistaken for "MCP works".
 
-`tasks/003-phase-11-work-plan.md` is the order of work and the record of *why*.
+`tasks/phase-11-mcp/003-work-plan.md` is the order of work and the record of *why*.
 This file is the shorter, harsher question: **what is not done.** When an item
 here is finished, cut it to one line pointing at the work plan entry that
 records it, and never delete the line — a loose end that was closed should not

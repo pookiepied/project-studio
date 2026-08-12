@@ -3,7 +3,7 @@
 A readable account, not a checklist. For the operational version — what to
 read before working, how to route an issue, what "done" requires — see
 `tasks/META-INSTRUCTIONS.md`. For the line-by-line record, see
-`tasks/003-phase-11-work-plan.md` and `tasks/005-phase-11-loose-ends.md`.
+`tasks/phase-11-mcp/003-work-plan.md` and `tasks/phase-11-mcp/005-loose-ends.md`.
 
 This document is a snapshot. Trust the source files it summarizes over this
 prose the moment they disagree.
@@ -32,9 +32,9 @@ from mid-2026), and STUDIO speaks both from one client.
 
 Phase 11 is organized as eight numbered pieces, `003.1` through `003.8`, and
 tracked in one running document that explains *why* each was built the way it
-was: `tasks/003-phase-11-work-plan.md`. A second, shorter document exists
+was: `tasks/phase-11-mcp/003-work-plan.md`. A second, shorter document exists
 because a long "why" entry about a finished piece reads exactly like one about
-a half-finished piece — `tasks/005-phase-11-loose-ends.md` asks the harsher
+a half-finished piece — `tasks/phase-11-mcp/005-loose-ends.md` asks the harsher
 question directly: what is still not done.
 
 ## The shape the phase was built in, on purpose

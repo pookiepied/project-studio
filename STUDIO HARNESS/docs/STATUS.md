@@ -57,7 +57,7 @@ process it talks to; neither contains the other.
 | 8 | Auth, credentials, local BYOK | Done |
 | 9 | Permission and containment kernel | Foundation done, 2 items open |
 | 10 | Native agent tools | **In progress — 9 of 10** |
-| 11 | MCP | **In progress — the client works, nothing is wired to it yet** |
+| 11 | MCP | **In progress — L-01 through L-05 done, 6 loose ends open** |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
 | 14 | Projects, workspaces, sandboxes | Not started |
@@ -203,9 +203,9 @@ relative path that climbs out of the home is refused rather than normalised
 ### Immediately next
 
 **Task 001 is closed — all 20 items.** A second audit — five reviewers over all
-21,274 lines — raised 22 complaints, 20 verified valid. Each one is recorded
-with its evidence, its fix, and the number of tests that fail without it in
-`tasks/001-cross-reference-audit-fixes.md`.
+21,274 lines — raised 22 complaints, 20 verified valid. Each one was recorded
+with its evidence, its fix, and the number of tests that fail without it; every
+item now lives below as its own Fixed entry.
 
 Two of them let a model run any program on the machine through the `git` tool,
 which declares `read`/`write` and therefore needs no execution permission. Both
@@ -227,14 +227,15 @@ ADR 0020.
 ~~**`fetch`** is next, and `C-10` is the question it waits on.~~ Done — ADRs
 0022 and 0023. `C-10` is closed.
 
-**Phase 11 (MCP) is next, and is in design.** Two things landed with the web
+**Phase 11 (MCP) is in progress — design is done, five of eleven loose ends
+are closed.** Two things landed with the web
 tools that it inherits rather than re-decides: `src/net/destination.ts`, which
 every HTTP destination goes through, and `K-07`'s rule that a capability id may
 not contain a `/` — which becomes load-bearing the moment a server supplies its
 own tool names.
 
-Research and design are in `tasks/002-phase-11-mcp.md`, and the running record of
-what has been built is `tasks/003-phase-11-work-plan.md`. This section describes
+Research and design are in `tasks/phase-11-mcp/002-design.md`, and the running record of
+what has been built is `tasks/phase-11-mcp/003-work-plan.md`. This section describes
 the design; it is not a progress report, and the work plan is the one that says
 where the code has reached. As of this note a client exists end to end — the
 registry, the extend spine, the wire layer, the connection, **both** channels,
@@ -263,15 +264,16 @@ era probe, and the handshake are the same code over both. What HTTP could not
 express through a duplex seam — a failed POST is the answer to what it carried,
 and a remote server has no `stderr` — is ADR 0027.
 
-**Every Phase 11 module has zero callers in `src/`.** Measured, not assumed. That
-is the shape the phase was built in on purpose — each piece tested against a
-fake, wiring last — but it means the honest summary is *a complete MCP client
-that nothing has ever run*, and one class of bug cannot have been found yet: the
-kind that only appears once the pieces are assembled against a real server. `S-04`
+**This was true when written and no longer is.** Every Phase 11 module had zero
+callers in `src/` until the launcher (`L-04`) gave the supervisor a real one —
+measured, not assumed, and kept here because the shape it describes was
+deliberate: each piece tested against a fake, wiring last. What is still true is
+the risk that shape carries: one class of bug cannot be found until the pieces
+are assembled against something real. `S-04`
 was exactly that shape and appeared the moment a real process was spawned.
 
 Everything unfinished in the phase is listed in
-`tasks/005-phase-11-loose-ends.md`, and **the phase is not finished while that
+`tasks/phase-11-mcp/005-loose-ends.md`, and **the phase is not finished while that
 file has an open item.**
 
 The protocol split into two eras on 2026-07-28: the modern revision has no

@@ -216,7 +216,7 @@ Add a registry and separate transports for local MCP and authenticated cloud MCP
 capability, permission, cancellation, telemetry, and result policy as native tools. Include tool
 provenance, collision handling, health, reconnect, and connection teardown.
 
-Design and protocol research: `tasks/002-phase-11-mcp.md`. The protocol split into two eras on
+Design and protocol research: `tasks/phase-11-mcp/002-design.md`. The protocol split into two eras on
 2026-07-28 — a stateless core with no `initialize` handshake, no session id, and no
 server-initiated requests. We speak the modern revision by default and probe for the legacy one.
 
