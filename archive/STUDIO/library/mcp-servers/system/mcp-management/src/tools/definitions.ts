@@ -1,7 +1,0 @@
-import {defineTools} from "../tool-schema.js";const str={type:"string"};const bool={type:"boolean"};
-export const TOOL_DEFINITIONS=defineTools([
-{name:"mcp_add_stdio",description:"Register and verify a local stdio MCP server.",inputSchema:{type:"object",properties:{name:str,command:str,args:{type:"array",items:str},env:{type:"object",additionalProperties:{type:"string"}}},required:["name","command"],additionalProperties:false}},
-{name:"mcp_add_remote",description:"Register a remote MCP server. bearerToken is sent only to the desktop and stored in its OS keyring.",inputSchema:{type:"object",properties:{name:str,endpoint:{type:"string",format:"uri"},transport:{type:"string",enum:["streamable-http","sse"]},bearerToken:{type:"string",description:"Secret; never persisted in cloud metadata."}},required:["name","endpoint","transport"],additionalProperties:false}},
-{name:"mcp_add_from_github",description:"Prepare a reviewable install plan. Confirmation is required in a separate call.",inputSchema:{type:"object",properties:{repository:{type:"string",format:"uri"},confirmed:bool},required:["repository"],additionalProperties:false}},
-...(["mcp_remove","mcp_enable","mcp_disable","mcp_reverify"] as const).map(name=>({name,description:`${name.replaceAll("_"," ")} for a desktop-owned registration.`,inputSchema:{type:"object" as const,properties:{id:str},required:["id"],additionalProperties:false as const}})),
-{name:"mcp_list",description:"List desktop-owned MCP registrations.",inputSchema:{type:"object",properties:{},additionalProperties:false}},]);

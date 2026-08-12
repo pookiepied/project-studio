@@ -1,1 +1,0 @@
-export { MemoriesGraph } from "./MemoriesGraph";

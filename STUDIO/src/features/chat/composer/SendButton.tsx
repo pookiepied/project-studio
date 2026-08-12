@@ -51,7 +51,7 @@ export function SendButton({
             />
           )}
         </AnimatePresence>
-        <Stop size="xs" />
+        <Stop size="sm" />
       </button>
     )
   }
@@ -68,7 +68,7 @@ export function SendButton({
         'disabled:bg-muted disabled:text-muted-foreground',
       )}
     >
-      <Send size="xs" />
+      <Send size="sm" />
     </button>
   )
 }

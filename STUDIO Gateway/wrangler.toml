@@ -1,0 +1,28 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "studio-gateway"
+main = "src/index.ts"
+compatibility_date = "2025-08-10"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 database
+[[d1_databases]]
+binding = "DB"
+database_name = "studio-gateway"
+database_id = "753e3357-945c-40c8-abbc-5dff8210f24d"
+migrations_dir = "migrations"
+
+# Secrets (set via `wrangler secret put CREDENTIAL_ENCRYPTION_KEY`)
+# CREDENTIAL_ENCRYPTION_KEY = base64 32-byte key for AES-GCM
+
+[vars]
+ENVIRONMENT = "development"
+GATEWAY_BASE_URL = "https://gateway.example.com"
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[observability.logs]
+enabled = true
+
+# Local dev vars example (copy to .dev.vars, never commit)
+# CREDENTIAL_ENCRYPTION_KEY="base64:..."

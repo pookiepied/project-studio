@@ -43,7 +43,7 @@ export function CollapsibleText({ text }: { text: string }) {
       >
         <p
           ref={ref}
-          className="text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground"
+          className="font-editorial text-[13px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground"
         >
           {text}
         </p>

@@ -1,16 +1,13 @@
 import { useState } from 'react'
-import { Check, Expand, Permission } from '@/components/icons'
+import { Check, Disclosure, Permission } from '@/components/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { StableLabel } from '@/features/chat/composer/controls/StableLabel'
 import { PERMISSION_OPTIONS } from '@/features/chat/composer/turnSettings'
-import {
-  pillButton,
-  pillActive,
-  pillIdle,
-  pillLabel,
-  pillValueWidth,
-} from '@/features/chat/composer/composerStyles'
+import { pillButton, pillActive, pillIdle } from '@/features/chat/composer/composerStyles'
 import type { PermissionMode } from '@/features/chat/session/types'
 import { cn } from '@/lib/utils'
+
+const PERMISSION_LABELS = PERMISSION_OPTIONS.map((option) => option.label)
 
 /**
  * How much the turn is allowed to do on its own.
@@ -35,13 +32,13 @@ export function PermissionSelector({
         className={cn(pillButton, open ? pillActive : pillIdle)}
         aria-label={`Permission mode: ${selected?.label ?? 'none'}`}
       >
-        <Permission size="xs" />
-        <span className={cn(pillLabel, pillValueWidth)}>{selected?.label ?? 'Permission'}</span>
-        <Expand size="xs" className="text-muted-foreground" />
+        <Permission size="xs" className="shrink-0" />
+        <StableLabel value={selected?.label ?? 'Permission'} candidates={PERMISSION_LABELS} />
+        <Disclosure size="xs" className="rotate-90 opacity-50" aria-hidden />
       </PopoverTrigger>
 
-      <PopoverContent side="top" align="start" className="w-60">
-        <div role="radiogroup" aria-label="Permission mode" className="flex flex-col gap-0.5">
+      <PopoverContent side="top" align="end" className="w-60">
+        <div role="radiogroup" aria-label="Permission mode" className="flex flex-col gap-px">
           {PERMISSION_OPTIONS.map((option) => {
             const active = option.value === permission
             return (
@@ -55,7 +52,7 @@ export function PermissionSelector({
                   setOpen(false)
                 }}
                 className={cn(
-                  'flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
+                  'flex items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors duration-150',
                   active ? 'bg-muted' : 'hover:bg-muted/60',
                 )}
               >

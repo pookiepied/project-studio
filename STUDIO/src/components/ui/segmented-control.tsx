@@ -1,5 +1,6 @@
 import { useId, type ComponentType } from 'react'
 import { motion } from 'framer-motion'
+import { SPRING_SNAPPY } from '@/app/motion'
 import type { IconSize } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
@@ -18,18 +19,29 @@ interface SegmentedControlProps<T extends string> {
   value: T
   onChange: (value: T) => void
   ariaLabel: string
+  className?: string
 }
 
 /**
- * The STUDIO segmented switch — one mechanism for choosing among a few
- * options, with the selection gliding between segments. This is the design
- * system's identity control for mode switching.
+ * The Studio segmented switch — the one mechanism for choosing among a few
+ * peer options, with the selection gliding between segments.
+ *
+ * The glide is the entire point and it is done with `layoutId`, not with a
+ * transform this component computes. That means the thumb travels correctly
+ * when the options change width, when the control is resized, and when the
+ * font loads late — three cases a hand-measured indicator gets wrong and only
+ * reveals under real content.
+ *
+ * The thumb is drawn *behind* the label (`z-10` on the content) rather than
+ * the label being redrawn on top of a moving box. Otherwise text crossfades
+ * as the thumb passes under it, which reads as a flicker.
  */
 export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
   ariaLabel,
+  className,
 }: SegmentedControlProps<T>) {
   const thumbId = useId()
 
@@ -37,7 +49,10 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className="flex items-center gap-0.5 rounded-full border border-border bg-muted/60 p-0.5"
+      className={cn(
+        'flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-muted/50 p-0.5',
+        className,
+      )}
     >
       {options.map((option) => {
         const selected = option.value === value
@@ -49,18 +64,19 @@ export function SegmentedControl<T extends string>({
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              'relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium outline-none transition-colors',
+              'relative flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors duration-150',
+              'outline-none focus-visible:ring-2 focus-visible:ring-ring',
               selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {selected && (
               <motion.span
                 layoutId={thumbId}
-                className="absolute inset-0 rounded-full bg-background shadow-sm ring-1 ring-border"
-                transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                className="absolute inset-0 rounded-full bg-surface-raised shadow-sm ring-1 ring-border"
+                transition={SPRING_SNAPPY}
               />
             )}
-            {option.icon && <option.icon size="sm" className="relative z-10" />}
+            {option.icon && <option.icon size="xs" className="relative z-10" />}
             <span className="relative z-10">{option.label}</span>
           </button>
         )

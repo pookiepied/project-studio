@@ -3,14 +3,13 @@ import type { Effort, PermissionMode, TurnSettings } from '@/features/chat/sessi
 export interface EffortStop {
   value: Effort
   label: string
-  /** One line explaining the trade, shown under the slider as it moves. */
+  /** One line explaining the trade, shown under the control as it changes. */
   hint: string
 }
 
 /**
- * The reasoning slider's stops, in order. Index is the slider position, so this
- * array is the single source of both the scale and its labels — the slider
- * never hard-codes a count.
+ * The reasoning levels, in order. This array is the single source of both the
+ * scale and its labels — no control hard-codes a count.
  */
 export const EFFORT_STOPS: readonly EffortStop[] = [
   { value: 'low', label: 'Low', hint: 'Fastest. Best for short, direct questions.' },
@@ -19,7 +18,13 @@ export const EFFORT_STOPS: readonly EffortStop[] = [
   { value: 'max', label: 'Max', hint: 'Everything it has. Slowest, most thorough.' },
 ]
 
-/** The top stop, which earns the gradient treatment in the slider. */
+/**
+ * The top stop. It used to earn a three-colour gradient and a one-shot light
+ * sweep; both are gone. The app is monochrome, and a control that paints
+ * itself indigo-to-amber to say "this setting is high" is decoration standing
+ * in for hierarchy. Peak now reads through weight and fill, like everything
+ * else.
+ */
 export const PEAK_EFFORT: Effort = 'max'
 
 export function effortIndex(effort: Effort): number {

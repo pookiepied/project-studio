@@ -1,6 +1,0 @@
-src-tauri/
-node_modules/
-dist/
-dist-web/
-library/
-*.bat

@@ -18,24 +18,44 @@
 import { forwardRef } from 'react'
 import {
   ArrowUp,
+  BookOpen as BookOpenGlyph,
   Brain as BrainGlyph,
+  Briefcase as BriefcaseGlyph,
+  Camera as CameraGlyph,
   CaretDown,
+  CaretRight,
   CaretUp,
   ChatCircle,
   Check as CheckGlyph,
+  Code as CodeGlyph,
   Copy as CopyGlyph,
   Eye as EyeGlyph,
+  File as FileGlyph,
+  Flask as FlaskGlyph,
+  Command as CommandGlyph,
+  Folder as FolderGlyph,
   FolderOpen as FolderOpenGlyph,
   Gear,
+  GitBranch as GitBranchGlyph,
+  LinkSimple as LinkSimpleGlyph,
+  ListChecks as ListChecksGlyph,
+  MagnifyingGlass as MagnifyingGlassGlyph,
   Microphone as MicrophoneGlyph,
   Monitor as MonitorGlyph,
   Moon as MoonGlyph,
+  MusicNotes as MusicNotesGlyph,
+  NotePencil as NotePencilGlyph,
+  Palette as PaletteGlyph,
   Paperclip as PaperclipGlyph,
+  Plus as PlusGlyph,
+  Rocket as RocketGlyph,
   ShieldCheck,
+  SignOut as SignOutGlyph,
   TextAlignLeft,
   SquaresFour,
   Stop as StopGlyph,
   Sun as SunGlyph,
+  User as UserGlyph,
   X,
   type Icon as PhosphorIcon,
   type IconProps as PhosphorIconProps,
@@ -110,21 +130,41 @@ function makeIcon(glyph: PhosphorIcon, name: string) {
   return Concept
 }
 
+export const Account = makeIcon(UserGlyph, 'Account')
 export const Attach = makeIcon(PaperclipGlyph, 'Attach')
 export const Apps = makeIcon(SquaresFour, 'Apps')
+export const Book = makeIcon(BookOpenGlyph, 'Book')
+export const Briefcase = makeIcon(BriefcaseGlyph, 'Briefcase')
+export const Camera = makeIcon(CameraGlyph, 'Camera')
 export const Chat = makeIcon(ChatCircle, 'Chat')
 export const Check = makeIcon(CheckGlyph, 'Check')
 export const Close = makeIcon(X, 'Close')
+export const Code = makeIcon(CodeGlyph, 'Code')
 export const Collapse = makeIcon(CaretUp, 'Collapse')
 export const Copy = makeIcon(CopyGlyph, 'Copy')
+export const Disclosure = makeIcon(CaretRight, 'Disclosure')
+export const File = makeIcon(FileGlyph, 'File')
+export const Flask = makeIcon(FlaskGlyph, 'Flask')
+export const Folder = makeIcon(FolderGlyph, 'Folder')
+export const Branch = makeIcon(GitBranchGlyph, 'Branch')
+export const Command = makeIcon(CommandGlyph, 'Command')
+export const Link = makeIcon(LinkSimpleGlyph, 'Link')
+export const Music = makeIcon(MusicNotesGlyph, 'Music')
+export const Note = makeIcon(NotePencilGlyph, 'Note')
+export const Palette = makeIcon(PaletteGlyph, 'Palette')
 export const Permission = makeIcon(ShieldCheck, 'Permission')
+export const Plus = makeIcon(PlusGlyph, 'Plus')
 export const Preview = makeIcon(EyeGlyph, 'Preview')
+export const Rocket = makeIcon(RocketGlyph, 'Rocket')
+export const Search = makeIcon(MagnifyingGlassGlyph, 'Search')
+export const SignOut = makeIcon(SignOutGlyph, 'SignOut')
+export const Tasks = makeIcon(ListChecksGlyph, 'Tasks')
 // Sidebar — custom outline (see `SidebarOutline.tsx`). Replaces Phosphor
 // `SidebarSimple` (which embeds a vertical divider). This is a true
 // component-based fix: dedicated `SidebarOutline` component, no `<line>`,
 // inspired by `archive/STUDIO/src/ui/icons/WorkspaceIcons.tsx:NavToggleIcon`
 // but with own metrics (rx 2.5, stroke 1.25) — not a direct copy. Both rails
-// share this single concept; no mirroring (see SideRail.tsx).
+// share this single concept; no mirroring (see chrome/PanelToggle.tsx).
 export const Sidebar = SidebarOutline
 export const WordWrap = makeIcon(TextAlignLeft, 'WordWrap')
 export const Expand = makeIcon(CaretDown, 'Expand')

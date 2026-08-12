@@ -15,6 +15,11 @@ import type { ChatStatus, TurnSettings } from '@/features/chat/session/types'
  * It owns the draft text and the turn settings, and nothing else. Each control
  * in the toolbar is its own module, so adding one is a new file plus a line
  * here rather than an edit to a growing component.
+ *
+ * The frame is `xl` (14px) with 6px of padding, which puts its children on the
+ * `md` step (14 − 6 = 8). That is the concentric rule from `index.css`, and it
+ * is why the pills inside no longer look like they belong to a different
+ * component than the box around them.
  */
 export function Composer({
   status,
@@ -38,10 +43,20 @@ export function Composer({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm transition-colors focus-within:border-ring/60">
+    <div
+      className={[
+        'rounded-xl border border-border bg-surface-raised p-1.5',
+        // Focus is carried by the border and a soft ring, not by a colour: the
+        // palette has no accent hue to spend, and a monochrome ring at low
+        // alpha is what macOS text fields do in graphite anyway.
+        'transition-[border-color,box-shadow] duration-150',
+        'focus-within:border-foreground/25 focus-within:shadow-[0_0_0_3px_var(--ring)]',
+        'shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
+      ].join(' ')}
+    >
       <ComposerInput value={text} onChange={setText} onSubmit={submit} />
 
-      <div className="flex items-center gap-1 px-2 pb-2">
+      <div className="flex items-center gap-1 pt-1">
         <div className={toolbarGroup}>
           <PendingAction
             icon={Attach}

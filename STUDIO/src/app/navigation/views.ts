@@ -1,34 +1,16 @@
-import type { ComponentType } from 'react'
-import { Apps, Chat, Settings, Workspace } from '@/components/icons'
-import type { IconSize } from '@/components/icons'
+/**
+ * Where the user is, as one typed value.
+ *
+ * The shell renders the middle panel from this and nothing else does. There is
+ * no view registry any more: the sidebar builds its own tree from the projects
+ * provider, so the only thing navigation owns is *location* — which surface,
+ * which project, which tab, which chat.
+ */
 
-export type View = 'chat' | 'workspace' | 'connectors' | 'settings'
+/** Tabs inside a project workspace. */
+export type ProjectTab = 'chat' | 'notes' | 'tasks' | 'files'
 
-type ViewIcon = ComponentType<{ size?: IconSize; className?: string }>
-
-export interface ViewEntry {
-  id: View
-  label: string
-  icon: ViewIcon
-  /**
-   * `false` renders the entry disabled in the dock instead of hiding it, so the
-   * shape of the app stays visible before every surface exists. Flip to `true`
-   * only when the view renders something real — the same convention the
-   * settings section nav uses.
-   */
-  ready: boolean
-}
-
-/** The view registry — the dock and the shell both render from this list. */
-export const VIEWS: readonly ViewEntry[] = [
-  { id: 'chat', label: 'Chat', icon: Chat, ready: true },
-  { id: 'workspace', label: 'Workspace', icon: Workspace, ready: true },
-  { id: 'connectors', label: 'Connectors', icon: Apps, ready: false },
-  { id: 'settings', label: 'Settings', icon: Settings, ready: true },
-]
-
-export function findView(id: View): ViewEntry {
-  const entry = VIEWS.find((view) => view.id === id)
-  if (!entry) throw new Error(`Unknown view: ${id}`)
-  return entry
-}
+export type View =
+  | { name: 'projects' }
+  | { name: 'project'; projectId: string; tab: ProjectTab; chatId: string | null }
+  | { name: 'settings' }

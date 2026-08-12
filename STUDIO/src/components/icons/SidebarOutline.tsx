@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
  *   not a direct copy of the reference `rect(2.5,2.5,11,11,rx3)+line(6.2)` .
  * - Same size scale (`xs`/`sm`/`md`/`lg`/`xl`) and Tailwind `size-*` as the
  *   Phosphor barrel, kept as a standalone component (not monolithic inline
- *   SVG in `SideRail.tsx`).
+ *   SVG in `PanelToggle.tsx`).
  */
 
 type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'

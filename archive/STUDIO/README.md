@@ -1,3 +1,0 @@
-﻿# STUDIO
-
-Coming soon.

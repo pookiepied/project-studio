@@ -44,9 +44,9 @@ export function ComposerInput({
       onKeyDown={onKeyDown}
       disabled={disabled}
       rows={1}
-      placeholder="Ask STUDIO anything…"
+      placeholder="Ask Studio anything…"
       aria-label="Message"
-      className="block max-h-52 w-full resize-none bg-transparent px-3.5 pt-3 pb-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60"
+      className="studio-selectable block max-h-52 w-full resize-none bg-transparent px-2 pt-2 pb-1 text-[13px] leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60"
     />
   )
 }

@@ -1,6 +1,0 @@
-import{defineTools}from"../tool-schema.js";const str={type:"string"};const base={name:str,description:str,localPath:str,category:str,version:str,activationHint:str};
-export const TOOL_DEFINITIONS=defineTools([
-...(["skill_add","skill_register"]as const).map(name=>({name,description:"Register validated local skill metadata. The desktop verifies SKILL.md exists.",inputSchema:{type:"object"as const,properties:base,required:["name","description","localPath"],additionalProperties:false as const}})),
-{name:"skill_create",description:"Create a skill through a reviewed desktop workflow.",inputSchema:{type:"object",properties:{...base,instructions:str,confirmed:{type:"boolean"}},required:["name","description","localPath","instructions","confirmed"],additionalProperties:false}},
-{name:"skill_update",description:"Update a registered skill through a reviewed desktop workflow.",inputSchema:{type:"object",properties:{id:str,...base,instructions:str,confirmed:{type:"boolean"}},required:["id","confirmed"],additionalProperties:false}},
-...(["skill_remove","skill_unregister"]as const).map(name=>({name,description:"Remove local skill metadata through the desktop owner.",inputSchema:{type:"object"as const,properties:{id:str},required:["id"],additionalProperties:false as const}})),]);

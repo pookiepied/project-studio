@@ -12,6 +12,12 @@ function PopoverTrigger(props: PopoverPrimitive.Trigger.Props) {
 /**
  * Popover surface. Mirrors the tooltip's portal/positioner/popup composition so
  * both overlays open, close, and animate the same way.
+ *
+ * `studio-blur` is what makes it read as a layer above the app rather than a
+ * box drawn on it: the surface is translucent and blurs whatever it covers,
+ * the way every AppKit menu and popover has since Yosemite. Radius is `lg`
+ * (10) with 6px of padding, so rows inside sit on the `sm` step — see the
+ * concentric rule in `index.css`.
  */
 function PopoverContent({
   className,
@@ -35,7 +41,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            'origin-(--transform-origin) rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-lg outline-none',
+            'studio-blur origin-(--transform-origin) rounded-lg border border-border p-1.5 text-popover-foreground shadow-lg outline-none',
             'data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
             'data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className,
