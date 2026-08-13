@@ -40,7 +40,10 @@ export async function findExposedModel(db: D1, modelId: string): Promise<ModelRo
   // Unified gateway lookup: model_id unique across providers when exposed
   // If model_id duplicates across providers, prefer first enabled provider's model.
   const row = await db
-    .prepare("SELECT * FROM models WHERE model_id = ? AND exposed = 1 LIMIT 1")
+    .prepare(
+      "SELECT models.* FROM models JOIN providers ON providers.id = models.provider_id " +
+        "WHERE models.model_id = ? AND models.exposed = 1 AND models.enabled = 1 AND providers.enabled = 1 LIMIT 1",
+    )
     .bind(modelId)
     .first<ModelRow>();
   return row ?? null;
@@ -48,7 +51,11 @@ export async function findExposedModel(db: D1, modelId: string): Promise<ModelRo
 
 export async function listExposedModels(db: D1): Promise<ModelRow[]> {
   const res = await db
-    .prepare("SELECT * FROM models WHERE exposed = 1 ORDER BY provider_id ASC, model_id ASC")
+    .prepare(
+      "SELECT models.* FROM models JOIN providers ON providers.id = models.provider_id " +
+        "WHERE models.exposed = 1 AND models.enabled = 1 AND providers.enabled = 1 " +
+        "ORDER BY provider_id ASC, model_id ASC",
+    )
     .all<ModelRow>();
   return res.results ?? [];
 }

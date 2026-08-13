@@ -14,6 +14,7 @@ import { adminKeysRoute } from "./routes/admin/keys.ts";
 import { adminModelsRoute } from "./routes/admin/models.ts";
 import { errorHandler } from "./middleware/errorHandler.ts";
 import { runDiscovery } from "./services/discovery.ts";
+import { requireAdmin } from "./middleware/auth.ts";
 
 export interface Env {
   DB: D1Database;
@@ -41,6 +42,7 @@ app.route("/admin", adminModelsRoute);
 
 // Discovery trigger (admin)
 app.post("/admin/discovery/run", async (c) => {
+  requireAdmin(c as never);
   const result = await runDiscovery(c.env.DB, c.env);
   return c.json(result);
 });

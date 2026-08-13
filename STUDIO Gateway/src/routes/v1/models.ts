@@ -6,7 +6,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
 import { listExposedModels } from "../../lib/db.ts";
-import { verifyGatewayBearer } from "../../middleware/auth.ts";
+import { requireGatewayBearer } from "../../middleware/auth.ts";
 import { checkRateLimit } from "../../lib/ratelimit.ts";
 import { logger } from "../../lib/logger.ts";
 
@@ -14,12 +14,7 @@ export const modelsRoute = new Hono<{ Bindings: Env }>();
 
 modelsRoute.get("/models", async (c) => {
   const authHeader = c.req.header("authorization");
-  const verified = await verifyGatewayBearer(c.env.DB, authHeader ?? null);
-  const keyCount = await c.env.DB.prepare("SELECT COUNT(*) as cnt FROM gateway_keys WHERE enabled=1").first<{ cnt: number }>();
-  const hasKeys = (keyCount?.cnt ?? 0) > 0;
-  if (hasKeys && !verified) {
-    return c.json({ error: { message: "Unauthorized - valid Bearer sk-gw_ required", type: "unauthorized", code: "UNAUTHORIZED" } }, 401);
-  }
+  const verified = await requireGatewayBearer(c.env.DB, authHeader ?? null, c.env.ENVIRONMENT);
   if (verified) {
     const rl = await checkRateLimit(c.env.DB, verified.keyId, verified.rpm);
     if (!rl.allowed) return c.json({ error: { message: "Rate limit exceeded", type: "rate_limited", code: "RATE_LIMITED" } }, 429);
@@ -38,18 +33,16 @@ modelsRoute.get("/models", async (c) => {
 
 modelsRoute.get("/models/:id", async (c) => {
   const authHeader = c.req.header("authorization");
-  const verified = await verifyGatewayBearer(c.env.DB, authHeader ?? null);
-  const keyCount = await c.env.DB.prepare("SELECT COUNT(*) as cnt FROM gateway_keys WHERE enabled=1").first<{ cnt: number }>();
-  const hasKeys = (keyCount?.cnt ?? 0) > 0;
-  if (hasKeys && !verified) {
-    return c.json({ error: { message: "Unauthorized", type: "unauthorized", code: "UNAUTHORIZED" } }, 401);
-  }
+  const verified = await requireGatewayBearer(c.env.DB, authHeader ?? null, c.env.ENVIRONMENT);
   if (verified) {
     const rl = await checkRateLimit(c.env.DB, verified.keyId, verified.rpm);
     if (!rl.allowed) return c.json({ error: { message: "Rate limit exceeded", type: "rate_limited", code: "RATE_LIMITED" } }, 429);
   }
   const id = c.req.param("id");
-  const row = await c.env.DB.prepare("SELECT * FROM models WHERE model_id = ? AND exposed = 1")
+  const row = await c.env.DB.prepare(
+    "SELECT models.* FROM models JOIN providers ON providers.id = models.provider_id " +
+      "WHERE models.model_id = ? AND models.exposed = 1 AND models.enabled = 1 AND providers.enabled = 1",
+  )
     .bind(id)
     .first();
   if (!row) return c.json({ error: { message: `Model not found: ${id}`, type: "not_found", code: "MODEL_NOT_FOUND" } }, 404);

@@ -18,7 +18,7 @@ export interface TelemetryEvent {
 function noop(): void {}
 
 export const telemetry = {
-  startSpan(name: string, _attrs?: Record<string, unknown>): { end: (attrs?: Record<string, unknown>) => void } {
+  startSpan(_name: string, _attrs?: Record<string, unknown>): { end: (attrs?: Record<string, unknown>) => void } {
     // In Workers, use console + future OTEL binding.
     // Kept as function so routes do `const span = telemetry.startSpan("chat")`
     return {

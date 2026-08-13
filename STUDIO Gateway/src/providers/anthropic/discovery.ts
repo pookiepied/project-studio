@@ -5,7 +5,6 @@
  */
 
 import type { ModelDefinition } from "../types.ts";
-import { ANTHROPIC_PRICING, inferReasoningType } from "./types.ts";
 
 // Static research snapshot from docs.anthropic.com/models 2026-06-09
 // Used when no credential configured or as fallback. Discovery overwrites with live data when key present.
