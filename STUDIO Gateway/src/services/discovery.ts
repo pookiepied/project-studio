@@ -11,25 +11,31 @@ import { logger } from "../lib/logger.ts";
 import type { ModelDefinition } from "../providers/types.ts";
 import { getAdapter } from "../providers/registry.ts";
 import { ANTHROPIC_STATIC_MODELS } from "../providers/anthropic/discovery.ts";
+import { FAL_STATIC_MODELS } from "../providers/custom/fal.ts";
+import { ELEVENLABS_STATIC_MODELS } from "../providers/custom/elevenlabs.ts";
 
 export async function runDiscovery(db: D1Database, env: { CREDENTIAL_ENCRYPTION_KEY?: string }): Promise<{ discovered: number; errors: string[] }> {
+  let total = 0;
+  const errors: string[] = [];
+
+  // Mode A: catalog sync is now separate (POST /admin/catalog/sync); discovery here is live-only (Mode B).
+  // Mode B: live GET /v1/models per credential'd enabled provider + static fallbacks for custom.
   const providers = await db.prepare("SELECT * FROM providers WHERE enabled = 1").all<{
     id: string;
     name: string;
     base_url: string;
     protocol: string;
   }>();
-  let total = 0;
-  const errors: string[] = [];
   for (const p of providers.results ?? []) {
     try {
       let models: ModelDefinition[] = [];
       const cred = await db.prepare("SELECT encrypted_key FROM provider_credentials WHERE provider_id = ?").bind(p.id).first<{ encrypted_key: string }>();
       if (!cred) {
-        // No credential -> use static fallback for anthropic so admin still sees models
-        if (p.id === "anthropic") {
-          models = ANTHROPIC_STATIC_MODELS;
-        } else {
+        // No credential -> static fallbacks only (catalog already seeded via /admin/catalog/sync)
+        if (p.id === "anthropic") models = ANTHROPIC_STATIC_MODELS;
+        else if (p.id === "fal") models = FAL_STATIC_MODELS;
+        else if (p.id === "elevenlabs") models = ELEVENLABS_STATIC_MODELS;
+        else {
           logger.info("discovery skip no credential", { provider: p.id });
           continue;
         }
@@ -38,12 +44,13 @@ export async function runDiscovery(db: D1Database, env: { CREDENTIAL_ENCRYPTION_
         if (!keyBase64) {
           logger.warn("discovery no encryption key", { provider: p.id });
           if (p.id === "anthropic") models = ANTHROPIC_STATIC_MODELS;
+          else if (p.id === "fal") models = FAL_STATIC_MODELS;
+          else if (p.id === "elevenlabs") models = ELEVENLABS_STATIC_MODELS;
           else continue;
         } else {
           const apiKey = await decrypt(cred.encrypted_key, keyBase64);
           const adapter = getAdapter(p.protocol as never);
           const fetched = await adapter.discover(apiKey, p.base_url);
-          // Ensure providerId is set (adapters return generic)
           models = fetched.map((m) => ({ ...m, providerId: p.id }));
         }
       }
@@ -57,9 +64,18 @@ export async function runDiscovery(db: D1Database, env: { CREDENTIAL_ENCRYPTION_
       const msg = `${p.id}: ${e instanceof Error ? e.message : String(e)}`;
       errors.push(msg);
       logger.error("discovery error", { provider: p.id, error: msg });
-      // Fallback static for anthropic on error
       if (p.id === "anthropic") {
         for (const m of ANTHROPIC_STATIC_MODELS) {
+          await upsertModel(db, m);
+          total++;
+        }
+      } else if (p.id === "fal") {
+        for (const m of FAL_STATIC_MODELS) {
+          await upsertModel(db, m);
+          total++;
+        }
+      } else if (p.id === "elevenlabs") {
+        for (const m of ELEVENLABS_STATIC_MODELS) {
           await upsertModel(db, m);
           total++;
         }

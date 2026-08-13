@@ -8,24 +8,8 @@ import { anthropicMessagesAdapter } from "../adapters/anthropic-messages/adapter
 import { openAICompletionsAdapter } from "../adapters/openai-completions/adapter.ts";
 import { openAIResponsesAdapter } from "../adapters/openai-responses/adapter.ts";
 import { googleGenerativeAdapter } from "../adapters/google-generative-ai/adapter.ts";
-import { adapter as alibabaAdapter } from "./alibaba/adapter.ts";
-import { adapter as cerebrasAdapter } from "./cerebras/adapter.ts";
-import { adapter as cohereAdapter } from "./cohere/adapter.ts";
-import { adapter as deepseekAdapter } from "./deepseek/adapter.ts";
-import { adapter as elevenlabsAdapter } from "./elevenlabs/adapter.ts";
-import { adapter as falAdapter } from "./fal/adapter.ts";
-import { adapter as fireworksAdapter } from "./fireworks/adapter.ts";
-import { adapter as groqAdapter } from "./groq/adapter.ts";
-import { adapter as huggingfaceAdapter } from "./huggingface/adapter.ts";
-import { adapter as minimaxAdapter } from "./minimax/adapter.ts";
-import { adapter as mistralAdapter } from "./mistral/adapter.ts";
-import { adapter as moonshotAdapter } from "./moonshot/adapter.ts";
-import { adapter as openrouterAdapter } from "./openrouter/adapter.ts";
-import { adapter as togetherAdapter } from "./together/adapter.ts";
-import { adapter as xaiAdapter } from "./xai/adapter.ts";
-import { adapter as xiaomiAdapter } from "./xiaomi/adapter.ts";
-import { adapter as zaiAdapter } from "./zai/adapter.ts";
-import { adapter as googleAdapter } from "./google/adapter.ts";
+import { sdkProviderAdapters } from "../adapters/sdk.ts";
+import { providerQuirks } from "./quirks.ts";
 
 export interface Adapter {
   readonly protocol: Protocol;
@@ -40,29 +24,12 @@ const adapters: Record<Protocol, Adapter> = {
   "google-generative-ai": googleGenerativeAdapter,
 };
 
-// Per-provider adapters - each handles quirks individually, no central system
-const providerAdapters: Record<string, Adapter> = {
-  alibaba: alibabaAdapter,
-  anthropic: anthropicMessagesAdapter,
-  cerebras: cerebrasAdapter,
-  cohere: cohereAdapter,
-  deepseek: deepseekAdapter,
-  elevenlabs: elevenlabsAdapter,
-  fal: falAdapter,
-  fireworks: fireworksAdapter,
-  google: googleAdapter,
-  groq: groqAdapter,
-  huggingface: huggingfaceAdapter,
-  minimax: minimaxAdapter,
-  mistral: mistralAdapter,
-  moonshot: moonshotAdapter,
-  openai: openAICompletionsAdapter,
-  openrouter: openrouterAdapter,
-  together: togetherAdapter,
-  xai: xaiAdapter,
-  xiaomi: xiaomiAdapter,
-  zai: zaiAdapter,
-};
+// Per-provider adapters — now single SDK+quirks file, not 20 folders.
+// Legacy `src/providers/*/adapter.ts` remain for reference but are no longer imported.
+const providerAdapters: Record<string, Adapter> = sdkProviderAdapters as Record<string, Adapter>;
+
+// Keep quirks import to ensure bundle includes patch table (tree-shake proof)
+void providerQuirks;
 
 // Static provider definitions - 20 providers: 3 core + 15 text + 2 image/audio
 export const providerDefinitions: ProviderDefinition[] = [
