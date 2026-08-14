@@ -60,6 +60,32 @@ describe("the MCP server registry", () => {
 
       expect(row.auth_env_var).toBe("GITHUB_TOKEN");
     });
+
+    it.each([
+      {
+        id: "nested-env",
+        transport: "stdio" as const,
+        command: programPath("node"),
+        env: { API_TOKEN: "secret" },
+        auth: "none" as const,
+      },
+      {
+        id: "secret-arg",
+        transport: "stdio" as const,
+        command: programPath("node"),
+        args: ["--password=secret"],
+        auth: "none" as const,
+      },
+      {
+        id: "secret-query",
+        transport: "http" as const,
+        url: "https://example.test/mcp?access_token=secret",
+        auth: "none" as const,
+      },
+    ])("rejects secret-shaped configuration and persists nothing", (input) => {
+      expect(() => registry.save({ title: input.id, ...input })).toThrow(ExtendError);
+      expect(registry.get(input.id)).toBeUndefined();
+    });
   });
 
   describe("a command is a program and an argument vector", () => {

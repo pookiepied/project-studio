@@ -4,6 +4,10 @@
  * Endpoint: POST {baseUrl}/v1/chat/completions , GET {baseUrl}/v1/models
  * Auth: Authorization: Bearer {apiKey}
  * All OpenAI-compatible providers use this (OpenAI, DeepSeek, Groq, etc.)
+ *
+ * Discovery: live `GET /v1/models` fallback only. Primary tagging is via
+ * `catalog/sync.ts` → `mapModelsDevToDefinition` (models.dev). Heuristics below
+ * are best-effort for providers without catalog entry (e.g. custom/self-hosted).
  */
 
 import type { Adapter } from "../../providers/registry.ts";
@@ -37,6 +41,7 @@ export const openAICompletionsAdapter: Adapter = {
       throw new Error(`OpenAI list models failed ${res.status}: ${text}`);
     }
     const data = (await res.json()) as OpenAIModelsResponse;
+    // Fallback heuristic only — catalog mapper is primary; keep in sync with `sdk.ts:mapModelsDevToDefinition` categories
     const models: ModelDefinition[] = (data.data ?? []).map((m) => {
       const idLower = m.id.toLowerCase();
       let category: ModelDefinition["category"] = "text";

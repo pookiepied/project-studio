@@ -34,8 +34,10 @@ export interface PermissionGrant {
    * What the approval was narrowed to — `src/**`, `git:log`. Undefined means
    * the whole capability, which is what every grant meant before resources
    * existed.
-   */
+  */
   readonly resourcePattern: string | undefined;
+  /** The definition the user saw when this approval was given. */
+  readonly definitionHash: string | undefined;
   readonly grantedAt: number;
 }
 
@@ -46,11 +48,12 @@ interface GrantRow {
   conversation_id: string | null;
   project_id: string | null;
   resource_pattern: string | null;
+  definition_hash: string | null;
   granted_at: number;
 }
 
 const COLUMNS = `id, capability_key, agent_id, conversation_id, project_id,
-                 resource_pattern, granted_at`;
+                  resource_pattern, definition_hash, granted_at`;
 
 function toGrant(row: GrantRow): PermissionGrant {
   return {
@@ -60,6 +63,7 @@ function toGrant(row: GrantRow): PermissionGrant {
     conversationId: row.conversation_id ?? undefined,
     projectId: row.project_id ?? undefined,
     resourcePattern: row.resource_pattern ?? undefined,
+    definitionHash: row.definition_hash ?? undefined,
     grantedAt: row.granted_at,
   };
 }
@@ -94,6 +98,7 @@ export class PermissionGrantStore {
     scope: ExecutionScope,
     resource?: string,
     kind: ResourceKind = "path",
+    definitionHash?: string,
   ): PermissionGrant | undefined {
     const key = capabilityKey(id);
 
@@ -117,8 +122,14 @@ export class PermissionGrantStore {
     // Pattern matching happens here rather than in SQL: SQLite's GLOB cannot
     // express the `*` / `**` distinction, and approximating it in SQL would
     // make the stored rule and the enforced rule two different things.
+    // A definition hash is another part of the approval: a connected tool with
+    // the same name but a different definition is not the thing the user saw.
     const applicable = rows
-      .filter((row) => matchesResource(row.resource_pattern ?? undefined, resource, kind))
+      .filter(
+        (row) =>
+          matchesResource(row.resource_pattern ?? undefined, resource, kind) &&
+          (definitionHash === undefined || row.definition_hash === definitionHash),
+      )
       .sort((left, right) => {
         // A conversation-scoped grant is narrower than a standing one, and a
         // specific pattern is narrower than a wildcard. Preferring the broader
@@ -154,6 +165,7 @@ export class PermissionGrantStore {
     scope: ExecutionScope,
     duration: GrantDuration,
     resourcePattern?: string,
+    definitionHash?: string,
   ): PermissionGrant | undefined {
     if (duration === "once") return undefined;
 
@@ -166,16 +178,20 @@ export class PermissionGrantStore {
       conversation_id: conversationId,
       project_id: scope.projectId ?? null,
       resource_pattern: resourcePattern ?? null,
+      definition_hash: definitionHash ?? null,
       granted_at: Date.now(),
     };
+
+    const existing = this.#findExact(grant);
+    if (existing) return this.#refreshDefinition(existing, definitionHash, grant.granted_at);
 
     try {
       this.#db.handle
         .prepare(
           `INSERT INTO permission_grant
                   (id, capability_key, agent_id, conversation_id, project_id,
-                   resource_pattern, verdict, granted_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'allow', ?)`,
+                    resource_pattern, definition_hash, verdict, granted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'allow', ?)`,
         )
         .run(
           grant.id,
@@ -184,14 +200,16 @@ export class PermissionGrantStore {
           grant.conversation_id,
           grant.project_id,
           grant.resource_pattern,
+          grant.definition_hash,
           grant.granted_at,
         );
     } catch (error) {
       // The unique index makes a repeated approval a conflict. That is the
-      // user approving something they already approved, which is a no-op, not
-      // a failure to surface.
-      const existing = this.find(id, scope, resourcePattern);
-      if (existing) return existing;
+      // user approving something they already approved, which is a no-op. A
+      // changed definition is different: the approval is new, so its hash must
+      // replace the old one rather than leaving the stale grant in place.
+      const existing = this.#findExact(grant);
+      if (existing) return this.#refreshDefinition(existing, definitionHash, grant.granted_at);
       throw storageErrorFrom(error);
     }
 
@@ -277,5 +295,44 @@ export class PermissionGrantStore {
       )
       .run(Date.now(), conversationId);
     return Number(result.changes);
+  }
+
+  #findExact(grant: GrantRow): GrantRow | undefined {
+    const row = this.#db.handle
+      .prepare(
+        `SELECT ${COLUMNS}
+           FROM permission_grant
+          WHERE capability_key = ?
+            AND agent_id = ?
+            AND IFNULL(conversation_id, '') = IFNULL(?, '')
+            AND IFNULL(project_id, '') = IFNULL(?, '')
+            AND IFNULL(resource_pattern, '') = IFNULL(?, '')
+            AND revoked_at IS NULL`,
+      )
+      .get(
+        grant.capability_key,
+        grant.agent_id,
+        grant.conversation_id,
+        grant.project_id,
+        grant.resource_pattern,
+      ) as unknown;
+
+    return row === undefined ? undefined : (row as GrantRow);
+  }
+
+  #refreshDefinition(
+    row: GrantRow,
+    definitionHash: string | undefined,
+    grantedAt: number,
+  ): PermissionGrant {
+    if (definitionHash !== undefined && row.definition_hash !== definitionHash) {
+      this.#db.handle
+        .prepare("UPDATE permission_grant SET definition_hash = ?, granted_at = ? WHERE id = ?")
+        .run(definitionHash, grantedAt, row.id);
+      row.definition_hash = definitionHash;
+      row.granted_at = grantedAt;
+    }
+
+    return toGrant(row);
   }
 }

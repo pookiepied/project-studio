@@ -1,5 +1,6 @@
 import type { KindReconciler } from "../reconcile.js";
 import { planReconcile } from "../reconcile.js";
+import type { McpConnection } from "./connection.js";
 import { McpServerRegistry, type McpServerRecord } from "./registry.js";
 import type { McpSupervisor } from "./supervisor.js";
 
@@ -26,6 +27,11 @@ import type { McpSupervisor } from "./supervisor.js";
 export interface McpReconcilerOptions {
   readonly registry: McpServerRegistry;
   readonly supervisor: McpSupervisor;
+  readonly onReady?: (
+    record: McpServerRecord,
+    connection: McpConnection,
+  ) => Promise<void> | void;
+  readonly onStop?: (serverId: string) => void;
 }
 
 export function createMcpReconciler(options: McpReconcilerOptions): KindReconciler {
@@ -44,7 +50,7 @@ export function createMcpReconciler(options: McpReconcilerOptions): KindReconcil
    * Live state, keyed by id, held next to the thing it describes and never
    * written down — the same rule the supervisor follows.
    */
-  const startedWith = new Map<string, McpServerRecord>();
+   const startedWith = new Map<string, McpServerRecord>();
 
   return async (desired: readonly string[]): Promise<void> => {
     const live = supervisor.statuses().map((status) => status.id);
@@ -66,6 +72,7 @@ export function createMcpReconciler(options: McpReconcilerOptions): KindReconcil
 
     for (const id of stopping) {
       supervisor.stop(id);
+      options.onStop?.(id);
       startedWith.delete(id);
     }
 
@@ -86,14 +93,32 @@ export function createMcpReconciler(options: McpReconcilerOptions): KindReconcil
         const record = registry.get(id);
         if (record === undefined) return;
 
+        // Remember failed attempts too. Otherwise an edit made while the
+        // supervisor's retry timer is pending has no previous record to compare
+        // against and leaves the old launch retrying beside the new one.
+        startedWith.set(id, record);
+
+        let connection: McpConnection;
         try {
-          await supervisor.ensure(record);
-          startedWith.set(id, record);
-        } catch {
+          connection = await supervisor.ensure(record);
+        } catch (error) {
           // Deliberately swallowed. The supervisor holds the reason, the last
           // thing the server said, and the retry; raising here would replace a
           // recoverable failure with a pass that stopped half way. Saying it
           // out loud to the user is 003.7.
+          return;
+        }
+
+        try {
+          await options.onReady?.(record, connection);
+          startedWith.set(id, record);
+        } catch (error) {
+          supervisor.stop(id);
+          options.onStop?.(id);
+          // A live server with no catalog is not usable. Forget it so the next
+          // reconciliation makes one clean attempt rather than claiming the
+          // old connection is ready.
+          throw error;
         }
       }),
     );

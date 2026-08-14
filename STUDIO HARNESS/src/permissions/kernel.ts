@@ -5,6 +5,7 @@ import {
   type CapabilityId,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
+import { hashToolDefinition } from "../extend/mcp/wire/definition-hash.js";
 import type { ErrorReporter } from "../observability/error-reporter.js";
 import { PermissionError } from "./errors.js";
 import type { PermissionGrantStore } from "./grant-store.js";
@@ -24,6 +25,9 @@ import {
   type PermissionRequest,
   type PolicyRule,
 } from "./policy.js";
+
+const DEFINITION_CHANGED_REASON =
+  "This tool's definition changed since you approved it. Review the updated tool before it runs again.";
 
 /**
  * The single source of permission for the harness.
@@ -83,6 +87,7 @@ export interface PermissionApprover {
   request(
     request: PermissionRequest,
     decision: PermissionDecision,
+    signal?: AbortSignal,
   ): Promise<PermissionAnswer | undefined>;
 }
 
@@ -231,6 +236,8 @@ export class PermissionKernel {
       };
     }
 
+    const definitionHash = hashFor(capability);
+
     // Trust is a precondition, not a rule, so it sits ahead of the policy list
     // *and* ahead of grants. A grant collected while a folder was trusted must
     // not outlive the user changing their mind about the folder.
@@ -271,25 +278,57 @@ export class PermissionKernel {
           return { verdict, source: "policy", reason: rule.reason, grantId: undefined };
         }
 
-        const granted = this.#grants.find(id, scope, call.resource, call.kind);
-        return granted
-          ? {
-              verdict: "allow",
-              source: "grant",
-              reason: "You approved this previously.",
-              grantId: granted.id,
-            }
-          : { verdict: "ask", source: "policy", reason: rule.reason, grantId: undefined };
+        const granted = this.#grants.find(
+          id,
+          scope,
+          call.resource,
+          call.kind,
+          definitionHash,
+        );
+        if (granted) {
+          return {
+            verdict: "allow",
+            source: "grant",
+            reason: "You approved this previously.",
+            grantId: granted.id,
+          };
+        }
+
+        if (definitionHash !== undefined && this.#grants.find(id, scope, call.resource, call.kind)) {
+          return {
+            verdict: "ask",
+            source: "policy",
+            reason: DEFINITION_CHANGED_REASON,
+            grantId: undefined,
+          };
+        }
+
+        return { verdict: "ask", source: "policy", reason: rule.reason, grantId: undefined };
       }
     }
 
-    const granted = this.#grants.find(id, scope, call.resource, call.kind);
+    const granted = this.#grants.find(
+      id,
+      scope,
+      call.resource,
+      call.kind,
+      definitionHash,
+    );
     if (granted) {
       return {
         verdict: "allow",
         source: "grant",
         reason: "You approved this previously.",
         grantId: granted.id,
+      };
+    }
+
+    if (definitionHash !== undefined && this.#grants.find(id, scope, call.resource, call.kind)) {
+      return {
+        verdict: "ask",
+        source: "default",
+        reason: DEFINITION_CHANGED_REASON,
+        grantId: undefined,
       };
     }
 
@@ -324,7 +363,9 @@ export class PermissionKernel {
     id: CapabilityId,
     scope: ExecutionScope,
     call: CallResource = { resource: undefined, kind: "path" },
+    signal?: AbortSignal,
   ): Promise<PermissionDecision> {
+    if (signal?.aborted) throw this.#cancelled(id);
     const decision = this.evaluate(id, scope, call);
 
     if (decision.verdict === "allow") return decision;
@@ -340,6 +381,8 @@ export class PermissionKernel {
       throw this.#refuse("approval_required", id, decision);
     }
 
+    const definitionHash = hashFor(capability);
+
     const scopes = offerScopes({
       resource: call.resource,
       kind: call.kind,
@@ -349,7 +392,9 @@ export class PermissionKernel {
     const answer = await this.#approver.request(
       { capability, scope, resource: call.resource, scopes },
       decision,
+      signal,
     );
+    if (signal?.aborted) throw this.#cancelled(id);
     if (!answer || answer.verdict === "deny") {
       // Not `decision.reason`: that explains why the user was asked, and
       // repeating it after they answered would report a call the user just
@@ -362,6 +407,8 @@ export class PermissionKernel {
     }
 
     const { scope: chosen, recognized } = resolveScope(scopes, answer.scopeId);
+
+    if (signal?.aborted) throw this.#cancelled(id);
 
     if (!recognized) {
       // An approver answering with something we did not offer is a bug in the
@@ -377,7 +424,13 @@ export class PermissionKernel {
       );
     }
 
-    const grant = this.#grants.grant(id, scope, answer.duration, chosen?.pattern);
+    const grant = this.#grants.grant(
+      id,
+      scope,
+      answer.duration,
+      chosen?.pattern,
+      definitionHash,
+    );
     return {
       verdict: "allow",
       source: "grant",
@@ -408,6 +461,27 @@ export class PermissionKernel {
 
     return error;
   }
+
+  #cancelled(id: CapabilityId): PermissionError {
+    const error = new PermissionError("cancelled", {
+      capability: capabilityKey(id),
+    });
+    this.#reporter?.report(error, {
+      operation: "permissions.authorize",
+      capability: capabilityKey(id),
+    });
+    return error;
+  }
+}
+
+function hashFor(capability: CapabilityDescriptor): string | undefined {
+  if (capability.provenance.origin !== "mcp") return undefined;
+
+  return hashToolDefinition({
+    name: capability.id.name,
+    description: capability.description,
+    inputSchema: capability.inputSchema,
+  });
 }
 
 /**
@@ -419,6 +493,10 @@ export class PermissionKernel {
  */
 function assertScope(scope: ExecutionScope): void {
   if (
+    (scope.clientId !== undefined &&
+      (typeof scope.clientId !== "string" || scope.clientId.trim() === "")) ||
+    (scope.sessionId !== undefined &&
+      (typeof scope.sessionId !== "string" || scope.sessionId.trim() === "")) ||
     typeof scope.agentId !== "string" ||
     scope.agentId.trim() === "" ||
     typeof scope.conversationId !== "string" ||

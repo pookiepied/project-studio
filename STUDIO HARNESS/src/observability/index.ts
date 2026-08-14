@@ -24,6 +24,7 @@ export {
   safeSerializeError,
   safeSerializeValue,
 } from "./errors.js";
+export { registerFlueTurnBoundary } from "./flue.js";
 import { TelemetryError } from "./telemetry-errors.js";
 export { createLogger, type Logger, type LogFields, type LogLevel } from "./logger.js";
 export {

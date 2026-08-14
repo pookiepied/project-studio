@@ -2,28 +2,21 @@
  * Catalog sync — first-party source of truth from models.dev (`@opencode-ai/models`).
  *
  * Full ingest: every provider + every model. Gating is admin-layer:
- *  - popular set → providers.enabled=1 (loud in UI)
- *  - rest       → providers.enabled=0 (faded, opt-in)
+ *  - popular set → providers.enabled=1 for NEW providers only (loud in UI)
+ *  - rest       → providers.enabled=0 for NEW providers (faded, opt-in)
+ *  - existing providers → enabled preserved (operator-owned)
  *  - models     → exposed=0 always (admin must drag to production grid)
  *
- * Two fetch modes share this queue (as requested):
- *  1. catalog mode — this file: static snapshot via @opencode-ai/models, tags all fields
- *  2. live mode    — services/discovery.ts GET /v1/models per credential'd provider,
- *                   merges on top (covers 11labs/fal image/video where catalog is thin)
+ * Live discovery is a separate job, but it writes through the same catalog
+ * repository so both sources produce the same D1 shape.
  */
 
 import { Models } from "@opencode-ai/models";
-import { POPULAR_PROVIDER_IDS, MODELS_DEV_TO_REGISTRY } from "./popular.ts";
-import { mapModelsDevToDefinition } from "../adapters/sdk.ts";
-import { logger } from "../lib/logger.ts";
-
-// Protocol inference from models.dev npm/doc fields
-function inferProtocol(npm: string | undefined, api: string | undefined): string {
-  if (npm === "@ai-sdk/anthropic") return "anthropic-messages";
-  if (npm === "@ai-sdk/google" || npm === "@ai-sdk/google-vertex") return "google-generative-ai";
-  if (api?.includes("/v1/responses")) return "openai-responses";
-  return "openai-completions";
-}
+import { POPULAR_PROVIDER_IDS, MODELS_DEV_TO_REGISTRY } from "./enabled-allowlist.ts";
+import { resolveProviderUrl, inferProtocol } from "./defaults.ts";
+import { mapModelsDevToDefinition } from "./mapper.ts";
+import { logger } from "../observability/logger.ts";
+import { batchUpsertCatalogModels } from "./repository.ts";
 
 export interface SyncResult {
   providersUpserted: number;
@@ -41,12 +34,12 @@ export async function syncCatalog(db: D1Database): Promise<SyncResult> {
   const providers = await client.providers() as Record<string, {
     id: string; name: string; npm?: string; doc?: string; api?: string;
     models: Record<string, {
-      id: string; name: string; description?: string;
+      id: string; name: string; description?: string; family?: string;
       modalities: { input: string[]; output: string[] };
       limit: { context: number; output?: number };
-      cost: { input?: number; output?: number; cache_read?: number; cache_write?: number };
+      cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number };
       tool_call: boolean; reasoning: boolean; reasoning_options?: Array<{ type: string }>;
-      attachment?: boolean; release_date?: string;
+      attachment?: boolean; release_date?: string; open_weights?: boolean; knowledge?: string; lab?: string;
     }>;
   }>;
 
@@ -62,62 +55,32 @@ export async function syncCatalog(db: D1Database): Promise<SyncResult> {
     if (isPopular) popularEnabled++;
 
     const protocol = inferProtocol(p.npm, p.api);
-    const baseUrl = p.api?.replace("${CLOUDFLARE_ACCOUNT_ID}", "account_id")
-                          .replace("${NEON_AI_GATEWAY_BASE_URL}", "https://ai-gateway.neon.tech")
-                          .replace("${DATABRICKS_HOST}", "databricks.example.com")
-                          .replace("${INFOMANIAK_PRODUCT_ID}", "product_id")
-                          .replace("${SNOWFLAKE_ACCOUNT}", "account") ?? `https://${devId}.example.com/v1`;
+    const baseUrl = resolveProviderUrl(devId, registryId, p.api);
 
     try {
+      // Preserve operator-owned `enabled` — only set for new providers, never overwrite existing
       await db.prepare(
-        `INSERT INTO providers (id, name, base_url, protocol, auth_mode, enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'apiKey', ?, unixepoch('now')*1000, unixepoch('now')*1000)
+        `INSERT INTO providers (id, name, base_url, protocol, auth_mode, enabled, catalog_source, doc_url, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'apiKey', ?, 'models.dev', ?, unixepoch('now')*1000, unixepoch('now')*1000)
          ON CONFLICT(id) DO UPDATE SET name=excluded.name, base_url=excluded.base_url,
-           protocol=excluded.protocol, updated_at=excluded.updated_at`,
-      ).bind(registryId, p.name ?? devId, baseUrl, protocol, enabled).run();
+           protocol=excluded.protocol, catalog_source=excluded.catalog_source,
+           doc_url=excluded.doc_url, updated_at=excluded.updated_at`,
+      ).bind(registryId, p.name ?? devId, baseUrl, protocol, enabled, p.doc ?? null).run();
       providersUpserted++;
 
-      // Upsert models — never auto-expose
+      // Batch upsert models — never auto-expose, preserves existing flags via batch
+      const defs: import("../providers/types.ts").ModelDefinition[] = [];
       for (const [modelId, m] of Object.entries(p.models)) {
         try {
-          const def = mapModelsDevToDefinition(registryId, modelId, m as never);
-          const existing = await db.prepare(
-            "SELECT exposed, enabled FROM models WHERE provider_id = ? AND model_id = ?",
-          ).bind(registryId, modelId).first<{ exposed: number; enabled: number }>();
-          const exposed = existing?.exposed ?? 0;
-          const now = Date.now();
-          await db.prepare(
-            `INSERT INTO models (provider_id, model_id, display_name, category, input_modalities, output_modalities,
-               context_window, max_output_tokens, pricing_input, pricing_output, pricing_cache_read, pricing_cache_write,
-               supports_tools, supports_parallel_tools, supports_vision, supports_reasoning, reasoning_type, reasoning_levels,
-               enabled, exposed, raw_json, fetched_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-             ON CONFLICT(provider_id, model_id) DO UPDATE SET
-               display_name=excluded.display_name, category=excluded.category,
-               input_modalities=excluded.input_modalities, output_modalities=excluded.output_modalities,
-               context_window=excluded.context_window, max_output_tokens=excluded.max_output_tokens,
-               pricing_input=excluded.pricing_input, pricing_output=excluded.pricing_output,
-               pricing_cache_read=excluded.pricing_cache_read, pricing_cache_write=excluded.pricing_cache_write,
-               supports_tools=excluded.supports_tools, supports_parallel_tools=excluded.supports_parallel_tools,
-               supports_vision=excluded.supports_vision, supports_reasoning=excluded.supports_reasoning,
-               reasoning_type=excluded.reasoning_type, reasoning_levels=excluded.reasoning_levels,
-               raw_json=excluded.raw_json, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
-          ).bind(
-            registryId, modelId, def.displayName ?? modelId, def.category,
-            JSON.stringify(def.inputModalities), JSON.stringify(def.outputModalities),
-            def.contextWindow, def.maxOutputTokens,
-            def.pricing?.input ?? null, def.pricing?.output ?? null,
-            def.pricing?.cacheRead ?? null, def.pricing?.cacheWrite ?? null,
-            def.supportsTools ? 1 : 0, def.supportsParallelTools ? 1 : 0,
-            def.supportsVision ? 1 : 0, def.supportsReasoning ? 1 : 0,
-            def.reasoning?.type ?? null,
-            def.reasoning ? JSON.stringify(def.reasoning.levels) : null,
-            exposed, JSON.stringify(m), now, now,
-          ).run();
-          modelsUpserted++;
+          defs.push(mapModelsDevToDefinition(registryId, modelId, m as never));
         } catch (e) {
           errors.push(`${registryId}/${modelId}: ${e instanceof Error ? e.message : String(e)}`);
         }
+      }
+      if (defs.length > 0) {
+        const batchCount = await batchUpsertCatalogModels(db, defs);
+        modelsUpserted += batchCount;
+        logger.info("catalog sync provider batch", { provider: registryId, models: batchCount });
       }
     } catch (e) {
       const msg = `${devId}: ${e instanceof Error ? e.message : String(e)}`;
@@ -128,53 +91,4 @@ export async function syncCatalog(db: D1Database): Promise<SyncResult> {
 
   logger.info("catalog sync done", { providersUpserted, modelsUpserted, popularEnabled, errors: errors.length });
   return { providersUpserted, modelsUpserted, popularEnabled, errors };
-}
-
-/**
- * Live fetch for a single provider's /v1/models (second queue mode).
- * Used for credential'd providers, especially custom image/video/audio
- * (fal, elevenlabs) where catalog has no entry. Merges into same table.
- */
-export async function syncLiveProvider(
-  db: D1Database,
-  providerId: string,
-  apiKey: string,
-  baseUrl: string,
-  protocol: string,
-): Promise<number> {
-  const { getAdapter } = await import("../providers/registry.ts");
-  const adapter = getAdapter(protocol as never);
-  const models = await adapter.discover(apiKey, baseUrl);
-  let count = 0;
-  for (const m of models) {
-    const existing = await db.prepare(
-      "SELECT exposed FROM models WHERE provider_id = ? AND model_id = ?",
-    ).bind(providerId, m.id).first<{ exposed: number }>();
-    const exposed = existing?.exposed ?? 0;
-    const now = Date.now();
-    await db.prepare(
-      `INSERT INTO models (provider_id, model_id, display_name, category, input_modalities, output_modalities,
-         context_window, max_output_tokens, pricing_input, pricing_output, pricing_cache_read, pricing_cache_write,
-         supports_tools, supports_parallel_tools, supports_vision, supports_reasoning, reasoning_type, reasoning_levels,
-         enabled, exposed, raw_json, fetched_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-       ON CONFLICT(provider_id, model_id) DO UPDATE SET
-         display_name=excluded.display_name, category=excluded.category,
-         input_modalities=excluded.input_modalities, output_modalities=excluded.output_modalities,
-         context_window=excluded.context_window, max_output_tokens=excluded.max_output_tokens,
-         raw_json=excluded.raw_json, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
-    ).bind(
-      providerId, m.id, m.displayName ?? m.id, m.category,
-      JSON.stringify(m.inputModalities), JSON.stringify(m.outputModalities),
-      m.contextWindow, m.maxOutputTokens,
-      m.pricing?.input ?? null, m.pricing?.output ?? null,
-      m.pricing?.cacheRead ?? null, m.pricing?.cacheWrite ?? null,
-      m.supportsTools ? 1 : 0, m.supportsParallelTools ? 1 : 0,
-      m.supportsVision ? 1 : 0, m.supportsReasoning ? 1 : 0,
-      m.reasoning?.type ?? null, m.reasoning ? JSON.stringify(m.reasoning.levels) : null,
-      exposed, JSON.stringify(m.raw ?? {}), now, now,
-    ).run();
-    count++;
-  }
-  return count;
 }

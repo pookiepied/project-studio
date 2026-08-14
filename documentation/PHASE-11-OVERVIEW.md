@@ -4,6 +4,10 @@ A readable account, not a checklist. For the operational version — what to
 read before working, how to route an issue, what "done" requires — see
 `tasks/META-INSTRUCTIONS.md`. For the line-by-line record, see
 `tasks/phase-11-mcp/003-work-plan.md` and `tasks/phase-11-mcp/005-loose-ends.md`.
+The cross-cutting Harness client boundary is settled in ADR 0028 and planned in
+`tasks/phase-11-mcp/006-harness-admission.md`.
+The current P1/P2 audit remediation is tracked in
+`tasks/phase-11-mcp/007-audit-remediation.md`.
 
 This document is a snapshot. Trust the source files it summarizes over this
 prose the moment they disagree.
@@ -39,20 +43,15 @@ question directly: what is still not done.
 
 ## The shape the phase was built in, on purpose
 
-Every piece of Phase 11 was built and tested against a fake before it was
-connected to anything real. The registry, the connection, both transport
-channels, the handshake, the supervisor, the reconciler — each has its own
-test file, each passes against a scripted double, and until recently none of
-them had a caller anywhere in `src/`.
+Every piece of Phase 11 was first built and tested against a fake, then task 007
+assembled the runtime against real MCP/Flue paths. The registry, connection,
+both transport channels, handshake, supervisor, reconciler, catalog, CallGate,
+management, approval, and native registrar now have source callers and
+regression evidence.
 
-That was a deliberate choice, not neglect, and it was named explicitly in the
-loose-ends file the moment it was measured: *"a complete MCP client that
-nothing has ever run."* The risk that shape carries is specific — a bug that
-only shows up when two real pieces meet cannot be found by testing each piece
-alone. One did show up exactly that way (`S-04`, `Windows delivered PATH to
-every child we spawned` — found the moment a real process was spawned) and
-became the reason later items were tested end-to-end deliberately, not just
-against fakes.
+That layering was deliberate, not neglect. The remaining risk is now the
+boundary work that cannot be proven by an in-process fake: packaged listener
+ownership, desktop bootstrap, and the current Gateway wire contract.
 
 ## What is built, in the order it had to be
 
@@ -94,26 +93,22 @@ same endpoint correctly share one connection.
 
 ## What is still open, and why it matters
 
-Six items remain, and they fall into two different kinds of waiting.
+The remaining items fall into three kinds of waiting.
 
-**Real feature work, not yet started.** A tool's declared shape is not yet
-tied to the specific approval a user gave it, so a server could change what a
-tool claims to do after being approved once (`L-06`). Editing or removing a
-server does not yet revoke the permissions it was granted (`L-07`). A
-capability hidden by a project's settings currently disappears with no
-explanation instead of a stated reason (`L-08`). And the largest remaining
-item by far — nothing in the running application actually calls any of this
-yet. The registry, the reconciler, and the supervisor exist and work, and
-nothing wires them to the permission kernel or to a settings screen a person
-can see (`L-09`).
+**Implemented remediation.** L-06 through L-09 are closed in task 007: grant
+definition hashes, revocation callers, withheld diagnostics, and live MCP/native
+gate wiring are source-backed and tested. ADR 0029 resolves the session
+membership contract.
 
 **Known but unresolved defects, narrower in scope.** An integration test times
 out intermittently under load, now instrumented with enough detail to diagnose
 next time it happens, but the cause itself is still unknown (`L-10`). And a
 setup CLI raises two bare errors that should carry a proper domain (`L-11`).
 
-None of these is hidden. Each has an entry stating exactly what is missing and
-what "done" will require.
+The remaining packaged Host seam is tracked as L-12 and A-04; the headless
+listener/readiness path is implemented and tested. OAuth, bundled library,
+model-facing management, desktop transport, and account-backed product identity
+remain explicitly deferred or pending rather than silently claimed.
 
 ## How a defect gets handled here
 

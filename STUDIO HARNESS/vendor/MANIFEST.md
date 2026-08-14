@@ -30,6 +30,17 @@ independent verification of the upstream artefact. Checking a published
 signature is recorded as V-01 in `docs/KNOWN-ISSUES.md`, and matters most when
 binaries start being fetched on demand rather than committed.
 
+## ripgrep 14.1.1 · `linux-x64/rg`
+
+| | |
+|---|---|
+| Source | <https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz> |
+| Archive SHA-256 | `4CF9F2741E6C465FFDB7C26F38056A59E2A2544B51F7CC128EF28337EEAE4D8E` |
+| `rg` SHA-256 | `F401154E2393F9002AC77E419F9EE5521C18F4F8CD3E32293972F493BA06FCE7` |
+| Size | 6,597,984 bytes |
+| Licence | MIT / Unlicense — no redistribution obligation |
+| Build | PCRE2 10.43 with JIT; runtime SIMD detection |
+
 ## Not vendored
 
 **git.** Developers overwhelmingly have it, it is ~50 MB extracted rather than

@@ -3,10 +3,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient } from "../../src/application/harness-client.js";
 
 /**
@@ -195,17 +196,21 @@ async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 20_000):
 interface RunningHarness {
   baseUrl: string;
   process: ChildProcess;
+  token: string;
   readStdio: () => string;
 }
 
 async function startHarness(gatewayUrl: string, databasePath: string): Promise<RunningHarness> {
   const port = await availablePort();
+  const admission = createAdmissionSession({ clientType: "test" });
   const child = spawn(process.execPath, ["dist/server.mjs"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       PORT: String(port),
+      PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
       PROJECT_STUDIO_DB_PATH: databasePath,
+      PROJECT_STUDIO_STORE_PATH: join(dirname(databasePath), "studio.db"),
       PROJECT_STUDIO_MODEL_SOURCE: "studio-cloud",
       PROJECT_STUDIO_GATEWAY_URL: gatewayUrl,
       PROJECT_STUDIO_GATEWAY_TOKEN: DEV_TOKEN,
@@ -235,7 +240,7 @@ async function startHarness(gatewayUrl: string, databasePath: string): Promise<R
     }
   });
 
-  return { baseUrl, process: child, readStdio: () => stdio };
+  return { baseUrl, process: child, token: admission.credential, readStdio: () => stdio };
 }
 
 async function stopHarness(child: ChildProcess): Promise<void> {
@@ -277,7 +282,7 @@ describe.sequential("studio-cloud source through a real Flue server", () => {
     "runs a full tool-continuation turn against the mock gateway",
     async () => {
       harness = await startHarness(mock.url, join(databaseDir, "flue.db"));
-      const client = new FlueHarnessClient({ baseUrl: harness.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: harness.baseUrl, token: harness.token });
 
       const run = await client.send("tools", "check the workspace");
       const result = await client.wait(run);
@@ -334,7 +339,7 @@ describe.sequential("studio-cloud source through a real Flue server", () => {
     async () => {
       mock.setHoldOpen(true);
       harness = await startHarness(mock.url, join(databaseDir, "flue.db"));
-      const client = new FlueHarnessClient({ baseUrl: harness.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: harness.baseUrl, token: harness.token });
 
       const run = await client.send("cancel", "check the workspace");
 

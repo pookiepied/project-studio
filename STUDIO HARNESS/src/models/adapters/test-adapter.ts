@@ -95,6 +95,14 @@ function hasToolResult(context: Context): boolean {
   );
 }
 
+function hasAnyToolResult(context: Context): boolean {
+  return context.messages.some((message) => message.role === "toolResult");
+}
+
+function mcpToolName(context: Context): string | undefined {
+  return context.tools?.find((tool) => tool.name.startsWith("mcp__"))?.name;
+}
+
 async function waitForDelay(
   milliseconds: number,
   signal: AbortSignal | undefined,
@@ -129,6 +137,22 @@ function stream(
       const initial = createMessage(model);
       events.push({ type: "start", partial: initial });
 
+      const mcpName = mcpToolName(context);
+      if (userText.toLowerCase().includes("mcp") && mcpName !== undefined && !hasAnyToolResult(context)) {
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "mcp-echo-1",
+          name: mcpName,
+          arguments: { text: "hello from the model" },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+
       if (
         userText.toLowerCase().includes("workspace") &&
         !hasToolResult(context)
@@ -159,6 +183,8 @@ function stream(
 
       const text = hasToolResult(context)
         ? "Project Studio V2 workspace is ready."
+        : hasAnyToolResult(context)
+          ? "MCP tool completed."
         : `Echo: ${userText.replace("[slow]", "").trim()}`;
       const partial = createMessage(model, [{ type: "text", text: "" }]);
       let streamedText = "";

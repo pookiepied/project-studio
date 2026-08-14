@@ -25,7 +25,7 @@ repeat it.
 
 Phase 11 is "MCP" and is broken into numbered sub-items, `003.1` through
 `003.8`, tracked in `tasks/phase-11-mcp/003-work-plan.md`. Loose ends within it
-are `L-01` through `L-11` in `tasks/phase-11-mcp/005-loose-ends.md`.
+are `L-01` through `L-12` in `tasks/phase-11-mcp/005-loose-ends.md`.
 
 **The rule for calling something done**, from the loose-ends file header:
 something in `src/` calls it, a test proves the rule it exists to enforce, and
@@ -41,16 +41,20 @@ session:
 | `L-03` Streamable HTTP transport | done |
 | `L-04` the launcher | done |
 | `L-05` supervisor keyed on launch, not id | done |
-| `L-06` tool-definition hash not on a grant | open |
-| `L-07` revoke has no caller | open |
-| `L-08` honest silence (003.7) | open, not started |
-| `L-09` nothing is wired (003.8) | open, not started — the largest item |
+| `L-06` tool-definition hash not on a grant | done in task 007 |
+| `L-07` revoke has no caller | done in task 007 |
+| `L-08` honest silence (003.7) | done in task 007 |
+| `L-09` nothing is wired (003.8) | done in task 007; remaining Phase 11 surfaces tracked separately |
 | `L-10` `E-02` harness test times out intermittently | open, instrumented, cause unknown |
 | `L-11` `E-03` raw errors in setup CLI | open, small |
-
+| `L-12` Harness client admission and local listener boundary | in progress; headless listener/readiness done, Tauri Host pending |
 Verify this table yourself before trusting it — read
 `tasks/phase-11-mcp/005-loose-ends.md` directly. This table is a snapshot and
 will go stale the moment another item closes.
+
+Task `tasks/phase-11-mcp/007-audit-remediation.md` is the active P1/P2
+remediation record. It must remain separate from the intentionally deferred
+Phase 12–18 product work.
 
 ## 3. What "done" requires, every time, no exceptions
 

@@ -266,6 +266,7 @@ describe("the failure taxonomy is actually adopted", () => {
   });
 
   it("keeps every declared domain reachable from a real error class", async () => {
+    const { AdmissionError } = await import("../../src/admission/errors.js");
     const { StudioAuthError } = await import("../../src/auth/errors.js");
     const { CredentialStoreError } = await import(
       "../../src/credentials/credential-store.js"
@@ -282,6 +283,7 @@ describe("the failure taxonomy is actually adopted", () => {
     );
 
     const domains = new Set([
+      new AdmissionError("internal").domain,
       new StudioAuthError("internal").domain,
       new CredentialStoreError("internal").domain,
       new StorageError("internal").domain,
@@ -292,6 +294,7 @@ describe("the failure taxonomy is actually adopted", () => {
 
     // `unclassified` is intentionally absent: nothing may raise it on purpose.
     expect([...domains].sort()).toEqual([
+      "admission",
       "auth",
       "credentials",
       "gateway",
@@ -387,16 +390,8 @@ describe("the gate is the only way a tool runs", () => {
     // The gate and the tool contracts are the public surface. Importing a tool
     // module itself gives a caller an `execute` it can invoke with no kernel in
     // the way, so the import is refused rather than the call.
-    const allowed = new Set(["gate.js", "types.js", "errors.js", "bounds.js"]);
-
-    // The one bypass that exists today, named rather than excused. It is
-    // `T-19`: `workspace-summary.ts` is a Flue tool handed straight to the
-    // agent, with no descriptor, no kernel and no sandbox. It is harmless — it
-    // echoes its input — but it is also the end-to-end fixture seven
-    // integration tests depend on, so removing it is its own change.
-    //
-    // Asserted as an exact list, not skipped. A second bypass fails here.
-    const known = ["workspace-summary.js"];
+    const allowed = new Set(["gate.js", "types.js", "errors.js", "bounds.js", "index.js"]);
+    const known: string[] = [];
     const bypasses: string[] = [];
 
     for (const path of await sourceFiles()) {

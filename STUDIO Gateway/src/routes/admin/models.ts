@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
 import { requireAdmin } from "../../middleware/auth.ts";
-import { badRequest } from "../../lib/errors.ts";
+import { badRequest, conflict } from "../../lib/errors.ts";
 
 export const adminModelsRoute = new Hono<{ Bindings: Env }>();
 
@@ -39,7 +39,7 @@ adminModelsRoute.get("/models", async (c) => {
     vals.push(`%${search}%`, `%${search}%`);
   }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  const sql = `SELECT provider_id, model_id, display_name, category, input_modalities, output_modalities, context_window, max_output_tokens, pricing_input, pricing_output, supports_tools, supports_parallel_tools, supports_vision, supports_reasoning, reasoning_type, reasoning_levels, exposed, enabled, fetched_at FROM models ${whereSql} ORDER BY provider_id ASC, model_id ASC LIMIT ? OFFSET ?`;
+   const sql = `SELECT provider_id, model_id, display_name, category, input_modalities, output_modalities, context_window, max_output_tokens, pricing_input, pricing_output, pricing_cache_read, pricing_cache_write, supports_tools, supports_parallel_tools, supports_vision, supports_reasoning, reasoning_type, reasoning_levels, family, lab, open_weights, knowledge_cutoff, catalog_source, exposed, enabled, fetched_at FROM models ${whereSql} ORDER BY provider_id ASC, model_id ASC LIMIT ? OFFSET ?`;
   vals.push(limit, offset);
   const res = await c.env.DB.prepare(sql).bind(...vals).all();
   const totalRes = await c.env.DB.prepare(`SELECT COUNT(*) as cnt FROM models ${whereSql}`).bind(...vals.slice(0, -2)).first<{ cnt: number }>();
@@ -61,6 +61,12 @@ adminModelsRoute.post("/models/bulk", async (c) => {
   let updated = 0;
   for (const { provider_id, model_id } of body.modelIds) {
     if (!provider_id || !model_id) continue;
+    if (body.exposed === true) {
+      const dup = await c.env.DB.prepare(
+        "SELECT provider_id FROM models WHERE model_id = ? AND exposed = 1 AND provider_id != ? LIMIT 1",
+      ).bind(model_id, provider_id).first<{ provider_id: string }>();
+      if (dup) throw conflict(`Model ${model_id} already exposed by provider ${dup.provider_id}`);
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     if (typeof body.exposed === "boolean") {

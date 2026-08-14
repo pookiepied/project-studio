@@ -5,7 +5,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
 import { requireAdmin } from "../../middleware/auth.ts";
-import { encrypt } from "../../lib/encryption.ts";
+import { encrypt } from "../../infra/encryption.ts";
 import { badRequest, notFound } from "../../lib/errors.ts";
 
 export const adminCredentialsRoute = new Hono<{ Bindings: Env }>();

@@ -5,7 +5,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
 import { requireAdmin } from "../../middleware/auth.ts";
-import { generateGatewayKey, hashGatewayKeyAsync } from "../../lib/encryption.ts";
+import { generateGatewayKey, hashGatewayKeyAsync } from "../../infra/encryption.ts";
 import { badRequest } from "../../lib/errors.ts";
 
 export const adminKeysRoute = new Hono<{ Bindings: Env }>();
@@ -24,6 +24,7 @@ adminKeysRoute.post("/keys", async (c) => {
   const name = body?.name?.trim();
   if (!name) throw badRequest("name required");
   const rpm = body?.rateLimitRpm ?? 60;
+  if (!Number.isInteger(rpm) || rpm < 1 || rpm > 100_000) throw badRequest("rateLimitRpm must be an integer between 1 and 100000");
   const raw = generateGatewayKey();
   const hash = await hashGatewayKeyAsync(raw);
   const id = crypto.randomUUID();

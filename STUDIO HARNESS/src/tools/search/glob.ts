@@ -37,6 +37,18 @@ export const GLOB_DESCRIPTOR: CapabilityDescriptor = {
     "Finds files by name pattern, most recently modified first. Use src/* to list a directory " +
     "and **/*.ts to match by extension. Page with limit and offset, and set includeIgnored to " +
     "include ignored directories such as node_modules.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      pattern: { type: "string", minLength: 1 },
+      path: { type: "string" },
+      limit: { type: "integer", minimum: 1 },
+      offset: { type: "integer", minimum: 0 },
+      includeIgnored: { type: "boolean" },
+    },
+    required: ["pattern"],
+    additionalProperties: false,
+  },
   // `read`, for the same reason as grep: ripgrep runs, but with an argument
   // vector this code built. See ADR 0013.
   effects: ["read"],

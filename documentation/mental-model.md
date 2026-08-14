@@ -6,7 +6,7 @@ refuses to be, and the decisions that span both halves of the repo.
 Detail lives one level down and is authoritative where it disagrees with this
 file:
 
-- `STUDIO HARNESS/docs/decisions/` — 21 ADRs, the real reasoning
+- `STUDIO HARNESS/docs/decisions/` — 31 ADRs, the real reasoning
 - `STUDIO HARNESS/docs/STATUS.md` — how far along we are
 - `STUDIO HARNESS/docs/ROADMAP.md` — what order to build in
 - `STUDIO HARNESS/docs/KNOWN-ISSUES.md` — what is currently untrue
@@ -164,11 +164,10 @@ Ordering does not rescue a removal: the conversation sits after both `tools` and
 **This is the solution to both the toggle problem and the per-operation-tools
 trap. It is the single most important implementation rule in the harness.**
 
-**Not implemented.** There is no `expandedTools` set and no per-session tool
-array. Every tool is registered once at startup, and there is nothing to
-discover until MCP arrives in Phase 11. Written down now because the rule has to
-be in place *before* the first `prompt()` call is written: retrofitting it means
-paying the invalidation once in every session already running.
+**Implemented for the Harness MCP path.** Each agent sandbox retains an
+append-only tool membership set. Native tools are registered at sandbox start;
+MCP tools are added as they are discovered. The implementation and trade-offs
+are recorded in ADR 0029.
 
 Flue's `OperationOptions.tools` is documented as *"scoped to the duration of the
 `session.prompt()` call."* So passing discovered tools to one call and not the
@@ -217,11 +216,9 @@ possibility that this rule belongs to MCP results rather than to native tools.
 
 > A tool is either **always-loaded** or **discoverable**. Nothing else.
 
-**Not implemented.** `tool_discover` does not exist, and neither does the
-discoverable state. Everything shipped today is always-loaded: seven native
-tools, all registered through the `CallGate` at startup. The two states become
-real with MCP in Phase 11, which is the first time there is anything to
-discover.
+`tool_discover` does not exist yet. The current Harness exposes the shipped
+native families as always-loaded and retains discovered MCP tools per sandbox;
+the explicit discovery UI/API remains later Phase 11/12 work.
 
 **Always-loaded** (target ≤ 15) — used in the majority of sessions, plus the
 entry points to whole subsystems, because a subsystem the model cannot learn

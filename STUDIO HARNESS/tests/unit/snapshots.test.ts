@@ -50,8 +50,10 @@ describe("the shadow repository", () => {
   });
 
   it("gives two projects with the same folder name different histories", () => {
-    const first = projectKey("C:\\work\\app");
-    const second = projectKey("C:\\other\\app");
+    const firstRoot = process.platform === "win32" ? "C:\\work\\app" : "/work/app";
+    const secondRoot = process.platform === "win32" ? "C:\\other\\app" : "/other/app";
+    const first = projectKey(firstRoot);
+    const second = projectKey(secondRoot);
 
     expect(first).not.toBe(second);
     expect(first.startsWith("app-")).toBe(true);

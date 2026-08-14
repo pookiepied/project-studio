@@ -1,48 +1,43 @@
 /**
- * POST /v1/embeddings — OpenAI embeddings proxy
+ * POST /v1/embeddings — OpenAI embeddings via AI SDK runtime.
+ * Supports text, batch, dimensions via providerOptions, and multimodal where provider supports it.
  */
 
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
-import { findExposedModel, getProvider, getCredential } from "../../lib/db.ts";
-import { decrypt } from "../../lib/encryption.ts";
-import { badRequest, modelNotFound, modelNotExposed, providerNotConfigured } from "../../lib/errors.ts";
-import { requireGatewayBearer } from "../../middleware/auth.ts";
-import { checkRateLimit } from "../../lib/ratelimit.ts";
-import { logger } from "../../lib/logger.ts";
+import { badRequest } from "../../lib/errors.ts";
+import { authorizeGateway } from "../../middleware/gatewayAuth.ts";
+import { rowToModelDef } from "../../infra/db.ts";
+import { logger } from "../../observability/logger.ts";
+import { resolveModelAndProvider, getApiKey } from "../../gateway/resolver.ts";
+import { getProviderRuntime } from "../../providers/registry.ts";
 
 export const embeddingsRoute = new Hono<{ Bindings: Env }>();
 
 embeddingsRoute.post("/embeddings", async (c) => {
-  const auth = c.req.header("authorization");
-  const verified = await requireGatewayBearer(c.env.DB, auth ?? null, c.env.ENVIRONMENT);
-  if (verified) {
-    const rl = await checkRateLimit(c.env.DB, verified.keyId, verified.rpm);
-    if (!rl.allowed) return c.json({ error: { message: "Rate limit exceeded", type: "rate_limited", code: "RATE_LIMITED" } }, 429);
-  }
+  await authorizeGateway(c);
   const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || typeof body.model !== "string") throw badRequest("Missing model");
   const modelId = body.model as string;
-  const model = await findExposedModel(c.env.DB, modelId);
-  if (!model) {
-    const any = await c.env.DB.prepare("SELECT 1 FROM models WHERE model_id = ?").bind(modelId).first();
-    if (any) throw modelNotExposed(modelId);
-    throw modelNotFound(modelId);
-  }
-  const provider = await getProvider(c.env.DB, model.provider_id);
-  if (!provider || !provider.enabled) throw providerNotConfigured(model.provider_id);
-  const cred = await getCredential(c.env.DB, provider.id);
-  if (!cred) throw providerNotConfigured(provider.id);
-  if (!c.env.CREDENTIAL_ENCRYPTION_KEY) throw providerNotConfigured(provider.id);
-  const apiKey = await decrypt(cred.encrypted_key, c.env.CREDENTIAL_ENCRYPTION_KEY);
+  const { model, provider } = await resolveModelAndProvider(c.env.DB, modelId);
+  if (model.category !== "embedding") throw badRequest(`Model ${modelId} is not an embedding model`);
+  const apiKey = await getApiKey(c.env.DB, provider.id, c.env.CREDENTIAL_ENCRYPTION_KEY);
   logger.info("embeddings", { provider: provider.id, model: modelId });
-  const clean = provider.base_url.replace(/\/$/, "");
-  const url = clean.endsWith("/v1") ? `${clean}/embeddings` : `${clean}/v1/embeddings`;
-  const upstream = await fetch(url, {
-    method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
+
+  const runtime = await getProviderRuntime(provider.id, provider.protocol as never);
+  if (!runtime.embed) throw badRequest(`Provider ${provider.id} does not support embeddings`);
+
+  const input = (body.input as string | string[] | undefined) ?? (body as { inputs?: string | string[] }).inputs;
+  if (!input) throw badRequest("input is required for embeddings");
+
+  const modelDef = rowToModelDef(model);
+
+  return runtime.embed({
+    model: modelDef,
+    provider: { id: provider.id, baseUrl: provider.base_url, protocol: provider.protocol as never },
+    apiKey,
+    input,
+    body: body as Record<string, unknown>,
     signal: c.req.raw.signal as AbortSignal,
   });
-  return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
 });

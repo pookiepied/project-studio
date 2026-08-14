@@ -2,11 +2,12 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { FlueConversationMessage } from "@flue/sdk";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createAdmissionSession } from "../../src/admission/verifier.js";
 import {
   FlueHarnessClient,
   type AcceptedRun,
@@ -15,6 +16,7 @@ import {
 interface RunningHarness {
   baseUrl: string;
   process: ChildProcess;
+  token: string;
 }
 
 const processes = new Set<ChildProcess>();
@@ -79,12 +81,15 @@ const STARTUP_BUDGET_MS = 60_000;
 
 async function startHarness(databasePath: string): Promise<RunningHarness> {
   const port = await availablePort();
+  const admission = createAdmissionSession({ clientType: "test" });
   const child = spawn(process.execPath, ["dist/server.mjs"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       PORT: String(port),
+      PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
       PROJECT_STUDIO_DB_PATH: databasePath,
+      PROJECT_STUDIO_STORE_PATH: join(dirname(databasePath), "studio.db"),
     },
     stdio: "pipe",
   });
@@ -139,7 +144,7 @@ async function startHarness(databasePath: string): Promise<RunningHarness> {
       ].join("\n  "),
   );
 
-  return { baseUrl, process: child };
+  return { baseUrl, process: child, token: admission.credential };
 }
 
 async function stopHarness(child: ChildProcess): Promise<void> {
@@ -187,7 +192,7 @@ describe.sequential("Flue harness vertical slice", () => {
     "accepts a run, streams renderable state, and keeps thread continuity",
     async () => {
       const running = await startHarness(await createDatabasePath());
-      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
       const observation = client.observe("continuity");
 
       const first = await client.send("continuity", "hello");
@@ -216,7 +221,7 @@ describe.sequential("Flue harness vertical slice", () => {
     "continues after a typed tool call and records the tool exchange",
     async () => {
       const running = await startHarness(await createDatabasePath());
-      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
       const run = await client.send("tools", "check the workspace");
       const result = await client.wait(run);
@@ -240,7 +245,7 @@ describe.sequential("Flue harness vertical slice", () => {
     "cancels accepted work with a durable aborted outcome",
     async () => {
       const running = await startHarness(await createDatabasePath());
-      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
       const run = await client.send("cancel", "[slow] please wait");
       expect(await client.cancel("cancel")).toBe(true);
@@ -261,9 +266,10 @@ describe.sequential("Flue harness vertical slice", () => {
     async () => {
       const databasePath = await createDatabasePath();
       const firstServer = await startHarness(databasePath);
-      const firstClient = new FlueHarnessClient({
-        baseUrl: firstServer.baseUrl,
-      });
+       const firstClient = new FlueHarnessClient({
+         baseUrl: firstServer.baseUrl,
+         token: firstServer.token,
+       });
       const accepted: AcceptedRun = await firstClient.send(
         "restart",
         "[slow] survive restart",
@@ -276,9 +282,10 @@ describe.sequential("Flue harness vertical slice", () => {
         ...accepted,
         streamUrl: `${replacement.baseUrl}/agents/studio/restart`,
       };
-      const replacementClient = new FlueHarnessClient({
-        baseUrl: replacement.baseUrl,
-      });
+       const replacementClient = new FlueHarnessClient({
+         baseUrl: replacement.baseUrl,
+         token: replacement.token,
+       });
 
       const result = await replacementClient.wait(resumedRun);
       expect(result.text).toBe("Echo: survive restart");

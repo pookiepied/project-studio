@@ -17,17 +17,15 @@ of three is a loose end.
 
 ## The finding that reframes the list
 
-**Every module built in Phase 11 has zero callers in `src/`.** Measured, not
-assumed — `McpServerRegistry`, `ExtensionInventory`, `ExtensionSelectionStore`,
-`ExtensionReconciler`, `McpSupervisor`, `createMcpReconciler`, `judgeDestination`,
-`revokeNamespace`, and `hashToolDefinition` are each imported only by their own
-tests.
+**Historical finding:** every module built in the first Phase 11 slice had zero
+callers in `src/`. Task 007 now wires the registry, inventory, selection,
+reconciler, supervisor, catalog, revocation, hash, management, approval, and
+native gate paths into the Harness composition.
 
-That is not a defect on its own. It is the shape the phase was deliberately
-built in: every piece is tested against a fake, and the wiring is 003.8. But it
-means the honest summary of Phase 11 today is **"a complete MCP client that
-nothing has ever run"**, and the loose ends below are mostly the difference
-between those two sentences.
+The original shape was deliberate: each piece was tested against a fake and
+wiring arrived later. The honest current summary is **"an experimentally
+integrated MCP client with an active P1/P2 remediation record"**; the remaining
+items below are the unresolved boundary and cleanup work.
 
 It also means one class of bug cannot have been found yet: anything that only
 appears when the pieces are assembled against a real server. `S-04` was exactly
@@ -159,43 +157,32 @@ the same launch.
 
 ---
 
-## L-06 — The tool-definition hash is not on a grant · **003.4, second half**
+## ~~L-06 — The tool-definition hash is not on a grant~~ · **done in task 007**
 
-`hashToolDefinition` exists (`004.F`) and has no caller. The column and the
-comparison do not exist.
+`hashToolDefinition` is stored on MCP grants, compared during authorization, and
+definition changes force a new approval. Migration 8, grant-store tests, and the
+MCP runtime path prove the rule.
 
-Without it, `kernel.register` replaces a descriptor silently whenever `sourceId`
-matches — which is the correct update path — and nothing protects the
-`description` the approval dialog showed. A server can be approved with one
-description and then present another.
-
-**Done when:** the hash is stored with the grant, compared on the call, and a
-changed definition re-asks. **Write the message before the column:** what the
-user is told when a tool has changed under an approval decides whether the
-column is worth having.
+The definition hash is part of the grant lookup and changed definitions return
+the explicit review message before any effect executes.
 
 ---
 
-## L-07 — Revoke has no caller · **003.4, third half**
+## ~~L-07 — Revoke has no caller~~ · **done in task 007**
 
-`PermissionGrantStore.revokeNamespace` works and nothing calls it. The events
-that must call it are editing a server's reach and uninstalling one, and neither
-is possible yet because a server cannot be added yet.
+`McpManagementService` calls `revokeNamespace` when a server reach changes and
+when it is removed. Title-only edits preserve grants; reach edits and removal
+revoke them, with management tests covering all three cases.
 
-`McpServerRegistry.reachChanged` is the field list, already used by the
-reconciler to decide a restart. The same list decides the revoke, and it must
-stay one list.
-
-**Done when:** editing reach in settings revokes, uninstalling revokes, and a
-test proves a title change revokes nothing.
+`McpServerRegistry.reachChanged` remains the shared field list for restart and
+revocation.
 
 ---
 
-## L-08 — Honest silence · **003.7, not started**
+## ~~L-08 — Honest silence~~ · **done in task 007**
 
-A capability that disappears from `list()` because a switch is off throws
-nothing, so nobody learns why. At minimum one line naming what was withheld and
-which switch did it.
+`CallGate.list()` reports withheld capabilities once with the capability and
+switch name. The native and MCP registration paths use the same gate callback.
 
 The stronger rule this came from is worth keeping either way: **write the error
 message before the schema.** A state whose message cannot be written is a state
@@ -203,19 +190,19 @@ that should not be stored.
 
 ---
 
-## L-09 — Nothing is wired · **003.8, not started**
+## ~~L-09 — Nothing is wired~~ · **done in task 007**
 
-The list at the top of this file, closed. The MCP registry registers itself as
-the inventory's `mcp` provider; the reconciler is called at startup and at a
-turn boundary; a server's tools reach the kernel through `CallGate`; the
-management surface exists; the bundled library ships.
+The MCP registry, inventory, reconciler, supervisor, catalog, management routes,
+approval routes, native registrars, and CallGate are wired in `src/app.ts` /
+`StudioRuntime`; real stdio and Flue integration tests prove the path. The
+bundled library remains an explicit deferred feature.
 
 This is the largest item and every other one either feeds it or is finished by
 it.
 
-**Done when:** a real MCP server installed by a person answers a real tool call
-through the gate, and switching it off in settings removes its tools from the
-next turn.
+**Evidence:** a real MCP server answers through the gate, and ADR 0029 defines
+that switching it off retains the session tool with an unavailable dispatch
+result while a new sandbox omits it.
 
 ---
 
@@ -244,6 +231,33 @@ one to call it gone. Not before — closing it on silence is how it comes back.
 `KNOWN-ISSUES.md`; listed here because the architecture rule names it as the
 exact remaining offender, and a list of exceptions that grows is a rule that
 stops meaning anything.
+
+---
+
+## L-12 — Harness client admission and local listener boundary · **in progress; Host and client implemented, cargo verification pending**
+
+The Harness now has one inbound admission boundary in
+`src/transport/http/create-app.ts`; missing or invalid credentials are rejected
+before Flue, MCP, or permission handlers, and valid contexts are checked for
+operation scopes. The checked-in Flue CLI patch and
+`src/host/harness-launcher.ts` enforce `127.0.0.1`, `PORT=0`, FD4 bootstrap and FD3 readiness; `STUDIO/src-tauri/src/harness/` now owns the child with the same contract (eager start, `get_harness_endpoint`/`restart_harness`, `RunEvent::Exit` shutdown, new credential on restart), and `STUDIO/src/platform/harness/` + `useFlueChatSession` connect the desktop via `@flue/sdk`.
+
+This is not an MCP-only concern. An outsider must not be able to submit a Flue
+agent request, mutate MCP configuration, or answer a permission prompt merely
+because it can reach a local HTTP port. Authentication is global; operation
+scopes remain domain-specific; capability effects still go through
+`PermissionKernel` and `CallGate`.
+
+The architecture is settled in ADR 0028. The admission contract, verifier, HTTP
+composition, headless launcher, Tauri Host, desktop client, and focused tests are
+implemented; the remaining verification (cargo build + desktop E2E) is in
+`tasks/phase-11-mcp/006-harness-admission.md`.
+
+**Done when:** every Harness route rejects an absent or invalid admission
+credential before route execution, the local listener is explicitly loopback-
+only with structured endpoint readiness, the credential is per-launch and
+memory-only, the desktop performs a real authenticated Flue conversation, and
+the browser/local-access surface does not receive the Harness credential.
 
 ---
 

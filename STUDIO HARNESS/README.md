@@ -151,10 +151,11 @@ Studio Gateway adapter now implements and the future local/BYOK adapter will imp
 persistence code do not change when the source changes.
 
 `src/app.ts` validates and bootstraps model providers before initializing observability, then
-mounts Flue's standard application. It does not add business HTTP routes. Inbound authentication
-must be added to the agent route admission middleware before the server is exposed outside a
-trusted local environment; the bearer token described below is outbound authentication to the
-Studio Gateway, not admission control for this harness.
+creates the authenticated HTTP composition in `src/transport/http/create-app.ts`. One admission
+middleware protects Flue, MCP management, and approval routes; operation scopes remain separate
+from capability policy. The headless launcher in `src/host/` now supplies the explicit loopback
+and structured readiness seam recorded in ADR 0028; packaged Tauri Host ownership remains a
+separate task.
 
 ## Commands
 
@@ -171,7 +172,9 @@ pnpm check
 `pnpm test` builds the generated Flue server before running tests. The restart test intentionally
 waits for Flue's expired lease to be reclaimed, so the full suite takes about one minute.
 
-To run the generated server:
+To run the generated server for local development, inject a private per-launch admission
+credential. The value is never a URL or product setting; tests pass it through the child process
+environment. Production Host bootstrap is tracked in task 006.
 
 ```powershell
 pnpm build

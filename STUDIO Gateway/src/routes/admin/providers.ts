@@ -6,7 +6,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
 import { requireAdmin } from "../../middleware/auth.ts";
-import { badRequest, notFound } from "../../lib/errors.ts";
+import { badRequest, notFound, conflict } from "../../lib/errors.ts";
 
 export const adminProvidersRoute = new Hono<{ Bindings: Env }>();
 
@@ -22,7 +22,7 @@ adminProvidersRoute.get("/providers/:id", async (c) => {
   const row = await c.env.DB.prepare("SELECT * FROM providers WHERE id = ?").bind(id).first();
   if (!row) throw notFound(`Provider ${id} not found`);
   const models = await c.env.DB.prepare(
-    "SELECT model_id, display_name, category, input_modalities, output_modalities, context_window, max_output_tokens, pricing_input, pricing_output, pricing_cache_read, pricing_cache_write, supports_tools, supports_parallel_tools, supports_vision, supports_reasoning, reasoning_type, reasoning_levels, exposed, enabled, fetched_at FROM models WHERE provider_id = ? ORDER BY model_id ASC",
+    "SELECT model_id, display_name, category, input_modalities, output_modalities, context_window, max_output_tokens, pricing_input, pricing_output, pricing_cache_read, pricing_cache_write, supports_tools, supports_parallel_tools, supports_vision, supports_reasoning, reasoning_type, reasoning_levels, family, lab, open_weights, knowledge_cutoff, catalog_source, exposed, enabled, fetched_at FROM models WHERE provider_id = ? ORDER BY model_id ASC",
   )
     .bind(id)
     .all();
@@ -39,6 +39,8 @@ adminProvidersRoute.get("/providers/:id", async (c) => {
 adminProvidersRoute.patch("/providers/:id", async (c) => {
   requireAdmin(c as never);
   const id = c.req.param("id");
+  const existing = await c.env.DB.prepare("SELECT 1 FROM providers WHERE id = ?").bind(id).first();
+  if (!existing) throw notFound(`Provider ${id} not found`);
   const body = await c.req.json().catch(() => null) as { enabled?: boolean; base_url?: string } | null;
   if (!body) throw badRequest("Invalid body");
   const sets: string[] = [];
@@ -60,13 +62,23 @@ adminProvidersRoute.patch("/providers/:id", async (c) => {
 });
 
 // Toggle model exposure - admin selects what gateway exposes
-adminProvidersRoute.patch("/providers/:id/models/:modelId", async (c) => {
+const updateModelFlags = async (c: import("hono").Context<{ Bindings: Env }>) => {
   requireAdmin(c as never);
-  const { id, modelId } = c.req.param();
+  const id = c.req.param("id");
+  const rawModelId = c.req.param("modelId") ?? c.req.param("*");
+  const modelId = rawModelId ? decodeURIComponent(rawModelId) : "";
+  if (!modelId) throw badRequest("Model id required");
   const body = await c.req.json().catch(() => null) as { exposed?: boolean; enabled?: boolean } | null;
   if (!body) throw badRequest("Invalid body");
   const row = await c.env.DB.prepare("SELECT 1 FROM models WHERE provider_id = ? AND model_id = ?").bind(id, modelId).first();
   if (!row) throw notFound(`Model ${modelId} not found for ${id}`);
+  // 409 if another provider already exposes same model_id
+  if (body.exposed === true) {
+    const dup = await c.env.DB.prepare(
+      "SELECT provider_id FROM models WHERE model_id = ? AND exposed = 1 AND provider_id != ? LIMIT 1",
+    ).bind(modelId, id).first<{ provider_id: string }>();
+    if (dup) throw conflict(`Model ${modelId} already exposed by provider ${dup.provider_id}`);
+  }
   const sets: string[] = [];
   const vals: unknown[] = [];
   if (typeof body.exposed === "boolean") {
@@ -83,4 +95,8 @@ adminProvidersRoute.patch("/providers/:id/models/:modelId", async (c) => {
   vals.push(id, modelId);
   await c.env.DB.prepare(`UPDATE models SET ${sets.join(", ")} WHERE provider_id = ? AND model_id = ?`).bind(...vals).run();
   return c.json({ ok: true });
-});
+};
+
+adminProvidersRoute.patch("/providers/:id/models/:modelId", updateModelFlags);
+// Model ids from catalog providers may contain slashes, for example Fal paths.
+adminProvidersRoute.patch("/providers/:id/models/*", updateModelFlags);

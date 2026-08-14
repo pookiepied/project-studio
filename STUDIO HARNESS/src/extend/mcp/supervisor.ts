@@ -68,6 +68,16 @@ export interface McpSupervisorOptions {
   /** Passed straight to `backoff.ts`. A test injects `random` here. */
   readonly backoff?: BackoffOptions;
   readonly connection?: McpConnectionOptions;
+  /** Runs after the handshake, including background retry recovery. */
+  readonly onReady?: (record: McpServerRecord, connection: McpConnection) => Promise<void> | void;
+  /** Invalidates dependent catalog state when a live server is unavailable. */
+  readonly onUnavailable?: (record: McpServerRecord, reason: unknown) => void;
+  /** Receives server notifications without teaching the connection about MCP policy. */
+  readonly onNotification?: (
+    record: McpServerRecord,
+    method: string,
+    params: unknown,
+  ) => void;
 }
 
 /** What is true about a server right now. All of it derived, none of it stored. */
@@ -102,6 +112,7 @@ interface Entry {
   starting: Promise<McpConnection> | undefined;
   retryTimer: ReturnType<typeof setTimeout> | undefined;
   lastError: string | undefined;
+  attempts: number;
   /**
    * Bumped every time an attempt begins and every time the server is stopped.
    *
@@ -126,11 +137,17 @@ export class McpSupervisor {
   readonly #launch: McpLauncher;
   readonly #backoff: BackoffOptions;
   readonly #connectionOptions: McpConnectionOptions;
+  readonly #onReady: McpSupervisorOptions["onReady"];
+  readonly #onUnavailable: McpSupervisorOptions["onUnavailable"];
+  readonly #onNotification: McpSupervisorOptions["onNotification"];
 
   constructor(options: McpSupervisorOptions) {
     this.#launch = options.launch;
     this.#backoff = options.backoff ?? {};
     this.#connectionOptions = options.connection ?? {};
+    this.#onReady = options.onReady;
+    this.#onUnavailable = options.onUnavailable;
+    this.#onNotification = options.onNotification;
   }
 
   /**
@@ -185,7 +202,10 @@ export class McpSupervisor {
       id: entry.record.id,
       key: entry.key,
       state: entry.state.kind,
-      attempts: entry.state.kind === "failed" ? entry.state.attempts : 0,
+      attempts:
+        entry.state.kind === "failed" || entry.state.kind === "given-up"
+          ? entry.attempts
+          : 0,
       ...(entry.session === undefined
         ? {}
         : {
@@ -231,6 +251,15 @@ export class McpSupervisor {
     // from the connection we are about to end, both check this and stop.
     entry.generation += 1;
 
+    if (entry.connection !== undefined) {
+      this.#onUnavailable?.(
+        entry.record,
+        new ExtendError("cancelled", {
+          message: `${entry.record.title} was stopped.`,
+        }),
+      );
+    }
+
     if (entry.retryTimer !== undefined) {
       clearTimeout(entry.retryTimer);
       entry.retryTimer = undefined;
@@ -266,6 +295,7 @@ export class McpSupervisor {
       starting: undefined,
       retryTimer: undefined,
       lastError: undefined,
+      attempts: 0,
       generation: 0,
       key,
     };
@@ -355,13 +385,25 @@ export class McpSupervisor {
       // start that never finished — the second would leave the attempt count
       // where it was and retry forever.
       connection.onClose((reason) => this.#connectionEnded(entry, generation, reason));
+      connection.onNotification((method, params) => {
+        this.#onNotification?.(entry.record, method, params);
+      });
+
+      await this.#onReady?.(entry.record, connection);
+      if (entry.generation !== generation || entry.state.kind !== "ready") {
+        throw new ExtendError("cancelled", {
+          message: `${entry.record.title} stopped while its catalog was refreshing.`,
+        });
+      }
 
       return connection;
     } catch (error) {
       started?.close();
       if (entry.generation === generation) {
         entry.lastError = describe(error);
-        this.#failed(entry);
+        if (entry.state.kind !== "failed" && entry.state.kind !== "given-up") {
+          this.#failed(entry);
+        }
       }
       throw error;
     }
@@ -379,6 +421,7 @@ export class McpSupervisor {
     if (entry.state.kind !== "ready") return;
 
     entry.lastError = describe(reason);
+    this.#onUnavailable?.(entry.record, reason);
     this.#failed(entry);
   }
 
@@ -398,6 +441,7 @@ export class McpSupervisor {
     entry.connection = undefined;
     entry.session = undefined;
     this.#apply(entry, { kind: "failed" });
+    if (entry.state.kind === "failed") entry.attempts = entry.state.attempts;
 
     if (entry.state.kind !== "failed") return;
 
@@ -414,7 +458,7 @@ export class McpSupervisor {
 
     entry.retryTimer = setTimeout(() => {
       entry.retryTimer = undefined;
-      if (entry.state.kind !== "failed") return;
+      if (this.#entries.get(entry.key) !== entry || entry.state.kind !== "failed") return;
       // Nobody is waiting on this one, so its failure is recorded by the
       // attempt itself and swallowed here. Rethrowing would take down the
       // process for a server that is allowed to be broken.

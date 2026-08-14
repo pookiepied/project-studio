@@ -2,6 +2,7 @@ import { ExtendError } from "../errors.js";
 import { NdjsonDecoder, encodeNdjson } from "./wire/framing.js";
 import {
   isJsonRpcErrorResponse,
+  isJsonRpcNotification,
   isJsonRpcSuccessResponse,
   JSONRPC_VERSION,
 } from "./wire/jsonrpc.js";
@@ -89,6 +90,8 @@ export class McpConnection {
    */
   readonly #wantsEnvelope = new Set<number>();
   #onClose: ((reason?: unknown) => void) | undefined;
+  #onNotification: ((method: string, params: unknown) => void) | undefined;
+  readonly #bufferedNotifications: { readonly method: string; readonly params: unknown }[] = [];
   #closeReason: unknown;
   #closed = false;
 
@@ -131,8 +134,12 @@ export class McpConnection {
    * send: a server fast enough to answer synchronously would otherwise reply to
    * an id nothing is waiting for yet.
    */
-  async request(method: string, params?: unknown): Promise<unknown> {
-    return this.#send(method, params, false);
+  async request(
+    method: string,
+    params?: unknown,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    return this.#send(method, params, false, signal);
   }
 
   /**
@@ -149,8 +156,12 @@ export class McpConnection {
    * could not happen. An answer of any shape resolves, because for this one
    * caller an error *is* the answer.
    */
-  async requestEnvelope(method: string, params?: unknown): Promise<unknown> {
-    return this.#send(method, params, true);
+  async requestEnvelope(
+    method: string,
+    params?: unknown,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    return this.#send(method, params, true, signal);
   }
 
   /**
@@ -166,10 +177,19 @@ export class McpConnection {
     if (this.#closed) listener(this.#closeReason);
   }
 
+  onNotification(listener: (method: string, params: unknown) => void): void {
+    this.#onNotification = listener;
+    while (this.#bufferedNotifications.length > 0) {
+      const notification = this.#bufferedNotifications.shift();
+      if (notification !== undefined) listener(notification.method, notification.params);
+    }
+  }
+
   async #send(
     method: string,
     params: unknown,
     wantsEnvelope: boolean,
+    signal: AbortSignal | undefined,
   ): Promise<unknown> {
     if (this.#closed) {
       throw new ExtendError("disconnected");
@@ -177,7 +197,7 @@ export class McpConnection {
 
     const id = this.#pending.nextId();
     const waiting = this.#pending
-      .register(id, { timeoutMs: this.#timeoutMs })
+      .register(id, { timeoutMs: this.#timeoutMs, ...(signal ? { signal } : {}) })
       // However this settles, the id stops being special. Written as part of
       // the returned chain rather than as a side effect, so it cannot be
       // skipped by a path that settles some other way.
@@ -269,6 +289,16 @@ export class McpConnection {
           value.id,
           new ExtendError("internal", { message: value.error.message }),
         );
+        continue;
+      }
+
+      if (isJsonRpcNotification(value)) {
+        const notification = {
+          method: value.method,
+          params: value.params,
+        };
+        if (this.#onNotification === undefined) this.#bufferedNotifications.push(notification);
+        else this.#onNotification(notification.method, notification.params);
         continue;
       }
 

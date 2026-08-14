@@ -6,6 +6,7 @@ import type {
   CapabilityEffect,
   ExecutionScope,
 } from "../../src/contracts/capabilities.js";
+import { hashDefinition } from "../../src/extend/mcp/wire/definition-hash.js";
 import { PermissionError } from "../../src/permissions/errors.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import {
@@ -18,13 +19,18 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
 function capability(
   name: string,
   effects: CapabilityEffect[],
-  options: { author?: CapabilityAuthor; namespace?: string } = {},
+  options: {
+    author?: CapabilityAuthor;
+    description?: string;
+    inputSchema?: unknown;
+    namespace?: string;
+  } = {},
 ): CapabilityDescriptor {
   const ours = (options.author ?? "studio") === "studio";
   return {
     id: { namespace: options.namespace ?? (ours ? "native" : "mcp:example"), name },
     title: name,
-    description: name,
+    description: options.description ?? name,
     effects,
     provenance: {
       origin: ours ? "native" : "mcp",
@@ -32,6 +38,7 @@ function capability(
       author: options.author ?? "studio",
     },
     idempotent: true,
+    ...(options.inputSchema === undefined ? {} : { inputSchema: options.inputSchema }),
   };
 }
 
@@ -184,6 +191,64 @@ describe("authority comes from the application, never the model", () => {
 });
 
 describe("grants", () => {
+  it("stores a tool definition and asks again when the definition changes", async () => {
+    let prompts = 0;
+    const promptReasons: string[] = [];
+    const kernel = new PermissionKernel({
+      grants,
+      approver: {
+        request: async (_request, decision) => {
+          prompts += 1;
+          promptReasons.push(decision.reason);
+          return { verdict: "allow" as const, duration: "always" as const };
+        },
+      },
+    });
+    const id = { namespace: "mcp:example", name: "search" } as const;
+    const firstSchema = {
+      type: "object",
+      properties: { query: { type: "string" } },
+    };
+    const first = capability("search", ["execute"], {
+      author: "third-party",
+      description: "Search the docs",
+      inputSchema: firstSchema,
+    });
+
+    kernel.register(first);
+    await kernel.authorize(id, SCOPE);
+
+    expect(grants.list()[0]?.definitionHash).toBe(
+      hashDefinition("search", "Search the docs", firstSchema),
+    );
+
+    kernel.unregister(id);
+    const secondSchema = {
+      type: "object",
+      properties: { query: { type: "string" }, limit: { type: "number" } },
+    };
+    kernel.register(
+      capability("search", ["execute"], {
+        author: "third-party",
+        description: "Search the docs",
+        inputSchema: secondSchema,
+      }),
+    );
+
+    const changed = kernel.evaluate(id, SCOPE);
+    expect(changed.verdict).toBe("ask");
+    expect(changed.reason).toMatch(/definition changed/i);
+
+    await kernel.authorize(id, SCOPE);
+
+    expect(prompts).toBe(2);
+    expect(promptReasons[1]).toMatch(/definition changed/i);
+    expect(grants.list()[0]?.definitionHash).toBe(
+      hashDefinition("search", "Search the docs", secondSchema),
+    );
+    expect(kernel.evaluate(id, SCOPE).verdict).toBe("allow");
+  });
+
   it("remembers an approval so the user is asked once, not every call", async () => {
     const kernel = new PermissionKernel({ grants, approver: approver("allow") });
     kernel.register(capability("write_file", ["write"]));
@@ -381,6 +446,28 @@ describe("authorize", () => {
     await expect(
       kernel.authorize({ namespace: "native", name: "run" }, SCOPE),
     ).rejects.toThrow(/declined/i);
+  });
+
+  it("cancels an approval wait without writing a grant", async () => {
+    const controller = new AbortController();
+    const kernel = new PermissionKernel({
+      grants,
+      approver: {
+        request: async (_request, _decision, signal) =>
+          new Promise((resolve) => {
+            signal?.addEventListener("abort", () => resolve(undefined), { once: true });
+          }),
+      },
+    });
+    const id = { namespace: "native", name: "run" } as const;
+    kernel.register(capability("run", ["execute"]));
+
+    const pending = kernel.authorize(id, SCOPE, undefined, controller.signal);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ kind: "cancelled" });
+    expect(grants.find(id, SCOPE, undefined, "path")).toBeUndefined();
   });
 
   it("never carries call arguments in the refusal", async () => {

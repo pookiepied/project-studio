@@ -32,6 +32,17 @@ export const EDIT_DESCRIPTOR: CapabilityDescriptor = {
   title: "Edit file",
   description:
     "Replaces an exact string in a file. The string must appear exactly once unless replaceAll is set. Read the file first.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string", minLength: 1 },
+      oldString: { type: "string", minLength: 1 },
+      newString: { type: "string" },
+      replaceAll: { type: "boolean" },
+    },
+    required: ["path", "oldString", "newString"],
+    additionalProperties: false,
+  },
   effects: ["write"],
   provenance: NATIVE_PROVENANCE,
   // Applying the same edit twice fails the second time, because the old string

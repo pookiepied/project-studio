@@ -60,6 +60,25 @@ export const GREP_DESCRIPTOR: CapabilityDescriptor = {
     "set outputMode to content for matching lines or count for per-file totals. " +
     "Filter with glob or type, page with limit and offset, and set includeIgnored to search " +
     "ignored directories such as node_modules.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      pattern: { type: "string", minLength: 1 },
+      path: { type: "string" },
+      outputMode: { enum: ["files", "content", "count"] },
+      glob: { type: "string" },
+      type: { type: "string" },
+      caseInsensitive: { type: "boolean" },
+      multiline: { type: "boolean" },
+      contextBefore: { type: "integer", minimum: 0 },
+      contextAfter: { type: "integer", minimum: 0 },
+      limit: { type: "integer", minimum: 1 },
+      offset: { type: "integer", minimum: 0 },
+      includeIgnored: { type: "boolean" },
+    },
+    required: ["pattern"],
+    additionalProperties: false,
+  },
   // A `read` capability, not `execute`. It spawns ripgrep, but with an argument
   // vector this code built from structured parameters — the model cannot supply
   // a flag. See ADR 0013.

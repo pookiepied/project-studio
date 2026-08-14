@@ -273,13 +273,16 @@ describe("requestDirect", () => {
       await requestDirect({
         url: `http://127.0.0.1:${start.port}/`,
         author: "user",
-        headers: { authorization: "Bearer secret", accept: "text/plain" },
+        headers: {
+          authorization: "Bearer secret",
+          "x-api-key": "custom-secret",
+          accept: "text/plain",
+        },
       });
 
       expect(start.requests[0]?.headers.authorization).toBe("Bearer secret");
       expect(destination.requests[0]?.headers.authorization).toBeUndefined();
-      // Only the origin-bound ones go. An ordinary header is still the caller's
-      // intent and survives the hop.
+      expect(destination.requests[0]?.headers["x-api-key"]).toBeUndefined();
       expect(destination.requests[0]?.headers.accept).toBe("text/plain");
     });
 

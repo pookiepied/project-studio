@@ -11,6 +11,8 @@ export type PermissionErrorKind =
   | "invalid_scope"
   /** A grant could not be read or written. */
   | "grant_unavailable"
+  /** The caller withdrew the request while approval was pending. */
+  | "cancelled"
   | "internal";
 
 const MESSAGE_BY_KIND: Record<PermissionErrorKind, string> = {
@@ -19,6 +21,7 @@ const MESSAGE_BY_KIND: Record<PermissionErrorKind, string> = {
   unknown_capability: "That action is not registered and cannot be run.",
   invalid_scope: "The action was requested without a valid execution scope.",
   grant_unavailable: "Stored permissions could not be read.",
+  cancelled: "The permission request was cancelled.",
   internal: "The permission system failed unexpectedly.",
 };
 

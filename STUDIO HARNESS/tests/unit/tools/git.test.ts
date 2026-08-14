@@ -53,13 +53,11 @@ describe("every subcommand is allowed", () => {
     expect(() => buildGitArgs({ subcommand: "whatever-is-new", args: [] })).not.toThrow();
   });
 
-  it("puts user arguments after the subcommand, always", () => {
-    // This ordering is what makes `-c` safe to allow: as git's own option it is
-    // only interpreted before the subcommand.
-    const args = buildGitArgs({ subcommand: "commit", args: ["-c", "HEAD"] });
+  it("puts user arguments after the subcommand while refusing configuration injection", () => {
+    const args = buildGitArgs({ subcommand: "commit", args: ["--message", "HEAD"] });
 
     expect(args.indexOf("commit")).toBeLessThan(args.indexOf("HEAD"));
-    expect(args.at(-2)).toBe("-c");
+    expect(args.at(-2)).toBe("--message");
     expect(args.at(-1)).toBe("HEAD");
   });
 
@@ -79,6 +77,10 @@ describe("options that run other programs are refused", () => {
     ["--exec=sh"],
     ["--exec-path=/tmp/evil"],
     ["--config=core.pager=sh"],
+    ["-c", "core.sshCommand=/bin/echo"],
+    ["-ccore.sshCommand=/bin/echo"],
+    ["-c=core.sshCommand=/bin/echo"],
+    ["--config-env", "core.sshCommand=ENV"],
     ["--tree-filter", "rm -rf /"],
     ["--index-filter=sh"],
     ["--msg-filter=sh"],

@@ -193,6 +193,24 @@ in one place and validated in another. Six launcher tests depend on the fix.
 This is the third of the same shape — a guarantee asserted against our own
 object rather than against the world. See `S-03` and `S-04`.
 
+### A-04 · Packaged Harness Host has no lifecycle owner · Partly answered
+
+Admission authentication now protects every authored Harness route. The checked-
+in Project Studio patch for pinned Flue beta.9 and `src/host/harness-launcher.ts`
+start the standalone/headless path on `127.0.0.1`, request an OS-assigned port,
+receive admission material over FD 4, and publish actual-address readiness over
+FD 3. The packaged Tauri Host still does not own the child or deliver the
+credential, and the upstream Flue API does not yet provide this seam publicly.
+Do not rewrite `dist/server.mjs`; keep the patch/launcher boundary until an
+upstream or packaged Host solution replaces it.
+
+### A-05 · Pending approval state is process-memory · Accepted for local v1
+
+`PermissionApprovalBroker` intentionally keeps pending requests in memory. A
+Harness restart drops an unanswered prompt rather than persisting a promise or
+approval secret. The Host/client lifecycle must surface restart and re-prompt;
+durable approval workflows belong to a later product boundary.
+
 ---
 
 ## Permissions (`src/permissions/`)
@@ -650,36 +668,16 @@ They were never the wall that protects the user — containment is, and it stays
 closed with no override. Both switches remain, reachable per workspace, by
 environment variable, or in one line for a fork.
 
-### T-19 · A tool can be registered outside the gate · Contained
+### T-19 · A tool can be registered outside the gate · Fixed
 
-`CallGate` says everything executable passes through it. Nothing enforced that.
-`src/agents/studio.ts` registers `workspace_summary` directly with Flue via
-`defineTool`, so it reaches the model without a `CapabilityDescriptor`, without
-the kernel, and without bounds.
+`workspace_summary` used to be registered directly with Flue via `defineTool`,
+without a `CapabilityDescriptor`, kernel decision, sandbox check, or shared
+bounds. Task 007 replaced it with a native descriptor and registered it, along
+with filesystem/search/Git/shell/web, through `registerNativeTools()` and the
+same `CallGate` used by MCP.
 
-`workspace_summary` itself is harmless — it echoes its input and touches
-nothing. The problem is that it is a working precedent for the shape, sitting in
-the tree, and it is currently the agent's **only** tool.
-
-Task 001 item 18 added three rules to `tests/unit/architecture.test.ts`:
-
-1. Every exported `create*Tool` factory is passed to `gate.register`. An orphan
-   factory is a tool reachable by import and by nothing else — the shape a
-   future agent wiring would pick up as a shortcut.
-2. Nothing outside `src/tools/` imports a tool module. Only `gate`, `types`,
-   `errors`, and `bounds` are importable, so no caller can get hold of an
-   `execute` with no kernel in the way.
-3. Registering all four tool groups leaves the kernel knowing every key the
-   gate will answer for. Registration is one call so the two cannot drift; this
-   asserts that the one call really does both.
-
-Rule 2 asserts an **exact list** of known bypasses rather than skipping them,
-and `workspace-summary.js` is named in it. A second bypass fails the test. Rule
-2 found this one on its first run.
-
-**Still open:** removing the fixture. It is the end-to-end tool in seven
-integration tests, so replacing it is its own change, and it belongs with the
-Phase 11 wiring that gives the agent real gate-registered tools.
+The architecture test now requires every exported native factory to be passed to
+`gate.register()` and has no known direct-tool bypass.
 
 ### T-05 · The read-before-modify record does not survive a restart · Accepted
 

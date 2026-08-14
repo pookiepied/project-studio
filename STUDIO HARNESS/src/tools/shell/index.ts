@@ -61,6 +61,17 @@ export const SHELL_DESCRIPTOR: CapabilityDescriptor = {
     "Runs one program and returns its output. Give the program and its arguments separately, " +
     'for example command "node" with args ["build.js"]. There is no shell, so pipes, ' +
     "redirects, &&, and quotes are not interpreted. Run one program per call.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      command: { type: "string", minLength: 1 },
+      args: { type: "array", items: { type: "string" } },
+      cwd: { type: "string" },
+      timeoutMs: { type: "number", minimum: 1000, maximum: 600000 },
+    },
+    required: ["command"],
+    additionalProperties: false,
+  },
   effects: ["execute"],
   provenance: NATIVE_PROVENANCE,
   // Running a program twice does whatever the program does twice.

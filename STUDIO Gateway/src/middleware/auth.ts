@@ -4,14 +4,10 @@
  * - Admin: Bearer admin token (future) - for now, check header x-admin-token == ADMIN_TOKEN secret
  */
 
-import { hashGatewayKeyAsync } from "../lib/encryption.ts";
-import { verifyGatewayKey } from "../lib/db.ts";
+import { hashGatewayKeyAsync } from "../infra/encryption.ts";
+import { verifyGatewayKey } from "../infra/db.ts";
 import { unauthorized, forbidden } from "../lib/errors.ts";
 import type { Env } from "../index.ts";
-
-export async function gatewayAuth(_c: { env: Env; req: Request; set: (k: string, v: unknown) => void }, _next: () => Promise<void>): Promise<void> {
-  // Placeholder - actual Hono middleware signature varies
-}
 
 export async function verifyGatewayBearer(db: D1Database, authHeader: string | null): Promise<{ keyId: string; rpm: number } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -49,12 +45,26 @@ export async function requireGatewayBearer(
   throw unauthorized("Valid Gateway bearer authentication is required");
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export function requireAdmin(c: { env: Env; req: { header: (s: string) => string | undefined } }): void {
   const adminToken = c.env.ADMIN_TOKEN;
   if (!adminToken) {
     if (isDevelopment(c.env.ENVIRONMENT)) return;
     throw unauthorized("Gateway admin authentication is not configured");
   }
-  const header = c.req.header("x-admin-token") ?? c.req.header("authorization")?.replace("Bearer ", "");
-  if (header !== adminToken) throw forbidden("Admin token required");
+  const xAdmin = c.req.header("x-admin-token");
+  const auth = c.req.header("authorization");
+  let header: string | undefined;
+  if (xAdmin !== undefined && xAdmin !== "") header = xAdmin.trim();
+  else if (auth !== undefined && auth !== "") {
+    const m = auth.match(/^Bearer\s+(.+)$/i);
+    header = m ? m[1].trim() : auth.trim();
+  }
+  if (!header || !timingSafeEqual(header, adminToken)) throw forbidden("Admin token required");
 }

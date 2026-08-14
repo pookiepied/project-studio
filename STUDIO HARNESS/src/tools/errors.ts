@@ -13,6 +13,8 @@ export type ToolErrorKind =
   | "timed_out"
   /** The caller withdrew the call. */
   | "cancelled"
+  /** The model retained a tool whose provider is currently unavailable. */
+  | "unavailable"
   | "internal";
 
 const MESSAGE_BY_KIND: Record<ToolErrorKind, string> = {
@@ -22,6 +24,7 @@ const MESSAGE_BY_KIND: Record<ToolErrorKind, string> = {
   execution_failed: "The tool could not complete.",
   timed_out: "The tool took too long and was stopped.",
   cancelled: "The call was stopped.",
+  unavailable: "That tool is currently unavailable.",
   internal: "The tool failed unexpectedly.",
 };
 

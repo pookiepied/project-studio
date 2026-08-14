@@ -16,8 +16,10 @@ handling.
   through Flue's `instrument(...)` API.
 - Configure the official OpenTelemetry Node SDK before Flue instrumentation is
   registered.
-- Compose lifecycle in `src/app.ts` by initializing observability and mounting
-  Flue's standard application only. No business HTTP routes are added here.
+- Compose lifecycle in `src/app.ts` by initializing observability and calling
+  the transport application factory. Business HTTP routes belong under the
+  factory's application boundary; `app.ts` contains no route handlers or
+  business routing logic.
 - Default exporters are local and non-networking. OTLP is enabled only when an
   endpoint is explicitly configured. Tests may use in-memory exporters.
 - GenAI content capture is disabled by default. Explicit opt-in runs captured
@@ -39,6 +41,7 @@ handling.
   changing agent or persistence code.
 - Content-bearing debug remains an explicit, redacted choice rather than a
   default production setting.
-- `app.ts` is now part of runtime composition solely for telemetry registration
-  and Flue mount order; ADR 0001's earlier "no app.ts" constraint is narrowed
-  accordingly for this phase.
+- `app.ts` is part of runtime composition for provider/bootstrap ordering,
+  telemetry registration, admission, and transport-factory wiring. ADR 0001's
+  earlier "no app.ts" constraint is narrowed to keep route implementation out of
+  the process bootstrap.

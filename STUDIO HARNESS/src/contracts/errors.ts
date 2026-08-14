@@ -23,6 +23,7 @@
  * having been classified — a measurable gap, not a category.
  */
 export type StudioErrorDomain =
+  | "admission"
   | "auth"
   | "credentials"
   | "models"

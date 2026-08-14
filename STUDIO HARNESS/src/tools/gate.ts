@@ -51,6 +51,13 @@ export interface CallGateOptions {
    * gap this exists to close.
    */
   readonly bounds?: CallBoundsOptions;
+  /** Reports a capability hidden by an operator switch. */
+  readonly onWithheld?: (event: WithheldCapability) => void;
+}
+
+export interface WithheldCapability {
+  readonly capability: string;
+  readonly switchName: "allowExec" | "allowNetwork";
 }
 
 export interface ToolCall {
@@ -68,6 +75,8 @@ export class CallGate {
   readonly #reporter: ErrorReporter | undefined;
   readonly #snapshots: SnapshotHook | undefined;
   readonly #bounds: CallBounds;
+  readonly #onWithheld: ((event: WithheldCapability) => void) | undefined;
+  readonly #reportedWithheld = new Set<string>();
 
   constructor(options: CallGateOptions) {
     this.#bounds = new CallBounds(options.bounds);
@@ -75,6 +84,7 @@ export class CallGate {
     this.#sandbox = options.sandbox;
     this.#reporter = options.reporter;
     this.#snapshots = options.snapshots;
+    this.#onWithheld = options.onWithheld;
   }
 
   /**
@@ -190,7 +200,20 @@ export class CallGate {
   list(): readonly CapabilityDescriptor[] {
     return [...this.#tools.values()]
       .map((tool) => tool.descriptor)
-      .filter((descriptor) => this.#sandbox.supports(descriptor));
+      .filter((descriptor) => {
+        if (this.#sandbox.supports(descriptor)) return true;
+
+        const switchName = this.#withheldSwitch(descriptor);
+        if (switchName === undefined) return false;
+
+        const capability = capabilityKey(descriptor.id);
+        const reportKey = `${capability}\0${switchName}`;
+        if (!this.#reportedWithheld.has(reportKey)) {
+          this.#reportedWithheld.add(reportKey);
+          this.#onWithheld?.({ capability, switchName });
+        }
+        return false;
+      });
   }
 
   /**
@@ -201,6 +224,18 @@ export class CallGate {
    */
   listAll(): readonly CapabilityDescriptor[] {
     return [...this.#tools.values()].map((tool) => tool.descriptor);
+  }
+
+  #withheldSwitch(
+    descriptor: CapabilityDescriptor,
+  ): WithheldCapability["switchName"] | undefined {
+    if (descriptor.effects.includes("execute") && !this.#sandbox.policy.allowExec) {
+      return "allowExec";
+    }
+    if (descriptor.effects.includes("network") && !this.#sandbox.policy.allowNetwork) {
+      return "allowNetwork";
+    }
+    return undefined;
   }
 
   async call(call: ToolCall): Promise<unknown> {
@@ -232,13 +267,18 @@ export class CallGate {
       // rule scoped to `src/**` in its unresolved form and pass.
       const resource = tool.resource(input, context);
 
-      await this.#kernel.authorize(tool.descriptor.id, call.scope, {
-        resource,
-        kind: tool.resourceKind,
-        // Supplied so the kernel can offer "this project" as an approval scope
-        // and, more importantly, so it can offer nothing above it.
-        root: this.#sandbox.policy.workspaceRoot,
-      });
+      await this.#kernel.authorize(
+        tool.descriptor.id,
+        call.scope,
+        {
+          resource,
+          kind: tool.resourceKind,
+          // Supplied so the kernel can offer "this project" as an approval scope
+          // and, more importantly, so it can offer nothing above it.
+          root: this.#sandbox.policy.workspaceRoot,
+        },
+        call.signal,
+      );
 
       // Permission is not containment. Approval says the user agreed; this says
       // we can actually hold the boundary. Both are required, and the sandbox

@@ -6,6 +6,7 @@
 import type { Adapter } from "../../providers/registry.ts";
 import type { ModelDefinition } from "../../providers/types.ts";
 import { ANTHROPIC_PRICING, inferReasoningType, type AnthropicModelInfo } from "../../providers/anthropic/types.ts";
+import { translateAnthropicSSEToOpenAI } from "../protocol-sse.ts";
 
 const VERSION = "2023-06-01";
 
@@ -71,7 +72,7 @@ export const anthropicMessagesAdapter: Adapter = {
     const translated = translateAnthropicSSEToOpenAI(upstream.body, (b.model as string) ?? "unknown");
     return new Response(translated, {
       status: 200,
-      headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" },
+      headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
     });
   },
 };
@@ -182,99 +183,4 @@ function mapStop(s: string): string {
   if (s === "max_tokens") return "length";
   if (s === "tool_use") return "tool_calls";
   return s;
-}
-
-function translateAnthropicSSEToOpenAI(body: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let id = `chatcmpl_${Date.now()}`;
-  let hasSentRole = false;
-
-  return body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        buffer += decoder.decode(chunk, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        let eventName = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventName = line.slice(7).trim();
-            continue;
-          }
-          if (!line.startsWith("data: ")) continue;
-          const dataStr = line.slice(6);
-          if (!dataStr || dataStr === "[DONE]") continue;
-          try {
-            const data = JSON.parse(dataStr);
-            if (eventName === "message_start" && data.message) {
-              id = data.message.id ?? id;
-            } else if (eventName === "content_block_delta") {
-              const delta = data.delta;
-              let content: string | undefined;
-              let toolCallDelta: unknown;
-              if (delta?.type === "text_delta" && delta.text) content = delta.text;
-              else if (delta?.type === "input_json_delta" && delta.partial_json) {
-                toolCallDelta = { index: data.index ?? 0, function: { arguments: delta.partial_json } };
-              } else if (delta?.type === "thinking_delta") {
-                // map thinking to content for now
-                content = delta.thinking;
-              }
-              if (content !== undefined || toolCallDelta) {
-                const chunk: Record<string, unknown> = {
-                  id,
-                  object: "chat.completion.chunk",
-                  created: Math.floor(Date.now() / 1000),
-                  model,
-                  choices: [
-                    {
-                      index: 0,
-                      delta: {
-                        ...(hasSentRole ? {} : { role: "assistant" }),
-                        ...(content ? { content } : {}),
-                        ...(toolCallDelta ? { tool_calls: [toolCallDelta] } : {}),
-                      },
-                      finish_reason: null,
-                    },
-                  ],
-                };
-                hasSentRole = true;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-              }
-            } else if (eventName === "content_block_start") {
-              const block = data.content_block;
-              if (block?.type === "tool_use") {
-                const chunk = {
-                  id,
-                  object: "chat.completion.chunk",
-                  created: Math.floor(Date.now() / 1000),
-                  model,
-                  choices: [{ index: 0, delta: { tool_calls: [{ index: data.index ?? 0, id: block.id, type: "function", function: { name: block.name, arguments: "" } }] }, finish_reason: null }],
-                };
-                hasSentRole = true;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-              }
-            } else if (eventName === "message_delta" && data.delta?.stop_reason) {
-              const finish = mapStop(data.delta.stop_reason);
-              const chunk = {
-                id,
-                object: "chat.completion.chunk",
-                created: Math.floor(Date.now() / 1000),
-                model,
-                choices: [{ index: 0, delta: {}, finish_reason: finish }],
-              };
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-            }
-          } catch {
-            // ignore parse errors
-          }
-          eventName = "";
-        }
-      },
-      flush(controller) {
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      },
-    }),
-  );
 }

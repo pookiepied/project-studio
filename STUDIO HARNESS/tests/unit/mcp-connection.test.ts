@@ -119,6 +119,18 @@ describe("one conversation with one MCP server", () => {
       await expect(connection.request("tools/list")).rejects.toThrow(ExtendError);
       expect(connection.inFlight).toBe(0);
     });
+
+    it("cancels a request when the caller aborts", async () => {
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+      const controller = new AbortController();
+
+      const waiting = connection.request("tools/call", undefined, controller.signal);
+      controller.abort();
+
+      await expect(waiting).rejects.toBeDefined();
+      expect(connection.inFlight).toBe(0);
+    });
   });
 
   describe("one bad line does not end a good connection", () => {
@@ -262,6 +274,24 @@ describe("one conversation with one MCP server", () => {
       expect("id" in sent).toBe(false);
       expect(sent.method).toBe("progress");
       expect(connection.inFlight).toBe(0);
+    });
+
+    it("delivers server tool-list changes to the lifecycle owner", () => {
+      const channel = new FakeChannel();
+      const connection = new McpConnection(channel);
+      const notifications: { method: string; params: unknown }[] = [];
+      connection.onNotification((method, params) => notifications.push({ method, params }));
+
+      channel.emit({
+        jsonrpc: "2.0",
+        method: "notifications/tools/list_changed",
+        params: { reason: "changed" },
+      });
+
+      expect(notifications).toEqual([
+        { method: "notifications/tools/list_changed", params: { reason: "changed" } },
+      ]);
+      expect(connection.diagnostics).toEqual([]);
     });
   });
 

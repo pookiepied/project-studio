@@ -22,6 +22,12 @@ export const FETCH_DESCRIPTOR: CapabilityDescriptor = {
   description:
     "Reads one web page and returns its text. Give a full https address. " +
     "Use web_search first when you do not already have the address.",
+  inputSchema: {
+    type: "object",
+    properties: { url: { type: "string", minLength: 1 } },
+    required: ["url"],
+    additionalProperties: false,
+  },
   effects: ["network"],
   provenance: NATIVE_PROVENANCE,
   // Reading the same page twice is safe. Retrying a failed read is not a

@@ -523,6 +523,23 @@ describe("the model is shown only what can actually run", () => {
     expect(locked.listAll().map((tool) => tool.id.name)).toEqual(["run"]);
   });
 
+  it("reports a withheld capability and switch once while listing", () => {
+    const withheld: { capability: string; switchName: string }[] = [];
+    const locked = new CallGate({
+      kernel: new PermissionKernel({ grants }),
+      sandbox: new LocalSandbox(
+        createSandboxPolicy({ workspaceRoot: workspace, allowExec: false }),
+      ),
+      onWithheld: (event) => withheld.push(event),
+    });
+    locked.register(executeTool([]));
+
+    expect(locked.list()).toEqual([]);
+    expect(locked.list()).toEqual([]);
+    expect(withheld).toEqual([{ capability: "native/run", switchName: "allowExec" }]);
+    expect(locked.listAll().map((tool) => tool.id.name)).toEqual(["run"]);
+  });
+
   it("does not hide a tool merely because it has not been approved", () => {
     // "You have not approved this yet" is a question with an answer. Hiding the
     // tool would take away the user's chance to give it.

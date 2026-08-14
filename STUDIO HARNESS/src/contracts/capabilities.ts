@@ -156,6 +156,13 @@ export interface CapabilityDescriptor {
   readonly id: CapabilityId;
   readonly title: string;
   readonly description: string;
+  /**
+   * The input schema shown with a connected tool. The kernel hashes this with
+   * the name and description so an approval cannot survive a changed tool.
+   * Native capabilities do not need this field because their definitions ship
+   * with the harness.
+   */
+  readonly inputSchema?: unknown;
   readonly effects: readonly CapabilityEffect[];
   readonly provenance: CapabilityProvenance;
   /**
@@ -175,6 +182,9 @@ export interface CapabilityDescriptor {
  * a scope the model can choose is a scope the model can widen.
  */
 export interface ExecutionScope {
+  /** The admitted local client/session that owns this execution. */
+  readonly clientId?: string;
+  readonly sessionId?: string;
   /** The conversation the call belongs to. */
   readonly conversationId: string;
   /** The project whose resources are reachable, when one is bound. */

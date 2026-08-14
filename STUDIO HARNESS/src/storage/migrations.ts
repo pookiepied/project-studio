@@ -232,6 +232,16 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    name: "grant_definition_hash",
+    up(db) {
+      // A connected server can keep the same tool name while changing what a
+      // person approved. Existing grants have no proof of the definition they
+      // covered, so they remain null and are asked about again on their next use.
+      db.exec("ALTER TABLE permission_grant ADD COLUMN definition_hash TEXT");
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

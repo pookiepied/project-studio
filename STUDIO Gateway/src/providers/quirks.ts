@@ -1,10 +1,14 @@
 /**
  * Provider quirks — single source of truth for OpenAI-compatible divergences.
- * Replaces 20 per-provider adapter folders. Each entry patches the OpenAI body
- * before proxying via the shared openai-completions fetch.
+ * Adapter-level patches applied BEFORE AI SDK translation (not after).
  *
- * Data sourced from ai-sdk provider docs + live testing.
- * When ai-sdk adds a fix, delete the quirk here.
+ * Canonical path: `providers/third-party/common.ts:thirdPartyChat` → `applyQuirk(id, body)`
+ * → `normalizeMessagesForSDK` → `generateText/streamText`. This keeps one quirks table
+ * for all 17 OpenAI-compatible providers and avoids per-provider adapter folders.
+ *
+ * Legacy path `adapters/router.ts:withProviderQuirk` is deprecated — new OpenAI-compatible
+ * providers MUST use the SDK path above. Delete an entry when provider natively accepts
+ * the canonical request.
  */
 
 export type QuirkPatch = (body: Record<string, unknown>) => Record<string, unknown>;
@@ -13,15 +17,16 @@ function stripStore(b: Record<string, unknown>): void {
   delete b.store;
 }
 
-function stripStrict(tools: unknown): void {
-  if (!Array.isArray(tools)) return;
-  for (const t of tools as Array<Record<string, unknown>>) {
-    const fn = t.function as Record<string, unknown> | undefined;
-    if (fn && "strict" in fn) {
-      const { strict: _s, ...rest } = fn;
-      t.function = rest;
-    }
-  }
+function stripStrict(tools: unknown): unknown {
+  if (!Array.isArray(tools)) return tools;
+  return tools.map((tool) => {
+    if (!tool || typeof tool !== "object") return tool;
+    const item = tool as Record<string, unknown>;
+    const fn = item.function;
+    if (!fn || typeof fn !== "object" || !("strict" in fn)) return { ...item };
+    const { strict: _strict, ...rest } = fn as Record<string, unknown>;
+    return { ...item, function: rest };
+  });
 }
 
 function mapMaxCompletionTokens(b: Record<string, unknown>): void {
@@ -43,7 +48,7 @@ export const providerQuirks: Record<string, QuirkPatch> = {
     const out = { ...b };
     stripStore(out);
     if (b.reasoning_effort && !out.reasoning_format) (out as Record<string, unknown>).reasoning_format = "parsed";
-    if (Array.isArray(out.tools)) stripStrict(out.tools);
+    if (Array.isArray(out.tools)) out.tools = stripStrict(out.tools);
     return out;
   },
   cohere: (b) => {
@@ -53,7 +58,7 @@ export const providerQuirks: Record<string, QuirkPatch> = {
     delete (out as Record<string, unknown>).metadata;
     if (out.reasoning_effort && !["none", "high"].includes(out.reasoning_effort as string)) out.reasoning_effort = "high";
     mapMaxCompletionTokens(out);
-    if (Array.isArray(out.tools)) stripStrict(out.tools);
+    if (Array.isArray(out.tools)) out.tools = stripStrict(out.tools);
     return out;
   },
   deepseek: (b) => {
@@ -67,7 +72,7 @@ export const providerQuirks: Record<string, QuirkPatch> = {
     const out = { ...b };
     if (typeof b.model === "string" && (b.model as string).includes("gpt-oss")) out.parallel_tool_calls = false;
     stripStore(out);
-    if (Array.isArray(out.tools)) stripStrict(out.tools);
+    if (Array.isArray(out.tools)) out.tools = stripStrict(out.tools);
     return out;
   },
   minimax: (b) => {
@@ -78,7 +83,7 @@ export const providerQuirks: Record<string, QuirkPatch> = {
   moonshot: (b) => {
     const out = { ...b };
     stripStore(out);
-    if (Array.isArray(out.tools)) stripStrict(out.tools);
+    if (Array.isArray(out.tools)) out.tools = stripStrict(out.tools);
     return out;
   },
   openrouter: (b) => {
@@ -92,14 +97,14 @@ export const providerQuirks: Record<string, QuirkPatch> = {
   together: (b) => {
     const out = { ...b };
     stripStore(out);
-    if (Array.isArray(out.tools)) stripStrict(out.tools);
+    if (Array.isArray(out.tools)) out.tools = stripStrict(out.tools);
     // together reasoning via reasoning.enabled handled upstream if present
     return out;
   },
   xiaomi: (b) => {
     const out = { ...b };
     stripStore(out);
-    if (Array.isArray(out.tools)) stripStrict(out.tools);
+    if (Array.isArray(out.tools)) out.tools = stripStrict(out.tools);
     return out;
   },
   zai: (b) => {
@@ -116,13 +121,10 @@ export const providerQuirks: Record<string, QuirkPatch> = {
   huggingface: (b) => ({ ...b }),
   fireworks: (b) => ({ ...b }),
   mistral: (b) => ({ ...b }),
-  alibaba_cn: (b) => {
-    const out = { ...b };
-    stripStore(out);
-    mapMaxCompletionTokens(out);
-    return out;
-  },
-  // elevenlabs / fal have non-chat modalities — keep passthrough for now, custom handlers handle images/audio
+  nvidia: (b) => ({ ...b }),
+  perplexity: (b) => ({ ...b }),
+  // ElevenLabs/Fal use dedicated non-chat handlers; these are only defensive
+  // passthroughs if a legacy chat call reaches this table.
   elevenlabs: (b) => ({ ...b }),
   fal: (b) => ({ ...b }),
 };

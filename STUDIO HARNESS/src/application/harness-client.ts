@@ -26,9 +26,16 @@ export class FlueHarnessClient implements HarnessClient {
   readonly #agentName: string;
   readonly #client: FlueClient;
 
-  constructor(options: { baseUrl: string; agentName?: string }) {
+  constructor(options: {
+    baseUrl: string;
+    agentName?: string;
+    token?: string;
+  }) {
     this.#agentName = options.agentName ?? "studio";
-    this.#client = createFlueClient({ baseUrl: options.baseUrl });
+    this.#client = createFlueClient({
+      baseUrl: options.baseUrl,
+      ...(options.token === undefined ? {} : { token: options.token }),
+    });
   }
 
   async send(threadId: string, message: string): Promise<AcceptedRun> {

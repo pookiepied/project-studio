@@ -26,6 +26,15 @@ export const WRITE_DESCRIPTOR: CapabilityDescriptor = {
   title: "Write file",
   description:
     "Writes a file, creating it or replacing it entirely. Read an existing file before replacing it. Prefer edit for changing part of a file.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string", minLength: 1 },
+      content: { type: "string" },
+    },
+    required: ["path", "content"],
+    additionalProperties: false,
+  },
   effects: ["write"],
   provenance: NATIVE_PROVENANCE,
   // Writing the same content twice lands the same file, so a retry after an

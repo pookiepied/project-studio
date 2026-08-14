@@ -32,12 +32,23 @@ the single structural lesson from v1, where the agent loop lived inside a React
 context provider and every feature had to be threaded through three runtimes.
 
 **Transport:** HTTP + SSE over localhost, via Hono. `FlueHarnessClient` in
-`src/application/harness-client.ts` is the client; `createFlueClient({ baseUrl })`
-with `observe(..., { live: "sse" })` for streaming.
+`src/application/harness-client.ts` is the headless client;
+`createFlueClient({ baseUrl, token })` with `observe(..., { live: "sse" })`
+provides authenticated streaming.
 
 Sub-millisecond overhead, and it buys three things: the harness is testable
 standalone, it runs headless, and it can serve a web build. The cost is a
 sidecar process to supervise. Worth it.
+
+The client admission and local-access boundary is defined in
+`STUDIO HARNESS/docs/decisions/0028-harness-client-admission-and-local-access.md`.
+The target is one global Harness admission middleware, a per-launch in-memory
+credential, an explicit loopback listener, and a Studio Host that owns the
+Harness process. Optional browser access belongs to a separate frontend gateway;
+it must not expose the Harness listener. The current repository has the Flue
+HTTP/streaming primitive, the global admission contract/middleware, and a
+headless launcher that binds the Harness to loopback with structured readiness.
+Studio Host lifecycle and the desktop caller remain pending.
 
 **Frontend seam:** `STUDIO/src/features/chat/session/useChatSession.ts` is
 already the single seam — everything above it codes against a `ChatSession`
@@ -53,7 +64,9 @@ Established, not proposed. See `STUDIO HARNESS/src/`.
 
 ```
 agents/          agent definitions (defineAgent)
-application/     harness client
+application/     domain services and runtime composition
+admission/       inbound Harness client authentication (ADR 0028)
+transport/       HTTP route composition and framework adapters
 auth/            sign-in, sessions
 context/         context assembly
 contracts/       shared types, model ids, and the one effect table (ADR 0020)
@@ -111,26 +124,17 @@ The harness continues on its own roadmap; the app connects at the end.
 |---|---|---|
 | 1–8 | foundation, loop, persistence, observability, providers, gateway, auth | done |
 | 9 | permission and containment kernel | foundation done |
-| 10 | native tools — 7 of 10 | **in progress** |
-| 11 | MCP | next |
+| 10 | native tools | implemented in dirty tree; local/manual posture |
+| 11 | MCP and audit remediation | **in progress** |
 | 12 | Skills | |
 | 13 | Subagents and tasks | |
 | 14–17 | projects, memory, workflows, evals | |
 | 18 | product integration — the frontend seam | |
 
-**The chain is clear** — snapshots, call bounds, and trust/modes are all done
-(ADRs 0016–0018). What is left in Phase 10, in order:
-
-1. ~~**Gate bounds** (`T-02`).~~ Done — ADR 0017.
-2. ~~**Trust and modes** (`T-03`, `T-09`).~~ Done — ADR 0018.
-3. ~~**`shell`**.~~ Done — ADR 0019.
-4. **`fetch`** — needs an ADR on the network-effect question first. The question
-   is written out in `check-later.md` as `C-10`. Last one.
-
-**The audit findings came first, and are done.** `T-16`, then `T-14`, `T-15` and
-`T-17` under ADR 0020. That ADR also named the shape behind three of the eleven
-findings: hand-written metadata that several subsystems trust and nobody
-verifies. `K-04` and `T-19` are the same shape, still open.
+**The chain is clear** — snapshots, call bounds, trust/modes, native registrars,
+and the P1/P2 MCP/permission remediation are source-backed in the dirty tree.
+Task 007 records the remaining listener/Host, Gateway wire, restart-durability,
+and intentionally deferred product boundaries.
 
 **Do C-01 and C-02 together**, once MCP lands and a real multi-turn session with
 discovery can run. They measure whether the Flue/Pi bet holds, and they are

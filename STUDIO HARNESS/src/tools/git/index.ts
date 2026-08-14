@@ -44,6 +44,15 @@ export const GIT_DESCRIPTOR: CapabilityDescriptor = {
     "Runs a git command in the project. Supply the subcommand and its arguments separately, " +
     "for example subcommand \"log\" with args [\"--oneline\", \"-n\", \"20\"]. " +
     "Arguments are passed directly to git; no shell is involved.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      subcommand: { type: "string", minLength: 1 },
+      args: { type: "array", items: { type: "string" } },
+    },
+    required: ["subcommand"],
+    additionalProperties: false,
+  },
   effects: ["read", "write"],
   provenance: NATIVE_PROVENANCE,
   // `git commit` twice makes two commits; `git push` twice is a no-op. The

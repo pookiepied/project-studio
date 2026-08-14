@@ -36,6 +36,16 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
   title: "Read file",
   description:
     "Reads a file from the project, returning numbered lines. Use offset and limit to page through a long file.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string", minLength: 1 },
+      offset: { type: "integer", minimum: 1 },
+      limit: { type: "integer", minimum: 1 },
+    },
+    required: ["path"],
+    additionalProperties: false,
+  },
   effects: ["read"],
   provenance: NATIVE_PROVENANCE,
   idempotent: true,

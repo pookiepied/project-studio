@@ -109,11 +109,17 @@ function scriptedSupervisor(options: {
   launch: McpLauncher["open"];
   backoff?: McpSupervisorOptions["backoff"];
   connection?: McpSupervisorOptions["connection"];
+  onReady?: McpSupervisorOptions["onReady"];
+  onUnavailable?: McpSupervisorOptions["onUnavailable"];
+  onNotification?: McpSupervisorOptions["onNotification"];
 }): McpSupervisor {
   return new McpSupervisor({
     launch: { key: (record) => record.id, open: options.launch },
     ...(options.backoff === undefined ? {} : { backoff: options.backoff }),
     ...(options.connection === undefined ? {} : { connection: options.connection }),
+    ...(options.onReady === undefined ? {} : { onReady: options.onReady }),
+    ...(options.onUnavailable === undefined ? {} : { onUnavailable: options.onUnavailable }),
+    ...(options.onNotification === undefined ? {} : { onNotification: options.onNotification }),
   });
 }
 
@@ -232,6 +238,28 @@ describe("supervising MCP servers", () => {
       expect(supervisor.status("blender")?.state).toBe("ready");
     });
 
+    it("refreshes lifecycle dependents when a background retry recovers", async () => {
+      let launches = 0;
+      let ready = 0;
+      const supervisor = scriptedSupervisor({
+        launch: async () => {
+          launches += 1;
+          if (launches === 1) throw new ExtendError("internal", { message: "not yet" });
+          return new ScriptedChannel();
+        },
+        backoff: IMMEDIATE,
+        onReady: () => {
+          ready += 1;
+        },
+      });
+
+      await expect(supervisor.ensure(RECORD)).rejects.toThrow(/not yet/);
+      await settle();
+
+      expect(ready).toBe(1);
+      expect(supervisor.status("blender")?.state).toBe("ready");
+    });
+
     it("stops retrying a server that always fails", async () => {
       let launches = 0;
       const supervisor = scriptedSupervisor({
@@ -248,6 +276,7 @@ describe("supervising MCP servers", () => {
       // Two retries after the first attempt, and then the decision to stop.
       expect(launches).toBe(3);
       expect(supervisor.status("blender")?.state).toBe("given-up");
+      expect(supervisor.status("blender")?.attempts).toBe(3);
 
       const before = launches;
       await settle();
@@ -307,6 +336,31 @@ describe("supervising MCP servers", () => {
       expect(channels).toHaveLength(2);
       expect(supervisor.status("blender")?.state).toBe("ready");
     });
+
+    it("notifies dependents when a ready server dies and recovers", async () => {
+      const channels: ScriptedChannel[] = [];
+      const unavailable: string[] = [];
+      let ready = 0;
+      const supervisor = scriptedSupervisor({
+        launch: async () => {
+          const channel = new ScriptedChannel();
+          channels.push(channel);
+          return channel;
+        },
+        backoff: IMMEDIATE,
+        onReady: () => {
+          ready += 1;
+        },
+        onUnavailable: (_record, reason) => unavailable.push(String(reason)),
+      });
+
+      await supervisor.ensure(RECORD);
+      channels[0]?.die(new ExtendError("disconnected", { message: "it crashed" }));
+      await settle();
+
+      expect(unavailable).toHaveLength(1);
+      expect(ready).toBe(2);
+    });
   });
 
   describe("stopping", () => {
@@ -335,6 +389,7 @@ describe("supervising MCP servers", () => {
 
       await expect(supervisor.ensure(RECORD)).rejects.toThrow();
       expect(supervisor.status("blender")?.state).toBe("given-up");
+      expect(supervisor.status("blender")?.attempts).toBe(1);
 
       supervisor.stop("blender");
       const connection = await supervisor.ensure(RECORD);

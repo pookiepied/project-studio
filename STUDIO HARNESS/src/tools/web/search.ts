@@ -20,6 +20,15 @@ export const WEB_SEARCH_DESCRIPTOR: CapabilityDescriptor = {
   description:
     "Searches the web and returns the best matches with a short extract of each page. " +
     "Use fetch afterwards to read one of them in full.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", minLength: 1 },
+      limit: { type: "integer", minimum: 1, maximum: 20 },
+    },
+    required: ["query"],
+    additionalProperties: false,
+  },
   effects: ["network"],
   provenance: NATIVE_PROVENANCE,
   idempotent: true,

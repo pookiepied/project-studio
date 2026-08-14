@@ -180,20 +180,20 @@ async function readBody(response: IncomingMessage, maxBytes: number): Promise<st
 }
 
 /**
- * Headers that must not survive a move to a different origin.
+ * Headers that may survive a move to a different origin.
  *
  * A redirect is chosen by the far end, so following one with the credentials
  * meant for the first host hands them to the second. This is the shape of the
  * bug that has leaked API keys out of every HTTP client that did not do it.
  */
-const ORIGIN_BOUND_HEADERS = ["authorization", "cookie", "proxy-authorization"];
+const REDIRECT_SAFE_HEADERS = new Set(["accept", "content-type", "user-agent"]);
 
 function stripOriginBound(
   headers: Readonly<Record<string, string>>,
 ): Record<string, string> {
   const kept: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
-    if (!ORIGIN_BOUND_HEADERS.includes(name.toLowerCase())) kept[name] = value;
+    if (REDIRECT_SAFE_HEADERS.has(name.toLowerCase())) kept[name] = value;
   }
   return kept;
 }

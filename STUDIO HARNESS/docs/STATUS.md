@@ -7,10 +7,9 @@ answers "how far along are we, and what is actually blocking what".
 Refresh it at a phase boundary. If it disagrees with the other two documents,
 they are right and this one is stale.
 
-Last refreshed: Phase 10 in progress, 9 of 10 native tools shipped. Undo, call
-bounds, trust/modes, `shell`, and the web pair landed (ADRs 0016–0019, 0022,
-0023). Only `task` and `skill` remain, and both belong to later phases, so
-Phase 10 is effectively closed.
+Last refreshed: 2026-08-13 during task 007 audit remediation. Phase 10 is
+effectively closed: the native families are implemented and now registered
+through the CallGate; `task` and `skill` belong to later phases.
 
 Then a cross-reference audit over everything shipped, which is why this file now
 contradicts itself less and admits more. It found eleven real defects — `T-14`
@@ -57,7 +56,7 @@ process it talks to; neither contains the other.
 | 8 | Auth, credentials, local BYOK | Done |
 | 9 | Permission and containment kernel | Foundation done, 2 items open |
 | 10 | Native agent tools | **In progress — 9 of 10** |
-| 11 | MCP | **In progress — L-01 through L-05 done, 6 loose ends open** |
+| 11 | MCP | **In progress — L-01 through L-05 done, 7 loose ends open** |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
 | 14 | Projects, workspaces, sandboxes | Not started |
@@ -161,11 +160,10 @@ folder — including `..`, symlinks pointing out, sibling folders whose names
 share a prefix, and other drive letters. That wall holds today and has no
 "approve anyway" option.
 
-That bypass is now **contained rather than open**: `architecture.test.ts` refuses
-any import of a tool module from outside `src/tools/`, and names
-`workspace-summary.js` in an exact list of the bypasses that exist. A second one
-fails the suite. Removing the fixture waits for the real wiring, because seven
-integration tests use it as their end-to-end tool.
+The former direct-tool bypass is now **fixed**: `workspace_summary` and all
+native families register through `registerNativeTools()` and `CallGate`. The
+architecture test has no known bypass exception, and the real Flue tests still
+exercise the workspace fixture through the gate.
 
 **Call bounds.** Every call has a deadline covering queue time and execution, a
 signal that reaches the tool so cancellation works mid-call, and a FIFO
@@ -227,20 +225,18 @@ ADR 0020.
 ~~**`fetch`** is next, and `C-10` is the question it waits on.~~ Done — ADRs
 0022 and 0023. `C-10` is closed.
 
-**Phase 11 (MCP) is in progress — design is done, five of eleven loose ends
-are closed.** Two things landed with the web
-tools that it inherits rather than re-decides: `src/net/destination.ts`, which
-every HTTP destination goes through, and `K-07`'s rule that a capability id may
-not contain a `/` — which becomes load-bearing the moment a server supplies its
-own tool names.
+**Phase 11 (MCP) is in progress — the protocol and P1/P2 remediation are
+implemented in the dirty tree, but the packaged Host boundary is not closed.**
+The current work is tracked in tasks 006 and 007. Admission, recursive secret
+validation, lifecycle/catalog recovery, append-only tool membership, native gate
+wiring, result/name semantics, credential cleanup, approval cancellation, and
+Gateway fail-closed tests are now source-backed.
 
-Research and design are in `tasks/phase-11-mcp/002-design.md`, and the running record of
-what has been built is `tasks/phase-11-mcp/003-work-plan.md`. This section describes
-the design; it is not a progress report, and the work plan is the one that says
-where the code has reached. As of this note a client exists end to end — the
-registry, the extend spine, the wire layer, the connection, **both** channels,
-the handshake, the supervisor, and the reconciler — and nothing calls it. Wiring
-it to the kernel and to settings is 003.7 and 003.8.
+Research and design are in `tasks/phase-11-mcp/002-design.md`; task 005 records
+loose ends, task 006 records local admission, and task 007 records the audit
+remediation. The registry, extend spine, wire layer, both channels, handshake,
+supervisor, reconciler, catalog, CallGate, management routes, approval routes,
+and real Flue/stdio paths now have callers in the dirty tree.
 
 **One process per launch, not per server** (`C-18`, closed). Two projects share
 a process only when the command, the arguments, the environment, and the working
@@ -283,17 +279,17 @@ probe for legacy.
 
 **One finding blocked the phase, and is now decided.** A connected capability
 declaring `execute` or `network` is refused absolutely (ADR 0019, ADR 0024), and
-those two are the only honest declaration for a tool we did not write. As
-written, no MCP tool could ever run.
+those two are the only honest declaration for a tool we did not write. The
+dirty-tree MCP path now reaches the kernel and CallGate with that policy intact.
 
 The answer is three layers, and it collapses rather than adds. **Installed** —
 accepting once that this program runs outside the folder wall, recorded at the
 moment the server is added. **Enabled** — which servers *this project* uses,
 defaulting to off, checked before anything is spawned or probed. **Approved** —
-the permission kernel, untouched. Enabling can only subtract: it never approves
-a call, and disabling hides a server from discovery rather than refusing it
-later. This mirrors ADR 0021 — trust is global, selection belongs to a project —
-and the same three layers cover skills and connectors.
+the permission kernel, untouched. Enabling never approves a call. Under ADR
+0029, disabling makes retained session tools unavailable at dispatch and a new
+sandbox omits them. This mirrors ADR 0021 — trust is global, selection belongs
+to a project — and the same three layers cover future skills and connectors.
 
 Four smaller collisions are in §3 of the task file. `npx` is resolved to an
 interpreter plus an absolute script path rather than refused, which keeps

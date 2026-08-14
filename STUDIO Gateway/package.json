@@ -9,19 +9,21 @@
     "deploy": "wrangler deploy",
     "cf:typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply studio_gateway --local",
+    "db:migrate": "wrangler d1 migrations apply studio-gateway",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "@opencode-ai/models": "^0.0.42",
+    "ai": "^7.0.64",
     "@ai-sdk/anthropic": "^4.0.38",
     "@ai-sdk/google": "^4.0.43",
     "@ai-sdk/openai": "^4.0.41",
     "@ai-sdk/openai-compatible": "^3.0.30",
-    "@opencode-ai/models": "^0.0.42",
-    "ai": "^7.0.64",
+    "@ai-sdk/fal": "^2.0.52",
+    "@ai-sdk/elevenlabs": "^2.0.51",
     "hono": "^4.7.9"
   },
   "devDependencies": {

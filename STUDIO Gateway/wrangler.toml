@@ -15,11 +15,14 @@ migrations_dir = "migrations"
 # CREDENTIAL_ENCRYPTION_KEY = base64 32-byte key for AES-GCM
 
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
 GATEWAY_BASE_URL = "https://gateway.example.com"
 
+[env.development.vars]
+ENVIRONMENT = "development"
+
 [triggers]
-crons = ["0 */6 * * *"]
+crons = ["0 */6 * * *", "0 3 * * *"]
 
 [observability.logs]
 enabled = true

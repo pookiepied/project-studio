@@ -6,11 +6,13 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient } from "../../src/application/harness-client.js";
 
 interface RunningHarness {
   baseUrl: string;
   process: ChildProcess;
+  token: string;
   dumpPath: string;
 }
 
@@ -86,13 +88,16 @@ async function startHarness(options: {
   const databasePath = join(directory, "flue.db");
   const dumpPath = join(directory, "telemetry.json");
   const port = await availablePort();
+  const admission = createAdmissionSession({ clientType: "test" });
 
   const child = spawn(process.execPath, ["dist/server.mjs"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       PORT: String(port),
+      PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
       PROJECT_STUDIO_DB_PATH: databasePath,
+      PROJECT_STUDIO_STORE_PATH: join(directory, "studio.db"),
       PROJECT_STUDIO_OTEL_EXPORTER: "memory",
       PROJECT_STUDIO_OTEL_MEMORY_DUMP_PATH: dumpPath,
       PROJECT_STUDIO_DEPLOYMENT_ENVIRONMENT: "test",
@@ -124,7 +129,7 @@ async function startHarness(options: {
     }
   });
 
-  return { baseUrl, process: child, dumpPath };
+  return { baseUrl, process: child, token: admission.credential, dumpPath };
 }
 
 async function stopHarness(child: ChildProcess): Promise<void> {
@@ -191,7 +196,7 @@ describe.sequential("observability vertical slice", () => {
     "emits agent/model/tool span hierarchy and metrics without content by default",
     async () => {
       const running = await startHarness({ captureContent: false });
-      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
       const run = await client.send("otel-tools", "check the workspace");
       expect((await client.wait(run)).text).toBe(
@@ -251,7 +256,7 @@ describe.sequential("observability vertical slice", () => {
     "applies redaction when content capture is enabled",
     async () => {
       const running = await startHarness({ captureContent: true });
-      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
       const secretMessage =
         "hello token=super-secret-value and Bearer sk-abcdefghijklmnopqrst";
@@ -292,7 +297,7 @@ describe.sequential("observability vertical slice", () => {
     "represents cancellation with error status on agent spans",
     async () => {
       const running = await startHarness({ captureContent: false });
-      const client = new FlueHarnessClient({ baseUrl: running.baseUrl });
+       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
       const run = await client.send("otel-cancel", "[slow] please wait");
       expect(await client.cancel("otel-cancel")).toBe(true);

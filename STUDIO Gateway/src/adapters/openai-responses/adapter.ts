@@ -3,7 +3,8 @@
  * Protocol: openai-responses
  * Endpoint: POST {baseUrl}/v1/responses
  * Auth: Authorization: Bearer {apiKey}
- * Used for gpt-5/o-series with reasoning effort, instructions vs messages separation
+ * Handles `POST /v1/responses` for any provider that speaks responses protocol.
+ * Discovery is now catalog-driven; live filter is passthrough (do not drop non-gpt-5).
  */
 
 import type { Adapter } from "../../providers/registry.ts";
@@ -24,26 +25,30 @@ export const openAIResponsesAdapter: Adapter = {
       throw new Error(`OpenAI list models failed ${res.status}: ${text}`);
     }
     const data = (await res.json()) as { data: Array<{ id: string; created: number; owned_by: string }> };
-    return (data.data ?? [])
-      .filter((m) => m.id.includes("gpt-5") || m.id.includes("o1") || m.id.includes("o3") || m.id.includes("responses"))
-      .map((m) => ({
+    // No id filter — catalog provides full metadata; passthrough all models and tag via heuristic fallback
+    return (data.data ?? []).map((m) => {
+      const idLower = m.id.toLowerCase();
+      const isVision = idLower.includes("vision") || idLower.includes("gpt-4o") || idLower.includes("4o") || idLower.includes("vl");
+      const isReasoning = idLower.includes("o1") || idLower.includes("o3") || idLower.includes("gpt-5") || idLower.includes("reasoning");
+      return {
         id: m.id,
         providerId: "",
         displayName: m.id,
         category: "text" as const,
-        inputModalities: ["text"] as const,
+        inputModalities: isVision ? (["text", "image"] as const) : (["text"] as const),
         outputModalities: ["text"] as const,
         contextWindow: null,
         maxOutputTokens: null,
         supportsTools: true,
-        supportsParallelTools: true,
-        supportsVision: true,
-        supportsReasoning: true,
-        reasoning: { type: "dynamic" as const, levels: ["low", "medium", "high", "xhigh", "max"] },
+        supportsParallelTools: false,
+        supportsVision: isVision,
+        supportsReasoning: isReasoning,
+        reasoning: isReasoning ? ({ type: "dynamic" as const, levels: ["low", "medium", "high", "xhigh", "max"] } as const) : null,
         pricing: null,
         releaseDate: m.created ? new Date(m.created * 1000).toISOString() : null,
         raw: m,
-      }));
+      };
+    });
   },
 
   async chat(apiKey: string, baseUrl: string, body: unknown, signal: AbortSignal): Promise<Response> {

@@ -9,6 +9,7 @@
 
 import type { Adapter } from "../../providers/registry.ts";
 import type { ModelDefinition } from "../../providers/types.ts";
+import { translateGoogleSSEToOpenAI } from "../protocol-sse.ts";
 
 export const googleGenerativeAdapter: Adapter = {
   protocol: "google-generative-ai",
@@ -78,7 +79,7 @@ export const googleGenerativeAdapter: Adapter = {
       const text = data.candidates?.[0]?.content.parts.map((p) => p.text ?? "").join("") ?? "";
       const finish = mapGoogleFinish(data.candidates?.[0]?.finishReason ?? "STOP");
       const openAIResp = {
-        id: `chatcmpl_${Date.now()}`,
+        id: `chatcmpl_${crypto.randomUUID()}`,
         object: "chat.completion",
         created: Math.floor(Date.now() / 1000),
         model,
@@ -97,7 +98,7 @@ export const googleGenerativeAdapter: Adapter = {
     const translated = translateGoogleSSEToOpenAI(upstream.body, model);
     return new Response(translated, {
       status: 200,
-      headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" },
+      headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
     });
   },
 };
@@ -172,58 +173,4 @@ function mapGoogleFinish(r: string): string {
   if (r === "MAX_TOKENS") return "length";
   if (r === "SAFETY" || r === "RECITATION") return "content_filter";
   return r.toLowerCase();
-}
-
-function translateGoogleSSEToOpenAI(body: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let sentRole = false;
-  let id = `chatcmpl_${Date.now()}`;
-  return body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        buffer += decoder.decode(chunk, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const dataStr = line.slice(6).trim();
-          if (!dataStr || dataStr === "[DONE]") continue;
-          try {
-            const data = JSON.parse(dataStr) as { candidates?: Array<{ content: { parts: Array<{ text?: string; thought?: boolean }> }; finishReason?: string }>; usageMetadata?: unknown };
-            const candidate = data.candidates?.[0];
-            if (!candidate) continue;
-            const text = candidate.content.parts.filter((p) => !p.thought).map((p) => p.text ?? "").join("");
-            const thinking = candidate.content.parts.filter((p) => p.thought).map((p) => p.text ?? "").join("");
-            const content = text || thinking;
-            if (content) {
-              const chunk = {
-                id,
-                object: "chat.completion.chunk",
-                created: Math.floor(Date.now() / 1000),
-                model,
-                choices: [{ index: 0, delta: { ...(sentRole ? {} : { role: "assistant" }), content }, finish_reason: null }],
-              };
-              sentRole = true;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-            }
-            if (candidate.finishReason) {
-              const chunk = {
-                id,
-                object: "chat.completion.chunk",
-                created: Math.floor(Date.now() / 1000),
-                model,
-                choices: [{ index: 0, delta: {}, finish_reason: mapGoogleFinish(candidate.finishReason) }],
-              };
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-            }
-          } catch {}
-        }
-      },
-      flush(controller) {
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      },
-    }),
-  );
 }

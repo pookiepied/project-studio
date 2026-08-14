@@ -20,14 +20,15 @@ import { ToolError } from "../errors.js";
  * `--upload-pack sh`, and matched by prefix in both directions, so the
  * abbreviations git itself accepts are refused too. See `reachesBlockedOption`.
  *
- * `-c` and `--config-env` are absent deliberately: as *git's own* options they
- * set `core.pager`, `core.editor`, or `credential.helper` and are lethal, but
- * they are only interpreted that way before the subcommand — and user arguments
- * are structurally placed after it. `git commit -c HEAD` is the subcommand's
- * own flag and means "reuse this message", so blocking it here would break a
- * real feature to prevent something already impossible.
+ * Configuration options are blocked in every model-supplied position. Git
+ * accepts `-c` after the subcommand too, and a value such as
+ * `core.sshCommand=...` can turn a read-looking command into arbitrary process
+ * execution. The fixed harness option below is authored by Project Studio and
+ * is not model input.
  */
 const BLOCKED_OPTIONS = new Set([
+  "-c",
+  "--config-env",
   // Run a program at the other end of a transport.
   "--upload-pack",
   "--receive-pack",
@@ -72,6 +73,9 @@ const BLOCKED_SUBCOMMANDS = new Set(["filter-branch"]);
  * `--` alone is the end-of-options marker, not an abbreviation of anything.
  */
 function reachesBlockedOption(name: string): boolean {
+  // Short `-cVALUE` is an attached spelling of the configuration option. It is
+  // safer to reject every attached `-c` form than to guess Git's parser.
+  if (name.startsWith("-c")) return true;
   if (!name.startsWith("--") || name.length <= 2) return false;
   for (const blocked of BLOCKED_OPTIONS) {
     if (blocked.startsWith(name) || name.startsWith(blocked)) return true;

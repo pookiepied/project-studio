@@ -16,7 +16,8 @@ export type ErrorCode =
   | "MODEL_NOT_EXPOSED"
   | "VALIDATION_ERROR"
   | "INTERNAL_ERROR"
-  | "DECRYPTION_ERROR";
+  | "DECRYPTION_ERROR"
+  | "NOT_IMPLEMENTED";
 
 export class AppError extends Error {
   readonly code: ErrorCode;
@@ -59,6 +60,10 @@ export function validationError(message: string, details?: unknown): AppError {
   return new AppError("VALIDATION_ERROR", message, 400, { details });
 }
 
+export function conflict(message: string, details?: unknown): AppError {
+  return new AppError("VALIDATION_ERROR", message, 409, { details });
+}
+
 export function modelNotFound(model: string): AppError {
   return new AppError("MODEL_NOT_FOUND", `Model not found: ${model}`, 404);
 }
@@ -77,8 +82,12 @@ export function providerError(provider: string, message: string, status = 502, c
   return new AppError("PROVIDER_ERROR", message, status, { provider, cause });
 }
 
-export function rateLimited(message = "Rate limit exceeded"): AppError {
-  return new AppError("RATE_LIMITED", message, 429);
+export function rateLimited(message = "Rate limit exceeded", details?: { limit?: number; remaining?: number; resetAt?: number }): AppError {
+  return new AppError("RATE_LIMITED", message, 429, { details });
+}
+
+export function notImplemented(message: string): AppError {
+  return new AppError("NOT_IMPLEMENTED", message, 501);
 }
 
 export function internalError(message = "Internal server error", cause?: unknown): AppError {

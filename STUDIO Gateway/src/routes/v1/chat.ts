@@ -5,57 +5,49 @@
 
 import { Hono } from "hono";
 import type { Env } from "../../index.ts";
-import { findExposedModel, getProvider, getCredential } from "../../lib/db.ts";
-import { decrypt } from "../../lib/encryption.ts";
-import { badRequest, modelNotFound, modelNotExposed, providerNotConfigured } from "../../lib/errors.ts";
-import { logger } from "../../lib/logger.ts";
-import { requireGatewayBearer } from "../../middleware/auth.ts";
-import { checkRateLimit } from "../../lib/ratelimit.ts";
-import { getProviderAdapter } from "../../providers/registry.ts";
+import { badRequest, notImplemented } from "../../lib/errors.ts";
+import { logger } from "../../observability/logger.ts";
+import { authorizeGateway } from "../../middleware/gatewayAuth.ts";
+import { getProviderRuntime } from "../../providers/registry.ts";
+import { resolveModelAndProvider, getApiKey, parseReasoning, needsVisionFallback } from "../../gateway/resolver.ts";
+import { rowToModelDef } from "../../infra/db.ts";
+import { isBudgetSupported } from "../../providers/shared/runtime.ts";
 
 export const chatRoute = new Hono<{ Bindings: Env }>();
 
 chatRoute.post("/chat/completions", async (c) => {
-  const authHeader = c.req.header("authorization");
-  const verified = await requireGatewayBearer(c.env.DB, authHeader ?? null, c.env.ENVIRONMENT);
-  if (verified) {
-    const rl = await checkRateLimit(c.env.DB, verified.keyId, verified.rpm);
-    if (!rl.allowed) {
-      return c.json({ error: { message: "Rate limit exceeded", type: "rate_limited", code: "RATE_LIMITED" } }, 429);
-    }
-    c.executionCtx.waitUntil(c.env.DB.prepare("UPDATE gateway_keys SET last_used_at = ? WHERE id = ?").bind(Date.now(), verified.keyId).run());
-  }
+  await authorizeGateway(c);
 
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body.model !== "string") throw badRequest("Missing model");
 
   const modelId: string = body.model;
-  const model = await findExposedModel(c.env.DB, modelId);
-  if (!model) {
-    const any = await c.env.DB.prepare("SELECT 1 FROM models WHERE model_id = ?").bind(modelId).first();
-    if (any) throw modelNotExposed(modelId);
-    throw modelNotFound(modelId);
-  }
-
-  const provider = await getProvider(c.env.DB, model.provider_id);
-  if (!provider || !provider.enabled) throw providerNotConfigured(model.provider_id);
-
-  const cred = await getCredential(c.env.DB, provider.id);
-  if (!cred) throw providerNotConfigured(provider.id);
-
-  const keyBase64 = c.env.CREDENTIAL_ENCRYPTION_KEY;
-  if (!keyBase64) throw providerNotConfigured(provider.id);
-  const apiKey = await decrypt(cred.encrypted_key, keyBase64);
-
-  const providerId = provider.id;
-  const baseUrl = provider.base_url;
+  const { model, provider } = await resolveModelAndProvider(c.env.DB, modelId);
+  if (model.category !== "text") throw badRequest(`Model ${modelId} is not a chat model`);
+  if (provider.protocol === "openai-responses") throw notImplemented(`Provider ${provider.id} requires the Responses API`);
+  const apiKey = await getApiKey(c.env.DB, provider.id, c.env.CREDENTIAL_ENCRYPTION_KEY);
   const stream = body.stream === true;
+  logger.info("chat completions", { provider: provider.id, model: modelId, stream });
 
-  logger.info("chat completions", { provider: providerId, model: modelId, stream });
+  // Explicit vision guard: image attached to non-vision model → 400 with actionable guidance.
+  // No auto-routing (Phase A); caller must use a vision model or POST /v1/documents/preprocess first.
+  if (needsVisionFallback(model, body as Record<string, unknown>)) {
+    logger.warn("chat vision fallback rejected", { provider: provider.id, model: modelId });
+    throw badRequest(`Model ${modelId} does not support vision. Use a vision-capable model or POST /v1/documents/preprocess to extract text from images first.`);
+  }
+  const runtime = await getProviderRuntime(provider.id, provider.protocol as never);
+  const modelDef = rowToModelDef(model);
 
-  const adapter = getProviderAdapter(providerId);
-  const upstream = await adapter.chat(apiKey, baseUrl, body, c.req.raw.signal as AbortSignal);
-
-  // Adapter already returns OpenAI-compatible response (translated if needed)
-  return upstream;
+  const reasoning = parseReasoning(body as Record<string, unknown>);
+  if (reasoning?.mode === "budget" && !isBudgetSupported(provider.id)) {
+    throw notImplemented(`Provider ${provider.id} does not support exact budget reasoning — use adaptive levels (low/medium/high) or a budget-capable provider (anthropic, google)`);
+  }
+  return runtime.chat({
+    model: modelDef,
+    provider: { id: provider.id, baseUrl: provider.base_url, protocol: provider.protocol as never },
+    apiKey,
+    body: body as Record<string, unknown>,
+    signal: c.req.raw.signal as AbortSignal,
+    reasoning,
+  });
 });

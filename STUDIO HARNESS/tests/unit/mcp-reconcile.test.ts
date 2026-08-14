@@ -57,7 +57,9 @@ function server(id: string, command: string): McpServerInput {
   };
 }
 
-const NODE = "C:\\tools\\node.exe";
+const NODE = process.platform === "win32" ? "C:\\tools\\node.exe" : "/usr/bin/node";
+const OTHER_NODE =
+  process.platform === "win32" ? "C:\\tools\\other.exe" : "/usr/bin/other-node";
 
 let db: StudioDatabase;
 let registry: McpServerRegistry;
@@ -132,7 +134,7 @@ describe("bringing MCP servers into line with what a project chose", () => {
     await reconcile(["blender"]);
     const first = channels.get("blender");
 
-    registry.save(server("blender", "C:\\tools\\other.exe"));
+    registry.save(server("blender", OTHER_NODE));
     await reconcile(["blender"]);
 
     expect(launched).toEqual(["blender", "blender"]);
@@ -173,6 +175,31 @@ describe("bringing MCP servers into line with what a project chose", () => {
 
     expect(launched).toEqual(["broken"]);
     expect(supervisor.status("broken")?.state).toBe("failed");
+  });
+
+  it("stops an old retry when the failed configuration is edited", async () => {
+    registry.save(server("blender", NODE));
+    supervisor = new McpSupervisor({
+      launch: {
+        key: (record) => record.id,
+        open: async (record) => {
+          if (record.command === NODE) {
+            throw new ExtendError("internal", { message: "old command is broken" });
+          }
+          launched.push(record.id);
+          return new ScriptedChannel();
+        },
+      },
+      backoff: { random: () => 0, baseDelayMs: 60_000, maxAttempts: 5 },
+    });
+    reconcile = createMcpReconciler({ registry, supervisor });
+
+    await reconcile(["blender"]);
+    registry.save(server("blender", OTHER_NODE));
+    await reconcile(["blender"]);
+
+    expect(launched).toEqual(["blender"]);
+    expect(supervisor.status("blender")?.state).toBe("ready");
   });
 
   it("starts the others when one will not start", async () => {

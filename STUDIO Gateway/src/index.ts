@@ -11,12 +11,14 @@ import { responsesRoute } from "./routes/v1/responses.ts";
 import { imagesRoute } from "./routes/v1/images.ts";
 import { audioRoute } from "./routes/v1/audio.ts";
 import { embeddingsRoute } from "./routes/v1/embeddings.ts";
+import { videosRoute } from "./routes/v1/videos.ts";
+import { documentsRoute } from "./routes/v1/documents.ts";
 import { adminProvidersRoute } from "./routes/admin/providers.ts";
 import { adminCredentialsRoute } from "./routes/admin/credentials.ts";
 import { adminKeysRoute } from "./routes/admin/keys.ts";
 import { adminModelsRoute } from "./routes/admin/models.ts";
 import { errorHandler } from "./middleware/errorHandler.ts";
-import { runDiscovery } from "./services/discovery.ts";
+import { runDiscovery } from "./catalog/discovery.ts";
 import { requireAdmin } from "./middleware/auth.ts";
 
 export interface Env {
@@ -39,6 +41,8 @@ app.route("/v1", responsesRoute);
 app.route("/v1", imagesRoute);
 app.route("/v1", audioRoute);
 app.route("/v1", embeddingsRoute);
+app.route("/v1", videosRoute);
+app.route("/v1", documentsRoute);
 
 // Admin (no UI yet, curl-able, x-admin-token if ADMIN_TOKEN set)
 app.route("/admin", adminProvidersRoute);
@@ -67,7 +71,12 @@ app.onError((err, c) => errorHandler(err as Error, c as never));
 // Cron every 6h
 export default {
   fetch: app.fetch,
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runDiscovery(env.DB, env));
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    if (event.cron === "0 3 * * *") {
+      const { syncCatalog } = await import("./catalog/sync.ts");
+      ctx.waitUntil(syncCatalog(env.DB).catch((error) => console.error("catalog cron failed", error)));
+      return;
+    }
+    ctx.waitUntil(runDiscovery(env.DB, env).catch((error) => console.error("discovery cron failed", error)));
   },
 };

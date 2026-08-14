@@ -1,68 +1,13 @@
 /**
- * Anthropic discovery - fetches and maps with fallback for unauthenticated.
- * Used by services/discovery.ts scheduled cron.
- * Exports helper to seed from static research when no API key configured (for admin preview).
+ * Anthropic static fallback — legacy offline preview only.
+ * Catalog sync (`models.dev`) is source of truth; live `GET /v1/models` overwrites this.
+ * Keep minimal so admin preview works without credential; do not add fictional future models.
  */
 
 import type { ModelDefinition } from "../types.ts";
 
-// Static research snapshot from docs.anthropic.com/models 2026-06-09
-// Used when no credential configured or as fallback. Discovery overwrites with live data when key present.
+// Deprecated: used only when no credential configured. Real data comes from catalog sync or live discovery.
 export const ANTHROPIC_STATIC_MODELS: ModelDefinition[] = [
-  {
-    id: "claude-fable-5",
-    providerId: "anthropic",
-    displayName: "Claude Fable 5",
-    category: "text",
-    inputModalities: ["text", "image"],
-    outputModalities: ["text"],
-    contextWindow: 1_000_000,
-    maxOutputTokens: 128_000,
-    supportsTools: true,
-    supportsParallelTools: true,
-    supportsVision: true,
-    supportsReasoning: true,
-    reasoning: { type: "dynamic", levels: ["low", "medium", "high", "xhigh", "max"] },
-    pricing: { input: 10, output: 50, cacheRead: null, cacheWrite: null },
-    releaseDate: "2026-06-09",
-    raw: { source: "static-docs" },
-  },
-  {
-    id: "claude-opus-5",
-    providerId: "anthropic",
-    displayName: "Claude Opus 5",
-    category: "text",
-    inputModalities: ["text", "image"],
-    outputModalities: ["text"],
-    contextWindow: 1_000_000,
-    maxOutputTokens: 128_000,
-    supportsTools: true,
-    supportsParallelTools: true,
-    supportsVision: true,
-    supportsReasoning: true,
-    reasoning: { type: "dynamic", levels: ["low", "medium", "high", "xhigh", "max"] },
-    pricing: { input: 5, output: 25, cacheRead: null, cacheWrite: null },
-    releaseDate: "2026-03-01",
-    raw: { source: "static-docs" },
-  },
-  {
-    id: "claude-sonnet-5",
-    providerId: "anthropic",
-    displayName: "Claude Sonnet 5",
-    category: "text",
-    inputModalities: ["text", "image"],
-    outputModalities: ["text"],
-    contextWindow: 1_000_000,
-    maxOutputTokens: 128_000,
-    supportsTools: true,
-    supportsParallelTools: true,
-    supportsVision: true,
-    supportsReasoning: true,
-    reasoning: { type: "dynamic", levels: ["low", "medium", "high"] },
-    pricing: { input: 2, output: 10, cacheRead: null, cacheWrite: null },
-    releaseDate: "2026-02-15",
-    raw: { source: "static-docs" },
-  },
   {
     id: "claude-haiku-4-5",
     providerId: "anthropic",
@@ -79,25 +24,7 @@ export const ANTHROPIC_STATIC_MODELS: ModelDefinition[] = [
     reasoning: { type: "selected", levels: ["low", "medium", "high"] },
     pricing: { input: 1, output: 5, cacheRead: null, cacheWrite: null },
     releaseDate: "2025-10-01",
-    raw: { source: "static-docs" },
-  },
-  {
-    id: "claude-opus-4-8",
-    providerId: "anthropic",
-    displayName: "Claude Opus 4.8",
-    category: "text",
-    inputModalities: ["text", "image"],
-    outputModalities: ["text"],
-    contextWindow: 1_000_000,
-    maxOutputTokens: 128_000,
-    supportsTools: true,
-    supportsParallelTools: true,
-    supportsVision: true,
-    supportsReasoning: true,
-    reasoning: { type: "dynamic", levels: ["low", "medium", "high"] },
-    pricing: { input: 5, output: 25, cacheRead: null, cacheWrite: null },
-    releaseDate: "2026-01-15",
-    raw: { source: "static-docs" },
+    raw: { source: "static-fallback" },
   },
   {
     id: "claude-sonnet-4-6",
@@ -115,6 +42,6 @@ export const ANTHROPIC_STATIC_MODELS: ModelDefinition[] = [
     reasoning: { type: "dynamic", levels: ["low", "medium", "high"] },
     pricing: { input: 3, output: 15, cacheRead: null, cacheWrite: null },
     releaseDate: "2025-11-01",
-    raw: { source: "static-docs" },
+    raw: { source: "static-fallback" },
   },
 ];

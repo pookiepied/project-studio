@@ -4,6 +4,7 @@ import { ExtendError } from "../errors.js";
 import type { ExtensionSummary } from "../inventory.js";
 import { parseHostPort } from "../../net/destination.js";
 import type { StudioDatabase } from "../../storage/database.js";
+import { assertSafeMcpRecord } from "./input-security.js";
 
 /**
  * The MCP servers installed on this machine.
@@ -219,6 +220,7 @@ export class McpServerRegistry {
    */
   save(input: McpServerInput): McpServerRecord {
     assertValidId(input.id);
+    assertSafeMcpRecord(input);
     assertConsistent(input);
 
     const now = Date.now();

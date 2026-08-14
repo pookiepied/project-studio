@@ -40,6 +40,9 @@ Project Studio/
 |   |   |-- 005-loose-ends.md           THE NEXT-ACTION LIST. What Phase 11
 |   |                                    is still missing. Read this to know
 |   |                                    what to do next.
+|   |   |-- 006-harness-admission.md     The implementation plan for the global
+|   |                                    Harness client boundary and Studio Host.
+|   |   |-- 007-audit-remediation.md     P1/P2 MCP, permission, native, and Gateway fixes
 |   |
 |   |-- delegation/                     THE DELEGATION PROCESS, not tied to
 |       |                                any one phase.
@@ -71,7 +74,8 @@ Project Studio/
 |-- STUDIO/                             THE DESKTOP UI. No project docs
 |                                        beyond its own README.md.
 |
-|-- STUDIO Gateway/                      Out of scope for this work. Ignore.
+|-- STUDIO Gateway/                      Independent Worker; auth/model-state
+|                                        audit and tests are tracked by task 007.
 |-- MCP/                                 One file inside has uncommitted,
 |                                        untouched changes that are not
 |                                        this work's. Leave it alone.

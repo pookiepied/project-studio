@@ -49,6 +49,19 @@ describe("migrations", () => {
     expect(rows.map((row) => row.name)).toEqual(MIGRATIONS.map((entry) => entry.name));
   });
 
+  it("adds the definition hash when an existing grant schema is upgraded", () => {
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle, MIGRATIONS.slice(0, 7));
+
+    expect(() => migrate(handle)).not.toThrow();
+
+    const columns = handle
+      .prepare("PRAGMA table_info(permission_grant)")
+      .all() as unknown as { name: string }[];
+    expect(columns.map((column) => column.name)).toContain("definition_hash");
+    handle.close();
+  });
+
   it("uses sequential versions with no gaps, so a partial upgrade is unambiguous", () => {
     expect(MIGRATIONS.map((entry) => entry.version)).toEqual(
       MIGRATIONS.map((_, index) => index + 1),

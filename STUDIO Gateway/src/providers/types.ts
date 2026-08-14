@@ -8,6 +8,10 @@
 // Protocols - distinct HTTP payload shapes. Collapsed auth wrappers share same string.
 export type Protocol = "openai-completions" | "openai-responses" | "anthropic-messages" | "google-generative-ai";
 
+export function isProtocol(value: string): value is Protocol {
+  return value === "openai-completions" || value === "openai-responses" || value === "anthropic-messages" || value === "google-generative-ai";
+}
+
 export type AuthMode = "apiKey" | "vertex-adc";
 
 // Categories - how model is used, for admin filtering and docs.
@@ -21,7 +25,7 @@ export type ModelCategory =
   | "video"
   | "rerank";
 
-export type Modality = "text" | "image" | "video" | "audio";
+export type Modality = "text" | "image" | "video" | "audio" | "pdf";
 
 // Reasoning - two modes as per spec
 export type ReasoningType = "none" | "dynamic" | "selected";
@@ -77,6 +81,11 @@ export interface ModelDefinition {
 
   // Metadata
   releaseDate?: string | null; // ISO date if known
+  family?: string | null;
+  lab?: string | null;
+  openWeights?: boolean;
+  knowledgeCutoff?: string | null;
+  catalogSource?: string | null;
   // Raw upstream JSON preserved for future fields without migration
   raw?: unknown;
 }
