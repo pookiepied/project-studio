@@ -53,41 +53,78 @@ Everything else is reference, opened when one of those three names it.
 
 ## The current tree
 
-Derived view. Statuses come from what was observed by running the suite, not
-from checklists.
+Derived view — every fact here lives in a source document first. Statuses come
+from what was observed by running the suite, not from checklists.
 
-Legend: ✅ verified · 🟢 implemented, unverified · 🟡 in progress · 🔴 blocked ·
-⚪ planned
+Work **branches**. Phases 1–11 did not each produce their own remediation;
+together they produced one. That single trunk is where all current work happens,
+and it may itself branch — a decision that turns out to need its own
+investigation becomes a child of the issue that raised it, not a new top-level
+task.
+
+```mermaid
+graph TD
+    PS[Project Studio]:::root
+
+    PS --> H[Studio Harness]:::prod
+    PS --> C[Studio Client]:::ok
+
+    H --> P111["Phases 1-11<br/>implemented, unverified"]:::warn
+    H --> P1218["Phases 12-18<br/>not started"]:::idle
+
+    P111 --> META["META-TASK<br/>Phases 1-11 remediation<br/>62 issues"]:::active
+
+    META --> S0["Stage 0 — Decisions<br/>#12-#18 · 7 open"]:::block
+    S0 --> S1["Stage 1 — Correctness<br/>#25-#29"]:::todo
+    S1 --> S2["Stage 2 — Architecture<br/>#19-#24"]:::todo
+    S2 --> S3["Stage 3 — Dead code<br/>#30-#35"]:::todo
+    S3 --> S4["Stage 4 — Repo + docs<br/>#36-#42"]:::todo
+    S4 --> S5["Stage 5 — Phase work<br/>#49-#62 · 90 items"]:::todo
+    S5 --> S6[Stage 6 — Organization pass]:::todo
+    S6 --> S7[Stage 7 — Fresh audit]:::todo
+    S7 --> DONE["Phases 1-11 COMPLETE<br/>then 12-18 unlock"]:::goal
+
+    DONE -.unlocks.-> P1218
+
+    SOLVED["11 Solved<br/>#1-#11"]:::ok
+    UNK["3 Unable to Determine<br/>#43-#45"]:::warn
+    META --- SOLVED
+    META --- UNK
+
+    classDef root fill:#1e293b,stroke:#0f172a,color:#fff
+    classDef prod fill:#7c3aed,stroke:#5b21b6,color:#fff
+    classDef active fill:#0369a1,stroke:#075985,color:#fff
+    classDef block fill:#b91c1c,stroke:#7f1d1d,color:#fff
+    classDef todo fill:#334155,stroke:#1e293b,color:#fff
+    classDef ok fill:#15803d,stroke:#166534,color:#fff
+    classDef warn fill:#b45309,stroke:#78350f,color:#fff
+    classDef idle fill:#475569,stroke:#334155,color:#cbd5e1
+    classDef goal fill:#065f46,stroke:#064e3b,color:#fff
+```
+
+**Everything below Stage 0 is blocked on you.** The seven decisions are the only
+thing standing between here and Stage 1.
+
+### How a new branch appears
+
+There is one rail. When something new is found, it does not become a parallel
+task list — it becomes a numbered issue on the meta-task, in the stage its
+dependencies put it in:
 
 ```
-Project Studio
-│
-├── Studio Harness ................................... 🟡
-│   ├── P-01..04  Harness foundation ................. 🟢
-│   ├── P-05      Observability foundation ........... 🟢
-│   ├── P-06      Provider bootstrap ................. 🟢
-│   ├── P-07      Studio Gateway integration ......... 🔴  decision #13
-│   ├── P-08      Auth, credentials, local BYOK ...... 🟢
-│   ├── P-09      Capability & permission kernel ..... 🟢
-│   ├── P-10      Native agent tools ................. 🟢
-│   ├── P-11      MCP ................................ 🟡
-│   ├── P-12..18  Skills → product integration ....... ⚪  not started
-│   │
-│   └── Phases 1-11 remediation (meta-task) .......... 🟡
-│         11 Solved · 7 Needs Decision · 38 Needs
-│         Implementation · 3 Unable to Determine ·
-│         3 No Longer Relevant
-│
-└── Studio Client ................................... 🟢
-      No phase plan of its own yet. Its current work
-      belongs to Harness Host/client contract items.
+Stage N
+   ↓
+issue found  ─────►  new #N in the register, categorized
+   ↓
+needs a decision? ──►  Needs Decision, with options + recommendation
+   ↓                      ↓
+   └──────────────────  decision recorded as an ADR
+                          ↓
+                       Needs Implementation → Solved → verified → commit
 ```
 
-No Harness phase is ✅. When the suite was first run to completion, 21 tests
-failed — including every Flue integration test, because two defects on
-`POST /agents/:name/:id` meant no agent submission could succeed. A phase whose
-integration tests could not have passed is not verified, whatever its checklist
-says.
+A blocker is a **point on the rail**, not a detour off it. That is why there is
+no `blockers/` folder.
 
 ## Current state, in one paragraph
 
