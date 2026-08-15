@@ -408,6 +408,41 @@ describe("the gate is the only way a tool runs", () => {
     expect([...new Set(bypasses)].sort()).toEqual(known);
   });
 
+describe("nothing the model chose reaches a process uncontained", () => {
+  it("keeps the direct spawn to modules whose programs we chose", async () => {
+    // `runProcess` starts a child with no containment at all, which is correct
+    // for `git`, `rg`, and the snapshot machinery: we wrote those call sites and
+    // picked those programs, and containing them would take the undo system
+    // down with them (`isolation/kinds.ts` explains why).
+    //
+    // It is exactly wrong for anything the *model* named. That path goes
+    // through `LocalSandbox.run`, which asks the kind what containment it is
+    // owed. The difference is one import, invisible in review, and a new
+    // execute-capable tool reaching for the familiar function is the realistic
+    // way this regresses — so the list is closed rather than advisory.
+    const allowed = new Set([
+      join("src", "sandbox", "local-sandbox.ts"),
+      join("src", "snapshots", "shadow-repo.ts"),
+      join("src", "tools", "git", "index.ts"),
+      join("src", "tools", "search", "ripgrep.ts"),
+    ]);
+
+    const importers: string[] = [];
+    for (const path of await sourceFiles()) {
+      const source = await readFile(path, "utf8");
+      if (!/from "[^"]*process\/exec\.js"/.test(source)) continue;
+      if (!/\brunProcess\b/.test(source)) continue;
+      importers.push(path.slice(path.indexOf(join("src", ""))));
+    }
+
+    // Equality rather than "no extras". A subset check passes when the scan
+    // finds nothing at all — a broken regex, a moved directory — and a rule
+    // that cannot fail is not a rule. This also makes a stale entry an error,
+    // so the list describes the code rather than the code's history.
+    expect(importers.sort()).toEqual([...allowed].sort());
+  });
+});
+
 describe("modular monolith — 008.3 gate", () => {
     /**
      * `src`-relative, forward-slashed, whatever the platform.

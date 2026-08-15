@@ -1,0 +1,112 @@
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+import { shippedBinaryDirectory } from "../../../platform/paths.js";
+import { SandboxError } from "../../errors.js";
+
+/**
+ * Talking to `studio-contain.exe`.
+ *
+ * The launcher is a shipped binary like `rg.exe`, found the same way and in the
+ * same place, so there is one answer to "where do our programs live" rather
+ * than a second convention for this one.
+ *
+ * ## Why `execFileSync` and not `runProcess`
+ *
+ * `runProcess` is the spawn point for work the *agent* asked for: it bounds
+ * time, caps output and kills process trees, because the thing on the other end
+ * was chosen by a model. These calls are none of that. They are short,
+ * administrative, fixed-argument calls the harness makes about itself, and
+ * routing them through `runProcess` would make `process/exec.ts` depend on the
+ * sandbox that depends on it. The one property that matters — an argument
+ * vector, never a command string, never a shell — is what `execFileSync` gives.
+ */
+
+/** Matches `[[bin]] name` in `native/windows-appcontainer/Cargo.toml`. */
+export const LAUNCHER_BINARY = "studio-contain.exe";
+
+/**
+ * Where the launcher is expected to be, whether or not it is there.
+ *
+ * Returns the path rather than throwing so `available()` can ask without
+ * handling an exception, which is the difference between "measure this" and
+ * "try it and see".
+ */
+export function launcherPath(vendorRoot = shippedBinaryDirectory()): string {
+  // `win32-x64` matches the directory `rg.exe` already ships in. AppContainer
+  // is a kernel feature and not an edition feature, so there is no second
+  // Windows variant to carry — but there will be an `arm64` one, and the
+  // existing layout already has a place to put it.
+  return join(vendorRoot, `${process.platform}-${process.arch}`, LAUNCHER_BINARY);
+}
+
+export function launcherInstalled(vendorRoot = shippedBinaryDirectory()): boolean {
+  return existsSync(launcherPath(vendorRoot));
+}
+
+/**
+ * Runs one launcher subcommand and returns its stdout, trimmed.
+ *
+ * Throws `SandboxError("unavailable")` rather than letting a raw spawn error
+ * out, because every caller here is answering "can this machine contain
+ * anything" and a missing binary is one of the answers, not a crash.
+ */
+export function invokeLauncher(
+  args: readonly string[],
+  options: { readonly vendorRoot?: string } = {},
+): string {
+  const executable = launcherPath(options.vendorRoot ?? shippedBinaryDirectory());
+  try {
+    return execFileSync(executable, [...args], {
+      encoding: "utf8",
+      windowsHide: true,
+      // Long enough for a profile creation on a slow disk, short enough that a
+      // wedged call does not hang a turn. The launcher itself never waits on
+      // anything but the OS for these subcommands.
+      timeout: 15_000,
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch (error) {
+    throw new SandboxError("unavailable", {
+      message: `The Windows sandbox launcher failed: ${describe(error)}`,
+    });
+  }
+}
+
+/**
+ * The argument vector for running a program inside a container.
+ *
+ * Split out from the spawn so it can be asserted on a machine that has no
+ * launcher at all. The order matters — everything after `--` belongs to the
+ * child, including anything that looks like one of the launcher's own flags —
+ * and an order test is worth more than a comment saying so.
+ */
+export function containArgs(input: {
+  readonly sid: string;
+  readonly cwd: string;
+  readonly executable: string;
+  readonly args: readonly string[];
+}): readonly string[] {
+  return [
+    "run",
+    "--sid",
+    input.sid,
+    "--cwd",
+    input.cwd,
+    "--",
+    input.executable,
+    ...input.args,
+  ];
+}
+
+function describe(error: unknown): string {
+  if (error instanceof Error) {
+    const stderr = (error as { stderr?: unknown }).stderr;
+    // The launcher explains itself on stderr; its message is more useful than
+    // "Command failed", which is all `Error.message` carries.
+    if (typeof stderr === "string" && stderr.trim() !== "") return stderr.trim();
+    return error.message;
+  }
+  return String(error);
+}

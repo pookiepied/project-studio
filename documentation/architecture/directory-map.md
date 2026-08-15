@@ -63,6 +63,13 @@ may import from `demo/`.
 
 Established, not proposed. See `STUDIO HARNESS/src/`.
 
+Two directories sit beside `src/` rather than inside it, because neither is
+TypeScript the build compiles: `vendor/` holds the programs we ship, laid out
+`<platform>-<arch>/`, and `native/` holds the source of the one program in
+`vendor/` that is ours — the Windows AppContainer launcher. `native/` has no
+Linux directory and that is the design, not a gap: there, the launcher is
+`bwrap` and the OS supplies it.
+
 ```
 agents/          agent definitions (defineAgent)
 application/     domain services and runtime composition
@@ -80,9 +87,12 @@ net/             destination.ts - every outbound address is checked here first
 observability/   OpenTelemetry, error contract, the redaction catalog
 permissions/     the kernel — decides, never executes, never prompts
 platform/        OS specifics
-process/         exec.ts — the only place a child process starts
+process/         exec.ts — the only place a child process starts, and it does
+                 so with no containment; who is owed containment is sandbox/
 retrieval/       web search and page reading providers - two slots, never a pool
-sandbox/         isolation tiers
+sandbox/         path containment, and what contains a child process
+                 isolation/       who needs containing, and what this host has
+                 isolation/windows/  the AppContainer launcher (ADR 0041)
 snapshots/       shadow git per project — the undo history
 storage/         SQLite, versioned migrations
 tools/           filesystem, search, git, shell, web — all behind one CallGate

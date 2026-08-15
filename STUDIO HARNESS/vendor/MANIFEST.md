@@ -41,6 +41,32 @@ binaries start being fetched on demand rather than committed.
 | Licence | MIT / Unlicense — no redistribution obligation |
 | Build | PCRE2 10.43 with JIT; runtime SIMD detection |
 
+## studio-contain 0.1.0 · `win32-x64/studio-contain.exe`
+
+**Ours, not a third party's.** The first entry here that we wrote, which makes
+the provenance question a different one: not "where did this come from" but
+"what produces it, and can anyone reproduce it".
+
+| | |
+|---|---|
+| Source | `native/windows-appcontainer/`, in this repository |
+| Build | `cargo build --release` with rustc 1.96.0 |
+| SHA-256 | `17B33816D91CD5E467CEBF12E19DBF0123ED0E4745FD9BC9DF7680C517CCE039` |
+| Size | 130,560 bytes |
+| Dependencies | `windows-sys` only |
+| Licence | ours |
+
+Committed rather than built during install, for the same reason `rg.exe` is:
+the harness's test suite must not require a Rust toolchain on every machine
+that runs it. The cost is that the binary and its source can drift, so the hash
+above is what a rebuild is compared against.
+
+It is not byte-reproducible across toolchain versions — `lto` and `strip` make
+the output compiler-specific — so a differing hash after a rebuild is expected
+and is not by itself evidence of tampering. What is checked instead is that the
+source in `native/` compiles and that the behaviour tests in
+`tests/integration/sandbox-appcontainer.test.ts` pass against the shipped copy.
+
 ## Not vendored
 
 **git.** Developers overwhelmingly have it, it is ~50 MB extracted rather than

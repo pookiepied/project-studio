@@ -55,6 +55,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0038](0038-a-grant-belongs-to-an-agent.md) | A grant belongs to an agent — the third column of a scope, and why `always` could not outlive a conversation until it did |
 | [0039](0039-a-child-inherits-nothing-it-was-not-given.md) | A child process inherits nothing it was not given — one rule, three named policies, and why the allowlist lives in two languages |
 | [0040](0040-one-bootstrap-protocol-two-transports.md) | One bootstrap protocol, two transports — how the credential reaches the Harness on a platform with no `dup2` |
+| [0041](0041-containment-is-the-kernel-s-job.md) | Containment is the kernel's job — a launcher that applies an AppContainer, why availability is probed and registration is not, and what it writes to the user's disk |
 | [0024](0024-capabilities-are-on-and-the-list-is-honest.md) | Capabilities are on, and the list is honest |
 | [0036](0036-user-decisions-are-durable.md) | A user decision is durable — approvals and answers live in SQL, never in process memory |
 

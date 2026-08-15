@@ -3,7 +3,6 @@ import {
   type CapabilityDescriptor,
 } from "../../contracts/capabilities.js";
 import { ProcessError } from "../../process/errors.js";
-import { runProcess } from "../../process/exec.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
@@ -199,13 +198,16 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
           : context.sandbox.resolveRead(input.cwd);
 
       try {
-        const result = await runProcess({
+        // Through the sandbox rather than straight to `runProcess`, and the
+        // kind is the whole point: `shell` is the one tool where the *model*
+        // picks the executable, so it is the one that has to be contained. The
+        // sandbox builds the environment from policy too, so there is no
+        // remaining way for this call site to hand the program the machine's
+        // tokens by forgetting a field.
+        const result = await context.sandbox.run("shell", {
           executable: program.path,
           args: [...input.args],
           cwd,
-          // Built from policy alone. Inheriting the host environment would hand
-          // the program every token on the machine.
-          env: context.sandbox.environment(),
           timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
           ...(context.signal ? { signal: context.signal } : {}),
         });

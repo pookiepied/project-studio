@@ -2,18 +2,41 @@ import { readdir, readFile, mkdir, rm, stat, writeFile } from "node:fs/promises"
 import { dirname } from "node:path";
 
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
+import { satisfiesIsolation } from "../contracts/effects.js";
+import { runProcess, type ProcessResult } from "../process/exec.js";
 import { SandboxError } from "./errors.js";
 import {
   assertIsolationAvailable,
-  selectIsolation,
+  hostIsolation,
+  isolationForKind,
+  type ChildKind,
+  type ContainedCommand,
   type IsolationSupport,
-} from "./isolation.js";
+} from "./isolation/index.js";
 import { resolveContainedPath } from "./paths.js";
 import {
   requiredIsolation,
   type IsolationLevel,
   type SandboxPolicy,
 } from "./policy.js";
+
+/**
+ * A command to run, minus everything the sandbox already knows.
+ *
+ * No `env`: that is built from the policy, here, so no caller can assemble one.
+ * `RunProcessOptions` without the fields a sandbox owns, rather than a partial
+ * of it, so adding a field there does not silently open a hole here.
+ */
+export interface SandboxRunOptions {
+  /** Absolute path to a real executable, already resolved. */
+  readonly executable: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly timeoutMs?: number;
+  readonly maxOutputBytes?: number;
+  readonly signal?: AbortSignal;
+  readonly stdin?: string;
+}
 
 export interface SandboxFileStat {
   readonly isFile: boolean;
@@ -29,17 +52,25 @@ export interface SandboxFileStat {
  * Every filesystem operation resolves through `resolveContainedPath`, so there
  * is one place where "is this allowed" is decided and no second path around it.
  *
- * Its honest limit, stated here because a sandbox that oversells itself is
- * worse than none: this is `in-process` isolation. It constrains what *our*
- * code does on the agent's behalf. It is effective against an agent that goes
- * off-track — the realistic failure — and it is not a boundary against code
- * that is actively hostile, because a real subprocess is outside our checks
- * entirely.
+ * Its own enforcement is `in-process` and always was: it constrains what *our*
+ * code does on the agent's behalf, which is effective against an agent that
+ * goes off-track — the realistic failure — and is no boundary at all against a
+ * subprocess, which is outside our checks entirely.
  *
- * It never claims otherwise. Where it admits `execute`, it admits it as
- * *uncontained by consent* rather than as containment — see `assertSupports`.
+ * What changed in Stage 4b is that the subprocess is no longer left there.
+ * {@link LocalSandbox.run} hands anything the harness did not choose to a real
+ * OS container when the host has one, and refuses when the build expects one
+ * and the machine cannot supply it. Where it still admits `execute`
+ * uncontained, it does so because no backend exists for this platform yet —
+ * stated as data in `isolation/registry.ts`, not as a comment.
  */
 export class LocalSandbox {
+  /**
+   * What this sandbox enforces *itself*, which is not what it can contain a
+   * child with. Kept separate from {@link LocalSandbox.isolationSupport}
+   * because collapsing them would let a machine with a working container claim
+   * that `readFile` is OS-isolated, which it is not.
+   */
   readonly isolation: IsolationLevel = "in-process";
   readonly #policy: SandboxPolicy;
   /**
@@ -51,7 +82,7 @@ export class LocalSandbox {
    */
   readonly #isolationSupport: IsolationSupport;
 
-  constructor(policy: SandboxPolicy, isolationSupport: IsolationSupport = selectIsolation()) {
+  constructor(policy: SandboxPolicy, isolationSupport: IsolationSupport = hostIsolation()) {
     this.#policy = policy;
     this.#isolationSupport = isolationSupport;
   }
@@ -158,6 +189,97 @@ export class LocalSandbox {
       // starts refusing without anyone having to remember this line.
       assertIsolationAvailable(requiredIsolation(effect), this.#isolationSupport);
     }
+  }
+
+  /**
+   * Starts a child process under whatever containment its kind is owed.
+   *
+   * **The one door for anything the harness did not choose.** `runProcess` is
+   * still the single spawn point and still does the bounding — timeouts, output
+   * caps, tree kills — but it takes a command and has no idea who picked it.
+   * That question is answered here, where the policy lives, because the answer
+   * needs the workspace's roots and the machine's measured support and neither
+   * of those belongs in `process/exec.ts`.
+   *
+   * First-party tools keep calling `runProcess` directly, and that is correct
+   * rather than an omission: `isolationForKind("tool")` is `in-process`, so
+   * routing `git` through here would be ceremony that changes nothing — except
+   * that `git` is what the snapshot system runs, and containing it would take
+   * undo down with it. `architecture.test.ts` is what keeps a *new* execute
+   * capability from quietly reaching for `runProcess` instead of this.
+   */
+  async run(kind: ChildKind, options: SandboxRunOptions): Promise<ProcessResult> {
+    const required = isolationForKind(kind);
+    // The same refusal `assertSupports` raises, asked again at the moment of
+    // truth. A capability list built minutes ago is a description; this is the
+    // spawn, and it is worth re-asking on the path that actually starts code.
+    assertIsolationAvailable(required, this.#isolationSupport);
+
+    const command = await this.plan(kind, options);
+
+    return runProcess({
+      executable: command.executable,
+      args: command.args,
+      cwd: options.cwd,
+      // Built here rather than by the caller. A tool that assembled its own
+      // environment could forget, and forgetting means the child inherits every
+      // token on the machine — see ADR 0039.
+      env: this.environment(),
+      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...(options.maxOutputBytes === undefined ? {} : { maxOutputBytes: options.maxOutputBytes }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+      ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
+    });
+  }
+
+  /**
+   * The command that {@link LocalSandbox.run} would actually spawn.
+   *
+   * Public because "what does containment do to this command" is worth being
+   * able to ask without starting a process — for a diagnostic, and for a test
+   * that can then run on a machine with no backend at all. It also keeps `run`
+   * to one readable path: decide, then spawn.
+   */
+  async plan(
+    kind: ChildKind,
+    command: {
+      readonly executable: string;
+      readonly args: readonly string[];
+      readonly cwd?: string;
+    },
+  ): Promise<ContainedCommand> {
+    const required = isolationForKind(kind);
+    const backend = this.#isolationSupport.backend;
+    const plain: ContainedCommand = { executable: command.executable, args: command.args };
+
+    // A kind that needs nothing is not wrapped just because a backend happens
+    // to exist — that is the `tool` row of the table, and it is what keeps the
+    // snapshot system's `git` calls working.
+    if (required === "in-process") return plain;
+    if (backend === undefined) return plain;
+    // A backend weaker than this kind needs was already refused by `run`; this
+    // guard is for `plan` called on its own.
+    if (!satisfiesIsolation(backend.level, required)) return plain;
+
+    return backend.contain({
+      policy: this.#policy,
+      executable: command.executable,
+      args: command.args,
+      cwd: command.cwd ?? this.#policy.workspaceRoot,
+    });
+  }
+
+  /**
+   * Removes what containment left on the user's machine for this workspace.
+   *
+   * On Windows that is a permission entry on their project directory and a
+   * profile registered with the OS. Neither is large and neither is hidden, but
+   * a feature that only ever adds to a security descriptor is a feature that
+   * grows without bound, so the removal exists and is reachable — `pnpm
+   * sandbox:release` in `sandbox/cli.ts` is its delivery path.
+   */
+  async releaseIsolation(): Promise<void> {
+    await this.#isolationSupport.backend?.release(this.#policy);
   }
 
   /** Resolves a path the agent may read, or refuses. */

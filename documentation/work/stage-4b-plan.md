@@ -1,6 +1,7 @@
 # Stage 4b — the real sandbox (#15, carrying #32 and #41)
 
-**Status:** Spike complete, implementation not started · **Opened:** 2026-08-15
+**Status:** Steps 1 and 2 landed — Windows contains, Linux does not yet ·
+**Opened:** 2026-08-15 · **Last measured:** 2026-08-15
 **Register:** `phases-1-11-remediation.md` #15, #32, #41 · **Blocked on:** nothing
 
 The decision was already taken and is not reopened here: **option (a), a real
@@ -50,21 +51,32 @@ feature. Three things were measured rather than assumed:
 | 2 | Can a child be spawned into it? | **Yes.** `STARTUPINFOEX` + `PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES` + `CreateProcessW`. The child ran `cmd.exe`, so it reached `C:\Windows\System32` — traverse to system paths is not blocked. |
 | 3 | Does containment actually bite? | **Yes.** With one `icacls` ACE on a workspace directory, the child read a file there (`type` → `hi`) and was refused a sibling directory it had no ACE for (`Access is denied`). |
 
-Two limits found in the same run, both of which shape the implementation:
+Two limits were recorded in the same run. **The first one was not real, and
+finding that out is the most important thing step 2 produced.**
 
-- **`dir` on the granted directory was refused while reading a file inside it
-  succeeded.** Enumeration and file-open are separate rights and the `(OI)(CI)(RX)`
-  grant used in the spike was not sufficient for the former. This has to be
-  resolved during implementation, not hand-waved: a tool that cannot list the
-  workspace is not usable.
-- **`icacls D:\ /grant` fails with exit code 5 — access denied.** Anything
-  requiring an ACE on a drive root needs elevation and is therefore not
-  available. The spike shows this is not needed for file reads; it may be needed
-  for enumeration, and if it is, that is a finding that changes the design.
+- ~~**`dir` on the granted directory was refused while reading a file inside it
+  succeeded.**~~ **Withdrawn 2026-08-15.** The spike measured this through
+  `cmd /c dir`, and `dir` fails inside a container for a reason of its own — it
+  cannot open the working directory it inherits — while reporting it with the
+  same "Access is denied." the kernel uses. Asked directly, with
+  `studio-contain probe` calling `CreateFileW` and `FindFirstFileW`, listing is
+  allowed exactly when reading is. Enumeration was never a limit; it was a
+  measurement taken through a program with opinions. The whole of §5's first
+  risk followed from it.
+- **`icacls D:\ /grant` fails with exit code 5 — access denied.** Real, and
+  still true: an ACE on a drive root needs elevation. It turned out not to
+  matter, because nothing needs one. The workspace's own directory is where the
+  grant goes, and the launcher opens the *program* with its own rights before the
+  container token applies — so `C:\Program Files
+odejs` never has to be
+  granted, and the contained child cannot read it either.
 
-The spike is deleted. It lived in the scratchpad, its two AppContainer profiles
+The spike is deleted. It lived in the scratchpad, its AppContainer profiles
 were removed (`DeleteAppContainerProfile` → `hr=0x0`), and its ACEs went with
-the directory tree it created.
+the directory tree it created. Its one durable output is the probe, which was
+kept as a `studio-contain` subcommand rather than thrown away with it — the
+thing that corrected the enumeration finding is worth having the next time a
+containment question needs an answer that `cmd` cannot give.
 
 ## 3. The shape this forces
 
@@ -114,32 +126,73 @@ containment cannot.
 
 Each step lands on its own and is verifiable on its own. No step claims #15.
 
-1. **The seam.** `SandboxFactory` behind the ADR 0035 ports; the kind-to-tier
-   table above stated in one module beside the environment policy it mirrors.
-   `assertSupports` stops falling through and throws `unsupported_isolation`
-   when no backend can supply what an effect needs — **which closes #32** and
-   makes the current state loud instead of silent. Nothing is contained yet, and
-   the capability list the model sees becomes honest about that.
-2. **The Windows backend.** The helper binary, the profile lifecycle, the ACE
-   grant and revoke, and the enumeration limit from §2 resolved. Tested on this
-   machine, which is now possible at all because of #87.
+1. **The seam.** ✅ *Landed `df37d43`.* The kind-to-tier table stated in one
+   module beside the environment policy it mirrors; `assertSupports` stops
+   falling through and throws `unsupported_isolation` when no backend can supply
+   what an effect needs — **which closed #32**. Nothing was contained yet, and
+   the code said so as data rather than as a comment.
+2. **The Windows backend.** ✅ *Landed.* `native/windows-appcontainer/`, shipped
+   as `vendor/win32-x64/studio-contain.exe`; profile lifecycle, ACE grant and
+   revoke in-process via `SetEntriesInAcl`; `LocalSandbox.run` routes anything
+   the model chose through it. Measured on this machine — see §2 and ADR 0041.
+   Two things it changed that were not in the plan: the enumeration limit was
+   withdrawn as a measurement error, and `LOCALAPPDATA` turned out to be
+   required by `CreateProcessW` itself for an AppContainer, which the harness's
+   deliberately-empty child environment does not provide.
 3. **The Linux backend.** `bwrap` argv, probed availability, unit-tested
-   construction. Marked unverified until it runs on Linux.
+   construction. **No longer needs to stay unverified:** a Linux VPS is
+   available on request, so the containment can be measured the same way the
+   Windows half was rather than described from documentation.
 4. **#41.** The containment text in the README and ADRs 0019/0022/0024 is
-   corrected *last*, because until steps 2 and 3 land the true statement is "not
-   yet contained", and writing it before then would be the third wrong claim in
-   that paragraph's history.
+   corrected *last*. What it must now say is **platform-specific** — contained
+   on Windows, not yet on Linux — which is a third distinct statement from
+   either of the two wrong ones already in that paragraph's history, and a
+   reason not to write it before step 3 lands.
 
-## 5. What could still sink this
+### Still open inside #15
 
-Recorded now so that finding one later is not a surprise:
+Named here so that "the sandbox works" is not read as more than it is:
 
-- **Enumeration.** If listing a directory turns out to need an ACE on the drive
-  root, Windows containment needs elevation and step 2 needs a different answer.
-- **ACLs are a side effect on the user's disk.** Granting a per-workspace
-  AppContainer SID writes to the project directory's security descriptor. It is
-  reversible and scoped to a folder the user already bound, but it is a real
-  modification and the ADR has to say so plainly.
-- **Every tool must still work.** A sandbox that contains `git` into
-  uselessness has cost more than it bought. The first-party row of §3.1 exists
-  precisely to prevent that, and it is the part most likely to be got wrong.
+- **`mcp-server` is classified `os` and is not yet contained.** It keeps its own
+  stdio channel and does not go through `LocalSandbox.run`. A third party's code
+  is the row of the taxonomy with the *strongest* claim on containment, and it
+  is the one still outside it.
+- **Linux.** Step 3.
+- **Profiles accumulate one per project.** Bounded in production and removable
+  with `pnpm sandbox:release <project>`, but nothing removes them on its own.
+  The test suite made this visible by minting a workspace per run and leaving
+  fourteen profiles behind; `tests/sandbox-profiles.ts` now removes the
+  difference a run created, and deliberately not everything matching the name.
+
+## 5. What could still sink this — and what actually did
+
+Recorded before the work, and now marked with what happened.
+
+- ~~**Enumeration.**~~ **Did not exist.** See §2. The risk was real as written
+  and false as measured, and it is left in this document rather than deleted
+  because the lesson is the durable part: the spike's evidence was a program's
+  error message, not the kernel's answer.
+- **ACLs are a side effect on the user's disk.** **Confirmed, and disclosed.**
+  One access-control entry per granted root, for a SID that exists only for that
+  workspace, added without disturbing any other entry. ADR 0041 says so plainly
+  and `pnpm sandbox:release` removes it. This is the cost of the feature, and it
+  is a real one.
+- **Every tool must still work.** **Held, and it was close.** The first version
+  of the grant applied write roots and then read roots as two passes;
+  `SetEntriesInAcl` *replaces* a trustee's entry rather than adding to it, and
+  the workspace root is on both lists — so read won and the agent could read its
+  own project but not write to it. A plausible-looking sandbox and a useless
+  agent. Caught by the integration test, fixed by resolving the mode per path
+  before applying anything, and pinned by a unit test that needs no Windows.
+
+## 6. What was measured, and where it is asserted
+
+Nothing in ADR 0041 rests on this document. Every claim is re-asserted in
+`tests/integration/sandbox-appcontainer.test.ts`, against the launcher in
+`vendor/` rather than the one in `target/`, so what is tested is what ships.
+The suite skips loudly on a machine with no backend rather than passing: a green
+run on Linux for a Windows feature would be the same class of untrue claim this
+whole cycle exists to remove.
+
+Baseline after step 2: **79 files, 1203 passed, 2 skipped, 0 failed**;
+`tsc --noEmit` clean; `cargo build --release` clean.

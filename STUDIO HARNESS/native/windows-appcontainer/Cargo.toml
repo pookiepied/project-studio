@@ -1,0 +1,33 @@
+[package]
+name = "studio-contain"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Runs a program inside a Windows AppContainer for Project Studio"
+
+[[bin]]
+name = "studio-contain"
+path = "src/main.rs"
+
+[dependencies]
+# The only dependency, on purpose. This binary is a security boundary; every
+# crate it pulls in is code running with the harness's own rights before the
+# AppContainer token is ever applied.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Security_Isolation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_Memory",
+    "Win32_System_Com",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"
