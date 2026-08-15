@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   createLogger,
+  getObservability,
   initializeObservability,
   normalizeError,
   redactGenAiContent,
@@ -75,6 +76,49 @@ describe("observability initialization", () => {
         deploymentEnvironment: "test",
       }),
     ).toThrow(/already been initialized/);
+  });
+
+  /**
+   * The three properties ADR 0037 rests on.
+   *
+   * #24 deleted the storage singletons and left this one, and the argument for
+   * keeping it is not "observability is special" — it is that this global can
+   * only be entered once, must be left explicitly, and refuses to be read
+   * before it exists. That argument is only worth anything if it is checked,
+   * so these assert it rather than leaving the ADR to be believed.
+   */
+  it("refuses to be read before it is initialized", async () => {
+    await shutdownObservability();
+
+    expect(() => getObservability()).toThrow(/not.*initialized/i);
+  });
+
+  it("can be initialized again after an explicit shutdown", async () => {
+    initializeObservability({ exporter: "memory", deploymentEnvironment: "test" });
+    await shutdownObservability();
+
+    // The handle was cleared, not merely marked stale. Without this a restart
+    // in-process is impossible and every test would need a module reload.
+    expect(() =>
+      initializeObservability({ exporter: "memory", deploymentEnvironment: "test" }),
+    ).not.toThrow();
+  });
+
+  it("returns redaction to the shipped defaults on shutdown", async () => {
+    const shipped = activeRedactionRuleIds();
+    initializeObservability({
+      exporter: "memory",
+      deploymentEnvironment: "test",
+      redactionRules: { email: true },
+    });
+    expect(activeRedactionRuleIds()).toContain("email");
+
+    await shutdownObservability();
+
+    // Module-level state has to be *returned*, not just set. A rule enabled by
+    // one start leaking into the next is the exact failure that makes a global
+    // untrustworthy, and it is what separates this from the storage singleton.
+    expect(activeRedactionRuleIds()).toEqual(shipped);
   });
 
   it("records resource attributes on exported spans", async () => {

@@ -30,7 +30,7 @@ future features, and they live in §5 rather than as open issues.
 
 65 issues. Categories per `../README.md` §4. Numbers are permanent.
 
-### Solved — 28
+### Solved — 30
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
 Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1138
@@ -83,6 +83,8 @@ prevented the storage singleton returning to the file it was removed from.
 | 33 | Unused imports in `observability/index.ts`, `permissions/trust.ts`, `tools/git/index.ts`. | Stage 3; those three plus six dead test-file locals the flags then surfaced |
 | 35 | Unbounded sets in `studio-runtime.ts` and `tools/gate.ts`. | Stage 3. `studio-runtime.ts` fixed — see #67, they were one defect — and mutation-verified by `turn-boundary.test.ts`. **The `gate.ts` half of this issue was wrong and is withdrawn:** `#reportedWithheld` has a key space of (capabilities × switches), is per-`CallGate`, and dies with the sandbox |
 | 67 | `TurnSnapshots` was rebuilt per Flue run, so its turn counter restarted and undo history repeated the label `"turn 1"`. | Stage 3; `#turns` (unkeyed `Set`) became `#turnSnapshots` keyed by project + conversation, so the entry is reused rather than replaced |
+| 24b | `observability/index.ts` module singleton — the one #24 left behind. | **ADR 0037**, Accepted: it is a process resource, not an ambient default. Unlike the storage globals it has guarded init, an explicit shutdown that clears it, a redaction reset, and it throws when read before init. Those three properties are now tests; two are mutation-verified. No architecture whitelist was added — behaviour is checked instead of shape |
+| 34 | `PassthroughContextOptimizer` never wired. | ADR 0003 stands; the register entry was wrong and `roadmap.md:65` was right. Marked declared-not-wired at the source alongside #31, and its test moved out of `architecture.test.ts` — filed there it read as a guarantee about the running system, which nothing wired can make |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
 
 ### Needs Decision — 6
@@ -99,7 +101,7 @@ them.**
 | 17 | **Broken `refs/codex/*` refs.** Five unreachable refs from another tool; git warns on every branch operation. Never previously documented. | (a) delete them; (b) keep | **(a).** They point at nothing reachable and are pure noise. Requires your go-ahead because ref deletion is destructive. |
 | 18 | **Root `README.md`.** You asked whether it should go. | (a) delete; (b) **keep, minimal** | **(b).** It is the entry point for anyone opening the repository, and it is nine lines pointing at `documentation/`. Deleting it makes the repo open onto three unexplained folders. |
 
-### Needs Implementation — 12
+### Needs Implementation — 10
 
 Agreed, understood, work remains.
 
@@ -112,12 +114,11 @@ into #24 below.
 
 | # | Issue |
 |---|---|
-| 24b | `observability/index.ts:49` is still a module-level singleton. The storage globals are gone; this one is a legitimate process-wide resource and needs a decision rather than a reflex. **Stage 3 recommends recording it Accepted** — unlike the storage globals it has a guarded init, an explicit `shutdownObservability()` that clears it, and a redaction reset; re-entry throws rather than silently sharing. `stage-3-plan.md` §3. |
 | 31 | ~~`isRetryableForUnknown`~~ (deleted in `e9a018e`), `createRetryExecutionContext`, `executionContext()`. **Reclassified in Stage 3:** neither remaining export is accidental. `createRetryExecutionContext` is ADR 0033's `attemptId` and is now marked declared-not-wired at the source; `executionContext()` is the declared pair of `authContext()` and is kept. |
 | 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. **Blocked on #15**, and larger than recorded: three kinds are never thrown, and one of them (`unavailable`) is read by `SandboxError`'s own `retryable` computation, so removing it changes behaviour. |
-| 34 | `PassthroughContextOptimizer` used only by its own test, never wired. **This entry contradicts `phases/roadmap.md:65`,** which records it as a deliberately unimplemented port from ADR 0003. One of the two is wrong; resolving that is the issue. Recommendation: ADR 0003 stands and this entry is corrected. |
 | 66 | `tests/integration/stop.test.ts` carries two complete MCP stdio server fixtures used by no test. The file is titled "008.2 stop, timeout, cancellation, and disconnect" and none of its four tests involves an MCP tool — the timeout and MCP-tool-cancellation half of 008.2 was set up and never written. The fixtures now live in `tests/fixtures/mcp-servers.ts` so the evidence survives; **that move does not close this.** |
-| 68 | `ExecutionScope.conversationId` defaults to `` `conversation:${agentId}` `` and `agents/studio.ts` passes only `agentId`, so every conversation for the `studio` agent shares the id `conversation:studio`. Anything reasoning per conversation downstream of `ExecutionScope` — grants, approval scope, `FileAccessLog` — is currently reasoning per *agent*. Found in Stage 3; **not dead code and not Stage 3.** |
+| 70 | **One unidentified intermittent suite failure.** A full run on 2026-08-15 reported `1 failed | 1141 passed | 2 skipped` and the failing test was not captured — the run's output was truncated to its last six lines, which show only the totals. Four subsequent full runs on the same tree (one before the remaining Stage 3 work, three after) were green at `1145 passed | 2 skipped`. So: roughly one failure in five runs, identity unknown. Recorded rather than dismissed, because a suite that fails once in five is not a suite anything should be declared complete against, and §6.2 requires `pnpm check` to pass on two platforms. **Next full-suite run must be captured to a log in full**, not tailed. |
+| 69 | **`ExecutionScope` has no agent dimension, and `always` cannot outlive a conversation.** Flue's initializer `id` is the agent *instance* — one per conversation thread — so `createAgentSandbox({ agentId: id })` puts a conversation identity in `agentId`, and `conversationId` derives a second copy of it. `grant-store.ts:108` filters on `agent_id`, so a `duration: "always"` grant is unreachable from any other conversation and is indistinguishable from `duration: "conversation"`. ADR 0015 keeps breadth and duration independent; duration currently has two values that mean the same thing. **Fails closed** — the user is asked again, never silently authorized — so this is correctness and approval fatigue, not a security defect. Pinned by `tests/unit/grant-identity.test.ts`. |
 
 **Repository and documentation**
 
@@ -139,6 +140,15 @@ Investigated, not resolved. Recorded rather than dropped.
 |---|---|---|
 | 44 | Whether `STUDIO/patches/@flue__sdk` (client) and `STUDIO HARNESS/patches/@flue__sdk` (harness) are identical or have diverged. Both are wired via `patchedDependencies`. Not diffed. |
 | 45 | Whether the `@flue/cli` patch — which implements the FD-based admission bootstrap (§4.2) — is still required, or whether Flue beta.9 now offers a supported hook. Not investigated. |
+
+### Withdrawn — 1
+
+Filed, then disproved. Kept rather than deleted: the number is permanent, and
+an issue that was wrong is worth as much as one that was right.
+
+| # | Issue as filed | Why it is wrong |
+|---|---|---|
+| 68 | "Every conversation for the `studio` agent shares the id `conversation:studio`, so grants and approval scope are per *agent*." | Read from the default expression `` `conversation:${agentId}` `` rather than measured. Flue's initializer `id` is the agent **instance**, not the agent name — probed against a running harness across two threads, which reported `alpha` and `beta`, not `studio`. Conversations are isolated; the defect runs the other way and is #69. The probe also showed the initializer running **twice per submission**, independently corroborating #35/#67. |
 
 ### No Longer Relevant — 3
 

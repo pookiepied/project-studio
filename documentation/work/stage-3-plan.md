@@ -140,11 +140,23 @@ After each step: `CI=true npx vitest run`. After step 7: `pnpm typecheck`,
 |---|---|---|
 | 66 | `tests/integration/stop.test.ts` defines `ECHO_SERVER` and `SLOW_SERVER` — two complete MCP stdio server fixtures — and **uses neither**. The file is titled "008.2 stop, timeout, cancellation, and disconnect" and has four tests, none of which involves an MCP tool. The timeout and MCP-tool-cancellation half of 008.2 was set up and never written. Deleting the constants to satisfy `noUnusedLocals` would erase the only evidence of the gap. | Needs Implementation |
 | 67 | `TurnSnapshots.#turn` restarts at 0 on every run because the sandbox is rebuilt per run, so undo history repeats the label `"turn 1"`. Same cause as #35. | Needs Implementation |
-| 68 | `ExecutionScope.conversationId` defaults to `` `conversation:${agentId}` `` and `agents/studio.ts` passes only `agentId`, so **every** conversation for the `studio` agent shares the id `conversation:studio`. Any per-conversation reasoning downstream of `ExecutionScope` is currently per-*agent*. Related to #35 but a distinct defect with its own blast radius — grants and approval scope read this. | Needs Implementation |
+| ~~68~~ | **Withdrawn — this was wrong.** Filed from reading the default expression `` `conversation:${agentId}` ``. Flue's initializer `id` is the agent *instance*, one per conversation thread; a probe against a running harness across two threads reported `alpha` and `beta`. Conversations are isolated. The real defect runs the other way and is #69. | Withdrawn |
+| 69 | `ExecutionScope` has no agent dimension: `agentId` holds a conversation identity and `conversationId` derives a second copy of it. Because `grant-store.ts:108` filters on `agent_id`, a `duration: "always"` grant cannot outlive the conversation that made it, so `always` and `conversation` are the same answer. Fails closed. Pinned by `tests/unit/grant-identity.test.ts`. | Needs Decision |
 
-**#68 is the one to look at first if any of these worry you.** It is not dead
-code and it is not Stage 3; it is recorded here because Stage 3 is where it
-surfaced.
+**#69 is the one to look at first**, and it needs a decision before an
+implementation — what a grant should be keyed by is not a question the fix
+should answer by itself. It is recorded here because Stage 3 is where it
+surfaced, not because it belongs to Stage 3.
+
+**On #68, and why this section now has a withdrawal in it.** The first version
+of this document asserted that all conversations shared one scope, and a
+recommendation was given on that basis. It came from reading a default
+expression instead of measuring what Flue passes. The measurement — a probe in
+`agents/studio.ts` writing its `id`, run against two threads of a live harness
+— took about four minutes and reversed the conclusion. The general lesson is
+already this cycle's rule and was not followed here: an identity that is
+*derived* from another value has to be observed at runtime before anything is
+concluded from its name.
 
 ---
 
@@ -182,12 +194,23 @@ passed · 2 skipped · 0 failed**; `tsc --noEmit` clean *with the new flags*;
 | 31 | **Accepted (b).** `createRetryExecutionContext` marked declared-not-wired at the source, naming ADR 0033 and decision #12. `executionContext()` kept as the pair of `authContext()`. |
 | 32 | **Blocked on #15.** Untouched, deliberately. |
 | 33 | **Solved.** Three `src/` imports removed, plus six dead test-file locals the flags surfaced. |
-| 34 | **Blocked** on confirming ADR 0003 stands. Untouched. |
+| 34 | **Solved.** ADR 0003 stands — the register entry was wrong, `roadmap.md:65` was right. Source marked declared-not-wired; test moved to `context-optimizer.test.ts`, where it no longer reads as an architectural guarantee. |
 | 35 | **Solved** for `studio-runtime.ts` — see §2, mutation-verified. **Withdrawn** for `gate.ts`: the claim was wrong. |
-| 24b | **Blocked** — decision, framed in §3. |
+| 24b | **Solved.** ADR 0037, recommendation (b) taken. The three properties the argument rests on are now tests; two mutation-verified. No whitelist added — see below. |
 | 66 | **Registered**, not closed. |
 | 67 | **Solved** with #35; they were one defect. |
-| 68 | **Registered.** Not Stage 3. |
+| 68 | **Withdrawn**, disproved by measurement. |
+| 69 | **Registered**, with a characterization test. Needs a decision, not a patch. |
+
+**On #24b, and what changed while implementing it.** The recommendation in §3
+assumed the fix was a named exception in an architecture whitelist. There is no
+general module-state test to whitelist against — the guard in
+`architecture.test.ts` is specific to `storage/database.ts` and forbids a
+module-level `StudioDatabase` binding. Widening it into a general rule with a
+carve-out would leave it enforced by whoever remembered to add themselves to a
+list. So the ADR's claims are asserted directly instead: read-before-init
+throws, shutdown clears the handle, shutdown resets redaction. Removing
+`resetRedaction()` or `handle = undefined` each fails the suite.
 
 **Mutation check on the one behavioural change.** Reverting `#turnSnapshots`
 to build a fresh `TurnSnapshots` per initializer run makes

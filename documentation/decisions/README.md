@@ -90,6 +90,7 @@ wrong answer, and why we believed it, is the useful part.
 | | |
 |---|---|
 | [0004](0004-observability.md) | Observability |
+| [0037](0037-observability-is-a-process-resource.md) | Observability is a process resource — why the one remaining module singleton stays, and what is checked to keep that honest |
 | [0011](0011-shared-error-contract.md) | Shared error contract |
 | [0032](0032-fail-safe-runtime-recovery.md) | Fail-safe runtime recovery |
 | [0033](0033-execution-identity-and-operation-correlation.md) | Execution identity and operation correlation |

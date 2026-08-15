@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { PassthroughContextOptimizer } from "../../src/context/context-optimizer.js";
 import {
   defaultModelReference,
   ModelResolutionError,
@@ -31,17 +30,6 @@ describe("harness boundaries", () => {
     expect(() => registry.resolve(defaultModelReference("local"))).toThrow(
       ModelResolutionError,
     );
-  });
-
-  it("keeps canonical context available when optimization is disabled", async () => {
-    const optimizer = new PassthroughContextOptimizer();
-    const context = { messages: [{ role: "user", content: "hello" }] };
-
-    const result = await optimizer.optimize(context);
-
-    expect(result.optimizer).toBe("passthrough");
-    expect(result.canonical).toBe(context);
-    expect(result.optimized).toBe(context);
   });
 });
 
