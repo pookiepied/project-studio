@@ -49,6 +49,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0018](0018-trust-and-modes.md) | Trust and modes |
 | [0021](0021-a-grant-belongs-to-a-project.md) | A grant belongs to a project |
 | [0024](0024-capabilities-are-on-and-the-list-is-honest.md) | Capabilities are on, and the list is honest |
+| [0036](0036-user-decisions-are-durable.md) | A user decision is durable — approvals and answers live in SQL, never in process memory |
 
 ### Tools and execution
 | | |
