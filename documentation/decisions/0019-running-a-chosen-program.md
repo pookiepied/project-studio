@@ -8,6 +8,12 @@
 run without asking*. What changed is where it is enforced: the sandbox no
 longer refuses connected code, because that refusal stood in for a consent
 path that now exists. The refusal moved to `BASE_POLICY`; it did not lift.
+**Amended by:** [ADR 0041](0041-containment-is-the-kernel-s-job.md), which
+supplies the thing this ADR was written around the absence of. Two sentences
+below are now false and are marked where they appear: a program the model chose
+is no longer "honestly uncontained", and the refusal of connected code was not
+"until a real isolation tier exists" in the indefinite sense it reads as — that
+tier exists, on Windows and on Linux, and was measured on both.
 
 ## Context
 
@@ -46,19 +52,32 @@ was right for its moment and is wrong for this one.
 **`assertSupports` takes the capability descriptor, not a bare effect**, because
 the answer depends on *who chose the code*.
 
-| Provenance | `execute` / `network` |
-|---|---|
-| Native, policy opted in | Allowed, and honestly **uncontained** |
-| Native, policy did not | Refused — `not_permitted` |
-| Anything a user connected | Refused — **always**, until a real isolation tier exists |
+| Provenance | `execute` / `network` | Superseded by ADR 0041 |
+|---|---|---|
+| Native, policy opted in | ~~Allowed, and honestly **uncontained**~~ | Allowed **and contained by the OS**, or refused if this host cannot |
+| Native, policy did not | Refused — `not_permitted` | unchanged |
+| Anything a user connected | ~~Refused — **always**, until a real isolation tier exists~~ | Contained, by the same mechanism, through the same one verdict |
 
-That second row makes `allowExec` mean something for the first time. The third
-row is absolute and is what `S-02` keeps closed: **we do not run a program a
-third party chose without a boundary, whatever the permissions say.** A user
-cannot approve their way past it, because the thing missing is not permission.
+That second row makes `allowExec` mean something for the first time.
 
-The sandbox never claims to contain what it admits here. It admits it as
-*uncontained by consent*, and the code says so in those words.
+**The third row's principle survived; its implementation was a placeholder.**
+What `S-02` keeps closed is *"we do not run a program a third party chose
+without a boundary, whatever the permissions say"* — and that sentence is now
+satisfied by supplying the boundary rather than by refusing for want of one. A
+user still cannot approve their way past it, and the reason is unchanged: the
+thing missing was never permission.
+
+~~The sandbox never claims to contain what it admits here. It admits it as
+*uncontained by consent*, and the code says so in those words.~~ It contains
+what it admits here. The precise claim, which is conditional rather than
+absolute, is in ADR 0041: `shell` and `mcp-server` are contained by the OS on
+Windows and on Linux, on a host whose kernel will supply it — and a host that
+will not is **refused**, not run open. macOS registers no backend and is out of
+scope by decision, so it enforces nothing.
+
+The struck text is kept rather than deleted. This paragraph has been wrong in
+three different directions across one cycle, and the shape of the wrongness is
+the useful part: each version was true when written and none of them said so.
 
 ### What still holds, and what `shell` gives up
 

@@ -1,6 +1,6 @@
 # Stage 4b — the real sandbox (#15, carrying #32 and #41)
 
-**Status:** Steps 1-3 landed — both platforms contain, and neither ships yet (§4 blockers) ·
+**Status:** All four steps landed — both platforms contain; §4 lists what still blocks shipping ·
 **Opened:** 2026-08-15 · **Last measured:** 2026-08-16 (Ubuntu 24.04, VPS)
 **Register:** `phases-1-11-remediation.md` #15, #32, #41 · **Blocked on:** nothing
 
@@ -161,11 +161,15 @@ Each step lands on its own and is verifiable on its own. No step claims #15.
    namespace, `/etc` absent unless the network is on and then only seven
    entries, and the network switch in both positions. One result came back
    different from Windows and is #93.
-4. **#41.** The containment text in the README and ADRs 0019/0022/0024 is
-   corrected *last*. What it must now say is **platform-specific** — contained
-   on Windows, not yet on Linux — which is a third distinct statement from
-   either of the two wrong ones already in that paragraph's history, and a
-   reason not to write it before step 3 lands.
+4. **#41.** ✅ *Landed 2026-08-16.* The containment text, corrected last and for
+   the reason the execution order gave — writing it before both backends existed
+   meant writing it twice. What it says now is **conditional** rather than
+   platform-specific, which is a *fourth* distinct statement and the first one
+   that survives a machine that cannot contain: `shell` and `mcp-server` are
+   contained by the OS on Windows and on Linux, on a host whose kernel will
+   supply it, and a host that will not is refused rather than run open. Struck
+   rather than deleted everywhere it was wrong; `documentation/archive/` left
+   alone, because it is the evidence of how the claim drifted.
 
 ### Still open inside #15 — the complete blocker list
 
@@ -228,11 +232,13 @@ window's container mid-call. Bounded and disclosed rather than unbounded, but it
 is still state this feature adds to a user's machine and never removes on its
 own.
 
-#### 5. The containment text is still wrong — #41
+#### 5. ~~The containment text is still wrong~~ — #41 ✅ closed 2026-08-16
 
-The README and ADRs 0019/0022/0024 describe a containment situation that has now
-been superseded three times. Step 4, and the only item on this list that is a
-documentation fix rather than an engineering one.
+Was the only documentation item on this list. ADRs 0019/0022/0024,
+`phases/roadmap.md` and the harness README now carry the conditional sentence;
+the archive is deliberately untouched. Chasing it also surfaced **#95** — ADR
+0022's untrusted-bytes half is entirely unaffected by containment, and an MCP
+server's result is the one place that argument was never applied.
 
 #### Not blockers, recorded so they are not mistaken for gaps
 

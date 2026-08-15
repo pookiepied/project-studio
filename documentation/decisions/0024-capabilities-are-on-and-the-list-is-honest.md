@@ -8,6 +8,12 @@
 sandbox refusal that has moved to the policy. The list rule here is
 untouched: `supports()` is still `assertSupports()` minus the exception, and
 is still the only filter on what the model sees.
+**Amended by:** [ADR 0041](0041-containment-is-the-kernel-s-job.md). The list
+rule is *still* untouched — and what it now filters on has changed underneath
+it, which is the point of having one rule instead of two. A connected tool used
+to be refused permanently; it is now contained, so it appears. On a host whose
+kernel cannot contain, it disappears again. See the corrected consequence at the
+end of this file.
 
 ## Context
 
@@ -99,7 +105,14 @@ would become safe only if someone remembered.
 - Nine native tools are usable out of the box.
 - A tool that cannot run costs nothing in the prompt.
 - MCP inherits this: a Phase 11 server whose tools the sandbox refuses will not
-  appear in the model's list, with no second decision to make.
+  appear in the model's list, with no second decision to make. **Still true, and
+  it now fires for a different reason** — since ADR 0041 the sandbox refuses a
+  connected tool not because of who wrote it but because *this machine* cannot
+  contain it. On a host that can, the tool appears and runs inside a container.
+  The rule did not change; the world it reads did.
 - One test changed meaning rather than being deleted: "refuses an effect the
-  sandbox cannot contain" now uses a *connected* capability, which is the case
-  where the refusal is absolute and permanent.
+  sandbox cannot contain" now uses a *connected* capability, ~~which is the case
+  where the refusal is absolute and permanent~~. **That clause is no longer
+  true.** It was permanent only for as long as no isolation tier existed, and
+  ADR 0041 built one for both supported platforms. The refusal is now
+  conditional on the host, which is a weaker claim and a truer one.

@@ -45,6 +45,12 @@ The obvious move was to reuse ADR 0019's line — provenance decides, native run
 by consent, connected servers are refused. It is symmetrical, and it is wrong,
 because the two effects fail in different places.
 
+> **Amended by [ADR 0041](0041-containment-is-the-kernel-s-job.md).** ADR 0019's
+> line has since changed — connected servers are contained rather than refused —
+> but the reason this ADR gave for *not* reusing it is unaffected, and reads
+> better now than when it was written. The two effects still fail in different
+> places, and containment fixed exactly one of them.
+
 `execute` risks **the machine**. The user chose the program, containment is the
 missing thing, and consent is a coherent answer to that.
 
@@ -57,6 +63,22 @@ can make them.
 Blocking loopback, link-local, and private ranges is still worth doing. It stops
 the agent reaching our own internals, which is a real class of accident. It is
 not containment, and it does nothing about the bytes that come back.
+
+**Both halves of that have since been tested against a real kernel, and they
+held.** ADR 0041 put a *subprocess's* network behind the operator's switch, and
+on Windows the granted boundary turned out to match this ADR's own list —
+`internetClient` reaches the public internet and is refused loopback and the
+LAN, measured. So the destination rule and the containment rule arrived at the
+same shape from opposite directions, which is the strongest evidence either of
+them is right.
+
+And the second half is still entirely unaddressed by containment, exactly as
+this paragraph says. A contained server reads a page and hands the text back; a
+sandbox has nothing to say about what the text *says*. That is why the label in
+`tools/web/untrusted.ts` is not made redundant by ADR 0041 — and why **#95**
+exists, for the case this ADR did not have to consider because connected servers
+were refused outright when it was written: an MCP server's result is text we did
+not write, arriving in a prompt that drives tool calls, and it is not labelled.
 
 ## Decision
 

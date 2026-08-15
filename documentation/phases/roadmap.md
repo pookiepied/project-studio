@@ -124,11 +124,17 @@ Foundation done. See ADR 0012.
   cannot leak across conversations or from a parent agent to a subagent.
 - Grants are persisted, listable, and revocable; revoking marks rather than
   deletes.
-- `LocalSandbox` contains the filesystem and withholds the host environment,
-  and declares `in-process` isolation honestly. Superseded in part by ADR 0019:
-  `execute` is now admitted for a **native** capability when the policy opted
-  in, as *uncontained by consent* rather than as containment. `network` is still
-  refused, and anything a user connected is still refused for both.
+- `LocalSandbox` contains the filesystem and withholds the host environment.
+  ~~Superseded in part by ADR 0019: `execute` is now admitted for a **native**
+  capability when the policy opted in, as *uncontained by consent* rather than
+  as containment. `network` is still refused, and anything a user connected is
+  still refused for both.~~ **Superseded again by ADR 0041, and this time by
+  building the missing thing rather than by consenting around it.** A program
+  the model chose and a server a third party wrote are both contained by the
+  operating system — an AppContainer on Windows, `bwrap` on Linux — and a host
+  whose kernel cannot supply that is **refused** rather than run open. macOS is
+  out of scope by decision and enforces nothing. Measured on both platforms
+  rather than declared; the evidence is in `tests/integration/`.
 
 Remaining in this phase:
 
@@ -165,7 +171,7 @@ capabilities.
 | Filesystem | `read`, `write`, `edit` | Done, and reversible — see ADR 0016 |
 | Search | `glob`, `grep` | Done, over vendored ripgrep 14.1.1 |
 | Version control | `git` | Done — complete subcommand coverage, one capability |
-| Execution | `shell` | Done — native only, uncontained by consent, ADR 0019 |
+| Execution | `shell` | Done — contained by the OS where the kernel supplies it, refused where it does not, ADR 0041 |
 | Network | `fetch`, `web_search` | Done — ADRs 0022 and 0023 |
 | Delegation | `task`, `skill` | Phases 13 and 12 |
 
