@@ -93,7 +93,7 @@ prevented the storage singleton returning to the file it was removed from.
 | 34 | `PassthroughContextOptimizer` never wired. | ADR 0003 stands; the register entry was wrong and `roadmap.md:65` was right. Marked declared-not-wired at the source alongside #31, and its test moved out of `architecture.test.ts` — filed there it read as a guarantee about the running system, which nothing wired can make |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
 
-### Answered — 4, on 2026-08-15
+### Answered — 5, on 2026-08-15
 
 Recorded here rather than folded away, per ADR 0036: a decision that cannot be
 found later gets re-litigated. **One of the four went against the
@@ -101,7 +101,8 @@ recommendation**, and that one changes the shape of the cycle — see #15.
 
 | # | Answer | What it changes |
 |---|---|---|
-| 14 | **Delete `STUDIO Gateway/`.** Answered as "you decide what's best, no need for wrongful code or dead code, or duplicated things", which is (b). | 163 tracked files removed in Stage 4. Recovery is real, not asserted: tags `snapshot/phases-1-11-pre-remediation` and `pre-phase5-snapshot` both contain the tree, verified present before deletion. |
+| 12 | **Delete the Flue idempotency patches**, accept lost-ack-as-unknown for 1.0. | Removes the mechanism that caused #1 — a hand-diff against `dist/*.mjs` calling a function that existed in no version of beta.9, which made every agent submission return 500. #44/#45 split it into three pieces: the `hostname` plumbing is redundant and goes; `onReady(address)` stays until upstream carries the bound address; the FD admission bootstrap has no upstream equivalent and is the piece to raise with Flue. Stage 4, with the reduction measured rather than assumed. |
+| 14 | **Keep `STUDIO Gateway/` — reversed on new information.** First answered as delete. Reversed once it emerged that the replacement is a **local TypeScript gateway bundled with Studio**, not another Cloudflare Worker, and that the folder is wanted as reference for analytics and structure. | Recorded as a reversal rather than re-answered quietly: the first answer was given without knowing the replacement's shape, and that fact is what changed it. Verified before agreeing: the folder is entirely self-contained (own `package.json`, lockfile, `tsconfig.json`, `wrangler.toml`) and **nothing in the Harness build, suite, typecheck, or architecture tests touches it**. It is reachable only from three documentation sentences. So the cost of keeping it is zero and the earlier "drift" argument was aesthetic, not structural — deleting source to fix a documentation error is treating the wrong thing. All 163 tracked files are real source (81 `src`, 44 `UI`, 19 `tests`, 7 `migrations`); no build output is tracked. **Conditions:** its README is labelled retired-reference (not built, not tested, not shipped, not 1.0), and `project-map.md` + root `README.md` stop describing it as a component — that part is #41/#42 work. |
 | 15 | **Implement the real sandbox — (a), not the recommended (b).** Windows and Linux only; **macOS is explicitly out of scope**, not deferred-with-intent. Stated reason: *"Real sandbox, or else we're going to take the heavy weight of half or bad implementation once again."* | The largest single change left in the cycle. `SandboxFactory` behind the ADR 0035 ports, `ProcessContainer` on Windows, `bwrap` on Linux. Turns #15 from a one-line status correction into a stage of its own, and reverses the 008.1 refusal of MXC. Un-blocks #32 in the opposite direction: `unsupported_isolation` stops being dead code and becomes the error the factory throws. Also changes what #41 must say — the containment text is corrected to *not yet contained*, not to *uncontained by policy*, because policy is no longer the final answer. |
 | 17 | **Delete the five broken `refs/codex/*` refs.** | Stage 4. All five verified unreachable-and-broken by `git for-each-ref` before removal. |
 | 18 | **Keep root `README.md`, minimal.** | Stays; its stale claims are corrected under #41 rather than removed with the file. |
@@ -114,17 +115,16 @@ half-implementation the rest of this cycle exists to undo. That is consistent
 with how #24, #35 and #42 were handled, and the recommendation was the less
 consistent position. Recorded as the reason, so this is not re-argued later.
 
-### Needs Decision — 2
+### Needs Decision — 1
 
 Each states options and a recommendation. **These block the items that follow
 them.**
 
 | # | Issue | Options | Recommendation |
 |---|---|---|---|
-| 12 | **B-01 Flue admission idempotency.** The patch hijacks `submissionId` as `project-studio:${key}` from a header; Flue already has idempotent `dispatch({dispatchId})` with 409. Both patches are hand-diffs against `dist/*.mjs` pinned by content hash — a version bump drops them silently, which is exactly how #1 happened. | (a) upstream a public Flue admission key; (b) move to `dispatch({dispatchId})`; (c) **Accept** lost-ack-as-unknown for 1.0, delete the two idempotency patches, keep automatic retry off | **(c).** It is the honest 1.0 position, deletes the most fragile code in the tree, and 008.1 already documents unknown-never-retried as the contract. (a) is right long-term, but it is upstream work we do not control. |
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
 
-### Needs Implementation — 11
+### Needs Implementation — 12
 
 Agreed, understood, work remains.
 
@@ -139,8 +139,9 @@ into #24 below.
 |---|---|
 | 31 | ~~`isRetryableForUnknown`~~ (deleted in `e9a018e`), `createRetryExecutionContext`, `executionContext()`. **Reclassified in Stage 3:** neither remaining export is accidental. `createRetryExecutionContext` is ADR 0033's `attemptId` and is now marked declared-not-wired at the source; `executionContext()` is the declared pair of `authContext()` and is kept. |
 | 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. **No longer a dead-code item.** The #15 answer resolves it in the direction opposite to the one Stage 3 was waiting for: the kind is not deleted, it becomes the error `SandboxFactory` throws on a host that supports no OS backend. Moved to Stage 4b. The other half of the Stage 3 finding stands and is not affected — `unavailable` and `internal` are also never thrown, and `unavailable` is read by `SandboxError`'s own `retryable` computation, so removing it would change behaviour. |
-| 66 | `tests/integration/stop.test.ts` carries two complete MCP stdio server fixtures used by no test. The file is titled "008.2 stop, timeout, cancellation, and disconnect" and none of its four tests involves an MCP tool — the timeout and MCP-tool-cancellation half of 008.2 was set up and never written. The fixtures now live in `tests/fixtures/mcp-servers.ts` so the evidence survives; **that move does not close this.** |
-| 70 | **One intermittent suite failure, now with a mechanism rather than a shrug.** A full run reported `1 failed | 1141 passed` and the failing test was lost to a truncated log. It did not reproduce in **eight** further full runs. Repetition was then abandoned for measurement: five verbose runs give per-test durations, and two things fall out. **(a)** `harness.test.ts` set `STARTUP_BUDGET_MS` to 60s while six of its nine tests run under a 30s timeout — vitest killed those tests 30 seconds before the startup diagnostic could fire, so a slow boot could only ever surface as a bare "test timed out" with none of the pid/exit-code/stderr report the file goes to trouble to build. Fixed: the budget is 20s, and the invariant *budget < enclosing timeout* is now stated where it can be read. **(b)** Margins are thinner than they look: `recovers after SIGKILL` runs 53–59s against a 90s timeout while other tests in the same suite vary 4× run to run (2.8s→12.7s). A 1.6× slowdown blows it. Raising that timeout is **not** proposed here — the file argues against exactly that, and doing it without knowing which test failed would be masking. Left open pending a captured failure or the #61 CI matrix. |
+| 66 | `tests/integration/stop.test.ts` carries two complete MCP stdio server fixtures used by no test. 008.2 is titled "stop, **timeout**, and cancellation" and marked **Done**; its four tests are abort-on-stream, abort-during-approval, disconnect, and settlement classification. **There is no timeout test and no MCP tool-cancellation test** — verified by reading the file, not inferred. The fixtures now live in `tests/fixtures/mcp-servers.ts` so the evidence survives; **that move does not close this.** | **Assigned to Stage 5 (#50/#55), definition of done: a timeout test and an MCP tool-cancellation test that fail when the behaviour is removed.** It was registered without a stage, which in practice is the same as deferring it. |
+| 71 | **The Harness advertises a model source whose server does not exist.** `models/adapters/studio-cloud-adapter.ts:61` declares `readonly operational = true`, and `src/models/studio-cloud/` is a complete 1,428-line client — HTTP, SSE parsing, event and request mapping, catalog, access tokens. Its only counterparty is the scripted `node:http` mock inside `studio-gateway.test.ts`. ADR 0031 already records that `STUDIO Gateway/` speaks a different protocol and is not a backend for it. So 1.0 would ship a selectable model source that fails at runtime — the same class of untrue claim as 008.8's "Done", stated in code rather than in a document. Found while deciding #13/#14, not by an audit. | Needs Implementation |
+| 70 | **One intermittent suite failure, now with a mechanism rather than a shrug.** A full run reported `1 failed | 1141 passed` and the failing test was lost to a truncated log. It did not reproduce in **eight** further full runs. Repetition was then abandoned for measurement: five verbose runs give per-test durations, and two things fall out. **(a)** `harness.test.ts` set `STARTUP_BUDGET_MS` to 60s while six of its nine tests run under a 30s timeout — vitest killed those tests 30 seconds before the startup diagnostic could fire, so a slow boot could only ever surface as a bare "test timed out" with none of the pid/exit-code/stderr report the file goes to trouble to build. Fixed: the budget is 20s, and the invariant *budget < enclosing timeout* is now stated where it can be read. **(b)** Margins are thinner than they look: `recovers after SIGKILL` runs 53–59s against a 90s timeout while other tests in the same suite vary 4× run to run (2.8s→12.7s). A 1.6× slowdown blows it. Raising that timeout is **not** proposed here — the file argues against exactly that, and doing it without knowing which test failed would be masking. Left open pending a captured failure or the #61 CI matrix. **Assigned to Stage 4b, definition of done: a captured failure with the startup report attached, or the #61 matrix running the suite on a second platform.** It was registered without a stage and would otherwise sit unowned. |
 
 **Repository and documentation**
 
@@ -154,14 +155,15 @@ into #24 below.
 | 41 | Stale containment claims in README, ADRs 0019/0022/0024 — 008.8 decided uncontained-by-policy, so text calling connected MCP code "contained" is false. |
 | 42 | Over-claimed statuses in task 008 (008.3 Done-by-exception; 008.4 3/5 not 5/5; 008.4 B-01 against a build that never worked; 008.6 no migration; 008.8 0% implementation). Record the correction, do not silently re-tick. |
 
-### Unable to Determine — 2
+### Answered Unknowns — 2 (was "Unable to Determine")
 
-Investigated, not resolved. Recorded rather than dropped.
+Both were "not investigated" rather than hard. Answered 2026-08-15; kept here
+with their findings because the answers changed #12's options.
 
-| # | Issue | What was tried / what is unknown |
+| # | Question | Answer |
 |---|---|---|
-| 44 | Whether `STUDIO/patches/@flue__sdk` (client) and `STUDIO HARNESS/patches/@flue__sdk` (harness) are identical or have diverged. Both are wired via `patchedDependencies`. Not diffed. |
-| 45 | Whether the `@flue/cli` patch — which implements the FD-based admission bootstrap (§4.2) — is still required, or whether Flue beta.9 now offers a supported hook. Not investigated. |
+| 44 | Whether the client and harness `@flue__sdk` patches have diverged. | **They have not.** Normalising for file order and `index` lines, the two patch the same two files with byte-identical hunks. But the register's description of them was wrong in a way that matters: it said both are "pinned by content hash". Only the harness one is. The client's reads `index 0000000..0000000`, so it is pinned to nothing and `git apply` falls back to context alone — the **less** safe of the two, because a version bump whose surrounding lines still match applies silently instead of failing loudly. |
+| 45 | Whether the `@flue/cli` patch is still required, or whether beta.9 offers a supported hook. | **Partly obsolete, and the parts separate cleanly.** Measured against the pristine `@flue/cli@1.0.0-beta.9` tarball, not against our patched `node_modules`. `options.hostname` is **native** (`flue.js:1254`) — that plumbing is redundant. `options.onReady` is **native but zero-argument**; the patch changes it to `onReady?.(address)`, and since we bind on port 0 and need the bound port back, that change survives. The FD-based admission bootstrap has **no upstream equivalent** — a genuine gap, and the piece worth raising with Flue rather than carrying as a hand-diff against a build artifact indefinitely. |
 
 ### Withdrawn — 1
 
@@ -208,8 +210,9 @@ come after #12-#42** — they are phase completion, not stabilization.
 Dependencies are real: each stage makes the next safe.
 
 ```
-Stage 0  Decisions                    ← ANSWERED: #16, #25-fixture, #14, #15,
-   |                                       #17, #18. OPEN: #12, #13, #69
+Stage 0  Decisions                    ← ANSWERED: #12, #14 (reversed), #15,
+   |                                       #16, #17, #18, #25-fixture, #69.
+   |                                       OPEN: #13 only
    ↓
 Stage 1  Correctness #25-#29          ← DONE (e9a018e, f25d715)
    ↓
