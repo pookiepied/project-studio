@@ -12,10 +12,11 @@ products designed to work together.
 |---|---|---|
 | **Studio Harness** | The runtime. Agents, permissions, sandboxing, policy, execution, storage, MCP. Everything with authority. | `STUDIO HARNESS/` |
 | **Studio Client** | The Tauri desktop application over the Harness. | `STUDIO/` |
-| **Studio Gateway** | Legacy hosted model gateway. **Paused.** Removal pending decision #14. | `STUDIO Gateway/` |
+| **Studio Gateway** | A Cloudflare Worker, **retired** — not built, not tested, not shipped, not imported. Kept as a design reference only; decision #14, answered as keep. | `STUDIO Gateway/` |
 
 The Harness is the primary codebase, and the Gateway must not shape its
-architecture.
+architecture. Its replacement is a local TypeScript gateway bundled with Studio,
+so the Worker's deployment half does not carry over at all.
 
 ## Where everything lives
 
@@ -28,13 +29,13 @@ Project Studio/                ONE git repository. No submodules.
 │   ├── rules.md                Constraints that fail work outright.
 │   ├── work/                   TEMPORARY. The active meta-task.
 │   ├── architecture/           DURABLE. How the system is shaped.
-│   ├── decisions/              DURABLE. ADRs 0001-0034.
+│   ├── decisions/              DURABLE. ADRs; the index is the count.
 │   ├── phases/                 DURABLE. What each phase delivered.
 │   └── archive/                Superseded, banner-marked.
 │
-├── STUDIO HARNESS/            THE RUNTIME. 278 files. Primary codebase.
-├── STUDIO/                    THE DESKTOP CLIENT. 129 files.
-└── STUDIO Gateway/            LEGACY. Paused.
+├── STUDIO HARNESS/            THE RUNTIME. 250 tracked files. Primary codebase.
+├── STUDIO/                    THE DESKTOP CLIENT. 129 tracked files.
+└── STUDIO Gateway/            RETIRED. Reference only, self-contained.
 ```
 
 Products are directories inside one repository, not separate repositories. Each
@@ -72,24 +73,20 @@ graph TD
     H --> P111["Phases 1-11<br/>implemented, unverified"]:::warn
     H --> P1218["Phases 12-18<br/>not started"]:::idle
 
-    P111 --> META["META-TASK<br/>Phases 1-11 remediation<br/>62 issues"]:::active
+    P111 --> META["META-TASK<br/>Phases 1-11 remediation<br/>register holds the counts"]:::active
 
-    META --> S0["Stage 0 — Decisions<br/>#12-#18 · 7 open"]:::block
-    S0 --> S1["Stage 1 — Correctness<br/>#25-#29"]:::todo
-    S1 --> S2["Stage 2 — Architecture<br/>#19-#24"]:::todo
-    S2 --> S3["Stage 3 — Dead code<br/>#30-#35"]:::todo
-    S3 --> S4["Stage 4 — Repo + docs<br/>#36-#42"]:::todo
-    S4 --> S5["Stage 5 — Phase work<br/>#49-#62 · 90 items"]:::todo
+    META --> S0["Stage 0 — Decisions<br/>#12-#18 · #13 open"]:::ok
+    S0 --> S1["Stage 1 — Correctness<br/>#25-#29"]:::ok
+    S1 --> S2["Stage 2 — Architecture<br/>#19-#24"]:::ok
+    S2 --> S3["Stage 3 — Dead code<br/>#30-#35"]:::ok
+    S3 --> S4["Stage 4 — Repo + docs<br/>#36-#42 · #12 last"]:::ok
+    S4 --> S4B["Stage 4b — OS isolation<br/>#15 + #32 + #41"]:::todo
+    S4B --> S5["Stage 5 — Phase work<br/>#49-#62"]:::todo
     S5 --> S6[Stage 6 — Organization pass]:::todo
     S6 --> S7[Stage 7 — Fresh audit]:::todo
     S7 --> DONE["Phases 1-11 COMPLETE<br/>then 12-18 unlock"]:::goal
 
     DONE -.unlocks.-> P1218
-
-    SOLVED["11 Solved<br/>#1-#11"]:::ok
-    UNK["3 Unable to Determine<br/>#43-#45"]:::warn
-    META --- SOLVED
-    META --- UNK
 
     classDef root fill:#1e293b,stroke:#0f172a,color:#fff
     classDef prod fill:#7c3aed,stroke:#5b21b6,color:#fff

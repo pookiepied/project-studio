@@ -7,7 +7,7 @@ products designed to work together.
 |---|---|---|
 | **Studio Harness** | The runtime — agents, permissions, sandboxing, policy, execution, storage, MCP. | `STUDIO HARNESS/` |
 | **Studio Client** | The Tauri desktop application over the Harness. | `STUDIO/` |
-| **Studio Gateway** | Legacy hosted model gateway. **Paused** — reference only. | `STUDIO Gateway/` |
+| **Studio Gateway** | A Cloudflare Worker, **retired**. Not built, not tested, not shipped, and not imported by the Harness. Kept only as a design reference for the local gateway that replaces it. | `STUDIO Gateway/` |
 
 The Harness is the primary codebase.
 
@@ -21,6 +21,8 @@ The Harness is the primary codebase.
 
 ## State
 
-Phases 1–11 of the Harness are implemented and under remediation. None is
-verified. Phases 12–18 have not started and should not begin until the 1–11
-gate closes.
+Phases 1–11 of the Harness are implemented and under remediation. No phase has
+been verified as complete; the remediation register above is the only authority
+on what is settled and what is still open, and this file deliberately carries no
+counts of its own so it cannot drift out of step with it. Phases 12–18 have not
+started and should not begin until the 1–11 gate closes.

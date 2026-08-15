@@ -28,12 +28,15 @@ future features, and they live in §5 rather than as open issues.
 
 ## 2. Issue register
 
-**81 numbers issued, 80 live** (#68 withdrawn). Categories per
+**81 numbers issued, 79 live** (#37 and #68 withdrawn). Every number from 1 to
+81 appears in exactly one section below — checked by counting, not asserted.
+That check is what recovered **#43**, which had been answered in Stage 1-2 and
+folded into another row without keeping its number. Categories per
 `../README.md` §4. Numbers are permanent, so this count only ever grows.
 The section headings below are the authority for how many are in each state;
 they are recounted whenever one moves.
 
-### Solved — 32, plus #24b
+### Solved — 40, plus #24b
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
 Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1138
@@ -43,6 +46,11 @@ Baseline at close of Stage 3: **70 files, 1139 passed, 2 skipped, 0 failed**;
 `flue build --target node` clean.
 Baseline after #70 and #69: **73 files, 1147 passed, 2 skipped, 0 failed**;
 `tsc --noEmit` and `flue build --target node` clean.
+Baseline at close of Stage 4: **74 files, 1150 passed, 2 skipped, 0 failed**;
+`tsc --noEmit` and `flue build --target node` clean. The three added tests are
+`git-network-parity.test.ts` (#78). **Measured on Node `v22.18.0`, which is not
+the pinned `24.14.0` and is below the `engines` floor of `>=22.19.0`** — that
+asterisk is #79 and it applies to every baseline above, not only this one.
 
 **The 2 skipped tests are platform gates, both healthy.** One is the
 "keyring unavailable" branch, skipped *because* the OS credential store is
@@ -92,6 +100,14 @@ prevented the storage singleton returning to the file it was removed from.
 | 24b | `observability/index.ts` module singleton — the one #24 left behind. | **ADR 0037**, Accepted: it is a process resource, not an ambient default. Unlike the storage globals it has guarded init, an explicit shutdown that clears it, a redaction reset, and it throws when read before init. Those three properties are now tests; two are mutation-verified. No architecture whitelist was added — behaviour is checked instead of shape |
 | 34 | `PassthroughContextOptimizer` never wired. | ADR 0003 stands; the register entry was wrong and `roadmap.md:65` was right. Marked declared-not-wired at the source alongside #31, and its test moved out of `architecture.test.ts` — filed there it read as a guarantee about the running system, which nothing wired can make |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
+| 36 | Two documentation roots — `STUDIO HARNESS/docs/` and `documentation/`. | Stage 4. **Reopened before it was closed:** the move happened, but the row's own instruction — "verify no path references broke" — had never been executed, and eight dead pointers had survived it. Fixed in `mental-model.md` (five "where to start" links), `directory-map.md` (`STUDIO HARNESS/docs/decisions/`), and `domain-ownership.md`. Re-grepped for the pattern after fixing, and the survivors were each read rather than counted: the archived 008 file and `archive/open-questions.md` (both records of where things were, left deliberately — #42), and `decisions/README.md:13`, which is not a pointer at all but the sentence stating the folder *was* there until 2026-08-15 |
+| 38 | `architecture/domain-ownership.md:30` said `bootstrap.ts:149` "will be moved in 008.3-04", against an item marked Done. | Stage 4. Larger than "not yet moved": the sentence also named `getDatabase()` as the last remaining exception, and that accessor was **deleted** under #24. Replaced with the correction rather than a date |
+| 39 | `architecture/api-inventory.md:3` said 3/5 Done; task 008 said 5/5. | Stage 4. Both ends now state the same thing and each names the other. The inventory header names the two open items instead of counting them, and flags that #12 will take it to 2/5; the 008 header carries the matching correction (#42) |
+| 40 | `architecture/api-inventory.md:30` promised an `X-Project-Studio-API-Version: 1` header that `create-app.ts` never implemented. | Stage 4. **Deleted the promise, not built the header.** Every consumer is compiled from this repository, at the same version, in the same binary, over loopback — a version negotiation with no second party. The condition that brings it back is written into the file: a client that ships separately from the harness |
+| 78 | The git network-subcommand list existed twice — `permissions/policy.ts:10` and `tools/git/classify.ts:27` — with nothing noticing drift. | `a82a8ac`; `tests/unit/git-network-parity.test.ts`. The duplication stays (permissions must not import from tools) and is now documented at both ends. Behavioural, not an array comparison: it drives the real rule by id, so a change to the rule's *matching* fails it too. Mutation-verified — dropping `fetch-pack` from the policy copy fails with the exact symptom that matters, a network subcommand reaching the network with no prompt |
+| 80 | Six stale citations and status lines found by the audit. | Stage 4, all six: `decisions/README.md` prose count deleted (the index is the count); `api-inventory.md` `src/application/ports.ts` → `McpAdministration`; ADR 0033 status corrected with a dated block naming steps 1-3 done and 4-5 open; ADR 0028 given a dated status note pointing at `supervisor.rs:197` and #74; both `check-later.md` pointers replaced. Registered as five, measured as **six** — `api-inventory.md` cited the deleted file at three lines, and the ADR 0033 entry was two defects (the word *proposed* and the renumbered `008.44` gate) |
+| 42 | Over-claimed statuses in task 008. | Stage 4. Recorded as a dated correction table in the archived file's header; **no `[x]` was changed**, because rewriting the ticks destroys the evidence of how the over-claim happened. Each row measured at `a82a8ac`. Two of the register's own shorthands did not survive measurement and are corrected there: B-01 is not "against a build that never worked" — `harness.test.ts:419` is live, unskipped and passing, and B-01 fails for the reason its own Residual column already gave; and 008.6's missing migration was real when ticked but was closed later as #16. Also found and recorded: 008.8 cites **ADR 0034** for a decision that lives in **ADR 0019**, and 008.5 proves credential compensation with `src/application/ports.ts` `withCompensation`, where neither file nor symbol exists. Citation sweep: 81 distinct references, 68 resolve, 12 name a missing file, 1 points past EOF |
+| 81 | `schema_migration` written and never read in `src/`. | Stage 4, resolved as **serve the purpose by naming the reader**, not by adding a consumer. The table is not write-only — its reader is a human opening a user's `studio.db` while diagnosing a support case, which needs rows and no code. Migration control flow correctly uses `user_version`. Verified the record is not free-floating: `tests/unit/storage.test.ts:53` asserts one row per migration, in order, by name, so a migration that forgets to record itself fails the suite. ADR 0010 said "auditability" without naming the auditor, which is what made it look unserved; both the ADR and the `CREATE TABLE` site now say who reads it. An in-product reader would need a diagnostics surface that does not exist, and writing one speculatively is the dead code this cycle exists to remove |
 
 ### Answered — 5, on 2026-08-15
 
@@ -101,11 +117,11 @@ recommendation**, and that one changes the shape of the cycle — see #15.
 
 | # | Answer | What it changes |
 |---|---|---|
-| 12 | **Delete the Flue idempotency patches**, accept lost-ack-as-unknown for 1.0. | Removes the mechanism that caused #1 — a hand-diff against `dist/*.mjs` calling a function that existed in no version of beta.9, which made every agent submission return 500. #44/#45 split it into three pieces: the `hostname` plumbing is redundant and goes; `onReady(address)` stays until upstream carries the bound address; the FD admission bootstrap has no upstream equivalent and is the piece to raise with Flue. Stage 4, with the reduction measured rather than assumed. |
+| 12 | **Delete the Flue idempotency patches**, accept lost-ack-as-unknown for 1.0. | Removes the mechanism that caused #1 — a hand-diff against `dist/*.mjs` calling a function that existed in no version of beta.9, which made every agent submission return 500. **Scope narrowed 2026-08-15 to the `@flue/runtime` and `@flue/sdk` idempotency patches only. The `@flue/cli` patch is load-bearing and stays** — see the correction in #45: its `hostname` hunk is the sole supplier of the loopback bind address, and deleting it would bind every interface, against ADR 0028. Of the CLI patch's three pieces, `onReady(address)` stays until upstream carries the bound address, and the FD admission bootstrap has no upstream equivalent and is the piece to raise with Flue. Stage 4, with the reduction measured rather than assumed. |
 | 14 | **Keep `STUDIO Gateway/` — reversed on new information.** First answered as delete. Reversed once it emerged that the replacement is a **local TypeScript gateway bundled with Studio**, not another Cloudflare Worker, and that the folder is wanted as reference for analytics and structure. | Recorded as a reversal rather than re-answered quietly: the first answer was given without knowing the replacement's shape, and that fact is what changed it. Verified before agreeing: the folder is entirely self-contained (own `package.json`, lockfile, `tsconfig.json`, `wrangler.toml`) and **nothing in the Harness build, suite, typecheck, or architecture tests touches it**. It is reachable only from three documentation sentences. So the cost of keeping it is zero and the earlier "drift" argument was aesthetic, not structural — deleting source to fix a documentation error is treating the wrong thing. All 163 tracked files are real source (81 `src`, 44 `UI`, 19 `tests`, 7 `migrations`); no build output is tracked. **Conditions:** its README is labelled retired-reference (not built, not tested, not shipped, not 1.0), and `project-map.md` + root `README.md` stop describing it as a component — that part is #41/#42 work. |
 | 15 | **Implement the real sandbox — (a), not the recommended (b).** Windows and Linux only; **macOS is explicitly out of scope**, not deferred-with-intent. Stated reason: *"Real sandbox, or else we're going to take the heavy weight of half or bad implementation once again."* | The largest single change left in the cycle. `SandboxFactory` behind the ADR 0035 ports, `ProcessContainer` on Windows, `bwrap` on Linux. Turns #15 from a one-line status correction into a stage of its own, and reverses the 008.1 refusal of MXC. Un-blocks #32 in the opposite direction: `unsupported_isolation` stops being dead code and becomes the error the factory throws. Also changes what #41 must say — the containment text is corrected to *not yet contained*, not to *uncontained by policy*, because policy is no longer the final answer. |
-| 17 | **Delete the five broken `refs/codex/*` refs.** | Stage 4. All five verified unreachable-and-broken by `git for-each-ref` before removal. |
-| 18 | **Keep root `README.md`, minimal.** | Stays; its stale claims are corrected under #41 rather than removed with the file. |
+| 17 | **Delete the five `refs/codex/*` refs.** | **Done in `a82a8ac` — but not for the reason this register gave.** The row said they "point at nothing reachable". Measured, they pointed at real, intact **tree** objects holding a `Backend/` `Discord Bot/` `api/` `auth/` layout the project has since refactored away from. So this was a deletion of obsolete work, not of corruption, and the trees become unreachable and are collected. The premise was corrected and the deletion re-confirmed before it happened; recorded here because acting on the original wording would have been acting on a false statement that happened to reach the right answer. |
+| 18 | **Keep root `README.md`, minimal.** | Stays. **Its stale claims are now corrected (Stage 4), not deferred to #41.** Every path in it re-verified to resolve. `STUDIO Gateway/` was described as "Legacy … **Paused**", which implies it may resume; it is **retired**, replaced by a local TypeScript gateway, and the row now says so in the same words as that folder's own README banner (#14). The State section drops "None is verified" as a bare absolute, points at this register as the sole authority on what is settled, and deliberately carries **no counts of its own** so it cannot drift out of step with it. |
 
 **On #15 going against the recommendation.** The recommendation was written on
 the premise that ADR 0034 had already settled the policy, so only the word
@@ -124,7 +140,7 @@ them.**
 |---|---|---|---|
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
 
-### Needs Implementation — 22
+### Needs Implementation — 13
 
 Agreed, understood, work remains.
 
@@ -147,41 +163,34 @@ into #24 below.
 | 75 | `platform/paths.ts:162` `durableDirectories()` has no caller in `src/`. ADR 0014 presents it as the enforcement mechanism for the backup set — "a new durable directory cannot be added and then forgotten by the backup" — and that property holds only if something consumes the list. Nothing does. |
 | 76 | `platform/paths.ts:119` `settingsPath()` (`config/settings.json`) has no caller in `src/`. ADR 0014 lists it as "user-authored — losing it loses preferences", but preferences live in the SQLite `app_setting` table. The documented home for user settings is a file nothing reads or writes. |
 | 77 | `observability/index.ts:123` `getLogger()` is exported with **zero** callers, in `src/` or `tests/`. Every consumer takes `logger` as an option, which ADR 0037 says is preferable. Unlike the declared-not-wired ports of #31 it carries no marker, so it reads as live API. |
-| 78 | The git network-subcommand list exists twice — `permissions/policy.ts:10` `GIT_NETWORK_SUBCOMMANDS` and `tools/git/classify.ts:27` `NETWORK`. Verified identical today (10 entries each). `policy.ts` admits the duplication in a comment. The risk is structural: the day one list gains a subcommand, policy and classification disagree and a network git command slips past the Auto-Edit `ask`. Cheapest fix is a test asserting the two are equal. |
 | 79 | **`.node-version` pins `24.14.0`; every verification in this cycle ran on `v22.18.0`** — two majors below the pin, and below the `engines` floor of `>=22.19.0`. The suite, typecheck, build and the independent audit are all measurements on an unpinned runtime. Either re-baseline on the pinned version or change the pin; until then "verified" carries an asterisk. |
-| 80 | **Stale citations and status lines found by the audit** — one doc-truth sweep, listed so none is lost: `decisions/README.md:3` says "34 ADRs" and there are 38; `api-inventory.md:15,22,25` cites `src/application/ports.ts`, deleted under #8; ADR 0033 still reads `Status: proposed; Task 008.44 gate` although the execution context is implemented and wired, and 008.44 was renumbered to 008.4; ADR 0028 still says the Tauri project "does not implement this yet" although the supervisor shipped; `observability/redaction-rules.ts:17` and `architecture/mental-model.md:13` point at `check-later.md`, which exists nowhere. |
-| 81 | `storage/migrations.ts:421` creates `schema_migration` and `:439` inserts into it; no `SELECT` exists in `src/`. ADR 0010 justifies the table by auditability — "`user_version` alone loses the history" — so the history is recorded and never read. A test reads it, production does not. Serve the purpose or drop the claim. |
 | 70 | **One intermittent suite failure, now with a mechanism rather than a shrug.** A full run reported `1 failed | 1141 passed` and the failing test was lost to a truncated log. It did not reproduce in **eight** further full runs. Repetition was then abandoned for measurement: five verbose runs give per-test durations, and two things fall out. **(a)** `harness.test.ts` set `STARTUP_BUDGET_MS` to 60s while six of its nine tests run under a 30s timeout — vitest killed those tests 30 seconds before the startup diagnostic could fire, so a slow boot could only ever surface as a bare "test timed out" with none of the pid/exit-code/stderr report the file goes to trouble to build. Fixed: the budget is 20s, and the invariant *budget < enclosing timeout* is now stated where it can be read. **(b)** Margins are thinner than they look: `recovers after SIGKILL` runs 53–59s against a 90s timeout while other tests in the same suite vary 4× run to run (2.8s→12.7s). A 1.6× slowdown blows it. Raising that timeout is **not** proposed here — the file argues against exactly that, and doing it without knowing which test failed would be masking. Left open pending a captured failure or the #61 CI matrix. **Assigned to Stage 4b, definition of done: a captured failure with the startup report attached, or the #61 matrix running the suite on a second platform.** It was registered without a stage and would otherwise sit unowned. |
 
 **Repository and documentation**
 
 | # | Issue |
 |---|---|
-| 36 | Two documentation roots — `STUDIO HARNESS/docs/` and `documentation/`. **Resolved in this change**: ADRs, roadmap, known-issues and status moved to `documentation/`; `STUDIO HARNESS/docs/` deleted. Verify no path references broke. |
-| 37 | ~~Empty root `patches/` directory. Delete.~~ **Withdrawn.** There is nothing to delete and there never was: git does not track empty directories, so an empty root `patches/` could only have existed on one machine's disk. The issue was filed against a local artifact rather than the repository. The two real patches folders are load-bearing — see §4.2. |
-| 38 | `architecture/domain-ownership.md:30` says `bootstrap.ts:149` "will be moved in 008.3-04". It was not; the item is marked Done. |
-| 39 | `architecture/api-inventory.md:3` says 3/5 Done; task 008 says 5/5. |
-| 40 | `architecture/api-inventory.md:30` promises an `X-Project-Studio-API-Version: 1` header. `create-app.ts` has no such logic. Implement or stop documenting. |
-| 41 | Stale containment claims in README, ADRs 0019/0022/0024 — 008.8 decided uncontained-by-policy, so text calling connected MCP code "contained" is false. |
-| 42 | Over-claimed statuses in task 008 (008.3 Done-by-exception; 008.4 3/5 not 5/5; 008.4 B-01 against a build that never worked; 008.6 no migration; 008.8 0% implementation). Record the correction, do not silently re-tick. |
+| 41 | Stale containment claims in README, ADRs 0019/0022/0024 — 008.8 decided uncontained-by-policy, so text calling connected MCP code "contained" is false. **Blocked on #15 and reshaped by it:** the correction is no longer "uncontained by policy" but *not yet contained*, because #15 puts a real sandbox back in scope. Doing this before the factory lands would write a third wrong claim. Assigned to Stage 4b, after #15. |
 
-### Answered Unknowns — 2 (was "Unable to Determine")
+### Answered Unknowns — 3 (was "Unable to Determine")
 
 Both were "not investigated" rather than hard. Answered 2026-08-15; kept here
 with their findings because the answers changed #12's options.
 
 | # | Question | Answer |
 |---|---|---|
+| 43 | Whether a corrupt `studio.db` really fails to abort startup, or whether the test was wrong. | **Answered in Stage 1-2 and then lost — restored here 2026-08-15.** It was answered by reproduction (`stage-1-2-plan.md` §#43) and folded into #25's Solved row without keeping its own number, which is exactly what the permanence rule exists to prevent; a reader counting the register found #43 missing. The answer: with a hot `-wal`/`-shm` pair, SQLite **replays the WAL, reconstructs a valid header and opens normally**, so overwriting the main file with garbage does not produce an unopenable database. The recovery property 008.1 claims is real; the test was corrupting one of three files and calling the result corrupt. Cause of the hot WAL: `SIGTERM` maps to `TerminateProcess` on Windows, so `app.ts:120` never ran and nothing checkpointed — a second finding, registered as **#63** and since fixed. Now covered by both a recovery and a refusal test in `storage.test.ts`. |
 | 44 | Whether the client and harness `@flue__sdk` patches have diverged. | **They have not.** Normalising for file order and `index` lines, the two patch the same two files with byte-identical hunks. But the register's description of them was wrong in a way that matters: it said both are "pinned by content hash". Only the harness one is. The client's reads `index 0000000..0000000`, so it is pinned to nothing and `git apply` falls back to context alone — the **less** safe of the two, because a version bump whose surrounding lines still match applies silently instead of failing loudly. |
 | 45 | Whether the `@flue/cli` patch is still required, or whether beta.9 offers a supported hook. | **Partly obsolete, and the parts separate cleanly.** Measured against the pristine `@flue/cli@1.0.0-beta.9` tarball, not against our patched `node_modules`. ~~`options.hostname` is **native** (`flue.js:1254`) — that plumbing is redundant.~~ **Corrected 2026-08-15, and the correction is the point:** `flue.js:1254` is *inside* `startFlueNodeServer` and **consumes** the option; our hunk is at the **call site** and is the only thing that reads `PROJECT_STUDIO_HARNESS_HOSTNAME` and supplies it. Removing it would not fall back to native behaviour — `flue.js:2221` is `if (options.hostname) listen(port, hostname) else listen(port)`, and no hostname means **binding every interface**. Deleting this hunk would take the Harness from loopback-only to network-exposed, against ADR 0028. "Native" described the option existing, not anyone passing it. Both the audit and this register drew the wrong conclusion from the same grep. `options.onReady` is **native but zero-argument**; the patch changes it to `onReady?.(address)`, and since we bind on port 0 and need the bound port back, that change survives. The FD-based admission bootstrap has **no upstream equivalent** — a genuine gap, and the piece worth raising with Flue rather than carrying as a hand-diff against a build artifact indefinitely. |
 
-### Withdrawn — 1
+### Withdrawn — 2
 
 Filed, then disproved. Kept rather than deleted: the number is permanent, and
 an issue that was wrong is worth as much as one that was right.
 
 | # | Issue as filed | Why it is wrong |
 |---|---|---|
+| 37 | "Empty root `patches/` directory. Delete." | There was nothing to delete and there never was. Git does not track empty directories, so an empty root `patches/` could only ever have existed on one machine's disk — the issue was filed against a local artifact, not against the repository. The two real patches folders are load-bearing; see §4.2. |
 | 68 | "Every conversation for the `studio` agent shares the id `conversation:studio`, so grants and approval scope are per *agent*." | Read from the default expression `` `conversation:${agentId}` `` rather than measured. Flue's initializer `id` is the agent **instance**, not the agent name — probed against a running harness across two threads, which reported `alpha` and `beta`, not `studio`. Conversations are isolated; the defect runs the other way and is #69. The probe also showed the initializer running **twice per submission**, independently corroborating #35/#67. |
 
 ### No Longer Relevant — 3
@@ -231,7 +240,13 @@ Stage 2  Architecture #19-#24         ← DONE (14b36df, f25d715, d66e844)
 Stage 3  Dead code #30-#35            ← DONE for #30/#33/#34/#35/#24b;
    |                                       #32 deferred into Stage 4b with #15
    ↓
-Stage 4  Repo + docs #36-#42          ← acts on #14 (delete Gateway) and #17
+Stage 4  Repo + docs #36-#42          ← DONE for #17/#18/#36/#37/#38/#39/#40/
+   |                                       #42/#78/#80/#81 (a82a8ac + this).
+   |                                       #41 moved to Stage 4b (needs #15);
+   |                                       #12 is the last item, taken on its
+   |                                       own because it changes behaviour.
+   |                                       Acts on #14 as **keep**, not delete
+   |                                       — the answer was reversed.
    ↓
 Stage 4b OS isolation #15 + #32       ← NEW, created by the #15 answer. Real
    |                                    `SandboxFactory`: Windows `ProcessContainer`,

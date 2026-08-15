@@ -2,6 +2,34 @@
 > guidance. The live source of truth is
 > `documentation/work/phases-1-11-remediation.md`.
 
+## Status corrections, 2026-08-15 (meta-task #42)
+
+**The ticked boxes below are not re-scored, and no `[x]` in this file was
+changed.** This file is the record of what was believed on 2026-08-14; rewriting
+it would destroy the evidence of how the over-claim happened. What follows is
+what a later measurement found, so a reader does not act on a tick that the code
+does not support. Everything here was checked against the tree at commit
+`a82a8ac`, not inferred from the wording.
+
+| Claim in this file | What the code shows |
+|---|---|
+| **008.3** — 13/13 ticked, including "narrow `StudioRuntime` … **or record a narrowly scoped exception in an ADR**". | Closed on the exception branch, not the fix. The exception was [ADR 0034](../../decisions/0034-modular-monolith-exception.md), now **superseded by [ADR 0035](../../decisions/0035-runtime-composition-and-ports.md)**, which says in its own words that the exception was taken instead of the fix. Read 008.3 as *Done by exception, exception since withdrawn*. |
+| **008.4** — 5/5 ticked. | **3 of 5 stand.** Item 1 (route inventory) and items 4-5 (UUID policy `src/identity/uuid.ts:17`, execution identity `src/execution/context.ts`) are real. Item 2 (compatibility/version rules) **was never implemented** — no version logic exists in `create-app.ts` or the admission middleware; the rule was deleted rather than left as a promise (meta-task **#40**). Item 3 (initial-admission idempotency) exists **only as vendored `@flue` patches**; meta-task **#12** removes them, at which point item 3 reverts to open. |
+| **008.1 B-01** — "Done via versioned Flue patches". | Implemented and passing — `tests/integration/harness.test.ts:419` is a live, unskipped test that proves exact-key replay returns one submission and one turn. What is **not** true is that this closes the blocker: B-01's own Residual column already said it "requires upstream Flue API or checked-in patch promotion to be considered stable", and neither happened. Under **#12** the patches are deleted and lost-ack stays `unknown` for 1.0, so B-01 is **withdrawn, not delivered**. Its rule still binds: no fix by blindly retrying `send()`. |
+| **008.6** — "durable in `studio.db` `pending_approval`", ticked. | **The tick was ahead of the code, and the code has since caught up.** When 008.6 was ticked the decision was recorded but no migration existed — the over-claim is real. It was closed later as meta-task **#16** (migration 009, `PendingApprovalStore`, ADR 0036, four tests including one across a restart). Verified here rather than assumed: the migration is at `src/storage/migrations.ts:247` and the repository reads and writes the table at `src/permissions/pending-approvals.ts:42,54,60`. This row is a correction of the *timeline*, not an open defect. |
+| **008.8** — 3/3 ticked; decision recorded as "**ADR 0034**". | The decision is real but **ADR 0034 is the wrong reference** — 0034 is the modular-monolith exception. The uncontained-by-consent decision lives in [ADR 0019](../../decisions/0019-running-a-chosen-program.md). Two further gaps: `unsupported_isolation` is called "now dead" while it is still declared at `src/sandbox/errors.ts:9` and `:19`; and the whole stance is **reversed** by meta-task **#15** — a real OS sandbox is now in scope for Windows and Linux for 1.0, so 008.8 records a decision that no longer holds. |
+| **008.5** — credential compensation proved by "`src/application/ports.ts` `withCompensation`". | **Neither the file nor the symbol exists.** `src/application/` has no `ports.ts`, and `withCompensation` appears nowhere in `src/`. The composition rules that replaced it are in ADR 0035. |
+
+**Citations across this file.** Of 81 distinct `path` / `path:line` references, 68
+resolve, 12 name a file that does not exist, and 1 points past the end of its
+file. The dead ones are the pre-move layout (`STUDIO HARNESS/docs/decisions/…`,
+`documentation/api-inventory.md`, `documentation/domain-ownership.md`,
+`documentation/architecture.md`) plus four root status files that were archived
+(`STATUS.md`, `KNOWN-ISSUES.md`, `PHASE-11-CHECKPOINT.md`,
+`STUDIO-HARNESS-STATE.md`) and `src/application/ports.ts` above. They are left
+in place: they are accurate as a record of where things were, and repointing
+them would make this file look like current guidance, which it is not.
+
 # Task 008 - Phase 1-11 Completion
 
 **Status:** in progress — 008.1 Done (13/14 +1 Accepted, Linux Done / Windows Accepted), 008.2 Done — 16/181 milestone per instruction (file verbatim 21 Done in 008.1+008.2 +3 Done in new 008.4), 165 remaining in combined face 2026-08-14

@@ -56,6 +56,19 @@ recording name and timestamp, because `user_version` alone loses the history.
 Each migration runs in its own transaction, so a failure leaves the file at the
 last fully applied version rather than half-migrated.
 
+> **Who reads that history — clarified 2026-08-15 (meta-task #81).** Nothing in
+> `src/` issues a `SELECT` against `schema_migration`, and that is correct, not
+> an omission. Migration control flow reads `user_version`, which is the right
+> source; the table exists for **out-of-band inspection** — opening a user's
+> `studio.db` while diagnosing a support case and asking which migrations ran
+> and when. That reader needs no code, only the rows. The record's integrity is
+> guarded: `tests/unit/storage.test.ts:53` asserts the table holds one row per
+> migration, in order, with matching names, so a migration that forgets to
+> record itself fails the suite. An in-product reader would need a diagnostics
+> surface, and no such surface exists; adding one speculatively would be dead
+> code. This paragraph originally said "auditability" without naming the
+> auditor, which is what made the table look write-only.
+
 A database at a *higher* version than the build understands is refused. Desktop
 users downgrade, and old code writing a new schema corrupts data quietly.
 

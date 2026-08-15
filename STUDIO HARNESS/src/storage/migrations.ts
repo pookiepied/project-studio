@@ -417,6 +417,12 @@ export function migrate(
     return current;
   }
 
+  // Nothing in `src/` reads this table, on purpose. Migration control flow uses
+  // `user_version`; the rows are for opening a user's `studio.db` by hand and
+  // asking which migrations ran and when. The record is not free-floating —
+  // `tests/unit/storage.test.ts` asserts one row per migration, in order, by
+  // name, so a migration that forgets to record itself fails. ADR 0010 and
+  // meta-task #81.
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migration (
       version     INTEGER PRIMARY KEY,

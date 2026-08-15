@@ -1,8 +1,10 @@
 # API Inventory — Task 008.4 (ex-008.44)
 
-> **Source:** `008.4` in `tasks/phase-11-mcp/008-phase-1-11-completion.md:308` — inventory every Harness HTTP route, request/response/error/scope/stream contract and add compatibility/version rules. **Status:** 3/5 Done (UUID, execution identity, idempotency). **The 2 open items are named rather than counted, because a count is what let them stay open unnoticed:** (1) grant listing and revocation have no route and no caller — meta-task **#73**; (2) the version rule below was specified and never built — meta-task **#40**, resolved by deleting the rule.
+> **Source:** `008.4` in [`documentation/archive/phase-11-mcp/008-phase-1-11-completion.md`](../archive/phase-11-mcp/008-phase-1-11-completion.md) — inventory every Harness HTTP route, request/response/error/scope/stream contract and add compatibility/version rules. **Status: 3 of 5.** **The open items are named rather than counted, because a count is what let them stay open unnoticed:** (1) the *inventory* was wrong — grant listing and revocation are described as routes and neither exists nor has a caller, meta-task **#73**; (2) the version rule below was specified and never built, meta-task **#40**, resolved by deleting the rule rather than leaving the promise.
 >
-> Task 008 records this section as 5/5. It is 3/5. The discrepancy is meta-task **#39**.
+> The three that stand are the UUID policy (`src/identity/uuid.ts:17`), the execution identity graph (`src/execution/context.ts`), and initial-admission idempotency. **Idempotency is provisional:** it exists only as vendored `@flue` patches, and meta-task **#12** deletes them and accepts lost-ack as `unknown` for 1.0. When that lands this line becomes 2 of 5.
+>
+> Task 008 records this section as 5/5. It is not. The discrepancy is meta-task **#39**; the full set of corrections to that file is meta-task **#42**, recorded in its header.
 
 ## 1. Route Inventory (Harness HTTP surface)
 

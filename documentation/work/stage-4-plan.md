@@ -110,7 +110,7 @@ second gets left alone.
 | 4 | #39, #40 | `api-inventory.md` | status line true; version header decided per §3 |
 | 5 | #42 | `archive/phase-11-mcp/008-*.md` | corrections recorded **as corrections**, not silently re-ticked |
 | 6 | #81 | `migrations.ts` or ADR 0010 | the claim and the code agree |
-| 7 | #12 | `patches/@flue__cli`, `pnpm-workspace.yaml` | redundant `hostname` hunk gone; suite still green |
+| 7 | #12 | ~~`patches/@flue__cli`~~ `patches/@flue__runtime`, `patches/@flue__sdk`, `pnpm-workspace.yaml` | ~~redundant `hostname` hunk gone~~ — **retracted, see §7.** The CLI patch is load-bearing; the step is the two idempotency patches, and it is taken **after** this stage because it changes behaviour |
 | 8 | #17 | git refs | `git for-each-ref refs/codex` silent |
 | 9 | #78 (optional) | new test | policy and classify lists asserted equal |
 | 10 | #18 | root `README.md` | claims match the register |
@@ -134,4 +134,64 @@ containment changes in 4b.
 
 ## 7. Outcome
 
-*Filled in on completion.*
+**Closed: #17, #18, #36, #37, #38, #39, #40, #42, #78, #80, #81.**
+**Carried out: #41** (to Stage 4b, blocked on #15) **and #12** (taken on its own
+after this stage). Suite at close: **74 files, 1150 passed, 2 skipped, 0
+failed**; `tsc --noEmit` clean; `flue build --target node` clean.
+
+### What the plan got wrong
+
+Three of this document's own statements did not survive measurement, and they
+are worth more than the eleven that did.
+
+**Step 7 was a security regression waiting to happen.** The plan, the register
+and the independent audit all said the `@flue/cli` patch's `hostname` plumbing
+was redundant because `options.hostname` is native at `flue.js:1254`. All three
+read the same grep hit and none checked which side of the call it sat on.
+`:1254` *consumes* the option inside `startFlueNodeServer`; our hunk is the call
+site that *supplies* it, and it is the only thing that reads
+`PROJECT_STUDIO_HARNESS_HOSTNAME`. With no hostname, `flue.js:2221` binds every
+interface. Deleting the hunk would have taken the Harness from loopback-only to
+network-exposed, against ADR 0028 — and the suite would have stayed green,
+because nothing tests the bind address. Three independent readers reaching the
+same wrong answer from the same evidence is the argument for measurement over
+consensus.
+
+**#17's premise was false and its conclusion was right.** The register said the
+five `refs/codex/*` refs "point at nothing reachable". They pointed at intact
+tree objects holding an obsolete `Backend/` `Discord Bot/` `api/` `auth/`
+layout. Deleting them was still correct — for a different reason, confirmed
+before acting rather than after.
+
+**#37 was never a repository issue.** Git cannot track an empty directory, so
+an empty root `patches/` could only have existed on one machine's disk.
+Withdrawn.
+
+### What the register got wrong, found while closing #42
+
+Two of #42's own shorthands failed the same test. "B-01 against a build that
+never worked" — `harness.test.ts:419` is live, unskipped and passing; B-01 fails
+for the reason its own Residual column already gave, not because it never
+worked. "008.6 no migration" was true when the box was ticked and had since been
+closed as #16. Both are corrected in the archived file rather than repeated.
+
+Two defects the register had not recorded at all turned up in the same pass:
+008.8 cites **ADR 0034** for a decision that lives in **ADR 0019**, and 008.5
+proves credential compensation with `src/application/ports.ts`
+`withCompensation` — neither file nor symbol exists.
+
+### The counting habit earned its place again
+
+Recounting the register rather than trusting its headings recovered **#43**,
+answered back in Stage 1-2 and folded into #25's row without keeping its number.
+Every number 1-81 now appears in exactly one section, verified by script.
+
+### One judgement call worth naming
+
+**#81 was resolved by naming the reader, not by adding one.** `schema_migration`
+looked write-only because ADR 0010 said "auditability" without saying whose. Its
+reader is a person opening a user's `studio.db` during a support case, which
+needs rows and no code; migration control flow correctly uses `user_version`.
+Adding an in-product `SELECT` with no consumer would have been exactly the dead
+code this cycle exists to delete. Checked before concluding it: the record is
+guarded — `storage.test.ts:53` asserts one row per migration, in order, by name.
