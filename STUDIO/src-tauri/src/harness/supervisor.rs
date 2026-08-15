@@ -11,6 +11,7 @@ use command_fds::{CommandFdExt, FdMapping};
 use os_pipe::PipeReader;
 
 use crate::harness::bootstrap::{generate_bootstrap, AdmissionBootstrap};
+use crate::harness::environment::apply_harness_environment;
 use crate::harness::endpoint::{parse_readiness_line, HarnessEndpoint, HarnessReadiness};
 
 const READINESS_FD: i32 = 3;
@@ -188,14 +189,22 @@ impl HarnessSupervisor {
         // Build command
         let mut cmd = Command::new("node");
         cmd.arg(&server_path);
+
+        // The environment is decided in one place, not here. This used to read
+        // "for now inherit all except credential", which handed the Harness
+        // every API key, cloud credential and CI token in the shell that
+        // launched the app, and protected exactly the one variable someone
+        // remembered to remove. See `environment.rs` and meta-task #74.
+        //
+        // It runs before the four below on purpose: it clears, so anything set
+        // first would be wiped, and anything the host happens to export under
+        // these names cannot shadow what we set deliberately.
+        apply_harness_environment(&mut cmd);
+
         cmd.env("PORT", "0");
         cmd.env("PROJECT_STUDIO_HARNESS_HOSTNAME", "127.0.0.1");
         cmd.env("PROJECT_STUDIO_READINESS_FD", READINESS_FD.to_string());
         cmd.env("PROJECT_STUDIO_ADMISSION_BOOTSTRAP_FD", BOOTSTRAP_FD.to_string());
-        // Ensure credential not in env
-        cmd.env_remove("PROJECT_STUDIO_ADMISSION_CREDENTIAL");
-        // Inherit filtered env: keep PATH, HOME etc but not secrets? For now inherit all except credential.
-        // Cargo sets many vars; we just remove credential.
         cmd.stdin(Stdio::null());
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());

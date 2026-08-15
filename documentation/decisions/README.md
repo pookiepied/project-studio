@@ -53,6 +53,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0018](0018-trust-and-modes.md) | Trust and modes |
 | [0021](0021-a-grant-belongs-to-a-project.md) | A grant belongs to a project |
 | [0038](0038-a-grant-belongs-to-an-agent.md) | A grant belongs to an agent — the third column of a scope, and why `always` could not outlive a conversation until it did |
+| [0039](0039-a-child-inherits-nothing-it-was-not-given.md) | A child process inherits nothing it was not given — one rule, three named policies, and why the allowlist lives in two languages |
 | [0024](0024-capabilities-are-on-and-the-list-is-honest.md) | Capabilities are on, and the list is honest |
 | [0036](0036-user-decisions-are-durable.md) | A user decision is durable — approvals and answers live in SQL, never in process memory |
 

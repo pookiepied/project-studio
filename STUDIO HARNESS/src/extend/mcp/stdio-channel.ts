@@ -1,10 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 
-import {
-  assertRunnableCommand,
-  buildEnvironment,
-  killProcessTree,
-} from "../../process/exec.js";
+import { buildEnvironment } from "../../process/environment.js";
+import { assertRunnableCommand, killProcessTree } from "../../process/exec.js";
 import { ExtendError } from "../errors.js";
 import type { McpChannel } from "./connection.js";
 

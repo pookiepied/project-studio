@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ProcessError } from "../../src/process/errors.js";
-import { buildEnvironment, runProcess } from "../../src/process/exec.js";
+import { buildEnvironment } from "../../src/process/environment.js";
+import { runProcess } from "../../src/process/exec.js";
 
 /** A real, absolute, OS-native executable to drive the tests with. */
 const NODE = process.execPath;

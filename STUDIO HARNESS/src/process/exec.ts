@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { extname, isAbsolute } from "node:path";
 
+import { buildEnvironment } from "./environment.js";
 import { ProcessError } from "./errors.js";
 
 /**
@@ -14,6 +15,11 @@ import { ProcessError } from "./errors.js";
  *
  * That property is what lets `git` and `ripgrep` be treated as substrate rather
  * than as arbitrary execution — see ADR 0013.
+ *
+ * **What a child inherits is not decided here.** That is one question with
+ * three answers depending on who is being started, and it lives in
+ * `environment.ts` so the answers sit next to each other instead of being
+ * rediscovered per spawn site (#74).
  */
 
 /** Two minutes. Long enough for a real `git clone`, short enough to notice. */
@@ -21,22 +27,6 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 
 /** 8 MiB. Beyond this the output is not being read by a human or a model. */
 const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
-
-/**
- * Variables Windows binaries need in order to start at all.
- *
- * This is the single, deliberate exception to "the environment is built from
- * policy, never from `process.env`". Without `SystemRoot` many Windows
- * executables fail to initialise the socket and crypto layers; without a temp
- * directory git cannot write its index lock. The list is an allowlist of OS
- * plumbing, and nothing here can carry a credential.
- *
- * `PATH` is absent from this list and then **explicitly blanked below**, which
- * is not the same thing. Inheriting `PATH` is how a spawned binary finds tools
- * the caller never approved, and on Windows leaving it out does not leave it
- * out — see the comment on that line.
- */
-const OS_REQUIRED_VARIABLES = ["SystemRoot", "windir", "TEMP", "TMP"] as const;
 
 export interface ProcessResult {
   /** What the child concluded. Non-zero is a result, not a failure. */
@@ -56,42 +46,6 @@ export interface RunProcessOptions {
   readonly maxOutputBytes?: number;
   readonly signal?: AbortSignal;
   readonly stdin?: string;
-}
-
-/**
- * Builds the child's environment.
- *
- * Exported so tests can assert the exception above stays an exception.
- */
-export function buildEnvironment(
-  supplied: Readonly<Record<string, string>> = {},
-): Record<string, string> {
-  const environment: Record<string, string> = {};
-
-  for (const name of OS_REQUIRED_VARIABLES) {
-    const value = process.env[name];
-    if (value !== undefined) environment[name] = value;
-  }
-
-  // Windows hands a child `PATH` whether or not we pass one. Measured, not
-  // assumed: spawning with `env: {}` still delivers PATH, USERPROFILE,
-  // USERNAME, HOMEDRIVE, HOMEPATH, LOGONSERVER, and USERDOMAIN, because libuv
-  // merges a set of variables the platform treats as mandatory.
-  //
-  // Leaving it there would make this file's central claim false — a spawned
-  // binary could resolve any tool on the machine, which is the exact thing
-  // building an environment from policy is meant to prevent. An explicitly
-  // empty value does override the injected one, so it is set rather than
-  // omitted. Omission is not refusal on this platform.
-  //
-  // The other injected variables are left alone: they name the user rather
-  // than granting reach, and blanking a home directory breaks programs for no
-  // security gain.
-  environment.PATH = "";
-
-  // The caller's policy wins, so a policy that pins TEMP is honoured rather
-  // than silently overwritten by the host's.
-  return { ...environment, ...supplied };
 }
 
 /**
