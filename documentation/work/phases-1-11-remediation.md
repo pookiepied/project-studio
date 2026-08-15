@@ -28,9 +28,12 @@ future features, and they live in §5 rather than as open issues.
 
 ## 2. Issue register
 
-65 issues. Categories per `../README.md` §4. Numbers are permanent.
+**70 numbers issued, 69 live** (#68 withdrawn). Categories per
+`../README.md` §4. Numbers are permanent, so this count only ever grows.
+The section headings below are the authority for how many are in each state;
+they are recounted whenever one moves.
 
-### Solved — 31
+### Solved — 32, plus #24b
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
 Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1138
@@ -98,6 +101,7 @@ recommendation**, and that one changes the shape of the cycle — see #15.
 
 | # | Answer | What it changes |
 |---|---|---|
+| 14 | **Delete `STUDIO Gateway/`.** Answered as "you decide what's best, no need for wrongful code or dead code, or duplicated things", which is (b). | 163 tracked files removed in Stage 4. Recovery is real, not asserted: tags `snapshot/phases-1-11-pre-remediation` and `pre-phase5-snapshot` both contain the tree, verified present before deletion. |
 | 15 | **Implement the real sandbox — (a), not the recommended (b).** Windows and Linux only; **macOS is explicitly out of scope**, not deferred-with-intent. Stated reason: *"Real sandbox, or else we're going to take the heavy weight of half or bad implementation once again."* | The largest single change left in the cycle. `SandboxFactory` behind the ADR 0035 ports, `ProcessContainer` on Windows, `bwrap` on Linux. Turns #15 from a one-line status correction into a stage of its own, and reverses the 008.1 refusal of MXC. Un-blocks #32 in the opposite direction: `unsupported_isolation` stops being dead code and becomes the error the factory throws. Also changes what #41 must say — the containment text is corrected to *not yet contained*, not to *uncontained by policy*, because policy is no longer the final answer. |
 | 17 | **Delete the five broken `refs/codex/*` refs.** | Stage 4. All five verified unreachable-and-broken by `git for-each-ref` before removal. |
 | 18 | **Keep root `README.md`, minimal.** | Stays; its stale claims are corrected under #41 rather than removed with the file. |
@@ -120,7 +124,7 @@ them.**
 | 12 | **B-01 Flue admission idempotency.** The patch hijacks `submissionId` as `project-studio:${key}` from a header; Flue already has idempotent `dispatch({dispatchId})` with 409. Both patches are hand-diffs against `dist/*.mjs` pinned by content hash — a version bump drops them silently, which is exactly how #1 happened. | (a) upstream a public Flue admission key; (b) move to `dispatch({dispatchId})`; (c) **Accept** lost-ack-as-unknown for 1.0, delete the two idempotency patches, keep automatic retry off | **(c).** It is the honest 1.0 position, deletes the most fragile code in the tree, and 008.1 already documents unknown-never-retried as the contract. (a) is right long-term, but it is upstream work we do not control. |
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
 
-### Needs Implementation — 9
+### Needs Implementation — 11
 
 Agreed, understood, work remains.
 
