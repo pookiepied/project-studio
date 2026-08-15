@@ -253,10 +253,20 @@ export class StudioRuntime implements AgentHost {
    * fresh one per run restarts it, which labelled the first snapshot of every
    * run "turn 1" and made undo history unnavigable across a conversation.
    *
-   * Still grows with distinct conversations, which is bounded only by how many
-   * a process sees. That is acceptable while `ExecutionScope.conversationId`
-   * defaults per *agent* (#68); when real conversation ids arrive, this map
-   * needs an eviction policy and #68 is where that is decided.
+   * **It grows without bound, and that is now overdue rather than deferred.**
+   * This comment used to say the growth was acceptable "while
+   * `ExecutionScope.conversationId` defaults per *agent*", and that an eviction
+   * policy would be needed "when real conversation ids arrive". They arrived:
+   * #69 made `conversationId` Flue's per-thread instance id, so every distinct
+   * conversation a long-lived process serves now adds an entry that is never
+   * removed — each holding a `TurnSnapshots`, its `SnapshotStore`, and a
+   * shadow-repository handle.
+   *
+   * The old text also pointed at #68 as the place the policy would be decided.
+   * #68 was withdrawn as wrong. A comment naming a dead issue is worse than no
+   * comment, because it reads as though someone is handling it. **The eviction
+   * policy is #72** — what evicts, and on what signal, is a decision and not a
+   * detail the fix should settle on its own.
    */
   readonly #turnSnapshots = new Map<string, TurnSnapshots>();
   #started: Promise<void> | undefined;
