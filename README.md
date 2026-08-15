@@ -15,9 +15,9 @@ The Harness is the primary codebase.
 
 **[`documentation/`](documentation/README.md)** — how the project is managed.
 
-1. [`documentation/tree/conventions.md`](documentation/tree/conventions.md) — how work is recorded.
-2. [`documentation/tree/project-tree.md`](documentation/tree/project-tree.md) — what is done and what is not.
-3. [`documentation/PROJECT-MAP.md`](documentation/PROJECT-MAP.md) — where everything lives.
+1. [`documentation/README.md`](documentation/README.md) — how documentation works here.
+2. [`documentation/work/phases-1-11-remediation.md`](documentation/work/phases-1-11-remediation.md) — every open issue, numbered.
+3. [`documentation/project-map.md`](documentation/project-map.md) — where everything lives.
 
 ## State
 
