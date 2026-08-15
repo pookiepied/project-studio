@@ -24,7 +24,8 @@ wrong answer, and why we believed it, is the useful part.
 | [0001](0001-harness-boundaries.md) | Harness boundaries |
 | [0013](0013-execution-substrate.md) | Execution substrate |
 | [0014](0014-where-things-live.md) | Where things live |
-| [0034](0034-modular-monolith-exception.md) | Modular-monolith exception — **disputed**, see below |
+| [0034](0034-modular-monolith-exception.md) | Modular-monolith exception — **superseded by 0035** |
+| [0035](0035-runtime-composition-and-ports.md) | Runtime composition, ports, and ownership |
 
 ### Storage
 | | |
