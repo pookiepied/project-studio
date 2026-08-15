@@ -16,7 +16,7 @@ import {
 import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ProviderSettingsStore } from "../../src/models/local/settings-store.js";
-import { closeDatabase, getDatabase } from "../../src/storage/database.js";
+import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 // Bootstrapping `local` reads provider settings. Point the store at memory so
 // these tests never touch — or depend on — the developer's real settings.
@@ -24,8 +24,15 @@ process.env.PROJECT_STUDIO_STORE_PATH = ":memory:";
 
 const originalEnv = { ...process.env };
 
+/**
+ * Opened per test rather than shared through a module global. The global made
+ * `PROJECT_STUDIO_STORE_PATH` inert for whichever test ran second.
+ */
+let database: StudioDatabase | undefined;
+
 afterEach(() => {
-  closeDatabase();
+  database?.close();
+  database = undefined;
   for (const key of Object.keys(process.env)) {
     if (!(key in originalEnv)) {
       delete process.env[key];
@@ -144,10 +151,12 @@ describe("createModelProviderAdapter", () => {
     // `local` is operational now; what it refuses is starting without knowing
     // which model the stable alias should route to.
     delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
-    expect(() => createModelProviderAdapter("local")).toThrow(
+    const opened = openDatabase();
+    database = opened;
+    expect(() => createModelProviderAdapter("local", { database: opened })).toThrow(
       ProviderConfigurationError,
     );
-    expect(() => createModelProviderAdapter("local")).toThrow(
+    expect(() => createModelProviderAdapter("local", { database: opened })).toThrow(
       /PROJECT_STUDIO_LOCAL_DEFAULT_MODEL/,
     );
   });
@@ -267,7 +276,9 @@ describe("provider bootstrap coordinator", () => {
     // The subphase 5 payoff: what the user chose in settings is what the
     // harness starts on.
     delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
-    const settings = new ProviderSettingsStore(getDatabase());
+    const opened = openDatabase();
+    database = opened;
+    const settings = new ProviderSettingsStore(opened);
     settings.upsertCustomProvider({
       id: "ollama",
       name: "Ollama",
@@ -279,9 +290,10 @@ describe("provider bootstrap coordinator", () => {
     });
     settings.setDefaultModel({ provider: "ollama", model: "llama3.1:8b" });
 
-    const result = createProviderBootstrapCoordinator().bootstrap({
-      source: "local",
-    });
+    const result = createProviderBootstrapCoordinator().bootstrap(
+      { source: "local" },
+      { database: opened },
+    );
 
     expect(result.descriptor.operational).toBe(true);
     expect(result.descriptor.resolvedModelId).toBe(STUDIO_MODEL_ID);

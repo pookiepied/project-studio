@@ -4,9 +4,9 @@ import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
 import { authContext, requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
 import { ExtendError } from "../../../extend/errors.js";
 import { assertSafeMcpPayload } from "../../../extend/mcp/input-security.js";
-import type { McpServerInput, McpServerRecord } from "../../../extend/mcp/registry.js";
+import type { McpServerInput } from "../../../extend/mcp/registry.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
-import type { StudioRuntime } from "../../../application/studio-runtime.js";
+import type { McpAdministration } from "../../../application/mcp-management.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -102,35 +102,22 @@ function failure(error: unknown): { error: string; code: string } {
   return { error: report.message, code: report.code };
 }
 
-function statusOf(
-  runtime: StudioRuntime,
-  record: McpServerRecord,
-): Record<string, unknown> {
-  return {
-    ...record,
-    status: runtime.supervisor.status(record.id),
-  };
-}
-
-export function createMcpRoutes(runtime: StudioRuntime): Hono<AdmissionEnv> {
+export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.EXTENSION_MANAGEMENT));
 
-  routes.get("/servers", (context) =>
-    context.json(runtime.registry.list().map((record) => statusOf(runtime, record))),
-  );
+  routes.get("/servers", (context) => context.json(servers.list()));
 
   routes.get("/servers/:id/status", (context) => {
-    const id = context.req.param("id");
-    const record = runtime.registry.get(id);
+    const record = servers.get(context.req.param("id"));
     if (record === undefined) return context.json({ error: "That server is not installed." }, 404);
-    return context.json(statusOf(runtime, record));
+    return context.json(record);
   });
 
   routes.post("/servers", async (context) => {
     try {
-      const record = runtime.management.save(serverInput(await body(context)), authContext(context));
-      return context.json(statusOf(runtime, record), 201);
+      const record = servers.save(serverInput(await body(context)), authContext(context));
+      return context.json(record, 201);
     } catch (error) {
       return context.json(failure(error), 400);
     }
@@ -139,12 +126,12 @@ export function createMcpRoutes(runtime: StudioRuntime): Hono<AdmissionEnv> {
   routes.patch("/servers/:id", async (context) => {
     try {
       const id = context.req.param("id");
-      const current = runtime.registry.get(id);
+      const current = servers.get(id);
       if (current === undefined) return context.json({ error: "That server is not installed." }, 404);
       const patch = await body(context);
       const merged = isRecord(patch) ? { ...current, ...patch, id } : patch;
-      const record = runtime.management.save(serverInput(merged, id), authContext(context));
-      return context.json(statusOf(runtime, record));
+      const record = servers.save(serverInput(merged, id), authContext(context));
+      return context.json(record);
     } catch (error) {
       return context.json(failure(error), 400);
     }
@@ -152,7 +139,7 @@ export function createMcpRoutes(runtime: StudioRuntime): Hono<AdmissionEnv> {
 
   routes.delete("/servers/:id", async (context) => {
     try {
-      const removed = await runtime.management.remove(context.req.param("id"), authContext(context));
+      const removed = await servers.remove(context.req.param("id"), authContext(context));
       return removed ? context.body(null, 204) : context.json({ error: "That server is not installed." }, 404);
     } catch (error) {
       return context.json(failure(error), 400);
@@ -168,7 +155,7 @@ export function createMcpRoutes(runtime: StudioRuntime): Hono<AdmissionEnv> {
         if (!isRecord(value) || typeof value["enabled"] !== "boolean") {
           return context.json({ error: "enabled must be a boolean.", code: "extend.internal" }, 400);
         }
-        runtime.management.setEnabled(
+        servers.setEnabled(
           context.req.param("projectId"),
           context.req.param("id"),
           value["enabled"],
@@ -187,7 +174,7 @@ export function createMcpRoutes(runtime: StudioRuntime): Hono<AdmissionEnv> {
       if (!isRecord(value) || typeof value["secret"] !== "string") {
         return context.json({ error: "secret must be text.", code: "credentials.invalid" }, 400);
       }
-      await runtime.management.setCredential(context.req.param("id"), value["secret"], authContext(context));
+      await servers.setCredential(context.req.param("id"), value["secret"], authContext(context));
       return context.body(null, 204);
     } catch (error) {
       return context.json(failure(error), 400);
@@ -196,7 +183,7 @@ export function createMcpRoutes(runtime: StudioRuntime): Hono<AdmissionEnv> {
 
   routes.delete("/servers/:id/credential", async (context) => {
     try {
-      await runtime.management.deleteCredential(context.req.param("id"), authContext(context));
+      await servers.deleteCredential(context.req.param("id"), authContext(context));
       return context.body(null, 204);
     } catch (error) {
       return context.json(failure(error), 400);

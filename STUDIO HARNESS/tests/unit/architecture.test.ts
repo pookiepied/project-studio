@@ -495,9 +495,10 @@ describe("modular monolith — 008.3 gate", () => {
     });
 
     it("only approved roots open a database", async () => {
+      // Entry points only. The runtime and bootstrap are no longer here: they
+      // are *given* a database now rather than resolving one (ADR 0035 §3).
       const allowedRoots = new Set([
-        "application/studio-runtime.ts",
-        "models/bootstrap.ts",
+        "app.ts",
         "models/local/cli.ts",
         "auth/cli.ts",
       ]);
@@ -525,19 +526,14 @@ describe("modular monolith — 008.3 gate", () => {
         if (/\bStudioRuntime\b|\bgetStudioRuntime\b/.test(source)) offenders.push(rel);
       }
 
-      // Known debt, tracked as T-004. These four still take the concrete
-      // runtime or reach for the global service locator. The list may only
-      // shrink: a fifth file fails here, and the test is done when it is `[]`.
+      // One exception, and it is a framework boundary rather than debt.
+      // `agents/studio.ts` is loaded by Flue's own module resolution and never
+      // constructed by us, so nothing can be injected into it; it reads the
+      // locator, which returns `AgentHost` and not the class (ADR 0035 §6).
       //
-      // Recorded as a shrinking whitelist rather than
-      // `expect(offenders.length).toBeGreaterThan(0)`, which is how this check
-      // was written before — green *because* the violation was present, and
-      // guaranteed to fail the moment it was fixed. See conventions rule 5.
-      expect(offenders.sort()).toEqual([
-        "agents/studio.ts",
-        "transport/http/create-app.ts",
-        "transport/http/routes/mcp.ts",
-      ]);
+      // Transport is gone from this list: it takes the `McpAdministration`
+      // port. A second agent file appearing here is a real regression.
+      expect(offenders.sort()).toEqual(["agents/studio.ts"]);
     });
 
     it("does not grow the runtime's public surface", async () => {
@@ -554,22 +550,10 @@ describe("modular monolith — 008.3 gate", () => {
         ...classBody.matchAll(/^  readonly ([a-z][A-Za-z]*):/gm),
       ].map((match) => match[1] as string);
 
-      // Same shrinking-whitelist rule. `StudioRuntime` still publishes ten
-      // repositories; T-004 replaces them with a bounded façade. Until then
-      // this pins the exact set, so an eleventh fails rather than passing a
-      // `>= 7` floor that no addition could ever violate.
-      expect(publicBags.sort()).toEqual([
-        "catalog",
-        "db",
-        "extensions",
-        "grants",
-        "inventory",
-        "management",
-        "registry",
-        "selection",
-        "supervisor",
-        "trust",
-      ]);
+      // Empty. All ten repositories are private; what the outside needs is
+      // reached through `servers` (a port) and the four `AgentHost` members,
+      // none of which is a repository handed over whole.
+      expect(publicBags.sort()).toEqual([]);
     });
 
     it("keeps one owner for the git network policy decision", async () => {

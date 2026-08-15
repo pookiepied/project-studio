@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
-import type { StudioRuntime } from "../../src/application/studio-runtime.js";
+import type { McpAdministration } from "../../src/application/mcp-management.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 import {
   authContext,
@@ -99,14 +99,14 @@ describe("Harness HTTP admission", () => {
     });
 
     const app = createHttpApp({
-      runtime: {
-        registry: {
-          list: () => {
-            mcpEntered += 1;
-            return [];
-          },
+      // A port, so the double is the three lines the route actually uses
+      // rather than a cast of the whole runtime.
+      servers: {
+        list: () => {
+          mcpEntered += 1;
+          return [];
         },
-      } as unknown as StudioRuntime,
+      } as unknown as McpAdministration,
       approvals: {
         list: () => {
           permissionEntered += 1;

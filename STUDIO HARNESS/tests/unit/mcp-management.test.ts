@@ -6,6 +6,7 @@ import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 import { ExtensionSelectionStore } from "../../src/extend/selection.js";
+import type { McpSupervisor } from "../../src/extend/mcp/supervisor.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
 
 const COMMAND = process.platform === "win32" ? "C:\\tools\\node.exe" : "/usr/bin/node";
@@ -58,7 +59,10 @@ describe("MCP management", () => {
       grants,
       selection,
       extensions: { changed: () => changed += 1 },
-      supervisor: { stop: (id) => stopped.push(id) },
+      supervisor: {
+        stop: async (id) => { stopped.push(id); },
+        status: () => ({ state: "idle" }) as ReturnType<McpSupervisor["status"]>,
+      },
       credentials,
     });
   });

@@ -22,7 +22,7 @@ import { SessionAccessTokenProvider } from "../auth/session-token-provider.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import { LocalModelProviderAdapter } from "./adapters/local-adapter.js";
-import { getDatabase } from "../storage/database.js";
+import type { StudioDatabase } from "../storage/database.js";
 import {
   mergeCustomProviders,
   resolveLocalModelConfig,
@@ -51,6 +51,15 @@ export interface LocalBootstrapOverrides {
 export interface BootstrapOptions {
   readonly studioCloud?: StudioCloudBootstrapOverrides;
   readonly local?: LocalBootstrapOverrides;
+  /**
+   * The database provider settings are read from.
+   *
+   * Passed in rather than resolved from a module global, so the caller that
+   * owns the connection is the caller that decides which one this uses. Only
+   * required when `local.config` is absent, which is the path that reads
+   * stored settings (ADR 0035 §3).
+   */
+  readonly database?: StudioDatabase;
 }
 
 /**
@@ -74,7 +83,7 @@ export function createModelProviderAdapter(
     case "studio-cloud":
       return createStudioCloudAdapter(options.studioCloud ?? {});
     case "local":
-      return createLocalAdapter(options.local ?? {});
+      return createLocalAdapter(options.local ?? {}, options.database);
     default:
       throw new ProviderConfigurationError(
         `Unknown model source "${source as string}".`,
@@ -125,8 +134,17 @@ function createStudioCloudAdapter(
  */
 function createLocalAdapter(
   overrides: LocalBootstrapOverrides,
+  database: StudioDatabase | undefined,
 ): LocalModelProviderAdapter {
-  const config = overrides.config ?? resolveLocalModelConfigFromSettings();
+  let config = overrides.config;
+  if (config === undefined) {
+    if (database === undefined) {
+      throw new ProviderConfigurationError(
+        "Local model settings cannot be read without a database.",
+      );
+    }
+    config = resolveLocalModelConfigFromSettings(database);
+  }
   const credentials = overrides.credentials ?? new KeyringCredentialStore();
 
   const runtime = createLocalRuntime({
@@ -145,8 +163,8 @@ function createLocalAdapter(
  * unreadable settings database is not swallowed — a user who configured
  * providers in the UI must not silently start on stale environment values.
  */
-function resolveLocalModelConfigFromSettings(): LocalModelConfig {
-  const settings = new ProviderSettingsStore(getDatabase());
+function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalModelConfig {
+  const settings = new ProviderSettingsStore(database);
   const selection = settings.getDefaultModel();
 
   return resolveLocalModelConfig({

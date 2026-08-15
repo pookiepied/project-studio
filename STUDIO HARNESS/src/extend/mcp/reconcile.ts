@@ -71,7 +71,9 @@ export function createMcpReconciler(options: McpReconcilerOptions): KindReconcil
     }
 
     for (const id of stopping) {
-      supervisor.stop(id);
+      // Awaited: the process runs in the project directory, so "stopped"
+      // must mean gone before anything acts on that directory again.
+      await supervisor.stop(id);
       options.onStop?.(id);
       startedWith.delete(id);
     }
@@ -113,7 +115,7 @@ export function createMcpReconciler(options: McpReconcilerOptions): KindReconcil
           await options.onReady?.(record, connection);
           startedWith.set(id, record);
         } catch (error) {
-          supervisor.stop(id);
+          await supervisor.stop(id);
           options.onStop?.(id);
           // A live server with no catalog is not usable. Forget it so the next
           // reconciliation makes one clean attempt rather than claiming the

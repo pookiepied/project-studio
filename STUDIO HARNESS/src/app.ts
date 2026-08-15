@@ -18,7 +18,7 @@ import {
   type ObservabilityHandle,
 } from "./observability/index.js";
 import { createHttpApp } from "./transport/http/create-app.js";
-import { closeDatabase } from "./storage/database.js";
+import { openDatabase, type StudioDatabase } from "./storage/database.js";
 
 interface HarnessApplication {
   readonly app: ReturnType<typeof createHttpApp>;
@@ -29,13 +29,19 @@ function createHarnessApplication(): HarnessApplication {
   let observability: ObservabilityHandle | undefined;
   let admission: ReturnType<typeof createAdmissionSession> | undefined;
   let studioRuntime: StudioRuntime | undefined;
+  let database: StudioDatabase | undefined;
 
   try {
+    // This function is the composition root: it opens the one connection the
+    // server uses, hands it to everything that needs one, and is the only
+    // thing that closes it.
+    database = openDatabase();
+
     // Provider selection is validated and bootstrapped before OpenTelemetry
     // starts, so an unavailable/invalid model source rejects cleanly instead of
     // leaving a partially initialized SDK behind.
     const providerConfig = resolveProviderConfig();
-    bootstrapModelProviders(providerConfig);
+    bootstrapModelProviders(providerConfig, { database });
 
     observability = initializeObservability();
 
@@ -55,6 +61,7 @@ function createHarnessApplication(): HarnessApplication {
 
     const approvals = new PermissionApprovalBroker();
     const runtime = new StudioRuntime({
+      database,
       logger: observability.logger,
       approver: approvals,
       clientId: admission.context.clientId,
@@ -79,7 +86,7 @@ function createHarnessApplication(): HarnessApplication {
     }
 
     const app = createHttpApp({
-      runtime,
+      servers: runtime.servers,
       approvals,
       admission: admission.verifier,
     });
@@ -89,9 +96,11 @@ function createHarnessApplication(): HarnessApplication {
       shutdownPromise ??= (async () => {
         admission?.verifier.invalidate();
         try {
-          runtime.stop();
+          // Awaited: MCP servers run in the project directory, and returning
+          // before they are gone leaves them orphaned.
+          await runtime.stop();
         } finally {
-          closeDatabase();
+          database?.close();
           await observability?.shutdown();
         }
       })();
@@ -104,9 +113,9 @@ function createHarnessApplication(): HarnessApplication {
     // failure is closed before the error escapes to the process supervisor.
     admission?.verifier.invalidate();
     try {
-      studioRuntime?.stop();
+      void studioRuntime?.stop();
     } finally {
-      closeDatabase();
+      database?.close();
       if (observability !== undefined) {
         void observability.shutdown().catch(() => undefined);
       }
@@ -117,8 +126,24 @@ function createHarnessApplication(): HarnessApplication {
 
 const { app, shutdown } = createHarnessApplication();
 
-process.once("SIGTERM", () => {
-  void shutdown();
+/**
+ * Graceful shutdown.
+ *
+ * `SIGTERM` is not deliverable on Windows — `process.kill` there maps to
+ * `TerminateProcess`, which ends the process without running a handler. So the
+ * database was never closed and its WAL never checkpointed, leaving a hot
+ * `-wal` beside every stopped harness. `SIGINT` and `SIGBREAK` do arrive on
+ * Windows, and the parent-owned `shutdown` message works regardless of
+ * platform, so a supervisor always has one way to ask.
+ */
+for (const signal of ["SIGTERM", "SIGINT", "SIGBREAK"] as const) {
+  process.once(signal, () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+}
+
+process.on("message", (message) => {
+  if (message === "shutdown") void shutdown().finally(() => process.exit(0));
 });
 
 export default app;

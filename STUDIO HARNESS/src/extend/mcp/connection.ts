@@ -46,6 +46,15 @@ export interface McpChannel {
   onClose(listener: (reason?: unknown) => void): void;
   /** Ends it from our side. Idempotent. */
   close(): void;
+  /**
+   * Resolves once the transport's resources are actually released.
+   *
+   * Optional because it only means something for a transport with an operating
+   * system process behind it. `close()` requests the end; this is how a caller
+   * knows the end happened, which matters when the next thing it does is
+   * delete a directory the process was running in.
+   */
+  whenExited?(): Promise<void>;
 }
 
 export interface McpConnectionOptions {
@@ -247,6 +256,11 @@ export class McpConnection {
     if (this.#closed) return;
     this.#channel.close();
     this.#ended(reason);
+  }
+
+  /** Waits for the transport to release its resources. See `McpChannel`. */
+  async whenExited(): Promise<void> {
+    await this.#channel.whenExited?.();
   }
 
   #receive(chunk: string | Uint8Array): void {

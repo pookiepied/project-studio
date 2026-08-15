@@ -19,16 +19,39 @@ export interface McpManagementOptions {
   readonly registry: McpServerRegistry;
   readonly grants: PermissionGrantStore;
   readonly selection: ExtensionSelectionStore;
-  readonly supervisor: Pick<McpSupervisor, "stop">;
+  readonly supervisor: Pick<McpSupervisor, "stop" | "status">;
   readonly extensions: Pick<ExtensionReconciler, "changed">;
   readonly credentials?: SecureCredentialStore;
 }
 
-export class McpManagementService {
+/** A server as a caller sees it: what was configured, plus what it is doing. */
+export type McpServerView = McpServerRecord & {
+  readonly status: ReturnType<McpSupervisor["status"]>;
+};
+
+/**
+ * Everything the HTTP surface needs, and nothing else.
+ *
+ * The route module used to take the whole `StudioRuntime` and compose
+ * `registry.get` with `supervisor.status` itself, which put a domain join in
+ * the transport layer and meant a route could reach anything the runtime
+ * exposed. This interface is the seam instead (ADR 0035 §2).
+ */
+export interface McpAdministration {
+  list(): readonly McpServerView[];
+  get(id: string): McpServerView | undefined;
+  save(input: McpServerInput, auth: AuthContext): McpServerView;
+  remove(id: string, auth: AuthContext): Promise<boolean>;
+  setEnabled(projectId: string, id: string, enabled: boolean, auth: AuthContext): void;
+  setCredential(id: string, secret: string, auth: AuthContext): Promise<void>;
+  deleteCredential(id: string, auth: AuthContext): Promise<boolean>;
+}
+
+export class McpManagementService implements McpAdministration {
   readonly #registry: McpServerRegistry;
   readonly #grants: PermissionGrantStore;
   readonly #selection: ExtensionSelectionStore;
-  readonly #supervisor: Pick<McpSupervisor, "stop">;
+  readonly #supervisor: Pick<McpSupervisor, "stop" | "status">;
   readonly #extensions: Pick<ExtensionReconciler, "changed">;
   readonly #credentials: SecureCredentialStore | undefined;
 
@@ -41,7 +64,21 @@ export class McpManagementService {
     this.#credentials = options.credentials;
   }
 
-  save(input: McpServerInput, _auth: AuthContext): McpServerRecord {
+  /** Configuration joined with live status — the join belongs here, not in a route. */
+  #view(record: McpServerRecord): McpServerView {
+    return { ...record, status: this.#supervisor.status(record.id) };
+  }
+
+  list(): readonly McpServerView[] {
+    return this.#registry.list().map((record) => this.#view(record));
+  }
+
+  get(id: string): McpServerView | undefined {
+    const record = this.#registry.get(id);
+    return record === undefined ? undefined : this.#view(record);
+  }
+
+  save(input: McpServerInput, _auth: AuthContext): McpServerView {
     const before = this.#registry.get(input.id);
     const after = this.#registry.save(input);
 
@@ -50,7 +87,7 @@ export class McpManagementService {
     }
 
     this.#extensions.changed();
-    return after;
+    return this.#view(after);
   }
 
   async remove(id: string, _auth: AuthContext): Promise<boolean> {
@@ -68,7 +105,7 @@ export class McpManagementService {
 
     this.#grants.revokeNamespace(McpServerRegistry.namespaceOf(id));
     this.#selection.forget("mcp", id);
-    this.#supervisor.stop(id);
+    await this.#supervisor.stop(id);
     this.#extensions.changed();
     return true;
   }
@@ -103,7 +140,7 @@ export class McpManagementService {
       });
     }
     await credentials.set({ scope: "mcp", id }, secret);
-    this.#supervisor.stop(id);
+    await this.#supervisor.stop(id);
     this.#extensions.changed();
   }
 
@@ -116,7 +153,7 @@ export class McpManagementService {
       });
     }
     const deleted = await credentials.delete({ scope: "mcp", id });
-    this.#supervisor.stop(id);
+    await this.#supervisor.stop(id);
     this.#extensions.changed();
     return deleted;
   }

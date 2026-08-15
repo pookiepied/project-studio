@@ -4,13 +4,14 @@ import { Hono } from "hono";
 import type { AdmissionVerifier } from "../../admission/verifier.js";
 import { ADMISSION_SCOPES } from "../../admission/scopes.js";
 import type { PermissionApprovalBroker } from "../../application/approval-broker.js";
-import type { StudioRuntime } from "../../application/studio-runtime.js";
+import type { McpAdministration } from "../../application/mcp-management.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 
 export interface CreateHttpAppOptions {
-  readonly runtime: StudioRuntime;
+  /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
+  readonly servers: McpAdministration;
   readonly approvals: PermissionApprovalBroker;
   readonly admission: AdmissionVerifier;
   /** Injectable Flue app for tests; production uses the generated Flue app. */
@@ -26,7 +27,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   const app = new Hono<AdmissionEnv>();
   app.use("*", createAdmissionMiddleware(options.admission));
 
-  app.route("/api/mcp", createMcpRoutes(options.runtime));
+  app.route("/api/mcp", createMcpRoutes(options.servers));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
 
   const agentRoutes = new Hono<AdmissionEnv>();

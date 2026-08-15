@@ -23,14 +23,20 @@ import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
 import { ProviderConfigurationError } from "../../contracts/models.js";
 import { KeyringCredentialStore } from "../../credentials/keyring-store.js";
 import { createDomainReporter } from "../../observability/error-reporter.js";
-import { closeDatabase, getDatabase } from "../../storage/database.js";
+import { openDatabase, type StudioDatabase } from "../../storage/database.js";
 import { parseModelSpecifier } from "./config.js";
 import { LocalProviderService } from "./provider-service.js";
 import { ProviderSettingsStore } from "./settings-store.js";
 
+/**
+ * This CLI is its own entry point, so it is its own composition root: it opens
+ * the connection it uses and closes it on the way out.
+ */
+const database: StudioDatabase = openDatabase();
+
 function buildService(): LocalProviderService {
   return new LocalProviderService({
-    settings: new ProviderSettingsStore(getDatabase()),
+    settings: new ProviderSettingsStore(database),
     credentials: new KeyringCredentialStore(),
     reporter: createDomainReporter("models"),
   });
@@ -318,5 +324,5 @@ main()
     process.exitCode = 1;
   })
   .finally(() => {
-    closeDatabase();
+    database.close();
   });

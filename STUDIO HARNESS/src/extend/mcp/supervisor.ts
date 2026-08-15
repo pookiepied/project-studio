@@ -239,13 +239,18 @@ export class McpSupervisor {
    *
    * Safe from every state, including part-way through starting.
    */
-  stop(id: string): void {
+  stop(id: string): Promise<void> {
+    const exits: (Promise<void> | undefined)[] = [];
     for (const entry of [...this.#entries.values()]) {
-      if (entry.record.id === id) this.#stopEntry(entry);
+      if (entry.record.id === id) exits.push(this.#stopEntry(entry));
     }
+    // Awaitable for the same reason `stopAll` is: a stdio server runs in the
+    // project directory, and a caller that disables one and then removes that
+    // directory was racing a process that had only been *asked* to stop.
+    return Promise.all(exits).then(() => undefined);
   }
 
-  #stopEntry(entry: Entry): void {
+  #stopEntry(entry: Entry): Promise<void> | undefined {
     this.#entries.delete(entry.key);
     // Before anything else: an attempt still in flight, and a close callback
     // from the connection we are about to end, both check this and stop.
@@ -265,21 +270,33 @@ export class McpSupervisor {
       entry.retryTimer = undefined;
     }
 
+    let exited: Promise<void> | undefined;
     if (entry.state.kind === "ready") {
       // Driven through the machine rather than assigned, so the transition it
       // exists to refuse — a `started` arriving after a stop — stays refused.
       this.#apply(entry, { kind: "stop" });
-      entry.connection?.close();
+      const connection = entry.connection;
+      connection?.close();
+      exited = connection?.whenExited();
       this.#apply(entry, { kind: "stopped" });
     }
 
     entry.connection = undefined;
     entry.session = undefined;
+    return exited;
   }
 
-  /** Stops every server. Called when the harness itself is shutting down. */
-  stopAll(): void {
-    for (const entry of [...this.#entries.values()]) this.#stopEntry(entry);
+  /**
+   * Stops every server and waits for the processes to be gone.
+   *
+   * Awaited rather than fire-and-forget: a stdio server runs in the project
+   * directory, so a caller that tears that directory down next was racing a
+   * live process. It surfaced on Windows as `EBUSY` and everywhere else as an
+   * orphan nobody noticed.
+   */
+  async stopAll(): Promise<void> {
+    const exits = [...this.#entries.values()].map((entry) => this.#stopEntry(entry));
+    await Promise.all(exits);
   }
 
   #entryFor(record: McpServerRecord): Entry {

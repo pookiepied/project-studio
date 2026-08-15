@@ -16,7 +16,7 @@ import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
 import { McpSupervisor } from "../extend/mcp/supervisor.js";
 import { ExtensionSelectionStore } from "../extend/selection.js";
-import { McpManagementService } from "./mcp-management.js";
+import { McpManagementService, type McpAdministration } from "./mcp-management.js";
 import { modelToolName } from "./tool-name.js";
 import { PermissionGrantStore } from "../permissions/grant-store.js";
 import {
@@ -33,12 +33,21 @@ import { createSandboxPolicy } from "../sandbox/policy.js";
 import { projectKey } from "../snapshots/shadow-repo.js";
 import { SnapshotStore } from "../snapshots/store.js";
 import { TurnSnapshots } from "../snapshots/turn.js";
-import { closeDatabase, getDatabase, type StudioDatabase } from "../storage/database.js";
+import type { StudioDatabase } from "../storage/database.js";
 import { CallGate } from "../tools/gate.js";
 import { ToolError } from "../tools/errors.js";
 import { registerNativeTools } from "../tools/native/index.js";
 
 export interface StudioRuntimeOptions {
+  /**
+   * The application database.
+   *
+   * Required, and never resolved from a module global. The runtime used to
+   * reach for the process-wide connection, which meant it silently shared
+   * whatever was opened first — so a test that set `PROJECT_STUDIO_STORE_PATH`
+   * got the *previous* test's database and could not tell (ADR 0035 §3).
+   */
+  readonly database: StudioDatabase;
   readonly logger?: Logger;
   readonly approver?: PermissionApprover;
   readonly credentials?: SecureCredentialStore;
@@ -174,17 +183,42 @@ function sessionEnvironment(sandbox: LocalSandbox): SessionEnv {
   };
 }
 
-export class StudioRuntime {
-  readonly db: StudioDatabase;
-  readonly grants: PermissionGrantStore;
-  readonly trust: WorkspaceTrustStore;
-  readonly selection: ExtensionSelectionStore;
-  readonly inventory: ExtensionInventory;
-  readonly extensions: ExtensionReconciler;
-  readonly registry: McpServerRegistry;
-  readonly supervisor: McpSupervisor;
-  readonly catalog: McpCapabilityCatalog;
-  readonly management: McpManagementService;
+/**
+ * What the Flue agent module needs from the runtime.
+ *
+ * `agents/studio.ts` is default-exported to Flue's `defineAgent` and loaded by
+ * Flue's own module resolution, so there is no point at which anything can be
+ * injected into it — which is why a service locator exists there at all. This
+ * is the narrowest type that locator can return: four members, not the class
+ * (ADR 0035 §6).
+ */
+export interface AgentHost {
+  readonly projectRoot: string;
+  start(): Promise<void>;
+  reconcile(): Promise<void>;
+  createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory;
+}
+
+/**
+ * The application runtime.
+ *
+ * Every repository below is private. They were public because composition
+ * happened here and nothing stopped it leaking; counting the callers showed six
+ * of the ten had no consumer outside this class at all (ADR 0035 §1). What the
+ * outside needs is exposed deliberately: `servers` for the HTTP surface, and
+ * the four `AgentHost` members for the Flue agent module.
+ */
+export class StudioRuntime implements AgentHost {
+  readonly #db: StudioDatabase;
+  readonly #grants: PermissionGrantStore;
+  readonly #trust: WorkspaceTrustStore;
+  readonly #selection: ExtensionSelectionStore;
+  readonly #inventory: ExtensionInventory;
+  readonly #extensions: ExtensionReconciler;
+  readonly #registry: McpServerRegistry;
+  readonly #supervisor: McpSupervisor;
+  readonly #catalog: McpCapabilityCatalog;
+  readonly #management: McpManagementService;
 
   readonly #logger: Logger | undefined;
   readonly #approver: PermissionApprover | undefined;
@@ -197,7 +231,7 @@ export class StudioRuntime {
   readonly #turns = new Set<() => void>();
   #started: Promise<void> | undefined;
 
-  constructor(options: StudioRuntimeOptions = {}) {
+  constructor(options: StudioRuntimeOptions) {
     this.#logger = options.logger;
     this.#approver = options.approver;
     this.#credentials = options.credentials ?? new KeyringCredentialStore();
@@ -207,56 +241,61 @@ export class StudioRuntime {
     this.#clientId = options.clientId ?? "standalone";
     this.#sessionId = options.sessionId ?? "standalone";
 
-    this.db = getDatabase();
-    this.grants = new PermissionGrantStore(this.db);
-    this.trust = new WorkspaceTrustStore(this.db);
-    this.selection = new ExtensionSelectionStore(this.db);
-    this.inventory = new ExtensionInventory(this.selection);
-    this.extensions = new ExtensionReconciler(this.inventory);
-    this.registry = new McpServerRegistry(this.db);
-    this.catalog = new McpCapabilityCatalog({
+    this.#db = options.database;
+    this.#grants = new PermissionGrantStore(this.#db);
+    this.#trust = new WorkspaceTrustStore(this.#db);
+    this.#selection = new ExtensionSelectionStore(this.#db);
+    this.#inventory = new ExtensionInventory(this.#selection);
+    this.#extensions = new ExtensionReconciler(this.#inventory);
+    this.#registry = new McpServerRegistry(this.#db);
+    this.#catalog = new McpCapabilityCatalog({
       diagnostic: (message, serverId) =>
         this.#logger?.warn(message, { server_id: serverId }),
       isServerEnabled: (serverId) =>
-        this.selection.isEnabled({
+        this.#selection.isEnabled({
           kind: "mcp",
           extensionId: serverId,
           projectId: this.#projectId,
         }),
     });
-    this.supervisor = new McpSupervisor({
+    this.#supervisor = new McpSupervisor({
       launch: createMcpLauncher({
         credentials: this.#credentials,
         projectRoot: () => this.#projectRoot,
       }),
       onReady: async (record, connection) => {
-        await this.catalog.refresh(record, connection);
+        await this.#catalog.refresh(record, connection);
       },
-      onUnavailable: (record) => this.catalog.remove(record.id),
+      onUnavailable: (record) => this.#catalog.remove(record.id),
       onNotification: (record, method) => {
         if (method === "notifications/tools/list_changed") {
-          this.catalog.markDirty(record.id);
+          this.#catalog.markDirty(record.id);
         }
       },
     });
 
-    this.inventory.register("mcp", () => this.registry.asExtensions());
-    this.extensions.register(
+    this.#inventory.register("mcp", () => this.#registry.asExtensions());
+    this.#extensions.register(
       "mcp",
       createMcpReconciler({
-        registry: this.registry,
-        supervisor: this.supervisor,
-        onStop: (serverId) => this.catalog.remove(serverId),
+        registry: this.#registry,
+        supervisor: this.#supervisor,
+        onStop: (serverId) => this.#catalog.remove(serverId),
       }),
     );
-    this.management = new McpManagementService({
-      registry: this.registry,
-      grants: this.grants,
-      selection: this.selection,
-      supervisor: this.supervisor,
-      extensions: this.extensions,
+    this.#management = new McpManagementService({
+      registry: this.#registry,
+      grants: this.#grants,
+      selection: this.#selection,
+      supervisor: this.#supervisor,
+      extensions: this.#extensions,
       credentials: this.#credentials,
     });
+  }
+
+  /** The MCP administration surface, for the HTTP layer. */
+  get servers(): McpAdministration {
+    return this.#management;
   }
 
   get projectId(): string {
@@ -268,17 +307,17 @@ export class StudioRuntime {
   }
 
   start(): Promise<void> {
-    this.#started ??= this.extensions.reconcile([this.#projectId]).then(() => undefined);
+    this.#started ??= this.#extensions.reconcile([this.#projectId]).then(() => undefined);
     return this.#started;
   }
 
   async reconcile(): Promise<void> {
-    await this.extensions.reconcile([this.#projectId]);
+    await this.#extensions.reconcile([this.#projectId]);
   }
 
   async prepareModelTurn(): Promise<void> {
     await this.reconcile();
-    await this.catalog.refreshDirty(this.registry.list());
+    await this.#catalog.refreshDirty(this.#registry.list());
     for (const beginTurn of this.#turns) beginTurn();
   }
 
@@ -305,9 +344,9 @@ export class StudioRuntime {
     this.#turns.add(() => snapshots.beginTurn());
     const gate = new CallGate({
       kernel: new PermissionKernel({
-        grants: this.grants,
+        grants: this.#grants,
         ...(this.#approver === undefined ? {} : { approver: this.#approver }),
-        posture: posture({ mode: this.#mode, trust: this.trust }),
+        posture: posture({ mode: this.#mode, trust: this.#trust }),
         reporter,
       }),
       sandbox,
@@ -320,17 +359,17 @@ export class StudioRuntime {
         ),
     });
     registerNativeTools(gate, {
-      database: this.db,
+      database: this.#db,
       credentials: this.#credentials,
     });
 
     const registeredMcp = new Map<string, McpTool>();
 
     const refreshTools = (): void => {
-      const active = this.registry
+      const active = this.#registry
         .list()
         .filter((record) =>
-          this.selection.isEnabled({
+          this.#selection.isEnabled({
             kind: "mcp",
             extensionId: record.id,
             projectId,
@@ -338,7 +377,7 @@ export class StudioRuntime {
         )
         .map((record) => record.id);
 
-      for (const tool of this.catalog.tools(active)) {
+      for (const tool of this.#catalog.tools(active)) {
         const key = capabilityKey(tool.descriptor.id);
         const existing = registeredMcp.get(key);
         if (existing === tool) continue;
@@ -400,15 +439,35 @@ export class StudioRuntime {
     };
   }
 
-  stop(): void {
-    this.supervisor.stopAll();
-    closeDatabase();
+  /**
+   * Stops every MCP server and waits for the processes to be gone.
+   *
+   * Awaited, because the synchronous version returned while children were
+   * still alive: they inherit the project directory as their `cwd`, so a
+   * caller that deleted that directory next raced them, and on Windows the
+   * removal failed outright with `EBUSY`. Orphaned children were the same
+   * defect everywhere else, just quieter.
+   *
+   * It does **not** close the database. It did, and it never owned it — the
+   * composition root that opened the connection closes it (ADR 0035 §4).
+   */
+  async stop(): Promise<void> {
+    await this.#supervisor.stopAll();
   }
 }
 
-let configuredRuntime: StudioRuntime | undefined;
+/**
+ * The one service locator in the codebase, and the reason it exists.
+ *
+ * Flue loads `agents/studio.ts` through its own module resolution and calls the
+ * default export; nothing in that path accepts a dependency. Rather than a
+ * wrapper that hides a global while still being one, it is a global, narrowed
+ * to `AgentHost`, with exactly one caller — and an architecture test that fails
+ * if a second appears (ADR 0035 §6).
+ */
+let configuredRuntime: AgentHost | undefined;
 
-export function configureStudioRuntime(runtime: StudioRuntime): void {
+export function configureStudioRuntime(runtime: AgentHost): void {
   if (configuredRuntime !== undefined) {
     throw new ExtendError("internal", {
       message: "The Studio runtime has already been configured.",
@@ -417,7 +476,7 @@ export function configureStudioRuntime(runtime: StudioRuntime): void {
   configuredRuntime = runtime;
 }
 
-export function getStudioRuntime(): StudioRuntime {
+export function getStudioRuntime(): AgentHost {
   if (configuredRuntime === undefined) {
     throw new ExtendError("internal", {
       message: "The Studio runtime has not been configured.",

@@ -201,20 +201,16 @@ export function storageHandle(db: StudioDatabase): DatabaseSync {
   return handle;
 }
 
-let shared: StudioDatabase | undefined;
-
 /**
- * The process-wide database. One connection, opened on first use, migrated
- * once. Tests open their own with `openDatabase` instead of touching this.
+ * There is deliberately no process-wide connection here.
+ *
+ * `getDatabase()`/`closeDatabase()` used to live at the bottom of this file.
+ * Whoever called first decided which file every later caller got, which made
+ * `PROJECT_STUDIO_STORE_PATH` silently inert for anyone who was not first — and
+ * made ownership of closing unanswerable, so two owners each closed it.
+ *
+ * Each entry point now opens its own connection and closes it: `app.ts` for the
+ * server, and each CLI for itself (ADR 0035 §3).
  */
-export function getDatabase(): StudioDatabase {
-  shared ??= openDatabase();
-  return shared;
-}
-
-export function closeDatabase(): void {
-  shared?.close();
-  shared = undefined;
-}
 
 export { LATEST_SCHEMA_VERSION };

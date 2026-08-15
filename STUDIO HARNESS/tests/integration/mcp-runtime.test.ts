@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
+import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
+import { openDatabase } from "../../src/storage/database.js";
 
 const SERVER = `
 process.stdin.setEncoding("utf8");
@@ -79,16 +81,20 @@ describe("MCP application runtime", () => {
     const databasePath = join(directory, "studio.db");
     await writeFile(script, SERVER, "utf8");
 
-    const previousDatabasePath = process.env.PROJECT_STUDIO_STORE_PATH;
-    process.env.PROJECT_STUDIO_STORE_PATH = databasePath;
+    // Opened explicitly rather than set through the environment. The runtime
+    // used to resolve a process-global connection, so this test got whichever
+    // database was opened first in the worker and `PROJECT_STUDIO_STORE_PATH`
+    // did nothing.
+    const database = openDatabase({ path: databasePath });
     const runtime = new StudioRuntime({
+      database,
       projectRoot,
       credentials,
       approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
     });
 
     try {
-      runtime.management.save({
+      runtime.servers.save({
         id: "echo-server",
         title: "Echo server",
         transport: "stdio",
@@ -97,8 +103,10 @@ describe("MCP application runtime", () => {
         env: {},
         auth: "none",
       }, AUTH_CONTEXT);
-      runtime.management.setEnabled(runtime.projectId, "echo-server", true, AUTH_CONTEXT);
-      runtime.trust.set(projectRoot, true);
+      runtime.servers.setEnabled(runtime.projectId, "echo-server", true, AUTH_CONTEXT);
+      // Trust is not on the runtime's surface; the store owns it and this test
+      // has the database, so it writes through the owner like any other caller.
+      new WorkspaceTrustStore(database).set(projectRoot, true);
       await runtime.start();
 
       const sandbox = runtime.createAgentSandbox({ agentId: "agent" });
@@ -116,7 +124,7 @@ describe("MCP application runtime", () => {
         { type: "text", text: "hello" },
       ]);
 
-      runtime.management.setEnabled(runtime.projectId, "echo-server", false, AUTH_CONTEXT);
+      runtime.servers.setEnabled(runtime.projectId, "echo-server", false, AUTH_CONTEXT);
       await runtime.reconcile();
       const retained = sandbox.tools?.(env, { subagents: {} }) ?? [];
       const unavailable = retained.find((tool) => tool.name === "mcp__11_echo-server__4_echo");
@@ -126,9 +134,11 @@ describe("MCP application runtime", () => {
         { type: "text", text: "This MCP tool is currently unavailable because its server is disabled or disconnected." },
       ]);
     } finally {
-      runtime.stop();
-      if (previousDatabasePath === undefined) delete process.env.PROJECT_STUDIO_STORE_PATH;
-      else process.env.PROJECT_STUDIO_STORE_PATH = previousDatabasePath;
+      // Awaited: the MCP child runs in `projectRoot`, and `afterEach` removes
+      // that directory. Returning early raced it, which Windows reported as
+      // EBUSY and every other platform silently tolerated.
+      await runtime.stop();
+      database.close();
     }
   }, 30_000);
 });

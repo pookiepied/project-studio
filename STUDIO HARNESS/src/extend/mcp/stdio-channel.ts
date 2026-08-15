@@ -90,8 +90,24 @@ export class StdioChannel implements McpChannel {
   readonly #bufferedData: Buffer[] = [];
   readonly #bufferedStderr: Buffer[] = [];
 
+  /**
+   * Resolves when the operating system process is actually gone.
+   *
+   * Distinct from `#ended`, which means "this channel is finished with the
+   * server". Shutdown needs the stronger fact: an MCP server inherits the
+   * project directory as its `cwd`, so anything that removes that directory
+   * after stopping is racing a process that may still hold it.
+   */
+  readonly #exited: Promise<void>;
+
   private constructor(child: ChildProcess) {
     this.#child = child;
+    this.#exited = child.exitCode !== null || child.signalCode !== null
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          child.once("exit", () => resolve());
+          child.once("error", () => resolve());
+        });
 
     // Subscribed immediately, not when a listener is attached. A pipe nobody
     // reads fills and then blocks the process writing into it, so a server
@@ -234,6 +250,25 @@ export class StdioChannel implements McpChannel {
     // Nothing should be held open waiting for a server we have already
     // finished with.
     this.#stopTimer.unref?.();
+  }
+
+  /**
+   * Waits for the process to be gone, forcing it if the polite stop is ignored.
+   *
+   * Only meaningful after `close()`. The kill is not a second grace period —
+   * `close` already gave one — it is the guarantee that this promise settles
+   * even when a server refuses to exit on a closed stdin.
+   */
+  async whenExited(): Promise<void> {
+    const forced = setTimeout(() => {
+      killProcessTree(this.#child.pid, () => this.#child.kill("SIGKILL"));
+    }, STOP_GRACE_MS * 2);
+    forced.unref?.();
+    try {
+      await this.#exited;
+    } finally {
+      clearTimeout(forced);
+    }
   }
 
   #finish(reason: unknown): void {

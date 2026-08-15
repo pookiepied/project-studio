@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { DatabaseSync } from "node:sqlite";
@@ -92,7 +93,10 @@ async function startHarness(databasePath: string): Promise<RunningHarness> {
       PROJECT_STUDIO_DB_PATH: databasePath,
       PROJECT_STUDIO_STORE_PATH: join(dirname(databasePath), "studio.db"),
     },
-    stdio: "pipe",
+    // An IPC channel alongside the pipes, so shutdown can be *requested* on
+    // Windows. `SIGTERM` there maps to TerminateProcess and never reaches a
+    // handler, which is why the harness listens for a message as well.
+    stdio: ["pipe", "pipe", "pipe", "ipc"],
   });
   processes.add(child);
 
@@ -150,12 +154,15 @@ async function startHarness(databasePath: string): Promise<RunningHarness> {
 
 async function stopHarness(child: ChildProcess): Promise<void> {
   if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGTERM");
+    // Ask over IPC when there is a channel, because a signal cannot carry this
+    // on Windows. `SIGTERM` remains the fallback for a child without one.
+    if (child.connected) child.send("shutdown");
+    else child.kill("SIGTERM");
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         child.kill("SIGKILL");
         resolve();
-      }, 3_000);
+      }, 5_000);
       child.once("exit", () => {
         clearTimeout(timer);
         resolve();
@@ -441,6 +448,14 @@ describe.sequential("Flue harness vertical slice", () => {
       const corruptStudioDatabase = Buffer.from("not a SQLite database\n", "utf8");
       await writeFile(studioDatabasePath, corruptStudioDatabase);
 
+      // The sidecars go too. A `-wal` left beside the corrupt file is not a
+      // corrupt database: SQLite replays the log, rebuilds a valid header, and
+      // opens normally — so leaving them made this assert the opposite of what
+      // it reads as. Recovery from a hot WAL is correct behaviour; what this
+      // test is about is a database that genuinely cannot be read.
+      await rm(`${studioDatabasePath}-wal`, { force: true });
+      await rm(`${studioDatabasePath}-shm`, { force: true });
+
       await expect(startHarness(databasePath)).rejects.toThrow(/exited during startup/i);
       expect(await readFile(studioDatabasePath)).toEqual(corruptStudioDatabase);
 
@@ -451,6 +466,30 @@ describe.sequential("Flue harness vertical slice", () => {
         token: replacement.token,
       }).history("failure-isolation");
       expect(history.messages.map(textFromMessage)).toContain("keep this");
+    },
+    30_000,
+  );
+
+  it(
+    "closes the application database cleanly on shutdown, leaving no hot WAL",
+    async () => {
+      // `SIGTERM` is not deliverable on Windows — it maps to TerminateProcess,
+      // which ends the process without running a handler — so the shutdown
+      // path never ran and every stop left a hot `-wal` behind. A checkpointed
+      // database is the observable proof that shutdown actually happened.
+      const databasePath = await createDatabasePath();
+      const studioDatabasePath = join(dirname(databasePath), "studio.db");
+      const server = await startHarness(databasePath);
+      const client = new FlueHarnessClient({
+        baseUrl: server.baseUrl,
+        token: server.token,
+      });
+      await client.wait(await client.send("clean-shutdown", "write something"));
+
+      await stopHarness(server.process);
+
+      expect(existsSync(`${studioDatabasePath}-wal`)).toBe(false);
+      expect(existsSync(`${studioDatabasePath}-shm`)).toBe(false);
     },
     30_000,
   );
