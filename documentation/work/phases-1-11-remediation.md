@@ -30,7 +30,7 @@ future features, and they live in §5 rather than as open issues.
 
 65 issues. Categories per `../README.md` §4. Numbers are permanent.
 
-### Solved — 30
+### Solved — 31
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
 Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1138
@@ -38,6 +38,8 @@ passed, 2 skipped, 0 failed**; `tsc --noEmit` clean; `flue build` clean.
 Baseline at close of Stage 3: **70 files, 1139 passed, 2 skipped, 0 failed**;
 `tsc --noEmit` clean **with `noUnusedLocals`/`noUnusedParameters` on**;
 `flue build --target node` clean.
+Baseline after #70 and #69: **73 files, 1147 passed, 2 skipped, 0 failed**;
+`tsc --noEmit` and `flue build --target node` clean.
 
 **The 2 skipped tests are platform gates, both healthy.** One is the
 "keyring unavailable" branch, skipped *because* the OS credential store is
@@ -83,6 +85,7 @@ prevented the storage singleton returning to the file it was removed from.
 | 33 | Unused imports in `observability/index.ts`, `permissions/trust.ts`, `tools/git/index.ts`. | Stage 3; those three plus six dead test-file locals the flags then surfaced |
 | 35 | Unbounded sets in `studio-runtime.ts` and `tools/gate.ts`. | Stage 3. `studio-runtime.ts` fixed — see #67, they were one defect — and mutation-verified by `turn-boundary.test.ts`. **The `gate.ts` half of this issue was wrong and is withdrawn:** `#reportedWithheld` has a key space of (capabilities × switches), is per-`CallGate`, and dies with the sandbox |
 | 67 | `TurnSnapshots` was rebuilt per Flue run, so its turn counter restarted and undo history repeated the label `"turn 1"`. | Stage 3; `#turns` (unkeyed `Set`) became `#turnSnapshots` keyed by project + conversation, so the entry is reused rather than replaced |
+| 69 | `ExecutionScope` had no agent dimension: `agentId` held Flue's per-thread instance id and `conversationId` derived a second copy of it, so a `duration: "always"` grant could not outlive the conversation that made it and was indistinguishable from `duration: "conversation"`. | **ADR 0038.** The agent is named (`contracts/agents.ts`), the thread id becomes the conversation, and `conversationId` loses its default so no caller can collapse the two again. The grant store did not change — it was correct and was being told the wrong thing. Mutation-verified: restoring `agentId: id` fails `tests/unit/agent-scope.test.ts`, which covers the call site where the defect actually lived. Existing rows are deliberately not migrated — see the ADR |
 | 24b | `observability/index.ts` module singleton — the one #24 left behind. | **ADR 0037**, Accepted: it is a process resource, not an ambient default. Unlike the storage globals it has guarded init, an explicit shutdown that clears it, a redaction reset, and it throws when read before init. Those three properties are now tests; two are mutation-verified. No architecture whitelist was added — behaviour is checked instead of shape |
 | 34 | `PassthroughContextOptimizer` never wired. | ADR 0003 stands; the register entry was wrong and `roadmap.md:65` was right. Marked declared-not-wired at the source alongside #31, and its test moved out of `architecture.test.ts` — filed there it read as a guarantee about the running system, which nothing wired can make |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
@@ -117,7 +120,7 @@ them.**
 | 12 | **B-01 Flue admission idempotency.** The patch hijacks `submissionId` as `project-studio:${key}` from a header; Flue already has idempotent `dispatch({dispatchId})` with 409. Both patches are hand-diffs against `dist/*.mjs` pinned by content hash — a version bump drops them silently, which is exactly how #1 happened. | (a) upstream a public Flue admission key; (b) move to `dispatch({dispatchId})`; (c) **Accept** lost-ack-as-unknown for 1.0, delete the two idempotency patches, keep automatic retry off | **(c).** It is the honest 1.0 position, deletes the most fragile code in the tree, and 008.1 already documents unknown-never-retried as the contract. (a) is right long-term, but it is upstream work we do not control. |
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
 
-### Needs Implementation — 10
+### Needs Implementation — 9
 
 Agreed, understood, work remains.
 
@@ -134,7 +137,6 @@ into #24 below.
 | 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. **No longer a dead-code item.** The #15 answer resolves it in the direction opposite to the one Stage 3 was waiting for: the kind is not deleted, it becomes the error `SandboxFactory` throws on a host that supports no OS backend. Moved to Stage 4b. The other half of the Stage 3 finding stands and is not affected — `unavailable` and `internal` are also never thrown, and `unavailable` is read by `SandboxError`'s own `retryable` computation, so removing it would change behaviour. |
 | 66 | `tests/integration/stop.test.ts` carries two complete MCP stdio server fixtures used by no test. The file is titled "008.2 stop, timeout, cancellation, and disconnect" and none of its four tests involves an MCP tool — the timeout and MCP-tool-cancellation half of 008.2 was set up and never written. The fixtures now live in `tests/fixtures/mcp-servers.ts` so the evidence survives; **that move does not close this.** |
 | 70 | **One intermittent suite failure, now with a mechanism rather than a shrug.** A full run reported `1 failed | 1141 passed` and the failing test was lost to a truncated log. It did not reproduce in **eight** further full runs. Repetition was then abandoned for measurement: five verbose runs give per-test durations, and two things fall out. **(a)** `harness.test.ts` set `STARTUP_BUDGET_MS` to 60s while six of its nine tests run under a 30s timeout — vitest killed those tests 30 seconds before the startup diagnostic could fire, so a slow boot could only ever surface as a bare "test timed out" with none of the pid/exit-code/stderr report the file goes to trouble to build. Fixed: the budget is 20s, and the invariant *budget < enclosing timeout* is now stated where it can be read. **(b)** Margins are thinner than they look: `recovers after SIGKILL` runs 53–59s against a 90s timeout while other tests in the same suite vary 4× run to run (2.8s→12.7s). A 1.6× slowdown blows it. Raising that timeout is **not** proposed here — the file argues against exactly that, and doing it without knowing which test failed would be masking. Left open pending a captured failure or the #61 CI matrix. |
-| 69 | **`ExecutionScope` has no agent dimension, and `always` cannot outlive a conversation.** Flue's initializer `id` is the agent *instance* — one per conversation thread — so `createAgentSandbox({ agentId: id })` puts a conversation identity in `agentId`, and `conversationId` derives a second copy of it. `grant-store.ts:108` filters on `agent_id`, so a `duration: "always"` grant is unreachable from any other conversation and is indistinguishable from `duration: "conversation"`. ADR 0015 keeps breadth and duration independent; duration currently has two values that mean the same thing. **Fails closed** — the user is asked again, never silently authorized — so this is correctness and approval fatigue, not a security defect. Pinned by `tests/unit/grant-identity.test.ts`. |
 
 **Repository and documentation**
 

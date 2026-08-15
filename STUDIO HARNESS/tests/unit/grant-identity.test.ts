@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { STUDIO_AGENT_ID } from "../../src/contracts/agents.js";
 import type { ExecutionScope } from "../../src/contracts/capabilities.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -7,29 +8,32 @@ import { openDatabase, type StudioDatabase } from "../../src/storage/database.js
 /**
  * What a grant is keyed by.
  *
- * This file exists because the question was got wrong from reading the code.
- * `createAgentSandbox({ agentId: id })` reads as "the agent", and
- * `ExecutionScope.conversationId` defaults to `conversation:${agentId}`, so the
- * pair looks like one identity duplicated per *agent*. It is not: Flue's
- * initializer `id` is the **agent instance**, one per conversation thread —
- * measured, by probing a running harness across two threads, as `alpha` and
- * `beta` rather than `studio`.
+ * This file exists because the question was got wrong twice from reading code
+ * instead of measuring it. First it looked as though every conversation shared
+ * one scope (#68, withdrawn — a probe of a running harness across two threads
+ * reported `alpha` and `beta`). Then, correctly, as #69: Flue's initializer
+ * `id` is the agent *instance*, one per thread, and it was being passed as
+ * `agentId`. A grant therefore had no agent dimension at all, and
+ * `duration: "always"` could not outlive the conversation that made it.
  *
- * So `agentId` carries a conversation identity and there is no agent dimension
- * in a grant at all. That is issue #69. These tests pin what the store does
- * today so the next person reasons from a measurement rather than from a name.
+ * Fixed by naming the agent (`contracts/agents.ts`) and putting the thread id
+ * where it belongs. The three columns now mean three different things, and the
+ * tests below are one per boundary: conversation, agent, project.
  */
 
 const READ = { namespace: "native", name: "read" } as const;
 
-function scopeFor(instanceId: string): ExecutionScope {
-  // Exactly what `StudioRuntime.createAgentSandbox` builds from Flue's `id`.
+/** Exactly what `StudioRuntime.createAgentSandbox` now builds. */
+function scopeFor(
+  threadId: string,
+  overrides: { agentId?: string; projectId?: string } = {},
+): ExecutionScope {
   return {
     clientId: "test-client",
     sessionId: "test-session",
-    agentId: instanceId,
-    conversationId: `conversation:${instanceId}`,
-    projectId: "proj-1",
+    agentId: overrides.agentId ?? STUDIO_AGENT_ID,
+    conversationId: `conversation:${threadId}`,
+    projectId: overrides.projectId ?? "proj-1",
   };
 }
 
@@ -56,43 +60,39 @@ describe("what a permission grant is keyed by", () => {
     expect(grants.find(READ, BETA, "src/app.ts")).toBeUndefined();
   });
 
-  it("does not carry an approval between two agent instances", () => {
+  /**
+   * The property #69 was about, stated positively.
+   *
+   * ADR 0015 keeps breadth and duration independent so that "for now" and
+   * "from now on" are separable answers. They are only separable if a standing
+   * grant is reachable from a conversation that did not make it. Before the
+   * fix this expectation was `toBeUndefined()` and the two durations were one
+   * answer wearing two labels.
+   */
+  it("carries a standing approval into a later conversation of the same agent", () => {
     grants.grant(READ, ALPHA, "always", "src/**");
 
-    expect(grants.find(READ, ALPHA, "src/app.ts")).toBeDefined();
-    // Isolation, and the safe direction: an unrecognised scope is asked about
-    // rather than assumed. This half is correct and worth holding.
-    expect(grants.find(READ, BETA, "src/app.ts")).toBeUndefined();
+    expect(grants.find(READ, BETA, "src/app.ts")).toBeDefined();
   });
 
-  /**
-   * **This documents a defect (#69). It is not a property to preserve.**
-   *
-   * `always` and `conversation` are meant to be different answers — ADR 0015
-   * keeps breadth and duration independent precisely so "for now" and "from now
-   * on" are separable. Because `agent_id` holds a conversation identity and the
-   * lookup filters on it, a standing grant cannot outlive the conversation that
-   * made it, so the two durations are indistinguishable in effect.
-   *
-   * It fails closed: the user is asked again rather than silently authorized,
-   * which is why this is a correctness and approval-fatigue defect and not a
-   * security one. When #69 is fixed this test should fail, and the fix is to
-   * delete it — not to restore the behaviour it describes.
-   */
-  it("cannot tell always from conversation, because agent_id is a conversation (#69)", () => {
-    const standing = scopeFor("standing");
-    const perConversation = scopeFor("per-conversation");
-    grants.grant(READ, standing, "always", "src/**");
-    grants.grant(READ, perConversation, "conversation", "src/**");
+  it("does not carry a standing approval to a different agent", () => {
+    grants.grant(READ, ALPHA, "always", "src/**");
 
-    // Each is honoured where it was made. Nothing surprising yet.
-    expect(grants.find(READ, standing, "src/app.ts")).toBeDefined();
-    expect(grants.find(READ, perConversation, "src/app.ts")).toBeDefined();
+    // The reason `agentId` is a field rather than a constant folded into the
+    // conversation: a subagent must not inherit what its parent was granted.
+    // Nothing creates a second agent today, which is why this is asserted
+    // rather than left to be noticed when one appears.
+    const otherAgent = scopeFor("alpha", { agentId: "reviewer" });
+    expect(grants.find(READ, otherAgent, "src/app.ts")).toBeUndefined();
+  });
 
-    // Seen from a third conversation the two durations are the same answer.
-    // A `conversation` grant stopping here is the point of that duration; an
-    // `always` grant stopping here is the defect — "from now on" lasts exactly
-    // as long as "for now".
-    expect(grants.find(READ, BETA, "src/app.ts")).toBeUndefined();
+  it("does not carry a standing approval to a different project", () => {
+    grants.grant(READ, ALPHA, "always", "src/**");
+
+    // ADR 0021. Widening `always` from one conversation to every conversation
+    // of an agent is the whole change here, so the boundary that stops it from
+    // widening further is worth a test in the same file.
+    const otherProject = scopeFor("beta", { projectId: "proj-2" });
+    expect(grants.find(READ, otherProject, "src/app.ts")).toBeUndefined();
   });
 });

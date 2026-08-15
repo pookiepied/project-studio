@@ -123,7 +123,10 @@ describe("MCP application runtime", () => {
       new WorkspaceTrustStore(database).set(projectRoot, true);
       await runtime.start();
 
-      const sandbox = runtime.createAgentSandbox({ agentId: "agent" });
+      const sandbox = runtime.createAgentSandbox({
+        agentId: "agent",
+        conversationId: "conversation:agent",
+      });
       const env = await sandbox.createSessionEnv({ id: "agent" });
       const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
       expect(tools.map((tool) => tool.name)).toContain("mcp__11_echo-server__4_echo");

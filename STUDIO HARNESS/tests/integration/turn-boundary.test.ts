@@ -24,6 +24,18 @@ import { openDatabase } from "../../src/storage/database.js";
  * and it is the same thing a person reads when choosing what to undo.
  */
 
+/**
+ * Two runs of one conversation. Named because that is the whole premise: the
+ * turn counter continues across the second initializer *because* the
+ * conversation did not end. This used to be implicit — both calls passed
+ * `agentId: "studio"` and the conversation id was derived from it — so the
+ * test passed for a reason it never stated. Since #69 the caller says it.
+ */
+const SAME_CONVERSATION = {
+  agentId: "studio",
+  conversationId: "conversation:thread-1",
+} as const;
+
 const credentials: SecureCredentialStore = {
   get: async () => null,
   set: async () => undefined,
@@ -80,13 +92,13 @@ describe("the model-turn boundary", () => {
         };
 
         // Run one.
-        const first = runtime.createAgentSandbox({ agentId: "studio" });
+        const first = runtime.createAgentSandbox(SAME_CONVERSATION);
         await runtime.prepareModelTurn();
         await write(first, "one.txt");
 
         // Run two: a second initializer for the same agent, exactly as Flue
         // does it. Nothing about the conversation has ended.
-        const second = runtime.createAgentSandbox({ agentId: "studio" });
+        const second = runtime.createAgentSandbox(SAME_CONVERSATION);
         await runtime.prepareModelTurn();
         await write(second, "two.txt");
 

@@ -58,8 +58,19 @@ export interface StudioRuntimeOptions {
 }
 
 export interface StudioAgentSandboxOptions {
+  /** The agent, not the thread — see `contracts/agents.ts`. */
   readonly agentId: string;
-  readonly conversationId?: string;
+  /**
+   * Required, and deliberately without a default.
+   *
+   * It defaulted to `` `conversation:${agentId}` ``, which is safe only while
+   * `agentId` happens to be unique per conversation. Now that it is not, that
+   * default would collapse every conversation of one agent into a single
+   * permission scope — a grant given in one would silently apply in all of
+   * them. Making the caller say which conversation this is keeps that
+   * structural rather than conventional (ADR 0015's reasoning, one level down).
+   */
+  readonly conversationId: string;
   readonly projectId?: string;
   readonly projectRoot?: string;
 }
@@ -347,7 +358,7 @@ export class StudioRuntime implements AgentHost {
       clientId: this.#clientId,
       sessionId: this.#sessionId,
       agentId: options.agentId,
-      conversationId: options.conversationId ?? `conversation:${options.agentId}`,
+      conversationId: options.conversationId,
       projectId,
     };
     const policy = createSandboxPolicy({ workspaceRoot: projectRoot });
