@@ -142,19 +142,39 @@ its API and may not touch the user's dev server, local database, or router.
 
 ## What it actually does, measured
 
-From inside a **Windows** container, against a real workspace, asking the kernel
-directly. The Linux column is deliberately absent: no machine has yet been
-available on which `bwrap` could be run at all, so the same table for it would
-be a description rather than a measurement, and `sandbox-bwrap.test.ts` is
-written and waiting for the host that can fill it in.
+From inside a container, against a real workspace, asking the kernel directly —
+on both platforms now. The Linux column was taken on Ubuntu 24.04 with
+`kernel.apparmor_restrict_unprivileged_userns` lowered for the length of the run
+and restored afterwards, which is the only way that machine can answer these
+questions at all (#92).
 
-| Attempt | Result |
-|---|---|
-| Open, list and read the granted workspace | allowed |
-| Create a file in a **read**-granted root | refused (error 5) |
-| Create a file in a **write**-granted root | allowed |
-| Read, list or write anything else — the user's Documents, their home, another project | refused (error 5) |
-| Reach the network | refused; name resolution does not work |
+The two mechanisms differ in a way worth naming: Windows *refuses* an ungranted
+path, and Linux makes it *absent*. `EPERM` against `ENOENT` is the same boundary
+reported from two directions, and the Linux one is marginally stronger — a path
+that does not exist discloses nothing about whether it did.
+
+| Attempt | Windows | Linux |
+|---|---|---|
+| Open, list and read the granted workspace | allowed | allowed |
+| Run a program from a script *file*, not only `-e` | allowed | allowed |
+| Create a file in a **read**-granted root | refused (error 5) | refused (`EROFS`) |
+| Create a file in a **write**-granted root | allowed | allowed |
+| Read, list or write anything else — their Documents, their home, another project | refused (error 5) | absent (`ENOENT`) |
+| `~/.bashrc`, `~/.ssh/authorized_keys` | refused | absent |
+| `/etc/passwd`, `/etc/shadow` | n/a | absent, network allowed or not |
+| `/etc` at all, with the network **off** | n/a | absent |
+| `/etc` with the network **on** | n/a | 7 entries — resolver and certificates, nothing else |
+| See another process on the host | — | no; empty PID namespace |
+| Reach the network, operator's switch off | refused; DNS does not resolve | refused |
+| Reach the network, operator's switch on | allowed, loopback and LAN still refused | allowed, **loopback too** (#93) |
+
+One Linux result is surprising enough to state rather than bury: listing the
+home directory **succeeds**, and returns exactly one entry. To mount the child's
+program root, `bwrap` has to create its mount point, which materialises every
+parent as an empty directory inside the container. What a child sees of `$HOME`
+is therefore the next component of the path to its own executable — which it was
+handed in `argv[0]`. Nothing of the user's is there, and it is pinned by a test
+so that if it ever becomes the real directory, something fails.
 
 Asserted in `tests/integration/sandbox-appcontainer.test.ts`, against the copy
 in `vendor/`, so what is measured is what ships.
@@ -235,11 +255,20 @@ survivable — the Linux counterpart of `pnpm sandbox:prepare` — is **#92**.
 
 ### The network switch does not mean the same thing on both platforms
 
-Windows grants `internetClient`, measured to exclude loopback and the LAN. Linux
-shares the host's network namespace, because `bwrap` offers nothing between
-"empty namespace" and "the host's" — so an allowed child there reaches
-`127.0.0.1` as well. The **refusal** half is identical and complete on both; the
-**granted** half is wider on Linux. Registered as **#93**, and written into
+One boolean, two boundaries, and the difference is measured on both sides rather
+than argued from the flags:
+
+| Target | Windows, `internetClient` | Linux, `--share-net` |
+|---|---|---|
+| Public address and DNS | allowed | allowed |
+| `127.0.0.1` | **refused** | **reached, 200** |
+
+Windows can be narrow because a capability names what it grants. Linux cannot,
+because `bwrap` offers nothing between "empty namespace" and "the host's" —
+narrowing it needs a firewall rule or a seccomp filter this does not have. The
+**refusal** half is identical and complete on both; the **granted** half is
+wider on Linux, so a contained server there may call its API *and* the user's
+dev server. Registered as **#93**, and written into
 `ContainmentRequest.network`'s own doc comment rather than only here, because
 that is the field whose name implies otherwise.
 

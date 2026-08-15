@@ -41,11 +41,17 @@ export interface ContainmentRequest {
    *
    * On Linux the switch is `--share-net`, which means *no network namespace at
    * all* — so the child gets the host's stack, loopback and LAN included.
-   * `bwrap` has no setting between "empty namespace" and "the host's", so
-   * matching the Windows boundary would need a firewall or a seccomp filter
-   * this does not have. The refusal half is identical and complete; the
-   * granted half is wider. Registered as **#93**, and stated here rather than
-   * in a document because this is the field whose name implies otherwise.
+   * **Measured, not deduced:** against a server on `127.0.0.1`, a contained
+   * child reaches it (`200`) with the network allowed and is refused
+   * (`ECONNREFUSED`) without it. `bwrap` has no setting between "empty
+   * namespace" and "the host's", so matching the Windows boundary needs a
+   * firewall rule or a seccomp filter this does not have.
+   *
+   * So the refusal half is identical and complete on both platforms, and the
+   * granted half is wider on Linux: a contained server there may call its API
+   * *and* the user's dev server. Registered as **#93**, and stated here rather
+   * than only in a document because this is the field whose name implies
+   * otherwise.
    */
   readonly network: boolean;
   /**

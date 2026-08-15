@@ -1,5 +1,5 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -162,14 +162,51 @@ linux("a contained child on Linux", () => {
       .toMatch(/ENOENT|EACCES|EPERM/);
   }, 60_000);
 
-  it("cannot see the user's home directory", async () => {
-    // Bind mounts make this a stronger boundary than the Windows one: an
-    // ungranted path is not refused, it is absent. Asserted separately from the
-    // sibling directory above because "the agent cannot read your home folder"
-    // is the claim a user actually cares about.
-    const home = JSON.stringify(process.env.HOME ?? "/root");
-    expect(await inside(sandbox, REPORT(`require("fs").readdirSync(${home})`)))
-      .toMatch(/ENOENT|EACCES|EPERM/);
+  it("cannot see anything in the user's home directory", async () => {
+    // "The agent cannot read your home folder" is the claim a user actually
+    // cares about, so it is asserted against real files rather than against the
+    // folder itself — and the difference between those two is a measurement
+    // that corrected this test rather than the code.
+    //
+    // The first version asserted that listing `$HOME` fails. It does not. It
+    // returns exactly one entry, and the next test says why. Bind mounts make
+    // an ungranted path *absent* rather than refused, which is a stronger
+    // boundary than Windows', and `ENOENT` is what that looks like.
+    const home = homedir();
+    for (const path of [
+      join(home, ".bashrc"),
+      join(home, ".ssh", "authorized_keys"),
+      join(home, "Documents"),
+    ]) {
+      const quoted = JSON.stringify(path);
+      expect(await inside(sandbox, REPORT(`require("fs").statSync(${quoted})`)))
+        .toMatch(/ENOENT|EACCES|EPERM/);
+    }
+  }, 60_000);
+
+  it("shows only the empty skeleton of the path to its own program", async () => {
+    // Why listing `$HOME` succeeds, pinned so nobody re-discovers it as a leak.
+    //
+    // To mount the program root, `bwrap` must create its mount point, and that
+    // means materialising every parent directory inside the container. They are
+    // empty directories on a tmpfs, not the user's. So a child whose runtime
+    // lives under the home directory can list `$HOME` and see one entry: the
+    // next component of the path to its own executable — which it was given as
+    // `argv[0]` and already knows.
+    //
+    // Nothing is disclosed, and the reason it is asserted anyway is that
+    // "listing the home directory works" is alarming until you know what it
+    // returns. A property this surprising should fail loudly if it ever changes
+    // into the real thing.
+    const listing = await inside(
+      sandbox,
+      `console.log(JSON.stringify(require("fs").readdirSync(${JSON.stringify(homedir())})))`,
+    );
+    const entries = JSON.parse(listing) as string[];
+    expect(entries.length).toBeLessThanOrEqual(1);
+    for (const entry of entries) {
+      expect(NODE.startsWith(join(homedir(), entry))).toBe(true);
+    }
   }, 60_000);
 
   it("cannot see the host's other processes", async () => {

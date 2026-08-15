@@ -118,10 +118,13 @@ it.
   real build-system consequence — the Harness's test suite would depend on a
   Rust artefact for the first time.
 
-**Unverified, and named as such:** no Linux machine is available, so every
+~~**Unverified, and named as such:** no Linux machine is available, so every
 statement about `bwrap` in this document is from its documented interface and
-not from a run. The argv construction can be unit-tested without it; the
-containment cannot.
+not from a run.~~ **Resolved 2026-08-16.** A Linux VPS was made available and
+every `bwrap` statement below is now from a run on it. The sentence is struck
+rather than deleted because the shape of the caveat was right: the argv
+construction was unit-testable without a Linux machine and the containment was
+not, and it stayed unclaimed until one existed.
 
 ## 4. Sequence
 
@@ -148,13 +151,16 @@ Each step lands on its own and is verifiable on its own. No step claims #15.
    probed by containing `/bin/true`. Nothing is written to the user's disk, so
    `release()` is a no-op with a reason rather than a gap.
 
-   **Verified on a real Linux machine, and the verification is one-sided.** The
-   VPS runs Ubuntu 24.04, which has `bwrap` installed and refuses it a user
-   namespace — so what is measured there is the *refusal* path, end to end:
-   `available()` false, `unsupported_isolation` raised, and the kernel's own
-   words quoted back. The containment matrix itself is written
-   (`sandbox-bwrap.test.ts`) and has not run; it needs a host that permits
-   unprivileged user namespaces, or #92.
+   **Verified on a real Linux machine, in both states.** The VPS runs Ubuntu
+   24.04, which has `bwrap` installed and refuses it a user namespace — so the
+   *refusal* path was measured end to end exactly as shipped: `available()`
+   false, `unsupported_isolation` raised, the kernel's own words quoted back.
+   The restriction was then lowered for a single session and restored, which
+   ran the containment matrix itself: workspace read/list/write, a script
+   *file* rather than only `-e`, refusal of everything outside, an empty PID
+   namespace, `/etc` absent unless the network is on and then only seven
+   entries, and the network switch in both positions. One result came back
+   different from Windows and is #93.
 4. **#41.** The containment text in the README and ADRs 0019/0022/0024 is
    corrected *last*. What it must now say is **platform-specific** — contained
    on Windows, not yet on Linux — which is a third distinct statement from
@@ -223,15 +229,18 @@ since every figure in this document before it came from one machine:
 
 | | Windows 11 Home 26200 | Ubuntu 24.04 (VPS) |
 |---|---|---|
-| Files | 79 passed, 1 skipped | 77 passed, 3 skipped |
-| Tests | 1227 passed, 19 skipped, 0 failed | 1189 passed, 57 skipped, 0 failed |
+| Files | 79 passed, 1 skipped | 79 passed, 1 skipped |
+| Tests | 1227 passed, 19 skipped, 0 failed | 1221 passed, 26 skipped, 0 failed |
 | `tsc --noEmit` | clean | clean |
 | `flue build --target node` | clean | clean |
-| Containment | measured working | measured **refusing** (#92) |
+| Containment | measured working | measured working, **and measured refusing** |
 
-The skip counts differ for one reason and it is the honest one: each platform
-skips the other's containment suite, and Linux additionally skips every case
-that has to start a real program, because this particular kernel will not let it
-(`tests/contained.ts`). Skipped, never quietly passed — a suite reporting green
-where the feature could not be exercised is the class of claim this cycle
-exists to remove.
+The Linux figures are from the session with the userns restriction lowered. As
+that machine normally stands, it reports **77 passed, 3 skipped / 1189 passed,
+57 skipped, 0 failed** instead — the difference being every case that has to
+start a real program, gated by `tests/contained.ts`. Both numbers are real and
+both are worth keeping: the first says the sandbox works, the second says the
+refusal works, and no single run can say both.
+
+Skipped, never quietly passed. A suite reporting green where the feature could
+not be exercised is the class of claim this cycle exists to remove.
