@@ -3,6 +3,7 @@ import {
 } from "./admission/verifier.js";
 import { createAdmissionSession } from "./admission/verifier.js";
 import { PermissionApprovalBroker } from "./application/approval-broker.js";
+import { PendingApprovalStore } from "./permissions/pending-approvals.js";
 import {
   configureStudioRuntime,
   StudioRuntime,
@@ -59,7 +60,11 @@ function createHarnessApplication(): HarnessApplication {
         : { sessionId: process.env.PROJECT_STUDIO_ADMISSION_SESSION_ID }),
     });
 
-    const approvals = new PermissionApprovalBroker();
+    // Durable: an unanswered question survives a restart and is asked again
+    // rather than disappearing with the process (ADR 0036).
+    const approvals = new PermissionApprovalBroker({
+      store: new PendingApprovalStore(database),
+    });
     const runtime = new StudioRuntime({
       database,
       logger: observability.logger,

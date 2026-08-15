@@ -242,6 +242,28 @@ export const MIGRATIONS: readonly Migration[] = [
       db.exec("ALTER TABLE permission_grant ADD COLUMN definition_hash TEXT");
     },
   },
+  {
+    version: 9,
+    name: "pending_approval",
+    up(db) {
+      // A question put to a person outlives the process that asked it (ADR
+      // 0036). Held in a `Map`, every in-flight approval vanished on restart
+      // and the run waiting on one could never be resumed — the person was
+      // simply never asked again.
+      //
+      // `request` and `decision` are the JSON the UI renders; they describe a
+      // capability and a target, never a credential. `asked_at` is what orders
+      // the queue and what lets a stale row be recognised as stale.
+      db.exec(`
+        CREATE TABLE pending_approval (
+          id        TEXT PRIMARY KEY,
+          request   TEXT NOT NULL,
+          decision  TEXT NOT NULL,
+          asked_at  INTEGER NOT NULL
+        ) STRICT;
+      `);
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

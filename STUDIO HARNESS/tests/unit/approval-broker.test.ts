@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { PermissionDecision, PermissionRequest } from "../../src/permissions/policy.js";
+import { PendingApprovalStore } from "../../src/permissions/pending-approvals.js";
+import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 const AUTH_CONTEXT = {
   clientId: "test-client",
@@ -69,5 +71,86 @@ describe("permission approval broker", () => {
 
     await expect(broker.request(REQUEST, DECISION, controller.signal)).resolves.toBeUndefined();
     expect(broker.list(AUTH_CONTEXT)).toEqual([]);
+  });
+});
+
+describe("permission approval durability (ADR 0036)", () => {
+  function freshDatabase(): StudioDatabase {
+    return openDatabase({ path: ":memory:" });
+  }
+
+  it("survives a restart: a question asked by a dead process is still queued", () => {
+    const database = freshDatabase();
+
+    // The process that asked. It parks a caller on a promise and exits.
+    const before = new PermissionApprovalBroker({
+      store: new PendingApprovalStore(database),
+    });
+    void before.request(REQUEST, DECISION);
+
+    // A new process over the same database — nothing in memory carries over.
+    const after = new PermissionApprovalBroker({
+      store: new PendingApprovalStore(database),
+    });
+
+    const pending = after.list(AUTH_CONTEXT);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.request.capability.id).toEqual(REQUEST.capability.id);
+    expect(pending[0]?.decision.reason).toBe(DECISION.reason);
+
+    database.close();
+  });
+
+  it("removes an inherited question once it is answered", () => {
+    const database = freshDatabase();
+    const before = new PermissionApprovalBroker({
+      store: new PendingApprovalStore(database),
+    });
+    void before.request(REQUEST, DECISION);
+
+    const after = new PermissionApprovalBroker({
+      store: new PendingApprovalStore(database),
+    });
+    const id = after.list(AUTH_CONTEXT)[0]?.id ?? "";
+
+    // There is no live waiter to resolve — that run died with its process —
+    // but the question is genuinely answered and must leave the queue.
+    expect(after.answer(id, { verdict: "allow", duration: "once" }, AUTH_CONTEXT)).toBe(true);
+    expect(after.list(AUTH_CONTEXT)).toEqual([]);
+
+    database.close();
+  });
+
+  it("clears the durable row when the asking process answers normally", async () => {
+    const database = freshDatabase();
+    const store = new PendingApprovalStore(database);
+    const broker = new PermissionApprovalBroker({ store });
+
+    const pending = broker.request(REQUEST, DECISION);
+    const id = broker.list(AUTH_CONTEXT)[0]?.id ?? "";
+    expect(store.list()).toHaveLength(1);
+
+    broker.answer(id, { verdict: "allow", duration: "once" }, AUTH_CONTEXT);
+    await expect(pending).resolves.toEqual({ verdict: "allow", duration: "once" });
+    // Left behind, this would be re-asked forever after a restart.
+    expect(store.list()).toEqual([]);
+
+    database.close();
+  });
+
+  it("clears the durable row when the caller aborts", async () => {
+    const database = freshDatabase();
+    const store = new PendingApprovalStore(database);
+    const broker = new PermissionApprovalBroker({ store });
+    const controller = new AbortController();
+
+    const pending = broker.request(REQUEST, DECISION, controller.signal);
+    expect(store.list()).toHaveLength(1);
+
+    controller.abort();
+    await expect(pending).resolves.toBeUndefined();
+    expect(store.list()).toEqual([]);
+
+    database.close();
   });
 });
