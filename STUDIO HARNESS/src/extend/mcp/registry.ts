@@ -230,7 +230,7 @@ export class McpServerRegistry {
       env: input.env ?? {},
     };
 
-    this.#db.handle
+    this.#db
       .prepare(
         `INSERT INTO mcp_server
            (id, title, transport, command, args, env, url,
@@ -267,7 +267,7 @@ export class McpServerRegistry {
   }
 
   get(id: string): McpServerRecord | undefined {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare(`SELECT * FROM mcp_server WHERE id = ?`)
       .get(id) as ServerRow | undefined;
 
@@ -275,7 +275,7 @@ export class McpServerRegistry {
   }
 
   list(): readonly McpServerRecord[] {
-    const rows = this.#db.handle
+    const rows = this.#db
       .prepare(`SELECT * FROM mcp_server ORDER BY id`)
       .all() as unknown as ServerRow[];
 
@@ -283,7 +283,7 @@ export class McpServerRegistry {
   }
 
   remove(id: string): boolean {
-    const result = this.#db.handle
+    const result = this.#db
       .prepare(`DELETE FROM mcp_server WHERE id = ?`)
       .run(id);
     return Number(result.changes) > 0;

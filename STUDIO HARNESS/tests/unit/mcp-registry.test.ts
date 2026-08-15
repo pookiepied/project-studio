@@ -5,7 +5,11 @@ import { ExtensionInventory } from "../../src/extend/inventory.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
 import { ExtensionSelectionStore } from "../../src/extend/selection.js";
 import { assertNoSecretColumns } from "../../src/storage/migrations.js";
-import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
+import {
+  openDatabase,
+  storageHandle,
+  type StudioDatabase,
+} from "../../src/storage/database.js";
 
 const WINDOWS = process.platform === "win32";
 
@@ -40,7 +44,7 @@ describe("the MCP server registry", () => {
       // The guard runs on every open, so reaching this line already proves it.
       // Asserted directly as well, because a future column added to this table
       // must fail here rather than in whatever opens a database next.
-      expect(() => assertNoSecretColumns(db.handle)).not.toThrow();
+      expect(() => assertNoSecretColumns(storageHandle(db))).not.toThrow();
     });
 
     it("stores the name of the variable a secret arrives in, never a value", () => {
@@ -54,7 +58,7 @@ describe("the MCP server registry", () => {
         authEnvVar: "GITHUB_TOKEN",
       });
 
-      const row = db.handle
+      const row = db
         .prepare("SELECT auth_env_var FROM mcp_server WHERE id = ?")
         .get("github") as { auth_env_var: string };
 

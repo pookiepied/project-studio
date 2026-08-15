@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   LATEST_SCHEMA_VERSION,
   openDatabase,
+  storageHandle,
   type StudioDatabase,
 } from "../../src/storage/database.js";
 import { StorageError, storageErrorFrom } from "../../src/storage/errors.js";
@@ -40,13 +41,13 @@ describe("migrations", () => {
 
   it("is idempotent: a second run applies nothing", () => {
     const db = open();
-    expect(migrate(db.handle)).toBe(LATEST_SCHEMA_VERSION);
-    expect(migrate(db.handle)).toBe(LATEST_SCHEMA_VERSION);
+    expect(migrate(storageHandle(db))).toBe(LATEST_SCHEMA_VERSION);
+    expect(migrate(storageHandle(db))).toBe(LATEST_SCHEMA_VERSION);
   });
 
   it("records every applied migration by name", () => {
     const rows = open()
-      .handle.prepare("SELECT version, name FROM schema_migration ORDER BY version")
+      .prepare("SELECT version, name FROM schema_migration ORDER BY version")
       .all() as unknown as { version: number; name: string }[];
 
     expect(rows).toHaveLength(MIGRATIONS.length);
@@ -74,10 +75,10 @@ describe("migrations", () => {
 
   it("refuses a database written by a newer build instead of corrupting it", () => {
     const db = open();
-    db.handle.exec("PRAGMA user_version = 999");
+    db.exec("PRAGMA user_version = 999");
 
-    expect(() => migrate(db.handle)).toThrow(StorageError);
-    expect(() => migrate(db.handle)).toThrow(/newer version/i);
+    expect(() => migrate(storageHandle(db))).toThrow(StorageError);
+    expect(() => migrate(storageHandle(db))).toThrow(/newer version/i);
   });
 
   it("leaves the schema at the last good version when a migration throws", () => {
@@ -111,14 +112,14 @@ describe("migrations", () => {
 describe("the keychain/database boundary", () => {
   it("rejects a schema that adds a column looking like secret storage", () => {
     const db = open();
-    db.handle.exec("CREATE TABLE leaky (id TEXT PRIMARY KEY, api_key TEXT) STRICT");
+    db.exec("CREATE TABLE leaky (id TEXT PRIMARY KEY, api_key TEXT) STRICT");
 
-    expect(() => assertNoSecretColumns(db.handle)).toThrow(StorageError);
-    expect(() => assertNoSecretColumns(db.handle)).toThrow(/credential store/i);
+    expect(() => assertNoSecretColumns(storageHandle(db))).toThrow(StorageError);
+    expect(() => assertNoSecretColumns(storageHandle(db))).toThrow(/credential store/i);
   });
 
   it("passes for the shipped schema", () => {
-    expect(() => assertNoSecretColumns(open().handle)).not.toThrow();
+    expect(() => assertNoSecretColumns(storageHandle(open()))).not.toThrow();
   });
 
   it("catches a secret word anywhere in the name, not only at the end", () => {
@@ -146,8 +147,8 @@ describe("the keychain/database boundary", () => {
 
     for (const name of secrets) {
       const db = open();
-      db.handle.exec(`CREATE TABLE leaky (id TEXT PRIMARY KEY, ${name} TEXT) STRICT`);
-      expect(() => assertNoSecretColumns(db.handle), name).toThrow(/credential store/i);
+      db.exec(`CREATE TABLE leaky (id TEXT PRIMARY KEY, ${name} TEXT) STRICT`);
+      expect(() => assertNoSecretColumns(storageHandle(db)), name).toThrow(/credential store/i);
     }
   });
 
@@ -165,8 +166,8 @@ describe("the keychain/database boundary", () => {
 
     for (const name of benign) {
       const db = open();
-      db.handle.exec(`CREATE TABLE fine (id TEXT PRIMARY KEY, ${name} TEXT) STRICT`);
-      expect(() => assertNoSecretColumns(db.handle), name).not.toThrow();
+      db.exec(`CREATE TABLE fine (id TEXT PRIMARY KEY, ${name} TEXT) STRICT`);
+      expect(() => assertNoSecretColumns(storageHandle(db)), name).not.toThrow();
     }
   });
 
@@ -210,14 +211,14 @@ describe("transactions", () => {
 
     expect(() =>
       db.transaction(() => {
-        db.handle
+        storageHandle(db)
           .prepare("INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)")
           .run("a", "1", Date.now());
         throw new Error("no");
       }),
     ).toThrow();
 
-    expect(db.handle.prepare("SELECT COUNT(*) AS n FROM app_setting").get()).toEqual({
+    expect(db.prepare("SELECT COUNT(*) AS n FROM app_setting").get()).toEqual({
       n: 0,
     });
   });
@@ -225,14 +226,14 @@ describe("transactions", () => {
   it("commits on return", () => {
     const db = open();
     const result = db.transaction(() => {
-      db.handle
+      storageHandle(db)
         .prepare("INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)")
         .run("a", "1", Date.now());
       return "done";
     });
 
     expect(result).toBe("done");
-    expect(db.handle.prepare("SELECT COUNT(*) AS n FROM app_setting").get()).toEqual({
+    expect(db.prepare("SELECT COUNT(*) AS n FROM app_setting").get()).toEqual({
       n: 1,
     });
   });
@@ -249,7 +250,7 @@ describe("transactions", () => {
   it("classifies a uniqueness violation as a conflict", () => {
     const db = open();
     const insert = () =>
-      db.handle
+      storageHandle(db)
         .prepare("INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)")
         .run("dup", "1", Date.now());
 
@@ -337,10 +338,10 @@ describe("startup failure containment", () => {
 
       const db = openDatabase({ path });
       try {
-        expect(db.handle.prepare("PRAGMA integrity_check").get()).toEqual({
+        expect(db.prepare("PRAGMA integrity_check").get()).toEqual({
           integrity_check: "ok",
         });
-        expect(db.handle.prepare("SELECT COUNT(*) AS count FROM crash_probe").get()).toEqual({
+        expect(db.prepare("SELECT COUNT(*) AS count FROM crash_probe").get()).toEqual({
           count: 0,
         });
       } finally {

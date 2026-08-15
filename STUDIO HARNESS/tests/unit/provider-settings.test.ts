@@ -95,7 +95,7 @@ describe("provider settings store", () => {
   });
 
   it("reports a corrupted selection instead of returning a half-read one", () => {
-    db.handle
+    db
       .prepare("INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)")
       .run("local.default_model", "{not json", Date.now());
 

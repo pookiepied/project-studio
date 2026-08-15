@@ -56,7 +56,7 @@ export class ProviderSettingsStore {
   }
 
   listCustomProviders(): readonly CustomProviderConfig[] {
-    const rows = this.#db.handle
+    const rows = this.#db
       .prepare(
         `SELECT id, name, base_url, api, models, context_window, max_tokens, created_at, updated_at
            FROM custom_provider ORDER BY id`,
@@ -67,7 +67,7 @@ export class ProviderSettingsStore {
   }
 
   getCustomProvider(id: string): CustomProviderConfig | undefined {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare(
         `SELECT id, name, base_url, api, models, context_window, max_tokens, created_at, updated_at
            FROM custom_provider WHERE id = ?`,
@@ -85,7 +85,7 @@ export class ProviderSettingsStore {
     const config = normalizeCustomProvider(input);
     const now = Date.now();
 
-    this.#db.handle
+    this.#db
       .prepare(
         `INSERT INTO custom_provider
                 (id, name, base_url, api, models, context_window, max_tokens, created_at, updated_at)
@@ -115,14 +115,14 @@ export class ProviderSettingsStore {
   }
 
   removeCustomProvider(id: string): boolean {
-    const result = this.#db.handle
+    const result = this.#db
       .prepare("DELETE FROM custom_provider WHERE id = ?")
       .run(id);
     return Number(result.changes) > 0;
   }
 
   listConnections(): readonly ProviderConnection[] {
-    const rows = this.#db.handle
+    const rows = this.#db
       .prepare(
         `SELECT provider_id, source, connected_at, updated_at
            FROM provider_connection ORDER BY provider_id`,
@@ -138,7 +138,7 @@ export class ProviderSettingsStore {
   }
 
   isConnected(providerId: string): boolean {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare("SELECT 1 AS present FROM provider_connection WHERE provider_id = ?")
       .get(providerId);
     return row !== undefined;
@@ -151,7 +151,7 @@ export class ProviderSettingsStore {
    */
   recordConnection(providerId: string, source = "local"): void {
     const now = Date.now();
-    this.#db.handle
+    this.#db
       .prepare(
         `INSERT INTO provider_connection (provider_id, source, connected_at, updated_at)
               VALUES (?, ?, ?, ?)
@@ -163,7 +163,7 @@ export class ProviderSettingsStore {
   }
 
   removeConnection(providerId: string): boolean {
-    const result = this.#db.handle
+    const result = this.#db
       .prepare("DELETE FROM provider_connection WHERE provider_id = ?")
       .run(providerId);
     return Number(result.changes) > 0;
@@ -197,18 +197,18 @@ export class ProviderSettingsStore {
   }
 
   clearDefaultModel(): void {
-    this.#db.handle.prepare("DELETE FROM app_setting WHERE key = ?").run(DEFAULT_MODEL_KEY);
+    this.#db.prepare("DELETE FROM app_setting WHERE key = ?").run(DEFAULT_MODEL_KEY);
   }
 
   #getSetting(key: string): string | undefined {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare("SELECT value FROM app_setting WHERE key = ?")
       .get(key) as unknown as { value: string } | undefined;
     return row?.value;
   }
 
   #setSetting(key: string, value: string): void {
-    this.#db.handle
+    this.#db
       .prepare(
         `INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,

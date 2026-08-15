@@ -61,7 +61,7 @@ describe("the extend spine", () => {
       inventory.register("mcp", () => [BLENDER, FIGMA]);
       inventory.list("mcp", "project-a");
 
-      const count = db.handle
+      const count = db
         .prepare("SELECT COUNT(*) AS n FROM extension_selection")
         .get() as { n: number };
 
@@ -103,7 +103,7 @@ describe("the extend spine", () => {
       selection.set(key, false);
       selection.set(key, true);
 
-      const count = db.handle
+      const count = db
         .prepare("SELECT COUNT(*) AS n FROM extension_selection")
         .get() as { n: number };
 

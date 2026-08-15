@@ -42,7 +42,7 @@ export class ExtensionSelectionStore {
    * written.
    */
   isEnabled(key: SelectionKey): boolean {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare(
         `SELECT enabled FROM extension_selection
           WHERE kind = ? AND extension_id = ? AND project_id = ?`,
@@ -56,7 +56,7 @@ export class ExtensionSelectionStore {
 
   /** Every extension of one kind this project switched on. */
   enabledIds(kind: ExtensionKind, projectId: string): readonly string[] {
-    const rows = this.#db.handle
+    const rows = this.#db
       .prepare(
         `SELECT extension_id FROM extension_selection
           WHERE kind = ? AND project_id = ? AND enabled = 1
@@ -76,7 +76,7 @@ export class ExtensionSelectionStore {
    * answerable when someone asks why a tool disappeared.
    */
   set(key: SelectionKey, enabled: boolean): void {
-    this.#db.handle
+    this.#db
       .prepare(
         `INSERT INTO extension_selection
            (kind, extension_id, project_id, enabled, decided_at)
@@ -100,7 +100,7 @@ export class ExtensionSelectionStore {
    * what an approval meant.
    */
   forget(kind: ExtensionKind, extensionId: string): number {
-    const result = this.#db.handle
+    const result = this.#db
       .prepare(`DELETE FROM extension_selection WHERE kind = ? AND extension_id = ?`)
       .run(kind, extensionId);
 

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { databasePath, resolveConfigured } from "../platform/paths.js";
 import { StorageError, storageErrorFrom } from "./errors.js";
@@ -27,10 +27,27 @@ import { LATEST_SCHEMA_VERSION, migrate } from "./migrations.js";
 
 const BUSY_TIMEOUT_MS = 5_000;
 
+/**
+ * The application database, as every domain outside `src/storage` sees it.
+ *
+ * Deliberately *not* a `DatabaseSync`. A domain repository needs to run
+ * statements against the tables it owns; it does not need the connection
+ * itself, and handing it over is what let any module reach any other module's
+ * tables — the leak that kept the modular-monolith gate open (see
+ * `documentation/audits/A-002-...`). `prepare`/`exec` are the whole surface.
+ *
+ * This narrows *reach*, not *reachability*: `exec` still takes arbitrary SQL,
+ * so nothing here stops a determined caller naming a table it does not own.
+ * That rule is enforced by the table-ownership architecture test, and the two
+ * together are the gate. The type stops the accident; the test stops the rest.
+ */
 export interface StudioDatabase {
-  readonly handle: DatabaseSync;
   readonly path: string;
   readonly schemaVersion: number;
+  /** Compiles a statement. The only way a domain reaches its own tables. */
+  prepare(sql: string): StatementSync;
+  /** Runs statements with no result rows — DDL and pragmas. */
+  exec(sql: string): void;
   /**
    * Runs `work` in a transaction, committing on return and rolling back on
    * throw. Not reentrant: SQLite has no nested transactions, and pretending
@@ -112,10 +129,17 @@ export function openDatabase(options: OpenDatabaseOptions = {}): StudioDatabase 
 
   let depth = 0;
 
-  return {
-    handle,
+  const database: StudioDatabase = {
     path,
     schemaVersion,
+
+    prepare(sql: string): StatementSync {
+      return handle.prepare(sql);
+    },
+
+    exec(sql: string): void {
+      handle.exec(sql);
+    },
 
     transaction<T>(work: () => T): T {
       if (depth > 0) {
@@ -142,6 +166,39 @@ export function openDatabase(options: OpenDatabaseOptions = {}): StudioDatabase 
       handle.close();
     },
   };
+
+  handles.set(database, handle);
+  return database;
+}
+
+/**
+ * Raw connections, keyed by the database that owns them.
+ *
+ * A `WeakMap` rather than a field, so the handle is not reachable from a
+ * `StudioDatabase` at all — not by property access, not by `Object.keys`, not
+ * by a cast. The only way to it is the function below, and an architecture
+ * test bounds who may call that.
+ */
+const handles = new WeakMap<StudioDatabase, DatabaseSync>();
+
+/**
+ * The raw connection, **for the storage domain and its tests only**.
+ *
+ * Migration runs DDL and reads `user_version`; that is genuinely connection-level
+ * work and it lives in `src/storage`. No other domain has a reason to call this
+ * — a repository that needs a table needs `prepare`, and reaching for the
+ * connection instead is the thing the narrow interface exists to prevent.
+ *
+ * Enforced by `tests/unit/architecture.test.ts`, not by convention.
+ */
+export function storageHandle(db: StudioDatabase): DatabaseSync {
+  const handle = handles.get(db);
+  if (handle === undefined) {
+    throw new StorageError("internal", {
+      message: "The database was not opened by this module and has no handle.",
+    });
+  }
+  return handle;
 }
 
 let shared: StudioDatabase | undefined;

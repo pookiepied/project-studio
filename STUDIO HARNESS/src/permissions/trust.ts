@@ -52,7 +52,7 @@ export class WorkspaceTrustStore {
     if (root === undefined) return "undecided";
 
     try {
-      const row = this.#db.handle
+      const row = this.#db
         .prepare("SELECT trusted, decided_at FROM workspace_trust WHERE root = ?")
         .get(trustKey(root)) as TrustRow | undefined;
 
@@ -72,7 +72,7 @@ export class WorkspaceTrustStore {
    */
   set(root: string, trusted: boolean): void {
     try {
-      this.#db.handle
+      this.#db
         .prepare(
           `INSERT INTO workspace_trust (root, trusted, decided_at)
                 VALUES (?, ?, ?)
@@ -87,7 +87,7 @@ export class WorkspaceTrustStore {
 
   list(): readonly { root: string; trusted: boolean; decidedAt: number }[] {
     try {
-      const rows = this.#db.handle
+      const rows = this.#db
         .prepare("SELECT root, trusted, decided_at FROM workspace_trust ORDER BY root")
         .all() as { root: string; trusted: number; decided_at: number }[];
 

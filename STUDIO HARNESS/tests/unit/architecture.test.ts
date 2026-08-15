@@ -110,9 +110,14 @@ describe("startup ordering and adapter boundaries", () => {
   it("centralizes Project Studio-owned UUID generation", async () => {
     const offenders: string[] = [];
     for (const path of await sourceFiles()) {
-      if (path.endsWith("src/identity/uuid.ts")) continue;
+      // Separator-agnostic: on Windows this path contains backslashes, so an
+      // `endsWith("src/identity/uuid.ts")` skips nothing and the generator
+      // reports itself. Same defect class as the 008.3 checks — `A-003` AF-02.
+      const rel = path.split("\\").join("/");
+      if (rel.endsWith("src/identity/uuid.ts")) continue;
+
       const source = await readFile(path, "utf8");
-      if (/randomUUID\s*\(/.test(source)) offenders.push(path);
+      if (/randomUUID\s*\(/.test(source)) offenders.push(rel);
     }
 
     expect(offenders).toEqual([]);
@@ -416,77 +421,169 @@ describe("the gate is the only way a tool runs", () => {
   });
 
 describe("modular monolith — 008.3 gate", () => {
-    it("hides the raw SQLite handle behind domain repositories", async () => {
+    /**
+     * `src`-relative, forward-slashed, whatever the platform.
+     *
+     * The previous version of these checks compared `path.includes("src/storage")`
+     * against native paths. On Windows those contain backslashes, so nothing
+     * ever matched and the gate silently bound on no file at all — see
+     * `A-003` AF-02. Every path comparison below goes through here.
+     */
+    const relative = (path: string): string =>
+      path.slice(SRC_ROOT.length + 1).split("\\").join("/");
+
+    const inStorage = (path: string): boolean =>
+      relative(path).startsWith("storage/");
+
+    it("keeps the raw SQLite connection inside src/storage", async () => {
+      // `StudioDatabase` exposes `prepare`/`exec` and no connection. A domain
+      // that names `DatabaseSync` or reaches for `storageHandle` has gone
+      // around the boundary rather than through it.
       const offenders: string[] = [];
+
       for (const path of await sourceFiles()) {
-        if (path.includes("src/storage")) continue;
+        if (inStorage(path)) continue;
         const source = await readFile(path, "utf8");
-        if (/\.handle\b/.test(source) && /storage\/database\.js/.test(source)) {
-          offenders.push(path.replace(SRC_ROOT, "src"));
+
+        if (/\bDatabaseSync\b/.test(source)) {
+          offenders.push(`${relative(path)} — DatabaseSync`);
         }
-        if (/DatabaseSync/.test(source) && !path.includes("src/storage")) {
-          if (!path.includes("tests/")) offenders.push(`${path.replace(SRC_ROOT, "src")} DatabaseSync`);
+        if (/\bstorageHandle\b/.test(source)) {
+          offenders.push(`${relative(path)} — storageHandle`);
         }
       }
-      const known = [
-        "src/extend/mcp/registry.ts",
-        "src/extend/selection.ts",
-        "src/models/local/settings-store.ts",
-        "src/permissions/grant-store.ts",
-        "src/permissions/trust.ts",
-        "src/retrieval/settings.ts",
-      ];
-      const unknown = offenders.filter((p) => !known.some((k) => p.endsWith(k)));
-      expect(unknown).toEqual([]);
+
+      expect(offenders).toEqual([]);
     });
 
-    it("only approved roots construct cross-domain infrastructure", async () => {
-      const offenders: string[] = [];
+    it("gives every application table exactly one owning module", async () => {
+      // The rule 008.3-05 states: one owner per table, and no cross-domain raw
+      // SQL. Hiding the connection stops the accident; this stops the rest,
+      // because `exec` still takes any SQL a caller cares to write.
+      const owners = new Map<string, Set<string>>();
+
+      // Only the string handed to `prepare`/`exec`. Scanning source text for
+      // SQL keywords matches ordinary English in comments — "from the",
+      // "into a" — and buries the real answer under prose.
+      const SQL_STRING = /\b(?:prepare|exec)\(\s*(["'`])([\s\S]*?)\1/g;
+      const TABLE_REF = /\b(?:FROM|INTO|UPDATE|JOIN)\s+([a-z_][a-z0-9_]*)/gi;
+      // `UPDATE SET` in an upsert, and SQLite's own catalogue.
+      const NOT_A_TABLE = new Set(["set", "sqlite_master", "sqlite_sequence"]);
+
+      for (const path of await sourceFiles()) {
+        if (inStorage(path)) continue;
+        const source = await readFile(path, "utf8");
+
+        for (const [, , sql] of source.matchAll(SQL_STRING)) {
+          for (const [, table] of (sql as string).matchAll(TABLE_REF)) {
+            const name = (table as string).toLowerCase();
+            if (NOT_A_TABLE.has(name)) continue;
+            owners.set(name, (owners.get(name) ?? new Set()).add(relative(path)));
+          }
+        }
+      }
+
+      const shared = [...owners]
+        .filter(([, files]) => files.size > 1)
+        .map(([table, files]) => `${table}: ${[...files].sort().join(", ")}`)
+        .sort();
+
+      // One known violation, tracked as T-004. `app_setting` is a generic
+      // key-value table that two unrelated domains write to directly, which is
+      // exactly what 008.3-05 forbids — the previous gate never caught it
+      // because it only checked who held the connection, never who touched
+      // which table. It needs one owning repository with typed key namespaces.
+      //
+      // Shrinking whitelist: a second shared table fails here immediately.
+      expect(shared).toEqual([
+        "app_setting: models/local/settings-store.ts, retrieval/settings.ts",
+      ]);
+    });
+
+    it("only approved roots open a database", async () => {
       const allowedRoots = new Set([
         "application/studio-runtime.ts",
         "models/bootstrap.ts",
         "models/local/cli.ts",
         "auth/cli.ts",
       ]);
+      const offenders: string[] = [];
+
       for (const path of await sourceFiles()) {
-        const rel = path.replace(SRC_ROOT + "/", "");
-        if (rel.startsWith("storage/")) continue;
-        if (allowedRoots.has(rel)) continue;
-        if (path.includes("tests/")) continue;
+        const rel = relative(path);
+        if (inStorage(path) || allowedRoots.has(rel)) continue;
+
         const source = await readFile(path, "utf8");
-        if (/getDatabase\(\)|openDatabase\(/.test(source)) {
-          offenders.push(rel);
-        }
+        if (/getDatabase\(\)|openDatabase\(/.test(source)) offenders.push(rel);
       }
+
       expect(offenders).toEqual([]);
     });
 
-    it("transport and agents consume ports, not concrete runtime internals", async () => {
+    it("does not let transport or agents reach past the runtime façade", async () => {
       const offenders: string[] = [];
+
       for (const path of await sourceFiles()) {
-        if (!path.includes("src/transport") && !path.includes("src/agents")) continue;
+        const rel = relative(path);
+        if (!rel.startsWith("transport/") && !rel.startsWith("agents/")) continue;
+
         const source = await readFile(path, "utf8");
-        if (/from "..\/application\/studio-runtime\.js"/.test(source) || /StudioRuntime/.test(source)) {
-          offenders.push(path.replace(SRC_ROOT, "src"));
-        }
+        if (/\bStudioRuntime\b|\bgetStudioRuntime\b/.test(source)) offenders.push(rel);
       }
-      // Known violation: transport currently imports StudioRuntime concrete — tracked as 008.3-05.
-      // This test documents the violation; it will be fixed when routes take ports.
-      expect(offenders.length).toBeGreaterThan(0);
+
+      // Known debt, tracked as T-004. These four still take the concrete
+      // runtime or reach for the global service locator. The list may only
+      // shrink: a fifth file fails here, and the test is done when it is `[]`.
+      //
+      // Recorded as a shrinking whitelist rather than
+      // `expect(offenders.length).toBeGreaterThan(0)`, which is how this check
+      // was written before — green *because* the violation was present, and
+      // guaranteed to fail the moment it was fixed. See conventions rule 5.
+      expect(offenders.sort()).toEqual([
+        "agents/studio.ts",
+        "transport/http/create-app.ts",
+        "transport/http/routes/mcp.ts",
+      ]);
     });
 
-    it("prevents new public repository bags and duplicated policy", async () => {
-      const runtimeSource = await readFile(join(SRC_ROOT, "application/studio-runtime.ts"), "utf8");
-      const publicBags = [...runtimeSource.matchAll(/readonly (db|grants|trust|selection|registry|supervisor|catalog|management)\b/g)].map((m) => m[1]);
-      // 008.3-04 will narrow these to private + façade; for now, document the 8 bags
-      expect(publicBags.length).toBeGreaterThanOrEqual(7);
+    it("does not grow the runtime's public surface", async () => {
+      const runtimeSource = await readFile(
+        join(SRC_ROOT, "application/studio-runtime.ts"),
+        "utf8",
+      );
+      // From the class declaration onwards, so the options interfaces above it
+      // — which are legitimately all-public — are not counted as bags.
+      const classBody = runtimeSource.slice(
+        runtimeSource.indexOf("export class StudioRuntime"),
+      );
+      const publicBags = [
+        ...classBody.matchAll(/^  readonly ([a-z][A-Za-z]*):/gm),
+      ].map((match) => match[1] as string);
 
+      // Same shrinking-whitelist rule. `StudioRuntime` still publishes ten
+      // repositories; T-004 replaces them with a bounded façade. Until then
+      // this pins the exact set, so an eleventh fails rather than passing a
+      // `>= 7` floor that no addition could ever violate.
+      expect(publicBags.sort()).toEqual([
+        "catalog",
+        "db",
+        "extensions",
+        "grants",
+        "inventory",
+        "management",
+        "registry",
+        "selection",
+        "supervisor",
+        "trust",
+      ]);
+    });
+
+    it("keeps one owner for the git network policy decision", async () => {
       const policySource = await readFile(join(SRC_ROOT, "permissions/policy.ts"), "utf8");
-      const hasPolicyNetwork = /GIT_NETWORK_SUBCOMMANDS/.test(policySource);
       const classifySource = await readFile(join(SRC_ROOT, "tools/git/classify.ts"), "utf8");
-      const hasClassifyNetwork = /const NETWORK/.test(classifySource);
-      expect(hasPolicyNetwork).toBe(true);
-      expect(hasClassifyNetwork).toBe(true);
+
+      expect(/GIT_NETWORK_SUBCOMMANDS/.test(policySource)).toBe(true);
+      expect(/const NETWORK/.test(classifySource)).toBe(true);
     });
   });
 

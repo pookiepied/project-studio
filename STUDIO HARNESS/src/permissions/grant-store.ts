@@ -101,7 +101,7 @@ export class PermissionGrantStore {
   ): PermissionGrant | undefined {
     const key = capabilityKey(id);
 
-    const rows = this.#db.handle
+    const rows = this.#db
       .prepare(
         `SELECT ${COLUMNS}
            FROM permission_grant
@@ -185,7 +185,7 @@ export class PermissionGrantStore {
     if (existing) return this.#refreshDefinition(existing, definitionHash, grant.granted_at);
 
     try {
-      this.#db.handle
+      this.#db
         .prepare(
           `INSERT INTO permission_grant
                   (id, capability_key, agent_id, conversation_id, project_id,
@@ -219,14 +219,14 @@ export class PermissionGrantStore {
   list(agentId?: string): readonly PermissionGrant[] {
     const rows = (
       agentId === undefined
-        ? this.#db.handle
+        ? this.#db
             .prepare(
               `SELECT ${COLUMNS}
                  FROM permission_grant WHERE revoked_at IS NULL
                 ORDER BY granted_at DESC`,
             )
             .all()
-        : this.#db.handle
+        : this.#db
             .prepare(
               `SELECT ${COLUMNS}
                  FROM permission_grant WHERE revoked_at IS NULL AND agent_id = ?
@@ -243,7 +243,7 @@ export class PermissionGrantStore {
    * user changing their mind.
    */
   revoke(grantId: string): boolean {
-    const result = this.#db.handle
+    const result = this.#db
       .prepare(
         "UPDATE permission_grant SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
       )
@@ -277,7 +277,7 @@ export class PermissionGrantStore {
    */
   revokeNamespace(namespace: string): number {
     const prefix = `${namespace}/`;
-    const result = this.#db.handle
+    const result = this.#db
       .prepare(
         `UPDATE permission_grant SET revoked_at = ?
           WHERE substr(capability_key, 1, ?) = ? AND revoked_at IS NULL`,
@@ -288,7 +288,7 @@ export class PermissionGrantStore {
 
   /** Drops conversation-scoped grants when a conversation ends. */
   revokeConversation(conversationId: string): number {
-    const result = this.#db.handle
+    const result = this.#db
       .prepare(
         "UPDATE permission_grant SET revoked_at = ? WHERE conversation_id = ? AND revoked_at IS NULL",
       )
@@ -297,7 +297,7 @@ export class PermissionGrantStore {
   }
 
   #findExact(grant: GrantRow): GrantRow | undefined {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare(
         `SELECT ${COLUMNS}
            FROM permission_grant
@@ -325,7 +325,7 @@ export class PermissionGrantStore {
     grantedAt: number,
   ): PermissionGrant {
     if (definitionHash !== undefined && row.definition_hash !== definitionHash) {
-      this.#db.handle
+      this.#db
         .prepare("UPDATE permission_grant SET definition_hash = ?, granted_at = ? WHERE id = ?")
         .run(definitionHash, grantedAt, row.id);
       row.definition_hash = definitionHash;

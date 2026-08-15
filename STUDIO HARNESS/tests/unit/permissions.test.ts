@@ -598,7 +598,7 @@ describe("an extension takes its approvals with it", () => {
 
     grants.revokeNamespace("mcp:blender");
 
-    const row = db.handle
+    const row = db
       .prepare("SELECT revoked_at FROM permission_grant WHERE capability_key = ?")
       .get("mcp:blender/render") as { revoked_at: number | null } | undefined;
 

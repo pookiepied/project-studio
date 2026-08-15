@@ -77,10 +77,10 @@ export class RetrievalSettingsStore {
   ): void {
     const key = settingKey(capability, slot);
     if (providerId === undefined) {
-      this.#db.handle.prepare("DELETE FROM app_setting WHERE key = ?").run(key);
+      this.#db.prepare("DELETE FROM app_setting WHERE key = ?").run(key);
       return;
     }
-    this.#db.handle
+    this.#db
       .prepare(
         `INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
@@ -89,7 +89,7 @@ export class RetrievalSettingsStore {
   }
 
   #get(key: string): string | undefined {
-    const row = this.#db.handle
+    const row = this.#db
       .prepare("SELECT value FROM app_setting WHERE key = ?")
       .get(key) as unknown as { value: string } | undefined;
     return row?.value;
