@@ -112,7 +112,7 @@ export function useFlueChatSession(): ChatSession {
           controller.signal,
         );
 
-        await client.send(THREAD_ID, text, controller.signal, crypto.randomUUID());
+        await client.send(THREAD_ID, text, controller.signal);
         setStatus("thinking");
 
         // Wait for terminal settlement (Flue durable). This also keeps SSE alive until done.

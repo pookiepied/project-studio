@@ -28,15 +28,15 @@ future features, and they live in §5 rather than as open issues.
 
 ## 2. Issue register
 
-**81 numbers issued, 79 live** (#37 and #68 withdrawn). Every number from 1 to
-81 appears in exactly one section below — checked by counting, not asserted.
+**82 numbers issued, 80 live** (#37 and #68 withdrawn). Every number from 1 to
+82 appears in exactly one section below — checked by counting, not asserted.
 That check is what recovered **#43**, which had been answered in Stage 1-2 and
 folded into another row without keeping its number. Categories per
 `../README.md` §4. Numbers are permanent, so this count only ever grows.
 The section headings below are the authority for how many are in each state;
 they are recounted whenever one moves.
 
-### Solved — 40, plus #24b
+### Solved — 41, plus #24b
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
 Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1138
@@ -48,7 +48,11 @@ Baseline after #70 and #69: **73 files, 1147 passed, 2 skipped, 0 failed**;
 `tsc --noEmit` and `flue build --target node` clean.
 Baseline at close of Stage 4: **74 files, 1150 passed, 2 skipped, 0 failed**;
 `tsc --noEmit` and `flue build --target node` clean. The three added tests are
-`git-network-parity.test.ts` (#78). **Measured on Node `v22.18.0`, which is not
+`git-network-parity.test.ts` (#78). The count is unchanged by #12 because one
+test was **replaced** rather than removed — the idempotency-replay assertion
+became the assertion that no deduplication happens. The desktop client also
+typechecks clean (`tsc -b --force`), which required installing its
+`node_modules` for the first time in this cycle. **Measured on Node `v22.18.0`, which is not
 the pinned `24.14.0` and is below the `engines` floor of `>=22.19.0`** — that
 asterisk is #79 and it applies to every baseline above, not only this one.
 
@@ -100,6 +104,7 @@ prevented the storage singleton returning to the file it was removed from.
 | 24b | `observability/index.ts` module singleton — the one #24 left behind. | **ADR 0037**, Accepted: it is a process resource, not an ambient default. Unlike the storage globals it has guarded init, an explicit shutdown that clears it, a redaction reset, and it throws when read before init. Those three properties are now tests; two are mutation-verified. No architecture whitelist was added — behaviour is checked instead of shape |
 | 34 | `PassthroughContextOptimizer` never wired. | ADR 0003 stands; the register entry was wrong and `roadmap.md:65` was right. Marked declared-not-wired at the source alongside #31, and its test moved out of `architecture.test.ts` — filed there it read as a guarantee about the running system, which nothing wired can make |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
+| 12 | Admission idempotency existed only as hand-diffs against `@flue` build output — the same mechanism that produced #1, where a call to a function present in no release of beta.9 made every submission return 500. | Stage 4. **Three patches deleted** — `@flue/runtime`, the Harness `@flue/sdk`, and the desktop client's `@flue/sdk` (identical hunks, and the client's was the less safe: `index 0000000..0000000`, so `git apply` matched on context alone). **The `@flue/cli` patch stays and the scope narrowed to say so** — see #45; deleting its `hostname` hunk would have bound every interface instead of loopback, silently, because nothing tests the bind address. The `idempotencyKey` parameter is removed from both clients rather than left as a hook reaching nothing; `AcceptedRun.requestId` went with it, having had no consumer but its own return statement. The replaced test is the point: `harness.test.ts` now asserts an identical resend produces **two** submissions and **two** turns — a hazard record that makes reintroducing dedup an argument rather than an absorption. Mutation-checked non-vacuous (asserting 3 turns fails with "got 2"). Verified after removal: 74 files / 1150 passed, `tsc --noEmit` clean in the Harness **and** the desktop client (whose `node_modules` had to be installed to check at all), `flue build --target node` clean, loopback assertion still green |
 | 36 | Two documentation roots — `STUDIO HARNESS/docs/` and `documentation/`. | Stage 4. **Reopened before it was closed:** the move happened, but the row's own instruction — "verify no path references broke" — had never been executed, and eight dead pointers had survived it. Fixed in `mental-model.md` (five "where to start" links), `directory-map.md` (`STUDIO HARNESS/docs/decisions/`), and `domain-ownership.md`. Re-grepped for the pattern after fixing, and the survivors were each read rather than counted: the archived 008 file and `archive/open-questions.md` (both records of where things were, left deliberately — #42), and `decisions/README.md:13`, which is not a pointer at all but the sentence stating the folder *was* there until 2026-08-15 |
 | 38 | `architecture/domain-ownership.md:30` said `bootstrap.ts:149` "will be moved in 008.3-04", against an item marked Done. | Stage 4. Larger than "not yet moved": the sentence also named `getDatabase()` as the last remaining exception, and that accessor was **deleted** under #24. Replaced with the correction rather than a date |
 | 39 | `architecture/api-inventory.md:3` said 3/5 Done; task 008 said 5/5. | Stage 4. Both ends now state the same thing and each names the other. The inventory header names the two open items instead of counting them, and flags that #12 will take it to 2/5; the 008 header carries the matching correction (#42) |
@@ -109,7 +114,7 @@ prevented the storage singleton returning to the file it was removed from.
 | 42 | Over-claimed statuses in task 008. | Stage 4. Recorded as a dated correction table in the archived file's header; **no `[x]` was changed**, because rewriting the ticks destroys the evidence of how the over-claim happened. Each row measured at `a82a8ac`. Two of the register's own shorthands did not survive measurement and are corrected there: B-01 is not "against a build that never worked" — `harness.test.ts:419` is live, unskipped and passing, and B-01 fails for the reason its own Residual column already gave; and 008.6's missing migration was real when ticked but was closed later as #16. Also found and recorded: 008.8 cites **ADR 0034** for a decision that lives in **ADR 0019**, and 008.5 proves credential compensation with `src/application/ports.ts` `withCompensation`, where neither file nor symbol exists. Citation sweep: 81 distinct references, 68 resolve, 12 name a missing file, 1 points past EOF |
 | 81 | `schema_migration` written and never read in `src/`. | Stage 4, resolved as **serve the purpose by naming the reader**, not by adding a consumer. The table is not write-only — its reader is a human opening a user's `studio.db` while diagnosing a support case, which needs rows and no code. Migration control flow correctly uses `user_version`. Verified the record is not free-floating: `tests/unit/storage.test.ts:53` asserts one row per migration, in order, by name, so a migration that forgets to record itself fails the suite. ADR 0010 said "auditability" without naming the auditor, which is what made it look unserved; both the ADR and the `CREATE TABLE` site now say who reads it. An in-product reader would need a diagnostics surface that does not exist, and writing one speculatively is the dead code this cycle exists to remove |
 
-### Answered — 5, on 2026-08-15
+### Answered — 4, on 2026-08-15
 
 Recorded here rather than folded away, per ADR 0036: a decision that cannot be
 found later gets re-litigated. **One of the four went against the
@@ -117,7 +122,6 @@ recommendation**, and that one changes the shape of the cycle — see #15.
 
 | # | Answer | What it changes |
 |---|---|---|
-| 12 | **Delete the Flue idempotency patches**, accept lost-ack-as-unknown for 1.0. | Removes the mechanism that caused #1 — a hand-diff against `dist/*.mjs` calling a function that existed in no version of beta.9, which made every agent submission return 500. **Scope narrowed 2026-08-15 to the `@flue/runtime` and `@flue/sdk` idempotency patches only. The `@flue/cli` patch is load-bearing and stays** — see the correction in #45: its `hostname` hunk is the sole supplier of the loopback bind address, and deleting it would bind every interface, against ADR 0028. Of the CLI patch's three pieces, `onReady(address)` stays until upstream carries the bound address, and the FD admission bootstrap has no upstream equivalent and is the piece to raise with Flue. Stage 4, with the reduction measured rather than assumed. |
 | 14 | **Keep `STUDIO Gateway/` — reversed on new information.** First answered as delete. Reversed once it emerged that the replacement is a **local TypeScript gateway bundled with Studio**, not another Cloudflare Worker, and that the folder is wanted as reference for analytics and structure. | Recorded as a reversal rather than re-answered quietly: the first answer was given without knowing the replacement's shape, and that fact is what changed it. Verified before agreeing: the folder is entirely self-contained (own `package.json`, lockfile, `tsconfig.json`, `wrangler.toml`) and **nothing in the Harness build, suite, typecheck, or architecture tests touches it**. It is reachable only from three documentation sentences. So the cost of keeping it is zero and the earlier "drift" argument was aesthetic, not structural — deleting source to fix a documentation error is treating the wrong thing. All 163 tracked files are real source (81 `src`, 44 `UI`, 19 `tests`, 7 `migrations`); no build output is tracked. **Conditions:** its README is labelled retired-reference (not built, not tested, not shipped, not 1.0), and `project-map.md` + root `README.md` stop describing it as a component — that part is #41/#42 work. |
 | 15 | **Implement the real sandbox — (a), not the recommended (b).** Windows and Linux only; **macOS is explicitly out of scope**, not deferred-with-intent. Stated reason: *"Real sandbox, or else we're going to take the heavy weight of half or bad implementation once again."* | The largest single change left in the cycle. `SandboxFactory` behind the ADR 0035 ports, `ProcessContainer` on Windows, `bwrap` on Linux. Turns #15 from a one-line status correction into a stage of its own, and reverses the 008.1 refusal of MXC. Un-blocks #32 in the opposite direction: `unsupported_isolation` stops being dead code and becomes the error the factory throws. Also changes what #41 must say — the containment text is corrected to *not yet contained*, not to *uncontained by policy*, because policy is no longer the final answer. |
 | 17 | **Delete the five `refs/codex/*` refs.** | **Done in `a82a8ac` — but not for the reason this register gave.** The row said they "point at nothing reachable". Measured, they pointed at real, intact **tree** objects holding a `Backend/` `Discord Bot/` `api/` `auth/` layout the project has since refactored away from. So this was a deletion of obsolete work, not of corruption, and the trees become unreachable and are collected. The premise was corrected and the deletion re-confirmed before it happened; recorded here because acting on the original wording would have been acting on a false statement that happened to reach the right answer. |
@@ -140,7 +144,7 @@ them.**
 |---|---|---|---|
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
 
-### Needs Implementation — 13
+### Needs Implementation — 14
 
 Agreed, understood, work remains.
 
@@ -163,6 +167,7 @@ into #24 below.
 | 75 | `platform/paths.ts:162` `durableDirectories()` has no caller in `src/`. ADR 0014 presents it as the enforcement mechanism for the backup set — "a new durable directory cannot be added and then forgotten by the backup" — and that property holds only if something consumes the list. Nothing does. |
 | 76 | `platform/paths.ts:119` `settingsPath()` (`config/settings.json`) has no caller in `src/`. ADR 0014 lists it as "user-authored — losing it loses preferences", but preferences live in the SQLite `app_setting` table. The documented home for user settings is a file nothing reads or writes. |
 | 77 | `observability/index.ts:123` `getLogger()` is exported with **zero** callers, in `src/` or `tests/`. Every consumer takes `logger` as an option, which ADR 0037 says is preferable. Unlike the declared-not-wired ports of #31 it carries no marker, so it reads as live API. |
+| 82 | **The desktop client is in no gate at all.** Found while carrying out #12, which is the first thing in this cycle to change client source. `STUDIO/` is a separate pnpm workspace: `pnpm check` in the Harness runs `typecheck && test` against the Harness only, `STUDIO/` contains **zero** test files, there are **no** `.github/workflows`, and its `node_modules` had never been installed here — so the client had not been typechecked once during Stages 1-4. It is clean now (`tsc -b --force`, exit 0), which is luck, not coverage: a breaking change to `HarnessClient` would have been caught by nothing. Distinct from #61, which is about a *Windows runner* for the Harness suite; this is about the client being outside every gate on every platform. Minimum bar is one command that typechecks both workspaces and fails the cycle if either breaks. |
 | 79 | **`.node-version` pins `24.14.0`; every verification in this cycle ran on `v22.18.0`** — two majors below the pin, and below the `engines` floor of `>=22.19.0`. The suite, typecheck, build and the independent audit are all measurements on an unpinned runtime. Either re-baseline on the pinned version or change the pin; until then "verified" carries an asterisk. |
 | 70 | **One intermittent suite failure, now with a mechanism rather than a shrug.** A full run reported `1 failed | 1141 passed` and the failing test was lost to a truncated log. It did not reproduce in **eight** further full runs. Repetition was then abandoned for measurement: five verbose runs give per-test durations, and two things fall out. **(a)** `harness.test.ts` set `STARTUP_BUDGET_MS` to 60s while six of its nine tests run under a 30s timeout — vitest killed those tests 30 seconds before the startup diagnostic could fire, so a slow boot could only ever surface as a bare "test timed out" with none of the pid/exit-code/stderr report the file goes to trouble to build. Fixed: the budget is 20s, and the invariant *budget < enclosing timeout* is now stated where it can be read. **(b)** Margins are thinner than they look: `recovers after SIGKILL` runs 53–59s against a 90s timeout while other tests in the same suite vary 4× run to run (2.8s→12.7s). A 1.6× slowdown blows it. Raising that timeout is **not** proposed here — the file argues against exactly that, and doing it without knowing which test failed would be masking. Left open pending a captured failure or the #61 CI matrix. **Assigned to Stage 4b, definition of done: a captured failure with the startup report attached, or the #61 matrix running the suite on a second platform.** It was registered without a stage and would otherwise sit unowned. |
 
@@ -303,25 +308,34 @@ independent *builds* inside one repository. That is a normal monorepo and worth
 keeping: the Harness and Client ship together and their contract changes in
 lockstep.
 
-### 4.2 The patches folders — do not delete
+### 4.2 The patches folders — one patch left, and it is load-bearing
 
-**The empty root `patches/` is safe to remove (#37). The other two are
-load-bearing and deleting them breaks the build.**
+**Settled 2026-08-15 by carrying out #12.** Three of the four patches are gone.
 
 | Folder | Contents | Status |
 |---|---|---|
-| `patches/` (root) | empty | **Delete** |
-| `STUDIO HARNESS/patches/` | `@flue/cli`, `@flue/runtime`, `@flue/sdk` | **Required** — wired via `pnpm-workspace.yaml` `patchedDependencies` |
-| `STUDIO/patches/` | `@flue/sdk` | **Required** — same mechanism |
+| `patches/` (root) | never existed in the repository | **#37 withdrawn** — git does not track empty directories |
+| `STUDIO HARNESS/patches/` | `@flue/cli` only | **Required** — wired via `pnpm-workspace.yaml` `patchedDependencies` |
+| ~~`STUDIO/patches/`~~ | ~~`@flue/sdk`~~ | **Deleted** (#12); the directory went with its only file |
 
-The `@flue/cli` patch is not cosmetic: it implements the **FD-based admission
-bootstrap**, reading the per-launch credential from a file descriptor so it
-never appears in argv, env, logs, or a database. That is the 008.5 security
-property. Removing it removes the credential channel.
+The `@flue/cli` patch is not cosmetic, and it earns its place twice over.
 
-The `runtime`/`sdk` patches carry the idempotency work — those two are what
-decision #12 is about, and under recommendation (c) they go while the `cli`
-patch stays.
+1. It implements the **FD-based admission bootstrap**, reading the per-launch
+   credential from a file descriptor so it never appears in argv, env, logs, or
+   a database. That is the 008.5 security property; removing it removes the
+   credential channel.
+2. Its `hostname` hunk is the **only** supplier of the loopback bind address.
+   `flue.js:2221` binds every interface when no hostname is passed, so deleting
+   it would take the Harness from loopback-only to network-exposed against ADR
+   0028 — silently, because nothing tests the bind address. That claim was
+   wrong in this register for two revisions; see #45.
+
+The `runtime`/`sdk` patches carried the idempotency work and are **deleted**. A
+contract that lives in a hand-diffed `dist/` is not a contract: it is one
+`pnpm update` from vanishing, and the same mechanism produced #1. Verified
+after removal: 74 files / 1150 passed, `tsc --noEmit` clean in **both** the
+Harness and the desktop client, `flue build --target node` clean, and the
+loopback assertion in `harness-listener.test.ts` still green.
 
 ### 4.3 Documentation — what changed
 

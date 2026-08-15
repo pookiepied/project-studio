@@ -15,7 +15,10 @@ import { harnessErrorFromUnknown } from "./errors";
 export interface HarnessClient {
   readonly baseUrl: string;
   readonly token: string;
-  send(threadId: string, message: string, signal?: AbortSignal, requestId?: string): Promise<SendResult>;
+  // No client-supplied request key: meta-task #12 removed the hand-diffed
+  // `@flue/sdk` patch that carried it. A lost acknowledgement is `unknown` and
+  // must not be retried blindly until Flue admits a key upstream.
+  send(threadId: string, message: string, signal?: AbortSignal): Promise<SendResult>;
   history(threadId: string): Promise<ChatMessage[]>;
   observe(threadId: string, onMessages: (messages: ChatMessage[]) => void, signal?: AbortSignal): () => void;
   cancel(threadId: string): Promise<boolean>;
@@ -66,11 +69,10 @@ export async function createHarnessClient(): Promise<HarnessClient> {
     baseUrl: endpoint.url,
     token: endpoint.token,
 
-    async send(threadId: string, message: string, signal?: AbortSignal, requestId = crypto.randomUUID()): Promise<SendResult> {
+    async send(threadId: string, message: string, signal?: AbortSignal): Promise<SendResult> {
       try {
         const admission = await flue.agents.send("studio", threadId, {
           message,
-          idempotencyKey: requestId,
           ...(signal ? { signal } : {}),
         });
         return {

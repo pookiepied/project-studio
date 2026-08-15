@@ -6,18 +6,29 @@ import {
   type FlueClient,
   type FlueConversationSnapshot,
 } from "@flue/sdk";
-import { createStudioUuid } from "../identity/uuid.js";
 
+/**
+ * The receipt for one admitted submission.
+ *
+ * There is no client-supplied request key here, and that is a decision rather
+ * than an omission (meta-task #12). Sending one meant patching `@flue/sdk` and
+ * `@flue/runtime` by hand-diffing their build output, which is how a call to a
+ * function that existed in no release of beta.9 shipped and made every
+ * submission return 500. Until Flue carries an admission key upstream, the
+ * contract is the conservative one ADR 0033 already states: **a lost
+ * acknowledgement is `unknown` and is never blindly retried.** `submissionId`
+ * is server-assigned, so it identifies a submission we know was admitted — it
+ * cannot answer for one we never heard back about.
+ */
 export interface AcceptedRun {
   readonly threadId: string;
-  readonly requestId: string;
   readonly submissionId: string;
   readonly streamUrl: string;
   readonly offset: string;
 }
 
 export interface HarnessClient {
-  send(threadId: string, message: string, requestId?: string): Promise<AcceptedRun>;
+  send(threadId: string, message: string): Promise<AcceptedRun>;
   wait(run: AcceptedRun, signal?: AbortSignal): Promise<AgentPromptResponse>;
   cancel(threadId: string): Promise<boolean>;
   history(threadId: string): Promise<FlueConversationSnapshot>;
@@ -40,15 +51,14 @@ export class FlueHarnessClient implements HarnessClient {
     });
   }
 
-  async send(threadId: string, message: string, requestId: string = createStudioUuid()): Promise<AcceptedRun> {
+  async send(threadId: string, message: string): Promise<AcceptedRun> {
     const admission = await this.#client.agents.send(
       this.#agentName,
       threadId,
-      { message, idempotencyKey: requestId },
+      { message },
     );
     return {
       threadId,
-      requestId,
       submissionId: admission.submissionId,
       streamUrl: admission.streamUrl,
       offset: admission.offset,

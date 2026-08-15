@@ -18,7 +18,15 @@ Status: Accepted — steps 1-3 implemented; steps 4-5 open, see below
 >
 > **Not implemented, deliberately:** step 4's public admission idempotency key
 > is meta-task **#12**, answered as *delete the patches and accept
-> lost-ack-as-unknown for 1.0*. Step 5's durable execution projection has no
+> lost-ack-as-unknown for 1.0* — and **carried out on 2026-08-15**. It had been
+> built, by hand-diffing `dist/` in `@flue/sdk` and `@flue/runtime`; that is the
+> mechanism that produced #1, a call to a function present in no release of
+> beta.9 which made every submission return 500. The `idempotencyKey` parameter
+> is gone from both clients rather than left as a hook that reaches nothing.
+> What holds instead is this ADR's own conservative rule, now pinned by a test
+> that asserts an identical resend creates a second submission and a second
+> turn. The step returns when Flue admits a key upstream, which is a request to
+> make of Flue, not a diff to reapply. Step 5's durable execution projection has no
 > consumer yet, which is the condition the step itself names.
 > `createRetryExecutionContext` exists with a test and no production caller; it
 > is marked declared-not-wired at the source under meta-task **#31**.

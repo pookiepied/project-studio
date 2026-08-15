@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient, type AcceptedRun } from "../../src/application/harness-client.js";
-import { createStudioUuid } from "../../src/identity/uuid.js";
 
 // Reuse the same harness boot as harness.test but with execution-context awareness.
 async function availablePort(): Promise<number> {
@@ -97,7 +96,7 @@ describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
     const h = await startHarness(db);
     toClean.push(() => stopHarness(h.process));
     const client = new FlueHarnessClient({ baseUrl: h.baseUrl, token: h.token });
-    const run: AcceptedRun = await client.send("stop-model", "[slow] please wait", createStudioUuid());
+    const run: AcceptedRun = await client.send("stop-model", "[slow] please wait");
     expect(await client.cancel("stop-model")).toBe(true);
     await expect(client.wait(run)).rejects.toThrow();
     const hist = await client.history("stop-model");
@@ -137,7 +136,7 @@ describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
     const client = new FlueHarnessClient({ baseUrl: h.baseUrl, token: h.token });
     const obs = client.observe("disconnect");
     // Start a slow turn
-    const run: AcceptedRun = await client.send("disconnect", "[slow] survive disconnect", createStudioUuid());
+    const run: AcceptedRun = await client.send("disconnect", "[slow] survive disconnect");
     // Immediately close the observation (desktop disconnect)
     obs.close();
     // The turn must still settle as completed, not aborted, and be readable via wait/history.

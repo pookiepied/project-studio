@@ -416,24 +416,38 @@ describe.sequential("Flue harness vertical slice", () => {
     30_000,
   );
 
+  /**
+   * There is no admission idempotency, and this test says so out loud.
+   *
+   * It replaces one that asserted the opposite. That test passed — but only
+   * because `@flue/sdk` and `@flue/runtime` were hand-diffed in `dist/`, the
+   * same mechanism that once shipped a call to a function existing in no
+   * release of beta.9 and made every submission return 500. Meta-task #12
+   * deleted those patches, so the behaviour is now Flue's own: an identical
+   * resend is a **second submission and a second turn**.
+   *
+   * This is a hazard record, not an endorsement. Pinning it matters in both
+   * directions. If someone reintroduces deduplication, this test fails and the
+   * change has to be argued rather than absorbed. And while it fails to
+   * deduplicate, nothing may retry a send automatically — ADR 0033's rule that
+   * a lost acknowledgement is `unknown` is the only thing standing between a
+   * dropped response and a silently duplicated turn.
+   */
   it(
-    "returns the same admission for an exact idempotency-key replay",
+    "does not deduplicate an identical resend — a lost ack stays unknown",
     async () => {
       const databasePath = await createDatabasePath();
       const running = await startHarness(databasePath);
       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
-      const requestId = "9ad0d7ba-8c2f-4d27-8e17-4c4a9e4e2c18";
 
-      const first = await client.send("idempotent", "same request", requestId);
-      const replay = await client.send("idempotent", "same request", requestId);
+      const first = await client.send("idempotent", "same request");
+      await client.wait(first);
+      const resend = await client.send("idempotent", "same request");
+      await client.wait(resend);
 
-      expect(replay.submissionId).toBe(first.submissionId);
-      expect(typeof replay.offset).toBe("string");
-      // Same logical request must not create a second turn.
-      expect((await client.wait(first)).text).toBe("Echo: same request");
+      expect(resend.submissionId).not.toBe(first.submissionId);
       const history = await client.history("idempotent");
-      expect(history.messages.filter((message) => message.role === "user")).toHaveLength(1);
-      await expect(client.send("idempotent", "different request", requestId)).rejects.toThrow();
+      expect(history.messages.filter((message) => message.role === "user")).toHaveLength(2);
     },
     60_000,
   );

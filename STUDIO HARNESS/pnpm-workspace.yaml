@@ -10,7 +10,9 @@ allowBuilds:
   sharp: false
   workerd: true
 
+# The @flue/runtime and @flue/sdk idempotency patches were removed under
+# meta-task #12. The remaining patch is load-bearing: its hostname hunk is the
+# only thing that supplies the loopback bind address, and without it Flue binds
+# every interface (ADR 0028).
 patchedDependencies:
   '@flue/cli@1.0.0-beta.9': patches/@flue__cli@1.0.0-beta.9.patch
-  '@flue/runtime@1.0.0-beta.9': patches/@flue__runtime@1.0.0-beta.9.patch
-  '@flue/sdk@1.0.0-beta.9': patches/@flue__sdk@1.0.0-beta.9.patch

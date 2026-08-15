@@ -134,10 +134,40 @@ containment changes in 4b.
 
 ## 7. Outcome
 
-**Closed: #17, #18, #36, #37, #38, #39, #40, #42, #78, #80, #81.**
-**Carried out: #41** (to Stage 4b, blocked on #15) **and #12** (taken on its own
-after this stage). Suite at close: **74 files, 1150 passed, 2 skipped, 0
-failed**; `tsc --noEmit` clean; `flue build --target node` clean.
+**Closed: #12, #17, #18, #36, #37, #38, #39, #40, #42, #78, #80, #81.**
+**Carried out: #41** (to Stage 4b, blocked on #15). Suite at close: **74 files,
+1150 passed, 2 skipped, 0 failed**; `tsc --noEmit` clean in the Harness and
+`tsc -b --force` clean in the desktop client; `flue build --target node` clean.
+
+### #12, taken last and on its own
+
+It was the only item here that changes behaviour rather than text, so it was
+separated from the documentation commit deliberately. Three patches went, not
+two: the register had listed `@flue/runtime` and the Harness `@flue/sdk`, and
+the desktop client held a third — the same hunks with `index 0000000..0000000`,
+meaning `git apply` matched on surrounding context alone and a version bump
+whose context still lined up would have applied silently instead of failing
+loudly. #44 had already found that; the deletion is where it mattered.
+
+Two things were removed that the plan had not anticipated. `AcceptedRun.requestId`
+had no consumer except its own return statement once the key stopped going on
+the wire, and the `requestId` parameter threaded through both clients and three
+tests with it. Leaving either would have been a hook that reaches nothing —
+which is the shape of dead code this cycle exists to delete, not a placeholder
+for the future. The future here is Flue admitting a key upstream, and that is a
+request to make of Flue rather than a diff to reapply.
+
+The replaced test is the substance of the change. Asserting that an identical
+resend produces **two** submissions and **two** turns is a hazard record, not an
+endorsement: it makes reintroducing deduplication an argument instead of an
+absorption, and it states in the file itself that while this holds, nothing may
+retry a send automatically. Mutation-checked non-vacuous — asserting three turns
+fails with "got 2", so it is reading real history.
+
+Verifying the desktop client required installing its `node_modules`, which had
+never been installed in this cycle. Worth recording: **the client's typecheck
+had not been run at any point during Stages 1-4**, so any breakage there would
+have gone unnoticed. It is clean, but that was luck rather than coverage.
 
 ### What the plan got wrong
 

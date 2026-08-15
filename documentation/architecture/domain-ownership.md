@@ -102,7 +102,7 @@ Domain modules that need `StudioDatabase` or `SecureCredentialStore` receive the
 |---|---|
 | **Logic** | Context-window assembly. `ContextOptimizer` interface + `PassthroughContextOptimizer` (`src/context/context-optimizer.ts:7,11`). Planned compaction lives here. |
 | **State** | **process-local, stateless passthrough today.** No durable state; per-turn envelope `canonical/optimized/optimizer`. |
-| **Invariants** | Optimizer must not drop tool-call history silently; future work must preserve idempotency-key linking. |
+| **Invariants** | Optimizer must not drop tool-call history silently. ~~Future work must preserve idempotency-key linking.~~ **There is no idempotency key to link** — it was deleted with the `@flue` patches under meta-task #12, and this clause would have had a reader believing a thing existed that does not. If Flue admits a key upstream, the clause returns with it. |
 | **Tables** | none. |
 | **Credential scopes** | none. |
 | **Filesystem** | none. |
