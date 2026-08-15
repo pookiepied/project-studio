@@ -19,7 +19,7 @@ index d05220033fe9d56662329e478c7ebc7db283f3ba..c5af69e23f6e322b955890ebc71db352
  	try {
  		const payload = parseDirectAgentPayload(await parseJsonBody(request));
  		const traceCarrier = extractTraceCarrier(request.headers);
-+		const idempotencyKey = parseIdempotencyKey(request);
++		const idempotencyKey = (request.headers.get("Idempotency-Key") ?? "").trim() || void 0;
  		const directOptions = {
  			payload,
  			admitAttachedSubmission: opts.admitAttachedSubmission,

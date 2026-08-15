@@ -114,7 +114,22 @@ function sessionEnvironment(sandbox: LocalSandbox): SessionEnv {
       };
     },
     readdir: (path) => sandbox.readdir(path),
-    exists: (path) => sandbox.exists(path),
+    // Flue's `SessionEnv.exists` is a total predicate, and the runtime calls it
+    // on *ancestor* directories while discovering `AGENTS.md` before a turn.
+    // `LocalSandbox.exists` deliberately throws for a path outside the
+    // workspace (see `local-sandbox.ts`) so a model-facing probe cannot walk
+    // out; that rule is right for the tool path and wrong here, where the
+    // caller is Flue itself and a throw aborts the whole submission with a 500.
+    // Answering `false` leaks nothing: it is the same answer for every path
+    // outside the workspace, present or not.
+    exists: async (path) => {
+      try {
+        return await sandbox.exists(path);
+      } catch (error) {
+        if (error instanceof SandboxError) return false;
+        throw error;
+      }
+    },
     mkdir: (path) => sandbox.mkdir(path),
     rm: (path) => sandbox.remove(path),
   };

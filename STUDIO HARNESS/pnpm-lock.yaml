@@ -9,7 +9,7 @@ patchedDependencies:
     hash: 60a44e4243d693846c858863f670d5e57aabc5aa15055e0becbea43333f8e6c3
     path: patches/@flue__cli@1.0.0-beta.9.patch
   '@flue/runtime@1.0.0-beta.9':
-    hash: 1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225
+    hash: 53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426
     path: patches/@flue__runtime@1.0.0-beta.9.patch
   '@flue/sdk@1.0.0-beta.9':
     hash: 1756a9d85ea1a34869eaa742ba89b07083b4f22df5fb90415495cff35805fa15
@@ -24,10 +24,10 @@ importers:
         version: 0.80.10(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@flue/opentelemetry':
         specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3(@flue/runtime@1.0.0-beta.9(patch_hash=1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@opentelemetry/api@1.9.1)
+        version: 1.0.0-beta.3(@flue/runtime@1.0.0-beta.9(patch_hash=53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@opentelemetry/api@1.9.1)
       '@flue/runtime':
         specifier: 1.0.0-beta.9
-        version: 1.0.0-beta.9(patch_hash=1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+        version: 1.0.0-beta.9(patch_hash=53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
       '@flue/sdk':
         specifier: 1.0.0-beta.9
         version: 1.0.0-beta.9(patch_hash=1756a9d85ea1a34869eaa742ba89b07083b4f22df5fb90415495cff35805fa15)
@@ -2853,7 +2853,7 @@ snapshots:
   '@flue/cli@1.0.0-beta.9(patch_hash=60a44e4243d693846c858863f670d5e57aabc5aa15055e0becbea43333f8e6c3)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(@types/node@24.13.3)(esbuild@0.28.1)(hono@4.12.31)(tsx@4.23.1)(typebox@1.1.38)(typescript@5.9.3)(wrangler@4.113.0)(ws@8.21.0)(yaml@2.9.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@cloudflare/vite-plugin': 1.46.0(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(tsx@4.23.1)(yaml@2.9.0))(wrangler@4.113.0)
-      '@flue/runtime': 1.0.0-beta.9(patch_hash=1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+      '@flue/runtime': 1.0.0-beta.9(patch_hash=53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
       '@flue/sdk': 1.0.0-beta.9(patch_hash=1756a9d85ea1a34869eaa742ba89b07083b4f22df5fb90415495cff35805fa15)
       '@hono/node-server': 2.0.11(hono@4.12.31)
       '@vercel/detect-agent': 1.2.3
@@ -2895,12 +2895,12 @@ snapshots:
       - zod-openapi
       - zod-to-json-schema
 
-  '@flue/opentelemetry@1.0.0-beta.3(@flue/runtime@1.0.0-beta.9(patch_hash=1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@opentelemetry/api@1.9.1)':
+  '@flue/opentelemetry@1.0.0-beta.3(@flue/runtime@1.0.0-beta.9(patch_hash=53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@flue/runtime': 1.0.0-beta.9(patch_hash=1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+      '@flue/runtime': 1.0.0-beta.9(patch_hash=53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
       '@opentelemetry/api': 1.9.1
 
-  '@flue/runtime@1.0.0-beta.9(patch_hash=1fb06555101938a6756bd9a71b1b6a51e35d35b7963617d9df71730a28f36225)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
+  '@flue/runtime@1.0.0-beta.9(patch_hash=53a1579d55f3c0f6e75fbd57b371e49ed1f057249f9adb5e08686375b48e2426)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@5.9.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@earendil-works/pi-agent-core': 0.80.10(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-ai': 0.80.10(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
