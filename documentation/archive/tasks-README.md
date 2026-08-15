@@ -1,3 +1,7 @@
+> **Superseded — archived 2026-08-15.** Kept for provenance, not as current
+> guidance. The live equivalents are `documentation/README.md`,
+> `documentation/PROJECT-MAP.md`, and `documentation/tree/project-tree.md`.
+
 # Tasks
 
 A task is a unit of work with a beginning and an end, written down before it

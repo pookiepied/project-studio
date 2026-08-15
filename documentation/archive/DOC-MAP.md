@@ -1,3 +1,7 @@
+> **Superseded — archived 2026-08-15.** Kept for provenance, not as current
+> guidance. The live equivalents are `documentation/README.md`,
+> `documentation/PROJECT-MAP.md`, and `documentation/tree/project-tree.md`.
+
 # Doc map — where to look, and only there
 
 One page. No prose to read first — the tree below is the whole thing. If a
