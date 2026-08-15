@@ -1,12 +1,19 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, sep } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { SandboxError } from "../../src/sandbox/errors.js";
 import {
   assertIsolationAvailable,
+  containCommand,
   isolationAvailable,
   isolationForKind,
   ISOLATION_ENFORCED,
   OS_ISOLATION_BACKENDS,
+  programRoots,
+  ancestorsOf,
   selectIsolation,
   type ContainedCommand,
   type IsolationBackend,
@@ -162,7 +169,68 @@ describe("LocalSandbox consults the measured support", () => {
   });
 });
 
+describe("every kind reaches the same verdict", () => {
+  const policy = createSandboxPolicy({ workspaceRoot: workspace });
+
+  it("contains an MCP server exactly as it contains a shell command", async () => {
+    // These two are spawned by completely different code — one waits for an
+    // exit, the other streams for a session — and the point of `containCommand`
+    // is that the *decision* is nonetheless one function. A second copy of it
+    // for MCP is how the two would drift.
+    const support = selectIsolation([backend("fake", true)]);
+    const request = { policy, executable: "node", args: ["server.js"], cwd: workspace };
+
+    const shell = await containCommand("shell", { ...request, network: true }, support);
+    const server = await containCommand("mcp-server", { ...request, network: true }, support);
+    expect(server).toEqual(shell);
+    expect(server.executable).toBe("fake-launcher");
+  });
+
+  it("refuses to start an MCP server a host cannot contain", async () => {
+    // The refusal that matters most: a third party's program on a machine whose
+    // build expects containment and cannot deliver it does not start at all.
+    const support = selectIsolation([backend("bwrap", false)]);
+    await expect(
+      containCommand(
+        "mcp-server",
+        { policy, executable: "node", args: [], cwd: workspace, network: true },
+        support,
+      ),
+    ).rejects.toThrow(SandboxError);
+  });
+
+  it("asks for the network only when the caller did", async () => {
+    const asked: boolean[] = [];
+    const recording: IsolationBackend = {
+      name: "recording",
+      level: "os",
+      available: () => true,
+      contain: async (request) => {
+        asked.push(request.network);
+        return { executable: "x", args: [] };
+      },
+      release: async () => {},
+    };
+    const support = selectIsolation([recording]);
+    const base = { policy, executable: "node", args: [], cwd: workspace };
+    await containCommand("shell", { ...base, network: false }, support);
+    await containCommand("shell", { ...base, network: true }, support);
+    expect(asked).toEqual([false, true]);
+  });
+});
+
 describe("the Windows launcher's argument rules", () => {
+  it("asks for internetClient only when the network was requested", () => {
+    // The capability is the whole network policy in one flag, so its presence
+    // and absence are both worth pinning. Measured behaviour behind it:
+    // `internetClient` reaches the internet and is refused loopback and the
+    // LAN, so this flag is "may call an API", not "may reach the machine".
+    const base = { sid: "S-1-15-2-1", cwd: "C:\\p", executable: "n.exe", args: [] };
+    expect(containArgs({ ...base, capabilities: ["internetClient"] }))
+      .toContain("internetClient");
+    expect(containArgs(base)).not.toContain("--capability");
+  });
+
   it("puts the program after `--`, so its flags are never ours", () => {
     // `studio-contain` and the program it runs can both be given `--cwd`. The
     // separator is what decides whose it is, and getting the order wrong would
@@ -207,6 +275,66 @@ describe("the Windows launcher's argument rules", () => {
     expect(first.length).toBeLessThanOrEqual(64);
     expect(first).toMatch(/^studio-[0-9a-f]{32}$/);
   });
+});
+
+describe("the two grants a contained program needs beyond its workspace", () => {
+  it("grants the program's own tree, and the node_modules that holds its dependencies", () => {
+    // Built on disk rather than as strings, because the function deliberately
+    // ignores paths that do not exist — granting a directory that is not there
+    // would be a permission entry nobody can account for later.
+    const base = mkdtempSync(join(tmpdir(), "studio-roots-"));
+    const packaged = join(base, "npm", "node_modules", "some-server", "dist");
+    const loose = join(base, "tools");
+    mkdirSync(packaged, { recursive: true });
+    mkdirSync(loose, { recursive: true });
+    writeFileSync(join(packaged, "index.js"), "");
+    writeFileSync(join(loose, "server.js"), "");
+
+    try {
+      // The gap that broke every real MCP server: the launcher opens the
+      // *executable* with our rights, so `node.exe` runs — and `server.js` is
+      // read from inside the container, where it is not granted. The nearest
+      // `node_modules` rather than the script's own folder, because package
+      // managers hoist dependencies a level up, and a grant on the package
+      // alone leaves the server unable to load them.
+      expect(programRoots([join(packaged, "index.js")])).toEqual([
+        join(base, "npm", "node_modules"),
+      ]);
+
+      // Outside a package tree there is nothing to walk up to, so the file's
+      // own directory is the grant.
+      expect(programRoots([join(loose, "server.js")])).toEqual([loose]);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores anything that is not an absolute path to a real file", () => {
+    // A relative argument would resolve against *our* working directory, which
+    // is not where the child runs — granting that would be granting the wrong
+    // folder while looking correct.
+    expect(programRoots(["--flag", "relative/path.js", "10"])).toEqual([]);
+  });
+
+  it("lists every ancestor of a path, root first", () => {
+    // Root first because that is the order the kernel checks them, and because
+    // a diagnostic built from this list should name the *first* wall a program
+    // will hit rather than the last.
+    const chain = ancestorsOf(join("C:", "Users", "someone", "project", "file.js"));
+    expect(chain).toEqual([
+      `C:${sep}`,
+      join("C:", "Users"),
+      join("C:", "Users", "someone"),
+      join("C:", "Users", "someone", "project"),
+    ]);
+  });
+
+  it("does not spin on a path that is already a root", () => {
+    // `dirname` is its own fixed point at the root. Without the guard this
+    // loops forever instead of failing, which is the worst way to be wrong.
+    expect(ancestorsOf(`C:${sep}`)).toEqual([`C:${sep}`]);
+  });
+
 });
 
 describe("what this build knows how to contain, per platform", () => {

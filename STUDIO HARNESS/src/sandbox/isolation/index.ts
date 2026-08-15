@@ -17,6 +17,15 @@
  */
 
 export { isolationForKind, type ChildKind } from "./kinds.js";
+export { containCommand, type ContainRequest } from "./contain.js";
+export { programRoots } from "./program-roots.js";
+export {
+  ALL_APPLICATION_PACKAGES,
+  ancestorsOf,
+  ensureTraversable,
+  grantTraverse,
+  holdsTraverse,
+} from "./windows/traversal.js";
 export {
   assertIsolationAvailable,
   isolationAvailable,

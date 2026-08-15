@@ -441,6 +441,40 @@ describe("nothing the model chose reaches a process uncontained", () => {
     // so the list describes the code rather than the code's history.
     expect(importers.sort()).toEqual([...allowed].sort());
   });
+
+  it("closes the list of modules that may reach `node:child_process` at all", async () => {
+    // The rule above guards `runProcess` and would not have caught the gap that
+    // prompted this one: `extend/mcp/stdio-channel.ts` never imported
+    // `runProcess`. It called `spawn` directly, so a third party's server — the
+    // kind with the strongest claim on containment — was started by a code path
+    // no containment rule could see.
+    //
+    // Each entry below is a spawn that cannot go through `LocalSandbox.run`,
+    // and each one owes a reason:
+    const allowed = new Map([
+      // The one place the harness starts a bounded, run-to-completion child.
+      [join("src", "process", "exec.ts"), "the single spawn point"],
+      // A long-lived streaming child, so it cannot use a call that waits for an
+      // exit. It asks `containCommand` for the same verdict instead.
+      [join("src", "extend", "mcp", "stdio-channel.ts"), "streams for a session"],
+      // Configures the sandbox. Cannot use the sandbox.
+      [join("src", "sandbox", "isolation", "windows", "launcher.ts"), "builds the container"],
+      // Starts the Harness itself, which is the trusted process — a process
+      // cannot contain itself (see `isolation/kinds.ts`).
+      [join("src", "host", "harness-launcher.ts"), "starts the trusted process"],
+      // Opens the user's browser for sign-in. Not an agent action at all.
+      [join("src", "auth", "google-login.ts"), "opens the user's browser"],
+    ]);
+
+    const importers: string[] = [];
+    for (const path of await sourceFiles()) {
+      const source = await readFile(path, "utf8");
+      if (!/from "node:child_process"/.test(source)) continue;
+      importers.push(path.slice(path.indexOf(join("src", ""))));
+    }
+
+    expect(importers.sort()).toEqual([...allowed.keys()].sort());
+  });
 });
 
 describe("modular monolith — 008.3 gate", () => {

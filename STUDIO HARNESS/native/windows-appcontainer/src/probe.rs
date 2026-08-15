@@ -20,7 +20,74 @@ use windows_sys::Win32::Storage::FileSystem::{
     FindFirstFileW, OPEN_EXISTING, WIN32_FIND_DATAW,
 };
 
+use std::net::{TcpStream, ToSocketAddrs};
+use std::time::Duration;
+
 use crate::wide::to_wide;
+
+/// Whether a name resolves from inside the container.
+///
+/// Separate from connecting because they fail separately and for different
+/// reasons: DNS goes through a system service the container may not be allowed
+/// to talk to, while a connection to a literal address does not involve it at
+/// all. Reporting one number for both would hide which wall was hit.
+pub fn resolve(host: &str) -> i32 {
+    match (host, 0u16).to_socket_addrs() {
+        Ok(mut addresses) => match addresses.next() {
+            Some(address) => {
+                println!("resolve {host}: ok {}", address.ip());
+                0
+            }
+            None => {
+                println!("resolve {host}: error no-address");
+                1
+            }
+        },
+        Err(error) => {
+            println!("resolve {host}: error {}", code(&error));
+            1
+        }
+    }
+}
+
+/// Whether a TCP connection can be opened from inside the container.
+///
+/// The measurement the capability question turns on. `internetClient` is
+/// documented to permit outbound connections to the internet and *not* to
+/// loopback or the local network — so this is run against a public address, a
+/// `127.0.0.1` listener and a LAN address, and the three answers are what
+/// decide whether a network-using MCP server can be contained usefully.
+pub fn connect(target: &str) -> i32 {
+    let Ok(mut addresses) = target.to_socket_addrs() else {
+        println!("connect {target}: error unresolved");
+        return 1;
+    };
+    let Some(address) = addresses.next() else {
+        println!("connect {target}: error no-address");
+        return 1;
+    };
+
+    // A short timeout on purpose. A blocked connection on Windows is usually a
+    // refusal, not a hang, and a probe that takes thirty seconds to say "no" is
+    // a probe nobody runs twice.
+    match TcpStream::connect_timeout(&address, Duration::from_secs(5)) {
+        Ok(_) => {
+            println!("connect {target}: ok");
+            0
+        }
+        Err(error) => {
+            println!("connect {target}: error {}", code(&error));
+            1
+        }
+    }
+}
+
+fn code(error: &std::io::Error) -> String {
+    match error.raw_os_error() {
+        Some(number) => number.to_string(),
+        None => error.kind().to_string(),
+    }
+}
 
 /// Reports each right separately, one line each, `name: ok` or `name: error N`.
 ///

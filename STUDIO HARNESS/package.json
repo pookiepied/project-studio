@@ -10,6 +10,7 @@
   "scripts": {
     "auth": "tsx src/auth/cli.ts",
     "providers": "tsx src/models/local/cli.ts",
+    "sandbox:prepare": "tsx src/sandbox/cli.ts prepare",
     "sandbox:release": "tsx src/sandbox/cli.ts",
     "build": "flue build --target node",
     "typecheck": "tsc --noEmit",

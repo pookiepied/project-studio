@@ -51,8 +51,8 @@ the provenance question a different one: not "where did this come from" but
 |---|---|
 | Source | `native/windows-appcontainer/`, in this repository |
 | Build | `cargo build --release` with rustc 1.96.0 |
-| SHA-256 | `17B33816D91CD5E467CEBF12E19DBF0123ED0E4745FD9BC9DF7680C517CCE039` |
-| Size | 130,560 bytes |
+| SHA-256 | `F3AC282DBB26638F14B10DE4062C70AF27B783EDEF0C211EDF53E3CF70B78B75` |
+| Size | 154,112 bytes |
 | Dependencies | `windows-sys` only |
 | Licence | ours |
 

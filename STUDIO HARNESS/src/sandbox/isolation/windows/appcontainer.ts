@@ -8,6 +8,7 @@ import type {
   IsolationBackend,
 } from "../backend.js";
 import { containArgs, invokeLauncher, launcherInstalled, launcherPath } from "./launcher.js";
+import { ensureTraversable, revokeTraverse } from "./traversal.js";
 
 /**
  * OS containment on Windows, using an AppContainer.
@@ -76,6 +77,8 @@ interface PreparedContainer {
   readonly sid: string;
   /** Absolute paths already granted, to keep repeat calls free. */
   readonly granted: Set<string>;
+  /** Ancestors made statable for this workspace, so `release` can undo them. */
+  readonly traversed: Set<string>;
 }
 
 /**
@@ -120,6 +123,41 @@ class WindowsAppContainerBackend implements IsolationBackend {
 
   async contain(request: ContainmentRequest): Promise<ContainedCommand> {
     const container = this.#prepare(request.policy);
+
+    // Every ancestor of everything the child will touch has to be statable, or
+    // the program dies resolving its own path before it runs a line. Most of
+    // the chain is granted here, silently; what is left is system-owned and
+    // needs one elevated command, named exactly.
+    const traversal = ensureTraversable(
+      [
+        request.cwd,
+        ...request.policy.readRoots,
+        ...request.policy.writeRoots,
+        ...(request.programRoots ?? []),
+      ],
+      container.sid,
+    );
+    for (const path of traversal.granted) container.traversed.add(path);
+
+    if (traversal.needsElevation.length > 0) {
+      // The exact folders, and the exact command. A message that says "run
+      // setup" invites running it against everything; naming what is actually
+      // missing keeps the machine-wide part of this as small as the machine
+      // genuinely needs — usually one or two system directories, once.
+      const folders = traversal.needsElevation.map((path) => `"${path}"`).join(" ");
+      throw new SandboxError("unavailable", {
+        message:
+          "The sandbox needs one-time setup for system folders it cannot change " +
+          "on its own. In a terminal opened as administrator, run: " +
+          `pnpm sandbox:prepare ${folders}`,
+      });
+    }
+    // Read, never write: these are the program's own files, and a server that
+    // rewrites its own installation is not a case worth supporting. Granted
+    // after the policy's roots so a program root that *is* the workspace keeps
+    // the stronger mode — `grant` is keyed by mode, so a read grant cannot
+    // replace a write one.
+    for (const root of request.programRoots ?? []) grant(container, root, "read");
     return {
       executable: launcherPath(),
       args: containArgs({
@@ -127,6 +165,11 @@ class WindowsAppContainerBackend implements IsolationBackend {
         cwd: request.cwd,
         executable: request.executable,
         args: request.args,
+        // Named holes in the wall, and only the one asked for. `internetClient`
+        // is outbound internet and nothing else — measured, not read: loopback
+        // and the LAN stay refused with it granted, and loopback stays refused
+        // under every capability Windows has.
+        capabilities: request.network ? ["internetClient"] : [],
       }),
     };
   }
@@ -157,7 +200,7 @@ class WindowsAppContainerBackend implements IsolationBackend {
           message: "The Windows sandbox did not return a usable identity.",
         });
       }
-      container = { sid, granted: new Set() };
+      container = { sid, granted: new Set(), traversed: new Set() };
       this.#prepared.set(key, container);
     }
 
@@ -183,6 +226,10 @@ class WindowsAppContainerBackend implements IsolationBackend {
     for (const root of new Set([...policy.readRoots, ...policy.writeRoots])) {
       invokeLauncher(["revoke", "--sid", sid, "--path", root]);
     }
+    // The corridor goes too. These are entries on directories the user owns —
+    // their home folder among them — and leaving them behind would be the
+    // "only ever adds" growth this method exists to prevent.
+    for (const ancestor of container?.traversed ?? []) revokeTraverse(ancestor, sid);
     invokeLauncher(["profile-delete", "--name", profileName(key)]);
     this.#prepared.delete(key);
   }
@@ -207,6 +254,11 @@ export function grantsFor(
 function grant(container: PreparedContainer, path: string, mode: "read" | "write"): void {
   const key = `${mode}:${path}`;
   if (container.granted.has(key)) return;
+  // A path already granted at the stronger mode is left alone. `SetEntriesInAcl`
+  // replaces a trustee's entry, so re-granting read over write would silently
+  // take the write away — the same downgrade that made the workspace read-only
+  // the first time this ran.
+  if (mode === "read" && container.granted.has(`write:${path}`)) return;
   invokeLauncher(["grant", "--sid", container.sid, "--path", path, "--mode", mode]);
   container.granted.add(key);
 }

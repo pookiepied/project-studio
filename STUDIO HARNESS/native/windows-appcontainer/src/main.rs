@@ -14,8 +14,9 @@
 //! studio-contain profile-ensure --name <name> [--display <text>]   → SID on stdout
 //! studio-contain profile-delete --name <name>
 //! studio-contain grant  --sid <sid> --path <path> --mode traverse|read|write
-//! studio-contain revoke --sid <sid> --path <path>
-//! studio-contain run    --sid <sid> [--cwd <dir>] -- <program> [args...]
+//! studio-contain revoke --sid <sid> --path <path> [--mode traverse|read|write]
+//! studio-contain check  --sid <sid> --path <path> --mode traverse|read|write
+//! studio-contain run    --sid <sid> [--cwd <dir>] [--capability <name>]... -- <program> [args...]
 //! ```
 //!
 //! `run` exits with the child's own exit code, so a contained `git` reports
@@ -25,6 +26,7 @@
 //! site.
 
 mod acl;
+mod capability;
 mod probe;
 mod profile;
 mod sid;
@@ -47,9 +49,10 @@ studio-contain — run a program inside a Windows AppContainer
   profile-ensure --name <name> [--display <text>]
   profile-delete --name <name>
   grant  --sid <sid> --path <path> --mode traverse|read|write
-  revoke --sid <sid> --path <path>
-  run    --sid <sid> [--cwd <dir>] -- <program> [args...]
-  probe  --path <path>
+  revoke --sid <sid> --path <path> [--mode traverse|read|write]
+  check  --sid <sid> --path <path> --mode traverse|read|write
+  run    --sid <sid> [--cwd <dir>] [--capability <name>]... -- <program> [args...]
+  probe  --path <path> | --connect <host:port> | --resolve <host>
 ";
 
 fn main() {
@@ -94,7 +97,13 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
         "revoke" => {
             let options = Options::parse(&arguments[1..])?;
             let sid = OwnedSid::parse(options.required("--sid")?)?;
-            acl::revoke(options.required("--path")?, &sid)?;
+            // Defaults to the propagating form, which is what a workspace
+            // grant needs undone. A traverse entry says so.
+            let mode = match options.get("--mode") {
+                Some(text) => acl::Mode::parse(text)?,
+                None => acl::Mode::Read,
+            };
+            acl::revoke(options.required("--path")?, &sid, mode)?;
             Ok(0)
         }
         "run" => {
@@ -104,16 +113,37 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             let Some((executable, rest)) = command.split_first() else {
                 return Err("no program to run was given after `--`".to_string());
             };
+            let capabilities = options.all("--capability");
             let code = spawn::run(spawn::Request {
                 sid: &sid,
+                capabilities: &capabilities,
                 executable,
                 arguments: rest,
                 working_directory: options.get("--cwd"),
             })?;
             Ok(code as i32)
         }
+        "check" => {
+            let options = Options::parse(&arguments[1..])?;
+            let sid = OwnedSid::parse(options.required("--sid")?)?;
+            let mode = acl::Mode::parse(options.required("--mode")?)?;
+            let held = acl::holds(options.required("--path")?, &sid, mode)?;
+            println!("{}", if held { "granted" } else { "missing" });
+            // Exit code as well as a word, so a caller can branch without
+            // parsing. "Missing" is an answer, not a failure.
+            Ok(if held { 0 } else { 1 })
+        }
         "probe" => {
             let options = Options::parse(&arguments[1..])?;
+            // One probe answers one question. A single invocation that checked
+            // files *and* the network would report a combined exit code, and
+            // the point of this tool is that each wall is reported separately.
+            if let Some(target) = options.get("--connect") {
+                return Ok(probe::connect(target));
+            }
+            if let Some(host) = options.get("--resolve") {
+                return Ok(probe::resolve(host));
+            }
             probe::run(options.required("--path")?)
         }
         "--help" | "-h" | "help" => {
@@ -166,6 +196,17 @@ impl<'a> Options<'a> {
             .iter()
             .find(|(key, _)| *key == name)
             .map(|(_, value)| *value)
+    }
+
+    /// Every value given for a flag, in order. Repeatable flags are the only
+    /// honest shape for a list: a comma-separated string would need an escape
+    /// rule the moment a value contained a comma.
+    fn all(&self, name: &str) -> Vec<String> {
+        self.named
+            .iter()
+            .filter(|(key, _)| *key == name)
+            .map(|(_, value)| (*value).to_string())
+            .collect()
     }
 
     fn required(&self, name: &str) -> Result<&'a str, String> {

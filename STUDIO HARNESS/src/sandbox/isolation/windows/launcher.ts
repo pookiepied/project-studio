@@ -61,10 +61,11 @@ export function invokeLauncher(
     return execFileSync(executable, [...args], {
       encoding: "utf8",
       windowsHide: true,
-      // Long enough for a profile creation on a slow disk, short enough that a
-      // wedged call does not hang a turn. The launcher itself never waits on
-      // anything but the OS for these subcommands.
-      timeout: 15_000,
+      // A minute. Profile creation takes milliseconds, but a `grant` on a large
+      // workspace makes Windows walk the tree pushing inheritance down, and 15
+      // seconds was not enough — the first symptom was an `ETIMEDOUT` that read
+      // exactly like a refusal, on a call that was working.
+      timeout: 60_000,
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
   } catch (error) {
@@ -87,6 +88,7 @@ export function containArgs(input: {
   readonly cwd: string;
   readonly executable: string;
   readonly args: readonly string[];
+  readonly capabilities?: readonly string[];
 }): readonly string[] {
   return [
     "run",
@@ -94,6 +96,10 @@ export function containArgs(input: {
     input.sid,
     "--cwd",
     input.cwd,
+    // Repeated rather than comma-joined. A list encoded into one string needs
+    // an escape rule the first time a value contains the separator, and a
+    // capability is not a thing to get subtly wrong.
+    ...(input.capabilities ?? []).flatMap((name) => ["--capability", name]),
     "--",
     input.executable,
     ...input.args,

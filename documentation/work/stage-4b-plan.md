@@ -66,10 +66,11 @@ finding that out is the most important thing step 2 produced.**
 - **`icacls D:\ /grant` fails with exit code 5 — access denied.** Real, and
   still true: an ACE on a drive root needs elevation. It turned out not to
   matter, because nothing needs one. The workspace's own directory is where the
-  grant goes, and the launcher opens the *program* with its own rights before the
-  container token applies — so `C:\Program Files
-odejs` never has to be
-  granted, and the contained child cannot read it either.
+  grant goes, and the launcher opens the *program* with its own rights before
+  the container token applies — so the program's install directory never has to
+  be granted, and the contained child cannot read it either. What the child
+  *does* need is every **ancestor** of its own path, which is a separate finding
+  and the one that cost the most: see ADR 0041 and `windows/traversal.ts`.
 
 The spike is deleted. It lived in the scratchpad, its AppContainer profiles
 were removed (`DeleteAppContainerProfile` → `hr=0x0`), and its ACEs went with
@@ -133,12 +134,14 @@ Each step lands on its own and is verifiable on its own. No step claims #15.
    the code said so as data rather than as a comment.
 2. **The Windows backend.** ✅ *Landed.* `native/windows-appcontainer/`, shipped
    as `vendor/win32-x64/studio-contain.exe`; profile lifecycle, ACE grant and
-   revoke in-process via `SetEntriesInAcl`; `LocalSandbox.run` routes anything
-   the model chose through it. Measured on this machine — see §2 and ADR 0041.
-   Two things it changed that were not in the plan: the enumeration limit was
-   withdrawn as a measurement error, and `LOCALAPPDATA` turned out to be
-   required by `CreateProcessW` itself for an AppContainer, which the harness's
-   deliberately-empty child environment does not provide.
+   revoke in-process via `SetEntriesInAcl`; `shell` **and** `mcp-server` both
+   route through one verdict, `containCommand`. Measured on this machine — see
+   §2 and ADR 0041. Four things it changed that were not in the plan: the
+   enumeration limit was withdrawn as a measurement error; `LOCALAPPDATA` turned
+   out to be required by `CreateProcessW` itself; a contained program must be
+   able to stat **every ancestor** of its own path, which costs one elevated
+   command per machine; and `SetNamedSecurityInfo` propagates to every
+   descendant, so applying that entry to a volume root with it never returns.
 3. **The Linux backend.** `bwrap` argv, probed availability, unit-tested
    construction. **No longer needs to stay unverified:** a Linux VPS is
    available on request, so the containment can be measured the same way the
@@ -153,11 +156,17 @@ Each step lands on its own and is verifiable on its own. No step claims #15.
 
 Named here so that "the sandbox works" is not read as more than it is:
 
-- **`mcp-server` is classified `os` and is not yet contained.** It keeps its own
-  stdio channel and does not go through `LocalSandbox.run`. A third party's code
-  is the row of the taxonomy with the *strongest* claim on containment, and it
-  is the one still outside it.
-- **Linux.** Step 3.
+- **Linux.** Step 3. `OS_ISOLATION_BACKENDS` is empty there, so nothing has
+  changed for it.
+- **A contained MCP server is given the internet unconditionally** — #90. The
+  filesystem boundary is complete; the network is granted to every server
+  because no record says whether one needs it. The capability is
+  `internetClient` alone, measured to exclude loopback and the LAN, so even the
+  default cannot reach a local service.
+- **Windows needs one elevated command per machine.** `pnpm sandbox:prepare`
+  adds a traverse entry to the system-owned ancestors of a project — `C:\` and
+  `C:\Users` in practice. Everything under the user's own folders is granted per
+  workspace, silently, and removed again by `sandbox:release`.
 - **Profiles accumulate one per project.** Bounded in production and removable
   with `pnpm sandbox:release <project>`, but nothing removes them on its own.
   The test suite made this visible by minting a workspace per run and leaving
@@ -194,5 +203,5 @@ The suite skips loudly on a machine with no backend rather than passing: a green
 run on Linux for a Windows feature would be the same class of untrue claim this
 whole cycle exists to remove.
 
-Baseline after step 2: **79 files, 1203 passed, 2 skipped, 0 failed**;
+Baseline after step 2, on Node 24.19.0: **79 files, 1215 passed, 2 skipped, 0 failed**;
 `tsc --noEmit` clean; `cargo build --release` clean.

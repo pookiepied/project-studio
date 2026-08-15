@@ -82,6 +82,64 @@ by probing means a Linux machine sees a registry holding only a Windows backend,
 finds it unavailable, and concludes containment exists and this host is
 broken — when the truth is that nobody has written the Linux half yet.
 
+### Getting the program to its first line
+
+Containment applies at process creation, and the launcher opens the executable's
+image with its **own** rights — so `node.exe` runs even though the contained
+child cannot read `C:\Program Files\nodejs`. Good, and a trap: it makes
+containment look complete one measurement too early. Two things the child still
+reads for itself.
+
+**Its own program files.** `node server.js` reads `server.js` from inside the
+container, and an MCP server lives under the user's npm root, not in their
+project. Granted read-only, at the nearest `node_modules` ancestor rather than
+the script's own folder, because package managers hoist dependencies a level up
+and a grant on the package alone leaves the server unable to load them.
+
+**Every directory on the way there.** Resolving a path calls `realpath`, which
+stats *every component* up to the volume root, and an AppContainer needs an
+entry on each. This splits in two, and only one half needs a prompt:
+
+| Ancestor | Owner | Granted to | When |
+|---|---|---|---|
+| `C:\`, `C:\Users` | the system | `ALL APPLICATION PACKAGES` | once, elevated, `pnpm sandbox:prepare` |
+| `C:\Users\you\…`, `D:\projects\…` | the user | that workspace's own identity | automatically, no prompt, removed by `release` |
+
+A traverse entry is traverse **and read-attributes, not `FILE_LIST_DIRECTORY`**:
+the holder may confirm a directory exists and walk through it, and may not learn
+what is in it. Non-inheriting, so it reaches nothing below. That is what makes
+it acceptable on `C:\Users` — it says "this folder exists", which the folder's
+name already said.
+
+### `SetNamedSecurityInfo` walks children, and the volume root is why that matters
+
+Changing a DACL with `SetNamedSecurityInfo` recomputes inherited entries on
+every descendant. Correct for a project folder, catastrophic for `C:\`: run
+elevated it is not refused, it simply never finishes. Non-inheriting entries use
+`SetFileSecurityW`, which touches the named object only — 55 ms instead of
+walking the disk. Which call is used is decided by the **mode**, on the way in
+*and* on the way out, because revoking a traverse entry on a home folder with
+propagation on is the same hang moved from startup to shutdown.
+
+### The network is a capability, and the operator's switch now reaches it
+
+`allowNetwork` used to bind only our own check; a subprocess ignored it
+entirely, which is the gap this ADR exists to close. It is a kernel fact now:
+`internetClient` is granted when the policy allows the network and withheld when
+it does not. The boundary is narrower than "network access" — measured, with
+every target verified reachable from *outside* the container in the same run, so
+the refusals are refusals and not unreachable hosts:
+
+| Target | no capability | `internetClient` |
+|---|---|---|
+| Public address, and DNS | refused | **allowed** |
+| `127.0.0.1` | refused | **refused** |
+| `192.168.x.x` | refused | **refused** |
+
+Loopback stays shut under *every* capability Windows offers; opening it needs an
+administrator exemption this will never ask for. So a contained server may call
+its API and may not touch the user's dev server, local database, or router.
+
 ## What it actually does, measured
 
 From inside a container, against a real workspace, asking the kernel directly:
@@ -131,11 +189,24 @@ state rather than a regression introduced by giving Windows a backend, and the
 unit test asserts it per platform — so the day `bwrap` lands, the Linux branch
 fails and this ADR has to be revisited rather than remembered.
 
+### MCP servers are contained, with the network granted by default
+
+`mcp-server` reaches the same verdict as `shell`, through the same function.
+They are spawned by completely different code — one waits for an exit, the other
+streams for a session — so the launcher cannot use `LocalSandbox.run`; it asks
+`containCommand` and spawns its own way. A second copy of the decision is what
+`T-28` was.
+
+The network is granted to every contained server, and that is the honest
+position rather than the ideal one: a server record carries no field saying
+whether it needs the internet, most exist to call an API, and shipping them all
+offline would produce a sandbox users switch off. The filesystem boundary lands
+in full regardless. Registered as **#90** — a declared per-server network
+capability, surfaced in the install dialog.
+
 ### What is still not contained
 
-`mcp-server` is classified `os` and is not yet routed through `LocalSandbox.run`;
-it keeps its own stdio channel. That is the next piece of #15, and it is named
-here so that "shell is contained" is not read as "everything is".
+Linux. `OS_ISOLATION_BACKENDS` is empty there, so nothing changed for it.
 
 ## The finding that changed the plan
 
@@ -148,3 +219,20 @@ kernel uses. Asked directly, listing is allowed exactly when reading is.
 
 A tool's error message is not a measurement. The probe that settled it is kept,
 as `studio-contain probe`, rather than deleted with the spike.
+
+**The same mistake then happened twice more, in the other direction.** The first
+traversal fix granted the volume root, because `C:\` was what the error named —
+and the next run failed on `C:\Users`. Then an `ETIMEDOUT` from an
+already-elevated terminal was reported as "run as administrator", which sent the
+investigation at the wrong wall entirely: the call was working, it was walking
+the disk.
+
+An error names the first thing that failed. It never names the shape of the
+problem, and reading one as the other is how a fix ships half-done.
+
+**And the tests were shaped to miss it.** Every case in
+`sandbox-appcontainer.test.ts` used `node -e`, the one invocation form that
+never resolves a main module — ten green tests all taking the same shortcut, past
+a containment that broke `node build.js`. There is now a case that runs a script
+*file*, and removing the traversal fix fails that one and no other, which is the
+measurement of how blind the rest were.

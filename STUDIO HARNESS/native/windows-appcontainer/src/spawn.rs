@@ -18,6 +18,7 @@ use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::UI::Shell::{FOLDERID_LocalAppData, SHGetKnownFolderPath};
 use windows_sys::Win32::System::Console::{GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
 
+use crate::capability::Capabilities;
 use crate::sid::OwnedSid;
 use crate::wide::{from_wide_ptr, to_wide};
 
@@ -192,6 +193,8 @@ impl Drop for AttributeList {
 
 pub struct Request<'a> {
     pub sid: &'a OwnedSid,
+    /// Named holes in the wall, empty by default. See `capability.rs`.
+    pub capabilities: &'a [String],
     pub executable: &'a str,
     pub arguments: &'a [String],
     pub working_directory: Option<&'a str>,
@@ -204,10 +207,11 @@ pub struct Request<'a> {
 /// `process/exec.ts`, and a second implementation of those here would be a
 /// second set of rules to keep in agreement.
 pub fn run(request: Request<'_>) -> Result<u32, String> {
+    let mut granted = Capabilities::derive(request.capabilities)?;
     let capabilities = SECURITY_CAPABILITIES {
         AppContainerSid: request.sid.raw() as PSID,
-        Capabilities: std::ptr::null_mut(),
-        CapabilityCount: 0,
+        CapabilityCount: granted.count(),
+        Capabilities: granted.pointer(),
         Reserved: 0,
     };
 

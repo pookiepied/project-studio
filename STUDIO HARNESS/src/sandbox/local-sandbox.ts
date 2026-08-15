@@ -2,11 +2,11 @@ import { readdir, readFile, mkdir, rm, stat, writeFile } from "node:fs/promises"
 import { dirname } from "node:path";
 
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
-import { satisfiesIsolation } from "../contracts/effects.js";
 import { runProcess, type ProcessResult } from "../process/exec.js";
 import { SandboxError } from "./errors.js";
 import {
   assertIsolationAvailable,
+  containCommand,
   hostIsolation,
   isolationForKind,
   type ChildKind,
@@ -246,27 +246,21 @@ export class LocalSandbox {
       readonly executable: string;
       readonly args: readonly string[];
       readonly cwd?: string;
+      /** Defaults to the policy switch, which is the operator's answer. */
+      readonly network?: boolean;
     },
   ): Promise<ContainedCommand> {
-    const required = isolationForKind(kind);
-    const backend = this.#isolationSupport.backend;
-    const plain: ContainedCommand = { executable: command.executable, args: command.args };
-
-    // A kind that needs nothing is not wrapped just because a backend happens
-    // to exist — that is the `tool` row of the table, and it is what keeps the
-    // snapshot system's `git` calls working.
-    if (required === "in-process") return plain;
-    if (backend === undefined) return plain;
-    // A backend weaker than this kind needs was already refused by `run`; this
-    // guard is for `plan` called on its own.
-    if (!satisfiesIsolation(backend.level, required)) return plain;
-
-    return backend.contain({
-      policy: this.#policy,
-      executable: command.executable,
-      args: command.args,
-      cwd: command.cwd ?? this.#policy.workspaceRoot,
-    });
+    return containCommand(
+      kind,
+      {
+        policy: this.#policy,
+        executable: command.executable,
+        args: command.args,
+        cwd: command.cwd ?? this.#policy.workspaceRoot,
+        network: command.network ?? this.#policy.allowNetwork,
+      },
+      this.#isolationSupport,
+    );
   }
 
   /**

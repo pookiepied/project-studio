@@ -19,6 +19,31 @@ export interface ContainmentRequest {
   readonly executable: string;
   readonly args: readonly string[];
   readonly cwd: string;
+  /**
+   * Whether the child may reach the internet.
+   *
+   * A boolean, and platform-neutral on purpose. Windows expresses it as the
+   * `internetClient` capability and Linux will express it as *not* unsharing
+   * the network namespace; naming either one here would put a platform's
+   * vocabulary in the interface every platform implements.
+   *
+   * It is not "network access" in general, and the difference was measured
+   * rather than assumed: with `internetClient` and nothing else, a contained
+   * child reaches a public address and resolves a name, and is refused
+   * `127.0.0.1` and `192.168.x.x` alike — both verified reachable from outside
+   * the container in the same run, so the refusals are refusals and not
+   * unreachable hosts. Loopback stays shut under *every* capability Windows
+   * offers; opening it needs an administrator exemption this will never ask
+   * for. So a contained server can call its API and cannot touch the user's dev
+   * server, their database, or their router.
+   */
+  readonly network: boolean;
+  /**
+   * Directories the child must be able to **read** to run at all — its own
+   * program files. See `program-roots.ts` for why this is not covered by the
+   * executable already being open.
+   */
+  readonly programRoots?: readonly string[];
 }
 
 /**

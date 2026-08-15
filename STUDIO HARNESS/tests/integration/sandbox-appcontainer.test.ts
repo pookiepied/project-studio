@@ -54,6 +54,24 @@ async function inside(sandbox: LocalSandbox, script: string): Promise<string> {
 const REPORT = (body: string): string =>
   `try { ${body}; console.log("ok"); } catch (error) { console.log(error.code ?? String(error)); }`;
 
+/**
+ * Reaches a public address and says which wall it hit, then exits.
+ *
+ * `res.resume()` and the explicit `process.exit` are not tidiness. An unread
+ * response keeps the socket open and the event loop alive, so the child runs
+ * until the harness kills it — and a 30-second timeout reads exactly like a
+ * blocked connection while actually being a script that forgot to finish.
+ */
+const NETWORK_PROBE = `
+  const request = require("https").get("https://example.com", (response) => {
+    response.resume();
+    console.log("reached " + response.statusCode);
+    process.exit(0);
+  });
+  request.on("error", (error) => { console.log("refused " + error.code); process.exit(0); });
+  request.setTimeout(8000, () => { console.log("refused ETIMEDOUT"); process.exit(0); });
+`;
+
 windows("a contained child on Windows", () => {
   let root = "";
   let workspace = "";
@@ -88,6 +106,39 @@ windows("a contained child on Windows", () => {
 
   it("still runs the program, and the program still works", async () => {
     expect(await inside(sandbox, 'console.log("alive")')).toBe("alive");
+  }, 60_000);
+
+  it("runs a program from a script file, not only from `-e`", async () => {
+    // **The regression this file was written badly enough to miss.** Every
+    // case here used `node -e`, which is the one invocation form that never
+    // resolves a main module — so ten green tests all took the same shortcut
+    // and shipped a containment that broke `node build.js`, the most ordinary
+    // thing a user runs.
+    //
+    // Resolving a main module calls `realpath`, which stats *every* component
+    // of the path up to the volume root, and an AppContainer needs an entry on
+    // each one. The fix is in `windows/traversal.ts`; this is the assertion
+    // that would have caught its absence.
+    const script = join(workspace, "build.js");
+    await writeFile(script, 'console.log("built from a file")', "utf8");
+    const result = await sandbox.run("shell", {
+      executable: NODE,
+      args: [script],
+      cwd: workspace,
+      timeoutMs: 30_000,
+    });
+    expect(`${result.stdout}${result.stderr}`.trim()).toBe("built from a file");
+    expect(result.exitCode).toBe(0);
+  }, 60_000);
+
+  it("takes the corridor back off the user's folders when released", async () => {
+    // Releasing has to undo the ancestor entries too, and it has to do it
+    // without walking the tree. The first version revoked with inheritance
+    // propagation on, which meant undoing one entry on a home folder rewrote
+    // every descendant — it did not fail, it simply never returned.
+    const started = Date.now();
+    await sandbox.releaseIsolation();
+    expect(Date.now() - started).toBeLessThan(20_000);
   }, 60_000);
 
   it("reads a file in the workspace", async () => {
@@ -135,15 +186,22 @@ windows("a contained child on Windows", () => {
     expect(await readFile(join(workspace, "written.txt"), "utf8")).toBe("from inside");
   }, 60_000);
 
-  it("cannot reach the network", async () => {
-    // Not a firewall rule and not a check of ours: an AppContainer declares the
-    // capabilities it wants, this one declares none, and name resolution is
-    // among the things that stop working as a result.
-    const script = REPORT(
-      'await new Promise((resolve, reject) => { const request = require("https").get("https://example.com", resolve); request.on("error", reject); request.setTimeout(8000, () => reject(new Error("ETIMEDOUT"))); })',
+  it("cannot reach the network when the operator switched it off", async () => {
+    // The `allowNetwork` switch used to be enforced only by our own capability
+    // check — a subprocess ignored it completely, which was the whole point of
+    // ADR 0041. It is now a kernel fact: no `internetClient` capability, so
+    // name resolution does not work, for the program as well as for us.
+    const denied = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: workspace, allowNetwork: false }),
     );
-    const seen = await inside(sandbox, `(async () => { ${script} })()`);
-    expect(seen).not.toBe("ok");
+    expect(await inside(denied, NETWORK_PROBE)).toMatch(/refused/);
+  }, 60_000);
+
+  it("reaches the internet when the operator allowed it", async () => {
+    // Asserted alongside the refusal on purpose. A test that only proved the
+    // network was blocked would still pass if containment blocked it always,
+    // which is the state that makes every API-calling MCP server useless.
+    expect(await inside(sandbox, NETWORK_PROBE)).toMatch(/reached \d+/);
   }, 60_000);
 
   it("takes its permission entry back off the user's directory", async () => {

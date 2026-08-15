@@ -1,4 +1,6 @@
 import type { SecureCredentialStore } from "../../credentials/credential-store.js";
+import { containCommand, programRoots } from "../../sandbox/isolation/index.js";
+import { createSandboxPolicy } from "../../sandbox/policy.js";
 import { ExtendError } from "../errors.js";
 import type { McpChannel } from "./connection.js";
 import { HttpChannel } from "./http-channel.js";
@@ -124,12 +126,47 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
       env[record.authEnvVar] = secret;
     }
 
-    return StdioChannel.start({
-      command: record.command,
+    // The project's root, never ours. A server started in our own directory
+    // would be a filesystem server pointed at the harness.
+    const cwd = projectRoot();
+
+    // **The one place a third party's program is handed to the OS.** It goes
+    // through the same verdict `shell` gets — `containCommand` — rather than a
+    // second rule written here, because this is the kind with the *strongest*
+    // claim on containment and it was the last one still outside it. On a host
+    // with a backend the command that comes back is the launcher; on one
+    // without, it is unchanged, and on a host that owes containment and cannot
+    // supply it, this throws before anything is spawned.
+    //
+    // The policy is derived from the project root rather than passed in. That
+    // is a second call to `createSandboxPolicy` for the same workspace, and it
+    // is safe only because the function is a pure function of the root — the
+    // supervisor deliberately holds no project (see this file's header), so
+    // there is no existing sandbox here to borrow.
+    const contained = await containCommand("mcp-server", {
+      policy: createSandboxPolicy({ workspaceRoot: cwd }),
+      executable: record.command,
       args: record.args,
-      // The project's root, never ours. A server started in our own directory
-      // would be a filesystem server pointed at the harness.
-      cwd: projectRoot(),
+      cwd,
+      // Granted, and this is the honest position rather than the ideal one.
+      // Most MCP servers exist to call an API, and a record has no field yet
+      // saying whether this one does — that field, and the dialog that shows
+      // it, is #90. Until then the boundary that lands in full is the
+      // filesystem, and the network hole is narrower than it sounds: measured,
+      // it reaches the internet and is refused loopback and the local network,
+      // so a server still cannot touch a dev server, a local database, or the
+      // user's router.
+      network: true,
+      // Without this the server cannot read its own entry script. It is
+      // installed under the user's npm root, not in their project, so every
+      // real server exited 1 with nothing to say until this was added.
+      programRoots: programRoots(record.args),
+    });
+
+    return StdioChannel.start({
+      command: contained.executable,
+      args: contained.args,
+      cwd,
       env,
       ...(options.startupTimeoutMs === undefined
         ? {}
