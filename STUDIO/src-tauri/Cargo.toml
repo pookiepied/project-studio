@@ -27,8 +27,18 @@ tauri-plugin-log = "2"
 base64 = "0.22"
 rand = "0.8"
 os_pipe = "1.2"
+
+# POSIX-only, and previously declared as if they were not — which is why this
+# crate had never compiled on Windows (meta-task #87). `command-fds` maps
+# descriptors with `dup2` inside a `pre_exec` hook and fails inside its own
+# source on a Windows target, before anything of ours is reached; `nix` is a
+# libc binding by definition. Both are reachable only from `#[cfg(unix)]` code,
+# so the declaration was the whole bug.
+#
+# `libc` used to be listed here too and is gone rather than moved: nothing in
+# `src/` referenced it.
+[target.'cfg(unix)'.dependencies]
 command-fds = "0.2"
-libc = "0.2"
 nix = { version = "0.27", features = ["process", "signal"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

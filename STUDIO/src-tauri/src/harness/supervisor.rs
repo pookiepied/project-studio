@@ -1,30 +1,72 @@
-use std::io::{BufRead, BufReader, Read, Write};
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
-use std::os::unix::{io::AsRawFd, process::CommandExt};
-
-use command_fds::{CommandFdExt, FdMapping};
-use os_pipe::PipeReader;
+use std::os::unix::process::CommandExt;
 
 use crate::harness::bootstrap::{generate_bootstrap, AdmissionBootstrap};
+use crate::harness::channel::{BootstrapChannel, ReadinessStream};
 use crate::harness::environment::apply_harness_environment;
 use crate::harness::endpoint::{parse_readiness_line, HarnessEndpoint, HarnessReadiness};
 
-const READINESS_FD: i32 = 3;
-const BOOTSTRAP_FD: i32 = 4;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How long a signalled process group is given to exit before it is killed.
+///
+/// Unix only, and that is the point rather than an oversight: there is no
+/// SIGTERM on Windows, so there is no polite request to wait out. See
+/// `terminate_child`.
+#[cfg(unix)]
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+
+/// How many lines of the child's own output are kept for a startup failure.
+///
+/// Bounded because on Windows the readiness stream *is* the child's stdout, so
+/// an unbounded buffer is an unbounded buffer of whatever the Harness logs.
+const DIAGNOSTIC_LINES: usize = 50;
+
+/// Longest diagnostic excerpt put into an error message.
+const DIAGNOSTIC_BYTES: usize = 2000;
+
+/// Removes the per-launch bearer from anything about to be logged or returned.
+///
+/// Every diagnostic path goes through here rather than each one remembering.
+/// The Harness echoes its own configuration on failure, and a startup error is
+/// exactly the text a user pastes into a bug report.
+fn redact(text: &str, token: &str) -> String {
+    if token.is_empty() {
+        return text.to_string();
+    }
+    text.replace(token, "[redacted]")
+}
+
+/// Keeps the tail of a diagnostic, on a character boundary.
+///
+/// Slicing a `String` by byte offset panics mid-codepoint, and this text is
+/// whatever a child process wrote — including a path with a non-ASCII
+/// character in it, which is ordinary on a Windows user profile.
+fn tail(text: String) -> String {
+    if text.len() <= DIAGNOSTIC_BYTES {
+        return text;
+    }
+    let mut start = text.len() - DIAGNOSTIC_BYTES;
+    while start < text.len() && !text.is_char_boundary(start) {
+        start += 1;
+    }
+    format!("…{}", &text[start..])
+}
 
 #[derive(Debug)]
 pub struct RunningHarness {
     pub child: Child,
+    /// Carries the per-launch bearer itself, which is why there is no separate
+    /// `token` field beside it. There was one; nothing ever read it, and the
+    /// Windows compile is what finally said so (#87).
     pub endpoint: HarnessEndpoint,
-    pub token: String,
-    // We keep the pipe readers/writers to prevent early close? Not needed after spawn.
 }
 
 #[derive(Debug, Default)]
@@ -88,10 +130,6 @@ impl HarnessSupervisor {
         Err("Harness server not found. Run `pnpm --filter project-studio-v2 build` in STUDIO HARNESS and ensure dist/server.mjs exists.".to_string())
     }
 
-    pub fn is_running(&self) -> bool {
-        self.get_endpoint().is_some()
-    }
-
     pub fn get_endpoint(&self) -> Option<HarnessEndpoint> {
         let mut guard = self.inner.lock().unwrap();
         Self::reap_dead_locked(&mut guard);
@@ -125,15 +163,11 @@ impl HarnessSupervisor {
         Ok(endpoint)
     }
 
-    pub fn stop(&self) -> Result<(), String> {
-        let mut guard = self.inner.lock().unwrap();
-        if let Some(mut running) = guard.running.take() {
-            Self::terminate_child(&mut running.child);
-            guard.last_endpoint = Some(running.endpoint.clone());
-            log::info!("Harness supervisor: stopped harness pid={}", running.endpoint.pid);
-        }
-        Ok(())
-    }
+    // There was a `stop()` here with no caller anywhere in the crate. The app
+    // stops the Harness through `shutdown_all` on window destruction and app
+    // exit (`lib.rs`), and a second way to do the same thing that nothing used
+    // is a second thing to keep correct. Removed with #87, when compiling on
+    // Windows made the crate's dead code visible for the first time.
 
     fn spawn_locked(&self, guard: &mut Inner) -> Result<HarnessEndpoint, String> {
         let server_path = self.resolve_server_path()?;
@@ -154,7 +188,6 @@ impl HarnessSupervisor {
         guard.running = Some(RunningHarness {
             child: endpoint.0,
             endpoint: endpoint.1.clone(),
-            token: token.clone(),
         });
         guard.start_count += 1;
         guard.last_endpoint = Some(endpoint.1.clone());
@@ -176,12 +209,6 @@ impl HarnessSupervisor {
         bootstrap: AdmissionBootstrap,
         token: String,
     ) -> Result<(Child, HarnessEndpoint), String> {
-        // Create pipes
-        let (bootstrap_reader, mut bootstrap_writer) =
-            os_pipe::pipe().map_err(|e| format!("failed to create bootstrap pipe: {e}"))?;
-        let (readiness_reader, readiness_writer) =
-            os_pipe::pipe().map_err(|e| format!("failed to create readiness pipe: {e}"))?;
-
         // Prepare bootstrap JSON (credential + ids)
         let bootstrap_json = serde_json::to_string(&bootstrap)
             .map_err(|e| format!("failed to serialize bootstrap: {e}"))?;
@@ -203,53 +230,38 @@ impl HarnessSupervisor {
 
         cmd.env("PORT", "0");
         cmd.env("PROJECT_STUDIO_HARNESS_HOSTNAME", "127.0.0.1");
-        cmd.env("PROJECT_STUDIO_READINESS_FD", READINESS_FD.to_string());
-        cmd.env("PROJECT_STUDIO_ADMISSION_BOOTSTRAP_FD", BOOTSTRAP_FD.to_string());
-        cmd.stdin(Stdio::null());
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
+
+        // Attached after the environment policy and the explicit variables,
+        // because it sets two more of its own and `apply_harness_environment`
+        // clears. It also owns `stdin`, which differs by platform: null on
+        // Unix, the bootstrap pipe on Windows.
+        let channel = BootstrapChannel::attach(&mut cmd)?;
 
         // Put the Harness and every descendant it starts in one process group.
         // The Host owns the group, not just the Node parent, so an MCP child
         // cannot survive a Harness crash/restart and retain a port or file.
+        //
+        // There is no Windows equivalent here yet — a Job Object is the
+        // counterpart and this does not create one, so a Windows MCP child can
+        // still outlive its Harness. Recorded as meta-task #89 rather than
+        // left to be discovered.
         #[cfg(unix)]
         cmd.process_group(0);
 
-        // Map fds: bootstrap_reader -> 4 (read), readiness_writer -> 3 (write)
-        // command-fds will handle CLOEXEC and dup2
-        let bootstrap_fd_mapping = FdMapping {
-            parent_fd: bootstrap_reader.as_raw_fd(),
-            child_fd: BOOTSTRAP_FD,
-        };
-        let readiness_fd_mapping = FdMapping {
-            parent_fd: readiness_writer.as_raw_fd(),
-            child_fd: READINESS_FD,
-        };
-        cmd.fd_mappings(vec![bootstrap_fd_mapping, readiness_fd_mapping])
-            .map_err(|e| format!("failed to map fds: {e}"))?;
-
-        // Keep pipes open until spawn; prevent close-on-exec for mapped fds is handled by command-fds
         let mut child = cmd.spawn().map_err(|e| format!("failed to spawn node harness: {e} (path={})", server_path.display()))?;
 
-        // Close child's copies in parent; we keep our ends
-        drop(bootstrap_reader);
-        drop(readiness_writer);
-
-        // Write bootstrap and close writer (signals EOF to child)
-        // Child reads fd 4 as file; it will read once and close
-        let bootstrap_clone = bootstrap_json.clone();
-        // Write in a thread to avoid blocking?
-        // For small JSON, direct write is fine.
-        bootstrap_writer
-            .write_all(bootstrap_clone.as_bytes())
-            .map_err(|e| {
+        let readiness_stream = match channel.deliver(&mut child, &bootstrap_json) {
+            Ok(stream) => stream,
+            Err(error) => {
                 Self::terminate_child(&mut child);
-                format!("failed to write bootstrap: {e}")
-            })?;
-        drop(bootstrap_writer); // EOF
+                return Err(error);
+            }
+        };
 
         // Read readiness with timeout
-        let readiness = Self::wait_for_readiness(readiness_reader, &mut child, &token)?;
+        let readiness = Self::wait_for_readiness(readiness_stream, &mut child, &token)?;
 
         // Verify endpoint host is loopback
         if readiness.host != "127.0.0.1" {
@@ -263,104 +275,181 @@ impl HarnessSupervisor {
                 "invalid readiness frame".to_string()
             })?;
 
+        // Startup is over, so nothing is reading the child's pipes any more.
+        // From here they are drained for their whole life, not sampled on
+        // failure.
+        Self::drain_output(&mut child);
+
         Ok((child, endpoint))
     }
 
+    /// Waits for the readiness frame, or explains why it never came.
+    ///
+    /// Reads lines rather than *a* line. The previous version started a thread,
+    /// read exactly one line, and failed if that line was not the frame — which
+    /// worked only because fd 3 carried nothing else. On Windows the readiness
+    /// stream is the child's stdout and the Harness's own logging shares it, so
+    /// "the first line" is `[flue] Server listening on …`.
+    ///
+    /// `stream.exclusive` keeps the Unix strictness intact rather than relaxing
+    /// both platforms to the weaker rule: on a dedicated descriptor, anything
+    /// that is not the frame is a fault and is still reported as one.
     fn wait_for_readiness(
-        reader: PipeReader,
+        stream: ReadinessStream,
         child: &mut Child,
         token: &str,
     ) -> Result<HarnessReadiness, String> {
-        let start = Instant::now();
-        let mut buf_reader = BufReader::new(reader);
-
-        // We need to poll both pipe and child exit. Use non-blocking with timeout.
-        // Simplify: set pipe to non-blocking and poll
-        // os_pipe reader is blocking; we will read with timeout via thread + channel
         use std::sync::mpsc;
-        let (tx, rx) = mpsc::channel();
+
+        let start = Instant::now();
+        let exclusive = stream.exclusive;
+        let mut buf_reader = BufReader::new(stream.reader);
+
+        // A reader thread, because neither an anonymous pipe nor a child's
+        // stdout can be read with a timeout. It sends every line and then
+        // closes the channel, so the loop below sees EOF as a disconnect.
+        //
+        // Once the receiver is gone — startup finished, one way or another —
+        // it does **not** stop. It keeps reading and drops what it reads. On
+        // Windows this stream is the child's stdout, and a reader that returns
+        // here would close the pipe under a Harness that logs for the rest of
+        // its life: every later write fails, and on a full buffer it blocks
+        // before it fails.
+        let (tx, rx) = mpsc::channel::<Result<String, String>>();
         std::thread::spawn(move || {
-            let mut line = String::new();
-            let result = buf_reader.read_line(&mut line);
-            let _ = tx.send((result, line));
+            let mut startup_owner_listening = true;
+            loop {
+                let mut line = String::new();
+                match buf_reader.read_line(&mut line) {
+                    Ok(0) => return,
+                    Ok(_) => {
+                        if startup_owner_listening && tx.send(Ok(line.clone())).is_err() {
+                            startup_owner_listening = false;
+                        }
+                        if !startup_owner_listening && !line.trim().is_empty() {
+                            log::debug!("harness stdout: {}", line.trim());
+                        }
+                    }
+                    Err(error) => {
+                        if startup_owner_listening {
+                            let _ = tx.send(Err(error.to_string()));
+                        }
+                        return;
+                    }
+                }
+            }
         });
+
+        // Lines seen before the frame. On Windows these are the Harness's own
+        // startup output and are the most useful thing to show when it fails.
+        let mut seen: VecDeque<String> = VecDeque::new();
+        let mut remember = |line: &str| {
+            if seen.len() == DIAGNOSTIC_LINES {
+                seen.pop_front();
+            }
+            seen.push_back(line.to_string());
+        };
+
+        let describe = |seen: &VecDeque<String>, child: &mut Child, token: &str| -> String {
+            let observed = seen
+                .iter()
+                .map(|line| line.trim())
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n");
+            let observed = redact(&observed, token);
+            let (stdout, stderr) = Self::collect_output(child, token);
+            format!(
+                "observed={} stdout={} stderr={}",
+                if observed.is_empty() { "(nothing)" } else { &observed },
+                if stdout.is_empty() { "(nothing)" } else { &stdout },
+                if stderr.is_empty() { "(nothing)" } else { &stderr }
+            )
+        };
 
         loop {
             if start.elapsed() > STARTUP_TIMEOUT {
                 Self::terminate_child(child);
-                // Collect stdout/stderr for diagnostics, redacted
-                let (stdout, stderr) = Self::collect_output(child, token);
                 return Err(format!(
-                    "Harness did not publish loopback readiness within {}ms.\nstdout={}\nstderr={}",
+                    "Harness did not publish loopback readiness within {}ms. {}",
                     STARTUP_TIMEOUT.as_millis(),
-                    if stdout.is_empty() { "(nothing)" } else { &stdout },
-                    if stderr.is_empty() { "(nothing)" } else { &stderr }
+                    describe(&seen, child, token)
                 ));
             }
 
-            // Check if child exited
+            // Checked before the channel, so an exit is reported as an exit
+            // rather than as the disconnect it also produces.
             match child.try_wait() {
                 Ok(Some(status)) => {
-                    let (stdout, stderr) = Self::collect_output(child, token);
                     return Err(format!(
-                        "Harness exited before readiness (status={}). stdout={} stderr={}",
-                        status,
-                        if stdout.is_empty() { "(nothing)" } else { &stdout },
-                        if stderr.is_empty() { "(nothing)" } else { &stderr }
+                        "Harness exited before readiness (status={status}). {}",
+                        describe(&seen, child, token)
                     ));
                 }
                 Ok(None) => {}
-                Err(e) => {
-                    return Err(format!("failed to poll child: {e}"));
-                }
+                Err(e) => return Err(format!("failed to poll child: {e}")),
             }
 
             match rx.recv_timeout(Duration::from_millis(50)) {
-                Ok((Ok(0), _)) => {
-                    // EOF without line
-                    let (stdout, stderr) = Self::collect_output(child, token);
-                    return Err(format!(
-                        "Harness readiness pipe closed without frame. stdout={} stderr={}",
-                        if stdout.is_empty() { "(nothing)" } else { &stdout },
-                        if stderr.is_empty() { "(nothing)" } else { &stderr }
-                    ));
-                }
-                Ok((Ok(_), line)) => {
-                    if let Some(readiness) = parse_readiness_line(line.trim()) {
+                Ok(Ok(line)) => {
+                    let trimmed = line.trim();
+                    if let Some(readiness) = parse_readiness_line(trimmed) {
                         return Ok(readiness);
-                    } else {
-                        // Not a readiness line - could be noise? Continue waiting
-                        // But FD 3 should only have readiness JSON; ignore malformed
-                        log::warn!("Harness supervisor: ignoring non-readiness line on FD 3: {}", line.trim());
-                        // Need to continue reading - but our thread already consumed one line.
-                        // For simplicity, if first line not readiness, fail
-                        let (stdout, stderr) = Self::collect_output(child, token);
+                    }
+                    if exclusive {
                         return Err(format!(
-                            "Harness readiness malformed: {}. stdout={} stderr={}",
-                            line.trim(),
-                            if stdout.is_empty() { "(nothing)" } else { &stdout },
-                            if stderr.is_empty() { "(nothing)" } else { &stderr }
+                            "Harness readiness malformed: {}. {}",
+                            redact(trimmed, token),
+                            describe(&seen, child, token)
                         ));
                     }
+                    // Shared stream: this is the Harness talking, not a fault.
+                    remember(trimmed);
                 }
-                Ok((Err(e), _)) => {
-                    return Err(format!("failed to read readiness: {e}"));
-                }
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    continue;
-                }
+                Ok(Err(e)) => return Err(format!("failed to read readiness: {e}")),
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    let (stdout, stderr) = Self::collect_output(child, token);
                     return Err(format!(
-                        "Harness readiness thread disconnected. stdout={} stderr={}",
-                        if stdout.is_empty() { "(nothing)" } else { &stdout },
-                        if stderr.is_empty() { "(nothing)" } else { &stderr }
+                        "Harness readiness stream closed without a frame. {}",
+                        describe(&seen, child, token)
                     ));
                 }
             }
         }
     }
 
+    /// Keeps the child's remaining output moving once startup has succeeded.
+    ///
+    /// Not cosmetic. A piped stream nobody reads fills its buffer and then
+    /// blocks the writer, so an undrained pipe is a Harness that freezes the
+    /// first time it logs enough. That was already latent for `stderr` on both
+    /// platforms; the readiness reader now covers `stdout` on Windows, and this
+    /// covers what is left.
+    fn drain_output(child: &mut Child) {
+        fn pump<R: Read + Send + 'static>(label: &'static str, reader: R) {
+            std::thread::spawn(move || {
+                for line in BufReader::new(reader).lines().map_while(Result::ok) {
+                    if !line.trim().is_empty() {
+                        log::debug!("harness {label}: {}", line.trim());
+                    }
+                }
+            });
+        }
+
+        // Already taken on Windows, where it is the readiness stream.
+        if let Some(stdout) = child.stdout.take() {
+            pump("stdout", stdout);
+        }
+        if let Some(stderr) = child.stderr.take() {
+            pump("stderr", stderr);
+        }
+    }
+
+    /// Drains what is left of the child's pipes for a startup failure message.
+    ///
+    /// Only ever called on a path that ends in an error. On Windows `stdout` is
+    /// already taken — it is the readiness stream — so the lines that would
+    /// have appeared here arrive as `observed=` instead.
     fn collect_output(child: &mut Child, token: &str) -> (String, String) {
         let mut stdout = String::new();
         let mut stderr = String::new();
@@ -370,18 +459,7 @@ impl HarnessSupervisor {
         if let Some(mut err) = child.stderr.take() {
             let _ = err.read_to_string(&mut stderr);
         }
-        // Redact token
-        let stdout_redacted = stdout.replace(token, "[redacted]");
-        let stderr_redacted = stderr.replace(token, "[redacted]");
-        // Tail 2000
-        let tail = |s: String| {
-            if s.len() > 2000 {
-                format!("…{}", &s[s.len() - 2000..])
-            } else {
-                s
-            }
-        };
-        (tail(stdout_redacted), tail(stderr_redacted))
+        (tail(redact(&stdout, token)), tail(redact(&stderr, token)))
     }
 
     fn terminate_child(child: &mut Child) {

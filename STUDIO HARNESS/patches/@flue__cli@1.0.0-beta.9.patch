@@ -9,7 +9,7 @@ index cffab4d29532a02cf3a423f71deaea3642902d7d..1a90525b7223d8e05ddbab2263457316
 +const bootstrapFd = Number.parseInt(process.env.PROJECT_STUDIO_ADMISSION_BOOTSTRAP_FD || '', 10);
 +if (Number.isInteger(bootstrapFd) && bootstrapFd >= 0) {
 +  const bootstrap = JSON.parse(readFileSync(bootstrapFd, 'utf8'));
-+  closeSync(bootstrapFd);
++  if (bootstrapFd > 2) closeSync(bootstrapFd);
 +  if (!bootstrap || typeof bootstrap !== 'object' || Array.isArray(bootstrap) ||
 +      typeof bootstrap.credential !== 'string' ||
 +      typeof bootstrap.clientId !== 'string' ||
@@ -40,7 +40,7 @@ index cffab4d29532a02cf3a423f71deaea3642902d7d..1a90525b7223d8e05ddbab2263457316
 +      sessionId: process.env.PROJECT_STUDIO_ADMISSION_SESSION_ID || '',
 +    };
 +    writeSync(readinessFd, JSON.stringify(readiness) + '\\n');
-+    closeSync(readinessFd);
++    if (readinessFd > 2) closeSync(readinessFd);
 +  },
  });
  async function stop(exitCode) {

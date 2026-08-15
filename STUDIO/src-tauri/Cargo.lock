@@ -2926,7 +2926,6 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "command-fds",
- "libc",
  "log",
  "nix",
  "os_pipe",
