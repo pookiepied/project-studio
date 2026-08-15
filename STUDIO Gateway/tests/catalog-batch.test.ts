@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { batchUpsertCatalogModels, CATALOG_BATCH_SIZE } from "../src/catalog/repository.ts";
+import { batchUpsertCatalogModels, CATALOG_BATCH_SIZE, D1_STATEMENT_BATCH_SIZE } from "../src/catalog/repository.ts";
 import type { ModelDefinition } from "../src/providers/types.ts";
 
 function createBatchDb() {
@@ -66,8 +66,10 @@ describe("Catalog batch", () => {
     for (let i = 0; i < 250; i++) models.push(makeDef("openai", `model-${i}`));
     const count = await batchUpsertCatalogModels(db, models);
     expect(count).toBe(250);
-    // 250 models for one provider => 3 batches (100,100,50)
-    expect(getBatchCalls()).toBe(3);
+    // Catalog selection chunks remain 100, while D1 statement batches are
+    // capped to avoid SQLite's aggregate variable limit.
+    expect(D1_STATEMENT_BATCH_SIZE).toBe(25);
+    expect(getBatchCalls()).toBe(10);
   });
 
   it("preserves exposed/enabled via batch (no hardcode)", async () => {

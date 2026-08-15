@@ -3,12 +3,20 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { AuthContext } from "../../../admission/context.js";
 import type { AdmissionVerifier } from "../../../admission/verifier.js";
 import { hasAdmissionScope, type AdmissionScope } from "../../../admission/scopes.js";
+import {
+  createRootExecutionContext,
+  runWithExecutionContext,
+  type ExecutionContext,
+} from "../../../execution/context.js";
+import { isStudioUuid } from "../../../identity/uuid.js";
 
 export const AUTH_CONTEXT = "authContext" as const;
+export const EXECUTION_CONTEXT = "executionContext" as const;
 
 export interface AdmissionEnv {
   Variables: {
     [AUTH_CONTEXT]: AuthContext;
+    [EXECUTION_CONTEXT]: ExecutionContext;
   };
 }
 
@@ -31,7 +39,14 @@ export function createAdmissionMiddleware(
     if (!result.ok) return unauthorized(context);
 
     context.set(AUTH_CONTEXT, result.context);
-    await next();
+    const header = context.req.header("X-Project-Studio-Request-Id");
+    const execution = createRootExecutionContext({
+      ...(isStudioUuid(header) ? { requestId: header } : {}),
+      clientId: result.context.clientId,
+      sessionId: result.context.sessionId,
+    });
+    context.set(EXECUTION_CONTEXT, execution);
+    return runWithExecutionContext(execution, next);
   };
 }
 
@@ -59,4 +74,10 @@ export function authContext(
   context: Context<AdmissionEnv>,
 ): AuthContext {
   return context.get(AUTH_CONTEXT);
+}
+
+export function executionContext(
+  context: Context<AdmissionEnv>,
+): ExecutionContext {
+  return context.get(EXECUTION_CONTEXT);
 }

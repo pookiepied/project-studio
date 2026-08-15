@@ -6,16 +6,18 @@ import {
   type FlueClient,
   type FlueConversationSnapshot,
 } from "@flue/sdk";
+import { createStudioUuid } from "../identity/uuid.js";
 
 export interface AcceptedRun {
   readonly threadId: string;
+  readonly requestId: string;
   readonly submissionId: string;
   readonly streamUrl: string;
   readonly offset: string;
 }
 
 export interface HarnessClient {
-  send(threadId: string, message: string): Promise<AcceptedRun>;
+  send(threadId: string, message: string, requestId?: string): Promise<AcceptedRun>;
   wait(run: AcceptedRun, signal?: AbortSignal): Promise<AgentPromptResponse>;
   cancel(threadId: string): Promise<boolean>;
   history(threadId: string): Promise<FlueConversationSnapshot>;
@@ -38,14 +40,15 @@ export class FlueHarnessClient implements HarnessClient {
     });
   }
 
-  async send(threadId: string, message: string): Promise<AcceptedRun> {
+  async send(threadId: string, message: string, requestId: string = createStudioUuid()): Promise<AcceptedRun> {
     const admission = await this.#client.agents.send(
       this.#agentName,
       threadId,
-      { message },
+      { message, idempotencyKey: requestId },
     );
     return {
       threadId,
+      requestId,
       submissionId: admission.submissionId,
       streamUrl: admission.streamUrl,
       offset: admission.offset,

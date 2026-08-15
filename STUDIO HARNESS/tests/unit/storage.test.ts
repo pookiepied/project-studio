@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -7,7 +11,7 @@ import {
   openDatabase,
   type StudioDatabase,
 } from "../../src/storage/database.js";
-import { StorageError } from "../../src/storage/errors.js";
+import { StorageError, storageErrorFrom } from "../../src/storage/errors.js";
 import {
   assertNoSecretColumns,
   migrate,
@@ -261,4 +265,129 @@ describe("transactions", () => {
     expect((caught as StorageError).kind).toBe("conflict");
     expect((caught as StorageError).code).toBe("storage.conflict");
   });
+});
+
+describe("startup failure containment", () => {
+  it("refuses an existing empty database instead of silently initializing it", () => {
+    const directory = mkdtempSync(join(tmpdir(), "studio-empty-db-"));
+    const path = join(directory, "studio.db");
+    writeFileSync(path, "", "utf8");
+
+    try {
+      expect(() => openDatabase({ path })).toThrow(StorageError);
+      expect(readFileSync(path)).toHaveLength(0);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not rewrite a malformed database file", () => {
+    const directory = mkdtempSync(join(tmpdir(), "studio-corrupt-db-"));
+    const path = join(directory, "studio.db");
+    const contents = Buffer.from("not a SQLite database\n", "utf8");
+    writeFileSync(path, contents);
+
+    try {
+      expect(() => openDatabase({ path })).toThrow(StorageError);
+      expect(readFileSync(path)).toEqual(contents);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["SQLITE_FULL", "disk full"],
+    ["attempt to write a readonly database", "read-only storage"],
+  ])("classifies %s as bounded unavailable storage", (message) => {
+    expect(storageErrorFrom(new Error(message), "internal").kind).toBe("unavailable");
+  });
+
+  it("rolls back an open transaction after SIGKILL and keeps the database valid", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "studio-wal-crash-"));
+    const path = join(directory, "studio.db");
+    const script = `
+      import { DatabaseSync } from "node:sqlite";
+      const db = new DatabaseSync(process.argv[1]);
+      db.exec("CREATE TABLE IF NOT EXISTS crash_probe (value TEXT NOT NULL) STRICT");
+      db.exec("BEGIN IMMEDIATE");
+      db.prepare("INSERT INTO crash_probe (value) VALUES (?)").run("uncommitted");
+      process.stdout.write("ready\\n");
+      setInterval(() => {}, 1_000);
+    `;
+    const child = spawn(
+      process.execPath,
+      ["--input-type=module", "-e", script, path],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let output = "";
+        child.stdout.on("data", (chunk: Buffer) => {
+          output += chunk.toString();
+          if (output.includes("ready")) resolve();
+        });
+        child.once("error", reject);
+        child.stderr.on("data", (chunk: Buffer) => {
+          output += chunk.toString();
+        });
+      });
+      child.kill("SIGKILL");
+      await new Promise<void>((resolve) => child.once("exit", () => resolve()));
+
+      const db = openDatabase({ path });
+      try {
+        expect(db.handle.prepare("PRAGMA integrity_check").get()).toEqual({
+          integrity_check: "ok",
+        });
+        expect(db.handle.prepare("SELECT COUNT(*) AS count FROM crash_probe").get()).toEqual({
+          count: 0,
+        });
+      } finally {
+        db.close();
+      }
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("returns a bounded unavailable error when another writer holds the database lock", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "studio-lock-"));
+    const path = join(directory, "studio.db");
+    const script = `
+      import { DatabaseSync } from "node:sqlite";
+      const db = new DatabaseSync(process.argv[1]);
+      db.exec("CREATE TABLE IF NOT EXISTS lock_probe (value TEXT NOT NULL) STRICT");
+      db.exec("BEGIN EXCLUSIVE");
+      process.stdout.write("locked\\n");
+      setInterval(() => {}, 1_000);
+    `;
+    const child = spawn(
+      process.execPath,
+      ["--input-type=module", "-e", script, path],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let output = "";
+        child.stdout.on("data", (chunk: Buffer) => {
+          output += chunk.toString();
+          if (output.includes("locked")) resolve();
+        });
+        child.once("error", reject);
+      });
+
+      expect(() => openDatabase({ path })).toThrow(StorageError);
+      expect(() => openDatabase({ path })).toThrow(/could not be opened|unavailable/i);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await new Promise<void>((resolve) => {
+        if (child.exitCode !== null || child.signalCode !== null) resolve();
+        else child.once("exit", () => resolve());
+      });
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }, 15_000);
 });

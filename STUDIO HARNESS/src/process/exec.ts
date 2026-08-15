@@ -160,6 +160,29 @@ export function killProcessTree(pid: number | undefined, kill: () => void): void
   }
 
   if (process.platform === "win32") {
+    // Resolve the system taskkill explicitly so Windows PATH cannot redirect
+    // which binary runs during teardown (P-05). Inheriting PATH here would
+    // contradict `buildEnvironment`'s central claim.
+    const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
+    const taskkillPath = `${systemRoot.replace(/\\$/, "")}\\System32\\taskkill.exe`;
+    try {
+      spawn(taskkillPath, ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+        // Explicit empty env would break SystemRoot lookup inside taskkill itself;
+        // we keep the minimal OS plumbing but not the caller's PATH.
+        env: {
+          SystemRoot: systemRoot,
+          windir: systemRoot,
+          PATH: "",
+        },
+      }).unref();
+      return;
+    } catch {
+      // Fall through: a failed taskkill is still better than no kill at all.
+    }
+    // Fallback to bare name only if the absolute path failed to spawn (e.g.
+    // SystemRoot misconfigured) — still better than no tree kill.
     try {
       spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
         stdio: "ignore",
@@ -167,7 +190,20 @@ export function killProcessTree(pid: number | undefined, kill: () => void): void
       }).unref();
       return;
     } catch {
-      // Fall through: a failed taskkill is still better than no kill at all.
+      // Fall through to single-process kill
+    }
+  }
+
+  if (process.platform !== "win32") {
+    // Callers that need descendant cleanup spawn the root as a detached process
+    // group. A negative pid addresses that group instead of only the parent.
+    try {
+      if (pid !== undefined) {
+        process.kill(-pid, "SIGKILL");
+        return;
+      }
+    } catch {
+      // The group may already have exited; retain the direct-kill fallback.
     }
   }
 
@@ -190,6 +226,7 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
       env: buildEnvironment(options.env),
       // The whole design rests on this staying false.
       shell: false,
+      detached: process.platform !== "win32",
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -251,6 +288,11 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
     child.on("error", (cause) => {
       settle(() => reject(new ProcessError("spawn_failed", { cause })));
     });
+
+    // Guard the stdin stream so a child that already exited does not surface
+    // as an unhandled EPIPE (P-06). The error is the close outcome, not a new
+    // exception.
+    child.stdin.on("error", () => {});
 
     child.on("close", (code) => {
       const killed = outcome;

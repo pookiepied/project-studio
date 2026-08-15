@@ -8,6 +8,9 @@ The cross-cutting Harness client boundary is settled in ADR 0028 and planned in
 `tasks/phase-11-mcp/006-harness-admission.md`.
 The current P1/P2 audit remediation is tracked in
 `tasks/phase-11-mcp/007-audit-remediation.md`.
+The complete Phase 1-11 closure order is tracked in
+`tasks/phase-11-mcp/008-phase-1-11-completion.md`; that file is the active
+checklist and requires API/client boundaries without requiring product UI work.
 
 This document is a snapshot. Trust the source files it summarizes over this
 prose the moment they disagree.

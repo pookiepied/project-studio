@@ -4,12 +4,13 @@ A snapshot, not a plan. `ROADMAP.md` says what order to build in and
 `KNOWN-ISSUES.md` says what is currently untrue about the system; this file
 answers "how far along are we, and what is actually blocking what".
 
-Refresh it at a phase boundary. If it disagrees with the other two documents,
-they are right and this one is stale.
+Refresh it at a phase boundary. The active ordered closure checklist is
+`tasks/phase-11-mcp/008-phase-1-11-completion.md`; this file is only the snapshot.
+If it disagrees with that task or the source/tests, it is stale.
 
-Last refreshed: 2026-08-13 during task 007 audit remediation. Phase 10 is
-effectively closed: the native families are implemented and now registered
-through the CallGate; `task` and `skill` belong to later phases.
+Last refreshed: 2026-08-14 after the Phase 1-11 completion checklist was created.
+The working tree remains dirty and current source is ahead of several historical
+audit paragraphs.
 
 Then a cross-reference audit over everything shipped, which is why this file now
 contradicts itself less and admits more. It found eleven real defects — `T-14`
@@ -18,10 +19,10 @@ through `T-21`, `K-04`, `P-05`, `P-06` — and the two that matter are that
 replacement containing `$`. Nothing found was a regression; all of it was
 shipped believing otherwise.
 
-Four are fixed: `T-16`, then `T-14`, `T-15`, and `T-17` together under ADR 0020.
-That ADR also named the shape behind three of the findings — hand-written
-metadata that several subsystems trust and nobody verifies — and removed it in
-one of the three places. `K-04` and `T-19` are the other two, still open.
+The audit remediation and current cleanup have fixed the listed MCP/native,
+process, snapshot, shell, Git policy, and CLI error findings in source. The
+remaining work is now ordered in Task 008 rather than treated as unrelated
+patches.
 
 ---
 
@@ -48,26 +49,26 @@ process it talks to; neither contains the other.
 
 | Phase | What it is | Status |
 |---|---|---|
-| 1–4 | Harness foundation, agent loop, persistence, recovery | Done |
-| 5 | Observability | Done |
-| 6 | Provider bootstrap | Done |
-| 7 | Studio Gateway integration | Done |
+| 1–4 | Harness foundation, agent loop, persistence, recovery | Existing - verify fail-safe matrix |
+| 5 | Observability | Existing - verify correlation and failure behavior |
+| 6 | Provider bootstrap | Harness-side existing - verify capability/stream matrix |
+| 7 | Studio Gateway integration | **Partial - contract mismatch; decision required** |
 | 7.5 | Architecture review | Done |
-| 8 | Auth, credentials, local BYOK | Done |
-| 9 | Permission and containment kernel | Foundation done, 2 items open |
-| 10 | Native agent tools | **In progress — 9 of 10** |
-| 11 | MCP | **In progress — L-01 through L-05 done, 7 loose ends open** |
+| 8 | Auth, credentials, local BYOK | Harness-side existing - verify OS/client lifecycle |
+| 9 | Permission and containment kernel | **Partial - containment decision and API closure open** |
+| 10 | Native agent tools | Native scope implemented - cross-platform/API verification open |
+| 11 | MCP | **Partial - core integrated; runtime/platform/API proofs open** |
 | 12 | Skills | Not started |
 | 13 | Subagents and tasks | Not started |
-| 14 | Projects, workspaces, sandboxes | Not started |
+| 14 | Projects, workspaces, sandboxes | UI precursor only; product persistence not started |
 | 15 | Memory and context | Not started |
 | 16 | Workflows and schedules | Not started |
 | 17 | Evals | Not started |
-| 18 | Product integration | Not started |
+| 18 | Product integration | API/Host source exists; packaging and E2E pending; UI work excluded from Task 008 |
 
-Nine phases closed, one in progress, eight untouched. That is not 50% of the
-work — the closed phases are foundation, and the open ones include everything
-the user actually sees.
+The first eleven phases are not declared closed yet. Task 008 closes them in
+order, including their accepted/deferred decisions and API boundaries, before
+Phase 12 or later product work begins.
 
 ---
 
@@ -352,13 +353,14 @@ means while isolation is `in-process`.
 ### Elsewhere
 
 - **Isolation (S-02).** Only `in-process` exists. WSL2 is the intended local
-  tier; a remote MicroVM comes later. Any capability needing `os` isolation is
-  refused today.
+  tier; a remote MicroVM comes later. The current behavior/decision must be
+  reconciled by Task 008 before external execute/network is called contained.
 - **On-demand git install.** Needs hash verification first (V-01) — fetching an
   executable and running it unverified is the one thing that must not ship.
 - **Non-text models.** Image, video, speech, and transcription are `unsupported`
   in the local catalog. Not a config gap; Pi's image collection is unwired.
-- **Frontend seam.** Nothing connects the harness to Studio V2 yet. Phase 18.
+- **Frontend seam.** API/Host/client source seams exist, but product UI wiring,
+  packaged sidecar, cargo verification, and desktop E2E are Task 008 gates.
 
 ---
 

@@ -1,0 +1,5 @@
+# Deploy the management control plane as a separate Cloudflare Pages site.
+# Set VITE_GATEWAY_URL at build time to the Worker API origin for production.
+name = "studio-gateway-ui"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-08-10"

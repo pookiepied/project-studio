@@ -100,7 +100,18 @@ export class TurnSnapshots implements SnapshotHook {
     // write, so the path being written is recorded as touched only afterwards.
     // It is force-added from the following snapshot onward, which is the first
     // one where it exists.
-    this.#pending ??= this.#capture();
+    //
+    // If the capture rejects (Full Auto, `required` true), the rejected promise
+    // is cleared so the next write in the same turn can retry. Otherwise the
+    // first transient failure (lock, disk full) would poison the whole turn
+    // (T-18). When `required` is false the capture resolves to undefined, so
+    // this path is not taken.
+    if (this.#pending === undefined) {
+      this.#pending = this.#capture().catch((error: unknown) => {
+        this.#pending = undefined;
+        throw error;
+      });
+    }
     await this.#pending;
 
     if (kind === "path" && resource !== undefined) {

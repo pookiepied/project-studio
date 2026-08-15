@@ -13,6 +13,11 @@
 
 Studio Harness is currently a local Node.js TypeScript agent-runtime backend, not a complete desktop product. It composes Flue for durable agent execution and conversation state, Pi for model protocols and provider behavior, and Project Studio code for policy, permissions, credentials, model-source selection, native tool implementations, MCP integration, product configuration persistence, snapshots, and observability.
 
+The active completion authority is `tasks/phase-11-mcp/008-phase-1-11-completion.md`.
+It closes Phases 1-11 one dependency at a time, includes all accepted/deferred
+decisions, and excludes visual UI work while requiring stable API and client
+contracts.
+
 The repository contains three separate applications:
 
 | Component | What it is today | Runtime status |
@@ -25,7 +30,7 @@ The strongest implemented path is:
 
 `Flue admission -> durable agent -> Pi model adapter -> model tool call -> MCP sandbox tool -> CallGate -> PermissionKernel/approval -> MCP stdio or Streamable HTTP server -> result -> Flue continuation`
 
-That path is proven by real generated-server and real stdio MCP integration tests in the uncommitted tree. The local control routes now have a global in-memory admission verifier and operation scopes, and the headless launcher owns loopback/readiness; the packaged Host lifecycle is not complete, the desktop does not call them, and the current Gateway Worker does not implement the Harness custom SSE contract.
+That path is proven by real generated-server and real stdio MCP integration tests in the uncommitted tree. The local control routes now have a global in-memory admission verifier and operation scopes, and the headless/Tauri Host and desktop client source seams exist; cargo, packaging, and desktop E2E verification remain open. The current Gateway Worker does not implement the Harness custom SSE contract.
 
 The correct maturity statement is **functionally substantial backend, experimentally integrated MCP, disconnected desktop, and incomplete production boundary**.
 
@@ -41,16 +46,16 @@ The correct maturity statement is **functionally substantial backend, experiment
 | 8 | Auth, secure credentials, local BYOK, application DB | Harness-side implemented; product integration absent | `src/auth/`, `credentials/`, `models/local/`, `storage/`; no desktop/auth-worker integration |
 | 9 | Permission and containment kernel | Foundation implemented; application/isolation edges partial | `src/permissions/`, `src/sandbox/`, `src/tools/gate.ts`; remote OS isolation and grant audit remain open |
 | 10 | Native tools | Libraries and CallGate production wiring implemented in dirty tree | Native families register through `registerNativeTools()`; local/manual posture and later product exposure remain |
-| 11 | MCP client, lifecycle, grants, capabilities, management, wiring | Core P1/P2 remediation and headless listener implemented in dirty tree; formal closure not justified | Auth, recovery, catalog refresh, names/results, credential lifecycle, append-only membership, native wiring, loopback/readiness, and tests landed; packaged Host, OAuth, bundled library, and management-tool scope remain |
+| 11 | MCP client, lifecycle, grants, capabilities, management, wiring | Core P1/P2 remediation and Host/client source seams exist; formal closure not justified | Auth, recovery, catalog refresh, names/results, credential lifecycle, append-only membership, native wiring, loopback/readiness, and focused tests landed; runtime restart proofs, packaging, OAuth, bundled library, and management-tool scope remain |
 | 12 | Skills | Designed only | Generic extension kind exists; no skill loader/executor |
 | 13 | Subagents and tasks | Partial upstream surface | Flue task surface exists; no Project Studio child identity/profile/policy |
 | 14 | Projects, workspaces, sandboxes | Designed beyond snapshots | UI projects are in memory; no product project persistence or Flue binding |
 | 15 | Memory and context | Designed only | `PassthroughContextOptimizer`; no memory store or context assembly engine |
 | 16 | Workflows and schedules | Designed only | No application workflow/schedule code |
 | 17 | Evals | Designed only | No eval subsystem |
-| 18 | Product integration | Not started | Desktop remains on demo hooks; no product projections |
+| 18 | Product integration | API/Host source exists; product integration incomplete | `STUDIO/src/platform/harness/`, Tauri Host, and `useFlueChatSession` exist; cargo/packaging/E2E and product projections remain |
 
-The Phase 11 loose-end rule in `tasks/phase-11-mcp/005-loose-ends.md` requires a source caller, a proving test, and documentation explaining the rule. The dirty tree now satisfies those three for L-06 through L-09; task 007 records the broader P1/P2 remediation. Phase 11 is therefore **functionally advanced but not a clean documented checkpoint** because the packaged listener/Host and deferred Phase 11 surfaces remain.
+The Phase 11 loose-end rule in `tasks/phase-11-mcp/005-loose-ends.md` requires a source caller, a proving test, and documentation explaining the rule. The dirty tree now satisfies those three for L-06 through L-09; task 007 records the broader P1/P2 remediation and Task 008 orders the remaining closure work. Phase 1-11 is therefore **functionally advanced but not a clean completion checkpoint** because runtime/platform proofs, containment decisions, API closure, Gateway contract, and deferred Phase 11 decisions remain.
 
 ## Repository Structure
 

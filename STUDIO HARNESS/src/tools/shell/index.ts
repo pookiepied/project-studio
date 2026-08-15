@@ -107,11 +107,11 @@ function report(
   if (stderr !== "") parts.push(`[stderr]\n${stderr}`);
   if (parts.length === 0) parts.push(`${program} produced no output.`);
 
+  const clipped = clip(parts.join("\n\n"));
   if (result.exitCode !== 0) {
-    parts.push(`[exit code ${result.exitCode}]`);
+    return `${clipped}\n\n[exit code ${result.exitCode}]`;
   }
-
-  return clip(parts.join("\n\n"));
+  return clipped;
 }
 
 export function createShellTool(): ToolDefinition<ShellInput, string> {

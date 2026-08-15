@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { accessSync, constants, statSync } from "node:fs";
 import { basename, delimiter, extname, isAbsolute, join } from "node:path";
 
 import { ToolError } from "../errors.js";
@@ -40,6 +40,16 @@ export interface ResolvedProgram {
 function isFile(path: string): boolean {
   try {
     return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isExecutable(path: string): boolean {
+  if (process.platform === "win32") return isFile(path);
+  try {
+    accessSync(path, constants.X_OK);
+    return isFile(path);
   } catch {
     return false;
   }
@@ -88,7 +98,7 @@ export function resolveProgram(
     if (SHIM_EXTENSIONS.includes(extname(program).toLowerCase())) {
       throw shimRefusal(program, program);
     }
-    if (!isFile(program)) {
+    if (!isExecutable(program)) {
       throw new ToolError("invalid_input", {
         message: `There is no program at ${program}.`,
       });
@@ -137,7 +147,7 @@ export function resolveProgram(
 
     for (const candidateName of candidates) {
       const candidate = join(directory, candidateName);
-      if (isFile(candidate)) return { path: candidate, name };
+      if (isExecutable(candidate)) return { path: candidate, name };
     }
 
     // Remembered but not returned. Finding only a shim is worth a different

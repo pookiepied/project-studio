@@ -11,6 +11,7 @@ import { rowToModelDef } from "../../infra/db.ts";
 import { logger } from "../../observability/logger.ts";
 import { resolveModelAndProvider, getApiKey } from "../../gateway/resolver.ts";
 import { getProviderRuntime } from "../../providers/registry.ts";
+import { markRoutingComplete } from "../../observability/request.ts";
 
 export const videosRoute = new Hono<{ Bindings: Env }>();
 
@@ -20,6 +21,7 @@ videosRoute.post("/videos/generations", async (c) => {
   if (!body || typeof body.model !== "string") throw badRequest("Missing model");
   const modelId = body.model as string;
   const { model, provider } = await resolveModelAndProvider(c.env.DB, modelId);
+  markRoutingComplete(c as never);
   if (model.category !== "video") throw badRequest(`Model ${modelId} is not a video generation model`);
   const apiKey = await getApiKey(c.env.DB, provider.id, c.env.CREDENTIAL_ENCRYPTION_KEY);
   logger.info("videos generations", { provider: provider.id, model: modelId });

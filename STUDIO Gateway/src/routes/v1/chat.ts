@@ -12,6 +12,7 @@ import { getProviderRuntime } from "../../providers/registry.ts";
 import { resolveModelAndProvider, getApiKey, parseReasoning, needsVisionFallback } from "../../gateway/resolver.ts";
 import { rowToModelDef } from "../../infra/db.ts";
 import { isBudgetSupported } from "../../providers/shared/runtime.ts";
+import { markRoutingComplete, updateRequestTelemetry } from "../../observability/request.ts";
 
 export const chatRoute = new Hono<{ Bindings: Env }>();
 
@@ -23,10 +24,12 @@ chatRoute.post("/chat/completions", async (c) => {
 
   const modelId: string = body.model;
   const { model, provider } = await resolveModelAndProvider(c.env.DB, modelId);
+  markRoutingComplete(c as never);
   if (model.category !== "text") throw badRequest(`Model ${modelId} is not a chat model`);
   if (provider.protocol === "openai-responses") throw notImplemented(`Provider ${provider.id} requires the Responses API`);
   const apiKey = await getApiKey(c.env.DB, provider.id, c.env.CREDENTIAL_ENCRYPTION_KEY);
   const stream = body.stream === true;
+  updateRequestTelemetry(c as never, { modelId, stream, reasoningUsed: Boolean(body.reasoning || body.reasoning_effort || body.thinking) });
   logger.info("chat completions", { provider: provider.id, model: modelId, stream });
 
   // Explicit vision guard: image attached to non-vision model → 400 with actionable guidance.

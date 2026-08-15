@@ -21,6 +21,11 @@ import {
   resetRedaction,
 } from "../../src/observability/redaction.js";
 import { REDACTION_RULES } from "../../src/observability/redaction-rules.js";
+import {
+  createChildExecutionContext,
+  createRootExecutionContext,
+  runWithExecutionContext,
+} from "../../src/execution/context.js";
 
 afterEach(async () => {
   await shutdownObservability();
@@ -94,6 +99,28 @@ describe("observability initialization", () => {
 });
 
 describe("structured logger", () => {
+  it("includes execution-family and parent-operation fields", () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      serviceName: "project-studio-v2",
+      serviceVersion: "0.1.0",
+      deploymentEnvironment: "test",
+      write: (line) => lines.push(line),
+    });
+    const root = createRootExecutionContext({ clientId: "client", sessionId: "session" });
+    const child = createChildExecutionContext(root, { kind: "tool" });
+
+    runWithExecutionContext(child, () => logger.info("operation"));
+
+    const record = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
+    expect(record.request_id).toBe(root.requestId);
+    expect(record.operation_id).toBe(child.operationId);
+    expect(record.parent_operation_id).toBe(root.operationId);
+    expect(record.attempt_id).toBe(child.attemptId);
+    expect(record.operation_kind).toBe("tool");
+    expect(record.client_id).toBe("client");
+  });
+
   it("includes trace correlation fields when a span is active", () => {
     const handle = initializeObservability({
       exporter: "memory",

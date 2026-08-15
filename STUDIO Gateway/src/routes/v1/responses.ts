@@ -11,6 +11,7 @@ import { authorizeGateway } from "../../middleware/gatewayAuth.ts";
 import { rowToModelDef } from "../../infra/db.ts";
 import { resolveModelAndProvider, getApiKey, parseReasoning } from "../../gateway/resolver.ts";
 import { getProviderRuntime } from "../../providers/registry.ts";
+import { markRoutingComplete } from "../../observability/request.ts";
 import { isProtocol } from "../../providers/types.ts";
 import { isBudgetSupported } from "../../providers/shared/runtime.ts";
 
@@ -23,6 +24,7 @@ responsesRoute.post("/responses", async (c) => {
   if (!body || typeof body.model !== "string") throw badRequest("Missing model");
   const modelId = body.model as string;
   const { model, provider } = await resolveModelAndProvider(c.env.DB, modelId);
+  markRoutingComplete(c as never);
   if (model.category !== "text") throw badRequest(`Model ${modelId} is not a text generation model`);
   if (!isProtocol(provider.protocol)) throw notImplemented(`Provider ${provider.id} has no supported protocol`);
   const supportsResponses = provider.protocol === "openai-responses" || (provider.id === "openai" && provider.protocol === "openai-completions");

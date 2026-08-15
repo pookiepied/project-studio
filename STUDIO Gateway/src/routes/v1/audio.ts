@@ -11,6 +11,7 @@ import { rowToModelDef } from "../../infra/db.ts";
 import { logger } from "../../observability/logger.ts";
 import { resolveModelAndProvider, getApiKey } from "../../gateway/resolver.ts";
 import { getProviderRuntime } from "../../providers/registry.ts";
+import { markRoutingComplete } from "../../observability/request.ts";
 
 export const audioRoute = new Hono<{ Bindings: Env }>();
 
@@ -30,6 +31,7 @@ async function proxyAudio(c: import("hono").Context<{ Bindings: Env }>, endpoint
   }
   if (!modelId) throw badRequest("Missing model");
   const { model, provider } = await resolveModelAndProvider(c.env.DB, modelId);
+  markRoutingComplete(c as never);
   if (endpoint === "/audio/speech" && model.category !== "speech") throw badRequest(`Model ${modelId} is not a speech model`);
   if (endpoint !== "/audio/speech" && model.category !== "transcription") throw badRequest(`Model ${modelId} is not a transcription model`);
   if (endpoint === "/audio/translations") throw notImplemented("Translation is not exposed as a separate operation — use transcription with language options");

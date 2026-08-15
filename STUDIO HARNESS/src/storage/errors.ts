@@ -59,6 +59,9 @@ export function storageErrorFrom(
   if (/database is locked|SQLITE_BUSY/i.test(message)) {
     return new StorageError("unavailable", { cause: error });
   }
+  if (/SQLITE_FULL|database or disk is full|readonly database|read-only database/i.test(message)) {
+    return new StorageError("unavailable", { cause: error });
+  }
 
   return new StorageError(fallback, { cause: error });
 }

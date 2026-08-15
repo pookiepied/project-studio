@@ -12,9 +12,12 @@ See `documentation/DOC-MAP.md` for the full tree and where a new fact goes.
 The short version, almost always the whole of it:
 
 1. `tasks/delegation/HOUSE-RULES.md` — the constraints.
-2. `tasks/phase-11-mcp/003-work-plan.md` — newest section only, what was just built.
-3. `tasks/phase-11-mcp/005-loose-ends.md` — what to do next.
-4. `STUDIO HARNESS/docs/STATUS.md` — the current snapshot, to sanity-check 2 and 3.
+2. `tasks/phase-11-mcp/008-phase-1-11-completion.md` — the active ordered
+   completion checklist for Phases 1-11.
+3. `tasks/phase-11-mcp/003-work-plan.md` — newest section only, what was just built.
+4. `tasks/phase-11-mcp/005-loose-ends.md` — detailed Phase 11 evidence.
+5. `STUDIO HARNESS/docs/STATUS.md` — the current snapshot, to sanity-check the
+   task against the source.
 
 Everything else — ADRs, `check-later.md`, `KNOWN-ISSUES.md`, `mental-model.md`,
 `architecture.md` — is reference, opened only when one of the four above names
@@ -46,15 +49,16 @@ session:
 | `L-08` honest silence (003.7) | done in task 007 |
 | `L-09` nothing is wired (003.8) | done in task 007; remaining Phase 11 surfaces tracked separately |
 | `L-10` `E-02` harness test times out intermittently | open, instrumented, cause unknown |
-| `L-11` `E-03` raw errors in setup CLI | open, small |
-| `L-12` Harness client admission and local listener boundary | in progress; headless listener/readiness done, Tauri Host pending |
+| `L-11` `E-03` raw errors in setup CLI | done in Task 008 |
+| `L-12` Harness client admission and local listener boundary | source implemented; cargo/desktop E2E verification is a Task 008 gate |
 Verify this table yourself before trusting it — read
 `tasks/phase-11-mcp/005-loose-ends.md` directly. This table is a snapshot and
 will go stale the moment another item closes.
 
-Task `tasks/phase-11-mcp/007-audit-remediation.md` is the active P1/P2
-remediation record. It must remain separate from the intentionally deferred
-Phase 12–18 product work.
+Task `tasks/phase-11-mcp/008-phase-1-11-completion.md` is the active closure
+record. Tasks 005-007 remain supporting evidence. It must remain separate from
+Phase 12-18 product work and must not be closed by silently deferring unresolved
+decisions.
 
 ## 3. What "done" requires, every time, no exceptions
 

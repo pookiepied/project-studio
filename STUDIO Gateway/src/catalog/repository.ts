@@ -7,6 +7,11 @@
 import type { ModelDefinition } from "../providers/types.ts";
 
 export const CATALOG_BATCH_SIZE = 100;
+export const D1_QUERY_BATCH_SIZE = 25;
+// Each catalog upsert binds 28 values. D1's SQLite variable limit applies to
+// the full batch, so 25 statements keeps a transaction below that limit while
+// preserving the larger catalog selection chunk above.
+export const D1_STATEMENT_BATCH_SIZE = 25;
 
 export function prepareUpsertCatalogModel(db: D1Database, model: ModelDefinition, existing: { exposed: number; enabled: number } | null): D1PreparedStatement {
   const exposed = existing?.exposed ?? 0;
@@ -24,7 +29,12 @@ export function prepareUpsertCatalogModel(db: D1Database, model: ModelDefinition
         reasoning_type, reasoning_levels,
         family, lab, open_weights, knowledge_cutoff, catalog_source,
         enabled, exposed, raw_json, fetched_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?
+      )
       ON CONFLICT(provider_id, model_id) DO UPDATE SET
         display_name=excluded.display_name, category=excluded.category,
         input_modalities=excluded.input_modalities, output_modalities=excluded.output_modalities,
@@ -94,13 +104,16 @@ export async function batchUpsertCatalogModels(db: D1Database, models: ModelDefi
     for (let i = 0; i < ids.length; i += CATALOG_BATCH_SIZE) {
       const chunkIds = ids.slice(i, i + CATALOG_BATCH_SIZE);
       const chunkModels = providerModels.slice(i, i + CATALOG_BATCH_SIZE);
-      const placeholders = chunkIds.map(() => "?").join(",");
-      const existingRows = await db
-        .prepare(`SELECT model_id, exposed, enabled FROM models WHERE provider_id = ? AND model_id IN (${placeholders})`)
-        .bind(providerId, ...chunkIds)
-        .all<{ model_id: string; exposed: number; enabled: number }>();
-      const existingMap = new Map<string, { exposed: number; enabled: number }>();
-      for (const r of existingRows.results ?? []) existingMap.set(r.model_id, { exposed: r.exposed, enabled: r.enabled });
+       const existingMap = new Map<string, { exposed: number; enabled: number }>();
+       for (let queryStart = 0; queryStart < chunkIds.length; queryStart += D1_QUERY_BATCH_SIZE) {
+         const queryIds = chunkIds.slice(queryStart, queryStart + D1_QUERY_BATCH_SIZE);
+         const queryPlaceholders = queryIds.map(() => "?").join(",");
+         const existingRows = await db
+           .prepare(`SELECT model_id, exposed, enabled FROM models WHERE provider_id = ? AND model_id IN (${queryPlaceholders})`)
+           .bind(providerId, ...queryIds)
+           .all<{ model_id: string; exposed: number; enabled: number }>();
+         for (const r of existingRows.results ?? []) existingMap.set(r.model_id, { exposed: r.exposed, enabled: r.enabled });
+       }
       const stmts: D1PreparedStatement[] = [];
       for (const m of chunkModels) {
         const existing = existingMap.get(m.id) ?? null;
@@ -109,7 +122,9 @@ export async function batchUpsertCatalogModels(db: D1Database, models: ModelDefi
       if (stmts.length > 0) {
         const batchFn = (db as unknown as { batch?: (stmts: D1PreparedStatement[]) => Promise<unknown> }).batch;
         if (typeof batchFn === "function") {
-          await batchFn.call(db, stmts);
+          for (let batchStart = 0; batchStart < stmts.length; batchStart += D1_STATEMENT_BATCH_SIZE) {
+            await batchFn.call(db, stmts.slice(batchStart, batchStart + D1_STATEMENT_BATCH_SIZE));
+          }
         } else {
           // Fallback for test mocks without batch support
           for (const s of stmts) await s.run();

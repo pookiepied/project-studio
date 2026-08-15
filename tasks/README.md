@@ -22,7 +22,7 @@ Files are grouped by what kind of thing they are, not left flat. Two folders:
 
 | Folder | Holds | Numbered? |
 |---|---|---|
-| `phase-11-mcp/` | One live phase's own progression — design, then the work plan, then what's left | Yes, within the phase: `002-design.md`, `003-work-plan.md`, `005-loose-ends.md` |
+| `phase-11-mcp/` | Phase 11 progression plus the ordered Phase 1-11 completion checklist | Yes, within the phase: `002-design.md`, `003-work-plan.md`, `005-loose-ends.md`, `008-phase-1-11-completion.md` |
 | `delegation/` | `HOUSE-RULES.md` — the standing rules for any delegated work, live regardless of phase | No |
 
 A finished delegated task's own record — what was sent, what came back, what

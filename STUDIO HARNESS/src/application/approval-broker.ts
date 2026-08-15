@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import type { AuthContext } from "../admission/context.js";
+import { createStudioUuid } from "../identity/uuid.js";
 import type {
   PermissionAnswer,
   PermissionApprover,
@@ -37,7 +36,7 @@ export class PermissionApprovalBroker implements PermissionApprover {
     decision: PermissionDecision,
     signal?: AbortSignal,
   ): Promise<PermissionAnswer | undefined> {
-    const id = randomUUID();
+    const id = createStudioUuid();
     if (signal?.aborted) return Promise.resolve(undefined);
     return new Promise((resolve) => {
       const onAbort = (): void => {

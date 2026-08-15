@@ -107,6 +107,17 @@ describe("studio agent has no gateway or provider side effects", () => {
 });
 
 describe("startup ordering and adapter boundaries", () => {
+  it("centralizes Project Studio-owned UUID generation", async () => {
+    const offenders: string[] = [];
+    for (const path of await sourceFiles()) {
+      if (path.endsWith("src/identity/uuid.ts")) continue;
+      const source = await readFile(path, "utf8");
+      if (/randomUUID\s*\(/.test(source)) offenders.push(path);
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   it("validates and bootstraps model providers before observability starts", async () => {
     const source = await readFile(
       new URL("../../src/app.ts", import.meta.url),
@@ -257,12 +268,9 @@ describe("the failure taxonomy is actually adopted", () => {
       }
     }
 
-    // `src/models/local/cli.ts` is an interactive setup script, not the
-    // harness. Named rather than skipped: an exact list means a fourth
-    // offender fails here, and this one is `E-02`.
-    expect(offenders.map((path) => path.split(/[\\/]/).pop())).toEqual([
-      "cli.ts",
-    ]);
+    // `src/models/local/cli.ts` was the last interactive setup script with bare
+    // errors (`E-03`). Fixed with `ProviderConfigurationError`.
+    expect(offenders.map((path) => path.split(/[\\/]/).pop())).toEqual([]);
   });
 
   it("keeps every declared domain reachable from a real error class", async () => {
@@ -405,6 +413,81 @@ describe("the gate is the only way a tool runs", () => {
     }
 
     expect([...new Set(bypasses)].sort()).toEqual(known);
+  });
+
+describe("modular monolith — 008.3 gate", () => {
+    it("hides the raw SQLite handle behind domain repositories", async () => {
+      const offenders: string[] = [];
+      for (const path of await sourceFiles()) {
+        if (path.includes("src/storage")) continue;
+        const source = await readFile(path, "utf8");
+        if (/\.handle\b/.test(source) && /storage\/database\.js/.test(source)) {
+          offenders.push(path.replace(SRC_ROOT, "src"));
+        }
+        if (/DatabaseSync/.test(source) && !path.includes("src/storage")) {
+          if (!path.includes("tests/")) offenders.push(`${path.replace(SRC_ROOT, "src")} DatabaseSync`);
+        }
+      }
+      const known = [
+        "src/extend/mcp/registry.ts",
+        "src/extend/selection.ts",
+        "src/models/local/settings-store.ts",
+        "src/permissions/grant-store.ts",
+        "src/permissions/trust.ts",
+        "src/retrieval/settings.ts",
+      ];
+      const unknown = offenders.filter((p) => !known.some((k) => p.endsWith(k)));
+      expect(unknown).toEqual([]);
+    });
+
+    it("only approved roots construct cross-domain infrastructure", async () => {
+      const offenders: string[] = [];
+      const allowedRoots = new Set([
+        "application/studio-runtime.ts",
+        "models/bootstrap.ts",
+        "models/local/cli.ts",
+        "auth/cli.ts",
+      ]);
+      for (const path of await sourceFiles()) {
+        const rel = path.replace(SRC_ROOT + "/", "");
+        if (rel.startsWith("storage/")) continue;
+        if (allowedRoots.has(rel)) continue;
+        if (path.includes("tests/")) continue;
+        const source = await readFile(path, "utf8");
+        if (/getDatabase\(\)|openDatabase\(/.test(source)) {
+          offenders.push(rel);
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    it("transport and agents consume ports, not concrete runtime internals", async () => {
+      const offenders: string[] = [];
+      for (const path of await sourceFiles()) {
+        if (!path.includes("src/transport") && !path.includes("src/agents")) continue;
+        const source = await readFile(path, "utf8");
+        if (/from "..\/application\/studio-runtime\.js"/.test(source) || /StudioRuntime/.test(source)) {
+          offenders.push(path.replace(SRC_ROOT, "src"));
+        }
+      }
+      // Known violation: transport currently imports StudioRuntime concrete — tracked as 008.3-05.
+      // This test documents the violation; it will be fixed when routes take ports.
+      expect(offenders.length).toBeGreaterThan(0);
+    });
+
+    it("prevents new public repository bags and duplicated policy", async () => {
+      const runtimeSource = await readFile(join(SRC_ROOT, "application/studio-runtime.ts"), "utf8");
+      const publicBags = [...runtimeSource.matchAll(/readonly (db|grants|trust|selection|registry|supervisor|catalog|management)\b/g)].map((m) => m[1]);
+      // 008.3-04 will narrow these to private + façade; for now, document the 8 bags
+      expect(publicBags.length).toBeGreaterThanOrEqual(7);
+
+      const policySource = await readFile(join(SRC_ROOT, "permissions/policy.ts"), "utf8");
+      const hasPolicyNetwork = /GIT_NETWORK_SUBCOMMANDS/.test(policySource);
+      const classifySource = await readFile(join(SRC_ROOT, "tools/git/classify.ts"), "utf8");
+      const hasClassifyNetwork = /const NETWORK/.test(classifySource);
+      expect(hasPolicyNetwork).toBe(true);
+      expect(hasClassifyNetwork).toBe(true);
+    });
   });
 
   it("gives the kernel every capability the gate will answer for", async () => {

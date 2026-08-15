@@ -15,7 +15,7 @@ import { harnessErrorFromUnknown } from "./errors";
 export interface HarnessClient {
   readonly baseUrl: string;
   readonly token: string;
-  send(threadId: string, message: string, signal?: AbortSignal): Promise<SendResult>;
+  send(threadId: string, message: string, signal?: AbortSignal, requestId?: string): Promise<SendResult>;
   history(threadId: string): Promise<ChatMessage[]>;
   observe(threadId: string, onMessages: (messages: ChatMessage[]) => void, signal?: AbortSignal): () => void;
   cancel(threadId: string): Promise<boolean>;
@@ -66,10 +66,11 @@ export async function createHarnessClient(): Promise<HarnessClient> {
     baseUrl: endpoint.url,
     token: endpoint.token,
 
-    async send(threadId: string, message: string, signal?: AbortSignal): Promise<SendResult> {
+    async send(threadId: string, message: string, signal?: AbortSignal, requestId = crypto.randomUUID()): Promise<SendResult> {
       try {
         const admission = await flue.agents.send("studio", threadId, {
           message,
+          idempotencyKey: requestId,
           ...(signal ? { signal } : {}),
         });
         return {

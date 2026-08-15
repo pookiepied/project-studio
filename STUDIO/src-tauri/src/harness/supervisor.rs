@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
-use std::os::unix::io::AsRawFd;
+use std::os::unix::{io::AsRawFd, process::CommandExt};
 
 use command_fds::{CommandFdExt, FdMapping};
 use os_pipe::PipeReader;
@@ -34,7 +34,7 @@ struct Inner {
     start_count: u64,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct HarnessSupervisor {
     inner: Arc<Mutex<Inner>>,
 }
@@ -88,15 +88,18 @@ impl HarnessSupervisor {
     }
 
     pub fn is_running(&self) -> bool {
-        self.inner.lock().unwrap().running.is_some()
+        self.get_endpoint().is_some()
     }
 
     pub fn get_endpoint(&self) -> Option<HarnessEndpoint> {
-        self.inner.lock().unwrap().running.as_ref().map(|r| r.endpoint.clone())
+        let mut guard = self.inner.lock().unwrap();
+        Self::reap_dead_locked(&mut guard);
+        guard.running.as_ref().map(|r| r.endpoint.clone())
     }
 
     pub fn start(&self) -> Result<HarnessEndpoint, String> {
         let mut guard = self.inner.lock().unwrap();
+        Self::reap_dead_locked(&mut guard);
         if guard.running.is_some() {
             return Ok(guard.running.as_ref().unwrap().endpoint.clone());
         }
@@ -197,6 +200,12 @@ impl HarnessSupervisor {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
+        // Put the Harness and every descendant it starts in one process group.
+        // The Host owns the group, not just the Node parent, so an MCP child
+        // cannot survive a Harness crash/restart and retain a port or file.
+        #[cfg(unix)]
+        cmd.process_group(0);
+
         // Map fds: bootstrap_reader -> 4 (read), readiness_writer -> 3 (write)
         // command-fds will handle CLOEXEC and dup2
         let bootstrap_fd_mapping = FdMapping {
@@ -255,7 +264,6 @@ impl HarnessSupervisor {
     ) -> Result<HarnessReadiness, String> {
         let start = Instant::now();
         let mut buf_reader = BufReader::new(reader);
-        let mut line = String::new();
 
         // We need to poll both pipe and child exit. Use non-blocking with timeout.
         // Simplify: set pipe to non-blocking and poll
@@ -368,26 +376,50 @@ impl HarnessSupervisor {
     }
 
     fn terminate_child(child: &mut Child) {
-        // Try SIGTERM then SIGKILL
+        // Try SIGTERM then SIGKILL, addressing the whole process group on Unix.
+        // The root may already have exited, but descendants can still be alive.
         #[cfg(unix)]
         {
-            let pid = nix::unistd::Pid::from_raw(child.id() as i32);
-            let _ = nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM);
-            let start = Instant::now();
-            while start.elapsed() < SHUTDOWN_GRACE {
-                match child.try_wait() {
-                    Ok(Some(_)) => return,
-                    Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-                    Err(_) => break,
+            let pid = child.id() as i32;
+            let group = nix::unistd::Pid::from_raw(-pid);
+            let _ = nix::sys::signal::kill(group, nix::sys::signal::Signal::SIGTERM);
+
+            if child.try_wait().ok().flatten().is_none() {
+                let start = Instant::now();
+                while start.elapsed() < SHUTDOWN_GRACE {
+                    match child.try_wait() {
+                        Ok(Some(_)) => break,
+                        Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+                        Err(_) => break,
+                    }
                 }
             }
-            let _ = nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGKILL);
+
+            let _ = nix::sys::signal::kill(group, nix::sys::signal::Signal::SIGKILL);
+            let _ = child.kill();
             let _ = child.wait();
         }
         #[cfg(not(unix))]
         {
             let _ = child.kill();
             let _ = child.wait();
+        }
+    }
+
+    fn reap_dead_locked(guard: &mut Inner) {
+        let exited = guard
+            .running
+            .as_mut()
+            .and_then(|running| running.child.try_wait().ok().flatten())
+            .is_some();
+
+        if !exited {
+            return;
+        }
+
+        if let Some(mut running) = guard.running.take() {
+            Self::terminate_child(&mut running.child);
+            guard.last_endpoint = Some(running.endpoint);
         }
     }
 

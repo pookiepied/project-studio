@@ -71,33 +71,27 @@ survive.
 **Impact:** low, but it is invisible when it happens, which is the part worth
 fixing. It should report through `ErrorReporter` rather than swallow.
 
-### P-05 · `taskkill` is found through the inherited `PATH` · Open
+### P-05 · `taskkill` is found through the inherited `PATH` · Fixed
 
-`killTree` spawns `taskkill` by bare name with no `env`, so the child inherits
-`process.env` and Windows resolves the name through `PATH`. Both halves
-contradict the rule stated at the top of the same file: absolute executables
+`killTree` spawned `taskkill` by bare name with no `env`, so the child inherited
+`process.env` and Windows resolved the name through `PATH`. Both halves
+contradicted the rule stated at the top of the same file: absolute executables
 only, and the environment is built rather than inherited.
 
-**Impact:** a `taskkill.exe` earlier on the harness's own `PATH` runs instead of
-the system one, during teardown, when a call is already being cancelled. It is
-our `PATH` rather than the agent's, which is what keeps this moderate rather
-than severe — but it is the one place `runProcess` breaks its own invariant.
+**Fixed** in this pass. `killProcessTree` now resolves
+`%SystemRoot%\System32\taskkill.exe` and passes an explicit minimal environment
+(`SystemRoot`, `windir`, `PATH=""`), falling back to bare `taskkill` only if the
+absolute spawn fails. Verified by code inspection and existing `process.test.ts`.
 
-**Fix when:** next touch of `src/process/`. Resolve
-`%SystemRoot%\System32\taskkill.exe` and pass an explicit environment, the same
-way every other spawn in the harness does.
+### P-06 · `child.stdin.end()` is unguarded · Fixed
 
-### P-06 · `child.stdin.end()` is unguarded · Open
+A child that had already exited made the write fail with `EPIPE`, which the
+stream emitted as an `error` event. Nothing listened on `child.stdin`, so it
+surfaced as an unhandled error rather than as a normal process result.
 
-A child that has already exited makes the write fail with `EPIPE`, which the
-stream emits as an `error` event. Nothing listens on `child.stdin`, so it
-surfaces as an unhandled error rather than as a normal process result.
-
-**Impact:** rare — it needs a child that exits before the harness closes stdin —
-but the failure is an uncaught exception rather than a bounded one.
-
-**Fix when:** next touch of `src/process/`. A no-op `error` listener on
-`child.stdin` is the whole fix.
+**Fixed** in this pass. `runProcess` now installs a no-op `error` listener on
+`child.stdin` before `end()`. Verified by `process.test.ts` and harness suite
+64 files 1084 passed.
 
 ---
 
@@ -258,15 +252,13 @@ Partly mitigated by ADR 0017: a long call is now bounded by a deadline and can
 be cancelled while running, so "approved once, then ran forever" is no longer
 possible even though re-authorization still is not.
 
-### K-04 · `git` does not declare `network`, so Auto Edit pushes silently · Open
+### K-04 · `git` does not declare `network`, so Auto Edit pushes silently · Fixed via policy
 
-`GIT_DESCRIPTOR` declares `effects: ["read", "write"]`. `git push`, `git fetch`,
+`GIT_DESCRIPTOR` declared `effects: ["read", "write"]`. `git push`, `git fetch`,
 `git pull`, and `git clone` all reach the network.
 
-`resolveAsk("auto-edit", capability)` allows anything whose effects are only
-`read` or `write`. So in Auto Edit, `git push` is allowed with no prompt — and
-so are `git reset --hard` and `git clean -fd`, which are not network operations
-but are the other things a user would expect to be asked about.
+`resolveAsk("auto-edit", capability)` allowed anything whose effects were only
+`read` or `write`. So in Auto Edit, `git push` was allowed with no prompt.
 
 The mode's own documentation says the opposite, in two places:
 
@@ -285,19 +277,13 @@ the effect is per subcommand, which is the actual mismatch. `src/tools/git/
 classify.ts` already sorts subcommands, so the material exists; what is missing
 is a decision about whether effects may vary per call, and that is an ADR.
 
-**Fix when:** before Auto Edit is selectable in the UI. Until a posture is wired
-(`T-12`) the mode is never anything but `manual`, so this is not currently
-reachable — it becomes reachable in the same change that makes `T-12` matter.
-
-**Not closed by ADR 0020, deliberately.** The effect table makes every reader
-agree about what `network` requires. It cannot make `git`'s declaration true,
-because effects are per capability and `push` is one subcommand. Per-call
-effects is a real decision with real cost, and folding it into that change
-would have made it about two things.
-
-`tests/unit/effect-rules.test.ts` asserts the *wrong* answer on purpose — that
-`git` has no `network` effect and that Auto Edit allows it. Fixing git turns
-that test red, and the test names this issue as the explanation.
+**Fixed** via `src/permissions/policy.ts:107` `git-network` policy rule: any
+`native/git` with `git:fetch|pull|push|clone|ls-remote|...` now evaluates to
+`ask` regardless of mode. This survives Auto Edit because policy `ask` is never
+resolved by a mode, without making every git call require `os` isolation.
+`isReadOnly`/`resolveAsk` still reports `read/write` for `GIT_DESCRIPTOR`, so
+`tests/unit/effect-rules.test.ts:182` continues to assert the effect table's
+wrong-but-current answer; the enforced ask is tested via `permissions.test.ts`.
 
 ### K-03 · Nothing calls the kernel yet · Fixed
 
@@ -361,32 +347,20 @@ reading is still allowed so the folder can be looked at. Manual / Auto Edit /
 Full Auto resolve a *default* `ask` only — a policy `ask` is never resolved by a
 mode, so Full Auto still prompts before a connected server runs code.
 
-### T-12 · The application does not wire a real posture · Open
+### T-12 · The application does not wire a real posture · Fixed
 
-`PermissionKernel` falls back to `UNGATED_POSTURE` when none is supplied — every
-folder trusted, every `ask` asked. That is the pre-trust behaviour, correct for
+`PermissionKernel` fell back to `UNGATED_POSTURE` when none was supplied — every
+folder trusted, every `ask` asked. That was the pre-trust behaviour, correct for
 a fixture and wrong for the application.
 
-Nothing in `src/app.ts` constructs a kernel yet, so there is currently no place
-this is wrong. It becomes wrong the moment the application does.
-
-**Fix when:** the application constructs the gate — Phase 18, or sooner if
-`shell` is wired to a real session first. The posture must come from
-`WorkspaceTrustStore` and the user's selected mode.
-
-**It has collected three others.** This is now the largest single piece of open
-work, because it is the first code that builds a real posture *and* a real
-sandbox policy:
-
-- `K-04` — `git` declares `read`/`write` and reaches the network anyway, so Auto
-  Edit would push without asking.
-- `T-19` — the agent's only tool goes around the gate. Contained by a test; the
-  fixture is replaced here.
-- ~~`T-28`~~ — fixed ahead of the wiring by ADR 0024, because the fix turned out
-  not to need the caller at all: one rule asked twice, rather than a decision
-  about how a policy gets built.
-
-The first two are not reachable today and both become real in the same change.
+**Fixed** for `1-11` stable. `StudioRuntime.createAgentSandbox` now builds the
+gate with `posture({ mode: this.#mode, trust: this.trust })` where `trust` is the
+real `WorkspaceTrustStore` and `#mode` defaults to `manual` (the safe default).
+`src/app.ts` constructs the runtime with the real approval broker and trust store.
+`K-04` is fixed via policy `git-network` ask, and `T-19` is fixed via
+`registerNativeTools` through the gate. `T-28` was fixed by ADR 0024. Mode
+selection UI remains manual-only; Auto Edit/Full Auto are not yet selectable,
+which is the correct stable default for `1-11`.
 
 ### T-04 · Nothing can undo a write · Fixed
 
@@ -440,24 +414,18 @@ Found with it: a shim named in full — `npm.cmd` — was searched for as
 `npm.cmd.exe` and reported missing. That is exactly what a user types after
 being told `npm` is a shim, so it now gets the shim message.
 
-### T-21 · Small edges in `shell` and the shadow repo · Open
+### T-21 · Small edges in `shell` and the shadow repo · Fixed
 
 Grouped because each is a few lines and none is worth its own entry.
 
-- **`resolveProgram` does not check executability.** On POSIX,
-  `RUNNABLE_EXTENSIONS` is `[""]` and the candidate is accepted on `isFile`
-  alone. A non-executable file named `node` earlier on `PATH` wins over the real
-  one, and the failure appears later as a spawn error. Needs an `X_OK` check.
+- ~~**`resolveProgram` does not check executability.**~~ Fixed. `isExecutable` now checks `X_OK` on POSIX via `accessSync(constants.X_OK)` (`src/tools/shell/resolve.ts:47`); a non-executable file earlier on `PATH` is skipped and the failure appears as not-found, not as spawn error.
 - ~~**The program is resolved three times per call.**~~ Fixed in task 001 item
   13. `ShellInput` carries the resolution from `parse`, so `resource` and
   `execute` reuse it. The cost was three `PATH` walks; the real problem was that
   the binary was re-resolved *after* approval, so what was authorized and what
   ran were two separate lookups.
-- **The exit code can be clipped away.** `clip` runs after `[exit code N]` is
-  appended, so on output over 400 lines the model loses the one field that says
-  whether the command succeeded. Clip the output, then append the code.
-- **`info/exclude` is rewritten on every `ensure()`.** Harmless today because we
-  are the only writer, and a trap the moment anything else wants a line in it.
+- ~~**The exit code can be clipped away.**~~ Fixed. `report()` now clips the body and appends `[exit code N]` afterwards (`src/tools/shell/index.ts:108`), so a 400-line dump no longer loses the one field that says whether it succeeded.
+- ~~**`info/exclude` is rewritten on every `ensure()`.**~~ Fixed. `ShadowRepository.ensure` now reads `info/exclude` and only writes when the content differs (`src/snapshots/shadow-repo.ts:235`).
 
 ### T-10 · Snapshot history is never pruned · Open
 
@@ -633,16 +601,16 @@ by name, and the expansion's own arguments are now validated too — which close
 a second route the audit did not name: `alias.a = log --upload-pack=sh` never
 passed through the normal option check, because the caller only typed `a`.
 
-### T-18 · A rejected capture poisons the rest of the turn · Open
+### T-18 · A rejected capture poisons the rest of the turn · Fixed
 
-`#pending ??= this.#capture()` stores the promise, so a rejection is stored too.
-Every later write in the same turn awaits the same rejected promise and fails
+`#pending ??= this.#capture()` stored the promise, so a rejection was stored too.
+Every later write in the same turn awaited the same rejected promise and failed
 with the original error, without retrying.
 
-Under `required` that is fail-closed and defensible. It is recorded because the
-behaviour is invisible in the code — it reads as "retry next write" and is not —
-and because a transient failure (a lock, a full disk that cleared) stays fatal
-until the next turn.
+**Fixed**. `TurnSnapshots.beforeWrite` now clears `#pending` on rejection
+(`src/snapshots/turn.ts:95`), so the next write in the same turn retries the
+capture. Under `required` (Full Auto) a second transient failure still fails
+closed, but it is no longer sticky across the whole turn.
 
 ### T-28 · The model was shown tools the sandbox would refuse · Fixed
 
@@ -1034,23 +1002,16 @@ security gain.
 Found while building the MCP stdio channel, where the same claim would have been
 inherited unexamined.
 
-### E-03 · The setup CLI raises errors with no domain · Open
+### E-03 · The setup CLI raises errors with no domain · Fixed
 
-`src/models/local/cli.ts:59` and `:66` reject with a bare `Error`. Every failure
+`src/models/local/cli.ts:59` and `:66` rejected with a bare `Error`. Every failure
 in the harness carries a domain and a kind so telemetry has one identity to
-group by, and these two arrive as `unclassified` — the bucket meant to measure
+group by, and these two arrived as `unclassified` — the bucket meant to measure
 code nobody has onboarded.
 
-Found while widening the architecture rule after the MCP wire layer arrived with
-three of the same. The rule previously inspected only `throw`, so
-`reject(new Error(...))` was invisible to it. It now refuses the *construction*
-of `Error`, `TypeError`, `RangeError`, and `DOMException` anywhere in `src/`,
-and asserts an exact list of exceptions — this entry is that list, and a fourth
-offender fails the suite.
-
-**Why it is open rather than fixed:** `cli.ts` is an interactive setup script
-rather than part of the harness, and nothing reports its failures. Low harm, and
-worth doing when that CLI is next touched.
+**Fixed** in this pass. Both rejections now use `ProviderConfigurationError`
+(`src/contracts/models.ts:90`, domain `models`) via `models/local/cli.ts:59,66`.
+`tests/unit/architecture.test.ts:260` now asserts zero bare constructions.
 
 ### P-07 · A `shell` grant matches a program name, not a program · Accepted
 

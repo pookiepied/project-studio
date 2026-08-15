@@ -20,6 +20,7 @@ import { createInterface } from "node:readline";
 
 import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
 
+import { ProviderConfigurationError } from "../../contracts/models.js";
 import { KeyringCredentialStore } from "../../credentials/keyring-store.js";
 import { createDomainReporter } from "../../observability/error-reporter.js";
 import { closeDatabase, getDatabase } from "../../storage/database.js";
@@ -56,14 +57,14 @@ function readSecret(message: string): Promise<string> {
       rl.close();
       const trimmed = answer.trim();
       if (trimmed === "") {
-        reject(new Error("No value entered."));
+        reject(new ProviderConfigurationError("No value entered."));
         return;
       }
       resolve(trimmed);
     });
     rl.on("SIGINT", () => {
       rl.close();
-      reject(new Error("Cancelled."));
+      reject(new ProviderConfigurationError("Cancelled."));
     });
   });
 }

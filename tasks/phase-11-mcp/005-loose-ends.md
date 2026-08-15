@@ -3,6 +3,10 @@
 Everything in Phase 11 that is started and not finished, in one place, so that
 "we built the MCP client" cannot be mistaken for "MCP works".
 
+The ordered completion task for all Phases 1-11 is
+`tasks/phase-11-mcp/008-phase-1-11-completion.md`. This file remains the
+Phase 11 evidence register; it is not the complete execution order.
+
 `tasks/phase-11-mcp/003-work-plan.md` is the order of work and the record of *why*.
 This file is the shorter, harsher question: **what is not done.** When an item
 here is finished, cut it to one line pointing at the work plan entry that
@@ -225,12 +229,11 @@ one to call it gone. Not before — closing it on silence is how it comes back.
 
 ---
 
-## L-11 — `E-03`, raw errors in the setup CLI · **small, adjacent**
+## ~~L-11 — `E-03`, raw errors in the setup CLI~~ · **done**
 
-`src/models/local/cli.ts` rejects with bare `Error` in two places. Recorded in
-`KNOWN-ISSUES.md`; listed here because the architecture rule names it as the
-exact remaining offender, and a list of exceptions that grows is a rule that
-stops meaning anything.
+`src/models/local/cli.ts:59,66` now rejects with `ProviderConfigurationError`
+(domain `models`) instead of bare `Error`. `tests/unit/architecture.test.ts:260`
+now asserts zero bare constructions.
 
 ---
 

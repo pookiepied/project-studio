@@ -148,6 +148,7 @@ export class StdioChannel implements McpChannel {
       env: buildEnvironment(options.env),
       // The whole design rests on this staying false.
       shell: false,
+      detached: process.platform !== "win32",
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });

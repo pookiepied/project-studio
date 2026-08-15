@@ -43,6 +43,8 @@ Project Studio/
 |   |   |-- 006-harness-admission.md     The implementation plan for the global
 |   |                                    Harness client boundary and Studio Host.
 |   |   |-- 007-audit-remediation.md     P1/P2 MCP, permission, native, and Gateway fixes
+|   |   |-- 008-phase-1-11-completion.md  The single ordered closure checklist for
+|   |                                    Phases 1-11 and their API boundaries.
 |   |
 |   |-- delegation/                     THE DELEGATION PROCESS, not tied to
 |       |                                any one phase.
@@ -74,8 +76,9 @@ Project Studio/
 |-- STUDIO/                             THE DESKTOP UI. No project docs
 |                                        beyond its own README.md.
 |
-|-- STUDIO Gateway/                      Independent Worker; auth/model-state
-|                                        audit and tests are tracked by task 007.
+|-- STUDIO Gateway/                      Independent Worker; current contract is
+|                                        not the supported Harness backend. Gateway
+|                                        strategy is tracked by Task 008.
 |-- MCP/                                 One file inside has uncommitted,
 |                                        untouched changes that are not
 |                                        this work's. Leave it alone.

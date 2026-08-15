@@ -1,10 +1,9 @@
-import { randomUUID } from "node:crypto";
-
 import {
   capabilityKey,
   type CapabilityId,
   type ExecutionScope,
 } from "../contracts/capabilities.js";
+import { createStudioUuid } from "../identity/uuid.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { storageErrorFrom } from "../storage/errors.js";
 import { matchesResource, patternSpecificity, type ResourceKind } from "./matcher.js";
@@ -172,7 +171,7 @@ export class PermissionGrantStore {
     const key = capabilityKey(id);
     const conversationId = duration === "conversation" ? scope.conversationId : null;
     const grant: GrantRow = {
-      id: randomUUID(),
+      id: createStudioUuid(),
       capability_key: key,
       agent_id: scope.agentId,
       conversation_id: conversationId,

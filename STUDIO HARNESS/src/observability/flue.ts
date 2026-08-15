@@ -2,9 +2,21 @@ import {
   createOpenTelemetryInstrumentation,
   type OpenTelemetryInstrumentation,
 } from "@flue/opentelemetry";
-import { instrument } from "@flue/runtime";
-import type { FlueExecutionInterceptor } from "@flue/runtime";
+import { instrument, type FlueExecutionInterceptor } from "@flue/runtime";
+import type {
+  FlueExecutionContext,
+  FlueExecutionOperation,
+} from "@flue/runtime";
 
+import {
+  createChildExecutionContext,
+  createRootExecutionContext,
+  currentExecutionContext,
+  runWithExecutionContext,
+  type ExecutionContext,
+  type ExecutionOperationKind,
+  type FlueExecutionLinks,
+} from "../execution/context.js";
 import type { ObservabilityConfig } from "./config.js";
 import { redactGenAiContent } from "./redaction.js";
 import { TelemetryError } from "./telemetry-errors.js";
@@ -52,7 +64,7 @@ export async function unregisterFlueInstrumentation(): Promise<void> {
 }
 
 export function registerFlueTurnBoundary(
-  beforeModel: () => Promise<void>,
+  beforeModel: (execution: ExecutionContext) => Promise<void>,
 ): void {
   if (disposeTurnBoundary !== undefined) {
     throw new TelemetryError("already_initialized", {
@@ -60,14 +72,70 @@ export function registerFlueTurnBoundary(
     });
   }
 
-  const interceptor: FlueExecutionInterceptor = async (operation, _context, next) => {
-    if (operation.type === "model") await beforeModel();
-    return next();
+  const interceptor: FlueExecutionInterceptor = async (operation, context, next) => {
+    const execution = executionContextForFlue(operation, context);
+    return runWithExecutionContext(execution, async () => {
+      if (operation.type === "model") await beforeModel(execution);
+      return next();
+    });
   };
   disposeTurnBoundary = instrument({
     key: Symbol("project-studio-turn-boundary"),
     observe: () => undefined,
     interceptor,
     dispose: () => undefined,
+  });
+}
+
+function operationKind(operation: FlueExecutionOperation): ExecutionOperationKind {
+  switch (operation.type) {
+    case "agent":
+      if (operation.operationKind === "task") return "subagent";
+      if (operation.operationKind === "skill") return "skill";
+      return "request";
+    case "model":
+      return "model";
+    case "tool":
+      return "tool";
+    case "task":
+      return "subagent";
+    case "workflow":
+      return "workflow";
+  }
+}
+
+function linksForFlue(
+  operation: FlueExecutionOperation,
+  context: FlueExecutionContext,
+): FlueExecutionLinks {
+  const turnId = context.turnId ?? (operation.type === "model" ? operation.turnId : undefined);
+  const taskId = context.taskId ?? (operation.type === "task" ? operation.taskId : undefined);
+  const operationId =
+    context.operationId ?? (operation.type === "agent" ? operation.operationId : undefined);
+  return {
+    ...(context.submissionId === undefined ? {} : { submissionId: context.submissionId }),
+    ...(context.conversationId === undefined ? {} : { conversationId: context.conversationId }),
+    ...(turnId === undefined ? {} : { turnId }),
+    ...(taskId === undefined ? {} : { taskId }),
+    ...(operationId === undefined ? {} : { operationId }),
+    ...(operation.type === "tool" ? { toolCallId: operation.toolCallId } : {}),
+  };
+}
+
+function executionContextForFlue(
+  operation: FlueExecutionOperation,
+  context: FlueExecutionContext,
+): ExecutionContext {
+  const kind = operationKind(operation);
+  const links = linksForFlue(operation, context);
+  const parent = currentExecutionContext();
+  if (parent !== undefined) return createChildExecutionContext(parent, { kind, flue: links });
+  const requestId = links.submissionId ?? links.conversationId;
+
+  return createRootExecutionContext({
+    kind,
+    ...(requestId === undefined ? {} : { requestId }),
+    requestIdSource: "flue",
+    flue: links,
   });
 }

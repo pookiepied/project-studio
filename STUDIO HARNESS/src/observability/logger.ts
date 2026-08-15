@@ -2,6 +2,7 @@ import { context, trace } from "@opentelemetry/api";
 
 import { safeSerializeValue } from "./errors.js";
 import { redactSensitiveString } from "./redaction.js";
+import { currentExecutionContext } from "../execution/context.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -26,20 +27,34 @@ export interface LoggerOptions {
 }
 
 function correlationFields(): LogFields {
+  const execution = currentExecutionContext();
   const span = trace.getSpan(context.active());
-  if (!span) {
-    return {};
-  }
-
-  const spanContext = span.spanContext();
-  if (!spanContext.traceId || !spanContext.spanId) {
-    return {};
-  }
+  const spanContext = span?.spanContext();
 
   return {
-    trace_id: spanContext.traceId,
-    span_id: spanContext.spanId,
-    trace_flags: spanContext.traceFlags,
+    ...(execution === undefined
+      ? {}
+      : {
+          request_id: execution.requestId,
+          request_id_source: execution.requestIdSource,
+          operation_id: execution.operationId,
+          ...(execution.parentOperationId === undefined
+            ? {}
+            : { parent_operation_id: execution.parentOperationId }),
+          attempt_id: execution.attemptId,
+          operation_kind: execution.kind,
+          ...(execution.clientId === undefined ? {} : { client_id: execution.clientId }),
+          ...(execution.sessionId === undefined ? {} : { session_id: execution.sessionId }),
+          ...(execution.flueSubmissionId === undefined ? {} : { flue_submission_id: execution.flueSubmissionId }),
+          ...(execution.flueConversationId === undefined ? {} : { flue_conversation_id: execution.flueConversationId }),
+          ...(execution.flueTurnId === undefined ? {} : { flue_turn_id: execution.flueTurnId }),
+          ...(execution.flueTaskId === undefined ? {} : { flue_task_id: execution.flueTaskId }),
+          ...(execution.flueOperationId === undefined ? {} : { flue_operation_id: execution.flueOperationId }),
+          ...(execution.flueToolCallId === undefined ? {} : { flue_tool_call_id: execution.flueToolCallId }),
+        }),
+    ...(spanContext?.traceId === undefined ? {} : { trace_id: spanContext.traceId }),
+    ...(spanContext?.spanId === undefined ? {} : { span_id: spanContext.spanId }),
+    ...(spanContext === undefined ? {} : { trace_flags: spanContext.traceFlags }),
   };
 }
 

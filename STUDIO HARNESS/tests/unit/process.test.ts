@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -203,4 +203,26 @@ describe("a run is bounded", () => {
   it("refuses to start when the signal is already aborted", async () => {
     await expect(node("0", { signal: AbortSignal.abort() })).rejects.toThrow(/cancelled/i);
   });
+
+  it.runIf(process.platform !== "win32")(
+    "kills descendants with the process group on forced termination",
+    async () => {
+      const marker = join(workspace, "orphan-marker.txt");
+      const childScript = `
+        const { writeFileSync } = await import("node:fs");
+        setTimeout(() => writeFileSync(${JSON.stringify(marker)}, "orphan"), 1_000);
+      `;
+      const parentScript = `
+        const { spawn } = await import("node:child_process");
+        spawn(process.execPath, ["--input-type=module", "-e", ${JSON.stringify(childScript)}], {
+          stdio: "ignore",
+        });
+        setTimeout(() => {}, 30_000);
+      `;
+
+      await expect(node(parentScript, { timeoutMs: 250 })).rejects.toThrow(/took too long/i);
+      await new Promise((resolve) => setTimeout(resolve, 1_250));
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
 });

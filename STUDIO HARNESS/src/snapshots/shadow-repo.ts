@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { runProcess } from "../process/exec.js";
@@ -232,8 +232,15 @@ export class ShadowRepository {
       await this.expect(["init", "--quiet"], "store_failed", signal);
     }
 
+    const excludePath = join(this.gitDir, "info", "exclude");
     try {
-      writeFileSync(join(this.gitDir, "info", "exclude"), EXCLUDE_FLOOR, "utf8");
+      let existing: string | undefined;
+      try {
+        existing = readFileSync(excludePath, "utf8");
+      } catch {}
+      if (existing !== EXCLUDE_FLOOR) {
+        writeFileSync(excludePath, EXCLUDE_FLOOR, "utf8");
+      }
     } catch (error) {
       throw new SnapshotError("store_failed", { cause: error });
     }

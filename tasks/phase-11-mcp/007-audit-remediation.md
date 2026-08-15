@@ -1,6 +1,7 @@
 # Task 007 - Phase 0–11 Audit Remediation
 
-**Status:** in progress
+**Status:** supporting audit record; active closure order is
+`tasks/phase-11-mcp/008-phase-1-11-completion.md`.
 
 **Scope:** close the Harness MCP/permission P1 and P2 findings without starting
 Skills, connectors, planner, memory, artifacts/projects, remote sandbox, MCP
@@ -58,7 +59,7 @@ OAuth, or the bundled MCP library.
   compatible with the independent Gateway API by ADR 0031; contract translation
   is a separate deferred decision.
 
-## Exit Gates
+## Supporting Exit Gates
 
 - P1/P2 Harness regression tests and real MCP stdio/Streamable HTTP tests pass.
 - Gateway auth/model-state tests pass.

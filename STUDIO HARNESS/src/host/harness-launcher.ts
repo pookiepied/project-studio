@@ -96,6 +96,7 @@ export async function launchHarness(
     cwd,
     env: environment,
     shell: false,
+    detached: process.platform !== "win32",
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe", "pipe", "pipe"],
   });

@@ -29,7 +29,7 @@ rand = "0.8"
 os_pipe = "1.2"
 command-fds = "0.2"
 libc = "0.2"
-nix = { version = "0.27", features = ["process"] }
+nix = { version = "0.27", features = ["process", "signal"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # DWM round-corner attribute for the outer window edge.

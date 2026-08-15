@@ -9,7 +9,7 @@ import { verifyGatewayKey } from "../infra/db.ts";
 import { unauthorized, forbidden } from "../lib/errors.ts";
 import type { Env } from "../index.ts";
 
-export async function verifyGatewayBearer(db: D1Database, authHeader: string | null): Promise<{ keyId: string; rpm: number } | null> {
+export async function verifyGatewayBearer(db: D1Database, authHeader: string | null): Promise<{ keyId: string; keyName?: string; rpm: number } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const raw = authHeader.slice(7).trim();
   if (!raw.startsWith("sk-gw_")) return null;
@@ -17,7 +17,7 @@ export async function verifyGatewayBearer(db: D1Database, authHeader: string | n
   const row = await verifyGatewayKey(db, hash);
   if (!row) return null;
   // Update last_used_at async (fire and forget)
-  return { keyId: row.id, rpm: row.rate_limit_rpm };
+  return { keyId: row.id, keyName: row.name, rpm: row.rate_limit_rpm };
 }
 
 function isDevelopment(environment: string | undefined): boolean {
@@ -33,7 +33,7 @@ export async function requireGatewayBearer(
   db: D1Database,
   authHeader: string | null,
   environment: string | undefined,
-): Promise<{ keyId: string; rpm: number } | null> {
+): Promise<{ keyId: string; keyName?: string; rpm: number } | null> {
   const verified = await verifyGatewayBearer(db, authHeader);
   const keyCount = await db
     .prepare("SELECT COUNT(*) as cnt FROM gateway_keys WHERE enabled = 1")

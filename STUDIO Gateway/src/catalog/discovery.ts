@@ -19,11 +19,18 @@ const STATIC_MODELS: Record<string, ModelDefinition[]> = {
   elevenlabs: ELEVENLABS_STATIC_MODELS,
 };
 
-export async function runDiscovery(db: D1Database, env: { CREDENTIAL_ENCRYPTION_KEY?: string }): Promise<{ discovered: number; errors: string[] }> {
+export async function runDiscovery(
+  db: D1Database,
+  env: { CREDENTIAL_ENCRYPTION_KEY?: string },
+  providerId?: string,
+): Promise<{ discovered: number; errors: string[] }> {
   let total = 0;
   const errors: string[] = [];
 
-  const providers = await db.prepare("SELECT * FROM providers WHERE enabled = 1").all<{
+  const providerQuery = providerId
+    ? db.prepare("SELECT * FROM providers WHERE enabled = 1 AND id = ?").bind(providerId)
+    : db.prepare("SELECT * FROM providers WHERE enabled = 1");
+  const providers = await providerQuery.all<{
     id: string;
     name: string;
     base_url: string;

@@ -12,7 +12,10 @@ export const adminProvidersRoute = new Hono<{ Bindings: Env }>();
 
 adminProvidersRoute.get("/providers", async (c) => {
   requireAdmin(c as never);
-  const rows = await c.env.DB.prepare("SELECT * FROM providers ORDER BY id ASC").all();
+  const rows = await c.env.DB.prepare(
+    "SELECT providers.*, CASE WHEN provider_credentials.provider_id IS NULL THEN 0 ELSE 1 END AS credential_configured " +
+      "FROM providers LEFT JOIN provider_credentials ON provider_credentials.provider_id = providers.id ORDER BY providers.id ASC",
+  ).all();
   return c.json({ data: rows.results });
 });
 
@@ -50,8 +53,16 @@ adminProvidersRoute.patch("/providers/:id", async (c) => {
     vals.push(body.enabled ? 1 : 0);
   }
   if (typeof body.base_url === "string") {
+    const raw = body.base_url.trim();
+    if (!raw) throw badRequest("base_url cannot be empty");
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("invalid protocol");
+    } catch {
+      throw badRequest("base_url must be a valid http(s) URL");
+    }
     sets.push("base_url = ?");
-    vals.push(body.base_url);
+    vals.push(raw);
   }
   if (sets.length === 0) throw badRequest("No fields to update");
   sets.push("updated_at = ?");

@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
+import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -164,6 +165,20 @@ async function stopHarness(child: ChildProcess): Promise<void> {
   processes.delete(child);
 }
 
+async function killHarness(child: ChildProcess): Promise<void> {
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill("SIGKILL");
+    await new Promise<void>((resolve) => {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        resolve();
+        return;
+      }
+      child.once("exit", () => resolve());
+    });
+  }
+  processes.delete(child);
+}
+
 async function createDatabasePath(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "project-studio-v2-"));
   temporaryDirectories.add(directory);
@@ -291,5 +306,152 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(result.text).toBe("Echo: survive restart");
     },
     90_000,
+  );
+
+  it(
+    "recovers after SIGKILL without duplicating the completed conversation",
+    async () => {
+      const databasePath = await createDatabasePath();
+      const firstServer = await startHarness(databasePath);
+      const firstClient = new FlueHarnessClient({
+        baseUrl: firstServer.baseUrl,
+        token: firstServer.token,
+      });
+      const accepted: AcceptedRun = await firstClient.send(
+        "hard-restart",
+        "[slow] survive hard restart",
+      );
+
+      // The admission response proves the submission is durable before the
+      // process is removed without running its shutdown handlers.
+      await killHarness(firstServer.process);
+
+      const replacement = await startHarness(databasePath);
+      const replacementClient = new FlueHarnessClient({
+        baseUrl: replacement.baseUrl,
+        token: replacement.token,
+      });
+      const resumedRun = {
+        ...accepted,
+        streamUrl: `${replacement.baseUrl}/agents/studio/hard-restart`,
+      };
+
+      expect((await replacementClient.wait(resumedRun)).text).toBe(
+        "Echo: survive hard restart",
+      );
+
+      const history = await replacementClient.history("hard-restart");
+      const rendered = history.messages.map(textFromMessage);
+      expect(rendered.filter((text) => text === "Echo: survive hard restart")).toHaveLength(1);
+
+      for (const path of [databasePath, join(dirname(databasePath), "studio.db")]) {
+        const database = new DatabaseSync(path);
+        try {
+          expect(database.prepare("PRAGMA integrity_check").get()).toEqual({
+            integrity_check: "ok",
+          });
+        } finally {
+          database.close();
+        }
+      }
+    },
+    90_000,
+  );
+
+  it(
+    "keeps Flue execution state separate from application state across a cold start",
+    async () => {
+      const databasePath = await createDatabasePath();
+      const studioDatabasePath = join(dirname(databasePath), "studio.db");
+      const firstServer = await startHarness(databasePath);
+      const firstClient = new FlueHarnessClient({
+        baseUrl: firstServer.baseUrl,
+        token: firstServer.token,
+      });
+
+      await firstClient.wait(await firstClient.send("separation", "persist this"));
+      await stopHarness(firstServer.process);
+
+      const flueDatabase = new DatabaseSync(databasePath);
+      const studioDatabase = new DatabaseSync(studioDatabasePath);
+      try {
+        const studioTables = studioDatabase
+          .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+          .all() as Array<{ name: string }>;
+        const flueTables = flueDatabase
+          .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+          .all() as Array<{ name: string }>;
+
+        expect(studioTables.map((table) => table.name)).toContain("schema_migration");
+        expect(studioTables.map((table) => table.name)).toContain("app_setting");
+        expect(flueTables.map((table) => table.name)).not.toContain("schema_migration");
+        expect(flueTables.map((table) => table.name)).not.toContain("app_setting");
+      } finally {
+        flueDatabase.close();
+        studioDatabase.close();
+      }
+
+      const replacement = await startHarness(databasePath);
+      const history = await new FlueHarnessClient({
+        baseUrl: replacement.baseUrl,
+        token: replacement.token,
+      }).history("separation");
+      expect(history.messages.map(textFromMessage)).toContain("persist this");
+    },
+    30_000,
+  );
+
+  it(
+    "returns the same admission for an exact idempotency-key replay",
+    async () => {
+      const databasePath = await createDatabasePath();
+      const running = await startHarness(databasePath);
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+      const requestId = "9ad0d7ba-8c2f-4d27-8e17-4c4a9e4e2c18";
+
+      const first = await client.send("idempotent", "same request", requestId);
+      const replay = await client.send("idempotent", "same request", requestId);
+
+      expect(replay.submissionId).toBe(first.submissionId);
+      expect(typeof replay.offset).toBe("string");
+      // Same logical request must not create a second turn.
+      expect((await client.wait(first)).text).toBe("Echo: same request");
+      const history = await client.history("idempotent");
+      expect(history.messages.filter((message) => message.role === "user")).toHaveLength(1);
+      await expect(client.send("idempotent", "different request", requestId)).rejects.toThrow();
+    },
+    60_000,
+  );
+
+  it(
+    "does not rewrite Flue state when application database startup fails",
+    async () => {
+      const databasePath = await createDatabasePath();
+      const studioDatabasePath = join(dirname(databasePath), "studio.db");
+      const firstServer = await startHarness(databasePath);
+      const firstClient = new FlueHarnessClient({
+        baseUrl: firstServer.baseUrl,
+        token: firstServer.token,
+      });
+
+      await firstClient.wait(await firstClient.send("failure-isolation", "keep this"));
+      await stopHarness(firstServer.process);
+
+      const validStudioDatabase = await readFile(studioDatabasePath);
+      const corruptStudioDatabase = Buffer.from("not a SQLite database\n", "utf8");
+      await writeFile(studioDatabasePath, corruptStudioDatabase);
+
+      await expect(startHarness(databasePath)).rejects.toThrow(/exited during startup/i);
+      expect(await readFile(studioDatabasePath)).toEqual(corruptStudioDatabase);
+
+      await writeFile(studioDatabasePath, validStudioDatabase);
+      const replacement = await startHarness(databasePath);
+      const history = await new FlueHarnessClient({
+        baseUrl: replacement.baseUrl,
+        token: replacement.token,
+      }).history("failure-isolation");
+      expect(history.messages.map(textFromMessage)).toContain("keep this");
+    },
+    30_000,
   );
 });

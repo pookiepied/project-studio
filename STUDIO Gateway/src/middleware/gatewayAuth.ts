@@ -9,6 +9,7 @@ import { requireGatewayBearer } from "./auth.ts";
 import { checkRateLimit, MILLISECONDS_PER_SECOND } from "../lib/ratelimit.ts";
 import { rateLimited } from "../lib/errors.ts";
 import type { Env } from "../index.ts";
+import { updateRequestTelemetry } from "../observability/request.ts";
 
 export async function authorizeGateway(c: Context<{ Bindings: Env }>): Promise<{ keyId: string; rpm: number } | null> {
   const authHeader = c.req.header("authorization") ?? null;
@@ -25,6 +26,7 @@ export async function authorizeGateway(c: Context<{ Bindings: Env }>): Promise<{
       throw rateLimited("Rate limit exceeded", { limit: rl.limit, remaining: rl.remaining, resetAt: rl.resetAt });
     }
     c.executionCtx.waitUntil(c.env.DB.prepare("UPDATE gateway_keys SET last_used_at = ? WHERE id = ?").bind(Date.now(), verified.keyId).run());
+    updateRequestTelemetry(c as never, { gatewayKeyId: verified.keyId, gatewayKeyName: verified.keyName });
   }
   return verified;
 }

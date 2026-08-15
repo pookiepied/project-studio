@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -71,9 +71,15 @@ export function openDatabase(options: OpenDatabaseOptions = {}): StudioDatabase 
   try {
     if (path !== ":memory:") {
       mkdirSync(dirname(path), { recursive: true });
+      if (existsSync(path) && statSync(path).size === 0) {
+        throw new StorageError("migration", {
+          message: `The Project Studio database at ${path} is empty and cannot be recovered safely.`,
+        });
+      }
     }
     handle = new DatabaseSync(path);
   } catch (error) {
+    if (error instanceof StorageError) throw error;
     // The path is named because "could not be opened" with no location is
     // undiagnosable, and a database path is configuration, not a secret.
     throw new StorageError("unavailable", {

@@ -2,6 +2,11 @@
 
 ## Audit Scope
 
+**Current closure authority:** `tasks/phase-11-mcp/008-phase-1-11-completion.md`.
+This checkpoint remains the historical issue register; its states must be
+reconciled against Task 008, current source, and current tests before Phase 1-11
+is called complete.
+
 - Audit date: 2026-08-13.
 - Branch: `task/phase-11-mcp-l-06`.
 - `HEAD`: `4a4df87`; current tree has uncommitted Phase 11 changes.

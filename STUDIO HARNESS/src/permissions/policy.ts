@@ -7,6 +7,19 @@ import { hasElevatedEffect, isReadOnly } from "../contracts/effects.js";
 import { matchesResource, type ResourceKind } from "./matcher.js";
 import type { PermissionScope } from "./scopes.js";
 
+const GIT_NETWORK_SUBCOMMANDS = new Set([
+  "fetch",
+  "pull",
+  "push",
+  "clone",
+  "ls-remote",
+  "remote",
+  "submodule",
+  "request-pull",
+  "send-pack",
+  "fetch-pack",
+]);
+
 /**
  * What the kernel concluded, and why.
  *
@@ -102,6 +115,23 @@ export const BASE_POLICY: readonly PolicyRule[] = [
       capability.provenance.author === "third-party" && hasElevatedEffect(capability)
         ? "ask"
         : undefined,
+  },
+  {
+    id: "git-network",
+    reason: "Git reaching the network always needs approval.",
+    // K-04: `git` declares `read`/`write` so Auto Edit would push without
+    // asking. Rather than declare every git call `network` (which would refuse
+    // `git log` on LocalSandbox), force the network subcommands to ask via
+    // policy. This survives Auto Edit because policy `ask` is never resolved
+    // by a mode. Duplicated from `tools/git/classify.ts` to avoid a layer
+    // inversion between permissions and tools.
+    evaluate: ({ capability, resource }) => {
+      if (capabilityKey(capability.id) !== "native/git") return undefined;
+      const subcommand = (resource ?? "").startsWith("git:")
+        ? (resource as string).slice(4)
+        : "";
+      return GIT_NETWORK_SUBCOMMANDS.has(subcommand) ? "ask" : undefined;
+    },
   },
 ];
 

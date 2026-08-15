@@ -9,6 +9,7 @@ import { createHttpApp } from "../../src/transport/http/create-app.js";
 import {
   authContext,
   createAdmissionMiddleware,
+  executionContext,
   requireAdmissionScope,
   type AdmissionEnv,
 } from "../../src/transport/http/middleware/admission.js";
@@ -55,6 +56,35 @@ describe("Harness HTTP admission", () => {
 
     expect(response.status).toBe(403);
     expect(entered).toBe(0);
+  });
+
+  it("creates one request execution context after admission", async () => {
+    const session = createAdmissionSession({ clientId: "desktop", sessionId: "session-1" });
+    const app = new Hono<AdmissionEnv>();
+    app.use("*", createAdmissionMiddleware(session.verifier));
+    app.get("/probe", (context) => {
+      const execution = executionContext(context);
+      return context.json({
+        requestId: execution.requestId,
+        clientId: execution.clientId,
+        sessionId: execution.sessionId,
+      });
+    });
+    const requestId = "6f5e6e6c-3a3a-4b12-9c55-1d253ce34db0";
+
+    const response = await app.request("http://harness.test/probe", {
+      headers: {
+        authorization: `Bearer ${session.credential}`,
+        "X-Project-Studio-Request-Id": requestId,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      requestId,
+      clientId: "desktop",
+      sessionId: "session-1",
+    });
   });
 
   it("places one admission boundary before Flue, MCP, and permission routes", async () => {

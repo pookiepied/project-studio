@@ -1,4 +1,4 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 import type { AuthContext, ClientType } from "./context.js";
 import {
@@ -8,6 +8,7 @@ import {
 } from "./credential.js";
 import { AdmissionError } from "./errors.js";
 import { ALL_ADMISSION_SCOPES, type AdmissionScope } from "./scopes.js";
+import { createStudioUuid } from "../identity/uuid.js";
 
 export interface AdmissionSessionOptions {
   readonly credential?: AdmissionCredential;
@@ -106,7 +107,7 @@ export function createAdmissionSession(
   options: AdmissionSessionOptions = {},
 ): AdmissionSession {
   const clientId = validIdentity(options.clientId, "studio");
-  const sessionId = validIdentity(options.sessionId, randomUUID());
+  const sessionId = validIdentity(options.sessionId, createStudioUuid());
   const scopes = options.scopes ?? ALL_ADMISSION_SCOPES;
   const credential = options.credential ?? createAdmissionCredential();
   const context = immutableContext({
