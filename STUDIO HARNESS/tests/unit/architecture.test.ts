@@ -515,6 +515,26 @@ describe("modular monolith — 008.3 gate", () => {
       expect(offenders).toEqual([]);
     });
 
+    it("keeps no process-wide connection in the storage module", async () => {
+      // The check above skips `src/storage`, so on its own it would not notice
+      // the singleton coming back to the exact file it was removed from — and
+      // that is where it lived. This is the assertion that protects #24: the
+      // module may open connections, never hold one.
+      const source = await readFile(join(SRC_ROOT, "storage/database.ts"), "utf8");
+      const code = source.replace(/\/\*\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+      // A module-level mutable binding of the database type is the shape a
+      // shared connection takes, whatever it ends up being called.
+      const moduleState = [
+        ...code.matchAll(/^(?:let|var)\s+(\w+)\s*:\s*StudioDatabase/gm),
+      ].map((match) => match[1] as string);
+      expect(moduleState).toEqual([]);
+
+      // And no ambient accessor handing one out.
+      expect(/export function getDatabase\b/.test(code)).toBe(false);
+      expect(/export function closeDatabase\b/.test(code)).toBe(false);
+    });
+
     it("does not let transport or agents reach past the runtime façade", async () => {
       const offenders: string[] = [];
 

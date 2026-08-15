@@ -33,8 +33,14 @@ future features, and they live in §5 rather than as open issues.
 ### Solved — 24
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
-Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1134
+Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1137
 passed, 2 skipped, 0 failed**; `tsc --noEmit` clean; `flue build` clean.
+
+**Mutation-verified.** Each fix was reverted in place and the suite re-run to
+confirm a test actually catches it. Eleven mutations: nine caught first time,
+two survived and are recorded below (#28, #29) — #29 now has a test, #28 is
+marked uncovered rather than claimed. One further gap found and closed: nothing
+prevented the storage singleton returning to the file it was removed from.
 
 | # | Issue | Proof |
 |---|---|---|
@@ -56,10 +62,10 @@ passed, 2 skipped, 0 failed**; `tsc --noEmit` clean; `flue build` clean.
 | 22 | Transport and agents took the concrete runtime. | `f25d715`; transport takes `McpAdministration`; agents whitelist is `["agents/studio.ts"]`, a framework boundary per ADR 0035 §6 |
 | 23 | `app_setting` written by two domains. | `14b36df`; `AppSettings` owns it; table-ownership whitelist is `[]` |
 | 24 | Global singletons in `storage/database.ts`. | `f25d715`; `getDatabase`/`closeDatabase` deleted |
-| 25 | Corrupt `studio.db` did not abort startup. | `f25d715`; the fixture was wrong, not the code — see #43. Sidecars removed; hot-WAL recovery given its own test |
+| 25 | Corrupt `studio.db` did not abort startup. | `f25d715`; **caused by #63** — with no graceful shutdown the WAL was never checkpointed, so a hot `-wal` survived and SQLite recovered from it. Fixing shutdown removes the stale sidecars; the test also removes them so it does not depend on that. Recovery and refusal each have a test in `storage.test.ts` (`e0f...` mutation-verified) |
 | 26 | `mcp-runtime.test.ts` stdio tool through the gate failed. | `f25d715`; never an MCP failure — `stop()` returned while children were alive. See #64 |
 | 27 | `outcomes.ts:35` accepted `idempotent` and never read it. | `e9a018e`; folded the dead `isRetryableForUnknown` into `outcomeFor` |
-| 28 | `bounds.ts:84` — `signal.reason` not wrapped as `ToolError`. | `e9a018e`; the live defect was the bare `catch` reporting queue faults as timeouts |
+| 28 | `bounds.ts:84` — `signal.reason` not wrapped as `ToolError`. | `e9a018e`; translation to `ToolError` is covered and mutation-verified. The added `!signal.aborted` guard is **unreachable today and has no test** — marked as such in the source rather than counted as covered |
 | 29 | `StudioRuntime` used `any` in `ModelToolResult`. | `e9a018e`; typed to text/image, and unsupported MCP blocks now degrade to text |
 | 63 | No graceful shutdown on Windows. | `f25d715`; `SIGINT`/`SIGBREAK` + IPC `shutdown`; proven by a no-hot-WAL test |
 | 64 | `stop()` returned with MCP children alive. | `f25d715`; `stop`/`stopAll`/`stop(id)` await real process exit |

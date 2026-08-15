@@ -239,6 +239,11 @@ export class CallBounds {
       // Only an abort is an ended call. A bare `catch` also caught a defect in
       // the permit queue and reported it to the model as a timeout, which is
       // both untrue and unreportable: the real error never reached a log.
+      //
+      // **No test covers this line**, and none can: `Permits` rejects only on
+      // abort, so today it is unreachable. It is a guard against a future
+      // change to the queue, kept deliberately and marked so nobody reads the
+      // green suite as evidence that it works.
       if (!signal.aborted) throw error;
       throw endedError(descriptor, reason(), false);
     }

@@ -27,11 +27,25 @@ function handle(message) {
         name: "echo",
         description: "Echo the supplied text",
         inputSchema: { type: "object", properties: { text: { type: "string" } } },
+      }, {
+        name: "resource",
+        description: "Return an MCP resource block",
+        inputSchema: { type: "object", properties: {} },
       }],
     });
     return;
   }
   if (message.method === "tools/call") {
+    if (message.params.name === "resource") {
+      // A valid MCP block kind the agent loop cannot represent.
+      reply(message.id, {
+        content: [{
+          type: "resource",
+          resource: { uri: "file:///notes.txt", mimeType: "text/plain", text: "from a resource" },
+        }],
+      });
+      return;
+    }
     reply(message.id, {
       content: [{ type: "text", text: message.params.arguments.text }],
     });
@@ -123,6 +137,15 @@ describe("MCP application runtime", () => {
         },
         { type: "text", text: "hello" },
       ]);
+
+      // MCP defines block kinds the agent loop does not accept. Forwarding one
+      // raw put a shape into the transcript that the loop cannot represent;
+      // it must arrive as readable text instead.
+      const resourceTool = tools.find((tool) => tool.name === "mcp__11_echo-server__8_resource");
+      expect(resourceTool).toBeDefined();
+      const resourceResult = await resourceTool?.execute("call-resource", {});
+      expect(resourceResult?.content.every((block) => block.type === "text")).toBe(true);
+      expect(JSON.stringify(resourceResult?.content)).toContain("from a resource");
 
       runtime.servers.setEnabled(runtime.projectId, "echo-server", false, AUTH_CONTEXT);
       await runtime.reconcile();

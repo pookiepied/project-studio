@@ -21,6 +21,7 @@ import {
 } from "../../src/storage/migrations.js";
 
 const opened: StudioDatabase[] = [];
+const directories: string[] = [];
 
 function open(): StudioDatabase {
   const db = openDatabase({ path: ":memory:" });
@@ -31,6 +32,10 @@ function open(): StudioDatabase {
 afterEach(() => {
   while (opened.length > 0) {
     opened.pop()?.close();
+  }
+  while (directories.length > 0) {
+    const directory = directories.pop();
+    if (directory !== undefined) rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -391,4 +396,50 @@ describe("startup failure containment", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   }, 15_000);
+});
+
+describe("a corrupt database, and what is not one", () => {
+  function scratch(): string {
+    const directory = mkdtempSync(join(tmpdir(), "studio-wal-"));
+    directories.push(directory);
+    return join(directory, "studio.db");
+  }
+
+  it("refuses to open a corrupt file when nothing can recover it", () => {
+    const path = scratch();
+    const seed = new DatabaseSync(path);
+    seed.exec("PRAGMA journal_mode = WAL");
+    seed.exec("CREATE TABLE t (x INTEGER)");
+    // A clean close checkpoints and removes the sidecars, so this leaves the
+    // main file alone on disk — the genuine corruption case.
+    seed.close();
+    writeFileSync(path, "not a SQLite database\n");
+
+    expect(() => openDatabase({ path })).toThrow(StorageError);
+  });
+
+  it("recovers from a hot WAL rather than treating it as corruption", () => {
+    // The behaviour that made the harness integration test read backwards for
+    // months: a `-wal` surviving beside an overwritten main file is not a
+    // corrupt database. SQLite replays the log and rebuilds a valid header.
+    // That is correct, and it is why a test asserting "corrupt" must remove
+    // the sidecars — see `harness.test.ts`.
+    const path = scratch();
+    const seed = new DatabaseSync(path);
+    seed.exec("PRAGMA journal_mode = WAL");
+    seed.exec("CREATE TABLE t (x INTEGER)");
+    seed.exec("INSERT INTO t VALUES (1)");
+    const wal = readFileSync(`${path}-wal`);
+    const shm = readFileSync(`${path}-shm`);
+    seed.close();
+
+    writeFileSync(path, "not a SQLite database\n");
+    writeFileSync(`${path}-wal`, wal);
+    writeFileSync(`${path}-shm`, shm);
+
+    const recovered = new DatabaseSync(path);
+    const row = recovered.prepare("SELECT COUNT(*) AS n FROM t").get();
+    expect(row).toEqual({ n: 1 });
+    recovered.close();
+  });
 });
