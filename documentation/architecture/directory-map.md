@@ -2,7 +2,8 @@
 
 Root-level shape of the repo and how the two halves fit together. Reasoning is
 in [mental-model.md](./mental-model.md); the harness's own ADRs in
-`STUDIO HARNESS/docs/decisions/` are authoritative for anything inside it.
+[`documentation/decisions/`](../decisions/README.md) are authoritative for
+anything inside it.
 
 ---
 
@@ -41,7 +42,7 @@ standalone, it runs headless, and it can serve a web build. The cost is a
 sidecar process to supervise. Worth it.
 
 The client admission and local-access boundary is defined in
-`STUDIO HARNESS/docs/decisions/0028-harness-client-admission-and-local-access.md`.
+[`documentation/decisions/0028-harness-client-admission-and-local-access.md`](../decisions/0028-harness-client-admission-and-local-access.md).
 The target is one global Harness admission middleware, a per-launch in-memory
 credential, an explicit loopback listener, and a Studio Host that owns the
 Harness process. Optional browser access belongs to a separate frontend gateway;

@@ -1,6 +1,10 @@
 # Decisions
 
-34 ADRs. Why a rule exists, when the answer was not obvious.
+Why a rule exists, when the answer was not obvious.
+
+The index below is the count; a number written here as prose goes stale the
+day an ADR is added, and had — it said 34 while there were 38, and
+`architecture/mental-model.md` said 31 at the same time.
 
 ## Why they are numbered and not renamed
 

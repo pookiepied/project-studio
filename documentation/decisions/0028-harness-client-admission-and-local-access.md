@@ -110,6 +110,19 @@ host owns:
 The current Tauri project does not implement this yet. `app_ready` is a window
 visibility command, not a Harness supervisor.
 
+> **Status note, 2026-08-15.** The paragraph above was true when this ADR was
+> written and is false now; it is left in place because an ADR records what was
+> believed when a decision was taken, and a correction is more honest than a
+> rewrite. The supervisor shipped:
+> `STUDIO/src-tauri/src/harness/supervisor.rs` (spawn, restart, stop, reap,
+> `shutdown_all`, FD-3 readiness, FD-4 bootstrap, loopback verification),
+> `endpoint.rs`, `bootstrap.rs`, and the `get_harness_endpoint` /
+> `restart_harness` / `get_harness_status` commands, with the desktop caller in
+> `STUDIO/src/platform/harness/`. One deferral remains **open** inside it:
+> `supervisor.rs:197` passes the entire host environment to the child minus the
+> admission credential — `// For now inherit all except credential`. That is
+> meta-task **#74** and is a decision, not an oversight to be tidied.
+
 Standalone Harness startup remains supported for tests and headless use. It
 uses the same application composition and admission verifier, with an injected
 test/development credential source.

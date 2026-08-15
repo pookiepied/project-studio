@@ -27,7 +27,7 @@ Enforcement: `assertNoSecretColumns` runs inside every migration txn **and** on 
 | **CLI entrypoints** | `STUDIO HARNESS/src/models/local/cli.ts:8`, `src/auth/cli.ts:8` | `ProviderSettingsStore(getDatabase())` for that CLI only, `KeyringCredentialStore` for that command | Must not be imported by `src/agents/*` or `src/tools/*` |
 | **Test factories** | `tests/unit/*`, `tests/integration/*` | `openDatabase({path:":memory:"})`, `InMemoryCredentialStore`, `ScriptedChannel` | Must not use `getDatabase()` singleton in assertions |
 
-Domain modules that need `StudioDatabase` or `SecureCredentialStore` receive them via `StudioRuntime` constructor or `createAgentSandbox` factory, never by calling `getDatabase()` directly. `src/models/bootstrap.ts:149` `new ProviderSettingsStore(getDatabase())` is the **last** allowed direct call outside roots and will be moved to `app.ts` in 008.3-04.
+Domain modules that need `StudioDatabase` or `SecureCredentialStore` receive them via `StudioRuntime` constructor or `createAgentSandbox` factory, never by calling `getDatabase()` directly. There is no exception to this: `getDatabase()` no longer exists. This sentence used to name `src/models/bootstrap.ts:149` `new ProviderSettingsStore(getDatabase())` as "the **last** allowed direct call outside roots", to be moved in `008.3-04`. It was never moved — the accessor itself was **deleted** under meta-task #24 (`f25d715`), which removed the exception rather than relocating it. The only surviving mention in `src/` is the tombstone comment at `storage/database.ts:207`. Corrected under meta-task #38: the rule was describing a carve-out for a function that no longer exists.
 
 ---
 
@@ -291,5 +291,5 @@ Domain modules that need `StudioDatabase` or `SecureCredentialStore` receive the
 - Network/process: `src/net/*`, `src/process/exec.ts`
 - Observability: `src/observability/*`, `src/execution/context.ts`
 - Transport/application: `src/transport/http/*`, `src/application/*`, `src/app.ts`, `src/host/*`
-- Decisions: `STUDIO HARNESS/docs/decisions/0028-*`, `0014`, `0023`, `0029` (to be amended in `008.16`)
+- Decisions: `documentation/decisions/0028-*`, `0014`, `0023`, `0029` (to be amended in `008.16`)
 

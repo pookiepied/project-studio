@@ -1,6 +1,27 @@
 # ADR 0033: Execution Identity And Operation Correlation
 
-Status: proposed; Task 008.44 gate
+Status: Accepted — steps 1-3 implemented; steps 4-5 open, see below
+
+> **Status corrected 2026-08-15.** This read `proposed; Task 008.44 gate` while
+> its core had been implemented and wired for some time, which invited a reader
+> either to re-litigate a settled design or to assume none of it existed. Two
+> things were stale: the word *proposed*, and the gate reference — `008.44` was
+> renumbered to `008.4`.
+>
+> **Implemented and in use:** the typed `ExecutionContext`
+> (`src/execution/context.ts`) carrying `requestId`, `operationId`,
+> `parentOperationId`, `attemptId`, `kind`, `clientId`, `sessionId` and the Flue
+> links; a root context created per request by the admission middleware
+> (`src/transport/http/middleware/admission.ts`); Flue operation ids linked at
+> turn boundaries (`src/observability/flue.ts`); the structured logger consuming
+> it. That is steps 1-3.
+>
+> **Not implemented, deliberately:** step 4's public admission idempotency key
+> is meta-task **#12**, answered as *delete the patches and accept
+> lost-ack-as-unknown for 1.0*. Step 5's durable execution projection has no
+> consumer yet, which is the condition the step itself names.
+> `createRetryExecutionContext` exists with a test and no production caller; it
+> is marked declared-not-wired at the source under meta-task **#31**.
 
 ## Context
 

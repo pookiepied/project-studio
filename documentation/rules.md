@@ -32,8 +32,9 @@ Full version: `documentation/mental-model.md`. Read it once.
 Project Studio/
   STUDIO/            React 19 + Vite + Tailwind v4 + Tauri v2. The desktop UI.
   STUDIO HARNESS/    TypeScript on Flue + Pi + Hono. The runtime. Your work.
-  documentation/     Repo-wide: mental-model.md, architecture.md, check-later.md
-  tasks/             Work in progress. This file lives here.
+  STUDIO Gateway/    Retired Cloudflare Worker. Reference only -- see its README.
+  documentation/     Repo-wide. decisions/, architecture/, phases/, work/, archive/.
+                     Work in progress lives in work/; this file lives here.
 ```
 
 Inside `STUDIO HARNESS/`:

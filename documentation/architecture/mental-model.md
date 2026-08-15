@@ -6,12 +6,17 @@ refuses to be, and the decisions that span both halves of the repo.
 Detail lives one level down and is authoritative where it disagrees with this
 file:
 
-- `STUDIO HARNESS/docs/decisions/` — 31 ADRs, the real reasoning
-- `STUDIO HARNESS/docs/STATUS.md` — how far along we are
-- `STUDIO HARNESS/docs/ROADMAP.md` — what order to build in
-- `STUDIO HARNESS/docs/KNOWN-ISSUES.md` — what is currently untrue
-- `documentation/check-later.md` — things deliberately deferred
-- `tasks/` — work in progress, as a checklist
+- [`documentation/decisions/`](../decisions/README.md) — 38 ADRs, the real reasoning
+- [`documentation/phases/roadmap.md`](../phases/roadmap.md) — what order to build in
+- [`documentation/work/phases-1-11-remediation.md`](../work/phases-1-11-remediation.md)
+  — how far along we are, every open issue numbered, and what is currently
+  untrue. This one file supersedes the three that used to be listed here:
+  `STATUS.md`, `KNOWN-ISSUES.md`, and the `check-later.md` deferral list.
+  Keeping progress, defects and deferrals in one register is deliberate — the
+  three separate files disagreed with each other and with the code, which is
+  the failure the register exists to prevent.
+- [`documentation/archive/`](../archive/) — the superseded originals, kept
+  readable because ADRs written at the time still refer to them by name.
 
 ---
 

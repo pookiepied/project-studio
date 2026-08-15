@@ -14,7 +14,9 @@
  * to logs and telemetry. If a user pastes an API key and asks the agent to use
  * it, the model gets the real key and the tool gets the real key; only the log
  * shows `[REDACTED]`. Deciding what the model may see is context policy, lives
- * in `context/`, and must not be folded in here — see `check-later.md` C-12.
+ * in `context/`, and must not be folded in here. That question was `C-12` in
+ * `check-later.md`, which no longer exists; it is now carried by the issue
+ * register at `documentation/work/phases-1-11-remediation.md`.
  *
  * ## How to turn a rule on or off
  *
