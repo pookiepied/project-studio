@@ -24,7 +24,13 @@ const READ: readonly string[] = [
   "symbolic-ref", "var", "version", "help",
 ];
 
-const NETWORK: readonly string[] = [
+/**
+ * Exported so a test can hold this list against the copy in
+ * `permissions/policy.ts`, which cannot import it — permissions must not depend
+ * on tools. The duplication is deliberate and stays; what was missing was
+ * anything that notices when the two stop agreeing. See meta-task #78.
+ */
+export const NETWORK: readonly string[] = [
   "fetch", "pull", "push", "clone", "ls-remote", "remote", "submodule",
   "request-pull", "send-pack", "fetch-pack",
 ];
