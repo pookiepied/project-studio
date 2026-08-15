@@ -158,8 +158,44 @@ export function bwrapArgs(input: BwrapInput): readonly string[] {
 }
 
 /** Where `bwrap` is, or a refusal that names what to install. */
-function bwrapPath(): string {
+export function bwrapPath(): string {
   return resolveBinary("bwrap").path;
+}
+
+/** What a containment probe found. */
+export interface ProbeResult {
+  readonly ok: boolean;
+  /** What the kernel said, when it said no. Never a guess. */
+  readonly detail?: string;
+}
+
+/**
+ * Actually contains something trivial, and reports what happened.
+ *
+ * A free function rather than only a method, because the setup command needs to
+ * ask **again** after installing an AppArmor profile — and the backend memoises
+ * its answer, correctly, since the probe starts a process. A second question
+ * needs a second measurement, not a stale one.
+ */
+export function probeContainment(path: string): ProbeResult {
+  try {
+    execFileSync(
+      path,
+      [
+        "--unshare-all",
+        "--ro-bind",
+        "/usr",
+        "/usr",
+        ...SYSTEM_ROOTS.flatMap((root) => ["--ro-bind-try", root, root]),
+        "--",
+        "/bin/true",
+      ],
+      { timeout: 10_000, stdio: ["ignore", "ignore", "pipe"] },
+    );
+    return { ok: true };
+  } catch (cause) {
+    return { ok: false, detail: failureText(cause) };
+  }
 }
 
 /**
@@ -207,9 +243,8 @@ class LinuxBwrapBackend implements IsolationBackend {
     return (
       `The sandbox program could not start a container here: ${this.#observed} ` +
       "Most often this is a kernel that withholds user namespaces from " +
-      "unprivileged programs — check " +
-      "`sysctl kernel.apparmor_restrict_unprivileged_userns` (Ubuntu 23.10 and " +
-      "later) and `sysctl kernel.unprivileged_userns_clone`."
+      "unprivileged programs, which `sudo pnpm sandbox:prepare` fixes for this " +
+      "machine by granting the namespace to bubblewrap alone."
     );
   }
 
@@ -233,6 +268,10 @@ class LinuxBwrapBackend implements IsolationBackend {
    * host cannot deliver, and `execute` would run uncontained under a build that
    * says it is contained. That is the failure this whole seam exists to prevent,
    * so the probe pays for a process.
+   *
+   * The first of those has a supported fix — `pnpm sandbox:prepare`, which
+   * installs an AppArmor profile granting the namespace to `bwrap` alone. See
+   * `apparmor.ts` for why that rather than the sysctl everyone reaches for.
    */
   #measure(): boolean {
     let path: string;
@@ -246,25 +285,9 @@ class LinuxBwrapBackend implements IsolationBackend {
       return false;
     }
 
-    try {
-      execFileSync(
-        path,
-        [
-          "--unshare-all",
-          "--ro-bind",
-          "/usr",
-          "/usr",
-          ...SYSTEM_ROOTS.flatMap((root) => ["--ro-bind-try", root, root]),
-          "--",
-          "/bin/true",
-        ],
-        { timeout: 10_000, stdio: ["ignore", "ignore", "pipe"] },
-      );
-      return true;
-    } catch (cause) {
-      this.#observed = failureText(cause);
-      return false;
-    }
+    const probe = probeContainment(path);
+    if (!probe.ok) this.#observed = probe.detail;
+    return probe.ok;
   }
 
   async contain(request: ContainmentRequest): Promise<ContainedCommand> {

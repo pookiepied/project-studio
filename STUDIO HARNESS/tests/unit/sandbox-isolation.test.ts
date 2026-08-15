@@ -20,6 +20,11 @@ import {
   type ContainedCommand,
   type IsolationBackend,
 } from "../../src/sandbox/isolation/index.js";
+import {
+  elevationInstructions,
+  profileText,
+  PROFILE_PATH,
+} from "../../src/sandbox/isolation/linux/apparmor.js";
 import { containArgs } from "../../src/sandbox/isolation/windows/launcher.js";
 import { grantsFor, profileName } from "../../src/sandbox/isolation/windows/appcontainer.js";
 import {
@@ -338,6 +343,73 @@ describe("the Linux launcher's argument rules", () => {
     const args = bwrapArgs(base);
     expect(modeOf(args, "/usr")).toBe("--ro-bind");
     expect(modeOf(args, "/lib64")).toBe("--ro-bind-try");
+  });
+});
+
+describe("the Linux machine setup, and the fix it refuses to suggest", () => {
+  // Pure text, so these run everywhere. What the profile *does* is measured on
+  // a Linux machine; what it *says* is checkable here, and the most important
+  // assertion in this block is a negative one.
+
+  it("grants the namespace to the binary the resolver actually found", () => {
+    // A profile attached to the wrong path silently grants nothing, and setup
+    // then reports success while the sandbox stays refused — the worst outcome
+    // available, and the reason this is a function of the path rather than a
+    // constant with `/usr/bin/bwrap` baked in.
+    const text = profileText("/opt/custom/bin/bwrap");
+    expect(text).toContain("profile studio-bwrap /opt/custom/bin/bwrap");
+    expect(text).toContain("userns,");
+  });
+
+  it("never tells the user to lower a kernel setting", () => {
+    // The pin that matters. `kernel.apparmor_restrict_unprivileged_userns=0` is
+    // one line, it works, and it removes the protection for *every program on
+    // the machine* to make one application run. An agent asking its user to
+    // weaken their kernel in order to switch a sandbox on is doing the exact
+    // thing the sandbox exists to prevent, and it is the first answer any
+    // search returns — so it is asserted against rather than merely avoided.
+    //
+    // Scoped to the instructions, which is what a user is asked to *do*. The
+    // first version of this test also covered the profile text and failed on
+    // its own comment explaining why the sysctl was rejected — a mention in a
+    // rejected-alternative sentence is the opposite of a recommendation, and a
+    // test that cannot tell those apart bans the explanation along with the
+    // advice.
+    const text = elevationInstructions();
+    expect(text).not.toMatch(/apparmor_restrict_unprivileged_userns/);
+    expect(text).not.toMatch(/unprivileged_userns_clone/);
+    expect(text.toLowerCase()).not.toContain("sysctl");
+    // It should still say a kernel setting is *not* being lowered, because that
+    // is the question a careful reader will have.
+    expect(text).toContain("no kernel setting is lowered");
+  });
+
+  it("explains the rejected alternative where it will outlive the terminal", () => {
+    // The profile file is the durable artefact; the instructions scroll away.
+    // Someone auditing `/etc/apparmor.d/` should be able to see both what this
+    // grants and what it was chosen over, without finding this repository.
+    const text = profileText("/usr/bin/bwrap");
+    expect(text).toContain("kernel.apparmor_restrict_unprivileged_userns=0");
+    expect(text).toContain("narrower");
+  });
+
+  it("tells the user the command, and what it will and will not change", () => {
+    const text = elevationInstructions();
+    expect(text).toContain("sudo pnpm sandbox:prepare");
+    expect(text).toContain(PROFILE_PATH);
+    // Reversibility is part of the offer, not a footnote. A machine-wide change
+    // with no stated way back is one a careful user is right to refuse.
+    expect(text).toContain("--undo");
+  });
+
+  it("says what the profile costs, in the profile itself", () => {
+    // The file outlives the terminal that printed the instructions. Someone
+    // auditing `/etc/apparmor.d/` a year from now should find out what this is
+    // and why it is narrower than the alternative, from the file alone.
+    const text = profileText("/usr/bin/bwrap");
+    expect(text).toContain("Project Studio");
+    expect(text).toContain("sandbox:prepare");
+    expect(text.toLowerCase()).toContain("every program on the machine");
   });
 });
 

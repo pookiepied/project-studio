@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
@@ -6,6 +8,14 @@ import {
   grantTraverse,
   holdsTraverse,
 } from "./isolation/index.js";
+import {
+  canInstall,
+  elevationInstructions,
+  installProfile,
+  profileInstalled,
+  PROFILE_PATH,
+} from "./isolation/linux/apparmor.js";
+import { bwrapPath, probeContainment } from "./isolation/linux/bwrap.js";
 import { LocalSandbox } from "./local-sandbox.js";
 import { createSandboxPolicy } from "./policy.js";
 
@@ -44,6 +54,112 @@ import { createSandboxPolicy } from "./policy.js";
  * by `sandbox:release` — so this is one prompt for the machine rather than one
  * per project, which is the difference between a decision and a habit.
  */
+/**
+ * `sudo pnpm sandbox:prepare` on Linux, and `--undo` to reverse it.
+ *
+ * The same command name as Windows and a completely different job, which is the
+ * point: what a user is told is "this machine needs one setup step", and the
+ * mechanism behind it is ours to choose per platform. Windows adds a traverse
+ * entry to system-owned directories; Linux installs an AppArmor profile so
+ * `bwrap` may create a user namespace.
+ *
+ * Deliberately **not** `sysctl kernel.apparmor_restrict_unprivileged_userns=0`.
+ * See `isolation/linux/apparmor.ts` — asking a user to weaken their kernel
+ * machine-wide in order to switch a sandbox *on* is a trade this should never
+ * offer, and it is one search result away from being the obvious fix.
+ */
+async function prepareLinux(undo: boolean): Promise<void> {
+  let path: string;
+  try {
+    path = bwrapPath();
+  } catch (error) {
+    // Not installed at all. The resolver's message already names the package
+    // and the command for the common distributions.
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  if (undo) {
+    if (!canInstall()) {
+      process.stderr.write(`Removing ${PROFILE_PATH} needs root. Run: sudo pnpm sandbox:prepare --undo\n`);
+      process.exitCode = 1;
+      return;
+    }
+    rmSync(PROFILE_PATH, { force: true });
+    // Unloading is its own act. Removing the file leaves the profile loaded in
+    // the kernel until the next boot, so the sandbox would keep working and the
+    // user would believe they had undone something they had not.
+    try {
+      execFileSync("apparmor_parser", ["-R", PROFILE_PATH], { stdio: "ignore", timeout: 30_000 });
+    } catch {
+      // Already unloaded, or never loaded. Removing what is not there is the
+      // outcome asked for either way.
+    }
+    process.stdout.write(`Removed ${PROFILE_PATH}. The sandbox will refuse work on this machine again.\n`);
+    return;
+  }
+
+  // Asked before anything is changed. A machine whose kernel already hands out
+  // namespaces — most non-Ubuntu distributions — needs no profile, and writing
+  // one anyway would be a permanent change made for no reason.
+  if (probeContainment(path).ok) {
+    process.stdout.write("The sandbox already works on this machine. Nothing to do.\n");
+    return;
+  }
+
+  if (!canInstall()) {
+    process.stdout.write(elevationInstructions());
+    process.exitCode = 1;
+    return;
+  }
+
+  if (profileInstalled(path)) {
+    // The profile is ours, byte for byte, and containment still fails. Saying
+    // "installed" here would be the setup command reporting success while the
+    // sandbox stays refused, which is the failure this whole cycle is about.
+    process.stderr.write(
+      `${PROFILE_PATH} is already installed and bubblewrap still cannot create a\n` +
+        `namespace. Something else on this machine is refusing it — a seccomp\n` +
+        `filter or a container runtime are the usual causes. What the kernel said:\n` +
+        `  ${probeContainment(path).detail ?? "(no detail)"}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    installProfile(path, (text) => writeFileSync(PROFILE_PATH, text, "utf8"));
+  } catch (error) {
+    process.stderr.write(
+      `Could not install ${PROFILE_PATH}: ` +
+        `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  // Measured again rather than assumed. `apparmor_parser` exiting zero means the
+  // profile parsed, not that the kernel now allows what we need — and the whole
+  // argument of this stage is that those are different questions.
+  const after = probeContainment(path);
+  if (!after.ok) {
+    process.stderr.write(
+      `Installed ${PROFILE_PATH}, and bubblewrap still cannot create a namespace.\n` +
+        `What the kernel said: ${after.detail ?? "(no detail)"}\n` +
+        `Undo with: sudo pnpm sandbox:prepare --undo\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write(
+    `Installed ${PROFILE_PATH} and verified that the sandbox now contains.\n` +
+      `Bubblewrap may create a user namespace; nothing else on this machine changed.\n` +
+      `Undo with: sudo pnpm sandbox:prepare --undo\n`,
+  );
+}
+
 async function prepare(targets: readonly string[]): Promise<void> {
   const paths = targets.length > 0 ? targets.map((target) => resolve(target)) : [process.cwd()];
   const seen = new Set<string>();
@@ -92,6 +208,14 @@ async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
 
   if (command === "prepare") {
+    // Dispatched on the platform rather than on what the user typed. "This
+    // machine needs one setup step" is the same sentence everywhere; only the
+    // mechanism behind it differs, and asking the user to know which one they
+    // are on would be leaking our implementation into their instructions.
+    if (process.platform === "linux") {
+      await prepareLinux(rest.includes("--undo"));
+      return;
+    }
     await prepare(rest);
     return;
   }
@@ -99,8 +223,11 @@ async function main(): Promise<void> {
   const target = command;
   if (target === undefined || target.trim() === "") {
     process.stderr.write(
-      "Usage: pnpm sandbox:prepare [project-directory...]\n" +
-        "       pnpm sandbox:release <project-directory>\n",
+      process.platform === "linux"
+        ? "Usage: sudo pnpm sandbox:prepare [--undo]\n" +
+            "       pnpm sandbox:release <project-directory>\n"
+        : "Usage: pnpm sandbox:prepare [project-directory...]\n" +
+            "       pnpm sandbox:release <project-directory>\n",
     );
     process.exitCode = 2;
     return;
