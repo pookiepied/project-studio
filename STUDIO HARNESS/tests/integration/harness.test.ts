@@ -78,8 +78,16 @@ async function waitUntil(
  * expected to approach, and raising it is explicitly **not** the fix for `E-02`
  * — the report above is. It is set far beyond any plausible boot so that when it
  * does expire, the machine was genuinely wedged and the message says so.
+ *
+ * **It must stay below the smallest enclosing test timeout.** This was 60s
+ * while six of the tests below run under a 30s timeout, which meant vitest
+ * killed those tests half a minute *before* this budget expired: the report
+ * above — pid, exit code, last probe error, stdout and stderr — could not
+ * print for two thirds of the file, and the failure arrived as a bare "test
+ * timed out" with nothing attached. A diagnostic that cannot fire is not a
+ * diagnostic. 20s is still an order of magnitude beyond an observed boot.
  */
-const STARTUP_BUDGET_MS = 60_000;
+const STARTUP_BUDGET_MS = 20_000;
 
 async function startHarness(databasePath: string): Promise<RunningHarness> {
   const port = await availablePort();
