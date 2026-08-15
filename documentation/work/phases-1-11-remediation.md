@@ -87,7 +87,27 @@ prevented the storage singleton returning to the file it was removed from.
 | 34 | `PassthroughContextOptimizer` never wired. | ADR 0003 stands; the register entry was wrong and `roadmap.md:65` was right. Marked declared-not-wired at the source alongside #31, and its test moved out of `architecture.test.ts` — filed there it read as a guarantee about the running system, which nothing wired can make |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
 
-### Needs Decision — 6
+### Answered — 4, on 2026-08-15
+
+Recorded here rather than folded away, per ADR 0036: a decision that cannot be
+found later gets re-litigated. **One of the four went against the
+recommendation**, and that one changes the shape of the cycle — see #15.
+
+| # | Answer | What it changes |
+|---|---|---|
+| 15 | **Implement the real sandbox — (a), not the recommended (b).** Windows and Linux only; **macOS is explicitly out of scope**, not deferred-with-intent. Stated reason: *"Real sandbox, or else we're going to take the heavy weight of half or bad implementation once again."* | The largest single change left in the cycle. `SandboxFactory` behind the ADR 0035 ports, `ProcessContainer` on Windows, `bwrap` on Linux. Turns #15 from a one-line status correction into a stage of its own, and reverses the 008.1 refusal of MXC. Un-blocks #32 in the opposite direction: `unsupported_isolation` stops being dead code and becomes the error the factory throws. Also changes what #41 must say — the containment text is corrected to *not yet contained*, not to *uncontained by policy*, because policy is no longer the final answer. |
+| 17 | **Delete the five broken `refs/codex/*` refs.** | Stage 4. All five verified unreachable-and-broken by `git for-each-ref` before removal. |
+| 18 | **Keep root `README.md`, minimal.** | Stays; its stale claims are corrected under #41 rather than removed with the file. |
+
+**On #15 going against the recommendation.** The recommendation was written on
+the premise that ADR 0034 had already settled the policy, so only the word
+"Done" was wrong. The answer rejects the premise rather than the reasoning:
+shipping in-process containment and calling the question closed is the same
+half-implementation the rest of this cycle exists to undo. That is consistent
+with how #24, #35 and #42 were handled, and the recommendation was the less
+consistent position. Recorded as the reason, so this is not re-argued later.
+
+### Needs Decision — 2
 
 Each states options and a recommendation. **These block the items that follow
 them.**
@@ -96,10 +116,6 @@ them.**
 |---|---|---|---|
 | 12 | **B-01 Flue admission idempotency.** The patch hijacks `submissionId` as `project-studio:${key}` from a header; Flue already has idempotent `dispatch({dispatchId})` with 409. Both patches are hand-diffs against `dist/*.mjs` pinned by content hash — a version bump drops them silently, which is exactly how #1 happened. | (a) upstream a public Flue admission key; (b) move to `dispatch({dispatchId})`; (c) **Accept** lost-ack-as-unknown for 1.0, delete the two idempotency patches, keep automatic retry off | **(c).** It is the honest 1.0 position, deletes the most fragile code in the tree, and 008.1 already documents unknown-never-retried as the contract. (a) is right long-term, but it is upstream work we do not control. |
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
-| 14 | **Delete `STUDIO Gateway/`?** 163 tracked files. Paused, not the intended architecture, but contains reusable pieces (provider catalog/discovery, auth and rate-limit middleware, SSE translation, usage projection). | (a) delete now; (b) **delete now, recover from git when the new Gateway starts**; (c) keep | **(b).** It is in git history and tagged; nothing is lost. Keeping 163 files of an architecture we have rejected is exactly the drift this cycle exists to stop. |
-| 15 | **OS isolation (008.8).** Marked Done with 0% implementation — no `bwrap`, `ProcessContainer`, or Seatbelt code exists. | (a) implement `SandboxFactory` now; (b) **record Accepted**: in-process containment, uncontained-by-policy, honestly documented; implementation is a post-1.0 phase | **(b).** ADR 0034 already decided the policy; what is wrong is the word "Done". This is a scope correction, not new code. |
-| 17 | **Broken `refs/codex/*` refs.** Five unreachable refs from another tool; git warns on every branch operation. Never previously documented. | (a) delete them; (b) keep | **(a).** They point at nothing reachable and are pure noise. Requires your go-ahead because ref deletion is destructive. |
-| 18 | **Root `README.md`.** You asked whether it should go. | (a) delete; (b) **keep, minimal** | **(b).** It is the entry point for anyone opening the repository, and it is nine lines pointing at `documentation/`. Deleting it makes the repo open onto three unexplained folders. |
 
 ### Needs Implementation — 10
 
@@ -115,7 +131,7 @@ into #24 below.
 | # | Issue |
 |---|---|
 | 31 | ~~`isRetryableForUnknown`~~ (deleted in `e9a018e`), `createRetryExecutionContext`, `executionContext()`. **Reclassified in Stage 3:** neither remaining export is accidental. `createRetryExecutionContext` is ADR 0033's `attemptId` and is now marked declared-not-wired at the source; `executionContext()` is the declared pair of `authContext()` and is kept. |
-| 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. **Blocked on #15**, and larger than recorded: three kinds are never thrown, and one of them (`unavailable`) is read by `SandboxError`'s own `retryable` computation, so removing it changes behaviour. |
+| 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. **No longer a dead-code item.** The #15 answer resolves it in the direction opposite to the one Stage 3 was waiting for: the kind is not deleted, it becomes the error `SandboxFactory` throws on a host that supports no OS backend. Moved to Stage 4b. The other half of the Stage 3 finding stands and is not affected — `unavailable` and `internal` are also never thrown, and `unavailable` is read by `SandboxError`'s own `retryable` computation, so removing it would change behaviour. |
 | 66 | `tests/integration/stop.test.ts` carries two complete MCP stdio server fixtures used by no test. The file is titled "008.2 stop, timeout, cancellation, and disconnect" and none of its four tests involves an MCP tool — the timeout and MCP-tool-cancellation half of 008.2 was set up and never written. The fixtures now live in `tests/fixtures/mcp-servers.ts` so the evidence survives; **that move does not close this.** |
 | 70 | **One intermittent suite failure, now with a mechanism rather than a shrug.** A full run reported `1 failed | 1141 passed` and the failing test was lost to a truncated log. It did not reproduce in **eight** further full runs. Repetition was then abandoned for measurement: five verbose runs give per-test durations, and two things fall out. **(a)** `harness.test.ts` set `STARTUP_BUDGET_MS` to 60s while six of its nine tests run under a 30s timeout — vitest killed those tests 30 seconds before the startup diagnostic could fire, so a slow boot could only ever surface as a bare "test timed out" with none of the pid/exit-code/stderr report the file goes to trouble to build. Fixed: the budget is 20s, and the invariant *budget < enclosing timeout* is now stated where it can be read. **(b)** Margins are thinner than they look: `recovers after SIGKILL` runs 53–59s against a 90s timeout while other tests in the same suite vary 4× run to run (2.8s→12.7s). A 1.6× slowdown blows it. Raising that timeout is **not** proposed here — the file argues against exactly that, and doing it without knowing which test failed would be masking. Left open pending a captured failure or the #61 CI matrix. |
 | 69 | **`ExecutionScope` has no agent dimension, and `always` cannot outlive a conversation.** Flue's initializer `id` is the agent *instance* — one per conversation thread — so `createAgentSandbox({ agentId: id })` puts a conversation identity in `agentId`, and `conversationId` derives a second copy of it. `grant-store.ts:108` filters on `agent_id`, so a `duration: "always"` grant is unreachable from any other conversation and is indistinguishable from `duration: "conversation"`. ADR 0015 keeps breadth and duration independent; duration currently has two values that mean the same thing. **Fails closed** — the user is asked again, never silently authorized — so this is correctness and approval fatigue, not a security defect. Pinned by `tests/unit/grant-identity.test.ts`. |
@@ -186,16 +202,21 @@ come after #12-#42** — they are phase completion, not stabilization.
 Dependencies are real: each stage makes the next safe.
 
 ```
-Stage 0  Decisions                    ← #16, #25-fixture ANSWERED; #12-#15, #17, #18 open
+Stage 0  Decisions                    ← ANSWERED: #16, #25-fixture, #14, #15,
+   |                                       #17, #18. OPEN: #12, #13, #69
    ↓
 Stage 1  Correctness #25-#29          ← DONE (e9a018e, f25d715)
    ↓
 Stage 2  Architecture #19-#24         ← DONE (14b36df, f25d715, d66e844)
    ↓
-Stage 3  Dead code #30-#35            ← DONE for #30/#33/#35; #32 blocked on #15,
-   |                                       #34 on ADR 0003, #24b is a decision
+Stage 3  Dead code #30-#35            ← DONE for #30/#33/#34/#35/#24b;
+   |                                       #32 deferred into Stage 4b with #15
    ↓
-Stage 4  Repo + docs #36-#42          ← includes acting on #14 (Gateway)
+Stage 4  Repo + docs #36-#42          ← acts on #14 (delete Gateway) and #17
+   ↓
+Stage 4b OS isolation #15 + #32       ← NEW, created by the #15 answer. Real
+   |                                    `SandboxFactory`: Windows `ProcessContainer`,
+   |                                    Linux `bwrap`, no macOS. Spike first.
    ↓
 Stage 5  Phase work #49-#62           ← phase completion, not stabilization
    ↓
@@ -203,6 +224,21 @@ Stage 6  Final architecture + organization pass
    ↓
 Stage 7  Fresh audit → fix → declare Phases 1-11 complete
 ```
+
+**#41 moves out of Stage 4 and into the end of Stage 4b.** It corrects text
+that calls connected MCP code "contained". Writing that correction before the
+sandbox exists means writing it twice, and the second version would contradict
+the first inside one cycle — which is the failure mode #42 is about. Everything
+else in Stage 4 is independent of the sandbox and proceeds now.
+
+**Stage 4b is a stage, not an item.** The #15 answer replaced a status
+correction with a security boundary. It gets its own comparative plan and a
+spike before any adoption: `@microsoft/mxc-sdk` is real and published (0.7.0,
+verified on npm), but 008.1 refused it for reasons that have not evaporated —
+`ProcessContainer` needs Windows 11 24H2+, `bwrap` is absent on many Linux
+hosts, and the SDK is itself pre-1.0. The answer settles *that we build it*,
+not *that the SDK works*; what happens on a host that supports neither is a
+design question the plan has to answer rather than discover.
 
 **Stage 3 after Stage 2, not before.** Turning on `noUnusedLocals` while the
 façade work is mid-flight produces errors for things about to be deleted
