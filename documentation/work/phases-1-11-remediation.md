@@ -36,6 +36,13 @@ Fixed and verified. Suite went 21 failures → 2 → **0**.
 Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1137
 passed, 2 skipped, 0 failed**; `tsc --noEmit` clean; `flue build` clean.
 
+**The 2 skipped tests are platform gates, both healthy.** One is the
+"keyring unavailable" branch, skipped *because* the OS credential store is
+available and its six real tests ran. The other is the POSIX process-group
+kill, which cannot run on Windows — its Windows counterpart (`taskkill /T`)
+now has its own test, so the behaviour is covered on both platforms and
+neither test is vacuous.
+
 **Mutation-verified.** Each fix was reverted in place and the suite re-run to
 confirm a test actually catches it. Eleven mutations: nine caught first time,
 two survived and are recorded below (#28, #29) — #29 now has a test, #28 is

@@ -204,6 +204,13 @@ describe("a run is bounded", () => {
     await expect(node("0", { signal: AbortSignal.abort() })).rejects.toThrow(/cancelled/i);
   });
 
+  // Two tests, because the two platforms kill descendants by different
+  // mechanisms and a single test can only bind on one of them. POSIX kills the
+  // process *group*, so the descendant must share it — spawned normally.
+  // Windows kills the *tree* with `taskkill /T`, and a normally-spawned
+  // descendant dies with the console/job anyway, which made the assertion pass
+  // even with `/T` removed. Detaching it is what makes the Windows test bind;
+  // detaching it on POSIX would give it its own group and break that one.
   it.runIf(process.platform !== "win32")(
     "kills descendants with the process group on forced termination",
     async () => {
@@ -217,6 +224,32 @@ describe("a run is bounded", () => {
         spawn(process.execPath, ["--input-type=module", "-e", ${JSON.stringify(childScript)}], {
           stdio: "ignore",
         });
+        setTimeout(() => {}, 30_000);
+      `;
+
+      await expect(node(parentScript, { timeoutMs: 250 })).rejects.toThrow(/took too long/i);
+      await new Promise((resolve) => setTimeout(resolve, 1_250));
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
+
+  it.runIf(process.platform === "win32")(
+    "kills descendants with the process tree on forced termination",
+    async () => {
+      const marker = join(workspace, "orphan-marker-win.txt");
+      const childScript = `
+        const { writeFileSync } = await import("node:fs");
+        setTimeout(() => writeFileSync(${JSON.stringify(marker)}, "orphan"), 1_000);
+      `;
+      // Detached, so it leaves the console and job the parent belongs to.
+      // Without this it dies with the parent regardless of `/T`, and the test
+      // would pass whether or not the tree kill works.
+      const parentScript = `
+        const { spawn } = await import("node:child_process");
+        spawn(process.execPath, ["--input-type=module", "-e", ${JSON.stringify(childScript)}], {
+          stdio: "ignore",
+          detached: true,
+        }).unref();
         setTimeout(() => {}, 30_000);
       `;
 
