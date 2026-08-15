@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -8,9 +8,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient, type AcceptedRun } from "../../src/application/harness-client.js";
-import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
-import { openDatabase } from "../../src/storage/database.js";
-import { projectKey } from "../../src/snapshots/shadow-repo.js";
 import { createStudioUuid } from "../../src/identity/uuid.js";
 
 // Reuse the same harness boot as harness.test but with execution-context awareness.
@@ -85,30 +82,6 @@ async function stopHarness(child: ChildProcess): Promise<void> {
     });
   }
 }
-
-const ECHO_SERVER = `
-process.stdin.setEncoding("utf8");
-let buf="";
-function reply(id, result){ process.stdout.write(JSON.stringify({ jsonrpc:"2.0", id, result })+"\\n"); }
-function handle(m){
-  if(m.method==="server/discover") reply(m.id,{protocolVersion:"2026-07-28",capabilities:{}});
-  else if(m.method==="tools/list") reply(m.id,{tools:[{name:"echo",description:"Echo",inputSchema:{type:"object",properties:{text:{type:"string"}}}}]});
-  else if(m.method==="tools/call") reply(m.id,{content:[{type:"text",text:m.params.arguments.text}]});
-}
-process.stdin.on("data",c=>{buf+=c; for(;;){const i=buf.indexOf("\\n"); if(i<0)break; const line=buf.slice(0,i); buf=buf.slice(i+1); if(line.trim()!=="") handle(JSON.parse(line));}});
-`;
-
-const SLOW_SERVER = `
-process.stdin.setEncoding("utf8");
-let buf="";
-function reply(id, result){ process.stdout.write(JSON.stringify({ jsonrpc:"2.0", id, result })+"\\n"); }
-function handle(m){
-  if(m.method==="server/discover") reply(m.id,{protocolVersion:"2026-07-28",capabilities:{}});
-  else if(m.method==="tools/list") reply(m.id,{tools:[{name:"slow",description:"Slow",inputSchema:{type:"object",properties:{text:{type:"string"}}}}]});
-  else if(m.method==="tools/call") setTimeout(()=>reply(m.id,{content:[{type:"text",text:m.params.arguments.text}]}), 8000);
-}
-process.stdin.on("data",c=>{buf+=c; for(;;){const i=buf.indexOf("\\n"); if(i<0)break; const line=buf.slice(0,i); buf=buf.slice(i+1); if(line.trim()!=="") handle(JSON.parse(line));}});
-`;
 
 describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
   const toClean: (() => Promise<void>)[] = [];

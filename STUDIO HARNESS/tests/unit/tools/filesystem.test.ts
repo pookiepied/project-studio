@@ -30,7 +30,6 @@ const OTHER_CONVERSATION: ExecutionScope = { ...SCOPE, conversationId: "conv-2" 
 let db: StudioDatabase;
 let workspace: string;
 let gate: CallGate;
-let log: FileAccessLog;
 
 beforeEach(() => {
   db = openDatabase({ path: ":memory:" });
@@ -48,7 +47,7 @@ beforeEach(() => {
     kernel,
     sandbox: new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace })),
   });
-  log = registerFilesystemTools(gate);
+  registerFilesystemTools(gate);
 });
 
 afterEach(() => {

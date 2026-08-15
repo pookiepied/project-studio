@@ -28,13 +28,16 @@ future features, and they live in §5 rather than as open issues.
 
 ## 2. Issue register
 
-62 issues. Categories per `../README.md` §4. Numbers are permanent.
+65 issues. Categories per `../README.md` §4. Numbers are permanent.
 
-### Solved — 24
+### Solved — 28
 
 Fixed and verified. Suite went 21 failures → 2 → **0**.
-Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1137
+Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1138
 passed, 2 skipped, 0 failed**; `tsc --noEmit` clean; `flue build` clean.
+Baseline at close of Stage 3: **70 files, 1139 passed, 2 skipped, 0 failed**;
+`tsc --noEmit` clean **with `noUnusedLocals`/`noUnusedParameters` on**;
+`flue build --target node` clean.
 
 **The 2 skipped tests are platform gates, both healthy.** One is the
 "keyring unavailable" branch, skipped *because* the OS credential store is
@@ -76,6 +79,10 @@ prevented the storage singleton returning to the file it was removed from.
 | 29 | `StudioRuntime` used `any` in `ModelToolResult`. | `e9a018e`; typed to text/image, and unsupported MCP blocks now degrade to text |
 | 63 | No graceful shutdown on Windows. | `f25d715`; `SIGINT`/`SIGBREAK` + IPC `shutdown`; proven by a no-hot-WAL test |
 | 64 | `stop()` returned with MCP children alive. | `f25d715`; `stop`/`stopAll`/`stop(id)` await real process exit |
+| 30 | `tsconfig.json` set neither `noUnusedLocals` nor `noUnusedParameters`. | Stage 3; both on, tree clean. Note the correction in `stage-3-plan.md` §1: the flags catch **only** #33 — an *export* is invisible to them, so they were never going to enforce #31/#32/#34 |
+| 33 | Unused imports in `observability/index.ts`, `permissions/trust.ts`, `tools/git/index.ts`. | Stage 3; those three plus six dead test-file locals the flags then surfaced |
+| 35 | Unbounded sets in `studio-runtime.ts` and `tools/gate.ts`. | Stage 3. `studio-runtime.ts` fixed — see #67, they were one defect — and mutation-verified by `turn-boundary.test.ts`. **The `gate.ts` half of this issue was wrong and is withdrawn:** `#reportedWithheld` has a key space of (capabilities × switches), is per-`CallGate`, and dies with the sandbox |
+| 67 | `TurnSnapshots` was rebuilt per Flue run, so its turn counter restarted and undo history repeated the label `"turn 1"`. | Stage 3; `#turns` (unkeyed `Set`) became `#turnSnapshots` keyed by project + conversation, so the entry is reused rather than replaced |
 | 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
 
 ### Needs Decision — 6
@@ -92,7 +99,7 @@ them.**
 | 17 | **Broken `refs/codex/*` refs.** Five unreachable refs from another tool; git warns on every branch operation. Never previously documented. | (a) delete them; (b) keep | **(a).** They point at nothing reachable and are pure noise. Requires your go-ahead because ref deletion is destructive. |
 | 18 | **Root `README.md`.** You asked whether it should go. | (a) delete; (b) **keep, minimal** | **(b).** It is the entry point for anyone opening the repository, and it is nine lines pointing at `documentation/`. Deleting it makes the repo open onto three unexplained folders. |
 
-### Needs Implementation — 11
+### Needs Implementation — 12
 
 Agreed, understood, work remains.
 
@@ -105,13 +112,12 @@ into #24 below.
 
 | # | Issue |
 |---|---|
-| 24b | `observability/index.ts:49` is still a module-level singleton. The storage globals are gone; this one is a legitimate process-wide resource and needs a decision rather than a reflex. |
-| 30 | `tsconfig.json` sets neither `noUnusedLocals` nor `noUnusedParameters`, so none of #31-#35 fails the build. Turn both on. |
-| 31 | Unreachable exports: ~~`isRetryableForUnknown`~~ (deleted in `e9a018e`), `createRetryExecutionContext`, `executionContext()`. |
-| 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. |
-| 33 | Unused imports: `observability/index.ts:13`, `permissions/trust.ts:3`, `tools/git/index.ts:11`. |
-| 34 | `PassthroughContextOptimizer` used only by its own test, never wired — the test proves nothing about the running system. Wire or delete. |
-| 35 | Unbounded sets, both growing for process lifetime: `studio-runtime.ts:143` `#turns` (never deleted; `prepareModelTurn` iterates every sandbox ever created) and `tools/gate.ts:200` `#reportedWithheld`. |
+| 24b | `observability/index.ts:49` is still a module-level singleton. The storage globals are gone; this one is a legitimate process-wide resource and needs a decision rather than a reflex. **Stage 3 recommends recording it Accepted** — unlike the storage globals it has a guarded init, an explicit `shutdownObservability()` that clears it, and a redaction reset; re-entry throws rather than silently sharing. `stage-3-plan.md` §3. |
+| 31 | ~~`isRetryableForUnknown`~~ (deleted in `e9a018e`), `createRetryExecutionContext`, `executionContext()`. **Reclassified in Stage 3:** neither remaining export is accidental. `createRetryExecutionContext` is ADR 0033's `attemptId` and is now marked declared-not-wired at the source; `executionContext()` is the declared pair of `authContext()` and is kept. |
+| 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. **Blocked on #15**, and larger than recorded: three kinds are never thrown, and one of them (`unavailable`) is read by `SandboxError`'s own `retryable` computation, so removing it changes behaviour. |
+| 34 | `PassthroughContextOptimizer` used only by its own test, never wired. **This entry contradicts `phases/roadmap.md:65`,** which records it as a deliberately unimplemented port from ADR 0003. One of the two is wrong; resolving that is the issue. Recommendation: ADR 0003 stands and this entry is corrected. |
+| 66 | `tests/integration/stop.test.ts` carries two complete MCP stdio server fixtures used by no test. The file is titled "008.2 stop, timeout, cancellation, and disconnect" and none of its four tests involves an MCP tool — the timeout and MCP-tool-cancellation half of 008.2 was set up and never written. The fixtures now live in `tests/fixtures/mcp-servers.ts` so the evidence survives; **that move does not close this.** |
+| 68 | `ExecutionScope.conversationId` defaults to `` `conversation:${agentId}` `` and `agents/studio.ts` passes only `agentId`, so every conversation for the `studio` agent shares the id `conversation:studio`. Anything reasoning per conversation downstream of `ExecutionScope` — grants, approval scope, `FileAccessLog` — is currently reasoning per *agent*. Found in Stage 3; **not dead code and not Stage 3.** |
 
 **Repository and documentation**
 
@@ -176,7 +182,8 @@ Stage 1  Correctness #25-#29          ← DONE (e9a018e, f25d715)
    ↓
 Stage 2  Architecture #19-#24         ← DONE (14b36df, f25d715, d66e844)
    ↓
-Stage 3  Dead code #30-#35            ← noUnusedLocals last: it surfaces what 1-2 orphan
+Stage 3  Dead code #30-#35            ← DONE for #30/#33/#35; #32 blocked on #15,
+   |                                       #34 on ADR 0003, #24b is a decision
    ↓
 Stage 4  Repo + docs #36-#42          ← includes acting on #14 (Gateway)
    ↓

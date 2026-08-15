@@ -10,7 +10,6 @@ import {
 } from "./flue.js";
 import { createLogger, type Logger } from "./logger.js";
 import {
-  getObservabilitySdk,
   isObservabilitySdkStarted,
   startObservabilitySdk,
   shutdownObservabilitySdk,

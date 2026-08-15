@@ -228,7 +228,26 @@ export class StudioRuntime implements AgentHost {
   readonly #mode: () => ExecutionMode;
   readonly #clientId: string;
   readonly #sessionId: string;
-  readonly #turns = new Set<() => void>();
+  /**
+   * Turn state, one entry per conversation in a project.
+   *
+   * Was a `Set` of closures with no key, appended to by `createAgentSandbox`.
+   * Flue re-runs an agent's initializer for **every run** — its own words: "Do
+   * not treat it as a one-time constructor" — so that set gained an entry per
+   * run and `prepareModelTurn` called `beginTurn()` on the snapshots of every
+   * sandbox ever built, forever.
+   *
+   * Keyed rather than merely deduplicated, because the entry has to be *reused*
+   * and not just counted once: `TurnSnapshots` carries the turn counter, and a
+   * fresh one per run restarts it, which labelled the first snapshot of every
+   * run "turn 1" and made undo history unnavigable across a conversation.
+   *
+   * Still grows with distinct conversations, which is bounded only by how many
+   * a process sees. That is acceptable while `ExecutionScope.conversationId`
+   * defaults per *agent* (#68); when real conversation ids arrive, this map
+   * needs an eviction policy and #68 is where that is decided.
+   */
+  readonly #turnSnapshots = new Map<string, TurnSnapshots>();
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -318,7 +337,7 @@ export class StudioRuntime implements AgentHost {
   async prepareModelTurn(): Promise<void> {
     await this.reconcile();
     await this.#catalog.refreshDirty(this.#registry.list());
-    for (const beginTurn of this.#turns) beginTurn();
+    for (const snapshots of this.#turnSnapshots.values()) snapshots.beginTurn();
   }
 
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory {
@@ -336,12 +355,19 @@ export class StudioRuntime implements AgentHost {
     const reporter = createErrorReporter(
       this.#logger === undefined ? {} : { logger: this.#logger },
     );
-    const snapshots = new TurnSnapshots({
-      store: new SnapshotStore({ workspaceRoot: projectRoot }),
-      required: () => this.#mode() === "full-auto",
-      reporter,
-    });
-    this.#turns.add(() => snapshots.beginTurn());
+    // Per project *and* conversation: the same conversation reopened against a
+    // different project root is a different history, and sharing one store
+    // between them would snapshot the wrong workspace.
+    const turnKey = `${projectId}\0${scope.conversationId}`;
+    let snapshots = this.#turnSnapshots.get(turnKey);
+    if (snapshots === undefined) {
+      snapshots = new TurnSnapshots({
+        store: new SnapshotStore({ workspaceRoot: projectRoot }),
+        required: () => this.#mode() === "full-auto",
+        reporter,
+      });
+      this.#turnSnapshots.set(turnKey, snapshots);
+    }
     const gate = new CallGate({
       kernel: new PermissionKernel({
         grants: this.#grants,

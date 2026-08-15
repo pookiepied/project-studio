@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
 
-import type { CapabilityDescriptor } from "../contracts/capabilities.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { storageErrorFrom } from "../storage/errors.js";
 import type { ExecutionMode } from "./mode.js";

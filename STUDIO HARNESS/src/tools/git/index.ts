@@ -8,7 +8,7 @@ import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { buildGitArgs } from "./argv.js";
-import { classifyGit, gitResource, isKnownSubcommand } from "./classify.js";
+import { gitResource, isKnownSubcommand } from "./classify.js";
 
 export { buildGitArgs, optionName } from "./argv.js";
 export { classifyGit, gitResource, isKnownSubcommand } from "./classify.js";

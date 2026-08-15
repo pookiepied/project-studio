@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { CallBounds } from "../../src/tools/bounds.js";
-import { capabilityKey } from "../../src/contracts/capabilities.js";
 
 function fakeCapability(idempotent: boolean) {
   return {
