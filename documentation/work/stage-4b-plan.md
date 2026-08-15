@@ -1,6 +1,6 @@
 # Stage 4b — the real sandbox (#15, carrying #32 and #41)
 
-**Status:** Steps 1-3 landed — both platforms have a backend; #41 is what is left ·
+**Status:** Steps 1-3 landed — both platforms contain, and neither ships yet (§4 blockers) ·
 **Opened:** 2026-08-15 · **Last measured:** 2026-08-16 (Ubuntu 24.04, VPS)
 **Register:** `phases-1-11-remediation.md` #15, #32, #41 · **Blocked on:** nothing
 
@@ -167,32 +167,88 @@ Each step lands on its own and is verifiable on its own. No step claims #15.
    either of the two wrong ones already in that paragraph's history, and a
    reason not to write it before step 3 lands.
 
-### Still open inside #15
+### Still open inside #15 — the complete blocker list
 
-Named here so that "the sandbox works" is not read as more than it is:
+**Verdict: the containment is done and the shipping story is not.** Both
+platforms contain a model-chosen program, and both were measured doing it
+against a real kernel rather than described. What is not finished is everything
+around that: a Linux user cannot reach the working state without editing kernel
+settings by hand, and the boundary a granted network draws is not the same on
+the two platforms. Ranked by what stands between this and shipping.
 
-- **A Linux machine whose kernel withholds user namespaces refuses everything.**
-  #92. Correct, and a cliff: on stock Ubuntu 24.04 the shell tool and every
-  stdio MCP server stop working, with a message and no way through. Windows has
-  the same shape of problem and an answer — one elevated `pnpm sandbox:prepare`
-  — and Linux needs its counterpart.
-- **The Linux network switch is wider than the Windows one.** #93. `--share-net`
-  shares the host's namespace, loopback included; `internetClient` does not.
-  The refusal half matches; the granted half does not.
-- **A contained MCP server is given the internet unconditionally** — #90. The
-  filesystem boundary is complete; the network is granted to every server
-  because no record says whether one needs it. The capability is
-  `internetClient` alone, measured to exclude loopback and the LAN, so even the
-  default cannot reach a local service.
+#### 1. Linux is correct and unusable out of the box — #92
+
+**The blocker.** Stock Ubuntu 23.10 and later set
+`kernel.apparmor_restrict_unprivileged_userns=1` and ship no AppArmor profile
+granting `bwrap` `userns create`, so an unprivileged user cannot obtain a
+namespace. The backend probes this, finds it, and refuses — which is right, and
+which means the shell tool and every stdio MCP server stop working on one of the
+most widely deployed Linux distributions.
+
+The only way this was made to work was lowering that sysctl by hand for one
+session. **That cannot be the instruction shipped to a user:** it is a
+machine-wide control, and telling people to weaken it to run our agent is
+precisely the trade this whole stage exists to avoid making silently. The likely
+answer is an AppArmor profile the installer places, because that is the
+mechanism Ubuntu expects of shipped applications — `/etc/apparmor.d/` already
+carries profiles for Chrome, VS Code and flatpak for exactly this reason.
+
+Windows has the same shape of problem and already has its answer: one elevated
+`pnpm sandbox:prepare` per machine. Linux needs its counterpart.
+
+#### 2. A granted network means more on Linux than on Windows — #93
+
+**Measured, not deduced.** With the operator's switch on, a contained child on
+Linux reached a server on `127.0.0.1` (`200`); on Windows the same attempt is
+refused, and loopback stays shut under every capability Windows offers. So a
+contained MCP server on Linux may call its API *and* the user's dev server,
+local database or router.
+
+`bwrap` offers nothing between "empty namespace" and "the host's stack", so
+closing this needs a firewall rule or a seccomp filter. The **refusal** half is
+identical and complete on both platforms; only the granted half diverges.
+
+#### 3. Every MCP server is given the internet — #90
+
+The filesystem boundary is complete for `mcp-server` on both platforms. The
+network is granted to all of them, because `McpServerRecord` carries no field
+saying whether one needs it, and shipping every server offline would produce a
+sandbox users switch off. This is a schema field, a migration and a dialog line
+— `ContainmentRequest.network` already takes the boolean. On Windows the default
+is narrow (`internetClient`, no loopback, no LAN); on Linux it is as wide as #93
+says.
+
+#### 4. Windows profiles accumulate, one per project — #94
+
+Creating a container mints an AppContainer profile and writes one access-control
+entry into the project directory. `pnpm sandbox:release <project>` takes both
+back, and nothing does it automatically — deliberately, because deleting a
+profile while a second Studio window works in the same project would strip that
+window's container mid-call. Bounded and disclosed rather than unbounded, but it
+is still state this feature adds to a user's machine and never removes on its
+own.
+
+#### 5. The containment text is still wrong — #41
+
+The README and ADRs 0019/0022/0024 describe a containment situation that has now
+been superseded three times. Step 4, and the only item on this list that is a
+documentation fix rather than an engineering one.
+
+#### Not blockers, recorded so they are not mistaken for gaps
+
+- **macOS is out of scope by decision**, so it registers no backend, enforces
+  nothing, and behaves exactly as before.
 - **Windows needs one elevated command per machine.** `pnpm sandbox:prepare`
   adds a traverse entry to the system-owned ancestors of a project — `C:\` and
   `C:\Users` in practice. Everything under the user's own folders is granted per
-  workspace, silently, and removed again by `sandbox:release`.
-- **Profiles accumulate one per project.** Bounded in production and removable
-  with `pnpm sandbox:release <project>`, but nothing removes them on its own.
-  The test suite made this visible by minting a workspace per run and leaving
-  fourteen profiles behind; `tests/sandbox-profiles.ts` now removes the
-  difference a run created, and deliberately not everything matching the name.
+  workspace, silently, and removed by `release`. This is finished work, not an
+  open item; it is the model #92 needs to copy.
+- **A program that reads its own *data* files from a protected directory cannot
+  be contained on Windows.** The launcher opens the executable's image with its
+  own rights, so the program runs without its install directory being granted —
+  but a runtime that reads its own library at run time needs that directory.
+  Python's standard library is the case to expect. Stated as a limit in ADR
+  0041 rather than tracked as a defect.
 
 ## 5. What could still sink this — and what actually did
 
