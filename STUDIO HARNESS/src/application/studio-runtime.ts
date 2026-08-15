@@ -240,33 +240,42 @@ export class StudioRuntime implements AgentHost {
   readonly #clientId: string;
   readonly #sessionId: string;
   /**
-   * Turn state, one entry per conversation in a project.
+   * Turn state, one entry per **project**.
    *
    * Was a `Set` of closures with no key, appended to by `createAgentSandbox`.
    * Flue re-runs an agent's initializer for **every run** — its own words: "Do
    * not treat it as a one-time constructor" — so that set gained an entry per
    * run and `prepareModelTurn` called `beginTurn()` on the snapshots of every
-   * sandbox ever built, forever.
+   * sandbox ever built, forever. Keying it fixed that (#67): the entry has to
+   * be *reused*, because `TurnSnapshots` carries the turn counter and a fresh
+   * one per run restarts it, labelling the first snapshot of every run
+   * "turn 1".
    *
-   * Keyed rather than merely deduplicated, because the entry has to be *reused*
-   * and not just counted once: `TurnSnapshots` carries the turn counter, and a
-   * fresh one per run restarts it, which labelled the first snapshot of every
-   * run "turn 1" and made undo history unnavigable across a conversation.
+   * **The key was `projectId\0conversationId` and is now `projectId` alone.**
+   * That is the answer to #72, which asked what should evict this map: nothing
+   * should, because per-conversation is the wrong unit and it was the only
+   * reason the map grew. Three measured defects came from that key, and all
+   * three are the same mistake — conversation-scoped state in front of a
+   * project-scoped resource:
    *
-   * **It grows without bound, and that is now overdue rather than deferred.**
-   * This comment used to say the growth was acceptable "while
-   * `ExecutionScope.conversationId` defaults per *agent*", and that an eviction
-   * policy would be needed "when real conversation ids arrive". They arrived:
-   * #69 made `conversationId` Flue's per-thread instance id, so every distinct
-   * conversation a long-lived process serves now adds an entry that is never
-   * removed — each holding a `TurnSnapshots`, its `SnapshotStore`, and a
-   * shadow-repository handle.
+   * 1. **Two shadow repositories over one git directory (#83).**
+   *    `SnapshotStore`'s `gitDir` is derived from the workspace root alone, so
+   *    two conversations in one project built two `ShadowRepository` objects
+   *    against the same directory — each with its own serialization queue. That
+   *    queue exists *specifically* to stop two `add`/`commit` pairs
+   *    interleaving on git's single index (T-17), and two queues do not
+   *    serialize against each other.
+   * 2. **Every conversation's counter advanced on every turn (#84).**
+   *    `prepareModelTurn()` looped the whole map, so an idle conversation's
+   *    number climbed with someone else's turns and its pending capture was
+   *    cleared underneath it.
+   * 3. **Labels collided in a shared history (#85).** Both conversations wrote
+   *    "turn 1" into the same log, and nothing distinguished them.
    *
-   * The old text also pointed at #68 as the place the policy would be decided.
-   * #68 was withdrawn as wrong. A comment naming a dead issue is worse than no
-   * comment, because it reads as though someone is handling it. **The eviction
-   * policy is #72** — what evicts, and on what signal, is a decision and not a
-   * detail the fix should settle on its own.
+   * With one entry per project all three disappear rather than being fixed
+   * separately, and `turn N` regains an unambiguous meaning: the Nth turn taken
+   * in this project, which is exactly what the one history it is written to
+   * records. Growth is now bounded by the workspace roots a process serves.
    */
   readonly #turnSnapshots = new Map<string, TurnSnapshots>();
   #started: Promise<void> | undefined;
@@ -355,6 +364,17 @@ export class StudioRuntime implements AgentHost {
     await this.#extensions.reconcile([this.#projectId]);
   }
 
+  /**
+   * Opens a turn on every project this runtime is holding turn state for.
+   *
+   * The loop used to be over conversations, which meant one conversation taking
+   * a turn advanced the counter of every other one and cleared its pending
+   * capture (#84). Over projects the loop is honest: a runtime serves one
+   * workspace root in every current path, and a second entry only appears if a
+   * sandbox overrode `projectRoot`, in which case both really are between
+   * turns. Bounded by workspace roots rather than by conversations, which is
+   * why nothing here needs evicting (#72).
+   */
   async prepareModelTurn(): Promise<void> {
     await this.reconcile();
     await this.#catalog.refreshDirty(this.#registry.list());
@@ -376,18 +396,19 @@ export class StudioRuntime implements AgentHost {
     const reporter = createErrorReporter(
       this.#logger === undefined ? {} : { logger: this.#logger },
     );
-    // Per project *and* conversation: the same conversation reopened against a
-    // different project root is a different history, and sharing one store
-    // between them would snapshot the wrong workspace.
-    const turnKey = `${projectId}\0${scope.conversationId}`;
-    let snapshots = this.#turnSnapshots.get(turnKey);
+    // Per project, and only per project. The undo history is one shadow
+    // repository per workspace root — `SnapshotStore` derives its `gitDir` from
+    // that root and nothing else — so the state in front of it has to share the
+    // same unit or it is describing a resource it does not match. Keying this
+    // by conversation as well is #72/#83/#84/#85; see the field's comment.
+    let snapshots = this.#turnSnapshots.get(projectId);
     if (snapshots === undefined) {
       snapshots = new TurnSnapshots({
         store: new SnapshotStore({ workspaceRoot: projectRoot }),
         required: () => this.#mode() === "full-auto",
         reporter,
       });
-      this.#turnSnapshots.set(turnKey, snapshots);
+      this.#turnSnapshots.set(projectId, snapshots);
     }
     const gate = new CallGate({
       kernel: new PermissionKernel({

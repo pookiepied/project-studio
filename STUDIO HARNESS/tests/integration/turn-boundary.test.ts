@@ -115,4 +115,78 @@ describe("the model-turn boundary", () => {
     },
     60_000,
   );
+
+  /**
+   * Two conversations, one project, one history.
+   *
+   * The undo history is a single shadow repository per workspace root —
+   * `SnapshotStore` builds its `gitDir` from that root and nothing else — so
+   * two conversations working in one project write into one log. Turn state
+   * used to be keyed per conversation in front of it, and the mismatch showed
+   * up three ways at once: two `ShadowRepository` objects with independent
+   * serialization queues over one git index (#83), an idle conversation's
+   * counter advancing on someone else's turn (#84), and two snapshots both
+   * labelled "turn 1" in the same log with nothing to tell them apart (#85).
+   *
+   * The label is the observable, as above. Under the old key this produced
+   * `["turn 1", "turn 1"]`; the numbers are now the project's, which is whose
+   * history it is.
+   */
+  it(
+    "keeps one turn history per project when two conversations share it",
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "studio-turn-project-"));
+      temporaryDirectories.push(directory);
+      const projectRoot = join(directory, "project");
+      await mkdir(projectRoot, { recursive: true });
+      previousHome = process.env.PROJECT_STUDIO_HOME;
+      process.env.PROJECT_STUDIO_HOME = join(directory, "home");
+
+      const database = openDatabase({ path: join(directory, "studio.db") });
+      const runtime = new StudioRuntime({
+        database,
+        projectRoot,
+        credentials,
+        approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
+      });
+
+      try {
+        new WorkspaceTrustStore(database).set(projectRoot, true);
+
+        const write = async (
+          sandbox: ReturnType<StudioRuntime["createAgentSandbox"]>,
+          name: string,
+        ): Promise<void> => {
+          const env = await sandbox.createSessionEnv({ id: "studio" });
+          const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
+          const tool = tools.find((candidate) => candidate.name === "write");
+          expect(tool).toBeDefined();
+          await tool?.execute("call", { path: name, content: name });
+        };
+
+        const alpha = runtime.createAgentSandbox({
+          agentId: "studio",
+          conversationId: "conversation:alpha",
+        });
+        await runtime.prepareModelTurn();
+        await write(alpha, "alpha.txt");
+
+        // A different conversation in the same project. Nothing about the
+        // workspace changed, so nothing about its history should restart.
+        const beta = runtime.createAgentSandbox({
+          agentId: "studio",
+          conversationId: "conversation:beta",
+        });
+        await runtime.prepareModelTurn();
+        await write(beta, "beta.txt");
+
+        const history = await new SnapshotStore({ workspaceRoot: projectRoot }).list();
+        expect(history.map((snapshot) => snapshot.label)).toEqual(["turn 2", "turn 1"]);
+      } finally {
+        await runtime.stop();
+        database.close();
+      }
+    },
+    60_000,
+  );
 });
