@@ -488,16 +488,10 @@ describe("modular monolith — 008.3 gate", () => {
         .map(([table, files]) => `${table}: ${[...files].sort().join(", ")}`)
         .sort();
 
-      // One known violation, tracked as T-004. `app_setting` is a generic
-      // key-value table that two unrelated domains write to directly, which is
-      // exactly what 008.3-05 forbids — the previous gate never caught it
-      // because it only checked who held the connection, never who touched
-      // which table. It needs one owning repository with typed key namespaces.
-      //
-      // Shrinking whitelist: a second shared table fails here immediately.
-      expect(shared).toEqual([
-        "app_setting: models/local/settings-store.ts, retrieval/settings.ts",
-      ]);
+      // No exceptions. `app_setting` was the last one: two unrelated domains
+      // wrote it directly until `storage/app-settings.ts` took ownership and
+      // handed each a namespaced view (ADR 0035 §5).
+      expect(shared).toEqual([]);
     });
 
     it("only approved roots open a database", async () => {

@@ -1,3 +1,4 @@
+import { AppSettings, type NamespacedSettings } from "../../storage/app-settings.js";
 import type { StudioDatabase } from "../../storage/database.js";
 import { StorageError } from "../../storage/errors.js";
 import { normalizeCustomProvider, type CustomProviderConfig } from "./config.js";
@@ -27,7 +28,8 @@ export interface DefaultModelSelection {
   readonly model: string;
 }
 
-const DEFAULT_MODEL_KEY = "local.default_model";
+// Relative to the `local` namespace, which supplies the `local.` prefix.
+const DEFAULT_MODEL_KEY = "default_model";
 
 interface CustomProviderRow {
   id: string;
@@ -50,9 +52,12 @@ interface ConnectionRow {
 
 export class ProviderSettingsStore {
   readonly #db: StudioDatabase;
+  /** `app_setting` belongs to the storage domain; this store owns keys in it. */
+  readonly #settings: NamespacedSettings;
 
   constructor(db: StudioDatabase) {
     this.#db = db;
+    this.#settings = new AppSettings(db).namespace("local");
   }
 
   listCustomProviders(): readonly CustomProviderConfig[] {
@@ -170,7 +175,7 @@ export class ProviderSettingsStore {
   }
 
   getDefaultModel(): DefaultModelSelection | undefined {
-    const raw = this.#getSetting(DEFAULT_MODEL_KEY);
+    const raw = this.#settings.get(DEFAULT_MODEL_KEY);
     if (raw === undefined) return undefined;
 
     let parsed: unknown;
@@ -193,27 +198,11 @@ export class ProviderSettingsStore {
   }
 
   setDefaultModel(selection: DefaultModelSelection): void {
-    this.#setSetting(DEFAULT_MODEL_KEY, JSON.stringify(selection));
+    this.#settings.set(DEFAULT_MODEL_KEY, JSON.stringify(selection));
   }
 
   clearDefaultModel(): void {
-    this.#db.prepare("DELETE FROM app_setting WHERE key = ?").run(DEFAULT_MODEL_KEY);
-  }
-
-  #getSetting(key: string): string | undefined {
-    const row = this.#db
-      .prepare("SELECT value FROM app_setting WHERE key = ?")
-      .get(key) as unknown as { value: string } | undefined;
-    return row?.value;
-  }
-
-  #setSetting(key: string, value: string): void {
-    this.#db
-      .prepare(
-        `INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      )
-      .run(key, value, Date.now());
+    this.#settings.clear(DEFAULT_MODEL_KEY);
   }
 
   #toConfig(row: CustomProviderRow): CustomProviderConfig {

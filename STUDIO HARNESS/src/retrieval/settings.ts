@@ -1,3 +1,4 @@
+import { AppSettings, type NamespacedSettings } from "../storage/app-settings.js";
 import type { StudioDatabase } from "../storage/database.js";
 import {
   DEFAULT_READER_PROVIDER,
@@ -26,8 +27,9 @@ export interface SlotSelection {
   readonly fallback: string | undefined;
 }
 
+/** Relative to the `retrieval` namespace, which supplies the prefix. */
 function settingKey(capability: RetrievalCapability, slot: RetrievalSlot): string {
-  return `retrieval.${capability}.${slot}`;
+  return `${capability}.${slot}`;
 }
 
 function isKnown(capability: RetrievalCapability, id: string): boolean {
@@ -35,10 +37,11 @@ function isKnown(capability: RetrievalCapability, id: string): boolean {
 }
 
 export class RetrievalSettingsStore {
-  readonly #db: StudioDatabase;
+  /** `app_setting` belongs to the storage domain; this store owns keys in it. */
+  readonly #settings: NamespacedSettings;
 
   constructor(db: StudioDatabase) {
-    this.#db = db;
+    this.#settings = new AppSettings(db).namespace("retrieval");
   }
 
   /**
@@ -77,21 +80,13 @@ export class RetrievalSettingsStore {
   ): void {
     const key = settingKey(capability, slot);
     if (providerId === undefined) {
-      this.#db.prepare("DELETE FROM app_setting WHERE key = ?").run(key);
+      this.#settings.clear(key);
       return;
     }
-    this.#db
-      .prepare(
-        `INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      )
-      .run(key, providerId, Date.now());
+    this.#settings.set(key, providerId);
   }
 
   #get(key: string): string | undefined {
-    const row = this.#db
-      .prepare("SELECT value FROM app_setting WHERE key = ?")
-      .get(key) as unknown as { value: string } | undefined;
-    return row?.value;
+    return this.#settings.get(key);
   }
 }
