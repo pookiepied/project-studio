@@ -3,10 +3,14 @@ import { dirname } from "node:path";
 
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
 import { SandboxError } from "./errors.js";
+import {
+  assertIsolationAvailable,
+  selectIsolation,
+  type IsolationSupport,
+} from "./isolation.js";
 import { resolveContainedPath } from "./paths.js";
 import {
   requiredIsolation,
-  satisfiesIsolation,
   type IsolationLevel,
   type SandboxPolicy,
 } from "./policy.js";
@@ -38,9 +42,23 @@ export interface SandboxFileStat {
 export class LocalSandbox {
   readonly isolation: IsolationLevel = "in-process";
   readonly #policy: SandboxPolicy;
+  /**
+   * What this host can actually contain, measured once per sandbox.
+   *
+   * Injectable so the enforcing branch is testable today, on a machine where
+   * no backend exists. A refusal that cannot be exercised until the backend
+   * ships is a refusal nobody has ever seen work.
+   */
+  readonly #isolationSupport: IsolationSupport;
 
-  constructor(policy: SandboxPolicy) {
+  constructor(policy: SandboxPolicy, isolationSupport: IsolationSupport = selectIsolation()) {
     this.#policy = policy;
+    this.#isolationSupport = isolationSupport;
+  }
+
+  /** What contained this sandbox's children, for diagnostics and honesty. */
+  get isolationSupport(): IsolationSupport {
+    return this.#isolationSupport;
   }
 
   get policy(): SandboxPolicy {
@@ -127,12 +145,18 @@ export class LocalSandbox {
         });
       }
 
-      if (satisfiesIsolation(this.isolation, requiredIsolation(effect))) continue;
-
-      // No isolation for this effect, and we run it anyway. What makes that
-      // acceptable is decided in two other places, on purpose: our own code was
-      // reviewed before it shipped, and connected code was installed by hand
-      // and asks again on every single call.
+      // The shortfall is decided in one place now, and it is a decision rather
+      // than a fall-through. This branch used to be an `if … continue` followed
+      // by a comment explaining why nothing happened — true, and inert, and
+      // impossible to act on.
+      //
+      // What makes running it anyway acceptable, while it *is* acceptable, is
+      // decided in two other places on purpose: our own code was reviewed
+      // before it shipped, and connected code was installed by hand and asks
+      // again on every single call. What changed is that the harness now says
+      // so by consulting `selectIsolation()`, so the day a backend exists this
+      // starts refusing without anyone having to remember this line.
+      assertIsolationAvailable(requiredIsolation(effect), this.#isolationSupport);
     }
   }
 
