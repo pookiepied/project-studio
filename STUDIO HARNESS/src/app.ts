@@ -18,6 +18,7 @@ import {
   registerFlueTurnBoundary,
   type ObservabilityHandle,
 } from "./observability/index.js";
+import { reportNodeRuntime } from "./platform/runtime.js";
 import { createHttpApp } from "./transport/http/create-app.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 
@@ -45,6 +46,13 @@ function createHarnessApplication(): HarnessApplication {
     bootstrapModelProviders(providerConfig, { database });
 
     observability = initializeObservability();
+
+    // Said out loud on every start, because the alternative was a number in a
+    // file nobody reads. `.node-version` and `engines` were both unenforced —
+    // no CI, no version manager — so the whole Stage 4 cycle was measured on a
+    // runtime below the floor our dependencies declare, and nothing said so
+    // (meta-task #79).
+    reportNodeRuntime(observability.logger);
 
     const bootstrapCredential = admissionCredentialFromEnvironment(
       process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL,

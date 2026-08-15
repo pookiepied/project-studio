@@ -159,7 +159,16 @@ separate task.
 
 ## Commands
 
-Use Node 22.19 or newer. The repository pins the intended local version in `.node-version`.
+Use Node 22.19 or newer — that floor is not ours, it is what `@flue/runtime`,
+`@flue/cli`, `@flue/opentelemetry` and `@earendil-works/pi-ai` each declare.
+`.node-version` pins `24.19.0`, the current patch of the Krypton LTS line, which
+is the version the project is meant to be developed and verified on.
+
+Nothing in this repository enforces either number: there is no CI, and neither
+pnpm's warning nor `.node-version` stops a build. So the Harness reports its own
+runtime at startup instead — `src/platform/runtime.ts` owns both numbers and
+`tests/unit/runtime-version.test.ts` fails if the copies drift apart or fall
+below what a dependency requires (meta-task #79).
 
 ```powershell
 pnpm install
