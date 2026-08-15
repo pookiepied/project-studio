@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isRetryableForUnknown, outcomeFor } from "../../src/execution/outcomes.js";
+import { outcomeFor } from "../../src/execution/outcomes.js";
 
 describe("stop/timeout/cancellation outcomes", () => {
   it("maps every reason to one stable outcome", () => {
@@ -12,12 +12,18 @@ describe("stop/timeout/cancellation outcomes", () => {
     expect(outcomeFor("provider_failure", true).outcome).toBe("failed");
   });
 
-  it("does not retry unknown for non-idempotent, allows retry for idempotent", () => {
-    expect(isRetryableForUnknown(false, "unknown")).toBe(false);
-    expect(isRetryableForUnknown(true, "unknown")).toBe(true);
-    expect(isRetryableForUnknown(true, "completed")).toBe(false);
-    expect(isRetryableForUnknown(true, "aborted")).toBe(false);
-    expect(isRetryableForUnknown(true, "failed")).toBe(false);
+  // `idempotent` was accepted and never read, so this decision was not being
+  // made at all: a non-idempotent capability and an idempotent one got the
+  // same answer. Fails if the parameter is ignored again.
+  it("decides retry safety for unknown from idempotence", () => {
+    expect(outcomeFor("transport_loss", false).retryable).toBe(false);
+    expect(outcomeFor("transport_loss", true).retryable).toBe(true);
+  });
+
+  it("does not let idempotence make a settled outcome retryable", () => {
+    expect(outcomeFor("user_stop", true).retryable).toBe(false);
+    expect(outcomeFor("deadline", true).retryable).toBe(false);
+    expect(outcomeFor("child_exit", true).retryable).toBe(false);
   });
 
   it("keeps transport loss as unknown, not aborted — desktop disconnect does not cancel", () => {

@@ -56,7 +56,11 @@ export function outcomeFor(reason: OutcomeReason, idempotent: boolean): OutcomeR
         // work running. The client can reconnect and observe the same
         // submission. Only a Flue `abort` makes it `aborted`.
         message: "The client transport was lost. The work continues and can be observed after reconnect.",
-        retryable: false,
+        // The one outcome where `idempotent` decides. `unknown` means the side
+        // effect may or may not have happened; repeating it is safe only when
+        // repeating it is a no-op. Every other reason has a settled result, so
+        // retry safety does not depend on the capability.
+        retryable: idempotent,
       };
     case "child_exit":
       return {
@@ -79,9 +83,4 @@ export function outcomeFor(reason: OutcomeReason, idempotent: boolean): OutcomeR
       });
     }
   }
-}
-
-export function isRetryableForUnknown(idempotent: boolean, outcome: ExecutionOutcome): boolean {
-  if (outcome !== "unknown") return false;
-  return idempotent;
 }

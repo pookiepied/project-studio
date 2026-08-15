@@ -231,7 +231,15 @@ export class CallBounds {
     let release: (() => void) | undefined;
     try {
       release = await this.#permits.acquire(signal);
-    } catch {
+    } catch (error) {
+      // `acquire` rejects with the abort reason, which is a `DOMException` and
+      // not part of the tool error contract — so it is translated here, where
+      // the descriptor needed to explain it is in scope.
+      //
+      // Only an abort is an ended call. A bare `catch` also caught a defect in
+      // the permit queue and reported it to the model as a timeout, which is
+      // both untrue and unreportable: the real error never reached a log.
+      if (!signal.aborted) throw error;
       throw endedError(descriptor, reason(), false);
     }
 

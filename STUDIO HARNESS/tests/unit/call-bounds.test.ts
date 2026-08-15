@@ -198,6 +198,26 @@ describe("concurrency", () => {
     expect(bounds.inFlight).toEqual({ active: 0, queued: 0 });
   });
 
+  // A queued call that is cancelled must reach the model as a `ToolError`, not
+  // as the raw `DOMException` the abort signal carries. Fails if the
+  // translation in `run` is removed.
+  it("reports a cancelled queue wait as a tool error, not the abort reason", async () => {
+    const bounds = new CallBounds({ timeoutMs: 5_000, maxConcurrent: 1 });
+    const controller = new AbortController();
+
+    const holding = bounds.run(SAFE, undefined, () => after(200));
+    const queued = bounds.run(UNSAFE, controller.signal, () => after(1));
+    controller.abort();
+
+    const error = await failure(queued);
+    expect(error).toBeInstanceOf(ToolError);
+    expect(error.kind).toBe("cancelled");
+    // It never started, so the message must say repeating it is safe.
+    expect(error.message).toMatch(/nothing was done/i);
+
+    await holding;
+  });
+
   it("releases the permit when a call throws", async () => {
     const bounds = new CallBounds({ timeoutMs: 5_000, maxConcurrent: 1 });
 

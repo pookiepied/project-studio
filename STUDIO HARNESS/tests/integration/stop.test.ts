@@ -178,10 +178,10 @@ describe.sequential("008.2 stop, timeout, cancellation, and disconnect", () => {
     // This is a unit-level check of the outcome mapping, but we also prove the Harness
     // does not auto-retry a non-idempotent unknown by checking that a cancelled
     // non-idempotent tool reports unknown and requires explicit user re-check.
-    const { outcomeFor, isRetryableForUnknown } = await import("../../src/execution/outcomes.js");
+    const { outcomeFor } = await import("../../src/execution/outcomes.js");
     expect(outcomeFor("transport_loss", false).outcome).toBe("unknown");
-    expect(isRetryableForUnknown(false, "unknown")).toBe(false);
-    expect(isRetryableForUnknown(true, "unknown")).toBe(true);
-    expect(isRetryableForUnknown(true, "aborted")).toBe(false);
+    expect(outcomeFor("transport_loss", false).retryable).toBe(false);
+    expect(outcomeFor("transport_loss", true).retryable).toBe(true);
+    expect(outcomeFor("user_stop", true).retryable).toBe(false);
   });
 });

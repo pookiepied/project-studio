@@ -65,23 +65,62 @@ function textResult(value: unknown): string {
   return serialized === undefined ? "The MCP tool returned no result." : serialized;
 }
 
+/**
+ * The content blocks the agent loop accepts — text and images, and nothing
+ * else.
+ *
+ * These mirror `TextContent`/`ImageContent` from the model layer structurally
+ * rather than importing them: they arrive through Flue from a transitive
+ * dependency we do not declare, and importing across that boundary would couple
+ * us to a package we have no version relationship with.
+ *
+ * MCP defines more block kinds than this — `resource` and `audio` among them —
+ * and a server may return any of them. While this was `any[]` such a block was
+ * forwarded straight into a loop that cannot represent it. It is now converted
+ * to text instead, so an unsupported block degrades to something the model can
+ * read rather than something the turn can fail on.
+ */
+type ModelTextContent = { readonly type: "text"; readonly text: string };
+type ModelImageContent = {
+  readonly type: "image";
+  readonly data: string;
+  readonly mimeType: string;
+};
+type ModelToolContent = ModelTextContent | ModelImageContent;
+
 type ModelToolResult = {
-  readonly content: any[];
-  readonly details: any;
+  readonly content: ModelToolContent[];
+  readonly details: unknown;
   readonly isError?: boolean;
 };
+
+function isSupportedContent(value: unknown): value is ModelToolContent {
+  if (!isRecord(value)) return false;
+  if (value["type"] === "text") return typeof value["text"] === "string";
+  if (value["type"] === "image") {
+    return typeof value["data"] === "string" && typeof value["mimeType"] === "string";
+  }
+  return false;
+}
+
+/** An unsupported block, rendered so its content still reaches the model. */
+function asText(value: unknown): ModelTextContent {
+  return { type: "text", text: textResult(value) };
+}
 
 function modelToolResult(value: unknown): ModelToolResult {
   if (isRecord(value) && Array.isArray(value["content"])) {
     return {
-      content: value["content"],
+      content: value["content"].map((block) =>
+        isSupportedContent(block) ? block : asText(block),
+      ),
       details: value,
       ...(value["isError"] === true ? { isError: true } : {}),
     };
   }
 
   return {
-    content: [{ type: "text", text: textResult(value) }],
+    content: [asText(value)],
     details: value,
   };
 }
