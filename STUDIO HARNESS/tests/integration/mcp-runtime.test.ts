@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
+import { itContained } from "../contained.js";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
@@ -77,6 +78,11 @@ const AUTH_CONTEXT = {
 } as const;
 
 describe("MCP application runtime", () => {
+  // The one case here starts a real stdio server, and an `mcp-server` is owed
+  // `os` isolation — so on a host that cannot supply it the launch is refused
+  // before a process exists. That refusal is the subject of the sandbox
+  // integration suites; this file's subject is what happens once the server is
+  // actually running, which needs a machine that can run one.
   const temporaryDirectories: string[] = [];
 
   afterEach(async () => {
@@ -86,7 +92,7 @@ describe("MCP application runtime", () => {
     }
   });
 
-  it("runs a selected real stdio tool through the gate and removes it when disabled", async () => {
+  itContained("runs a selected real stdio tool through the gate and removes it when disabled", async () => {
     const directory = await mkdtemp(join(tmpdir(), "studio-mcp-runtime-"));
     temporaryDirectories.push(directory);
     const projectRoot = join(directory, "project");

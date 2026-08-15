@@ -14,6 +14,7 @@ import { openDatabase, type StudioDatabase } from "../../../src/storage/database
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
 import { requiresUndoPoint } from "../../../src/contracts/effects.js";
+import { itContained } from "../../contained.js";
 import {
   registerShellTools,
   resolveProgram,
@@ -82,7 +83,14 @@ describe("how long a program may run", () => {
 });
 
 describe("running a program", () => {
-  it("runs it and returns its output", async () => {
+  // `itContained` on everything that actually starts one. The shell tool is
+  // owed `os` isolation, so on a host that cannot supply it the call is refused
+  // — correctly, and that refusal is asserted in the sandbox integration
+  // suites. What is *not* gated is everything decided before the spawn: a
+  // working directory outside the project, a command passed as one string, a
+  // policy that never opted in. Those are this file's own subject and they hold
+  // on every machine.
+  itContained("runs it and returns its output", async () => {
     const output = await run(gate(), {
       command: NODE,
       args: ["-e", "console.log('hello')"],
@@ -91,7 +99,7 @@ describe("running a program", () => {
     expect(output).toContain("hello");
   });
 
-  it("reports a non-zero exit as a result rather than a failure", async () => {
+  itContained("reports a non-zero exit as a result rather than a failure", async () => {
     // A failing test suite is the answer to the question that was asked.
     const output = await run(gate(), {
       command: NODE,
@@ -101,7 +109,7 @@ describe("running a program", () => {
     expect(output).toContain("exit code 3");
   });
 
-  it("labels stderr so the model can tell the streams apart", async () => {
+  itContained("labels stderr so the model can tell the streams apart", async () => {
     const output = await run(gate(), {
       command: NODE,
       args: ["-e", "console.error('bad')"],
@@ -111,7 +119,7 @@ describe("running a program", () => {
     expect(output).toContain("bad");
   });
 
-  it("runs in the project, and in a subdirectory when asked", async () => {
+  itContained("runs in the project, and in a subdirectory when asked", async () => {
     mkdirSync(join(workspace, "sub"), { recursive: true });
 
     const output = await run(gate(), {
@@ -131,7 +139,7 @@ describe("running a program", () => {
 });
 
 describe("there is no shell", () => {
-  it("passes metacharacters through as ordinary text", async () => {
+  itContained("passes metacharacters through as ordinary text", async () => {
     // The property the whole design rests on. This is one argument, not a
     // command followed by three more.
     const output = await run(gate(), {
@@ -241,7 +249,7 @@ describe("containment", () => {
     ).rejects.toBeInstanceOf(SandboxError);
   });
 
-  it("does not hand the host environment to the program", async () => {
+  itContained("does not hand the host environment to the program", async () => {
     // Inheriting process.env would give every program on the machine every
     // token on the machine.
     process.env.STUDIO_SHELL_LEAK_CHECK = "leaked";
@@ -255,7 +263,7 @@ describe("containment", () => {
     expect(output).toContain("undefined");
   });
 
-  it("stops a program that outlives its time limit", async () => {
+  itContained("stops a program that outlives its time limit", async () => {
     const output = await run(gate(), {
       command: NODE,
       args: ["-e", "setInterval(() => {}, 1000)"],

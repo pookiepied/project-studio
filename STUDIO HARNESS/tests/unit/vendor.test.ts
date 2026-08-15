@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,11 +20,19 @@ let vendored: string;
 let managed: string;
 let systemDirectory: string;
 
-/** Creates a file that looks like a real binary to the resolver. */
+/**
+ * Creates a file that looks like a real binary to the resolver.
+ *
+ * Including the permission bit. A fixture that is merely *present* would let
+ * the resolver pass a file the OS refuses to run, which is exactly the shape of
+ * the bug that shipped: a vendored `rg` committed without `+x`, found on Linux
+ * and invisible on Windows.
+ */
 function placeBinary(directory: string, name: string): string {
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `${name}${EXECUTABLE_SUFFIX}`);
   writeFileSync(path, "");
+  chmodSync(path, 0o755);
   return path;
 }
 
@@ -178,6 +186,27 @@ describe("only real files are accepted", () => {
     expect(() =>
       resolveBinary("git", { vendorRoot: vendored, searchPath: systemDirectory }),
     ).toThrow(VendorError);
+  });
+
+  it("does not resolve a file the OS would refuse to run", () => {
+    // Windows has no executable bit — `X_OK` answers yes for any file that
+    // exists — so there is nothing to take away and nothing to assert. Skipped
+    // by platform semantics rather than by capability: this is not a feature
+    // that might work here, it is a permission model that does not exist here.
+    if (process.platform === "win32") return;
+
+    const path = placeBinary(join(vendored, platformKey()), "rg");
+    chmodSync(path, 0o644);
+
+    expect(() => resolveBinary("rg", { vendorRoot: vendored })).toThrow(VendorError);
+  });
+
+  it("ships a ripgrep that is actually executable", () => {
+    // The pin for a bug that only a Linux run could see. `vendor/linux-x64/rg`
+    // was committed as mode 100644 because Windows git does not track a
+    // permission bit, so it resolved fine and then failed at spawn with EACCES
+    // — every search on Linux, in a build whose Windows tests were all green.
+    expect(() => resolveBinary("rg")).not.toThrow();
   });
 });
 

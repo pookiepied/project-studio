@@ -58,15 +58,24 @@ describe("the effect table", () => {
         safeUntrusted: false,
       },
       execute: { isolation: "os", undo: true, elevated: true, safeUntrusted: false },
-      network: { isolation: "os", undo: false, elevated: true, safeUntrusted: false },
+      network: { isolation: "in-process", undo: false, elevated: true, safeUntrusted: false },
     });
   });
 
   it("keeps the isolation answers the sandbox was built on", () => {
+    // `execute` is the one effect that always means a child was started, so it
+    // is the one that always needs a boundary our own process cannot draw.
+    //
+    // `network` said `os` until the Linux backend landed, and the reasoning was
+    // about a subprocess opening a socket — which is now decided by the kernel
+    // where the subprocess is created, from `allowNetwork` (ADR 0041). Left at
+    // `os`, this line only ever reached capabilities that start no child at
+    // all, and refused our own `web_fetch` on a host whose *shell* sandbox was
+    // unavailable. Pinned at `in-process` so it cannot drift back.
     expect(requiredIsolation("read")).toBe("in-process");
     expect(requiredIsolation("write")).toBe("in-process");
     expect(requiredIsolation("execute")).toBe("os");
-    expect(requiredIsolation("network")).toBe("os");
+    expect(requiredIsolation("network")).toBe("in-process");
 
     expect(satisfiesIsolation("remote-vm", "os")).toBe(true);
     expect(satisfiesIsolation("in-process", "os")).toBe(false);

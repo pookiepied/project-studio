@@ -459,6 +459,10 @@ describe("nothing the model chose reaches a process uncontained", () => {
       [join("src", "extend", "mcp", "stdio-channel.ts"), "streams for a session"],
       // Configures the sandbox. Cannot use the sandbox.
       [join("src", "sandbox", "isolation", "windows", "launcher.ts"), "builds the container"],
+      // Asks the kernel whether it will hand out a user namespace, by trying.
+      // The answer cannot be reached any other way, and a backend that guessed
+      // it would be the exact failure this whole seam exists to prevent.
+      [join("src", "sandbox", "isolation", "linux", "bwrap.ts"), "probes the container"],
       // Starts the Harness itself, which is the trusted process — a process
       // cannot contain itself (see `isolation/kinds.ts`).
       [join("src", "host", "harness-launcher.ts"), "starts the trusted process"],

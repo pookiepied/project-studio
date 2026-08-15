@@ -1,6 +1,6 @@
 # ADR 0041 — Containment is the kernel's job
 
-**Status:** Accepted · 2026-08-15
+**Status:** Accepted · 2026-08-15 · extended 2026-08-16 with the Linux backend
 **Relates to:** [ADR 0039](0039-a-child-inherits-nothing-it-was-not-given.md) —
 the same taxonomy of children, the other axis. 0039 says what a child *inherits*;
 this says what a child can *reach*.
@@ -142,7 +142,11 @@ its API and may not touch the user's dev server, local database, or router.
 
 ## What it actually does, measured
 
-From inside a container, against a real workspace, asking the kernel directly:
+From inside a **Windows** container, against a real workspace, asking the kernel
+directly. The Linux column is deliberately absent: no machine has yet been
+available on which `bwrap` could be run at all, so the same table for it would
+be a description rather than a measurement, and `sandbox-bwrap.test.ts` is
+written and waiting for the host that can fill it in.
 
 | Attempt | Result |
 |---|---|
@@ -154,6 +158,9 @@ From inside a container, against a real workspace, asking the kernel directly:
 
 Asserted in `tests/integration/sandbox-appcontainer.test.ts`, against the copy
 in `vendor/`, so what is measured is what ships.
+`tests/integration/sandbox-bwrap.test.ts` asserts the same claims against a
+Linux kernel, and asserts the *refusal* on a host that cannot contain — which is
+the half that has actually been exercised so far.
 
 ## Consequences
 
@@ -181,13 +188,77 @@ The limit that follows: a program that reads its own files *at runtime* rather
 than only linking system libraries needs its directory granted. Python's
 standard library is the case to expect.
 
-### Linux is uncontained, and says so
+### Linux is contained too, and by the distribution's own binary
 
-`OS_ISOLATION_BACKENDS` is empty on Linux, so `ISOLATION_ENFORCED` is false there
-and `execute` runs exactly as it did before. That is the honest transitional
-state rather than a regression introduced by giving Windows a backend, and the
-unit test asserts it per platform — so the day `bwrap` lands, the Linux branch
-fails and this ADR has to be revisited rather than remembered.
+`bwrap` is registered on Linux as of Stage 4b step 3. It needed no launcher of
+ours — the distribution supplies one, reviews it, and ships its security updates
+on its own schedule, which is a better trade than vendoring a sandbox and owning
+its CVEs. So the Linux backend is an argument vector and a probe, and the two
+platform directories are deliberately not the same size.
+
+It also writes **nothing** to the user's disk. Windows adds an access-control
+entry to the project directory and needs `release()` to take it back; a
+namespace evaporates with the process it contained, so `release()` there is a
+genuine no-op rather than an unimplemented one.
+
+Two rules survive the change of mechanism, expressed differently. Read and write
+roots are resolved to one mode per path on Windows, because `SetEntriesInAcl`
+*replaces* a trustee's entry; on Linux they are ordered, because a later `bwrap`
+mount wins. Same rule, two shapes, both pinned by a test.
+
+### A backend that is installed and still does not work
+
+The finding step 3 produced, and the one that justifies the probe existing at
+all. On **stock Ubuntu 24.04**, `bwrap` 0.9.0 is installed at `/usr/bin/bwrap`
+and an unprivileged user cannot use it:
+
+```
+$ bwrap --unshare-user  … -- /bin/echo hi
+bwrap: setting up uid map: Permission denied
+$ bwrap --unshare-all   … -- /bin/true
+bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted
+```
+
+`kernel.apparmor_restrict_unprivileged_userns=1` since Ubuntu 23.10, and no
+AppArmor profile grants `bwrap` `userns create`. A `process.platform === "linux"`
+check would have claimed containment on that machine and run every shell command
+open under a build that reports itself contained. That is the exact failure the
+seam exists to prevent, and it is not an edge case — it is the default state of
+one of the most widely deployed Linux distributions.
+
+So this host **refuses**, which is correct, and the refusal now quotes what the
+kernel actually said. The remedy sentence beside it is a list of things known to
+produce that class of failure, kept separate from the observation on purpose:
+deciding the cause and printing only the fix is how an `ETIMEDOUT` got reported
+as "run as administrator" to someone already elevated. Making that refusal
+survivable — the Linux counterpart of `pnpm sandbox:prepare` — is **#92**.
+
+### The network switch does not mean the same thing on both platforms
+
+Windows grants `internetClient`, measured to exclude loopback and the LAN. Linux
+shares the host's network namespace, because `bwrap` offers nothing between
+"empty namespace" and "the host's" — so an allowed child there reaches
+`127.0.0.1` as well. The **refusal** half is identical and complete on both; the
+**granted** half is wider on Linux. Registered as **#93**, and written into
+`ContainmentRequest.network`'s own doc comment rather than only here, because
+that is the field whose name implies otherwise.
+
+### `network` stopped requiring `os`, and that is not a relaxation
+
+`EFFECT_RULES.network.isolation` was `os`, for a reason that was true about a
+subprocess: nothing in userspace Node stops one opening a socket. But a
+subprocess's network is now decided by the kernel where the subprocess is
+created, from the operator's `allowNetwork` switch. Asking the same question
+again in the effect table only ever reached capabilities that start **no child
+at all** — our own `web_fetch`, an HTTPS request from the harness process — and
+refused them because somebody else's sandbox was unavailable.
+
+Nothing had ever run on a host that registers a backend and cannot use it, so
+the two answers had always coincided. Ubuntu 24.04 was the first machine to tell
+them apart, and it did so by disabling the web tools. Containment is a property
+of the **kind** of child (`isolation/kinds.ts`); the effect table says what an
+effect needs of the harness. Conflating them is the second taxonomy this ADR
+opens by refusing, arriving from the other direction.
 
 ### MCP servers are contained, with the network granted by default
 
@@ -206,7 +277,13 @@ capability, surfaced in the install dialog.
 
 ### What is still not contained
 
-Linux. `OS_ISOLATION_BACKENDS` is empty there, so nothing changed for it.
+macOS, by decision rather than omission — Stage 4b put it out of scope — so a
+Mac registers no backend, enforces nothing, and behaves exactly as it did.
+
+And any Linux machine whose kernel withholds user namespaces, which refuses
+rather than running open. That is the intended behaviour and it is also a
+usability cliff: on such a host the shell tool and every stdio MCP server stop
+working until #92 gives the user a way through.
 
 ## The finding that changed the plan
 

@@ -4,8 +4,9 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
+import { itContained } from "../contained.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import { FlueHarnessClient } from "../../src/application/harness-client.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
@@ -137,7 +138,9 @@ describe("MCP through the Flue agent", () => {
     directory = undefined;
   });
 
-  it("runs a real selected tool through approval and removes it after disable", async () => {
+  // Starts a real stdio MCP server, so it needs a host that can contain one.
+  // The refusal on a host that cannot is asserted in the sandbox suites.
+  itContained("runs a real selected tool through approval and removes it after disable", async () => {
     directory = await mkdtemp(join(tmpdir(), "studio-mcp-flue-"));
     const script = join(directory, "server.mjs");
     await writeFile(script, SERVER, "utf8");

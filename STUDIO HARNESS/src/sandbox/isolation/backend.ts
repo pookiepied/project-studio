@@ -27,15 +27,25 @@ export interface ContainmentRequest {
    * the network namespace; naming either one here would put a platform's
    * vocabulary in the interface every platform implements.
    *
-   * It is not "network access" in general, and the difference was measured
+   * **What it grants is not the same on both platforms, and saying otherwise
+   * would be the easy lie here.**
+   *
+   * On Windows it is narrower than "network access", and that was measured
    * rather than assumed: with `internetClient` and nothing else, a contained
    * child reaches a public address and resolves a name, and is refused
    * `127.0.0.1` and `192.168.x.x` alike — both verified reachable from outside
    * the container in the same run, so the refusals are refusals and not
    * unreachable hosts. Loopback stays shut under *every* capability Windows
-   * offers; opening it needs an administrator exemption this will never ask
-   * for. So a contained server can call its API and cannot touch the user's dev
-   * server, their database, or their router.
+   * offers. So a contained server can call its API and cannot touch the user's
+   * dev server, their database, or their router.
+   *
+   * On Linux the switch is `--share-net`, which means *no network namespace at
+   * all* — so the child gets the host's stack, loopback and LAN included.
+   * `bwrap` has no setting between "empty namespace" and "the host's", so
+   * matching the Windows boundary would need a firewall or a seccomp filter
+   * this does not have. The refusal half is identical and complete; the
+   * granted half is wider. Registered as **#93**, and stated here rather than
+   * in a document because this is the field whose name implies otherwise.
    */
   readonly network: boolean;
   /**
@@ -73,6 +83,21 @@ export interface IsolationBackend {
    * than no backend at all.
    */
   available(): boolean;
+  /**
+   * One sentence saying why this host cannot use it, and what would fix it.
+   *
+   * Optional, and only consulted when {@link IsolationBackend.available} said
+   * no. Without it a refusal reads "no sandbox backend on this machine can
+   * provide it", which is true and useless — the Windows half of this feature
+   * already learned that lesson the other way round, where naming the exact
+   * folders and the exact command is what turned a dead end into a one-time
+   * setup step.
+   *
+   * It must report what was **observed**, not what is likely. A guess in this
+   * position sends the user to fix something that was never broken, which is
+   * the failure ADR 0041's addendum is about.
+   */
+  diagnose?(): string | undefined;
   /** Prepares whatever the policy needs, and rewrites the command. */
   contain(request: ContainmentRequest): Promise<ContainedCommand>;
   /**
@@ -98,6 +123,14 @@ export interface IsolationSupport {
    * rather than run anyway.
    */
   readonly enforcing: boolean;
+  /**
+   * Why the backends this build has could not be used here, if they could not.
+   *
+   * Empty when containment is available, and empty when there was never a
+   * backend for this platform — a machine that was never promised containment
+   * has nothing to explain.
+   */
+  readonly shortfall: readonly string[];
 }
 
 /**
@@ -113,8 +146,16 @@ export interface IsolationSupport {
  */
 export function selectIsolation(backends: readonly IsolationBackend[]): IsolationSupport {
   let best: IsolationBackend | undefined;
+  const shortfall: string[] = [];
   for (const backend of backends) {
-    if (!backend.available()) continue;
+    if (!backend.available()) {
+      // Collected on the way past, while the backend still remembers what it
+      // saw. Asking afterwards would mean re-probing, and a probe that runs
+      // twice is a probe whose two answers can differ.
+      const reason = backend.diagnose?.();
+      if (reason !== undefined) shortfall.push(reason);
+      continue;
+    }
     if (best === undefined || satisfiesIsolation(backend.level, best.level)) {
       best = backend;
     }
@@ -128,10 +169,12 @@ export function selectIsolation(backends: readonly IsolationBackend[]): Isolatio
       // not a transitional one: the build has containment for this platform and
       // this particular machine cannot give it.
       enforcing: backends.length > 0,
+      shortfall,
     };
   }
 
-  return { level: best.level, backend: best, enforcing: backends.length > 0 };
+  // Nothing to explain once something works, even if a second backend failed.
+  return { level: best.level, backend: best, enforcing: backends.length > 0, shortfall: [] };
 }
 
 /**
@@ -155,9 +198,11 @@ export function assertIsolationAvailable(
   if (!support.enforcing) return;
 
   throw new SandboxError("unsupported_isolation", {
-    message:
+    message: [
       "This action needs OS-level isolation, and no sandbox backend on this " +
-      "machine can provide it.",
+        "machine can provide it.",
+      ...support.shortfall,
+    ].join(" "),
   });
 }
 

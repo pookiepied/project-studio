@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
 
 import {
@@ -22,11 +22,16 @@ import { VendorError } from "./errors.js";
  * - **managed** — downloaded by us into the user's Studio home, under a
  *   version-stamped directory. Git, as a fallback for a machine without it.
  *
+ * `bwrap` is system-only with no fallback at all, which is the third answer
+ * again: it is the Linux sandbox, so a copy of ours would put us on the hook for
+ * its security updates, and a machine without it is a machine that gets told to
+ * install it rather than one that quietly runs uncontained.
+ *
  * Nothing is ever guessed. A missing tool with an actionable message is
  * recoverable; a silently different tool is not.
  */
 
-export type VendorBinaryName = "git" | "rg";
+export type VendorBinaryName = "git" | "rg" | "bwrap";
 
 export type BinarySource =
   /** Shipped with the application, reviewed and committed. */
@@ -64,6 +69,11 @@ export interface ResolveBinaryOptions {
 const SOURCES: Record<VendorBinaryName, readonly BinarySource[]> = {
   rg: ["shipped"],
   git: ["system", "managed"],
+  // The system's copy and nothing else. `bwrap` is the Linux sandbox, and
+  // vendoring a security tool would mean owning its CVEs on our release
+  // schedule instead of the distribution's — the wrong half of that trade for
+  // the one program whose job is to be trusted.
+  bwrap: ["system"],
 };
 
 /**
@@ -75,6 +85,10 @@ const SOURCES: Record<VendorBinaryName, readonly BinarySource[]> = {
 const MISSING_MESSAGE: Record<VendorBinaryName, string> = {
   git: "Git is not available. Install Git, or let Project Studio set it up for you.",
   rg: "The search program is missing from this installation of Project Studio.",
+  bwrap:
+    "The sandbox program is not installed. Install bubblewrap — " +
+    "`sudo apt install bubblewrap` on Debian and Ubuntu, " +
+    "`sudo dnf install bubblewrap` on Fedora and RHEL.",
 };
 
 /** Only the extensions `runProcess` is willing to spawn without a shell. */
@@ -121,10 +135,24 @@ export function managedRoot(options: ResolveBinaryOptions = {}): string {
     : managedBinaryDirectory();
 }
 
-/** True when the path is a real file we could hand to the OS. */
+/**
+ * True when the path is a real file the OS would actually agree to run.
+ *
+ * The permission bit is checked here rather than left to `spawn`, and the
+ * reason is a bug this cost a Linux run to find: `vendor/linux-x64/rg` was
+ * committed without its executable bit — invisible on Windows, where git does
+ * not track one — so every search on Linux resolved a binary that existed and
+ * then died with `EACCES` inside `runProcess`. A missing tool has a message
+ * that tells the user what to do; a spawn failure two layers down does not.
+ *
+ * `X_OK` is a no-op on Windows, where any existing file answers yes, so this is
+ * one check rather than a platform branch.
+ */
 function isFile(path: string): boolean {
   try {
-    return statSync(path).isFile();
+    if (!statSync(path).isFile()) return false;
+    accessSync(path, constants.X_OK);
+    return true;
   } catch {
     return false;
   }

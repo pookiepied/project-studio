@@ -9,6 +9,7 @@ import type {
   CapabilityDescriptor,
   CapabilityEffect,
 } from "../../src/contracts/capabilities.js";
+import { CAN_CONTAIN } from "../contained.js";
 import { SandboxError } from "../../src/sandbox/errors.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { isInsideRoot } from "../../src/sandbox/paths.js";
@@ -259,11 +260,17 @@ describe("isolation is claimed honestly", () => {
     expect(sandbox.isolation).toBe("in-process");
   });
 
-  it("requires OS isolation for running code and reaching the network", () => {
-    // Neither can be contained from inside our own process: a subprocess is
-    // outside our path checks, and nothing in userspace Node stops a socket.
+  it("requires OS isolation for running code, and asks it of nothing else", () => {
+    // `execute` cannot be contained from inside our own process: a subprocess
+    // is outside our path checks, and it is the only effect that always means
+    // one exists.
+    //
+    // `network` is deliberately not in that list any more. The subprocess half
+    // of the old reasoning is now enforced by the kernel where the subprocess
+    // is made — `internetClient` on Windows, `--share-net` on Linux — and the
+    // in-process half was never true of our own HTTPS call.
     expect(requiredIsolation("execute")).toBe("os");
-    expect(requiredIsolation("network")).toBe("os");
+    expect(requiredIsolation("network")).toBe("in-process");
     expect(requiredIsolation("read")).toBe("in-process");
     expect(requiredIsolation("write")).toBe("in-process");
   });
@@ -306,15 +313,25 @@ describe("isolation is claimed honestly", () => {
     expect(() => locked.assertSupports(descriptor(["execute"]))).toThrow(SandboxError);
   });
 
-  it("runs a native program when the policy opted in, uncontained and said so", () => {
-    // ADR 0019. Containing hostile code needs OS isolation and still does.
-    // Running a program the user chose, in a folder they trusted, with their
-    // approval is not containment — it is doing as asked.
+  it("lets the policy's opt-in past the policy, and no further", () => {
+    // This used to be called "runs a native program … uncontained and said so",
+    // citing ADR 0019: running a program the user chose, in a folder they
+    // trusted, with their approval is doing as asked rather than containment.
+    // ADR 0041 overrode it. `execute` is contained now, and a host that cannot
+    // contain refuses instead of running open — that is the whole of #15.
+    //
+    // So `allowExec` clears the operator's switch and then hands the question
+    // to the machine, and the honest assertion is both halves: past the switch,
+    // and decided by measured support. Written this way rather than gated with
+    // `itContained`, because "what happens when the host cannot contain" is
+    // precisely what this test is about.
     const permissive = new LocalSandbox(
       createSandboxPolicy({ workspaceRoot: workspace, allowExec: true }),
     );
+    const attempt = () => permissive.assertSupports(descriptor(["execute"]));
 
-    expect(() => permissive.assertSupports(descriptor(["execute"]))).not.toThrow();
+    if (CAN_CONTAIN) expect(attempt).not.toThrow();
+    else expect(attempt).toThrow(SandboxError);
   });
 
   it("does not ask who wrote the code, because that is not a containment fact", () => {

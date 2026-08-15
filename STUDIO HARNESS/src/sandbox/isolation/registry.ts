@@ -1,5 +1,6 @@
 import type { IsolationBackend, IsolationSupport } from "./backend.js";
 import { selectIsolation } from "./backend.js";
+import { linuxBwrap } from "./linux/bwrap.js";
 import { windowsAppContainer } from "./windows/appcontainer.js";
 
 /**
@@ -22,16 +23,23 @@ import { windowsAppContainer } from "./windows/appcontainer.js";
  * that nobody has written the Linux half yet. Those are different sentences and
  * they deserve different behaviour.
  *
- * ## Why Linux is absent rather than present-and-failing
+ * ## Both platforms are registered, and neither is thereby claimed
  *
- * Stage 4b step 3 adds `bwrap`. Until then Linux has no entry, so
- * {@link ISOLATION_ENFORCED} is false there and `execute` runs uncontained,
- * exactly as it does today. That is the same honest transitional state the seam
- * shipped with — not a regression introduced by giving Windows a backend, and
- * not a claim that Linux is contained.
+ * Linux was absent here until Stage 4b step 3, so `ISOLATION_ENFORCED` was false
+ * there and `execute` ran uncontained. It is present now, which means Linux
+ * *enforces*: a machine whose `bwrap` cannot get a user namespace is refused
+ * rather than run open. That distinction is not theoretical — it is the measured
+ * state of stock Ubuntu 24.04, where `bwrap` is installed and the kernel still
+ * says no. Registration says the implementation exists; only `available()` says
+ * it works.
+ *
+ * macOS stays absent, and that is a decision rather than a gap: Stage 4b put it
+ * explicitly out of scope, so a Mac gets `in-process` and no enforcement, the
+ * same honest transitional state Linux had until now.
  */
 const BACKENDS_BY_PLATFORM: Partial<Record<NodeJS.Platform, readonly IsolationBackend[]>> = {
   win32: [windowsAppContainer],
+  linux: [linuxBwrap],
 };
 
 export const OS_ISOLATION_BACKENDS: readonly IsolationBackend[] =

@@ -9,16 +9,19 @@
  * | `backend.ts` | what a containment mechanism must be able to do, and which one this host has |
  * | `registry.ts` | which mechanisms this build knows about, per platform |
  * | `windows/` | one mechanism, in full |
+ * | `linux/` | the other one, in full |
  *
- * A `linux/` directory appears in Stage 4b step 3 and holds `bwrap`. It is
- * absent rather than empty on purpose: a directory that promises an
- * implementation nobody has written is the same lie as a comment that says
- * "TODO: contain this".
+ * The two platform directories are deliberately not symmetrical in size.
+ * Windows needed a launcher written, an identity minted and permission entries
+ * granted and revoked; Linux needed an argument vector, because the distribution
+ * already ships the launcher. Forcing them into the same shape would be
+ * inventing work to make a diagram tidy.
  */
 
 export { isolationForKind, type ChildKind } from "./kinds.js";
 export { containCommand, type ContainRequest } from "./contain.js";
 export { programRoots } from "./program-roots.js";
+export { bwrapArgs, linuxBwrap, type BwrapInput } from "./linux/bwrap.js";
 export {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,

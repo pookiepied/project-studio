@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { join, parse } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +14,9 @@ import {
   OS_ISOLATION_BACKENDS,
   programRoots,
   ancestorsOf,
+  bwrapArgs,
   selectIsolation,
+  type BwrapInput,
   type ContainedCommand,
   type IsolationBackend,
 } from "../../src/sandbox/isolation/index.js";
@@ -38,6 +40,16 @@ import { createSandboxPolicy } from "../../src/sandbox/policy.js";
  * `tests/integration/sandbox-appcontainer.test.ts`, which measures the kernel
  * rather than describing it.
  */
+
+/**
+ * The running platform's filesystem root — `D:\` here, `/` there.
+ *
+ * Path *shape* is the one thing in this file that cannot be written as a
+ * Windows literal and still mean something everywhere: `node:path` on Linux
+ * does not consider `C:/Users` rooted, so an assertion built from `C:` there
+ * tests the test rather than the code.
+ */
+const ROOT = parse(process.cwd()).root;
 
 const workspace = process.cwd();
 
@@ -219,6 +231,116 @@ describe("every kind reaches the same verdict", () => {
   });
 });
 
+describe("the Linux launcher's argument rules", () => {
+  // Pure-function tests, run on every platform for the same reason the Windows
+  // ones are: what a command line *says* is checkable anywhere, and what the
+  // kernel does with it is measured in `tests/integration/sandbox-bwrap.test.ts`
+  // on a machine that has one.
+  const base: BwrapInput = {
+    cwd: "/home/u/project",
+    executable: "/usr/bin/node",
+    args: [],
+    readRoots: [],
+    writeRoots: [],
+    programRoots: [],
+    network: false,
+  };
+
+  /** The mode `bwrap` would end up applying to a path — last mention wins. */
+  function modeOf(args: readonly string[], path: string): string | undefined {
+    let mode: string | undefined;
+    for (let index = 0; index < args.length; index += 1) {
+      if (args[index] !== path) continue;
+      const flag = args[index - 1];
+      if (flag === "--bind" || flag === "--ro-bind" || flag === "--ro-bind-try") {
+        mode = flag;
+      }
+    }
+    return mode;
+  }
+
+  it("unshares everything, and shares the network back only when asked", () => {
+    // One flag is the whole network policy, exactly as `internetClient` is on
+    // Windows. `--unshare-all` already includes the network namespace, so the
+    // default is refusal and `--share-net` is the only thing that undoes it.
+    expect(bwrapArgs(base)).toContain("--unshare-all");
+    expect(bwrapArgs(base)).not.toContain("--share-net");
+    expect(bwrapArgs({ ...base, network: true })).toContain("--share-net");
+  });
+
+  it("binds name resolution and certificates only with the network", () => {
+    // Bound individually rather than by handing over the whole of `/etc`. The
+    // child's business is its own API call, not the machine's user list.
+    expect(bwrapArgs({ ...base, network: true })).toContain("/etc/resolv.conf");
+    expect(bwrapArgs(base)).not.toContain("/etc/resolv.conf");
+  });
+
+  it("dies with its parent and drops the controlling terminal", () => {
+    // Neither is decoration. A child that outlives the harness keeps its mounts
+    // and stops being contained by anything we control; a child that keeps a
+    // terminal can push characters back into it with TIOCSTI, which is a
+    // contained program typing at the user's shell.
+    expect(bwrapArgs(base)).toContain("--die-with-parent");
+    expect(bwrapArgs(base)).toContain("--new-session");
+  });
+
+  it("gives a root that is both readable and writable the stronger mode", () => {
+    // The same rule the Windows backend spells out in `grantsFor`, where it had
+    // to be a map because `SetEntriesInAcl` replaces an entry. Here it is an
+    // ordering, because `bwrap` lets the last mount win — and the workspace
+    // root is on both lists, so getting it backwards is a sandbox that can read
+    // its own project and not write to it. That shipped once already.
+    const args = bwrapArgs({
+      ...base,
+      readRoots: ["/home/u/project"],
+      writeRoots: ["/home/u/project"],
+    });
+    expect(modeOf(args, "/home/u/project")).toBe("--bind");
+  });
+
+  it("lets the policy's roots override the system ones", () => {
+    // A workspace under a system path is still the workspace. System mounts are
+    // laid down first for exactly this reason.
+    const args = bwrapArgs({ ...base, writeRoots: ["/usr/local/src/project"] });
+    expect(args.lastIndexOf("/usr")).toBeLessThan(args.indexOf("/usr/local/src/project"));
+  });
+
+  it("keeps a program root read-only even when it is listed twice", () => {
+    // Program files are the one thing that never becomes writable by being
+    // mentioned again: they are applied before the policy, so a genuine write
+    // root still wins, but nothing about being a program grants a write.
+    const args = bwrapArgs({ ...base, programRoots: ["/opt/tool"] });
+    expect(modeOf(args, "/opt/tool")).toBe("--ro-bind-try");
+  });
+
+  it("puts the program after `--`, so its flags are never ours", () => {
+    // `bwrap` and the program it runs can both be given `--chdir`. The
+    // separator decides whose it is, and the model writes the second list.
+    const args = bwrapArgs({
+      ...base,
+      executable: "/usr/bin/env",
+      args: ["--chdir", "anything"],
+    });
+    const separator = args.indexOf("--");
+    expect(args.slice(separator)).toEqual([
+      "--",
+      "/usr/bin/env",
+      "--chdir",
+      "anything",
+    ]);
+  });
+
+  it("tolerates system directories a distribution does not have", () => {
+    // `/lib64` is absent on some distributions and `/bin` is a symlink on
+    // merged-`/usr` ones. A hard bind on a path that is not there fails the
+    // whole launch, so only `/usr` — the one that is never optional — is
+    // allowed to be fatal.
+    const args = bwrapArgs(base);
+    expect(modeOf(args, "/usr")).toBe("--ro-bind");
+    expect(modeOf(args, "/lib64")).toBe("--ro-bind-try");
+  });
+});
+
 describe("the Windows launcher's argument rules", () => {
   it("asks for internetClient only when the network was requested", () => {
     // The capability is the whole network policy in one flag, so its presence
@@ -320,19 +442,25 @@ describe("the two grants a contained program needs beyond its workspace", () => 
     // Root first because that is the order the kernel checks them, and because
     // a diagnostic built from this list should name the *first* wall a program
     // will hit rather than the last.
-    const chain = ancestorsOf(join("C:", "Users", "someone", "project", "file.js"));
+    //
+    // Built from the running platform's own root rather than a `C:\` literal.
+    // The first version of this test hardcoded a Windows path, which meant it
+    // asserted nothing on Linux except that `node:path` there does not consider
+    // `C:/Users` rooted — a true statement about the wrong subject, and a
+    // failure that says the code is broken when the test is.
+    const chain = ancestorsOf(join(ROOT, "one", "two", "three", "file.js"));
     expect(chain).toEqual([
-      `C:${sep}`,
-      join("C:", "Users"),
-      join("C:", "Users", "someone"),
-      join("C:", "Users", "someone", "project"),
+      ROOT,
+      join(ROOT, "one"),
+      join(ROOT, "one", "two"),
+      join(ROOT, "one", "two", "three"),
     ]);
   });
 
   it("does not spin on a path that is already a root", () => {
     // `dirname` is its own fixed point at the root. Without the guard this
     // loops forever instead of failing, which is the worst way to be wrong.
-    expect(ancestorsOf(`C:${sep}`)).toEqual([`C:${sep}`]);
+    expect(ancestorsOf(ROOT)).toEqual([ROOT]);
   });
 
 });
@@ -343,17 +471,52 @@ describe("what this build knows how to contain, per platform", () => {
     // keeping: *this build has an implementation* is knowledge fixed when the
     // code was written, while *it works on this machine* is `available()`.
     //
-    // This assertion is what makes step 3 impossible to forget. The day the
-    // `bwrap` backend lands, the Linux branch here fails — and that is the same
-    // day the containment text in the README and ADRs 0019/0022/0024 stops
-    // being wrong for a new reason (#41).
+    // This assertion is what made step 3 impossible to forget: while Linux had
+    // no backend, the branch below asserted an empty registry, so landing
+    // `bwrap` failed the test and forced this file, the ADR and the README to
+    // be brought along with it. It did exactly that.
+    //
+    // macOS is the remaining `else`, and it is out of scope by decision rather
+    // than by omission — so it still asserts an empty registry and no
+    // enforcement, which is the state Linux has just left.
     if (process.platform === "win32") {
       expect(OS_ISOLATION_BACKENDS.map((entry) => entry.name)).toEqual(["appcontainer"]);
+      expect(ISOLATION_ENFORCED).toBe(true);
+    } else if (process.platform === "linux") {
+      expect(OS_ISOLATION_BACKENDS.map((entry) => entry.name)).toEqual(["bwrap"]);
       expect(ISOLATION_ENFORCED).toBe(true);
     } else {
       expect(OS_ISOLATION_BACKENDS).toHaveLength(0);
       expect(ISOLATION_ENFORCED).toBe(false);
     }
+  });
+
+  it("says why containment is missing, when the backend can say", () => {
+    // A refusal that only says "no backend can provide it" is true and leaves
+    // the user nowhere to go. This is the same lesson the Windows half learned
+    // in reverse: naming the exact folders and the exact command is what turned
+    // a dead end into a one-time setup step.
+    const mute = backend("mute", false);
+    const speaking: IsolationBackend = {
+      ...backend("speaking", false),
+      diagnose: () => "Install bubblewrap.",
+    };
+
+    expect(selectIsolation([mute, speaking]).shortfall).toEqual(["Install bubblewrap."]);
+    expect(() => assertIsolationAvailable("os", selectIsolation([mute, speaking])))
+      .toThrow(/Install bubblewrap\./);
+  });
+
+  it("explains nothing once something works", () => {
+    // A second backend that failed is not the user's problem when the first one
+    // succeeded, and printing its complaint would be noise attached to a call
+    // that is about to run perfectly well.
+    const speaking: IsolationBackend = {
+      ...backend("speaking", false),
+      diagnose: () => "Install bubblewrap.",
+    };
+
+    expect(selectIsolation([speaking, backend("works", true)]).shortfall).toEqual([]);
   });
 
   it("derives enforcement from the registry rather than from a second switch", () => {

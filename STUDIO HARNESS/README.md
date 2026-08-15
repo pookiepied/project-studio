@@ -88,7 +88,10 @@ src/
   sandbox/
     policy.ts                 Closed-by-default containment policy and isolation levels
     paths.ts                  Path containment: traversal, symlinks, prefixes, Windows
-    local-sandbox.ts          In-process containment; refuses exec and network
+    local-sandbox.ts          Path containment, and the one door to a contained child
+    isolation/                OS containment: kinds, backends, and the single verdict
+      windows/                AppContainer, via the studio-contain launcher we ship
+      linux/                  bwrap, via the one the distribution ships
     errors.ts                 Typed sandbox errors, never echoing the attempted path
   storage/
     database.ts               Application-owned SQLite connection and transactions

@@ -54,9 +54,26 @@ export interface EffectRule {
   /**
    * The isolation this effect needs before we may honestly admit it.
    *
-   * `execute` and `network` cannot be contained from inside our own process:
-   * once a subprocess exists our path checks are irrelevant to it, and nothing
-   * in userspace Node stops it opening a socket.
+   * `execute` cannot be contained from inside our own process: once a
+   * subprocess exists our path checks are irrelevant to it, and it is the one
+   * effect that *always* means a child was started.
+   *
+   * `network` used to say `os` for the second half of that sentence — nothing
+   * in userspace Node stops a subprocess opening a socket. True, and it was
+   * being asked in the wrong place. A child's network access is now decided
+   * where the child is created, by the kernel, from the operator's
+   * `allowNetwork` switch: `internetClient` or not on Windows, `--share-net` or
+   * not on Linux (ADR 0041). Asking again here only reached capabilities that
+   * *do not start a child at all* — our own `web_fetch`, which makes an HTTPS
+   * request from the harness process — and refused them because a sandbox for
+   * somebody else's subprocess was unavailable.
+   *
+   * That is the second taxonomy ADR 0041 was written to prevent, arriving from
+   * the other direction: containment is a property of the **kind** of child, in
+   * `isolation/kinds.ts`, and this table describes what an effect needs of the
+   * harness. It surfaced on stock Ubuntu 24.04, the first host ever measured
+   * that registers a backend and cannot run it — on every earlier machine the
+   * two answers happened to coincide.
    */
   readonly isolation: IsolationLevel;
   /**
@@ -112,7 +129,11 @@ export const EFFECT_RULES: Readonly<Record<CapabilityEffect, EffectRule>> = {
     safeUntrusted: false,
   },
   network: {
-    isolation: "os",
+    // See `EffectRule.isolation`. Not a relaxation: a contained child's network
+    // is granted or withheld by the kernel at creation, which is stronger than
+    // this check ever was. `allowNetwork` is still asked, immediately above the
+    // isolation branch in `LocalSandbox.assertSupports`.
+    isolation: "in-process",
     undo: false,
     elevated: true,
     safeUntrusted: false,
