@@ -3,7 +3,7 @@
 The current shape of Project Studio. Derived view — every fact here lives in a
 node first. Update this last, and always.
 
-**Last updated:** 2026-08-15 · **Baseline commit:** `655bf58`
+**Last updated:** 2026-08-15 · **Baseline commit:** `edba5a5`
 
 Legend: ✅ verified · 🟢 implemented, unverified · 🟡 in progress · 🔴 blocked ·
 ⚪ planned · 📦 deferred
@@ -34,11 +34,12 @@ Project Studio
 │       │
 │       └── A-003  Baseline verification ............. ✅  2026-08-15
 │             │      first full suite actually run
+│             │      21 failures → 2
 │             │
 │             ├── T-001  Git baseline & snapshot ..... ✅  95c99f6
 │             ├── T-002  Admission path repair ....... ✅  655bf58
-│             ├── T-003  Tree System infrastructure .. 🟡  this change
-│             ├── T-004  Architecture gate (008.3) ... ⚪  blocked by nothing
+│             ├── T-003  Tree System infrastructure .. ✅  397b624
+│             ├── T-004  Architecture gate (008.3) ... 🟡  edba5a5, partial
 │             ├── T-005  Dead code & typing sweep .... ⚪
 │             └── T-006  Doc reconciliation .......... ⚪
 │
@@ -69,6 +70,19 @@ regardless of what its checklist says. Promoting these to ✅ is what T-004
 through T-006 are for.
 
 P-11 is 🟡 rather than 🟢 because task 008 tracks 165 open items against it.
+
+## Where the Harness suite stands
+
+`CI=true vitest run` — **2 failed, 1125 passed, 2 skipped**, typecheck and build
+clean. Both failures are pre-existing and tracked in `T-004`: `A-003` AF-03
+(corrupt `studio.db` does not abort startup when a stale WAL is present) and
+AF-04 (real stdio MCP through the gate).
+
+`T-004` is partial. The storage boundary is closed and the architecture tests
+now bind on both platforms, but three items remain: `StudioRuntime` still
+publishes ten repositories, transport and agents still take the concrete
+runtime, and `app_setting` is still written by two domains. Each is pinned by a
+whitelist that can only shrink, so none can quietly get worse.
 
 ## How this file gets updated
 

@@ -84,7 +84,9 @@ verification (`A-003`, 2026-08-15) ran the Harness suite to completion for the
 first time and found 21 failures, including every Flue integration test: two
 defects on `POST /agents/:name/:id` — a patch calling a function that does not
 exist, and a sandbox probe throwing where a boolean was required — meant no
-agent submission could succeed. Both are fixed (`T-002`); 6 failures remain.
-The modular-monolith gate (`008.3`) is recorded as closed but is not, and its
-architecture tests were written to assert the violations rather than their
-absence (`A-002`). Work is sequenced in `tree/project-tree.md`.
+agent submission could succeed. Both are fixed (`T-002`); 2 failures remain.
+The modular-monolith gate
+(`008.3`) was recorded as closed but was enforced by nothing — its tests
+asserted the violations rather than their absence, and could not match a path
+on Windows at all (`A-002`, `A-003`). The storage half is now closed and the
+tests bind (`T-004`, partial). Work is sequenced in `tree/project-tree.md`.

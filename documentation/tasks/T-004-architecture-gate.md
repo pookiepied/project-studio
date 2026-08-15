@@ -1,8 +1,34 @@
 # T-004 — Close the architecture gate for real
 
 **Parent:** `A-002` (with `A-003` AF-02..AF-04)
-**Status:** Planned
+**Status:** In progress — requirements 1, 2, 6, 7 done (`edba5a5`)
 **Opened:** 2026-08-15 · **Closed:** —
+
+## Progress
+
+**Done — commit `edba5a5`:**
+
+- **(1)** `StudioDatabase` exposes `prepare`/`exec` and no `DatabaseSync`. Six
+  domain repositories rewritten onto it. The raw handle lives in a `WeakMap`,
+  reachable only via `storageHandle()`, which an architecture test bounds to
+  `src/storage`.
+- **(2)** Table ownership is enforced, scanning the strings handed to
+  `prepare`/`exec`. It immediately found a violation the old gate could not
+  see: `app_setting` is written by both `models/local/settings-store.ts` and
+  `retrieval/settings.ts`. Pinned as a one-entry shrinking whitelist.
+- **(6)** `application/ports.ts` deleted — zero importers, and its `StoragePort`
+  re-exposed the handle anyway.
+- **(7)** All checks are separator-agnostic and assert absence, or an explicit
+  whitelist that may only shrink. 33/33 pass, and were confirmed to fail when
+  the properties they name are broken. `A-003` AF-02 closed, along with the
+  same defect in the UUID check.
+
+**Remaining — 3, 4, 5, and the two open failures:** `StudioRuntime` still
+publishes ten repositories and reaches for `getDatabase()`; transport and
+agents still take the concrete runtime; `getStudioRuntime()` still exists;
+`app_setting` still has two writers. AF-03 and AF-04 are undiagnosed.
+
+Suite: 21 failures at the start of this work → 2.
 
 ## What and why
 
