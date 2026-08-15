@@ -30,9 +30,11 @@ future features, and they live in §5 rather than as open issues.
 
 62 issues. Categories per `../README.md` §4. Numbers are permanent.
 
-### Solved — 11
+### Solved — 24
 
-Fixed and verified. Suite went 21 failures → 2 across these.
+Fixed and verified. Suite went 21 failures → 2 → **0**.
+Baseline at close of Stage 1–2: `CI=true vitest run` → **69 files, 1134
+passed, 2 skipped, 0 failed**; `tsc --noEmit` clean; `flue build` clean.
 
 | # | Issue | Proof |
 |---|---|---|
@@ -47,8 +49,23 @@ Fixed and verified. Suite went 21 failures → 2 across these.
 | 9 | UUID-centralization test had the same Windows path defect and reported the generator against itself. | `edba5a5` |
 | 10 | No canonical documentation structure; competing sources of truth. | `397b624` + this restructure; `documentation/README.md` |
 | 11 | Uncertain whether the repo was one Git repository or several. | Verified: one repo, one `.git`, no submodules. §4.1 |
+| 16 | `pending_approval` durability — code and ADR disagreed. | `d66e844`; migration 009 + `PendingApprovalStore`; ADR 0036; 4 tests incl. cross-restart |
+| 19 | `StudioRuntime` published 10 repositories. | `f25d715`; all ten private; `publicBags` whitelist is `[]` |
+| 20 | `StudioRuntime` called `getDatabase()` for a process global. | `f25d715`; `database` is a required constructor option |
+| 21 | `stop()` closed a connection it did not own; `app.ts` closed it again. | `f25d715`; `app.ts` is the sole owner |
+| 22 | Transport and agents took the concrete runtime. | `f25d715`; transport takes `McpAdministration`; agents whitelist is `["agents/studio.ts"]`, a framework boundary per ADR 0035 §6 |
+| 23 | `app_setting` written by two domains. | `14b36df`; `AppSettings` owns it; table-ownership whitelist is `[]` |
+| 24 | Global singletons in `storage/database.ts`. | `f25d715`; `getDatabase`/`closeDatabase` deleted |
+| 25 | Corrupt `studio.db` did not abort startup. | `f25d715`; the fixture was wrong, not the code — see #43. Sidecars removed; hot-WAL recovery given its own test |
+| 26 | `mcp-runtime.test.ts` stdio tool through the gate failed. | `f25d715`; never an MCP failure — `stop()` returned while children were alive. See #64 |
+| 27 | `outcomes.ts:35` accepted `idempotent` and never read it. | `e9a018e`; folded the dead `isRetryableForUnknown` into `outcomeFor` |
+| 28 | `bounds.ts:84` — `signal.reason` not wrapped as `ToolError`. | `e9a018e`; the live defect was the bare `catch` reporting queue faults as timeouts |
+| 29 | `StudioRuntime` used `any` in `ModelToolResult`. | `e9a018e`; typed to text/image, and unsupported MCP blocks now degrade to text |
+| 63 | No graceful shutdown on Windows. | `f25d715`; `SIGINT`/`SIGBREAK` + IPC `shutdown`; proven by a no-hot-WAL test |
+| 64 | `stop()` returned with MCP children alive. | `f25d715`; `stop`/`stopAll`/`stop(id)` await real process exit |
+| 65 | `routes/mcp.ts` composed registry with supervisor in the transport layer. | `f25d715`; the join moved into `McpManagementService` |
 
-### Needs Decision — 7
+### Needs Decision — 6
 
 Each states options and a recommendation. **These block the items that follow
 them.**
@@ -59,41 +76,25 @@ them.**
 | 13 | **Gateway contract.** Phase 7 cannot close. The Worker is unsupported and no contract test proves compatibility. | (a) decide the full contract now; (b) **declare Phase 7 Harness-side-only for 1.0** — `studio-cloud` is BYOK-local, hosted Gateway is out of 1.0 | **(b).** You have already said the Gateway is paused and will be rebuilt simpler. Deciding a contract for an implementation we intend to replace is work with no consumer. |
 | 14 | **Delete `STUDIO Gateway/`?** 163 tracked files. Paused, not the intended architecture, but contains reusable pieces (provider catalog/discovery, auth and rate-limit middleware, SSE translation, usage projection). | (a) delete now; (b) **delete now, recover from git when the new Gateway starts**; (c) keep | **(b).** It is in git history and tagged; nothing is lost. Keeping 163 files of an architecture we have rejected is exactly the drift this cycle exists to stop. |
 | 15 | **OS isolation (008.8).** Marked Done with 0% implementation — no `bwrap`, `ProcessContainer`, or Seatbelt code exists. | (a) implement `SandboxFactory` now; (b) **record Accepted**: in-process containment, uncontained-by-policy, honestly documented; implementation is a post-1.0 phase | **(b).** ADR 0034 already decided the policy; what is wrong is the word "Done". This is a scope correction, not new code. |
-| 16 | **`pending_approval` durability (008.6).** ADR promises a durable table; there is no migration and `approval-broker.ts:32` is still a `Map`. Code and decision disagree. | (a) add migration 009 + durable broker; (b) revert the ADR to process-memory | **(a).** You confirmed durable re-prompt across restart. A Map loses every pending approval on restart, which is a real user-visible failure, not a technicality. |
 | 17 | **Broken `refs/codex/*` refs.** Five unreachable refs from another tool; git warns on every branch operation. Never previously documented. | (a) delete them; (b) keep | **(a).** They point at nothing reachable and are pure noise. Requires your go-ahead because ref deletion is destructive. |
 | 18 | **Root `README.md`.** You asked whether it should go. | (a) delete; (b) **keep, minimal** | **(b).** It is the entry point for anyone opening the repository, and it is nine lines pointing at `documentation/`. Deleting it makes the repo open onto three unexplained folders. |
 
-### Needs Implementation — 24
+### Needs Implementation — 11
 
 Agreed, understood, work remains.
 
-**Architecture gate — completes #4-#8**
-
-| # | Issue |
-|---|---|
-| 19 | `StudioRuntime` publishes 10 repositories (`db`, `grants`, `trust`, `selection`, `inventory`, `extensions`, `registry`, `supervisor`, `catalog`, `management`). Replace with a bounded façade. Pinned by whitelist today. |
-| 20 | `StudioRuntime` calls `getDatabase()` for a process-global instead of being constructed with its database. |
-| 21 | `StudioRuntime.stop()` calls `closeDatabase()`, closing a connection it does not own; `app.ts` closes it again. |
-| 22 | `createHttpApp` and `agents/studio.ts` take the concrete runtime; `getStudioRuntime()` is a global service locator. 3 files, pinned by whitelist. |
-| 23 | `app_setting` is written directly by `models/local/settings-store.ts` *and* `retrieval/settings.ts`. Needs one owning repository with typed key namespaces. |
-| 24 | Global singletons: `storage/database.ts:147`, `db.ts:33`, `observability/index.ts:49`. |
-
-**Correctness**
-
-| # | Issue |
-|---|---|
-| 25 | Corrupt `studio.db` does not abort startup when a stale `-wal`/`-shm` pair is present — it starts. Opening the corrupt file alone throws correctly, so the WAL is implicated. This is the recovery property 008.1 claims to have proven. **Do not close by adjusting the test.** |
-| 26 | `mcp-runtime.test.ts` — real selected stdio tool through the gate fails. Undiagnosed. |
-| 27 | `execution/outcomes.ts:35` accepts `idempotent` and never reads it: the retry-safety decision it exists to make **is not being made**. |
-| 28 | `tools/bounds.ts:84` — `signal.reason` is not wrapped as a `ToolError`. |
-| 29 | `StudioRuntime` uses `any` in `ModelToolResult` (`content: any[]`, `details: any`). |
+**Architecture gate and correctness — closed.** #19–#29 and #63–#65 are in
+Solved above. Every architecture whitelist is `[]` except one documented
+framework boundary (ADR 0035 §6). `observability/index.ts:49` remains, folded
+into #24 below.
 
 **Dead code and hygiene**
 
 | # | Issue |
 |---|---|
+| 24b | `observability/index.ts:49` is still a module-level singleton. The storage globals are gone; this one is a legitimate process-wide resource and needs a decision rather than a reflex. |
 | 30 | `tsconfig.json` sets neither `noUnusedLocals` nor `noUnusedParameters`, so none of #31-#35 fails the build. Turn both on. |
-| 31 | Unreachable exports: `isRetryableForUnknown`, `createRetryExecutionContext`, `executionContext()`. |
+| 31 | Unreachable exports: ~~`isRetryableForUnknown`~~ (deleted in `e9a018e`), `createRetryExecutionContext`, `executionContext()`. |
 | 32 | `sandbox/errors.ts:9` `unsupported_isolation` — never thrown since ADR 0034. |
 | 33 | Unused imports: `observability/index.ts:13`, `permissions/trust.ts:3`, `tools/git/index.ts:11`. |
 | 34 | `PassthroughContextOptimizer` used only by its own test, never wired — the test proves nothing about the running system. Wire or delete. |
@@ -111,13 +112,12 @@ Agreed, understood, work remains.
 | 41 | Stale containment claims in README, ADRs 0019/0022/0024 — 008.8 decided uncontained-by-policy, so text calling connected MCP code "contained" is false. |
 | 42 | Over-claimed statuses in task 008 (008.3 Done-by-exception; 008.4 3/5 not 5/5; 008.4 B-01 against a build that never worked; 008.6 no migration; 008.8 0% implementation). Record the correction, do not silently re-tick. |
 
-### Unable to Determine — 3
+### Unable to Determine — 2
 
 Investigated, not resolved. Recorded rather than dropped.
 
 | # | Issue | What was tried / what is unknown |
 |---|---|---|
-| 43 | Root cause of #25. Corrupt `studio.db` in an isolated directory throws `StorageError` correctly. In the test a `-wal`/`-shm` pair from the previous run survives the overwrite. Stale-WAL recovery is the hypothesis; a controlled reproduction did not produce the harness-created files in the scratch directory, so it is unconfirmed. |
 | 44 | Whether `STUDIO/patches/@flue__sdk` (client) and `STUDIO HARNESS/patches/@flue__sdk` (harness) are identical or have diverged. Both are wired via `patchedDependencies`. Not diffed. |
 | 45 | Whether the `@flue/cli` patch — which implements the FD-based admission bootstrap (§4.2) — is still required, or whether Flue beta.9 now offers a supported hook. Not investigated. |
 
@@ -157,11 +157,11 @@ come after #12-#42** — they are phase completion, not stabilization.
 Dependencies are real: each stage makes the next safe.
 
 ```
-Stage 0  Decisions #12-#18            ← blocks everything; needs you
+Stage 0  Decisions                    ← #16, #25-fixture ANSWERED; #12-#15, #17, #18 open
    ↓
-Stage 1  Correctness #25-#29          ← a stable suite before refactoring
+Stage 1  Correctness #25-#29          ← DONE (e9a018e, f25d715)
    ↓
-Stage 2  Architecture #19-#24         ← façade, DI, ports, table ownership
+Stage 2  Architecture #19-#24         ← DONE (14b36df, f25d715, d66e844)
    ↓
 Stage 3  Dead code #30-#35            ← noUnusedLocals last: it surfaces what 1-2 orphan
    ↓

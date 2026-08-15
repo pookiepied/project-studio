@@ -1,5 +1,9 @@
 # ADR 0034: Modular Monolith Exception — StudioRuntime and Storage Handle
 
+**Status: Superseded by [ADR 0035](0035-runtime-composition-and-ports.md)** (2026-08-15). The exception this records was taken instead of the fix; the fix
+landed in `f25d715`. The text below is left as written — the wrong answer, and
+why we believed it, is the useful part.
+
 Status: Accepted — Narrow exception for 1.0, expires at 008.21 closure
 
 ## Context

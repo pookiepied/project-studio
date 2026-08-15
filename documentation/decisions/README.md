@@ -94,17 +94,16 @@ wrong answer, and why we believed it, is the useful part.
 | [0032](0032-fail-safe-runtime-recovery.md) | Fail-safe runtime recovery |
 | [0033](0033-execution-identity-and-operation-correlation.md) | Execution identity and operation correlation |
 
-## ADR 0034 is disputed
+## ADR 0034 is superseded
 
-It records a narrowly scoped exception letting `StudioRuntime` keep its public
+It recorded a narrowly scoped exception letting `StudioRuntime` keep its public
 repository bags and the SQLite handle stay public, so the 008.3 gate could be
-recorded closed.
+recorded closed. The exception was taken *instead of* the fix, and the tests
+written alongside it asserted the violations rather than their absence.
 
-The exception was taken *instead of* the fix, and the tests written alongside it
-asserted the violations rather than their absence. Meta-task issues #4–#8 and
-#19–#24 close the gate properly. When they land, 0034 should be **superseded by
-a new ADR** stating what actually holds — not edited to look as though it always
-said that.
+**Closed 2026-08-15** by meta-task #4–#8 and #19–#24. [ADR
+0035](0035-runtime-composition-and-ports.md) states what actually holds; 0034
+keeps its text and gained a status line, as the format requires.
 
 ## Adding one
 
