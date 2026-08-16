@@ -100,7 +100,7 @@ export function TurnMenu() {
       ))}
 
       <MenuSeparator />
-      <MenuLabel>Thinking</MenuLabel>
+      <MenuLabel>Reasoning</MenuLabel>
       {EFFORTS.map((effort) => (
         <MenuItem
           key={effort.id}

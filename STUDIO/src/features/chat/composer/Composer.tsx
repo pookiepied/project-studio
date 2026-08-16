@@ -97,7 +97,17 @@ export function Composer({
         // that it performs. A control this central looking identical whether or
         // not it is ready for typing is the specific thing that made the page
         // read as a picture of an app rather than one you are using.
-        focused ? 'py-2.5' : 'py-1.5',
+        // One height, always the taller one.
+        //
+        // The field used to grow on focus. It was the right instinct and the
+        // wrong mechanism: the control at the centre of the page changing size
+        // when the caret arrives means the page reflows every time you click
+        // into it, and on paste the height and the radius resolved a frame
+        // apart, which is what read as the composer changing shape and
+        // correcting itself. The roomier size was better in both states, so it
+        // is simply the size now. Focus is still acknowledged -- by the shadow,
+        // which costs no layout.
+        'py-2.5',
         'transition-[box-shadow,border-radius,padding] duration-base ease-out',
         // Both properties, or the radius does not animate at all: naming only
         // `box-shadow` sets `transition-property` to exactly that, so the

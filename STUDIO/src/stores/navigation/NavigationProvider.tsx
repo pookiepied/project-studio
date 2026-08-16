@@ -43,7 +43,7 @@ const HOME: Route = { kind: 'home' }
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(HOME)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   // Presentation of the sidebar rather than navigation proper, but it lives
   // here with `sidebarOpen`: the workspace store is the data, and how the

@@ -58,8 +58,19 @@ export function MessageActions({
         setFocusWithin(false)
       }}
       className={cn(
-        'mt-1 flex items-center gap-0.5',
+        // `mt-3`, not `mt-1`. At 4px the row sat on the last line of the reply
+        // and read as part of it -- the controls looked like a footer attached
+        // to the final paragraph rather than something belonging to the whole
+        // message. The gap has to be larger than the prose's own line spacing
+        // for the row to separate from it.
+        'mt-3 flex items-center gap-0.5',
         align === 'end' && 'justify-end',
+        // Pulled out by the button's optical inset so the first *glyph* lines
+        // up with the text column, not the button's box. A 24px circle holding
+        // a ~14px mark insets it about 5px, which is why the row looked
+        // indented under a reply that starts flush left. Alignment is between
+        // what the eye sees, and the eye does not see the padding.
+        align === 'end' ? '-mr-[5px]' : '-ml-[5px]',
         // Hidden from the pointer as well as the eye: invisible buttons that
         // still take clicks are worse than visible ones.
         !shown && 'pointer-events-none',

@@ -88,9 +88,17 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       />
 
       <div className="relative shrink-0">
+        {/* Behind the composer, not over it.
+
+            Without the stacking order stated, the fade painted on top of the
+            field's upper edge -- the composer's outline is a 1px ring in its
+            box-shadow, and a gradient laid over it ate the top of that ring.
+            The field looked like it had three sides. The fade's job is to
+            dissolve the *transcript*, so it belongs under everything the
+            composer draws. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-full h-10 bg-gradient-to-t from-surface to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-full z-0 h-10 bg-gradient-to-t from-surface to-transparent"
         />
 
         {/* Only offered once the reader has scrolled away. Shown permanently it
@@ -113,7 +121,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         </AnimatePresence>
 
         <div
-          className="mx-auto w-full bg-surface pb-4"
+          className="relative z-10 mx-auto w-full bg-surface pb-4"
           style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
         >
           <Composer

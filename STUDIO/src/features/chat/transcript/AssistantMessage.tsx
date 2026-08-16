@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
+import { cn } from '@/lib/cn'
 import { findModel } from '@/domain/models/catalog'
 import { Markdown } from '@/features/chat/markdown'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
@@ -60,8 +61,25 @@ export function AssistantMessage({
               { id: 'read', label: 'Read aloud', icon: Icons.readAloud, run: () => undefined },
             ]}
           />
-          {model && hovered ? (
-            <span className="text-caption text-muted-foreground">{model.name}</span>
+          {/* Same height as the buttons beside it, and faded rather than
+              mounted.
+
+              It was a bare span appearing and disappearing on hover, so it had
+              neither the row's height nor its timing: the name popped in at a
+              different moment from the controls and sat on its own baseline,
+              which is what made the row look assembled from two unrelated
+              pieces. `h-6` is the `sm` button, so both now centre on one line;
+              opacity matches how the actions themselves come and go. */}
+          {model ? (
+            <span
+              className={cn(
+                'flex h-6 items-center text-caption text-muted-foreground',
+                'transition-opacity duration-fast',
+                hovered ? 'opacity-100' : 'opacity-0',
+              )}
+            >
+              {model.name}
+            </span>
           ) : null}
         </div>
       )}
