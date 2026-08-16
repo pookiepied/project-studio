@@ -1,2 +1,2 @@
 export { Transcript } from './Transcript'
-export { useAutoScroll } from './useAutoScroll'
+export { useAutoScroll } from './scroll'

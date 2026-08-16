@@ -34,7 +34,6 @@ export function Transcript({
             key={message.id}
             message={message}
             onEdit={(text) => onEdit(message.id, text)}
-            onFork={() => onFork(message.id)}
           />
         ) : (
           <AssistantMessage

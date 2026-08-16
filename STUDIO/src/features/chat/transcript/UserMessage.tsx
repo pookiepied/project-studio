@@ -23,11 +23,9 @@ import type { Message } from '@/domain/session/types'
 export function UserMessage({
   message,
   onEdit,
-  onFork,
 }: {
   message: Message
   onEdit: (text: string) => void
-  onFork: () => void
 }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -108,7 +106,14 @@ export function UserMessage({
               setEditing(true)
             },
           },
-          { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: onFork },
+          // Copy and edit, and nothing else.
+          //
+          // Branching lived here too and did not belong. A branch is a fork of
+          // the *conversation* from a point in it, and the point is always the
+          // reply you want to redo -- offering it on your own message asks the
+          // reader to work out what "from here" means when "here" is something
+          // they wrote. It is still on every assistant message, where the
+          // question it answers is the one people actually have.
         ]}
       />
     </motion.div>

@@ -24,7 +24,7 @@ import type { Conversation } from '@/domain/session/types'
 export function ChatPage({ conversation }: { conversation: Conversation }) {
   const { status, retry, editMessage, fork } = useWorkspace()
   const { openChat } = useNavigation()
-  const { viewport, pinned, onScroll, onWheel, onPointerDown, scrollToBottom } = useAutoScroll(
+  const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } = useAutoScroll(
     conversation.messages,
   )
 
@@ -40,6 +40,9 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         onScroll={onScroll}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
+        // Paging and arrowing are scrolling too. Without this the keyboard was
+        // the one way to leave the bottom that the follow would silently undo.
+        onKeyDown={onKeyDown}
         className="studio-scroll-inset min-h-0 flex-1 overflow-y-auto"
       >
         <div
@@ -107,13 +110,13 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           {!pinned ? (
             <motion.button
               type="button"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 8, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.9 }}
               transition={{ duration: DURATION.fast, ease: EASE_OUT }}
               onClick={scrollToBottom}
               aria-label="Jump to latest"
-              className="studio-blur absolute -top-9 left-1/2 z-20 flex size-7 -translate-x-1/2 items-center justify-center rounded-full border shadow-lifted"
+              className="studio-blur absolute -top-14 left-1/2 z-20 flex size-8 -translate-x-1/2 items-center justify-center rounded-full border shadow-lifted"
             >
               <Icons.jumpToLatest className="text-muted-foreground" />
             </motion.button>
