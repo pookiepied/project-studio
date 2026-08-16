@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
+import { useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react'
 import { COMPOSER } from '@/design/tokens'
 
 export interface ComposerFieldHandle {
@@ -39,7 +39,11 @@ export function ComposerField({
 
   useImperativeHandle(handleRef, () => ({ focus: () => field.current?.focus() }), [])
 
-  useEffect(() => {
+  // Layout, not effect. This measures the field and writes its height, and a
+  // passive effect runs *after* the browser has painted -- so a paste showed one
+  // frame at the previous height and radius before snapping to the right ones.
+  // Running before paint means the first frame the user sees is already correct.
+  useLayoutEffect(() => {
     const element = field.current
     if (!element) return
 

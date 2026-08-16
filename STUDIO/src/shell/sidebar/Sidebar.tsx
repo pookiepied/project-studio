@@ -100,7 +100,12 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
           <span className="studio-heading text-foreground">Studio</span>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-0.5 px-2 pb-3">
+        {/* Spacing in this column separates things that are different in kind,
+            not merely adjacent. The two standing actions sit closer to each
+            other than to the list below them, and the list's groups sit further
+            apart than the rows inside a group -- so the eye gets the hierarchy
+            from the gaps before it reads a single title. */}
+        <div className="flex shrink-0 flex-col gap-1 px-2 pb-4">
           <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
           <Action
             label="Search"
@@ -213,13 +218,13 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             {sectionOpen ? (
               <motion.div {...COLLAPSE} className="overflow-hidden">
                 {flat ? (
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-1">
                     {sorted.map((conversation) => (
                       <ConversationRow key={conversation.id} conversation={conversation} />
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-3">
                     {projects.map((project) => (
                       <ProjectSection
                         key={project.id}
@@ -237,10 +242,10 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
 
           {!flat && loose.length > 0 ? (
             <>
-              <p className="px-1.5 pt-4 pb-1 text-micro text-muted-foreground/80 uppercase">
+              <p className="px-1.5 pt-5 pb-1.5 text-micro text-muted-foreground/80 uppercase">
                 Conversations
               </p>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-1">
                 {loose.map((conversation) => (
                   <ConversationRow key={conversation.id} conversation={conversation} />
                 ))}

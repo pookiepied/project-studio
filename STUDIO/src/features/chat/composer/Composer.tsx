@@ -91,7 +91,12 @@ export function Composer({
       }}
       className={cn(
         'bg-surface-raised py-1.5',
-        'transition-[box-shadow] ease-out',
+        // Both properties, or the radius does not animate at all: naming only
+        // `box-shadow` sets `transition-property` to exactly that, so the
+        // capsule-to-box change snapped a frame after the field had already
+        // grown. That mismatch -- height first, shape a frame later -- is what
+        // read as the composer changing shape and correcting itself on paste.
+        'transition-[box-shadow,border-radius] ease-out',
         focused
           ? 'shadow-[0_2px_10px_rgba(0,0,0,0.07),0_0_0_1px_rgba(0,0,0,0.07)]'
           : 'shadow-[0_2px_10px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.045)]',

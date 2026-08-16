@@ -55,7 +55,12 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         type="button"
         onClick={() => openChat(conversation.id)}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left text-ui leading-tight',
+          // No leading utility here. `text-ui` carries its own line-height, and a
+          // Tailwind `leading-*` sits in the utilities layer, which outranks the
+          // role class in `@layer components` -- so it silently won and this row
+          // rendered at a tighter leading than every other 13px row in the
+          // column. Same size, different rhythm, which reads as a size mismatch.
+          'flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left text-ui',
           active ? 'text-foreground' : 'text-muted-foreground group-hover/row:text-foreground',
         )}
       >

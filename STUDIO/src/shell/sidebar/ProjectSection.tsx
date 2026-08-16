@@ -101,7 +101,7 @@ export function ProjectSection({
       <AnimatePresence initial={false}>
         {open ? (
           <motion.div {...COLLAPSE} className="overflow-hidden">
-            <div className="mt-1 ml-3 flex flex-col gap-0.5">
+            <div className="mt-1.5 ml-3 flex flex-col gap-1">
               {conversations.length === 0 ? (
                 <p className="px-2 py-1 text-caption text-muted-foreground/70">No conversations</p>
               ) : (
