@@ -1,4 +1,6 @@
 export {
+  detachedConversationId,
+  openConversationWindow,
   isTauri,
   minimizeWindow,
   toggleMaximizeWindow,

@@ -11,7 +11,9 @@ import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
 import { DEMO_CONVERSATIONS, DEMO_PROJECTS } from '@/domain/session/demo'
 import type { Conversation, Message, SessionStatus, TurnSettings } from '@/domain/session/types'
 import type { Project } from '@/domain/projects/types'
+import { detachedConversationId } from '@/platform/tauri'
 import { deriveTitle } from '@/stores/workspace/deriveTitle'
+import { readHandoff } from '@/stores/workspace/handoff'
 import { useDemoTurn } from '@/stores/workspace/useDemoTurn'
 import type { TurnRun } from '@/stores/workspace/useDemoTurn'
 import { useGalleryTurn } from '@/stores/workspace/useGalleryTurn'
@@ -87,8 +89,17 @@ interface WorkspaceValue {
 const WorkspaceContext = createContext<WorkspaceValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = useState<readonly Project[]>(DEMO_PROJECTS)
-  const [conversations, setConversations] = useState<readonly Conversation[]>(DEMO_CONVERSATIONS)
+  // A detached window opens with the workspace as its opening window saw it,
+  // not with the demo seed -- the conversation it was opened for may be one
+  // the seed has never heard of. Read once for the life of the window: the
+  // snapshot was written at the moment of opening (see `useDetachConversation`)
+  // and is a birth certificate, not a subscription.
+  const [seed] = useState(() => (detachedConversationId() ? readHandoff() : null))
+
+  const [projects, setProjects] = useState<readonly Project[]>(seed?.projects ?? DEMO_PROJECTS)
+  const [conversations, setConversations] = useState<readonly Conversation[]>(
+    seed?.conversations ?? DEMO_CONVERSATIONS,
+  )
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [running, setRunning] = useState<ReadonlySet<string>>(() => new Set())
 

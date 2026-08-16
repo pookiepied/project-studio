@@ -5,7 +5,7 @@ import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { useNavigation } from '@/stores/navigation'
-import { useWorkspace } from '@/stores/workspace'
+import { useDetachConversation, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
 
 /**
@@ -28,6 +28,7 @@ import type { Conversation } from '@/domain/session/types'
  */
 export function IdentityLine({ conversation }: { conversation: Conversation }) {
   const { projects, rename, setProject, setBranch, togglePin, setArchived, remove } = useWorkspace()
+  const detach = useDetachConversation()
   const { openProject, goHome } = useNavigation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [branchOpen, setBranchOpen] = useState(false)
@@ -144,7 +145,10 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
         </MenuItem>
         <MenuItem
           icon={<Icons.openExternal />}
-          onSelect={() => setMenuOpen(false)}
+          onSelect={() => {
+            detach(conversation.id, conversation.title ?? 'Untitled')
+            setMenuOpen(false)
+          }}
           note="Opens this conversation on its own."
         >
           Open in new window

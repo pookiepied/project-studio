@@ -21,7 +21,18 @@ import type { Conversation } from '@/domain/session/types'
  * the text scrolling past, and `studio-scroll-inset` keeps the scroll thumb out
  * from under those gradients.
  */
-export function ChatPage({ conversation }: { conversation: Conversation }) {
+export function ChatPage({
+  conversation,
+  onForked,
+}: {
+  conversation: Conversation
+  /**
+   * Where a fork opens. The default navigates in place, which is right in the
+   * studio; a detached window has no navigation to move, so it passes its own
+   * and gives the fork a window of its own instead.
+   */
+  onForked?: (conversationId: string) => void
+}) {
   const { status, retry, editMessage, fork } = useWorkspace()
   const { openChat } = useNavigation()
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } = useAutoScroll(
@@ -30,7 +41,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
 
   const forkFrom = (messageId: string) => {
     const created = fork(conversation.id, messageId)
-    if (created) openChat(created)
+    if (created) (onForked ?? openChat)(created)
   }
 
   return (

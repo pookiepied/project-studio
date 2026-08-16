@@ -73,3 +73,32 @@ export async function signalAppReady(): Promise<void> {
   if (!isTauri()) return
   await invoke('app_ready')
 }
+
+/**
+ * The conversation this window was opened for, if it is a detached one.
+ *
+ * Read from the URL rather than held in a store, because it is decided before
+ * any React code runs and never changes for the life of the window. A store
+ * would be a second source of truth for a fact the window was born with.
+ */
+export function detachedConversationId(): string | null {
+  if (typeof window === 'undefined') return null
+  return new URLSearchParams(window.location.search).get('conversation')
+}
+
+/**
+ * Open one conversation in its own window.
+ *
+ * Falls back to a browser tab outside Tauri so the same menu item works under
+ * `pnpm dev`, where there is no native window to create.
+ */
+export async function openConversationWindow(
+  conversationId: string,
+  title: string,
+): Promise<void> {
+  if (!isTauri()) {
+    window.open(`?conversation=${encodeURIComponent(conversationId)}`, '_blank', 'noopener')
+    return
+  }
+  await invoke('open_conversation_window', { conversationId, title })
+}

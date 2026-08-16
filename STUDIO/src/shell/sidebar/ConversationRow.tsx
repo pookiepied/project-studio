@@ -3,7 +3,7 @@ import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { useNavigation } from '@/stores/navigation'
-import { useWorkspace } from '@/stores/workspace'
+import { useDetachConversation, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
 import { cn } from '@/lib/cn'
 
@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn'
 export function ConversationRow({ conversation }: { conversation: Conversation }) {
   const { route, openChat, goHome } = useNavigation()
   const { rename, togglePin, setArchived, remove, running } = useWorkspace()
+  const detach = useDetachConversation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(conversation.title ?? '')
@@ -123,7 +124,13 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         >
           Rename
         </MenuItem>
-        <MenuItem icon={<Icons.openExternal />} onSelect={() => setMenuOpen(false)}>
+        <MenuItem
+          icon={<Icons.openExternal />}
+          onSelect={() => {
+            detach(conversation.id, conversation.title ?? 'Untitled')
+            setMenuOpen(false)
+          }}
+        >
           Open in new window
         </MenuItem>
 
