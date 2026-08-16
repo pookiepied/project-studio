@@ -6,6 +6,7 @@ import { ContextMeter } from '@/shell/chrome/SessionControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useNavigation } from '@/stores/navigation'
+import { contextUsage } from '@/domain/session/context'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
@@ -25,7 +26,7 @@ import { useWorkspace } from '@/stores/workspace'
  */
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations } = useWorkspace()
+  const { conversations, settings } = useWorkspace()
 
   const conversation =
     route.kind === 'chat'
@@ -53,7 +54,7 @@ export function TopStrip() {
           <Icons.sidebar />
         </IconButton>
 
-        {conversation ? <ContextMeter used={conversation.contextUsed} /> : null}
+        {conversation ? <ContextMeter used={contextUsage(conversation, settings.modelId)} /> : null}
       </div>
 
       {/* Absolutely centred, so the identity sits on the window's midline

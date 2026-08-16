@@ -29,7 +29,6 @@ export function galleryConversation(): Conversation {
     pinned: true,
     archived: false,
     updatedAt: Date.now() - 5 * 60 * 1000,
-    contextUsed: 0.34,
     messages: [
       {
         id: 'msg_gallery_user',

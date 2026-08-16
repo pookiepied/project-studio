@@ -182,7 +182,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           updatedAt: Date.now(),
           pinned: false,
           archived: false,
-          contextUsed: 0.02,
         }
         targetId = created.id
         setConversations((current) => [created, ...current])

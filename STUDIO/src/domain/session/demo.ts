@@ -59,7 +59,6 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
     updatedAt: Date.now() - 20 * 60 * 1000,
     pinned: false,
     archived: false,
-    contextUsed: 0.72,
     messages: [
       message('user', 'Show me everything the transcript can render.'),
       message('assistant', richSample(), {
@@ -78,7 +77,6 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
     updatedAt: Date.now() - 2 * HOUR,
     pinned: true,
     archived: false,
-    contextUsed: 0.34,
     messages: [
       message('user', 'What measure should the transcript use? It runs full width and it is tiring to read.'),
       message(
@@ -99,7 +97,6 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
     updatedAt: Date.now() - 26 * HOUR,
     pinned: false,
     archived: false,
-    contextUsed: 0.08,
     messages: [
       message('user', 'The rounded panel inside the rounded window looks pasted on. What is the rule?'),
       message(
@@ -116,7 +113,6 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
     updatedAt: Date.now() - 3 * 24 * HOUR,
     pinned: false,
     archived: false,
-    contextUsed: 0.61,
     messages: [
       message('user', 'Are "auto-approve" and "manual" good labels for the execution modes?'),
       message(
@@ -133,7 +129,6 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
     updatedAt: Date.now() - 5 * 24 * HOUR,
     pinned: false,
     archived: false,
-    contextUsed: 0.12,
     messages: [
       message('user', 'The scroll thumb disappears into the gradient at the top and bottom.'),
       message(
@@ -150,7 +145,6 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
     updatedAt: Date.now() - 30 * 24 * HOUR,
     pinned: false,
     archived: true,
-    contextUsed: 0.04,
     messages: [
       message('user', 'Which glyphs are doing double duty?'),
       message('assistant', 'The brain was carrying both "thinking now" and "how hard to think". Those are different questions and now hold different marks.', { modelId: 'sonnet-5' }),

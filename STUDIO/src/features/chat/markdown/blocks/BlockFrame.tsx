@@ -38,6 +38,7 @@ export function BlockFrame({
   actions,
   collapsedHeight,
   expandLabel,
+  flush = false,
   children,
 }: {
   /** What this block is: a path for code, a name for prose. Left of the caption. */
@@ -56,6 +57,16 @@ export function BlockFrame({
   actions?: ReactNode
   /** Fold past this height, in px. Omitted, the block never folds. */
   collapsedHeight?: number
+  /**
+   * The child paints to the panel's edges and supplies its own padding.
+   *
+   * Needed by anything that scrolls. A scroller nested inside the frame's
+   * padding puts its scrollbar at the bottom of the *content*, leaving a strip
+   * of panel underneath it -- so the bar floats short of the corner instead of
+   * sitting at the end of the curve. Given the whole panel, the scroller's
+   * bar lands on the panel's own bottom edge where it belongs.
+   */
+  flush?: boolean
   expandLabel?: (folded: boolean) => string
   children: ReactNode
 }) {
@@ -101,7 +112,7 @@ export function BlockFrame({
             : null),
         }}
       >
-        <div ref={body} className="min-w-0 py-3">
+        <div ref={body} className={cn('min-w-0', flush ? undefined : 'py-3')}>
           {children}
         </div>
       </div>

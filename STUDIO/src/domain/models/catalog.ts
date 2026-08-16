@@ -25,6 +25,7 @@ export const MODELS: readonly Model[] = [
     slug: 'claude-opus-5',
     capabilities: ['text', 'vision', 'tools', 'reasoning'],
     note: 'The most capable. Slower, and worth it on hard problems.',
+    contextWindow: 200_000,
   },
   {
     id: 'sonnet-5',
@@ -33,6 +34,7 @@ export const MODELS: readonly Model[] = [
     slug: 'claude-sonnet-5',
     capabilities: ['text', 'vision', 'tools', 'reasoning'],
     note: 'Balanced. The everyday default.',
+    contextWindow: 200_000,
   },
   {
     id: 'haiku-4-5',
@@ -41,6 +43,7 @@ export const MODELS: readonly Model[] = [
     slug: 'claude-haiku-4-5',
     capabilities: ['text', 'vision', 'tools'],
     note: 'Fast and light.',
+    contextWindow: 200_000,
   },
   {
     id: 'gpt-5-6',
@@ -49,6 +52,7 @@ export const MODELS: readonly Model[] = [
     slug: 'gpt-5.6',
     capabilities: ['text', 'vision', 'tools', 'reasoning'],
     note: 'Strong general reasoning.',
+    contextWindow: 200_000,
   },
   {
     id: 'gpt-5-6-mini',
@@ -57,6 +61,7 @@ export const MODELS: readonly Model[] = [
     slug: 'gpt-5.6-mini',
     capabilities: ['text', 'vision', 'tools'],
     note: 'Cheaper, and quick.',
+    contextWindow: 200_000,
   },
   {
     id: 'gemini-3-flash',
@@ -65,6 +70,7 @@ export const MODELS: readonly Model[] = [
     slug: 'gemini-3-flash',
     capabilities: ['text', 'vision', 'tools'],
     note: 'Very fast, very long context.',
+    contextWindow: 200_000,
   },
   {
     id: 'gemini-3-pro',
@@ -73,6 +79,7 @@ export const MODELS: readonly Model[] = [
     slug: 'gemini-3-pro',
     capabilities: ['text', 'vision', 'tools', 'reasoning'],
     note: 'Google at full strength.',
+    contextWindow: 200_000,
   },
   {
     id: 'llama-4-maverick',
@@ -81,6 +88,7 @@ export const MODELS: readonly Model[] = [
     slug: 'llama-4-maverick',
     capabilities: ['text', 'tools'],
     note: 'Open weights, run anywhere.',
+    contextWindow: 200_000,
   },
   {
     id: 'deepseek-v4',
@@ -89,6 +97,7 @@ export const MODELS: readonly Model[] = [
     slug: 'deepseek-v4',
     capabilities: ['text', 'tools', 'reasoning'],
     note: 'Reasoning at a low price.',
+    contextWindow: 200_000,
   },
   {
     id: 'mistral-large-3',
@@ -97,6 +106,7 @@ export const MODELS: readonly Model[] = [
     slug: 'mistral-large-3',
     capabilities: ['text', 'tools'],
     note: 'European hosting, solid all-rounder.',
+    contextWindow: 200_000,
   },
 ]
 

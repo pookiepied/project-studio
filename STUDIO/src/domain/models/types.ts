@@ -19,6 +19,11 @@ export interface Model {
   readonly capabilities: readonly Capability[]
   /** One line, shown under the name. Says what it is for, not what it is. */
   readonly note: string
+  /**
+   * Tokens the model can hold. Declared per model rather than assumed, because
+   * the meter is meaningless if every model is measured against one number.
+   */
+  readonly contextWindow: number
 }
 
 export interface Provider {

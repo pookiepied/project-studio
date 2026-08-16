@@ -57,3 +57,17 @@ export const GENERATED_VIDEO_POSTER = dataUri(`
   <circle cx="480" cy="270" r="54" fill="#ffffff" fill-opacity="0.9"/>
   <path d="M464 244 L516 270 L464 296 Z" fill="#2a2f45"/>
 </svg>`)
+
+/**
+ * A real, playable six-second clip for the gallery.
+ *
+ * A file in `public/` rather than a data URI, unlike the stills above. The
+ * stills are a few hundred bytes and belong inline; a video is tens of
+ * kilobytes, and base64 in a TypeScript module is 33% larger again, parsed on
+ * every startup, and unreadable in a diff. It is also the honest shape -- a
+ * real result arrives as a URL, so the demo exercises the same path.
+ *
+ * Generated, not sourced: a synthetic gradient drift, so there is nothing to
+ * license and nothing that implies what the model would actually produce.
+ */
+export const GENERATED_VIDEO = '/demo/generated-loop.mp4'

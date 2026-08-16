@@ -21,6 +21,7 @@
     "framer-motion": "^12.42.2",
     "katex": "^0.18.4",
     "lucide-react": "^1.31.0",
+    "media-chrome": "^4.19.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",

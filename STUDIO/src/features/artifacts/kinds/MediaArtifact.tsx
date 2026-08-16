@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
+import { MediaLightbox } from '@/features/artifacts/media'
 import { Timeline } from '@/features/artifacts/sections'
 import { isWorking, type Artifact } from '@/domain/artifacts/types'
+import { cn } from '@/lib/cn'
 
 /**
  * Generated media -- an image or a video.
@@ -24,6 +27,12 @@ interface MediaData {
 export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: boolean }) {
   const data = (artifact.data ?? {}) as MediaData
   const working = isWorking(artifact.status)
+  const [open, setOpen] = useState(false)
+
+  // Whatever there is to show. A finished video whose file has not landed yet
+  // still has a poster, which is a real frame of it and beats a placeholder.
+  const still = data.url ?? data.poster
+  const openable = !working && Boolean(still)
   const timeline = artifact.sections?.find((section) => section.type === 'timeline')
 
   const detail = [working ? 'Generating' : video ? 'Video ready' : 'Image ready', data.model]
@@ -40,34 +49,54 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
         initial={{ opacity: 0, scale: 0.99 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: DURATION.base, ease: EASE_OUT }}
-        className="overflow-hidden rounded-lg"
+        className="relative overflow-hidden rounded-block-inner"
         // The aspect ratio is reserved *before* the media exists, so the
         // finished frame drops into a space already the right size. Without it
         // the transcript jumps by the height of an image the moment one
         // resolves, which is the single most visible layout shift in a chat.
         style={{ aspectRatio: data.aspectRatio ?? '4 / 3' }}
       >
-        {!working && data.url ? (
-          video ? (
-            <video
-              src={data.url}
-              poster={data.poster}
-              controls
-              className="size-full bg-black object-cover"
-            />
-          ) : (
-            <img src={data.url} alt={artifact.title} className="size-full object-cover" />
-          )
-        ) : !working && data.poster ? (
-          // A finished video whose file is not local yet. The poster is a real
-          // frame from it, so showing that beats showing the working shimmer
-          // for something that is no longer working -- and a `<video>` with no
-          // source renders as a black rectangle with broken controls.
-          <img src={data.poster} alt={artifact.title} className="size-full object-cover" />
+        {still && !working ? (
+          <img src={still} alt={artifact.title} className="size-full object-cover" />
         ) : (
           <Shimmer active={working} video={video} />
         )}
+
+        {/* The whole frame is the target, not a small button in the corner of
+            it. Clicking a picture to see it bigger is the gesture everyone
+            already has; a video plays here rather than in place, because a
+            control bar under a 200px-tall clip in a transcript is four tiny
+            targets nobody can hit. */}
+        {openable ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={video ? `Play ${artifact.title}` : `Open ${artifact.title}`}
+            className="group/media absolute inset-0 flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          >
+            <span className="absolute inset-0 bg-black/0 transition-colors duration-base group-hover/media:bg-black/15" />
+            <span
+              className={cn(
+                'relative flex items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm',
+                'transition-transform duration-base group-hover/media:scale-105',
+                video ? 'size-12' : 'size-9 opacity-0 group-hover/media:opacity-100',
+              )}
+            >
+              {video ? <PlayGlyph /> : <Icons.rail />}
+            </span>
+          </button>
+        ) : null}
       </motion.div>
+
+      <MediaLightbox
+        open={open}
+        onClose={() => setOpen(false)}
+        title={artifact.title}
+        caption={data.prompt}
+        video={video}
+        src={data.url ?? data.poster}
+        poster={data.poster}
+      />
 
       {data.prompt ? (
         <p className="mt-2.5 text-caption leading-relaxed text-muted-foreground">
@@ -82,6 +111,22 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
         </div>
       ) : null}
     </ArtifactShell>
+  )
+}
+
+/**
+ * The play triangle.
+ *
+ * Drawn rather than taken from the icon set: every mark in the registry is a
+ * 1.2px stroke at 14px, and a play button is a solid shape at 20 -- borrowing
+ * an outline glyph and filling it would put a shape in the app that answers to
+ * neither rule.
+ */
+function PlayGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5 translate-x-[1px]" aria-hidden>
+      <path d="M8 5.5 L19 12 L8 18.5 Z" fill="currentColor" />
+    </svg>
   )
 }
 

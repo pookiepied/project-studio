@@ -67,6 +67,9 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
       // The caption goes under the code, and the code is what you came for.
       label={path ?? displayName(language)}
       meta={lines === 1 ? 'Line 1' : `Lines 1–${lines}`}
+      // The highlighter's `<pre>` is the scroller, so it gets the whole panel
+      // and pads itself. See `flush`.
+      flush
       collapsedHeight={COLLAPSED_HEIGHT}
       expandLabel={(folded) => (folded ? `Show all ${lines}` : 'Collapse')}
       actions={
@@ -112,7 +115,12 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
         className="studio-code"
         customStyle={{
           margin: 0,
-          padding: '0 1.125rem',
+          padding: '0.875rem 1.125rem',
+          // Stated, not `inherit`. `inherit` resolves against the immediate
+          // parent -- the frame's plain body wrapper, which has no radius --
+          // so it silently computed to 0 and the scrollbar squared off the
+          // corner it now sits in.
+          borderRadius: 'var(--radius-block-inner)',
           fontSize: 'var(--code-size)',
           lineHeight: 1.7,
           background: 'transparent',

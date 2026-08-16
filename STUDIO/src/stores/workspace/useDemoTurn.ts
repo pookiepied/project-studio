@@ -107,9 +107,6 @@ export function useDemoTurn() {
                 message.id === assistantId ? { ...message, text: upto } : message,
               ),
               updatedAt: Date.now(),
-              contextUsed: last
-                ? Math.min(1, conversation.contextUsed + 0.06)
-                : conversation.contextUsed,
             }))
             if (last) onDone()
           })

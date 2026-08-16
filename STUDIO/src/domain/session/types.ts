@@ -41,8 +41,6 @@ export interface Conversation {
   readonly updatedAt: number
   readonly pinned: boolean
   readonly archived: boolean
-  /** Fraction of the context window in use, 0 to 1. */
-  readonly contextUsed: number
 }
 
 /** What the session is doing. Drives the mark, the send button, and the composer. */

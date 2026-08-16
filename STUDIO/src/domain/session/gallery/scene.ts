@@ -1,4 +1,4 @@
-import { GENERATED_IMAGE, GENERATED_VIDEO_POSTER } from '@/domain/session/gallery/marks'
+import { GENERATED_IMAGE, GENERATED_VIDEO, GENERATED_VIDEO_POSTER } from '@/domain/session/gallery/marks'
 import type { Artifact } from '@/domain/artifacts/types'
 
 /**
@@ -160,6 +160,11 @@ function video(stage: Stage): Artifact {
       aspectRatio: '16 / 9',
       prompt: 'Slow drift across a gradient horizon, no camera shake, seamless loop.',
       poster: done ? GENERATED_VIDEO_POSTER : undefined,
+      // An SVG cannot be played, so the finished clip carries a tiny real
+      // video. Without one the player would be posed rather than exercised,
+      // and a control bar that has never had a file in it is a control bar
+      // nobody has tested.
+      url: done ? GENERATED_VIDEO : undefined,
     },
     sections: [
       {
