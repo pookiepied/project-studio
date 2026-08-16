@@ -13,6 +13,9 @@ import type { Conversation, Message, SessionStatus, TurnSettings } from '@/domai
 import type { Project } from '@/domain/projects/types'
 import { deriveTitle } from '@/stores/workspace/deriveTitle'
 import { useDemoTurn } from '@/stores/workspace/useDemoTurn'
+import type { TurnRun } from '@/stores/workspace/useDemoTurn'
+import { useGalleryTurn } from '@/stores/workspace/useGalleryTurn'
+import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { newId } from '@/lib/id'
 
 /**
@@ -79,7 +82,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<readonly Conversation[]>(DEMO_CONVERSATIONS)
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [settings, setSettings] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
-  const { run, cancel } = useDemoTurn()
+  const demo = useDemoTurn()
+  const gallery = useGalleryTurn()
+
+  /**
+   * Which turn runner answers, and why the choice lives here.
+   *
+   * One conversation in the demo set is the artifact gallery, and replying in
+   * it plays every artifact through its stages instead of typing a canned
+   * paragraph. Deciding that here rather than inside the runner keeps both
+   * runners ignorant of each other and of conversation ids -- and it is the
+   * single seam a real transport replaces, since `run` is the only thing the
+   * four call sites below know about.
+   */
+  const run = useCallback(
+    (conversationId: string, options: TurnRun) =>
+      (conversationId === GALLERY_CONVERSATION_ID ? gallery.run : demo.run)(options),
+    [demo.run, gallery.run],
+  )
+
+  const cancel = useCallback(() => {
+    demo.cancel()
+    gallery.cancel()
+  }, [demo.cancel, gallery.cancel])
 
   const patchConversation = useCallback(
     (id: string, change: (conversation: Conversation) => Conversation) => {
@@ -171,7 +196,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       const id = targetId
-      run({
+      run(id, {
         modelId: settings.modelId,
         patch: (change) => patchConversation(id, change),
         onThinking: () => setStatus('thinking'),
@@ -197,7 +222,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (kept.length === 0) return
 
       patchConversation(conversationId, (current) => ({ ...current, messages: kept }))
-      run({
+      run(conversationId, {
         modelId: settings.modelId,
         patch: (change) => patchConversation(conversationId, change),
         onThinking: () => setStatus('thinking'),
@@ -232,7 +257,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         updatedAt: Date.now(),
       }))
 
-      run({
+      run(conversationId, {
         modelId: settings.modelId,
         patch: (change) => patchConversation(conversationId, change),
         onThinking: () => setStatus('thinking'),

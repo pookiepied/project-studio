@@ -58,6 +58,12 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
           ) : (
             <img src={data.url} alt={artifact.title} className="size-full object-cover" />
           )
+        ) : !working && data.poster ? (
+          // A finished video whose file is not local yet. The poster is a real
+          // frame from it, so showing that beats showing the working shimmer
+          // for something that is no longer working -- and a `<video>` with no
+          // source renders as a black rectangle with broken controls.
+          <img src={data.poster} alt={artifact.title} className="size-full object-cover" />
         ) : (
           <Shimmer active={working} video={video} />
         )}

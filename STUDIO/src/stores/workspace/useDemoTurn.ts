@@ -26,7 +26,7 @@ const LEAD_IN = 380
 
 export type TurnPatch = (change: (conversation: Conversation) => Conversation) => void
 
-interface RunOptions {
+export interface TurnRun {
   readonly modelId: string
   readonly patch: TurnPatch
   readonly onThinking: () => void
@@ -49,7 +49,7 @@ export function useDemoTurn() {
   }, [])
 
   const run = useCallback(
-    ({ modelId, patch, onThinking, onStreaming, onDone }: RunOptions) => {
+    ({ modelId, patch, onThinking, onStreaming, onDone }: TurnRun) => {
       const assistantId = newId('msg')
       const trace = demoThinking()
       const reply = demoReply()
