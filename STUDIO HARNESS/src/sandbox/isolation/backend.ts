@@ -27,8 +27,8 @@ export interface ContainmentRequest {
    * the network namespace; naming either one here would put a platform's
    * vocabulary in the interface every platform implements.
    *
-   * **What it grants is not the same on both platforms, and saying otherwise
-   * would be the easy lie here.**
+   * **What it grants is now the same on both platforms, and it was not always,
+   * which is why this is spelled out here rather than only in a document.**
    *
    * On Windows it is narrower than "network access", and that was measured
    * rather than assumed: with `internetClient` and nothing else, a contained
@@ -39,19 +39,24 @@ export interface ContainmentRequest {
    * offers. So a contained server can call its API and cannot touch the user's
    * dev server, their database, or their router.
    *
-   * On Linux the switch is `--share-net`, which means *no network namespace at
-   * all* — so the child gets the host's stack, loopback and LAN included.
-   * **Measured, not deduced:** against a server on `127.0.0.1`, a contained
-   * child reaches it (`200`) with the network allowed and is refused
-   * (`ECONNREFUSED`) without it. `bwrap` has no setting between "empty
-   * namespace" and "the host's", so matching the Windows boundary needs a
-   * firewall rule or a seccomp filter this does not have.
+   * On Linux it once meant `--share-net` — *no network namespace at all*, so the
+   * child got the host's stack with loopback and the LAN included, measured
+   * reaching a server on the host's `127.0.0.1`, an RFC1918 address and a
+   * Tailscale peer. That was **#93**. It now means a namespace built by `pasta`
+   * that bubblewrap shares, with the private ranges refused by blackhole routes
+   * the child cannot remove: internet reached, host loopback refused, RFC1918
+   * and carrier-grade NAT refused.
    *
-   * So the refusal half is identical and complete on both platforms, and the
-   * granted half is wider on Linux: a contained server there may call its API
-   * *and* the user's dev server. Registered as **#93**, and stated here rather
-   * than only in a document because this is the field whose name implies
-   * otherwise.
+   * Two deliberate differences remain, both in the direction of *narrower* on
+   * Linux or harmless. The child's **own** loopback keeps working there, because
+   * inside its namespace it reaches nothing but itself — Windows refuses
+   * loopback because there, loopback is the host. And the host's own public
+   * address is refused on Linux and allowed on Windows, because `pasta` leaves
+   * the child holding that address.
+   *
+   * A Linux machine that cannot narrow the network is **refused** one rather
+   * than handed the host's, which is the whole point: the wide behaviour must
+   * not come back as a fallback.
    */
   readonly network: boolean;
   /**

@@ -44,6 +44,16 @@ export const PROFILE_PATH = "/etc/apparmor.d/studio-bwrap";
 export const PROFILE_NAME = "studio-bwrap";
 
 /**
+ * The second profile in the same file, for the network stack.
+ *
+ * One file, two profiles, because they are one decision: the user is asked once
+ * for the namespaces this sandbox needs, and `apparmor_parser` loads and unloads
+ * a file's profiles together. Two files would be two prompts and two ways to end
+ * up half-configured.
+ */
+export const NETWORK_PROFILE_NAME = "studio-pasta";
+
+/**
  * Where the kernel lists what it is actually enforcing.
  *
  * Root-readable, one profile per line, and the only account of this that cannot
@@ -81,7 +91,22 @@ export function profileLoaded(): boolean {
  * attached to the wrong path silently grants nothing, which is the worst
  * outcome available here: setup reports success and the sandbox stays refused.
  */
-export function profileText(bwrapPath: string): string {
+export function profileText(bwrapPath: string, pastaPath?: string): string {
+  const pasta =
+    pastaPath === undefined
+      ? ""
+      : `
+# The same grant for passt's pasta, which builds the network namespace a
+# contained program is given when the operator allows it one. Without this the
+# sandbox still runs; it refuses to hand out a network, because the alternative
+# is falling back to the host's own network namespace — which is the machine.
+profile ${NETWORK_PROFILE_NAME} ${pastaPath} flags=(unconfined) {
+  userns,
+
+  include if exists <local/${NETWORK_PROFILE_NAME}>
+}
+`;
+
   return `# Project Studio's sandbox contains a program the model chose by putting it in
 # a user namespace, which is what bubblewrap builds. Ubuntu 23.10 and later
 # withhold namespaces from unprivileged programs unless a profile grants them.
@@ -100,15 +125,15 @@ profile ${PROFILE_NAME} ${bwrapPath} flags=(unconfined) {
   userns,
 
   # Site-specific additions and overrides. See local/README for details.
-  include if exists <local/studio-bwrap>
+  include if exists <local/${PROFILE_NAME}>
 }
-`;
+${pasta}`;
 }
 
 /** Whether the profile on disk is already the one we would write. */
-export function profileInstalled(bwrapPath: string): boolean {
+export function profileInstalled(bwrapPath: string, pastaPath?: string): boolean {
   try {
-    return readFileSync(PROFILE_PATH, "utf8") === profileText(bwrapPath);
+    return readFileSync(PROFILE_PATH, "utf8") === profileText(bwrapPath, pastaPath);
   } catch {
     return false;
   }
@@ -131,8 +156,12 @@ export function canInstall(): boolean {
  * not root" — which has a next step — from "AppArmor rejected this", which does
  * not. Only ever called when {@link canInstall} is true.
  */
-export function installProfile(bwrapPath: string, write: (text: string) => void): void {
-  write(profileText(bwrapPath));
+export function installProfile(
+  bwrapPath: string,
+  pastaPath: string | undefined,
+  write: (text: string) => void,
+): void {
+  write(profileText(bwrapPath, pastaPath));
   // Loading is a separate act from writing, and skipping it is the failure mode
   // that looks like success: the file is there, the kernel has never read it,
   // and the sandbox stays refused until the next reboot.

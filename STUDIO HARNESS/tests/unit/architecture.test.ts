@@ -463,6 +463,9 @@ describe("nothing the model chose reaches a process uncontained", () => {
       // The answer cannot be reached any other way, and a backend that guessed
       // it would be the exact failure this whole seam exists to prevent.
       [join("src", "sandbox", "isolation", "linux", "bwrap.ts"), "probes the container"],
+      // The same question about the network stack, which creates a namespace of
+      // its own and is refused by the same kernel restriction.
+      [join("src", "sandbox", "isolation", "linux", "network.ts"), "probes the network"],
       // Runs `apparmor_parser` to load and unload the profile that lets the
       // sandbox exist at all. Cannot go through the sandbox for the same reason
       // the Windows launcher cannot, and reached only from `sandbox/cli.ts`,

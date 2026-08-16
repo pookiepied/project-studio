@@ -180,10 +180,12 @@ around that: a Linux user cannot reach the working state without editing kernel
 settings by hand, and the boundary a granted network draws is not the same on
 the two platforms. Ranked by what stands between this and shipping.
 
-*Updated 2026-08-16: the first of those is closed — a Linux user reaches the
-working state with one command and no kernel edit. The list is kept in its
-original order and marked, rather than rewritten, because what each item failed
-to anticipate is the useful part.*
+*Updated 2026-08-16: the first two are closed — a Linux user reaches the working
+state with one command and no kernel edit, and a granted network now draws the
+same boundary on both platforms. The list is kept in its original order and
+marked, rather than rewritten, because what each item failed to anticipate is
+the useful part: #92 did not foresee that the setup command would measure the
+wrong account, and #93 predicted a firewall rule it turned out not to need.*
 
 #### 1. Linux is correct and unusable out of the box — #92 — **closed 2026-08-16**
 
@@ -222,7 +224,21 @@ carries profiles for Chrome, VS Code and flatpak for exactly this reason.
 Windows has the same shape of problem and already has its answer: one elevated
 `pnpm sandbox:prepare` per machine. Linux needs its counterpart.
 
-#### 2. A granted network means more on Linux than on Windows — #93
+#### 2. A granted network means more on Linux than on Windows — #93 — **closed 2026-08-16**
+
+**Closed.** `pasta` (from `passt`) builds the namespace in userspace and
+bubblewrap shares *that* instead of the machine's. Internet reached, host
+loopback refused, RFC1918 refused, carrier-grade NAT refused, and the child
+cannot take the routes back off. A machine without `passt` is refused a network
+rather than quietly handed `--share-net`.
+
+The prediction below — "closing this needs a firewall rule or a seccomp filter"
+— was wrong in an instructive way. It needed neither: a second namespace and
+five blackhole routes. The guess came from asking what `bwrap` could do rather
+than what was available to compose with it. ADR 0041 has the measured table and
+the three findings that only running it produced.
+
+
 
 **Measured, not deduced.** With the operator's switch on, a contained child on
 Linux reached a server on `127.0.0.1` (`200`); on Windows the same attempt is

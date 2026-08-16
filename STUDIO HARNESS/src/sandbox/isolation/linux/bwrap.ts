@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 import { resolveBinary } from "../../../vendor/resolver.js";
+import { SandboxError } from "../../errors.js";
 import type { SandboxPolicy } from "../../policy.js";
 import type {
   ContainedCommand,
@@ -8,6 +9,13 @@ import type {
   IsolationBackend,
 } from "../backend.js";
 import { programRoots } from "../program-roots.js";
+import { asIdentity, type ProbeIdentity } from "./identity.js";
+import {
+  pastaPath,
+  probeNetwork,
+  withNarrowedNetwork,
+  type NetworkProbe,
+} from "./network.js";
 
 /**
  * OS containment on Linux, using `bwrap`.
@@ -71,6 +79,16 @@ import { programRoots } from "../program-roots.js";
  * can push characters back into it with `TIOCSTI`, which is a contained program
  * typing commands at the user's shell.
  */
+/**
+ * The shell that runs the network setup, and the one path allowed to be assumed.
+ *
+ * POSIX requires it at exactly this path, `bwrap` and `pasta` both already
+ * depend on a working system, and a resolver entry for it would imply a choice
+ * that does not exist. Named here rather than inline so the assumption is
+ * visible.
+ */
+const SHELL_PATH = "/bin/sh";
+
 const BASE_ARGUMENTS: readonly string[] = [
   "--unshare-all",
   "--die-with-parent",
@@ -100,7 +118,27 @@ const SYSTEM_ROOTS: readonly string[] = ["/bin", "/lib", "/lib32", "/lib64", "/s
  * Bound only when the network is allowed, and named individually rather than
  * binding `/etc` wholesale — the child's business is its own API call, not the
  * machine's user list, mail configuration or cron table.
+ *
+ * Unaffected by the move to `pasta`: the child still resolves names itself, and
+ * `pasta` forwards the queries like any other traffic.
  */
+/**
+ * The resolver list to use when `/etc/resolv.conf` names a local stub.
+ *
+ * `systemd-resolved` is the default on Ubuntu, Fedora and most desktops, and it
+ * writes `nameserver 127.0.0.53` — a stub it answers on the *host's* loopback.
+ * Inside `pasta`'s namespace that address is the child's own loopback, where
+ * nothing is listening, so every lookup came back `EAI_AGAIN` while raw IP
+ * traffic worked perfectly. Found by a test that resolved a name; a probe
+ * against an address would have missed it entirely.
+ *
+ * The real upstream servers are in this file, and binding it over
+ * `/etc/resolv.conf` is what container runtimes do for the same reason. Bound
+ * *after* `/etc/resolv.conf` so it wins where it exists, and `--ro-bind-try` so
+ * a machine without `systemd-resolved` simply keeps its own.
+ */
+const RESOLVED_UPSTREAM = "/run/systemd/resolve/resolv.conf";
+
 const NETWORK_CONFIGURATION: readonly string[] = [
   "/etc/resolv.conf",
   "/etc/hosts",
@@ -142,6 +180,7 @@ export function bwrapArgs(input: BwrapInput): readonly string[] {
   for (const root of SYSTEM_ROOTS) args.push("--ro-bind-try", root, root);
   if (input.network) {
     for (const path of NETWORK_CONFIGURATION) args.push("--ro-bind-try", path, path);
+    args.push("--ro-bind-try", RESOLVED_UPSTREAM, "/etc/resolv.conf");
   }
 
   // Program files, then read roots, then write roots. Order is the rule: a path
@@ -169,62 +208,6 @@ export interface ProbeResult {
   readonly detail?: string;
 }
 
-/** Whose ability to contain is being measured. */
-export interface ProbeIdentity {
-  readonly uid: number;
-  readonly gid: number;
-}
-
-/**
- * The unprivileged account whose answer the setup command actually needs.
- *
- * `nobody` on every distribution that ships one, and the point is that the
- * *number* barely matters: the AppArmor restriction is attached to the program,
- * not to the person, so any account without `CAP_SYS_ADMIN` returns the same
- * verdict. This is the stand-in for "somebody who is not root" when there is no
- * real candidate to name.
- */
-const NOBODY: ProbeIdentity = { uid: 65_534, gid: 65_534 };
-
-/**
- * Who a *setup* command must ask about, which is rarely the process asking.
- *
- * Root creates user namespaces whatever the kernel's restriction says — it holds
- * `CAP_SYS_ADMIN`, and AppArmor's `userns` rule never applies to it. So `sudo
- * pnpm sandbox:prepare` probing itself measures the one account on the machine
- * whose answer does not matter, concludes the sandbox already works, and exits
- * without installing anything. Measured on Ubuntu 24.04: the same `bwrap`
- * command fails for the user and succeeds under `sudo`.
- *
- * That is not a rough edge, it is the failure this seam exists to prevent,
- * wearing the setup command as a disguise: containment reported as working while
- * every contained thing the user runs is refused.
- *
- * Pure in its arguments so the mapping can be asserted on any platform — the
- * caller supplies `process.getuid?.()` and `process.env`. `undefined` means
- * "measure yourself", which is right whenever the asker is already unprivileged.
- */
-export function unprivilegedIdentity(
-  uid: number | undefined,
-  env: NodeJS.ProcessEnv,
-): ProbeIdentity | undefined {
-  if (uid !== 0) return undefined;
-
-  // `sudo` names the person who invoked it, and they are exactly who will run
-  // Studio afterwards. Preferred over `nobody` because a machine could in
-  // principle confine that one account further, and the answer they get should
-  // be the answer about them.
-  const sudoUid = Number(env["SUDO_UID"]);
-  const sudoGid = Number(env["SUDO_GID"]);
-  if (Number.isInteger(sudoUid) && sudoUid > 0) {
-    return {
-      uid: sudoUid,
-      gid: Number.isInteger(sudoGid) && sudoGid > 0 ? sudoGid : sudoUid,
-    };
-  }
-  return NOBODY;
-}
-
 /**
  * Actually contains something trivial, and reports what happened.
  *
@@ -233,9 +216,8 @@ export function unprivilegedIdentity(
  * its answer, correctly, since the probe starts a process. A second question
  * needs a second measurement, not a stale one.
  *
- * `as` runs the probe under another account. Dropping to a non-zero uid drops
- * the capabilities with it, which is the whole reason this works: the child is
- * unprivileged in the way that makes the kernel's restriction apply.
+ * `as` runs the probe under another account; see `identity.ts` for why the
+ * answer for root is never the answer that matters.
  */
 export function probeContainment(path: string, as?: ProbeIdentity): ProbeResult {
   try {
@@ -250,14 +232,7 @@ export function probeContainment(path: string, as?: ProbeIdentity): ProbeResult 
         "--",
         "/bin/true",
       ],
-      {
-        timeout: 10_000,
-        stdio: ["ignore", "ignore", "pipe"],
-        // Set together or not at all: `gid` after `uid` cannot be changed back,
-        // so Node applies them in that order and a missing `gid` would leave the
-        // child in root's group.
-        ...(as === undefined ? {} : { uid: as.uid, gid: as.gid }),
-      },
+      { timeout: 10_000, stdio: ["ignore", "ignore", "pipe"], ...asIdentity(as) },
     );
     return { ok: true };
   } catch (cause) {
@@ -288,6 +263,8 @@ class LinuxBwrapBackend implements IsolationBackend {
   #availability: boolean | undefined;
   /** What the probe saw when it failed. Never a guess — see {@link diagnose}. */
   #observed: string | undefined;
+  /** Memoised for the same reason: building a namespace costs a process. */
+  #networkAvailability: NetworkProbe | undefined;
 
   available(): boolean {
     this.#availability ??= this.#measure();
@@ -366,9 +343,13 @@ class LinuxBwrapBackend implements IsolationBackend {
       ...(request.programRoots ?? []),
     ]);
 
-    return {
-      executable: bwrapPath(),
-      args: bwrapArgs({
+    // `--share-net` shares the *parent's* namespace. Without `pasta` that parent
+    // is the machine, which is how the boundary got wider than the Windows one.
+    // With it, the parent is a namespace that reaches the internet and not the
+    // user's own machine.
+    const contained = [
+      bwrapPath(),
+      ...bwrapArgs({
         cwd: request.cwd,
         executable: request.executable,
         args: request.args,
@@ -377,7 +358,54 @@ class LinuxBwrapBackend implements IsolationBackend {
         programRoots: [...roots],
         network: request.network,
       }),
-    };
+    ];
+
+    if (!request.network) {
+      // An empty namespace is already the strictest answer available, so the
+      // network-off path never depends on `pasta` being installed.
+      return { executable: contained[0]!, args: contained.slice(1) };
+    }
+
+    const stack = this.#networkPath();
+    const wrapped = withNarrowedNetwork(stack, SHELL_PATH, contained);
+    return { executable: wrapped[0]!, args: wrapped.slice(1) };
+  }
+
+  /**
+   * Where the network stack is, or a refusal — never a quiet `--share-net`.
+   *
+   * Falling back to the host's namespace when `pasta` is missing would be the
+   * defect this closes, reintroduced as an error path: the child would get the
+   * whole machine and the only sign would be a package that was not installed.
+   * A machine that cannot narrow the network refuses to grant one, and says
+   * which package fixes it.
+   */
+  #networkPath(): string {
+    let path: string;
+    try {
+      path = pastaPath();
+    } catch (cause) {
+      // The same kind the host-cannot-contain path throws. A network the
+      // operator granted and the machine cannot narrow is isolation this host
+      // does not provide, which is exactly what the kind means.
+      throw new SandboxError("unsupported_isolation", {
+        message:
+          `${cause instanceof Error ? cause.message : String(cause)} ` +
+          "Until then a contained program can still run here; it just cannot be " +
+          "given a network.",
+      });
+    }
+
+    this.#networkAvailability ??= probeNetwork(path);
+    if (!this.#networkAvailability.ok) {
+      throw new SandboxError("unsupported_isolation", {
+        message:
+          "The network program is installed and cannot build a network namespace " +
+          `here: ${this.#networkAvailability.detail ?? "(no detail)"} ` +
+          "`sudo pnpm sandbox:prepare` grants it the namespace it needs.",
+      });
+    }
+    return path;
   }
 
   /**

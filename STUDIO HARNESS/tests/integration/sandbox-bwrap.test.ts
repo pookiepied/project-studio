@@ -1,5 +1,7 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir, networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -67,6 +69,45 @@ const NETWORK_PROBE = `
   request.setTimeout(8000, () => { console.log("refused ETIMEDOUT"); process.exit(0); });
 `;
 
+/**
+ * A plain TCP probe of one address, which is what the local targets need.
+ *
+ * `https` would confuse a refusal with a handshake failure, and the question
+ * here is only whether a packet gets there. A short timeout counts as refused
+ * because a blackhole route answers immediately while a dropped packet does
+ * not — both are "did not reach", and distinguishing them is not this test's
+ * job.
+ */
+function probeFor(host: string, port: number): string {
+  return `
+    const socket = require("net").connect(${port}, ${JSON.stringify(host)});
+    socket.setTimeout(5000, () => { console.log("refused ETIMEDOUT"); process.exit(0); });
+    socket.on("connect", () => { console.log("reached"); process.exit(0); });
+    socket.on("error", (error) => { console.log("refused " + error.code); process.exit(0); });
+  `;
+}
+
+/**
+ * A private address this host actually holds, if it has one.
+ *
+ * Returned rather than hard-coded because the point is to bind a server
+ * somewhere the child could plausibly reach — a Docker bridge, a LAN interface,
+ * a VPN. A cloud machine with only a public address has nothing to test here,
+ * and skipping is more honest than asserting against an address nobody is
+ * listening on.
+ */
+function privateAddress(): string | undefined {
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family !== "IPv4" || entry.internal) continue;
+      if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(entry.address)) {
+        return entry.address;
+      }
+    }
+  }
+  return undefined;
+}
+
 linux("a contained child on Linux", () => {
   let root = "";
   let workspace = "";
@@ -89,12 +130,32 @@ linux("a contained child on Linux", () => {
     await rm(root, { recursive: true, force: true });
   }, 60_000);
 
-  it("runs the sandbox program the resolver found, not a bare name", async () => {
+  it("runs the sandbox programs the resolver found, not bare names", async () => {
     // `runProcess` only accepts an absolute path, and "whatever `bwrap` means on
-    // this PATH today" is not a program we chose.
+    // this PATH today" is not a program we chose. Both programs are in the line
+    // now: with a network granted, `pasta` builds the namespace and `bwrap` runs
+    // inside it, so the outer name is `pasta` and `bwrap` moved into the
+    // arguments. This test asserted `executable` contained "bwrap" and caught
+    // that change, which is what it is for — the claim it makes is about
+    // resolution, not about which program happens to be first.
     const planned = await sandbox.plan("shell", { executable: NODE, args: [] });
     expect(planned.executable).toMatch(/^\//);
+    expect(planned.executable).toContain("pasta");
+    const bwrap = planned.args.find((argument) => argument.includes("bwrap"));
+    expect(bwrap).toMatch(/^\//);
+  });
+
+  it("uses bwrap alone when no network was granted", async () => {
+    // The other half of the same claim, and the reason the network-off path is
+    // worth its own assertion: an empty namespace is already stricter than
+    // anything `pasta` could build, so bringing it in would be a dependency
+    // bought for nothing.
+    const denied = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: workspace, allowNetwork: false }),
+    );
+    const planned = await denied.plan("shell", { executable: NODE, args: [] });
     expect(planned.executable).toContain("bwrap");
+    expect(planned.executable).not.toContain("pasta");
   });
 
   it("still runs the program, and the program still works", async () => {
@@ -235,6 +296,73 @@ linux("a contained child on Linux", () => {
     // network was blocked would still pass if containment blocked it always,
     // which is the state that makes every API-calling MCP server useless.
     expect(await inside(sandbox, NETWORK_PROBE)).toMatch(/reached \d+/);
+  }, 60_000);
+
+  it("cannot reach a server on the host's own loopback", async () => {
+    // The measurement that opened #93. With `--share-net` the child had the
+    // *machine's* network namespace, and this exact server came back `200` —
+    // while the Windows capability refuses loopback outright. The fix is that
+    // the namespace is now `pasta`'s rather than the host's, so `127.0.0.1`
+    // inside the child is the child's own loopback and reaches nothing.
+    const server = createServer((_, response) => response.end("host"));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      expect(await inside(sandbox, probeFor("127.0.0.1", port))).toMatch(/refused/);
+    } finally {
+      server.close();
+    }
+  }, 60_000);
+
+  it("cannot reach a private address on the machine's own network", async () => {
+    // The other half, and the one a firewall rule would have been needed for if
+    // `pasta` filtered by destination — it does not, so these are blackhole
+    // routes inside the namespace. Bound to a private address the host actually
+    // holds, so the test measures a reachable target being refused rather than
+    // an unreachable one staying unreachable.
+    const address = privateAddress();
+    if (address === undefined) return; // no private interface on this host
+    const server = createServer((_, response) => response.end("lan"));
+    await new Promise<void>((resolve) => server.listen(0, address, resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      expect(await inside(sandbox, probeFor(address, port))).toMatch(/refused/);
+    } finally {
+      server.close();
+    }
+  }, 60_000);
+
+  it("cannot take the blackhole routes back off", async () => {
+    // The property the whole arrangement rests on. `bwrap` puts the child in a
+    // *nested* user namespace, and capabilities there do not reach a network
+    // namespace owned by the parent — so the routes are not advice. Asserted
+    // rather than reasoned about, because "the child cannot undo it" is the
+    // difference between a boundary and a suggestion.
+    const escape = await inside(
+      sandbox,
+      'const { spawnSync } = require("child_process");' +
+        'const r = spawnSync("ip", ["route", "del", "blackhole", "10.0.0.0/8"], { encoding: "utf8" });' +
+        'console.log(r.status === 0 ? "removed" : "refused");',
+    );
+    expect(escape).toMatch(/refused/);
+  }, 60_000);
+
+  it("still lets the child talk to itself", async () => {
+    // Deliberately unlike Windows, and the reason `127.0.0.0/8` is absent from
+    // the blackhole list: the child's loopback is private to its namespace, so
+    // it is not a boundary — and a program that binds a port and connects to it
+    // is ordinary, not an escape attempt.
+    const own = await inside(
+      sandbox,
+      'const net = require("net");' +
+        'const s = net.createServer((c) => c.end("hi"));' +
+        's.listen(0, "127.0.0.1", () => {' +
+        '  const c = net.connect(s.address().port, "127.0.0.1");' +
+        '  c.on("connect", () => { console.log("reached"); process.exit(0); });' +
+        '  c.on("error", () => { console.log("refused"); process.exit(0); });' +
+        "});",
+    );
+    expect(own).toMatch(/reached/);
   }, 60_000);
 
   it("leaves nothing behind on the user's disk", async () => {

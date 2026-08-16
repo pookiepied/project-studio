@@ -21,13 +21,14 @@
 export { isolationForKind, type ChildKind } from "./kinds.js";
 export { containCommand, type ContainRequest } from "./contain.js";
 export { programRoots } from "./program-roots.js";
+export { bwrapArgs, linuxBwrap, type BwrapInput } from "./linux/bwrap.js";
+export { unprivilegedIdentity, type ProbeIdentity } from "./linux/identity.js";
 export {
-  bwrapArgs,
-  linuxBwrap,
-  unprivilegedIdentity,
-  type BwrapInput,
-  type ProbeIdentity,
-} from "./linux/bwrap.js";
+  withNarrowedNetwork,
+  NETWORK_SETUP,
+  PRIVATE_V4,
+  PRIVATE_V6,
+} from "./linux/network.js";
 export {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,

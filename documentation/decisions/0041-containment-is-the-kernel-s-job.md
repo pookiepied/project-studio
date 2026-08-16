@@ -301,19 +301,76 @@ looking. Closes **#92**.
 One boolean, two boundaries, and the difference is measured on both sides rather
 than argued from the flags:
 
-| Target | Windows, `internetClient` | Linux, `--share-net` |
-|---|---|---|
-| Public address and DNS | allowed | allowed |
-| `127.0.0.1` | **refused** | **reached, 200** |
+| Target | Windows, `internetClient` | Linux, `--share-net` | Linux, `pasta` |
+|---|---|---|---|
+| Public address and DNS | allowed | allowed | allowed |
+| Host's `127.0.0.1` | refused | **reached, 200** | refused |
+| Host's own public address | allowed | allowed | **refused** |
+| RFC1918, e.g. `172.17.0.1` | refused | **reached** | refused |
+| Carrier-grade NAT (Tailscale) | refused | **reached** | refused |
+| The child's *own* loopback | refused | reached | **allowed** |
 
-Windows can be narrow because a capability names what it grants. Linux cannot,
-because `bwrap` offers nothing between "empty namespace" and "the host's" —
-narrowing it needs a firewall rule or a seccomp filter this does not have. The
-**refusal** half is identical and complete on both; the **granted** half is
-wider on Linux, so a contained server there may call its API *and* the user's
-dev server. Registered as **#93**, and written into
-`ContainmentRequest.network`'s own doc comment rather than only here, because
-that is the field whose name implies otherwise.
+The middle column is what shipped after step 3, and it is not a network — it is
+the machine. `--share-net` hands over the host's namespace, so a contained MCP
+server could call its API *and* the user's dev server, local database, admin
+panel or router.
+
+`bwrap` offers nothing between "empty namespace" and "the host's", so the answer
+is a second program: `pasta`, from `passt`, builds a network namespace in
+userspace and runs a command inside it. It **composes** rather than replaces —
+`pasta … -- bwrap --unshare-all --share-net … -- child` — and `--share-net` goes
+on meaning "share the parent's namespace"; the parent is simply no longer the
+machine. The network-off path never involves `pasta` at all, because an empty
+namespace is already the strictest answer available.
+
+Three details carry the result, and each was measured rather than reasoned:
+
+- **`pasta`'s port forwarding is on by default**, and it forwards every port
+  between the namespace and the host's loopback. Without `-t none -u none -T
+  none -U none` a child reached a server on the host's `127.0.0.1` exactly as it
+  had through `--share-net`. The fix depends entirely on four flags whose absence
+  looks like nothing.
+- **`pasta` has no opinion about destinations.** It forwards what it is given by
+  opening ordinary sockets on the host, so with forwarding off a child still
+  reached `172.17.0.1` and a Tailscale peer. The private ranges are refused by
+  **blackhole routes inside the namespace** — no `nftables` dependency, and an
+  immediate `ENETUNREACH` instead of a timeout. The child cannot remove them:
+  `bwrap` nests it in a child user namespace, and capabilities there do not
+  reach a network namespace owned by the parent. Its `ip route del` comes back
+  `Operation not permitted`.
+- **Every route on the interface is flushed**, not just the private ones deleted.
+  `pasta --config-net` copies the host's address *and its on-link subnet*, and on
+  a laptop that subnet is the user's LAN — `192.168.1.0/24` beats a
+  `192.168.0.0/16` blackhole on longest prefix. The selective version would have
+  left the LAN reachable on precisely the machines most likely to have one, in a
+  branch that never runs on a cloud VM. Flushing removes the host-shaped branch
+  along with the route.
+
+Two departures from Windows, both deliberate. The child's **own** loopback keeps
+working: inside the namespace it reaches nothing but the child, so it is not a
+boundary, and blackholing it would break a program that binds a port and talks to
+itself. And the **host's own public address** is refused here and allowed on
+Windows — `pasta` keeps the address it copied, so that address resolves, inside
+the namespace, to the child. Measured: `sshd` bound to `0.0.0.0` came back
+refused.
+
+A machine without `passt` is told so and **refused a network** — never quietly
+handed `--share-net`, which would be this defect returning as an error path.
+Closes **#93**.
+
+### The stub resolver, which only broke once the network got narrower
+
+`systemd-resolved` is the default on Ubuntu and Fedora and writes `nameserver
+127.0.0.53` into `/etc/resolv.conf` — a stub it answers on the *host's*
+loopback. That worked for as long as the child had the host's network namespace.
+Inside `pasta`'s, the address is the child's own loopback, nothing is listening,
+and every lookup returns `EAI_AGAIN` while raw IP traffic works perfectly.
+
+`/run/systemd/resolve/resolv.conf` holds the real upstream servers and is bound
+over `/etc/resolv.conf`, which is what container runtimes do for the same reason.
+Worth its own heading because of how it was found: the integration test resolves
+a **name**, and a probe written against an address — the more obvious test for
+"can it reach the internet" — would have passed while every real API call failed.
 
 ### `network` stopped requiring `os`, and that is not a relaxation
 

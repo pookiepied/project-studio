@@ -91,7 +91,7 @@ src/
     local-sandbox.ts          Path containment, and the one door to a contained child
     isolation/                OS containment: kinds, backends, and the single verdict
       windows/                AppContainer, via the studio-contain launcher we ship
-      linux/                  bwrap, via the one the distribution ships
+      linux/                  bwrap and pasta, as the distribution ships them
     errors.ts                 Typed sandbox errors, never echoing the attempted path
   storage/
     database.ts               Application-owned SQLite connection and transactions

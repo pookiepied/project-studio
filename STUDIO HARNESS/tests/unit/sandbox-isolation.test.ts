@@ -17,6 +17,10 @@ import {
   bwrapArgs,
   selectIsolation,
   unprivilegedIdentity,
+  withNarrowedNetwork,
+  NETWORK_SETUP,
+  PRIVATE_V4,
+  PRIVATE_V6,
   type BwrapInput,
   type ContainedCommand,
   type IsolationBackend,
@@ -279,6 +283,16 @@ describe("the Linux launcher's argument rules", () => {
     // child's business is its own API call, not the machine's user list.
     expect(bwrapArgs({ ...base, network: true })).toContain("/etc/resolv.conf");
     expect(bwrapArgs(base)).not.toContain("/etc/resolv.conf");
+
+    // And the stub-resolver case, which only appeared once the child stopped
+    // sharing the host's network namespace: `systemd-resolved` writes
+    // `nameserver 127.0.0.53`, and inside the namespace that is the child's own
+    // loopback. The real upstreams are bound over it, and *after* it, because a
+    // later `bwrap` mount wins.
+    const withNetwork = bwrapArgs({ ...base, network: true });
+    const upstream = withNetwork.indexOf("/run/systemd/resolve/resolv.conf");
+    expect(upstream).toBeGreaterThan(withNetwork.indexOf("/etc/resolv.conf"));
+    expect(withNetwork[upstream + 1]).toBe("/etc/resolv.conf");
   });
 
   it("dies with its parent and drops the controlling terminal", () => {
@@ -344,6 +358,99 @@ describe("the Linux launcher's argument rules", () => {
     const args = bwrapArgs(base);
     expect(modeOf(args, "/usr")).toBe("--ro-bind");
     expect(modeOf(args, "/lib64")).toBe("--ro-bind-try");
+  });
+});
+
+describe("what a granted network means on Linux", () => {
+  // The whole point of #93 is that "the network is allowed" meant two different
+  // things on the two platforms. These pin the argument vector; the integration
+  // suite measures what the kernel does with it.
+
+  const inner = ["bwrap", "--unshare-all", "--share-net", "--", "node", "x.js"];
+
+  it("turns off pasta's port forwarding, all four of it", () => {
+    // Not hardening trim. Pasta's *default* forwards every port between the
+    // namespace and the host's loopback, and with these left out a contained
+    // child reached a server on the host's 127.0.0.1 exactly as it did through
+    // `--share-net` — the defect this closes, reintroduced by omission.
+    const args = withNarrowedNetwork("/usr/bin/pasta", "/bin/sh", inner);
+    for (const flag of ["-t", "-u", "-T", "-U"]) {
+      expect(args[args.indexOf(flag) + 1]).toBe("none");
+    }
+  });
+
+  it("runs the contained command inside the namespace it built", () => {
+    const args = withNarrowedNetwork("/usr/bin/pasta", "/bin/sh", inner);
+    expect(args[0]).toBe("/usr/bin/pasta");
+    // `sh` sits between the setup script and the command as `$0`, so the
+    // caller's executable lands at `$1` and `exec "$@"` runs the right thing.
+    expect(args.slice(-inner.length - 1)).toEqual(["sh", ...inner]);
+  });
+
+  it("never interpolates the command into the shell script", () => {
+    // The reason the script is a constant. A program whose path contained a
+    // quote or a semicolon would otherwise become shell syntax, and the argument
+    // for the sandbox does not survive the sandbox launching arbitrary commands.
+    const hostile = ["bwrap", "; rm -rf /", "$(whoami)", "'"];
+    const args = withNarrowedNetwork("/usr/bin/pasta", "/bin/sh", hostile);
+    const script = args[args.indexOf("-c") + 1] ?? "";
+    expect(script).toBe(NETWORK_SETUP);
+    for (const piece of hostile) expect(script).not.toContain(piece);
+  });
+
+  it("refuses the ranges Windows refuses, including the two easy to forget", () => {
+    // RFC1918 is the obvious half. `100.64.0.0/10` is carrier-grade NAT, where
+    // Tailscale and most mesh VPNs live — measured reachable before this, on a
+    // real peer. `169.254.0.0/16` is link-local, home of 169.254.169.254, every
+    // cloud provider's unauthenticated credentials endpoint.
+    expect(PRIVATE_V4).toEqual(
+      expect.arrayContaining([
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "100.64.0.0/10",
+        "169.254.0.0/16",
+      ]),
+    );
+    expect(PRIVATE_V6).toEqual(expect.arrayContaining(["fc00::/7", "fe80::/10"]));
+  });
+
+  it("leaves the child's own loopback alone", () => {
+    // Deliberate divergence from Windows, and the reason for it: inside the
+    // namespace 127.0.0.1 is the child's own loopback and reaches nothing but
+    // itself. Windows refuses loopback because there, loopback *is* the host.
+    // Blackholing it would break a program that binds a port and talks to it.
+    expect(PRIVATE_V4).not.toContain("127.0.0.0/8");
+    expect(NETWORK_SETUP).not.toContain("127.0.0.0/8");
+  });
+
+  it("flushes the interface rather than deleting the private routes it finds", () => {
+    // `pasta --config-net` copies the host's on-link subnet, and on a laptop
+    // that subnet *is* the user's LAN: 192.168.1.0/24 beats a 192.168.0.0/16
+    // blackhole on longest prefix. A selective delete would leave the LAN
+    // reachable on exactly the machines most likely to have one — and would do
+    // it in a branch that only runs on somebody else's network.
+    expect(NETWORK_SETUP).toContain("ip route flush dev");
+    expect(NETWORK_SETUP).toContain("ip route add default dev");
+  });
+
+  it("gives the child back the empty PATH the sandbox meant it to have", () => {
+    // The script needs `ip`, `sed` and `head`, and a contained child is given an
+    // empty PATH on purpose so an MCP server cannot find tools nobody approved.
+    // Both are true at once, so the borrow is undone before `exec` — otherwise
+    // narrowing the network would quietly widen the toolbox.
+    const setup = NETWORK_SETUP.indexOf("PATH=/usr/sbin");
+    const restore = NETWORK_SETUP.indexOf("PATH=$_studio_path");
+    const exec = NETWORK_SETUP.indexOf('exec "$@"');
+    expect(setup).toBeGreaterThan(-1);
+    expect(restore).toBeGreaterThan(setup);
+    expect(exec).toBeGreaterThan(restore);
+  });
+
+  it("fails closed if a route cannot be added", () => {
+    // Without this the child execs with a wider network than the operator
+    // agreed to, and nothing anywhere says so.
+    expect(NETWORK_SETUP.startsWith("set -eu")).toBe(true);
   });
 });
 

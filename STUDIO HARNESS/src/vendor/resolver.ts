@@ -31,7 +31,7 @@ import { VendorError } from "./errors.js";
  * recoverable; a silently different tool is not.
  */
 
-export type VendorBinaryName = "git" | "rg" | "bwrap";
+export type VendorBinaryName = "git" | "rg" | "bwrap" | "pasta";
 
 export type BinarySource =
   /** Shipped with the application, reviewed and committed. */
@@ -74,6 +74,9 @@ const SOURCES: Record<VendorBinaryName, readonly BinarySource[]> = {
   // schedule instead of the distribution's — the wrong half of that trade for
   // the one program whose job is to be trusted.
   bwrap: ["system"],
+  // Same reasoning, same answer. `pasta` is what a contained child's network is
+  // made of on Linux, so it is a security tool by the same definition.
+  pasta: ["system"],
 };
 
 /**
@@ -89,6 +92,10 @@ const MISSING_MESSAGE: Record<VendorBinaryName, string> = {
     "The sandbox program is not installed. Install bubblewrap — " +
     "`sudo apt install bubblewrap` on Debian and Ubuntu, " +
     "`sudo dnf install bubblewrap` on Fedora and RHEL.",
+  pasta:
+    "The network program is not installed, so a contained program cannot be " +
+    "given a network. Install passt — `sudo apt install passt` on Debian and " +
+    "Ubuntu, `sudo dnf install passt` on Fedora and RHEL.",
 };
 
 /** Only the extensions `runProcess` is willing to spawn without a shell. */

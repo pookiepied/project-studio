@@ -18,7 +18,9 @@ import {
   PROFILE_PATH,
   removeProfile,
 } from "./isolation/linux/apparmor.js";
-import { bwrapPath, probeContainment, unprivilegedIdentity } from "./isolation/linux/bwrap.js";
+import { bwrapPath, probeContainment } from "./isolation/linux/bwrap.js";
+import { unprivilegedIdentity } from "./isolation/linux/identity.js";
+import { pastaPath, probeNetwork } from "./isolation/linux/network.js";
 import { LocalSandbox } from "./local-sandbox.js";
 import { createSandboxPolicy } from "./policy.js";
 
@@ -83,6 +85,17 @@ async function prepareLinux(undo: boolean): Promise<void> {
     return;
   }
 
+  // Optional on purpose. A machine without `passt` still contains programs; it
+  // refuses to give them a network. Making setup fail here would block the
+  // majority case — a project that never grants a child the network — on a
+  // package it does not need.
+  let stack: string | undefined;
+  try {
+    stack = pastaPath();
+  } catch {
+    stack = undefined;
+  }
+
   if (undo) {
     if (!canInstall()) {
       process.stderr.write(`Removing ${PROFILE_PATH} needs root. Run: sudo pnpm sandbox:prepare --undo\n`);
@@ -106,7 +119,7 @@ async function prepareLinux(undo: boolean): Promise<void> {
       // deletes the file by hand lands. `apparmor_parser -R` reads the name out
       // of a file, so the file is written back in order to take the grant away.
       // Recovering a state we caused is worth six lines.
-      writeFileSync(PROFILE_PATH, profileText(path), "utf8");
+      writeFileSync(PROFILE_PATH, profileText(path, stack), "utf8");
     }
 
     try {
@@ -151,13 +164,18 @@ async function prepareLinux(undo: boolean): Promise<void> {
   const subject = unprivilegedIdentity(process.getuid?.(), process.env);
   const measured = subject === undefined ? "this account" : `uid ${subject.uid}`;
 
-  // Asked before anything is changed. A machine whose kernel already hands out
-  // namespaces — most non-Ubuntu distributions — needs no profile, and writing
-  // one anyway would be a permanent change made for no reason.
-  if (probeContainment(path, subject).ok) {
+  // Both halves, because they fail independently. A machine where `bwrap` works
+  // and `pasta` does not is a machine that contains programs and refuses to give
+  // any of them a network — and reporting "nothing to do" there would be the
+  // same half-truth the whole cycle is about.
+  const contains = probeContainment(path, subject).ok;
+  const networks = stack === undefined ? undefined : probeNetwork(stack, subject).ok;
+
+  if (contains && networks !== false) {
     process.stdout.write(
       `The sandbox already works on this machine, measured as ${measured}. Nothing to do.\n`,
     );
+    if (stack === undefined) process.stdout.write(`\n${networkPackageAdvice()}`);
     return;
   }
 
@@ -167,23 +185,28 @@ async function prepareLinux(undo: boolean): Promise<void> {
     return;
   }
 
-  if (profileInstalled(path)) {
-    // The profile is ours, byte for byte, and containment still fails. Saying
+  if (profileInstalled(path, stack)) {
+    // The profile is ours, byte for byte, and something still fails. Saying
     // "installed" here would be the setup command reporting success while the
     // sandbox stays refused, which is the failure this whole cycle is about.
+    const refused = contains
+      ? `the network program still cannot build a namespace for ${measured}`
+      : `bubblewrap still cannot create a namespace for ${measured}`;
+    const detail = contains
+      ? (stack === undefined ? undefined : probeNetwork(stack, subject).detail)
+      : probeContainment(path, subject).detail;
     process.stderr.write(
-      `${PROFILE_PATH} is already installed and bubblewrap still cannot create a\n` +
-        `namespace for ${measured}. Something else on this machine is refusing it —\n` +
-        `a seccomp filter or a container runtime are the usual causes. What the\n` +
-        `kernel said:\n` +
-        `  ${probeContainment(path, subject).detail ?? "(no detail)"}\n`,
+      `${PROFILE_PATH} is already installed and ${refused}.\n` +
+        `Something else on this machine is refusing it — a seccomp filter or a\n` +
+        `container runtime are the usual causes. What the kernel said:\n` +
+        `  ${detail ?? "(no detail)"}\n`,
     );
     process.exitCode = 1;
     return;
   }
 
   try {
-    installProfile(path, (text) => writeFileSync(PROFILE_PATH, text, "utf8"));
+    installProfile(path, stack, (text) => writeFileSync(PROFILE_PATH, text, "utf8"));
   } catch (error) {
     process.stderr.write(
       `Could not install ${PROFILE_PATH}: ` +
@@ -208,10 +231,49 @@ async function prepareLinux(undo: boolean): Promise<void> {
     return;
   }
 
+  // Reported separately from containment, because a machine can end up with one
+  // and not the other and the user needs to know which they have.
+  if (stack !== undefined) {
+    const network = probeNetwork(stack, subject);
+    if (!network.ok) {
+      process.stderr.write(
+        `Installed ${PROFILE_PATH}. Bubblewrap contains, and the network program\n` +
+          `still cannot build a namespace for ${measured}, so a contained program\n` +
+          `will be refused a network rather than given the machine's.\n` +
+          `What the kernel said: ${network.detail ?? "(no detail)"}\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   process.stdout.write(
     `Installed ${PROFILE_PATH} and verified that the sandbox now contains for ${measured}.\n` +
-      `Bubblewrap may create a user namespace; nothing else on this machine changed.\n` +
+      (stack === undefined
+        ? `Bubblewrap may create a user namespace; nothing else on this machine changed.\n`
+        : `Bubblewrap and the network program may each create a user namespace;\n` +
+          `nothing else on this machine changed.\n`) +
       `Undo with: sudo pnpm sandbox:prepare --undo\n`,
+  );
+  if (stack === undefined) process.stdout.write(`\n${networkPackageAdvice()}`);
+}
+
+/**
+ * What to say on a machine that can contain but cannot narrow a network.
+ *
+ * Printed rather than treated as a failure, because containment is the part
+ * most projects need and `passt` is only required by a child the operator
+ * *grants* the network. Silence would be worse than either: the refusal would
+ * arrive later, from a tool call, with no hint that a package fixes it.
+ */
+function networkPackageAdvice(): string {
+  return (
+    `One thing is missing. \`passt\` is not installed, so a contained program\n` +
+    `cannot be given a network — it will be refused one rather than handed the\n` +
+    `machine's own. Install it and run this again if you want that:\n` +
+    `\n` +
+    `  sudo apt install passt      # Debian, Ubuntu\n` +
+    `  sudo dnf install passt      # Fedora, RHEL\n`
   );
 }
 
