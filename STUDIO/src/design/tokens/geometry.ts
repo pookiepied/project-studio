@@ -11,12 +11,22 @@
  * once, here, rather than guessed at each call site.
  */
 
+/*
+ * Softened by two pixels across the middle of the scale.
+ *
+ * The steps were drawn tight enough that a row, a menu and a chip all read as
+ * rectangles with the corners taken off rather than as soft objects, and at
+ * this size that is the difference between an interface that feels calm and one
+ * that feels administrative. The window's own 20 is unchanged -- it was already
+ * the softest thing on screen, and everything else was failing to agree with
+ * it.
+ */
 export const RADIUS = {
-  xs: 6,
-  sm: 8,
-  md: 10,
-  lg: 12,
-  xl: 16,
+  xs: 8,
+  sm: 10,
+  md: 12,
+  lg: 14,
+  xl: 18,
   /** The window itself. Every other radius is derived from this one. */
   window: 20,
   /** A capsule. The one radius that is concentric with anything. */

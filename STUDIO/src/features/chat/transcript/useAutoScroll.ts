@@ -73,12 +73,22 @@ export function useAutoScroll(dependency: unknown) {
   /** A press in the transcript is the reader taking the wheel. */
   const onPointerDown = useCallback(() => setPinned(false), [])
 
+  /**
+   * The button's scroll, which is smooth -- unlike the follow, which is not.
+   *
+   * The distinction is the whole reason this is a separate function. Following
+   * a stream has to be instant: a smooth scroll restarts on every chunk and
+   * never arrives, so the view lags permanently behind the text. Pressing
+   * jump-to-latest is one deliberate journey with a beginning and an end, and
+   * teleporting there loses the reader -- they arrive with no idea whether they
+   * moved a screen or twenty.
+   */
   const scrollToBottom = useCallback(() => {
     const element = viewport.current
     if (!element) return
     programmatic.current = true
     lastTop.current = element.scrollHeight
-    element.scrollTo({ top: element.scrollHeight })
+    element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' })
     setPinned(true)
   }, [])
 

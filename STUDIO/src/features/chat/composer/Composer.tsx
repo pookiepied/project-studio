@@ -90,15 +90,22 @@ export function Composer({
         transitionDuration: `${DURATION.base}s`,
       }}
       className={cn(
-        'bg-surface-raised py-1.5',
+        'bg-surface-raised',
+        // The field breathes on focus: a little taller, lifted a little further
+        // off the page. Both are small enough to register without being watched
+        // -- the point is that the surface acknowledges the caret arriving, not
+        // that it performs. A control this central looking identical whether or
+        // not it is ready for typing is the specific thing that made the page
+        // read as a picture of an app rather than one you are using.
+        focused ? 'py-2.5' : 'py-1.5',
+        'transition-[box-shadow,border-radius,padding] ease-out',
         // Both properties, or the radius does not animate at all: naming only
         // `box-shadow` sets `transition-property` to exactly that, so the
         // capsule-to-box change snapped a frame after the field had already
         // grown. That mismatch -- height first, shape a frame later -- is what
         // read as the composer changing shape and correcting itself on paste.
-        'transition-[box-shadow,border-radius] ease-out',
         focused
-          ? 'shadow-[0_2px_10px_rgba(0,0,0,0.07),0_0_0_1px_rgba(0,0,0,0.07)]'
+          ? 'shadow-[0_6px_20px_-4px_rgba(0,0,0,0.10),0_0_0_1px_rgba(0,0,0,0.08)]'
           : 'shadow-[0_2px_10px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.045)]',
         'dark:shadow-[0_2px_12px_rgba(0,0,0,0.34),0_0_0_1px_rgba(255,255,255,0.07)]',
       )}

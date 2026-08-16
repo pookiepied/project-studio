@@ -32,7 +32,14 @@
   --text-micro: calc(var(--ui-size) - 2px);
   --text-caption: calc(var(--ui-size) - 1px);
   --text-ui: var(--ui-size);
-  --text-body: calc(var(--ui-size) + 1px);
+  /* Equal to `ui`, not a step above it.
+     Body used to sit one pixel over the rest of the interface so prose would
+     read as prose. In a window this dense that pixel did not read as care, it
+     read as the transcript being slightly wrong -- reported as "too big" three
+     separate times, and correctly. One size for everything that is read; the
+     transcript is separated by its leading and its measure instead, which is
+     what actually makes a paragraph legible. */
+  --text-body: var(--ui-size);
   --text-title: calc(var(--ui-size) + 7px);
   --text-display: calc(var(--ui-size) + 19px);
 }
@@ -49,11 +56,11 @@
      of radius R - P. Follow it and corners run parallel; break it and the inner
      arc bulges past the outer one.
      ---------------------------------------------------------------------- */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-2xl: 20px;
 
   /* -- Surface -------------------------------------------------------------

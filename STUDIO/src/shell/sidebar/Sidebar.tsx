@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { COLLAPSE, SHELL, SPRING_PANEL } from '@/design/tokens'
+import { COLLAPSE, DURATION, EASE_OUT, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { StudioMark } from '@/components/brand'
 import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
 import { startWindowDrag } from '@/platform/tauri'
+import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -46,8 +47,10 @@ import { cn } from '@/lib/cn'
  * column is simply revealed, and nothing inside it is asked to re-measure.
  */
 export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
+  const compact = useCompactLayout()
   const {
     sidebarOpen,
+    toggleSidebar,
     goHome,
     openSettings,
     setPaletteOpen,
@@ -73,17 +76,49 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
   const loose = sorted.filter((conversation) => conversation.projectId === null)
 
   return (
-    <motion.aside
-      // The border animates away with the width. Left on, a closed sidebar
-      // leaves a 1px rule down the edge of the window -- the ghost of a panel
-      // that is supposed to be gone.
-      animate={{
-        width: sidebarOpen ? SHELL.sidebar.expandedWidth : 0,
-        borderRightWidth: sidebarOpen ? 1 : 0,
-      }}
-      transition={SPRING_PANEL}
-      className="relative z-20 h-full shrink-0 overflow-hidden border-r bg-surface-sunken"
-    >
+    <>
+      {/* Narrow windows get a scrim, because a floating column over live content
+          has to say the content behind it is not the thing being used. It is
+          also the dismissal target: on a small window the quickest way out of a
+          panel is a tap beside it, not finding the toggle again. */}
+      <AnimatePresence>
+        {compact && sidebarOpen ? (
+          <motion.button
+            type="button"
+            aria-label="Close sidebar"
+            onClick={toggleSidebar}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: DURATION.base, ease: EASE_OUT }}
+            className="absolute inset-0 z-20 bg-scrim"
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <motion.aside
+        // Two layouts, one component. Wide, the column is part of the row and
+        // animates its width, so the page is genuinely narrower while it is
+        // open. Narrow, it leaves the flow entirely and slides over the page,
+        // because 236px out of a 620px window leaves the transcript thinner
+        // than the sidebar beside it -- a split that makes the conversation the
+        // smaller half of its own screen.
+        animate={
+          compact
+            ? { x: sidebarOpen ? 0 : -SHELL.sidebar.expandedWidth, width: SHELL.sidebar.expandedWidth }
+            : { x: 0, width: sidebarOpen ? SHELL.sidebar.expandedWidth : 0 }
+        }
+        transition={SPRING_PANEL}
+        // The border goes with the width when it collapses: left on, a closed
+        // sidebar leaves a 1px rule down the edge of the window -- the ghost of
+        // a panel that is supposed to be gone. Floating, it always has an edge,
+        // because it always has content beside it.
+        style={{ borderRightWidth: compact || sidebarOpen ? 1 : 0 }}
+        className={cn(
+          'h-full overflow-hidden border-r bg-surface-sunken',
+          compact ? 'absolute inset-y-0 left-0 z-30 shadow-[8px_0_28px_-12px_rgba(0,0,0,0.28)]' : 'relative z-20 shrink-0',
+        )}
+      >
       {/* `inert` while closed. A hidden column that still takes Tab is worse
           than a visible one: focus disappears into a panel nobody can see. */}
       <div
@@ -151,10 +186,13 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
               aria-expanded={sectionOpen}
               className="flex min-w-0 flex-1 items-center gap-1 rounded text-micro uppercase text-muted-foreground/80 transition-colors duration-150 hover:text-muted-foreground"
             >
-              <Icons.disclosure
-                state={sectionOpen ? 'on' : 'rest'}
-                className="shrink-0"
-              />
+              {/* Sized `sm`, not from its own text. Marks size at 1.1em of the
+                  text beside them, and this header is `micro` while the project
+                  rows under it are `ui` -- so the parent's arrow came out
+                  *smaller* than its children's, which inverts the hierarchy the
+                  arrows exist to express. A disclosure belongs to the tree, not
+                  to the label it happens to sit next to. */}
+              <Icons.disclosure state={sectionOpen ? 'on' : 'rest'} size="sm" className="shrink-0" />
               {flat ? 'Conversations' : 'Projects'}
             </button>
 
@@ -296,8 +334,9 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             <Icons.settings />
           </IconButton>
         </div>
-      </div>
-    </motion.aside>
+        </div>
+      </motion.aside>
+    </>
   )
 }
 

@@ -64,10 +64,27 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
       {/* `pointer-events-none` matters: a gradient laid over the transcript
           that swallowed clicks would silently make the last line of a reply
           unselectable. */}
+      {/* Solid for the strip's own height, then a short fade below it.
+
+          It used to be one gradient the whole way down, which meant the band
+          holding the identity line was already partly transparent -- so a line
+          of the transcript sliding underneath showed *through* the project
+          name and branch. Two pieces of text occupying the same pixels is not
+          a soft edge, it is a collision, and it is worst exactly when the page
+          is moving and the eye is trying to read the title.
+
+          The fade still exists; it just starts where the chrome ends. Below
+          the strip there is nothing to protect, so text can dissolve into the
+          surface the way it should. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/85 to-transparent"
-        style={{ height: SHELL.topStrip.height + 14 }}
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-surface"
+        style={{ height: SHELL.topStrip.height }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 z-20 h-5 bg-gradient-to-b from-surface to-transparent"
+        style={{ top: SHELL.topStrip.height }}
       />
 
       <div className="relative shrink-0">

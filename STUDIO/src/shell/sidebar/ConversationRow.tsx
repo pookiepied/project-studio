@@ -64,7 +64,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
           active ? 'text-foreground' : 'text-muted-foreground group-hover/row:text-foreground',
         )}
       >
-        {conversation.pinned ? <Icons.pin className="shrink-0 opacity-60" /> : null}
+        {conversation.pinned ? <Icons.pin className="shrink-0 text-muted-foreground" /> : null}
         <span className="min-w-0 truncate">{conversation.title ?? 'Untitled'}</span>
       </button>
 

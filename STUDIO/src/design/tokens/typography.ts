@@ -51,8 +51,8 @@ export const TYPE: Record<TypeRole, TypeStep> = {
   caption: { size: 12, lineHeight: 1.5, icon: 14 },
   /** The workhorse: buttons, menus, the sidebar, the composer. */
   ui: { size: 13, lineHeight: 1.55, icon: 14 },
-  /** Transcript prose, and nothing else. */
-  body: { size: 14, lineHeight: 1.68, icon: 16 },
+  /** Transcript prose, and nothing else. Same size as `ui`; see index.css. */
+  body: { size: 13, lineHeight: 1.68, icon: 14 },
   /** Section headings. */
   title: { size: 20, lineHeight: 1.3, icon: 22 },
   /** Page titles and greetings. Serif. */
@@ -91,7 +91,12 @@ export const DEFAULT_CODE_SIZE: CodeSize = 12
 export const ICON = {
   xs: TYPE.micro.icon,
   sm: TYPE.ui.icon,
-  md: TYPE.body.icon,
+  /* Deliberately literal rather than `TYPE.body.icon`. `md` is the step for a
+     mark that stands alone in a large control -- send and voice inside the
+     composer -- and those did not shrink when body text came down to meet `ui`.
+     Binding it to a text role it no longer sits beside would have shrunk them
+     by proxy. */
+  md: 16,
   lg: TYPE.title.icon,
 } as const
 
