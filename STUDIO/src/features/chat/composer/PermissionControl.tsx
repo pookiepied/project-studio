@@ -1,0 +1,88 @@
+import { useState } from 'react'
+import { MenuItem, MenuLabel, Popover, Tooltip } from '@/components/primitives'
+import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
+import { useWorkspace } from '@/stores/workspace'
+import { cn } from '@/lib/cn'
+
+/**
+ * What Studio may do, in the composer.
+ *
+ * ---- Why it left the turn menu --------------------------------------------
+ *
+ * Model, reasoning and permission were one menu because they are all "what
+ * happens when I press send". True, and it hid the difference that matters:
+ * they are touched at completely different rates. The model is a per-
+ * conversation choice, reasoning is a per-question dial, and permission is a
+ * per-*situation* consent -- the only one of the three whose consequence lands
+ * on the user's files. It is also the one you reconsider while looking at the
+ * thing you are about to send, which is not where the window chrome is.
+ *
+ * So it sits by the send button. That leaves the pill in the strip meaning one
+ * coherent thing -- who you are talking to and how hard it is thinking -- and
+ * puts the consent where the consequence happens.
+ *
+ * ---- Why it is a mark and not a label -------------------------------------
+ *
+ * The brief is fewer things to look at by default, and a permanent word in the
+ * composer is a word to read every time the eye passes the field. Three modes
+ * reuse three glyphs, so the mark becomes recognisable the way a transport
+ * control is -- and unlike a label, it costs no width that the text should be
+ * spending. The name is one hover away, and the full sentence is one click.
+ *
+ * The exception is the mode that changes what "send" means most: `auto` also
+ * shows its name. Running unattended is the one state worth being unable to
+ * forget you are in, and a mark alone can be glanced past.
+ */
+export function PermissionControl() {
+  const { settings, setSettings } = useWorkspace()
+  const [open, setOpen] = useState(false)
+
+  const mode = findPermissionMode(settings.permission)
+  const Mark = mode.icon
+  const loud = mode.id === 'auto'
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      side="top"
+      align="start"
+      className="w-64"
+      trigger={
+        <Tooltip label={`What Studio may do · ${mode.name}`}>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-label={`What Studio may do: ${mode.name}`}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-full px-2 text-ui',
+              // Matches the other controls in the row, so the field's contents
+              // sit on one line rather than one of them being a different
+              // height and pulling the row's centre off.
+              'h-8 text-muted-foreground transition-colors duration-fast',
+              open ? 'bg-selected' : 'hover:bg-tint',
+            )}
+          >
+            <Mark className="shrink-0" />
+            {loud ? <span className="truncate">{mode.name}</span> : null}
+          </button>
+        </Tooltip>
+      }
+    >
+      <MenuLabel>What Studio may do</MenuLabel>
+      {PERMISSION_MODES.map((candidate) => (
+        <MenuItem
+          key={candidate.id}
+          selected={candidate.id === settings.permission}
+          note={candidate.note}
+          onSelect={() => {
+            setSettings({ ...settings, permission: candidate.id })
+            setOpen(false)
+          }}
+        >
+          {candidate.name}
+        </MenuItem>
+      ))}
+    </Popover>
+  )
+}

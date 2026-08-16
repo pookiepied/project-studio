@@ -10,7 +10,7 @@ import {
 } from '@/components/primitives'
 import { findModel, modelsByProvider } from '@/domain/models/catalog'
 import { EFFORTS } from '@/domain/models/types'
-import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
+import { findPermissionMode } from '@/domain/permissions/modes'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -160,21 +160,6 @@ export function TurnMenu() {
             Reasoning
           </MenuItem>
 
-          <MenuSeparator />
-          <MenuLabel>What Studio may do</MenuLabel>
-          {PERMISSION_MODES.map((candidate) => (
-            <MenuItem
-              key={candidate.id}
-              selected={candidate.id === settings.permission}
-              note={candidate.note}
-              onSelect={() => {
-                setSettings({ ...settings, permission: candidate.id })
-                setOpen(false)
-              }}
-            >
-              {candidate.name}
-            </MenuItem>
-          ))}
         </>
       )}
     </Popover>

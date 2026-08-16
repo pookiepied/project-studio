@@ -69,11 +69,34 @@ export function CollapsibleText({ text }: { text: string }) {
 
   return (
     <div className="flex flex-col">
+      {/* The fade is a mask on the text, not a coloured panel over it.
+          It used to be an absolutely-positioned gradient whose `from` colour
+          tried to reproduce the bubble's fill: `color-mix(in oklch,
+          var(--surface), var(--foreground) 8%)`. That can never be right. The
+          bubble is `bg-selected`, which is `--foreground` at 8% *alpha*,
+          composited by the browser in sRGB -- while `color-mix(in oklch, ...)`
+          interpolates in a different space entirely. Two different
+          computations of "the same" colour, so the band was always a shade
+          off, and it showed as a pale seam across the bottom of the bubble.
+          That is the artifact.
+
+          A mask has no colour to get wrong. It fades the text itself to
+          transparent and lets the real background show through, whatever the
+          bubble is filled with and whatever the theme does to it. It also
+          removes a stacking layer that sat over the glyphs, which is what was
+          shifting their antialiasing and making the clamped text render subtly
+          differently from unclamped text. */}
       <div
         className="relative overflow-hidden"
         style={{
           maxHeight,
           transition: armed ? 'max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1)' : undefined,
+          ...(overflowing && !expanded
+            ? {
+                maskImage: 'linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent)',
+                WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent)',
+              }
+            : null),
         }}
       >
         <p
@@ -83,17 +106,6 @@ export function CollapsibleText({ text }: { text: string }) {
           {text}
         </p>
 
-        {overflowing && !expanded ? (
-          <div
-            aria-hidden
-            // Fades to the bubble's own rendered colour, not to the page behind
-            // it: the gradient lives inside the bubble, and fading to the
-            // surface colour would draw a pale band across the bottom of a grey
-            // bubble. `color-mix` composites `selected` over `surface` so the
-            // stop equals the bubble's fill whatever the theme.
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[color-mix(in_oklch,var(--surface),var(--foreground)_8%)] to-transparent"
-          />
-        ) : null}
       </div>
 
       {overflowing ? (

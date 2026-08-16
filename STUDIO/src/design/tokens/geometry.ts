@@ -97,6 +97,26 @@ export const SHELL = {
 export const COMPOSER = {
   /** Height of the resting single-line field. Radius is half of this. */
   restingHeight: 52,
+  /**
+   * The single-line radius: half the field's own height, so it is a capsule.
+   *
+   * A real number rather than `RADIUS.pill`, and this is the fix for the
+   * reshape-on-paste that survived three other attempts.
+   *
+   * `pill` is 9999. Animating 9999 -> 18 is a linear interpolation through
+   * absurd values, and border-radius is clamped to half the box at paint time,
+   * so nothing visible happens for most of the transition -- the field sits as
+   * a capsule through ~99% of the duration and then collapses to a box in the
+   * last few frames. That late collapse, arriving after the height had already
+   * changed, is exactly the "it changes shape and then reverts" the user kept
+   * seeing. The measurement was never late; the interpolation was.
+   *
+   * From 24 to 18 the transition is short, monotonic and visible the whole way,
+   * which is what makes it read as one object relaxing rather than two shapes
+   * swapping.
+   */
+  restingRadius: 24,
+
   /** Past this the field is a box, not a capsule. */
   multilineRadius: RADIUS.xl,
   /** Grow to about eight lines, then scroll inside. */

@@ -69,12 +69,16 @@ export function MessageActions({
         setFocusWithin(false)
       }}
       className={cn(
-        // `mt-3`, not `mt-1`. At 4px the row sat on the last line of the reply
-        // and read as part of it -- the controls looked like a footer attached
-        // to the final paragraph rather than something belonging to the whole
-        // message. The gap has to be larger than the prose's own line spacing
-        // for the row to separate from it.
-        'mt-3 flex items-center gap-0.5',
+        // Space above *and* below.
+        //
+        // Above, so the row separates from the last line of the reply rather
+        // than reading as its final paragraph -- the gap has to beat the
+        // prose's own line spacing to do that. Below, because the row is the
+        // end of one turn and the next message begins immediately after it; at
+        // rest the row is invisible, so without the trailing space two turns
+        // appear to touch and the transcript loses its rhythm exactly when it
+        // is not being hovered, which is most of the time.
+        'mt-3 mb-4 flex items-center gap-0.5',
         align === 'end' && 'justify-end',
         // Pulled out by the button's optical inset so the first *glyph* lines
         // up with the text column, not the button's box. A 24px circle holding

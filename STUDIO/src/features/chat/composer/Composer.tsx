@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { COMPOSER, DURATION, EASE_OUT, RADIUS } from '@/design/tokens'
+import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { AddMenu } from '@/features/chat/composer/AddMenu'
+import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { useWorkspace } from '@/stores/workspace'
@@ -86,7 +87,7 @@ export function Composer({
       // fight the textarea's own height.
       style={{
         paddingInline: COMPOSER.paddingInline,
-        borderRadius: multiline ? COMPOSER.multilineRadius : RADIUS.pill,
+        borderRadius: multiline ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
         transitionDuration: `${DURATION.base}s`,
       }}
       className={cn(
@@ -129,6 +130,14 @@ export function Composer({
           the mismatch between those two was the misalignment in the last pass. */}
       <div className={cn('flex gap-1', multiline ? 'items-end' : 'items-center')}>
         <AddMenu />
+
+        {/* What Studio may do, next to the thing that will make it do it.
+            The mode is the one setting whose consequence lands on the user's
+            machine, and it is the one you reconsider while looking at what you
+            are about to send -- so it sits by the send button rather than
+            three clicks deep in a menu in the window chrome. Mark only at
+            rest; the name is a hover and a click away. */}
+        <PermissionControl />
 
         <div className="min-w-0 flex-1">
           <ComposerField

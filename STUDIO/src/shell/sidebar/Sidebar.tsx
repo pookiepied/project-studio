@@ -330,7 +330,11 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t px-2 py-2">
+        {/* No rule above it. The gap already separates this from the list --
+            a footer pinned to the bottom of a column reads as a footer without
+            being underlined, and the line was one more piece of furniture in a
+            panel whose whole job is to be quiet. Position does the work. */}
+        <div className="flex shrink-0 items-center justify-between px-2 pt-3 pb-2">
           <button
             type="button"
             onClick={() => openSettings('account')}
