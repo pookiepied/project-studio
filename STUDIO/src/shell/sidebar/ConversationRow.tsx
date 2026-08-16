@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
+import { ActivityMark } from '@/shell/sidebar/ActivityMark'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
@@ -16,12 +17,13 @@ import { cn } from '@/lib/cn'
  */
 export function ConversationRow({ conversation }: { conversation: Conversation }) {
   const { route, openChat, goHome } = useNavigation()
-  const { rename, togglePin, setArchived, remove } = useWorkspace()
+  const { rename, togglePin, setArchived, remove, running } = useWorkspace()
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(conversation.title ?? '')
 
   const active = route.kind === 'chat' && route.conversationId === conversation.id
+  const working = running.has(conversation.id)
 
   const commit = () => {
     rename(conversation.id, draft)
@@ -66,6 +68,17 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
       >
         {conversation.pinned ? <Icons.pin className="shrink-0 text-muted-foreground" /> : null}
         <span className="min-w-0 truncate">{conversation.title ?? 'Untitled'}</span>
+
+        {/* After the title, not before it.
+            Leading, it would push every title in the column right the moment
+            any one of them started working, and the list would twitch each
+            time a reply began or ended. Trailing, it occupies the slack the
+            truncation already leaves. */}
+        {working ? (
+          <span className="ml-auto shrink-0 pl-1">
+            <ActivityMark />
+          </span>
+        ) : null}
       </button>
 
       <Popover
@@ -81,6 +94,9 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
             className={cn(
               'flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-fast',
               'text-muted-foreground hover:bg-tint',
+              // A working row keeps its mark visible until the pointer
+              // arrives; the menu button then takes the slot, because the two
+              // want the same corner and the one you reached for wins.
               menuOpen ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
             )}
           >

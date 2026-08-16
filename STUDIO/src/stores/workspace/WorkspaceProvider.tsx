@@ -49,6 +49,15 @@ interface WorkspaceValue {
   readonly projects: readonly Project[]
   readonly conversations: readonly Conversation[]
   readonly status: SessionStatus
+  /**
+   * Which conversations are working right now.
+   *
+   * `status` is a single value describing *the one you are looking at*, which
+   * was fine while a turn could only run in the foreground. It cannot answer
+   * "is anything happening in the other three", and that is the question the
+   * sidebar has to answer -- so this is a set rather than another flag.
+   */
+  readonly running: ReadonlySet<string>
   readonly settings: TurnSettings
 
   setSettings: (settings: TurnSettings) => void
@@ -81,6 +90,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<readonly Project[]>(DEMO_PROJECTS)
   const [conversations, setConversations] = useState<readonly Conversation[]>(DEMO_CONVERSATIONS)
   const [status, setStatus] = useState<SessionStatus>('idle')
+  const [running, setRunning] = useState<ReadonlySet<string>>(() => new Set())
+
+  const markRunning = useCallback((conversationId: string, active: boolean) => {
+    setRunning((current) => {
+      if (active === current.has(conversationId)) return current
+      const next = new Set(current)
+      if (active) next.add(conversationId)
+      else next.delete(conversationId)
+      return next
+    })
+  }, [])
   const [settings, setSettings] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
   const demo = useDemoTurn()
   const gallery = useGalleryTurn()
@@ -198,9 +218,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       run(id, {
         modelId: settings.modelId,
         patch: (change) => patchConversation(id, change),
-        onThinking: () => setStatus('thinking'),
+        onThinking: () => {
+          setStatus('thinking')
+          markRunning(id, true)
+        },
         onStreaming: () => setStatus('streaming'),
-        onDone: () => setStatus('idle'),
+        onDone: () => {
+          setStatus('idle')
+          markRunning(id, false)
+        },
       })
 
       return targetId
@@ -224,9 +250,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       run(conversationId, {
         modelId: settings.modelId,
         patch: (change) => patchConversation(conversationId, change),
-        onThinking: () => setStatus('thinking'),
+        onThinking: () => {
+          setStatus('thinking')
+          markRunning(conversationId, true)
+        },
         onStreaming: () => setStatus('streaming'),
-        onDone: () => setStatus('idle'),
+        onDone: () => {
+          setStatus('idle')
+          markRunning(conversationId, false)
+        },
       })
     },
     [cancel, conversations, patchConversation, run, settings.modelId],
@@ -259,9 +291,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       run(conversationId, {
         modelId: settings.modelId,
         patch: (change) => patchConversation(conversationId, change),
-        onThinking: () => setStatus('thinking'),
+        onThinking: () => {
+          setStatus('thinking')
+          markRunning(conversationId, true)
+        },
         onStreaming: () => setStatus('streaming'),
-        onDone: () => setStatus('idle'),
+        onDone: () => {
+          setStatus('idle')
+          markRunning(conversationId, false)
+        },
       })
     },
     [cancel, conversations, patchConversation, run, settings.modelId],
@@ -341,6 +379,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       projects,
       conversations,
       status,
+      running,
       settings,
       setSettings,
       createProject,
@@ -362,6 +401,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       projects,
       conversations,
       status,
+      running,
       settings,
       createProject,
       removeProject,
