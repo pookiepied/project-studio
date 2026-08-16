@@ -1,0 +1,46 @@
+[package]
+name = "studio"
+version = "0.1.0"
+description = "AI-powered studio"
+authors = ["pookiepied"]
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-log = "2"
+base64 = "0.22"
+rand = "0.8"
+os_pipe = "1.2"
+
+# POSIX-only, and previously declared as if they were not — which is why this
+# crate had never compiled on Windows (meta-task #87). `command-fds` maps
+# descriptors with `dup2` inside a `pre_exec` hook and fails inside its own
+# source on a Windows target, before anything of ours is reached; `nix` is a
+# libc binding by definition. Both are reachable only from `#[cfg(unix)]` code,
+# so the declaration was the whole bug.
+#
+# `libc` used to be listed here too and is gone rather than moved: nothing in
+# `src/` referenced it.
+[target.'cfg(unix)'.dependencies]
+command-fds = "0.2"
+nix = { version = "0.27", features = ["process", "signal"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# DWM round-corner attribute for the outer window edge.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }

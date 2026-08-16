@@ -1,0 +1,490 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/inter';
+@import '@fontsource/instrument-serif';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens
+
+   Four scales, each with exactly one source of truth: radius, surface, blur,
+   motion. A component picks a step; it never invents a value. The scales are
+   small on purpose — every extra step is a decision someone has to re-make.
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+
+  /* -- Radius --------------------------------------------------------------
+     Absolute steps, not multiples of a base. The old chain (`--radius * 1.8`)
+     produced values nobody chose and made concentric nesting impossible to
+     reason about.
+
+     The concentric rule: a container of radius R with padding P holds children
+     of radius R − P. Follow it and corners stay parallel; break it and the
+     inner corner either fights the outer one or floats inside it.
+
+       xs  6  ticks, swatches, the smallest chips
+       sm  8  menu rows inside a popover
+       md 10  buttons, inputs, list rows — the workhorse
+       lg 12  popovers, panels, tooltips
+       xl 16  composer, dialogs, project cards
+      2xl 20  large feature surfaces / the window frame
+
+     These are deliberately one step rounder than a typical dashboard scale.
+     Soft corners are the single loudest signal that a surface is a *panel*
+     rather than a table cell, and it is most of what separates the macOS /
+     Notion feel from a Bootstrap admin. When in doubt, round more.
+     ---------------------------------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 26px;
+
+  /* -- Surface -------------------------------------------------------------
+     Three planes, and they are ordered: sunken (rails) sits behind surface
+     (content), which sits behind raised (cards, bars). Depth is carried by
+     this ordering plus a hairline — never by a drop shadow alone, which is
+     what made the old cards read as stickers.
+     ---------------------------------------------------------------------- */
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+  --color-overlay: var(--overlay);
+  --color-scrim: var(--scrim);
+  --color-hairline: var(--hairline);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* -- Motion --------------------------------------------------------------
+     Mirrors `app/motion.ts` so CSS transitions and Framer animations move at
+     the same speed. If you change one, change both.
+     ---------------------------------------------------------------------- */
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------------------------------------------------------------------------
+   Palette — monochrome, and enforced.
+
+   Every colour in this file is oklch with chroma 0 except `--destructive`,
+   which has to be red to mean anything. Traffic lights are the other exception
+   and they carry their own hex in the component, because they are OS chrome
+   rather than product surface. Nothing else gets a hue. If a control needs
+   emphasis, it takes weight, contrast, or a fill — not a colour.
+   --------------------------------------------------------------------------- */
+:root {
+  /* `surface` is the panel — paper white. `sunken` is the tray the panels
+     float on, and it is only just off white: enough that a panel edge reads as
+     a lift, not enough to be a grey band. An earlier pass had these much
+     further apart and the whole app went battleship. */
+  --surface: oklch(1 0 0);
+  --surface-sunken: oklch(0.979 0 0);
+  --surface-raised: oklch(1 0 0);
+  --hairline: oklch(0.145 0 0 / 7.5%);
+
+  /* Translucent so `backdrop-filter` has something to show through — but only
+     just. At 78% a white sheet over a dark scrim *samples* the scrim and reads
+     as grey, which is exactly what went wrong with the New Project sheet. 93%
+     still blurs visibly and stays white. */
+  --overlay: oklch(1 0 0 / 93%);
+  --scrim: oklch(0.145 0 0 / 18%);
+
+  --background: var(--surface);
+  --foreground: oklch(0.145 0 0);
+  --card: var(--surface-raised);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: var(--overlay);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.971 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.962 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--hairline);
+  --input: oklch(0.145 0 0 / 11%);
+  --ring: oklch(0.145 0 0 / 26%);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 12px;
+  --sidebar: var(--surface-sunken);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.962 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: oklch(0.145 0 0 / 32%);
+}
+
+.dark {
+  --surface: oklch(0.205 0 0);
+  --surface-sunken: oklch(0.145 0 0);
+  --surface-raised: oklch(0.232 0 0);
+  --hairline: oklch(1 0 0 / 8%);
+
+  --overlay: oklch(0.232 0 0 / 93%);
+  --scrim: oklch(0 0 0 / 40%);
+
+  --background: var(--surface);
+  --foreground: oklch(0.985 0 0);
+  --card: var(--surface-raised);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: var(--overlay);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.94 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.285 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: var(--hairline);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(1 0 0 / 26%);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: var(--surface-sunken);
+  --sidebar-foreground: oklch(0.985 0 0);
+  /* Was oklch(0.488 0.243 264.376) — a saturated blue inherited from the
+     shadcn default. The app is monochrome; this is now the same neutral the
+     light theme uses. */
+  --sidebar-primary: oklch(0.94 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.285 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: oklch(1 0 0 / 30%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    /* The OS window is transparent; the rounded app panel inside paints the
+       visible surface. */
+    background: transparent;
+  }
+  body {
+    margin: 0;
+  }
+  html {
+    @apply font-sans;
+    /* Hairlines are 1px of low-contrast neutral. Without this they sample
+       unevenly at fractional device pixels and the shell looks smudged. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Nothing in the app is user-selectable chrome. Text inside content regions
+     opts back in — see `.studio-selectable`. */
+  button,
+  [role='button'],
+  [role='radio'],
+  [role='tab'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion
+
+   Framer Motion is handled at the root by `<MotionConfig reducedMotion="user">`.
+   This covers everything else — CSS transitions, `tw-animate-css` keyframes,
+   and any third-party subtree. Transitions collapse to ~1 frame rather than
+   0ms so state changes still fire their `transitionend`.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Blur surfaces
+
+   Anything that floats over content is translucent and blurs what is behind
+   it: popovers, tooltips, dialogs, the command palette, the scrim, and the
+   bars that content scrolls under. That is the single strongest cue that a
+   layer is *above* rather than *inside* — and it is what the shell was missing.
+
+   `saturate` is part of the recipe, not decoration: a plain blur of neutral
+   content reads flat and muddy, and pushing saturation back restores the
+   sense of depth. The app is monochrome, so this only affects how the blur
+   samples — it introduces no hue of its own.
+
+   `@supports` guards the whole thing. Without backdrop-filter the surfaces
+   fall back to opaque, which is correct but flat; with it they layer.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .studio-blur {
+    background-color: var(--overlay);
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .studio-blur {
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
+    }
+
+    /* Bars content scrolls under — lighter, because a heavy blur on a surface
+       that is always visible reads as a smear rather than a layer. */
+    .studio-blur-bar {
+      -webkit-backdrop-filter: blur(12px) saturate(160%);
+      backdrop-filter: blur(12px) saturate(160%);
+    }
+
+    .studio-blur-scrim {
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+    }
+  }
+
+  /* Content regions opt back into selection (see the base rule above). */
+  .studio-selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbars
+
+   One treatment everywhere a surface scrolls. Thin, thumb-only, and tinted from
+   the foreground so it works in both themes without a second rule.
+   --------------------------------------------------------------------------- */
+@layer base {
+  /* Global, not opt-in. Third-party subtrees (the syntax highlighter's <pre>,
+     any future embed) scroll with their own elements, and an opt-in class can
+     never reach them — which is how a default chunky scrollbar shows up inside
+     a code block. Styling every scroller is the only treatment that holds. */
+  /* Firefox only. Chromium ignores `::-webkit-scrollbar` entirely once
+     `scrollbar-width` is set, so declaring both would silently pin us to
+     Chromium's ~10px "thin" bar instead of the 6px below. WebView2 is Chromium,
+     so the webkit path is the one that matters for the desktop app. */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in oklch, var(--foreground) 16%, transparent) transparent;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: color-mix(in oklch, var(--foreground) 16%, transparent);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--foreground) 30%, transparent);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Display voice
+
+   The editorial serif for short display moments — page titles, dialog
+   headers, the note title. Instrument Serif is the brand's single serif,
+   reserved for display; everyday content stays in the simple sans (Inter).
+   The component owns its size; this class owns the voice.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .studio-display {
+    @apply font-display;
+    font-optical-sizing: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Assistant prose
+
+   The typographic contract for model output. Two jobs:
+     1. vertical rhythm — consistent spacing between blocks, so a reply reads as
+        a document rather than a stack of elements;
+     2. width containment — every block that can exceed the column is capped and
+        scrolls inside itself. `min-width: 0` on the flex/grid ancestors is what
+        makes that possible; without it a <pre> stretches its container instead.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .studio-prose {
+    /* Everyday reading face: the same simple sans as the rest of the UI, at a
+       quieter size than body text. The conversation is prose, but it is still
+       product content — Inter keeps it calm and legible while Instrument Serif
+       stays reserved for display moments. Optical sizing keeps hairlines
+       honest this small. */
+    @apply font-sans text-[13px] leading-relaxed text-foreground;
+    font-optical-sizing: auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  .studio-prose > * + * {
+    margin-top: 0.85rem;
+  }
+
+  .studio-prose h1,
+  .studio-prose h2,
+  .studio-prose h3,
+  .studio-prose h4 {
+    @apply font-semibold tracking-tight text-foreground;
+    line-height: 1.3;
+  }
+  .studio-prose h1 { @apply text-[17px]; }
+  .studio-prose h2 { @apply text-[15px]; }
+  .studio-prose h3 { @apply text-[13px]; }
+  .studio-prose h4 { @apply text-[13px] text-muted-foreground; }
+
+  /* Headings bind to the text beneath them, not the block above. */
+  .studio-prose > * + :is(h1, h2, h3, h4) {
+    margin-top: 1.5rem;
+  }
+  .studio-prose :is(h1, h2, h3, h4) + * {
+    margin-top: 0.5rem;
+  }
+
+  .studio-prose ul,
+  .studio-prose ol {
+    @apply pl-5;
+    list-style-position: outside;
+  }
+  .studio-prose ul { list-style-type: disc; }
+  .studio-prose ol { list-style-type: decimal; }
+  .studio-prose li + li { margin-top: 0.3rem; }
+  .studio-prose li::marker { @apply text-muted-foreground; }
+  .studio-prose li > ul,
+  .studio-prose li > ol { margin-top: 0.3rem; }
+
+  .studio-prose a {
+    @apply text-foreground underline decoration-border underline-offset-2;
+  }
+  .studio-prose a:hover {
+    @apply decoration-foreground;
+  }
+
+  .studio-prose strong { @apply font-semibold text-foreground; }
+
+  .studio-prose blockquote {
+    @apply border-l-2 border-border pl-3 text-muted-foreground;
+  }
+
+  .studio-prose hr {
+    @apply border-border;
+  }
+
+  /* Inline code sits inside a line, so it may wrap; it must not stretch it.
+     Fenced code is not styled here — `CodeBlock` owns its own frame, and
+     `markdownComponents` unwraps the <pre> so the two never nest. */
+  .studio-prose :not(pre) > code {
+    @apply rounded-xs bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground;
+    overflow-wrap: anywhere;
+  }
+
+  /* The prose-wide `overflow-wrap: anywhere` must not reach fenced code: it
+     inherits into the <code> and wraps every long line, which silently makes
+     the block's word-wrap toggle do nothing. Wrapping in a fence is the
+     toggle's decision, not the container's. */
+  .studio-prose pre,
+  .studio-prose pre code {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  /* The scroll container and border belong to the wrapper in
+     `markdownComponents`, so the table itself is a plain grid. Rules are
+     horizontal only — a full cell grid reads heavier than the data usually
+     warrants. */
+  .studio-prose table {
+    @apply w-full border-collapse text-xs;
+  }
+  .studio-prose :is(th, td) {
+    @apply px-3 py-2 text-left align-top;
+    white-space: nowrap;
+  }
+  .studio-prose thead th {
+    @apply border-b border-border font-semibold text-foreground;
+  }
+  .studio-prose tbody tr + tr td {
+    @apply border-t border-border/60;
+  }
+  .studio-prose tbody td {
+    @apply text-muted-foreground;
+  }
+
+  /* The wrapper already rounds and borders the block; a table that fills it
+     edge to edge would collide with that radius. */
+  .studio-prose table :is(th, td):first-child {
+    @apply pl-3.5;
+  }
+  .studio-prose table :is(th, td):last-child {
+    @apply pr-3.5;
+  }
+
+  .studio-prose img {
+    @apply max-w-full rounded-lg;
+  }
+}
