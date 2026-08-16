@@ -4,6 +4,9 @@ import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { WorkingDots, WorkingHalo } from '@/features/artifacts/ArtifactMotion'
+import { useRail } from '@/stores/rail'
+import { useNavigation } from '@/stores/navigation'
+import { useWorkspace } from '@/stores/workspace'
 import { isWorking, type Artifact } from '@/domain/artifacts/types'
 import { cn } from '@/lib/cn'
 
@@ -34,7 +37,6 @@ export function ArtifactShell({
   artifact,
   mark,
   status,
-  onOpenRail,
   children,
   footer,
 }: {
@@ -43,13 +45,23 @@ export function ArtifactShell({
   mark: ReactNode
   /** One line under the title: what is happening, or what happened. */
   status: ReactNode
-  /** Present only when this artifact can be opened in the side rail. */
-  onOpenRail?: () => void
   children?: ReactNode
   footer?: ReactNode
 }) {
   const working = isWorking(artifact.status)
   const failed = artifact.status === 'failed'
+
+  // The rail is offered by the shell rather than passed in by each kind. Every
+  // artifact can be read larger, and making that a per-kind decision would mean
+  // half of them silently lacking it for no reason anyone could state.
+  const { openArtifact } = useRail()
+  const { route } = useNavigation()
+  const { conversations } = useWorkspace()
+
+  const conversation =
+    route.kind === 'chat'
+      ? conversations.find((item) => item.id === route.conversationId) ?? null
+      : null
 
   return (
     <motion.div
@@ -78,9 +90,15 @@ export function ArtifactShell({
         {/* Reserved space, revealed on hover -- the same rule the code block's
             controls follow, so a reply full of blocks does not twitch as the
             pointer crosses it. */}
-        {onOpenRail ? (
+        {conversation && !working ? (
           <span className="shrink-0 opacity-0 transition-opacity duration-fast group-hover/artifact:opacity-100">
-            <IconButton label="Open in side rail" size="sm" onClick={onOpenRail}>
+            <IconButton
+              label="Open in side rail"
+              size="sm"
+              onClick={() =>
+                openArtifact(artifact, conversation.id, conversation.title ?? 'Conversation')
+              }
+            >
               <Icons.rail />
             </IconButton>
           </span>

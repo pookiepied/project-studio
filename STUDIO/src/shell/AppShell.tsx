@@ -8,6 +8,7 @@ import { NewProjectDialog, ProjectPage } from '@/features/projects'
 import { SettingsPage } from '@/features/settings'
 import { ActionsMenu } from '@/shell/ActionsMenu'
 import { TopStrip } from '@/shell/chrome/TopStrip'
+import { SideRail } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
@@ -139,6 +140,11 @@ export function AppShell() {
           {Surface({ route, conversations, projects })}
         </motion.main>
       </div>
+
+      {/* Outside the page's rounded container, so the rail is a sibling of the
+          conversation rather than something floating over it. The page keeps
+          its own corners; the rail brings its own. */}
+      <SideRail />
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />

@@ -6,6 +6,7 @@ import { signalAppReady, suppressWebviewChrome } from '@/platform/tauri'
 import { AppShell } from '@/shell/AppShell'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { NavigationProvider } from '@/stores/navigation'
+import { RailProvider } from '@/stores/rail'
 import { WorkspaceProvider } from '@/stores/workspace'
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <AppearanceProvider>
         <WorkspaceProvider>
+        <RailProvider>
           <NavigationProvider>
             {/* The app is fully painted the whole time; only the splash moves.
 
@@ -70,7 +72,8 @@ export default function App() {
             </motion.div>
             <AnimatePresence>{showSplash ? <SplashScreen /> : null}</AnimatePresence>
           </NavigationProvider>
-        </WorkspaceProvider>
+        </RailProvider>
+      </WorkspaceProvider>
       </AppearanceProvider>
     </MotionConfig>
   )
