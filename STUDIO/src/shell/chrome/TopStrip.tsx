@@ -1,6 +1,7 @@
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
+import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { ContextMeter } from '@/shell/chrome/SessionControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
@@ -9,21 +10,19 @@ import { contextUsage } from '@/domain/session/context'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
- * The top strip's two ends.
+ * The top strip.
  *
  * Not a title bar: no fill, no hairline, no height that content must dodge. It
  * is a transparent layer over the one surface, and the page scrolls underneath
  * it behind a gradient.
  *
  * Left is the window: controls and the sidebar toggle, plus the context meter
- * once a conversation is far enough along to have one. Right is the turn
- * settings behind one mark, and only on a conversation: everywhere else the
- * strip ends in nothing, so the page's own content is the last thing at the
- * top of the window rather than a control repeated on every screen.
- *
- * The middle -- the identity line -- is not here. It is centred on the window
- * rather than on the page, and that means living at the shell rather than in
- * this strip; see `IdentityOverlay`.
+ * once a conversation is far enough along to have one. Centre is what you are
+ * looking at -- and it gets the room, because the identity line (project,
+ * title, branch) is the thing worth reading here. Right is the turn settings
+ * behind one mark, and only on a conversation: everywhere else the strip ends
+ * in nothing, so the page's own content is the last thing at the top of the
+ * window rather than a control repeated on every screen.
  */
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
@@ -56,6 +55,34 @@ export function TopStrip() {
         </IconButton>
 
         {conversation ? <ContextMeter used={contextUsage(conversation, settings.modelId)} /> : null}
+      </div>
+
+      {/* Centred on the page, not on the window. The identity names the
+          conversation, and the conversation lives in the page -- so when the
+          sidebar or the rail changes the column's bounds, the title moves with
+          the column, exactly as the transcript under it does. A window-centred
+          title would hold still while everything beneath it slid sideways,
+          which reads as disconnected rather than as anchored.
+
+          Absolutely positioned so the strip's two ends cannot push it: a
+          flex-centred middle child drifts every time either end changes width,
+          and both ends here change width with state.
+
+          ---- `w-full` on the clamping box is load-bearing ------------------
+
+          That box carries `@container`, and a container with
+          `container-type: inline-size` is sized *as if it had no contents*.
+          As a plain flex child that computes to zero width, and the identity
+          then overflows from the centre point to the right -- the title sits
+          half a column right of centre no matter what the surrounding rule
+          says. `w-full` gives the box a definite width for the container
+          queries to resolve against; `max-w-[62%]` caps it, and the two
+          `justify-center`s do the centring. Remove the `w-full` and the
+          shrink-to-fit comes back as zero, silently. */}
+      <div className="pointer-events-none absolute inset-x-0 flex justify-center">
+        <div className="@container pointer-events-auto flex w-full min-w-0 max-w-[62%] justify-center">
+          {conversation ? <IdentityLine conversation={conversation} /> : null}
+        </div>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-0.5">

@@ -7,7 +7,6 @@ import { CommandPalette } from '@/features/palette'
 import { NewProjectDialog, ProjectPage } from '@/features/projects'
 import { SettingsPage } from '@/features/settings'
 import { ActionsMenu } from '@/shell/ActionsMenu'
-import { IdentityOverlay } from '@/shell/chrome/IdentityOverlay'
 import { TopStrip } from '@/shell/chrome/TopStrip'
 import { SideRail } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
@@ -155,10 +154,6 @@ export function AppShell() {
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
       <SideRail />
-
-      {/* After both columns, so the one thing that must sit above them -- the
-          identity line, centred on the window -- is painted last. */}
-      <IdentityOverlay />
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
