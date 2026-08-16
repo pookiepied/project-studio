@@ -5,7 +5,7 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
-import { CodeBlock } from '@/features/chat/markdown/CodeBlock'
+import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/blocks'
 
 /**
  * Model output, rendered.
@@ -75,6 +75,12 @@ const COMPONENTS: Components = {
         </code>
       )
     }
+
+    // A fence can mean "here is code" or "here is a piece of writing I made
+    // for you". They are different objects and get different blocks -- see
+    // `TextBlock` for why a rewrite should not be set as monospace.
+    if (fence in TEXT_FENCES) return <TextBlock text={text} fence={fence} />
+
     return <CodeBlock code={text} fence={fence} />
   },
 

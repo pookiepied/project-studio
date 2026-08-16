@@ -666,26 +666,132 @@
     word-break: normal;
   }
 
+  /* -- Tables --------------------------------------------------------------
+
+     The old rules had three problems and they compounded.
+
+     `white-space: nowrap` was on *every* cell, so a column of sentences could
+     not wrap and the table simply ran off sideways -- which is why it read as
+     broken rather than dense. Nowrap belongs on headers, where the label is
+     two words and wrapping it looks like a mistake, and on nothing else.
+
+     Every cell body was `--muted-foreground`, so the data -- the only reason a
+     table exists -- was the faintest text in the block. Values are foreground
+     now; the header is the muted one, because a column label is a signpost you
+     read once.
+
+     And the whole thing was hairlines on the page with no ground of its own,
+     which is the flatness. It now sits on a sunken fill with a header band, so
+     it reads as an object with rows in it rather than as text that happens to
+     be aligned.
+     --------------------------------------------------------------------- */
   .studio-prose table {
     @apply w-full border-collapse;
     font-size: var(--text-caption);
   }
   .studio-prose :is(th, td) {
     @apply px-3 py-2 text-left align-top;
-    white-space: nowrap;
   }
   .studio-prose thead th {
-    @apply border-b font-semibold;
+    @apply border-b font-medium;
+    background: var(--surface-sunken);
+    color: var(--muted-foreground);
+    white-space: nowrap;
+    /* Sticky, so scanning a long table does not mean losing the labels. The
+       header is opaque above, which is what lets rows pass under it. */
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
-  .studio-prose tbody tr + tr td {
+  .studio-prose tbody tr + tr {
     @apply border-t;
   }
   .studio-prose tbody td {
-    color: var(--muted-foreground);
+    color: var(--foreground);
+  }
+  /* The first column is usually the row's name. Weighting it gives the eye a
+     rail to travel down, which is the difference between reading a table and
+     decoding one. */
+  .studio-prose tbody td:first-child {
+    @apply font-medium;
+  }
+  .studio-prose tbody tr {
+    transition: background-color var(--duration-fast) var(--ease-out-quint);
+  }
+  .studio-prose tbody tr:hover {
+    background: var(--tint);
   }
 
   .studio-prose img {
     @apply max-w-full rounded-lg;
+  }
+
+  /* -- Syntax ---------------------------------------------------------------
+
+     The theme is CSS, not a JavaScript object.
+
+     It used to be `atomOneDark` / `atomOneLight` imported from the highlighter
+     and swapped on the appearance context. Three things were wrong with that.
+     The palettes are early-2010s editor colours -- six saturated hues at full
+     chroma -- which is most of why the block looked dated beside a monochrome
+     shell. Switching theme re-rendered every code block in the conversation,
+     because the style object is a prop. And the colours could not be expressed
+     in the app's own tokens, so they were the one part of the interface that
+     did not respond to anything.
+
+     As CSS the palette is `.dark`-aware for free, costs no re-render, and is
+     stated in the same oklch vocabulary as everything else. Chroma is kept low
+     on purpose: code needs enough hue to parse structurally at a glance, and
+     nothing beyond that. Six colours, none of them shouting.
+     --------------------------------------------------------------------- */
+  .studio-code {
+    --code-comment: oklch(0.63 0.008 260);
+    --code-keyword: oklch(0.5 0.13 300);
+    --code-string: oklch(0.48 0.1 152);
+    --code-number: oklch(0.52 0.11 55);
+    --code-function: oklch(0.5 0.12 255);
+    --code-type: oklch(0.5 0.08 205);
+  }
+
+  .dark .studio-code {
+    /* Lighter and slightly less saturated. The same hues on a 0.205 surface
+       are harder to read and, being the only chroma on the screen, louder. */
+    --code-comment: oklch(0.58 0.008 260);
+    --code-keyword: oklch(0.78 0.11 300);
+    --code-string: oklch(0.79 0.09 152);
+    --code-number: oklch(0.82 0.09 62);
+    --code-function: oklch(0.78 0.1 255);
+    --code-type: oklch(0.8 0.07 205);
+  }
+
+  .studio-code .hljs-comment,
+  .studio-code .hljs-quote {
+    color: var(--code-comment);
+    font-style: italic;
+  }
+  .studio-code :is(.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag, .hljs-formula) {
+    color: var(--code-keyword);
+  }
+  .studio-code :is(.hljs-string, .hljs-regexp, .hljs-symbol, .hljs-bullet, .hljs-addition, .hljs-meta-string) {
+    color: var(--code-string);
+  }
+  .studio-code :is(.hljs-number, .hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-attribute) {
+    color: var(--code-number);
+  }
+  .studio-code :is(.hljs-title, .hljs-name, .hljs-section, .hljs-selector-id, .hljs-selector-class) {
+    color: var(--code-function);
+  }
+  .studio-code :is(.hljs-type, .hljs-built_in, .hljs-class, .hljs-params, .hljs-meta, .hljs-tag) {
+    color: var(--code-type);
+  }
+  .studio-code :is(.hljs-emphasis) {
+    font-style: italic;
+  }
+  .studio-code :is(.hljs-strong) {
+    @apply font-semibold;
+  }
+  .studio-code .hljs-deletion {
+    color: var(--danger);
   }
 
   .studio-prose .katex-display {

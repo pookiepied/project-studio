@@ -1,2 +1,2 @@
 export { Markdown } from './Markdown'
-export { CodeBlock } from './CodeBlock'
+export { BlockFrame, CodeBlock, TextBlock } from './blocks'
