@@ -47,11 +47,23 @@ export function AssistantMessage({
         {streaming ? <StreamingCaret /> : null}
       </div>
 
-      {/* No actions on a message still being written: retrying something that
-          has not finished arriving is a request nobody means. */}
-      {streaming ? null : (
-        <MessageActions
-          visible={hovered}
+      {/* Always mounted, never conditional -- and this is the fix for the jump
+          at the end of a reply.
+
+          It used to be `{streaming ? null : <MessageActions/>}`. So the instant
+          the response finished, a 24px row plus 12px above and 16px below
+          appeared out of nothing, and every pixel of the conversation above it
+          moved. That is the "flash" and the bubble "leaching" at the exact
+          moment a response lands: nothing was flickering, the whole transcript
+          was being shoved by a row arriving late.
+
+          `MessageActions` already promises to hold its height while hidden and
+          fade rather than mount -- this component was the one place breaking
+          that promise. Now the space is reserved from the first frame of the
+          reply, so when the row appears nothing else moves. `visible` still
+          gates it, so a message being written offers no retry button. */}
+      <MessageActions
+          visible={hovered && !streaming}
           copyPayload={message.text}
           actions={[
             { id: 'retry', label: 'Try again', icon: Icons.retry, run: onRetry },
@@ -64,7 +76,6 @@ export function AssistantMessage({
             model ? <span className="text-caption text-muted-foreground">{model.name}</span> : null
           }
         />
-      )}
     </div>
   )
 }
