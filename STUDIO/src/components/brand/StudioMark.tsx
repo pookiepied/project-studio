@@ -1,21 +1,25 @@
 import { motion, type Transition } from 'framer-motion'
+import { EASE_OUT } from '@/design/tokens'
 
 /**
- * The STUDIO mark: five rounded tiles descending in a staircase.
+ * The Studio mark: five rounded tiles descending in a staircase.
  *
- * It draws in `currentColor`, so it inherits text colour and works in both
- * themes without a second asset — unlike the raster/SVG brand files, which
- * carry their own dark fill and border.
+ * Draws in `currentColor`, so it inherits text colour and works in both themes
+ * without a second asset. This is the brand rather than system chrome, so the
+ * monochrome rule does not constrain it -- it simply happens not to need a hue.
  *
- * `busy` is the working state: each tile breathes in sequence so a wave ripples
- * down the mark. It reads as active without spinning, and it is the same glyph
- * at rest, so nothing jumps when a turn starts or ends.
+ * `busy` ripples the tiles to signal work in flight. It reads as active without
+ * spinning, and it is the same glyph at rest, so nothing jumps when a turn
+ * starts or ends.
+ *
+ * `entrance` is the one-shot assembly for the splash screen: the tiles stagger
+ * in top to bottom, in the order the staircase is read, so the mark arrives
+ * already descending.
  */
 
-const EASE_OUT = [0.16, 1, 0.3, 1] as const
 const TILE = { size: 25, radius: 5.5 } as const
 
-/** Tile origins on the 96×128 canvas, top to bottom. */
+/** Tile origins on the 96x128 canvas, top to bottom. */
 const TILES = [
   { x: 25, y: 8 },
   { x: 47, y: 30 },
@@ -30,12 +34,20 @@ interface TileMotion {
   transition: Transition
 }
 
-function tileMotion(index: number, busy: boolean): TileMotion {
-  if (!busy) {
+function tileMotion(index: number, busy: boolean, entrance: boolean): TileMotion {
+  if (!busy && !entrance) {
     return {
       initial: false,
       animate: { opacity: 1, scale: 1 },
       transition: { duration: 0.48, ease: EASE_OUT },
+    }
+  }
+
+  if (entrance) {
+    return {
+      initial: { opacity: 0, scale: 0.82 },
+      animate: { opacity: 1, scale: 1 },
+      transition: { duration: 0.48, delay: 0.12 + index * 0.14, ease: EASE_OUT },
     }
   }
 
@@ -44,24 +56,23 @@ function tileMotion(index: number, busy: boolean): TileMotion {
   return {
     initial: { opacity: 1, scale: 1 },
     animate: { opacity: [0.62, 1, 0.62], scale: [0.94, 1, 0.94] },
-    transition: {
-      duration: 1.4,
-      repeat: Infinity,
-      ease: 'easeInOut',
-      delay: index * 0.12,
-    },
+    transition: { duration: 1.4, repeat: Infinity, ease: 'easeInOut', delay: index * 0.12 },
   }
 }
 
-interface StudioMarkProps {
-  /** Ripple the tiles to signal a turn in flight. */
+export function StudioMark({
+  busy = false,
+  entrance = false,
+  size = 16,
+  className,
+}: {
   busy?: boolean
+  /** One-shot staggered assembly -- the splash entrance. */
+  entrance?: boolean
   /** Rendered height in px; the mark keeps its 3:4 ratio. */
   size?: number
   className?: string
-}
-
-export function StudioMark({ busy = false, size = 16, className }: StudioMarkProps) {
+}) {
   return (
     <svg
       height={size}
@@ -74,7 +85,7 @@ export function StudioMark({ busy = false, size = 16, className }: StudioMarkPro
       className={className}
     >
       {TILES.map((tile, index) => {
-        const motionProps = tileMotion(index, busy)
+        const props = tileMotion(index, busy, entrance)
         return (
           <motion.rect
             key={tile.y}
@@ -85,9 +96,9 @@ export function StudioMark({ busy = false, size = 16, className }: StudioMarkPro
             rx={TILE.radius}
             fill="currentColor"
             style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-            initial={motionProps.initial}
-            animate={motionProps.animate}
-            transition={motionProps.transition}
+            initial={props.initial}
+            animate={props.animate}
+            transition={props.transition}
           />
         )
       })}

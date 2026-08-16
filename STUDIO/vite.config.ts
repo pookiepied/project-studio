@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/vite'
 
 const host = process.env.TAURI_DEV_HOST
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -21,12 +20,16 @@ export default defineConfig({
     strictPort: true,
     host: host || false,
     hmr: host ? { protocol: 'ws', host, port: 1421 } : undefined,
+    watch: {
+      // Ignore Cargo build artifacts -- on Windows the compiler locks .dll
+      // files, causing EBUSY errors in Vite's file watcher.
+      ignored: ['**/src-tauri/target/**'],
+    },
   },
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
   build: {
     // Tauri on Windows uses WebView2 (Chromium); elsewhere WKWebView (Safari).
     target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
-    // Vite 8 minifies with oxc; only skipped for Tauri debug builds.
     minify: !process.env.TAURI_ENV_DEBUG,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },

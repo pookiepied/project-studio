@@ -1,74 +1,111 @@
-import { useRef } from 'react'
-import { StudioMark } from '@/components/brand/StudioMark'
-import { Composer } from '@/features/chat/composer/Composer'
-import { useChatSession } from '@/features/chat/session/useChatSession'
-import { ScrollToLatest } from '@/features/chat/transcript/ScrollToLatest'
-import { Transcript } from '@/features/chat/transcript/Transcript'
+import { AnimatePresence, motion } from 'framer-motion'
+import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
+import { Icons } from '@/components/icons'
+import { Composer } from '@/features/chat/composer'
+import { Transcript, useAutoScroll } from '@/features/chat/transcript'
+import { useNavigation } from '@/stores/navigation'
+import { useWorkspace } from '@/stores/workspace'
+import type { Conversation } from '@/domain/session/types'
 
 /**
- * Composition root for the chat surface: a scrolling transcript under a docked
- * composer. It wires children and owns nothing — conversation state lives
- * behind `useChatSession`, draft state lives in the composer.
+ * A conversation: a scrolling transcript with the composer beneath it.
  *
- * The transcript is the only scroll region here. The composer sits outside it
- * so it stays put no matter how far the conversation is scrolled.
+ * The composer is the same component and the same measure as on home, so
+ * sending the first message moves the field up the screen rather than replacing
+ * it with a different one. Nothing about the control changes -- only its
+ * position -- which makes the transition read as the room rearranging rather
+ * than as a new page.
  *
- * The dock is layered *over* the transcript rather than stacked beneath it, so
- * text passes behind the composer instead of stopping at a hard edge. A
- * gradient mask above it does the fade. Two consequences worth stating: the
- * transcript needs bottom padding equal to the dock's height (nothing else
- * reserves that space), and the mask must not intercept pointer events or the
- * bottom of the conversation becomes unclickable.
+ * Both ends fade into the surface instead of meeting a bar. The strip above and
+ * the composer below paint no fill, so a gradient is what separates them from
+ * the text scrolling past, and `studio-scroll-inset` keeps the scroll thumb out
+ * from under those gradients.
  */
-export default function ChatPage() {
-  const { messages, status, error, send, stop } = useChatSession()
-  const scrollRef = useRef<HTMLDivElement>(null)
+export function ChatPage({ conversation }: { conversation: Conversation }) {
+  const { status, retry, editMessage, fork } = useWorkspace()
+  const { openChat } = useNavigation()
+  const { viewport, pinned, onScroll, onWheel, onPointerDown, scrollToBottom } = useAutoScroll(
+    conversation.messages,
+  )
+
+  const forkFrom = (messageId: string) => {
+    const created = fork(conversation.id, messageId)
+    if (created) openChat(created)
+  }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
-      <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} className="h-full overflow-y-auto">
-          {/* pb-32 clears the docked composer. */}
-          <div className="mx-auto w-full max-w-3xl min-w-0 px-6 pt-8 pb-32">
-            {messages.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <Transcript messages={messages} status={status} />
-            )}
-          </div>
+    <div className="relative flex h-full flex-col">
+      <div
+        ref={viewport}
+        onScroll={onScroll}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        className="studio-scroll-inset min-h-0 flex-1 overflow-y-auto"
+      >
+        <div
+          className="mx-auto w-full"
+          style={{
+            maxWidth: SHELL.measure,
+            paddingInline: SHELL.gutter,
+            paddingTop: SHELL.topStrip.height + 20,
+            paddingBottom: 20,
+          }}
+        >
+          <Transcript
+            conversation={conversation}
+            status={status}
+            onRetry={() => retry(conversation.id)}
+            onEdit={(messageId, text) => editMessage(conversation.id, messageId, text)}
+            onFork={forkFrom}
+          />
         </div>
-
-        <ScrollToLatest scrollRef={scrollRef} />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-        {/* The fade. `to transparent` in the same surface colour, so the
-            transcript dissolves into the dock rather than sliding under a
-            visible band. */}
+      {/* `pointer-events-none` matters: a gradient laid over the transcript
+          that swallowed clicks would silently make the last line of a reply
+          unselectable. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/85 to-transparent"
+        style={{ height: SHELL.topStrip.height + 14 }}
+      />
+
+      <div className="relative shrink-0">
         <div
           aria-hidden
-          className="h-10 bg-gradient-to-b from-transparent to-surface"
+          className="pointer-events-none absolute inset-x-0 bottom-full h-10 bg-gradient-to-t from-surface to-transparent"
         />
-        <div className="pointer-events-auto bg-surface pb-5">
-          <div className="mx-auto w-full max-w-3xl px-6">
-            {error && (
-              <p role="alert" className="mb-2 text-xs text-destructive">
-                {error}
-              </p>
-            )}
-            <Composer status={status} onSend={send} onStop={stop} />
-          </div>
+
+        {/* Only offered once the reader has scrolled away. Shown permanently it
+            is a button that does nothing most of the time. */}
+        <AnimatePresence>
+          {!pinned ? (
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              onClick={scrollToBottom}
+              aria-label="Jump to latest"
+              className="studio-blur absolute -top-9 left-1/2 z-20 flex size-7 -translate-x-1/2 items-center justify-center rounded-full border shadow-[0_4px_14px_-4px_rgba(0,0,0,0.24)]"
+            >
+              <Icons.jumpToLatest className="text-muted-foreground" />
+            </motion.button>
+          ) : null}
+        </AnimatePresence>
+
+        <div
+          className="mx-auto w-full bg-surface pb-4"
+          style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
+        >
+          <Composer
+            conversationId={conversation.id}
+            projectId={conversation.projectId}
+            placeholder="Reply"
+          />
         </div>
       </div>
-    </div>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-      <StudioMark size={40} className="text-foreground/80" />
-      <p className="text-[13px] text-muted-foreground">What are we working on?</p>
     </div>
   )
 }

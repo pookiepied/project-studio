@@ -1,87 +1,161 @@
-import { useState } from 'react'
-import { Attach, Microphone } from '@/components/icons'
-import { ComposerInput } from '@/features/chat/composer/ComposerInput'
-import { SendButton } from '@/features/chat/composer/SendButton'
-import { toolbarGroup } from '@/features/chat/composer/composerStyles'
-import { ModelReasoningControl } from '@/features/chat/composer/controls/ModelReasoningControl'
-import { PendingAction } from '@/features/chat/composer/controls/PendingAction'
-import { PermissionSelector } from '@/features/chat/composer/controls/PermissionSelector'
-import { DEFAULT_TURN_SETTINGS } from '@/features/chat/composer/turnSettings'
-import type { ChatStatus, TurnSettings } from '@/features/chat/session/types'
+import { useCallback, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { COMPOSER, DURATION, EASE_OUT, RADIUS } from '@/design/tokens'
+import { Icons } from '@/components/icons'
+import { IconButton } from '@/components/primitives'
+import { AddMenu } from '@/features/chat/composer/AddMenu'
+import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
+import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
+import { useWorkspace } from '@/stores/workspace'
+import { cn } from '@/lib/cn'
 
 /**
- * Composition root for the composer: a field over a toolbar row.
+ * The composer.
  *
- * It owns the draft text and the turn settings, and nothing else. Each control
- * in the toolbar is its own module, so adding one is a new file plus a line
- * here rather than an edit to a growing component.
+ * ---- What it is not ------------------------------------------------------
  *
- * The frame is `xl` (14px) with 6px of padding, which puts its children on the
- * `md` step (14 − 6 = 8). That is the concentric rule from `index.css`, and it
- * is why the pills inside no longer look like they belong to a different
- * component than the box around them.
+ * It carries no model picker, no permission control and no context meter. All
+ * three moved to the top strip, because they are session facts -- who you are
+ * talking to and what it may do -- rather than properties of the sentence you
+ * are writing. Kept here they turned the field into a toolbar, which is the
+ * single loudest way a text box stops looking calm.
+ *
+ * What is left is what genuinely belongs to this message: what to add to it,
+ * and whether to send it.
+ *
+ * ---- The shape ------------------------------------------------------------
+ *
+ * A capsule while it holds one line, a rounded box once it holds more. Both are
+ * correct and neither is correct for the other case: a capsule with four lines
+ * of text has enormous dead corners, and a 16px box on a single line reads as a
+ * form input. The radius animates between them, so growing feels like one
+ * object changing rather than two components swapping.
+ *
+ * Separation is a shadow, not a border. A hairline around a white field on a
+ * white surface reads as an input; a soft shadow reads as an object resting on
+ * the page, which is what the reference does.
  */
 export function Composer({
-  status,
-  onSend,
-  onStop,
+  conversationId,
+  projectId,
+  placeholder,
+  onSent,
 }: {
-  status: ChatStatus
-  onSend: (text: string, settings: TurnSettings) => void
-  onStop: () => void
+  conversationId: string | null
+  projectId: string | null
+  placeholder: string
+  onSent?: (conversationId: string) => void
 }) {
+  const { status, send, stop } = useWorkspace()
   const [text, setText] = useState('')
-  const [settings, setSettings] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
+  const [focused, setFocused] = useState(false)
+  const [multiline, setMultiline] = useState(false)
+  const field = useRef<ComposerFieldHandle>(null)
 
-  const busy = status === 'submitting' || status === 'thinking' || status === 'streaming'
+  const focus = useCallback(() => field.current?.focus(), [])
+  useTypeToFocus(true, focus)
+
+  const busy = status !== 'idle'
   const canSend = text.trim().length > 0 && !busy
 
   const submit = () => {
     if (!canSend) return
-    onSend(text.trim(), settings)
+    const id = send(conversationId, text, projectId)
     setText('')
+    setMultiline(false)
+    if (conversationId === null && id) onSent?.(id)
   }
 
   return (
     <div
-      className={[
-        'rounded-xl border border-border bg-surface-raised p-1.5',
-        // Focus is carried by the border and a soft ring, not by a colour: the
-        // palette has no accent hue to spend, and a monochrome ring at low
-        // alpha is what macOS text fields do in graphite anyway.
-        'transition-[border-color,box-shadow] duration-150',
-        'focus-within:border-foreground/25 focus-within:shadow-[0_0_0_3px_var(--ring)]',
-        'shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
-      ].join(' ')}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+        setFocused(false)
+      }}
+      // The radius is a real style with a CSS transition, not a Framer
+      // `animate`. A Framer value is only applied once the animation loop
+      // runs, so the resting shape of the most important control in the app
+      // would depend on frames being scheduled -- and it renders as a square
+      // box in any situation where they are not. CSS interpolates one property
+      // just as well and always paints the correct shape on the first frame.
+      // The shape and the height both change together on send/past. Animating
+      // only the shadow keeps them on the same clock -- a radius animation that
+      // outlasts an instant height change is the capsule that never finishes
+      // reshaping itself. The shadow is what gives the lift, and it does not
+      // fight the textarea's own height.
+      style={{
+        paddingInline: COMPOSER.paddingInline,
+        borderRadius: multiline ? COMPOSER.multilineRadius : RADIUS.pill,
+        transitionDuration: `${DURATION.base}s`,
+      }}
+      className={cn(
+        'bg-surface-raised py-1.5',
+        'transition-[box-shadow] ease-out',
+        focused
+          ? 'shadow-[0_2px_10px_rgba(0,0,0,0.07),0_0_0_1px_rgba(0,0,0,0.07)]'
+          : 'shadow-[0_2px_10px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.045)]',
+        'dark:shadow-[0_2px_12px_rgba(0,0,0,0.34),0_0_0_1px_rgba(255,255,255,0.07)]',
+      )}
     >
-      <ComposerInput value={text} onChange={setText} onSubmit={submit} />
+      {/* `items-end` while multiline so the buttons stay level with the last
+          line rather than floating beside the middle of a tall field.
+          `items-center` on one line is what actually centres the glyphs, and
+          the mismatch between those two was the misalignment in the last pass. */}
+      <div className={cn('flex gap-1', multiline ? 'items-end' : 'items-center')}>
+        <AddMenu onDictate={focus} />
 
-      <div className="flex items-center gap-1 pt-1">
-        <div className={toolbarGroup}>
-          <PendingAction
-            icon={Attach}
-            label="Attach files"
-            reason="Attachments arrive with the files slice."
-          />
-          <PendingAction
-            icon={Microphone}
-            label="Voice input"
-            reason="Voice input arrives with the transcription slice."
+        <div className="min-w-0 flex-1">
+          <ComposerField
+            handleRef={field}
+            value={text}
+            onChange={setText}
+            onSubmit={submit}
+            onMultilineChange={setMultiline}
+            placeholder={placeholder}
           />
         </div>
 
-        <div className={`${toolbarGroup} ml-auto`}>
-          <PermissionSelector
-            permission={settings.permission}
-            onChange={(permission) => setSettings((current) => ({ ...current, permission }))}
-          />
-          <ModelReasoningControl
-            modelId={settings.modelId}
-            effort={settings.effort}
-            onModelChange={(modelId) => setSettings((current) => ({ ...current, modelId }))}
-            onEffortChange={(effort) => setSettings((current) => ({ ...current, effort }))}
-          />
-          <SendButton status={status} canSend={canSend} onSend={submit} onStop={onStop} />
+        <div className="flex items-center gap-0.5">
+          <AnimatePresence initial={false}>
+            {canSend || busy ? (
+              <motion.div
+                key="send"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              >
+                <IconButton
+                  label={busy ? 'Stop' : 'Send'}
+                  size="lg"
+                  round
+                  tone="solid"
+                  onClick={busy ? stop : submit}
+                >
+                  {busy ? <Icons.stop /> : <Icons.send size="md" />}
+                </IconButton>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="voice"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              >
+                {/* Voice mode, not dictation. Dictation turns speech into text
+                    in this field and lives in the plus menu; this starts a
+                    spoken conversation and replaces the field entirely. Two
+                    features, so two marks -- the previous build gave them
+                    adjacent glyphs and they read as one control with a
+                    duplicate. */}
+                <IconButton label="Voice mode" size="lg" round onClick={() => undefined}>
+                  <Icons.voice size="md" />
+                </IconButton>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

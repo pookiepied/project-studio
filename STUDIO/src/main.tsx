@@ -1,14 +1,17 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
-import { readStoredTheme, resolveTheme } from '@/app/theme/theme'
+import App from '@/App'
+import { applyAppearance, readAppearance } from '@/design/theme'
 
-// Apply the persisted theme before first paint so the window never flashes
-// the wrong color scheme.
-document.documentElement.classList.toggle('dark', resolveTheme(readStoredTheme()) === 'dark')
+// Apply theme and text sizes before first paint, so the window never shows a
+// frame at the wrong scale or in the wrong colour scheme.
+applyAppearance(readAppearance())
 
-createRoot(document.getElementById('root')!).render(
+const container = document.getElementById('root')
+if (!container) throw new Error('Missing #root element')
+
+createRoot(container).render(
   <StrictMode>
     <App />
   </StrictMode>,

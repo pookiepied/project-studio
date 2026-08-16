@@ -1,0 +1,95 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+/**
+ * Follow streaming output, and stop the moment the reader takes over.
+ *
+ * Sticking to the bottom unconditionally is the behaviour everyone complains
+ * about: you scroll up to re-read something, the next chunk arrives, and you
+ * are yanked back down. So the hook holds a `pinned` flag that is true while
+ * the viewport is at the bottom and goes false as soon as the user scrolls away
+ * from it. Only when pinned does new content scroll into view.
+ *
+ * `THRESHOLD` exists because "at the bottom" is never exact -- fractional
+ * device pixels and a growing last line put the number a few pixels off even
+ * when nothing has moved. Anything within it counts as still at the end.
+ *
+ * ---- Telling our scroll from theirs ---------------------------------------
+ *
+ * The hard part is that writing `scrollTop` fires a real `scroll` event, so a
+ * naive handler cannot tell the follow from the user. Three signals resolve it:
+ *
+ *   1. A `programmatic` flag is raised before every write the hook makes, and
+ *      the first event to arrive under it is swallowed. That kills the race
+ *      where the follow's own scroll re-pinned the viewport and the
+ *      jump-to-latest button flickered.
+ *   2. Direction beats distance. Any *upward* movement unpins, even inside the
+ *      threshold: on a trackpad a slow scroll up moves a few pixels at a time,
+ *      and if only distance counted, the next chunk would win before the user
+ *      had left the slack zone. They cannot escape the pull -- which is exactly
+ *      the bug this version exists to fix.
+ *   3. The wheel and the pointer are intent. `onWheel` upward and
+ *      `onPointerDown` anywhere in the viewport unpin directly, so a click or a
+ *      nudge during streaming takes the view away from the follow immediately.
+ *
+ * Scrolling back to the bottom re-pins, and so does the jump-to-latest button
+ * via `scrollToBottom`.
+ *
+ * Scrolling is instant, not smooth: a smooth scroll restarts on every chunk and
+ * never arrives, so the view lags permanently behind the text it follows.
+ */
+
+const THRESHOLD = 48
+
+export function useAutoScroll(dependency: unknown) {
+  const viewport = useRef<HTMLDivElement>(null)
+  const [pinned, setPinned] = useState(true)
+  const programmatic = useRef(false)
+  const lastTop = useRef(0)
+
+  const atBottom = useCallback(() => {
+    const element = viewport.current
+    if (!element) return true
+    return element.scrollHeight - element.scrollTop - element.clientHeight <= THRESHOLD
+  }, [])
+
+  const onScroll = useCallback(() => {
+    const element = viewport.current
+    if (!element) return
+    if (programmatic.current) {
+      programmatic.current = false
+      lastTop.current = element.scrollTop
+      return
+    }
+    const upward = element.scrollTop < lastTop.current
+    lastTop.current = element.scrollTop
+    setPinned(!upward && atBottom())
+  }, [atBottom])
+
+  /** The wheel says so before the position does -- unpinned on the first notch. */
+  const onWheel = useCallback((event: { deltaY: number }) => {
+    if (event.deltaY < 0) setPinned(false)
+  }, [])
+
+  /** A press in the transcript is the reader taking the wheel. */
+  const onPointerDown = useCallback(() => setPinned(false), [])
+
+  const scrollToBottom = useCallback(() => {
+    const element = viewport.current
+    if (!element) return
+    programmatic.current = true
+    lastTop.current = element.scrollHeight
+    element.scrollTo({ top: element.scrollHeight })
+    setPinned(true)
+  }, [])
+
+  useEffect(() => {
+    if (!pinned) return
+    const element = viewport.current
+    if (!element) return
+    programmatic.current = true
+    lastTop.current = element.scrollHeight
+    element.scrollTop = element.scrollHeight
+  }, [dependency, pinned])
+
+  return { viewport, pinned, onScroll, onWheel, onPointerDown, scrollToBottom }
+}

@@ -1,32 +1,98 @@
-# React + TypeScript + Vite
+# Studio Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The desktop UI. React 19 + Vite + Tailwind v4 + Tauri v2.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+pnpm install
+pnpm tauri dev     # the real frameless window
+pnpm dev           # the same shell in a browser, minus window controls
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The previous shell is kept alongside at `STUDIO (ON HOLD UI)/`.
+
+## The type scale, and why it decides everything else
+
+One decision sits under the whole interface: **13px UI text, and every text step
+names the icon size that belongs beside it.**
+
+| Role | Text | Icon | Used for |
+|---|---|---|---|
+| micro | 11 | 12 | badges, meta, timestamps |
+| caption | 12 | 14 | secondary labels, hints |
+| **ui** | **13** | **14** | buttons, menus, sidebar, composer |
+| body | 14 | 16 | transcript prose only |
+| title | 17 | 20 | section headings |
+| display | 28 | - | the home line (serif) |
+| code | 12 | - | code blocks, inline code |
+
+Icons trail their text by about a pixel because a glyph is mostly negative
+space and an icon is a solid mark: matched by number, the icon looks bigger.
+Binding the pair in `design/tokens/typography.ts` removes the judgement call --
+a component picks a role and the role already knows both sizes.
+
+13 rather than 14 because Inter has a tall x-height and renders visually larger
+than a system UI face at the same nominal size.
+
+Sizes are applied as `--ui-size` and `--code-size` on the root, and every step
+in `index.css` is a delta on those. That is what lets the appearance settings
+move the whole system without breaking the pairing.
+
+## Where things live
+
+```
+src/
+  design/       tokens and theme. the source of truth for every value
+    tokens/     typography, geometry, motion
+    theme/      appearance state, persistence, the root variables
+  components/
+    icons/      the registry -- one glyph, one concept, enforced
+    brand/      the Studio mark
+    primitives/ Popover, Dialog, Tooltip, IconButton, Segmented, Button, Field
+  domain/       types and data. no React
+    models/     providers, models, effort
+    permissions/execution modes
+    projects/   projects, source folders, marks
+    session/    conversations, messages, and the demo content
+  stores/
+    workspace/  projects, conversations, turns
+    navigation/ where the user is
+  features/
+    chat/       composer, transcript, markdown, code, thinking
+    home/ projects/ settings/ palette/
+  platform/tauri/ the only files that touch the Tauri API
+  shell/        window, top strip, sidebar, actions menu
+```
+
+Two rules worth keeping:
+
+**One glyph, one concept, and it is enforced.** `components/icons/registry.tsx`
+throws at startup in development if two concepts share a glyph. It caught a real
+collision the day it was written. Four concepts sit close enough to be confused,
+so each takes a different metaphor: thinking is a live event, reasoning is a
+level on a dial, permission is a shield, models wear provider marks.
+
+**Fonts are bundled.** Inter and Instrument Serif come from `@fontsource`, so a
+local-first app makes no network request to render text.
+
+## Where the demo is
+
+`domain/session/demo.ts` holds every piece of fake content, and
+`stores/workspace/useDemoTurn.ts` is the entire stand-in transport. The
+component tree calls `send` and `stop` and knows nothing about how text arrives.
+
+A real runtime replaces `useDemoTurn` and keeps one contract: set `thinking`,
+then `streaming`, append to the trailing assistant message as text arrives, and
+land on `idle`.
+
+## What is real, and what is a placeholder
+
+Real: the shell, the composer, the transcript and every renderer in it
+(markdown, GFM tables, math, sanitised HTML, syntax-highlighted code), the
+thinking block, message actions, editing, forking, retry, auto-scroll,
+projects, the sidebar, search, archive with batch delete, appearance settings,
+the custom right-click menu, and window-size persistence.
+
+Placeholder: Voice, Personalization, Shortcuts, Account, MCP servers,
+Connectors, Browser use, Skills, Hooks, Git, Worktrees, Environments. Each
+renders a pane saying what will live in it rather than an empty frame. Adding a
+provider is a working form that does not persist yet.

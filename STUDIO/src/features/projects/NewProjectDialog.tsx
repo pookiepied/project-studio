@@ -1,223 +1,175 @@
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SURFACE } from '@/app/motion'
-import { useMountTransition } from '@/app/useMountTransition'
-import { useNavigation } from '@/app/navigation/NavigationProvider'
-import { useChrome } from '@/app/shell/ChromeProvider'
-import { Close, Folder } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import { PROJECT_ICON_IDS, PROJECT_ICONS } from '@/features/projects/projectIcons'
-import { useProjects } from '@/features/projects/ProjectsProvider'
-import type { ProjectIconId } from '@/features/projects/types'
-import { cn } from '@/lib/utils'
+import { useState } from 'react'
+import { Icons } from '@/components/icons'
+import { Button, Dialog, IconButton, TextArea, TextField } from '@/components/primitives'
+import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
+import { DEFAULT_PROJECT_ICON, PROJECT_ICONS, type ProjectIcon } from '@/domain/projects/types'
+import { useNavigation } from '@/stores/navigation'
+import { useWorkspace } from '@/stores/workspace'
+import { cn } from '@/lib/cn'
 
 /**
- * The New Project sheet — the Codex-style flow: name it, pick its mark, point
- * it at as many source folders as you like, create. One calm sheet, no steps.
+ * Creating a project: a name, a mark, and the folders it works in.
  *
- * Demo-only: folder rows are typed paths, not a filesystem browse. The real
- * picker arrives with the Tauri dialog plugin alongside the harness.
+ * Folders are the substance here, so they are not an afterthought at the
+ * bottom. A project with no folder is a label; a project with folders is
+ * something the agent can actually work in, and the form says so by refusing to
+ * submit without at least one.
+ *
+ * The picker is demo-only in this build -- it appends a plausible path rather
+ * than opening the OS dialog, because the real one is a Tauri capability that
+ * belongs with the harness work. The shape of what it produces is real, so
+ * swapping it is one function.
  */
-export function NewProjectDialog() {
-  const { newProjectOpen, setNewProjectOpen } = useChrome()
-  const { createProject } = useProjects()
-  const { openChat } = useNavigation()
+export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { createProject } = useWorkspace()
+  const { openProject } = useNavigation()
 
   const [name, setName] = useState('')
-  const [icon, setIcon] = useState<ProjectIconId>('folder')
-  const [folders, setFolders] = useState<string[]>([])
-  const [folderDraft, setFolderDraft] = useState('')
+  const [icon, setIcon] = useState<ProjectIcon>(DEFAULT_PROJECT_ICON)
+  const [description, setDescription] = useState('')
+  const [folders, setFolders] = useState<{ name: string; path: string }[]>([])
 
-  const close = () => setNewProjectOpen(false)
+  const valid = name.trim().length > 0 && folders.length > 0
 
-  // Back to a blank sheet every time it opens.
-  useEffect(() => {
-    if (!newProjectOpen) return
+  const reset = () => {
     setName('')
-    setIcon('folder')
+    setIcon(DEFAULT_PROJECT_ICON)
+    setDescription('')
     setFolders([])
-    setFolderDraft('')
-  }, [newProjectOpen])
+  }
 
-  // Escape is the sheet's cancel.
-  useEffect(() => {
-    if (!newProjectOpen) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setNewProjectOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [newProjectOpen, setNewProjectOpen])
+  const close = () => {
+    reset()
+    onClose()
+  }
 
   const addFolder = () => {
-    const folder = folderDraft.trim()
-    if (!folder || folders.includes(folder)) return
-    setFolders((current) => [...current, folder])
-    setFolderDraft('')
+    const index = folders.length + 1
+    const slug = name.trim().toLowerCase().replace(/\s+/g, '-') || 'project'
+    setFolders((current) => [
+      ...current,
+      { name: index === 1 ? slug : `${slug}-${index}`, path: `D:/Work/${slug}${index === 1 ? '' : `-${index}`}` },
+    ])
   }
 
-  const create = () => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    const project = createProject({ name: trimmed, icon, folders })
-    close()
-    openChat(project.id, project.chats[0].id)
+  const submit = () => {
+    if (!valid) return
+    const project = createProject({ name, icon, description, folders })
+    reset()
+    onClose()
+    openProject(project.id)
   }
-
-  const mounted = useMountTransition(newProjectOpen, DURATION.base * 1000)
-  if (!mounted) return null
 
   return (
-    /*
-      Lifecycle is `useMountTransition`, not `AnimatePresence` — conditional
-      presence never completes on this framer-motion/React pairing and leaves
-      an invisible `fixed inset-0` sheet behind that eats every click in the
-      app. See `app/useMountTransition.ts`.
-    */
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: newProjectOpen ? 1 : 0 }}
-      transition={{ duration: DURATION.base, ease: EASE_OUT }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+    <Dialog
+      open={open}
+      onClose={close}
+      title="New project"
+      width="28rem"
+      footer={
+        <>
+          <Button onClick={close}>Cancel</Button>
+          <Button variant="primary" disabled={!valid} onClick={submit}>
+            Create project
+          </Button>
+        </>
+      }
     >
-          <div
-            onClick={close}
-            /* Blurred, not just dimmed. A flat black wash tells you something
-               is modal; a blur tells you the app is still there behind it,
-               which is the difference between a dialog and a page change. */
-            className="studio-blur-scrim absolute inset-0 bg-scrim"
-            aria-hidden
+      <div className="flex flex-col gap-4 pt-1">
+        <Field label="Name">
+          <TextField value={name} onChange={setName} placeholder="Quiet Hours" autoFocus />
+        </Field>
+
+        <Field label="Mark">
+          <div className="flex flex-wrap gap-1">
+            {PROJECT_ICONS.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                aria-label={candidate}
+                aria-pressed={icon === candidate}
+                onClick={() => setIcon(candidate)}
+                className={cn(
+                  'flex size-8 items-center justify-center rounded-md border transition-colors duration-150',
+                  icon === candidate
+                    ? 'border-foreground/25 bg-selected text-foreground'
+                    : 'border-transparent text-muted-foreground hover:bg-tint hover:text-foreground',
+                )}
+              >
+                <ProjectIconMark icon={candidate} />
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="Description" optional>
+          <TextArea
+            value={description}
+            onChange={setDescription}
+            rows={2}
+            placeholder="What this project is for."
           />
+        </Field>
 
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label="New project"
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
-            animate={
-              newProjectOpen ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 8, scale: 0.98 }
-            }
-            transition={
-              newProjectOpen ? SPRING_SURFACE : { duration: DURATION.base, ease: EASE_OUT }
-            }
-            className="studio-blur relative w-full max-w-md rounded-xl border border-border p-5 shadow-2xl"
-          >
-            <h2 className="font-display text-[24px] leading-none tracking-tight">New project</h2>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Folders, chats, notes and files — gathered around one piece of work.
-            </p>
-
-            <div className="mt-5">
-              <label htmlFor="project-name" className="text-xs font-medium">
-                Name
-              </label>
-              <input
-                id="project-name"
-                autoFocus
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') create()
-                }}
-                placeholder="Aurora Film Score"
-                className="mt-1.5 h-8 w-full rounded-md border border-border bg-surface px-2.5 text-[13px] outline-none transition-colors duration-150 placeholder:text-muted-foreground/60 focus:border-foreground/25"
-              />
-            </div>
-
-            <div className="mt-4">
-              <span className="text-xs font-medium">Icon</span>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {PROJECT_ICON_IDS.map((id) => {
-                  const IconGlyph = PROJECT_ICONS[id]
-                  const selected = id === icon
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setIcon(id)}
-                      aria-label={`${id} icon`}
-                      aria-pressed={selected}
-                      className={cn(
-                        'flex size-8 items-center justify-center rounded-md transition-colors duration-150',
-                        selected
-                          ? 'bg-muted text-foreground ring-1 ring-border'
-                          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                      )}
-                    >
-                      <IconGlyph size="md" />
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label htmlFor="project-folder" className="text-xs font-medium">
-                Source folders
-                <span className="ml-1.5 font-normal text-muted-foreground">optional</span>
-              </label>
-
-              {folders.length > 0 && (
-                <ul className="mt-1.5 flex flex-col gap-0.5">
-                  {folders.map((folder) => (
-                    <li
-                      key={folder}
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted/60"
-                    >
-                      <Folder size="sm" className="shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate text-[13px]">{folder}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFolders((current) => current.filter((entry) => entry !== folder))
-                        }
-                        aria-label={`Remove ${folder}`}
-                        className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <Close size="xs" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="mt-1.5 flex items-center gap-1.5">
-                <input
-                  id="project-folder"
-                  value={folderDraft}
-                  onChange={(event) => setFolderDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addFolder()
-                    }
-                  }}
-                  placeholder="~/projects/my-folder"
-                  className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2.5 text-[13px] outline-none transition-colors duration-150 placeholder:text-muted-foreground/60 focus:border-foreground/25"
-                />
-                <Button
-                  variant="outline"
+        <Field label="Source folders">
+          <div className="flex flex-col gap-1">
+            {folders.map((folder, index) => (
+              <div
+                key={folder.path}
+                className="flex items-center gap-2 rounded-md border bg-surface px-2 py-1.5"
+              >
+                <Icons.project className="text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-ui text-foreground">{folder.name}</span>
+                <span className="hidden shrink-0 text-micro text-muted-foreground sm:block">
+                  {folder.path}
+                </span>
+                <IconButton
+                  label={`Remove ${folder.name}`}
                   size="sm"
-                  onClick={addFolder}
-                  disabled={!folderDraft.trim()}
+                  onClick={() => setFolders((current) => current.filter((_, i) => i !== index))}
                 >
-                  Add
-                </Button>
+                  <Icons.close />
+                </IconButton>
               </div>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Folders Studio can read while it works. Add as many as you like.
-              </p>
-            </div>
+            ))}
 
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={close}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={create} disabled={!name.trim()}>
-                Create project
-              </Button>
-            </div>
-          </motion.div>
-    </motion.div>
+            <button
+              type="button"
+              onClick={addFolder}
+              className="flex items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-ui text-muted-foreground transition-colors duration-150 hover:bg-tint hover:text-foreground"
+            >
+              <Icons.add />
+              Add folder
+            </button>
+
+            {folders.length === 0 ? (
+              <p className="text-micro text-muted-foreground/80">
+                A project needs at least one folder to work in.
+              </p>
+            ) : null}
+          </div>
+        </Field>
+      </div>
+    </Dialog>
+  )
+}
+
+function Field({
+  label,
+  optional = false,
+  children,
+}: {
+  label: string
+  optional?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-caption text-muted-foreground">
+        {label}
+        {optional ? <span className="text-muted-foreground/60"> &middot; optional</span> : null}
+      </span>
+      {children}
+    </label>
   )
 }

@@ -1,56 +1,72 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Expand } from '@/components/icons'
-import { StudioMark } from '@/components/brand/StudioMark'
-import { cn } from '@/lib/utils'
+import { COLLAPSE } from '@/design/tokens'
+import { Icons } from '@/components/icons'
+import { StudioMark } from '@/components/brand'
+import type { Thinking } from '@/domain/session/types'
+import { cn } from '@/lib/cn'
 
 /**
- * The model's reasoning, above its answer.
+ * The reasoning trace.
  *
- * It is collapsed by default and expands in place — thinking is context, not
- * the result, so it should be available without competing with the answer for
- * the reader's attention.
+ * Collapsed by default, always. The trace is working-out, not the answer, and
+ * opening it by default puts the least useful text in a reply at the top of it
+ * -- the reader has to scroll past somebody else's notes to reach the point.
+ * It stays collapsed while streaming too, so the block does not expand and
+ * shove the reply down the screen mid-sentence.
  *
- * While thinking is still arriving the block auto-expands and the mark ripples,
- * because at that moment it is the only thing there is to show. Once the answer
- * begins, it collapses back on its own.
+ * The header still earns its place while collapsed by carrying the duration:
+ * "Thought for 4s" is the one fact about the trace that is worth a glance
+ * without opening it.
+ *
+ * The mark is the brand mark, not a glyph: the same StudioMark that assembles
+ * on the splash ripples here while the model works. "Studio is thinking" is
+ * said by Studio itself, which no generic spinner can say.
  */
-export function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
-  const [manuallyOpen, setManuallyOpen] = useState(false)
-  const open = active || manuallyOpen
+export function ThinkingBlock({ thinking, live }: { thinking: Thinking; live: boolean }) {
+  const [open, setOpen] = useState(false)
 
   return (
-    <div className="mb-3">
+    <div className="mb-2.5">
       <button
         type="button"
-        onClick={() => setManuallyOpen((value) => !value)}
+        onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="group/think inline-flex items-center gap-1.5 rounded-md py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        className={cn(
+          'group/thinking inline-flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 pl-1',
+          'text-caption text-muted-foreground transition-colors duration-150 hover:text-foreground',
+        )}
       >
-        <StudioMark busy={active} size={13} />
-        <span>{active ? 'Thinking…' : 'Thought process'}</span>
-        <Expand
-          size="xs"
-          className={cn('transition-transform duration-200', open && 'rotate-180')}
-        />
+        <StudioMark busy={live} size={13} className="text-current" />
+
+        <span>{live ? 'Thinking' : `Thought for ${formatSeconds(thinking.seconds)}`}</span>
+
+        <Icons.disclosure state={open ? 'on' : 'rest'} />
       </button>
 
       <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            key="thinking-body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="overflow-hidden"
-          >
-            <p className="mt-1.5 border-l-2 border-border pl-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              {text}
-            </p>
+        {open ? (
+          <motion.div {...COLLAPSE} className="overflow-hidden">
+            <div
+              className={cn(
+                // Indented behind a rule rather than boxed: a bordered card
+                // would give the working-out the same visual weight as the
+                // answer sitting under it.
+                'studio-selectable mt-1.5 ml-1.5 border-l-2 pl-3',
+                'text-caption whitespace-pre-wrap text-muted-foreground',
+              )}
+            >
+              {thinking.text}
+            </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   )
+}
+
+function formatSeconds(seconds: number): string {
+  if (seconds < 1) return 'a moment'
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  return `${Math.round(seconds / 60)}m`
 }
