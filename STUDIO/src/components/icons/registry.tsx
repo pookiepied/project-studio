@@ -26,7 +26,7 @@
  * glyph inside it rather than the glyph having its own small hitbox.
  */
 import {
-  Archive, ArrowDown, ArrowUp, AudioLines, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
+  Archive, ArrowDown, ArrowUp, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
   CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
   MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
@@ -37,7 +37,7 @@ import {
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
-import { SidebarToggle } from '@/components/icons/drawn'
+import { SidebarToggle, VoiceWave } from '@/components/icons/drawn'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
 const SNAP = { type: 'spring', stiffness: 520, damping: 30, mass: 0.5 } as const
@@ -145,7 +145,6 @@ const REGISTRY = {
   add: { mark: Plus, motion: CROSS },
   attach: { mark: Paperclip },
   dictate: { mark: Mic },
-  voice: { mark: AudioLines },
   send: { mark: ArrowUp, motion: LIFT },
   stop: { mark: Square },
 
@@ -223,6 +222,7 @@ export const Icons = {
     ]),
   ) as Record<keyof typeof REGISTRY, ReturnType<typeof fromLucide>>),
   sidebar: SidebarToggle,
+  voice: VoiceWave,
 }
 
 export type IconConcept = keyof typeof Icons

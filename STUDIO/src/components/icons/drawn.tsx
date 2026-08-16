@@ -60,6 +60,37 @@ import { cn } from '@/lib/cn'
 
 
 
+/**
+ * A mark that is one static path on the 16-unit grid.
+ *
+ * No motion, no state -- most drawn marks do not need any, and the ones that do
+ * are built by hand below. It exists so a plain glyph does not have to carry
+ * the sizing rule and the `studio-icon` class at each definition.
+ */
+function drawnMark(d: string, name: string) {
+  function Mark({ size = 'text', className, style }: { size?: IconSize; className?: string; style?: React.CSSProperties }) {
+    const box = size === 'text' ? '1.1em' : `${STEP_PX[size]}px`
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        focusable={false}
+        className={cn('studio-icon shrink-0', className)}
+        style={{ width: box, height: box, ...style }}
+      >
+        <path d={d} />
+      </svg>
+    )
+  }
+  Mark.displayName = name
+  return Mark
+}
+
 const STEP_PX: Record<Exclude<IconSize, 'text'>, number> = {
   xs: ICON.xs,
   sm: ICON.sm,
@@ -86,6 +117,29 @@ const SLIDE_X: Record<IconState, number> = {
 }
 
 const FRAME = 'M4.6 3.2h6.8a2.4 2.4 0 0 1 2.4 2.4v4.8a2.4 2.4 0 0 1-2.4 2.4H4.6a2.4 2.4 0 0 1-2.4-2.4V5.6a2.4 2.4 0 0 1 2.4-2.4Z'
+
+/**
+ * Voice mode.
+ *
+ * One continuous line that rises and falls -- a voice as a waveform, drawn as a
+ * single stroke rather than as a row of bars. The bars are the conventional
+ * mark and they are the wrong one here: a bar chart of amplitude is a picture
+ * of an audio meter, which is equipment. A line that swells once and settles is
+ * a picture of someone speaking, and it sits in the same family as the rest of
+ * the set, which is all single-weight strokes.
+ *
+ * Deliberately not a mic. The mic beside it is `dictate` -- speech becoming
+ * text, one turn. This is voice mode, a conversation held out loud, and the two
+ * being different things is exactly why they cannot share a glyph.
+ *
+ * The curve is asymmetric on purpose: a perfect sine reads as a decoration or a
+ * maths symbol, and the previous mark's problem was that it read as a square
+ * root sign. Two unequal swells make it read as a voice.
+ */
+export const VoiceWave = drawnMark(
+  'M1.8 8c.9 0 1.1-3.4 2.1-3.4S5 11.4 6 11.4 7.1 3.2 8.1 3.2s1.1 8.2 2.1 8.2 1.1-4.8 2-4.8 1.1 1.4 2 1.4',
+  'voice',
+)
 
 export function SidebarToggle({
   size = 'text',

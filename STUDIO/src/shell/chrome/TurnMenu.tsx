@@ -1,6 +1,13 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { Icons, ProviderMark } from '@/components/icons'
-import { MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
+import {
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  Popover,
+  StepSlider,
+  Tooltip,
+} from '@/components/primitives'
 import { findModel, modelsByProvider } from '@/domain/models/catalog'
 import { EFFORTS } from '@/domain/models/types'
 import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
@@ -9,228 +16,167 @@ import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 
 /**
- * The turn settings: one pill, three targets.
+ * The turn settings: one pill, one menu, two depths.
  *
- * ---- Why it split ----------------------------------------------------------
+ * ---- Why it is one control again -------------------------------------------
  *
- * This was a single button opening a single menu that stacked models, then
- * reasoning, then permission, in one scrolling column. That construction has a
- * ceiling and we were already at it: the moment a user brings their own keys
- * the model list is twenty rows, the two settings underneath fall off the
- * bottom, and every one of them is reached by scrolling past models the user
- * was not choosing between.
+ * This was briefly three segments in a bordered capsule with dividers between
+ * them. That solved the right problem -- a single scrolling column cannot hold
+ * a model library plus two settings -- and introduced a worse one: a bordered,
+ * divided container in the top strip reads as a toolbar, and a toolbar is the
+ * developer-tool look this app is defined against. Three outlines and two rules
+ * where there had been one quiet word is more furniture, not less.
  *
- * The deeper problem is that they were never one question. Who you are talking
- * to, how hard it should think, and what it may touch without asking are three
- * different kinds of decision -- one is an identity, one is a dial, one is a
- * consent. Stacking them in a column says they are the same kind of thing and
- * makes the most consequential of the three the hardest to reach.
+ * So the separation moved inside. One borderless pill, one menu, and the menu
+ * has a second level for the setting that needs room. Nothing on the strip
+ * changed shape; the depth is behind a click, which is where depth belongs.
  *
- * So: still one pill, because on screen these are one idea -- "what happens
- * when I press send". Inside it, three segments that each open their own small
- * menu. Nothing scrolls until the model list itself is long, and the permission
- * mode is one click from anywhere instead of one click plus a scroll.
+ * ---- Why reasoning is a slider ---------------------------------------------
  *
- * ---- Why the segments are ordered this way --------------------------------
+ * Because it is the one setting here that is a dial rather than a choice. The
+ * steps are ordered and adjacent ones are near-equivalent: nobody wants "high"
+ * specifically, they want "more than medium". A column of rows says these are
+ * five unrelated options and hides the ordering that is the entire meaning.
  *
- * Model, reasoning, permission -- widest to narrowest, and least to most
- * consequential. The model name is the thing being read, so it leads; the
- * permission mode is the thing that changes what happens to your machine, so it
- * sits at the end where the eye lands last and the pointer travels least from
- * the composer.
+ * It also absorbs the thing that will otherwise break this screen later --
+ * models disagree about their scales. Four steps, six steps, a differently
+ * named top end. A track is the same control at any length; a list of rows
+ * changes height and position every time the model changes, moving the setting
+ * out from under the pointer that was adjusting it.
  */
 export function TurnMenu() {
   const { settings, setSettings } = useWorkspace()
   const { openSettings } = useNavigation()
-  const [open, setOpen] = useState<'model' | 'effort' | 'permission' | null>(null)
+  const [open, setOpen] = useState(false)
+  const [view, setView] = useState<'root' | 'reasoning'>('root')
 
   const model = findModel(settings.modelId)
   const mode = findPermissionMode(settings.permission)
-  const effort = useMemo(
-    () => EFFORTS.find((candidate) => candidate.id === settings.effort),
-    [settings.effort],
-  )
+  const effort = EFFORTS.find((candidate) => candidate.id === settings.effort)
   const ModeMark = mode.icon
 
-  const close = () => setOpen(null)
+  // Reopening lands on the top level. A menu that remembers it was left on a
+  // sub-page reopens showing something other than what its trigger describes.
+  useEffect(() => {
+    if (!open) setView('root')
+  }, [open])
 
-  return (
-    <div
-      className={cn(
-        // One container, so the three read as a single control rather than as
-        // three loose buttons that happen to be adjacent. The dividers are the
-        // only thing saying they are separable, and they are 1px of hairline --
-        // enough to find, not enough to look like a toolbar.
-        'flex items-center rounded-md border border-hairline bg-surface-raised',
-        'divide-x divide-hairline',
-      )}
-    >
-      <Segment
-        open={open === 'model'}
-        onOpenChange={(next) => setOpen(next ? 'model' : null)}
-        tooltip="Model"
-        label={model?.name ?? 'Model'}
-        leading={model ? <ProviderMark provider={model.providerId} className="shrink-0" /> : null}
-        className="max-w-44 rounded-l-md"
-      >
-        {modelsByProvider().map(({ provider, models }) => (
-          <div key={provider.id}>
-            {/* The provider's mark sits with its name, once, rather than on
-                every model beneath it. Repeating a logo down a group says the
-                rows differ by provider when what differs is the model. */}
-            <MenuLabel>
-              <span className="flex items-center gap-1.5">
-                <ProviderMark provider={provider.id} />
-                {provider.name}
-              </span>
-            </MenuLabel>
-            {models.map((candidate) => (
-              <MenuItem
-                key={candidate.id}
-                selected={candidate.id === settings.modelId}
-                note={candidate.note}
-                onSelect={() => {
-                  setSettings({ ...settings, modelId: candidate.id })
-                  close()
-                }}
-              >
-                {candidate.name}
-              </MenuItem>
-            ))}
-          </div>
-        ))}
-
-        {/* Where a user's own models arrive from, rather than letting them
-            swell this list. A picker is for choosing; adding is a different
-            activity and belongs on a page that can hold a key, a base URL and
-            a wire format without becoming a menu. */}
-        <MenuSeparator />
-        <MenuItem
-          icon={<Icons.settings />}
-          onSelect={() => {
-            close()
-            openSettings('providers')
-          }}
-        >
-          Manage models…
-        </MenuItem>
-      </Segment>
-
-      <Segment
-        open={open === 'effort'}
-        onOpenChange={(next) => setOpen(next ? 'effort' : null)}
-        tooltip="Reasoning"
-        label={effort?.name ?? 'Reasoning'}
-        leading={<Icons.reasoning className="shrink-0" />}
-      >
-        <MenuLabel>Reasoning</MenuLabel>
-        {EFFORTS.map((candidate) => (
-          <MenuItem
-            key={candidate.id}
-            selected={candidate.id === settings.effort}
-            note={candidate.note}
-            onSelect={() => {
-              setSettings({ ...settings, effort: candidate.id })
-              close()
-            }}
-          >
-            {candidate.name}
-          </MenuItem>
-        ))}
-      </Segment>
-
-      {/* The mode is a mark alone, no word.
-          Three modes reuse three glyphs, so the mark becomes recognisable in a
-          way a third piece of text in the pill would not -- and the pill has a
-          width budget the model name should be spending. The name is one hover
-          away and the whole thing is a click away. */}
-      <Segment
-        open={open === 'permission'}
-        onOpenChange={(next) => setOpen(next ? 'permission' : null)}
-        tooltip={`What Studio may do · ${mode.name}`}
-        leading={<ModeMark className="shrink-0" />}
-        align="end"
-        className="rounded-r-md"
-      >
-        <MenuLabel>What Studio may do</MenuLabel>
-        {PERMISSION_MODES.map((candidate) => (
-          <MenuItem
-            key={candidate.id}
-            selected={candidate.id === settings.permission}
-            note={candidate.note}
-            onSelect={() => {
-              setSettings({ ...settings, permission: candidate.id })
-              close()
-            }}
-          >
-            {candidate.name}
-          </MenuItem>
-        ))}
-      </Segment>
-    </div>
-  )
-}
-
-/**
- * One segment of the pill.
- *
- * The disclosure chevron appears on the segment that is open and on hover, not
- * permanently on all three: three chevrons in a control this size is three
- * arrows competing with the one word that matters.
- */
-function Segment({
-  open,
-  onOpenChange,
-  tooltip,
-  label,
-  leading,
-  align = 'start',
-  className,
-  children,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  tooltip: string
-  label?: string
-  leading?: ReactNode
-  align?: 'start' | 'end'
-  className?: string
-  children: ReactNode
-}) {
   return (
     <Popover
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={setOpen}
       side="bottom"
-      align={align}
-      className="max-h-[26rem] min-w-56 overflow-y-auto"
+      align="end"
+      className="max-h-[28rem] w-72 overflow-y-auto"
       trigger={
-        <Tooltip label={tooltip} side="bottom">
+        <Tooltip label={`${model?.name ?? 'Model'} · ${effort?.name ?? ''} · ${mode.name}`} side="bottom">
           <button
             type="button"
-            onClick={() => onOpenChange(!open)}
-            aria-label={tooltip}
+            onClick={() => setOpen(!open)}
+            aria-label="Turn settings"
             className={cn(
-              'group flex items-center gap-1.5 px-2 py-1 text-ui',
+              // No border, no dividers, no fill at rest. The strip holds the
+              // window's identity; this is a label that happens to be clickable.
+              'flex max-w-56 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui',
               'text-muted-foreground transition-colors duration-fast',
               open ? 'bg-selected text-foreground' : 'hover:bg-tint',
-              className,
             )}
           >
-            {leading}
-            {label ? <span className="min-w-0 truncate">{label}</span> : null}
-            <Icons.disclosure
-              state={open ? 'on' : 'rest'}
-              className={cn(
-                'shrink-0 transition-opacity duration-fast',
-                open ? 'opacity-60' : 'opacity-0 group-hover:opacity-60',
-              )}
-            />
+            {/* Provider, name, mode: who, what, and how far it may go. */}
+            {model ? <ProviderMark provider={model.providerId} className="shrink-0" /> : null}
+            <span className="min-w-0 truncate">{model?.name ?? 'Model'}</span>
+            <ModeMark className="shrink-0 opacity-70" />
+            <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
           </button>
         </Tooltip>
       }
     >
-      {children}
+      {view === 'reasoning' ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setView('root')}
+            className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-ui text-muted-foreground hover:bg-tint"
+          >
+            {/* Pointing back the way it came. The same mark the disclosures
+                use, turned -- one idea of "there is more this way". */}
+            <Icons.disclosure className="shrink-0 rotate-180" />
+            Reasoning
+          </button>
+          <MenuSeparator />
+          <StepSlider
+            steps={EFFORTS}
+            value={settings.effort}
+            onChange={(next) => setSettings({ ...settings, effort: next })}
+          />
+        </>
+      ) : (
+        <>
+          {modelsByProvider().map(({ provider, models }) => (
+            <div key={provider.id}>
+              {/* The provider's mark sits with its name, once, rather than on
+                  every model beneath it. Repeating a logo down a group says the
+                  rows differ by provider when what differs is the model. */}
+              <MenuLabel>
+                <span className="flex items-center gap-1.5">
+                  <ProviderMark provider={provider.id} />
+                  {provider.name}
+                </span>
+              </MenuLabel>
+              {models.map((candidate) => (
+                <MenuItem
+                  key={candidate.id}
+                  selected={candidate.id === settings.modelId}
+                  note={candidate.note}
+                  onSelect={() => {
+                    setSettings({ ...settings, modelId: candidate.id })
+                    setOpen(false)
+                  }}
+                >
+                  {candidate.name}
+                </MenuItem>
+              ))}
+            </div>
+          ))}
+
+          {/* Where a user's own models arrive from, rather than letting them
+              swell this list. A picker is for choosing; adding is a different
+              activity and needs a page that can hold a key, a base URL and a
+              wire format without becoming a menu. */}
+          <MenuItem icon={<Icons.mcp />} onSelect={() => { setOpen(false); openSettings('providers') }}>
+            Model library…
+          </MenuItem>
+
+          <MenuSeparator />
+
+          {/* Not a submenu that opens sideways: at this width a flyout would
+              leave the window. It replaces the panel's contents, the way a
+              settings pane does, and the header row is the way back. */}
+          <MenuItem
+            icon={<Icons.reasoning />}
+            hint={effort?.name}
+            onSelect={() => setView('reasoning')}
+          >
+            Reasoning
+          </MenuItem>
+
+          <MenuSeparator />
+          <MenuLabel>What Studio may do</MenuLabel>
+          {PERMISSION_MODES.map((candidate) => (
+            <MenuItem
+              key={candidate.id}
+              selected={candidate.id === settings.permission}
+              note={candidate.note}
+              onSelect={() => {
+                setSettings({ ...settings, permission: candidate.id })
+                setOpen(false)
+              }}
+            >
+              {candidate.name}
+            </MenuItem>
+          ))}
+        </>
+      )}
     </Popover>
   )
 }
