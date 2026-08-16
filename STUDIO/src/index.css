@@ -658,8 +658,9 @@
   .studio-prose strong { @apply font-semibold; }
 
   .studio-prose blockquote {
-    @apply border-l-2 pl-3;
+    @apply rounded-r-lg border-l-2 py-1 pl-3.5;
     color: var(--muted-foreground);
+    background: color-mix(in oklab, var(--foreground) 2.5%, transparent);
   }
 
   .studio-prose hr {
@@ -711,7 +712,13 @@
     font-size: var(--text-caption);
   }
   .studio-prose :is(th, td) {
-    @apply px-3 py-2 text-left align-top;
+    @apply px-3.5 py-2.5 text-left align-top;
+  }
+  /* Numbers right-align and use tabular figures, so a column of them lines up
+     on the decimal instead of ragging like prose. A table whose numbers do not
+     align is a table you have to read rather than scan. */
+  .studio-prose :is(th, td).studio-num {
+    @apply text-right tabular-nums;
   }
   /* The corner radius is on the header cells' own fill, not on a wrapper
      clipping them.
@@ -737,8 +744,9 @@
 
   .studio-prose thead th {
     @apply border-b font-medium;
-    background: var(--surface-sunken);
+    background: color-mix(in oklab, var(--foreground) 4%, var(--code-surface));
     color: var(--muted-foreground);
+    letter-spacing: 0.01em;
     white-space: nowrap;
     /* Sticky, so scanning a long table does not mean losing the labels. The
        header is opaque above, which is what lets rows pass under it. */
@@ -787,6 +795,51 @@
      on purpose: code needs enough hue to parse structurally at a glance, and
      nothing beyond that. Six colours, none of them shouting.
      --------------------------------------------------------------------- */
+  /* -- The code element itself --------------------------------------------
+
+     These rules are not decoration, they are the ones the highlighter's own
+     stylesheet used to provide.
+
+     Turning off `useInlineStyles` to take over the palette also turned off
+     everything else the theme object carried -- and `overflow-x: auto` was in
+     there. Without it a `<pre>` with `white-space: pre` simply grows to its
+     longest line, and since the panel around it deliberately does not clip
+     (see `BlockFrame`), a long line painted straight out of the block and
+     across the page. Replacing a theme means replacing all of it, not just the
+     colours.
+     --------------------------------------------------------------------- */
+  .studio-code {
+    display: block;
+    overflow-x: auto;
+    /* The scroller is the element with the padding, so at the far right of a
+       long line the text would otherwise stop flush against the edge. */
+    scroll-padding-inline-end: 1.125rem;
+  }
+
+  /* A thin, self-effacing scrollbar, shared by every inset panel that scrolls
+     sideways. The default is a wide grey trough that, inside a rounded panel
+     this size, is the loudest thing in the block. */
+  .studio-scroll-x::-webkit-scrollbar,
+  .studio-code::-webkit-scrollbar {
+    height: 8px;
+  }
+  .studio-scroll-x::-webkit-scrollbar-track,
+  .studio-code::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .studio-scroll-x::-webkit-scrollbar-thumb,
+  .studio-code::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--foreground) 16%, transparent);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  .studio-scroll-x:hover::-webkit-scrollbar-thumb,
+  .studio-code:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--foreground) 28%, transparent);
+    background-clip: content-box;
+  }
+
   .studio-code {
     --code-comment: oklch(0.63 0.008 260);
     --code-keyword: oklch(0.5 0.13 300);

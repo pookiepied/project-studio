@@ -109,7 +109,7 @@ const COMPONENTS: Components = {
       // reason: a table is a produced object, and the corners come from the
       // cells' own fills rather than from a wrapper clipping them.
       <div className="my-5 w-full min-w-0 rounded-block bg-surface-raised p-2 shadow-lifted">
-        <div className="w-full min-w-0 overflow-x-auto rounded-block-inner">
+        <div className="studio-scroll-x w-full min-w-0 overflow-x-auto rounded-block-inner bg-code-surface">
           <table>{children}</table>
         </div>
       </div>
