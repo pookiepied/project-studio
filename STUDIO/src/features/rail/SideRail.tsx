@@ -198,7 +198,16 @@ function ResizeHandle({
         if (event.key === 'ArrowLeft') onWidth(Math.min(ceiling, width + 24))
         if (event.key === 'ArrowRight') onWidth(width - 24)
       }}
-      className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none after:absolute after:inset-y-0 after:-left-1 after:w-3 hover:bg-selected focus-visible:bg-selected"
-    />
+      className="group/resize absolute inset-y-0 left-0 z-10 w-3 cursor-col-resize touch-none"
+    >
+      {/* The visible edge is one hairline at the centre of the reach. The
+          reach is 12px because a 1px target is a target nobody hits on the
+          first try; the line is 1px because a separator that announces itself
+          as a bar is a wall, not a seam. Faint at rest, where it only has to
+          say "the layers part here", and firmer once the pointer arrives or
+          the handle holds focus -- the moment there is something to reach
+          for. */}
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 rounded-full bg-foreground/15 transition-colors duration-fast group-hover/resize:bg-foreground/45 group-active/resize:bg-foreground/45 group-focus-visible/resize:bg-foreground/45" />
+    </div>
   )
 }

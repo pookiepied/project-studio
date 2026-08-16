@@ -1,7 +1,6 @@
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
-import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { ContextMeter } from '@/shell/chrome/SessionControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
@@ -10,19 +9,21 @@ import { contextUsage } from '@/domain/session/context'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
- * The top strip.
+ * The top strip's two ends.
  *
  * Not a title bar: no fill, no hairline, no height that content must dodge. It
  * is a transparent layer over the one surface, and the page scrolls underneath
  * it behind a gradient.
  *
  * Left is the window: controls and the sidebar toggle, plus the context meter
- * once a conversation is far enough along to have one. Centre is what you are
- * looking at -- and it gets the room, because the identity line (project,
- * title, branch) is the thing worth reading here. Right is the turn settings
- * behind one mark, and only on a conversation: everywhere else the strip ends
- * in nothing, so the page's own content is the last thing at the top of the
- * window rather than a control repeated on every screen.
+ * once a conversation is far enough along to have one. Right is the turn
+ * settings behind one mark, and only on a conversation: everywhere else the
+ * strip ends in nothing, so the page's own content is the last thing at the
+ * top of the window rather than a control repeated on every screen.
+ *
+ * The middle -- the identity line -- is not here. It is centred on the window
+ * rather than on the page, and that means living at the shell rather than in
+ * this strip; see `IdentityOverlay`.
  */
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
@@ -55,16 +56,6 @@ export function TopStrip() {
         </IconButton>
 
         {conversation ? <ContextMeter used={contextUsage(conversation, settings.modelId)} /> : null}
-      </div>
-
-      {/* Absolutely centred, so the identity sits on the window's midline
-          rather than the midline of whatever space the two ends leave over. A
-          flex-centred middle child drifts every time either end changes width,
-          and both ends here change width with state. */}
-      <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-        <div className="@container pointer-events-auto flex min-w-0 max-w-[62%] justify-center">
-          {conversation ? <IdentityLine conversation={conversation} /> : null}
-        </div>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-0.5">

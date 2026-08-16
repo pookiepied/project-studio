@@ -7,11 +7,13 @@ import { CommandPalette } from '@/features/palette'
 import { NewProjectDialog, ProjectPage } from '@/features/projects'
 import { SettingsPage } from '@/features/settings'
 import { ActionsMenu } from '@/shell/ActionsMenu'
+import { IdentityOverlay } from '@/shell/chrome/IdentityOverlay'
 import { TopStrip } from '@/shell/chrome/TopStrip'
 import { SideRail } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
+import { useRail } from '@/stores/rail'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
@@ -30,6 +32,7 @@ export function AppShell() {
     useNavigation()
   const compact = useCompactLayout()
   const { conversations, projects } = useWorkspace()
+  const { open: railOpen } = useRail()
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
   /** The page only rounds when there is a sidebar beside it to rest on. */
@@ -109,6 +112,13 @@ export function AppShell() {
         style={{
           borderTopLeftRadius: rounded ? RADIUS.xl : 0,
           borderBottomLeftRadius: rounded ? RADIUS.xl : 0,
+          // The same rule, mirrored: the page's right edge rests on the rail
+          // whenever the rail is open, so it rounds against it -- and squares
+          // off against the window when the rail is gone, exactly as the left
+          // edge does when the sidebar is gone. One rule for both edges: round
+          // where something is being rested on, square where the window is.
+          borderTopRightRadius: railOpen ? RADIUS.xl : 0,
+          borderBottomRightRadius: railOpen ? RADIUS.xl : 0,
         }}
       >
         <TopStrip />
@@ -145,6 +155,10 @@ export function AppShell() {
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
       <SideRail />
+
+      {/* After both columns, so the one thing that must sit above them -- the
+          identity line, centred on the window -- is painted last. */}
+      <IdentityOverlay />
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
