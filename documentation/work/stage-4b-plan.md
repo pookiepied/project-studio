@@ -180,12 +180,13 @@ around that: a Linux user cannot reach the working state without editing kernel
 settings by hand, and the boundary a granted network draws is not the same on
 the two platforms. Ranked by what stands between this and shipping.
 
-*Updated 2026-08-16: the first two are closed — a Linux user reaches the working
-state with one command and no kernel edit, and a granted network now draws the
-same boundary on both platforms. The list is kept in its original order and
-marked, rather than rewritten, because what each item failed to anticipate is
-the useful part: #92 did not foresee that the setup command would measure the
-wrong account, and #93 predicted a firewall rule it turned out not to need.*
+*Updated 2026-08-16: four of the five are closed — #92, #93, #90 and #41 — and
+#95 turned out not to be a defect at all. Only #94 is left. The list is kept in
+its original order and marked, rather than rewritten, because what each item
+failed to anticipate is the useful part: #92 did not foresee that the setup
+command would measure the wrong account, #93 predicted a firewall rule it turned
+out not to need, and #95 was written from a grep that could not tell "nobody
+does this" from "somebody does this their own way".*
 
 #### 1. Linux is correct and unusable out of the box — #92 — **closed 2026-08-16**
 
@@ -250,7 +251,20 @@ local database or router.
 closing this needs a firewall rule or a seccomp filter. The **refusal** half is
 identical and complete on both platforms; only the granted half diverges.
 
-#### 3. Every MCP server is given the internet — #90
+#### 3. Every MCP server is given the internet — #90 — **closed 2026-08-16**
+
+**Closed.** `McpServerRecord.needsNetwork`, migration 10, and the launcher
+passing it where `true` used to be hardcoded. The default is still `true` for
+the reason below, so no installed server changes behaviour; what is new is that
+a server *can* be installed without one, and then gets an empty network
+namespace on Linux and no `internetClient` on Windows.
+
+The estimate here was right for once — "a schema field, a migration and a dialog
+line" — with the dialog line left for the product session, since a field nothing
+can set yet is still a field the sandbox enforces. And the last sentence has
+aged: on Linux it is no longer "as wide as #93 says", because #93 is closed too.
+
+
 
 The filesystem boundary is complete for `mcp-server` on both platforms. The
 network is granted to all of them, because `McpServerRecord` carries no field

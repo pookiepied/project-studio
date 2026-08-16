@@ -148,15 +148,19 @@ export function createMcpLauncher(options: McpLauncherOptions): McpLauncher {
       executable: record.command,
       args: record.args,
       cwd,
-      // Granted, and this is the honest position rather than the ideal one.
-      // Most MCP servers exist to call an API, and a record has no field yet
-      // saying whether this one does — that field, and the dialog that shows
-      // it, is #90. Until then the boundary that lands in full is the
-      // filesystem, and the network hole is narrower than it sounds: measured,
-      // it reaches the internet and is refused loopback and the local network,
-      // so a server still cannot touch a dev server, a local database, or the
-      // user's router.
-      network: true,
+      // What the record says, rather than the `true` this used to be. Most MCP
+      // servers exist to call an API, so `true` is still what a server gets when
+      // nothing says otherwise — an offline-by-default sandbox is one users turn
+      // off, and a boundary nobody runs is worth nothing. What changed is that
+      // the grant is now a *declaration*: a filesystem server, a database
+      // server or a formatter can be installed without it, and then gets the
+      // strongest boundary either platform has.
+      //
+      // Narrow either way. Measured on both: the granted network reaches the
+      // internet and is refused loopback, RFC1918 and carrier-grade NAT, so
+      // even a server that declares it cannot touch a dev server, a local
+      // database or the router.
+      network: record.needsNetwork,
       // Without this the server cannot read its own entry script. It is
       // installed under the user's npm root, not in their project, so every
       // real server exited 1 with nothing to say until this was added.

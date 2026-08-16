@@ -61,11 +61,39 @@ export interface McpServerRecord {
    * comes from the credential store at spawn time and is never stored here.
    */
   readonly authEnvVar?: string;
+  /**
+   * Whether this server is given a network when it is contained.
+   *
+   * `stdio` only, and the reason this field exists at all: every contained MCP
+   * server used to be granted the network because a record had no way to say
+   * otherwise. Most exist to call an API, so the *default* is still `true` — an
+   * offline-by-default sandbox is one users switch off, and a boundary nobody
+   * runs is worth nothing.
+   *
+   * What changes is that the grant is now a **declaration** rather than an
+   * assumption. A filesystem server, a database server, a formatter — the ones
+   * with no reason to talk to anything — can be installed without it, and then
+   * the strongest boundary either platform offers applies: an empty network
+   * namespace on Linux, no `internetClient` on Windows.
+   *
+   * Irrelevant for `http` servers, which *are* the network: the harness makes
+   * those requests itself and no child is contained.
+   */
+  readonly needsNetwork: boolean;
 }
 
-export type McpServerInput = Omit<McpServerRecord, "args" | "env"> & {
+export type McpServerInput = Omit<McpServerRecord, "args" | "env" | "needsNetwork"> & {
   readonly args?: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * Optional on the way in, and `true` when omitted.
+   *
+   * The default matches what every already-installed server has, so an upgrade
+   * changes nothing a user would notice. Making it required would have been the
+   * tidier type and would have turned "we now record this" into "every existing
+   * caller is a compile error and every existing server might change behaviour".
+   */
+  readonly needsNetwork?: boolean;
 };
 
 /** Ids become part of a capability namespace, so they may not carry a separator. */
@@ -184,6 +212,7 @@ interface ServerRow {
   auth_kind: string;
   auth_header: string | null;
   auth_env_var: string | null;
+  needs_network: number;
 }
 
 function toRecord(row: ServerRow): McpServerRecord {
@@ -198,6 +227,11 @@ function toRecord(row: ServerRow): McpServerRecord {
     auth: row.auth_kind as McpAuthKind,
     ...(row.auth_header === null ? {} : { authHeader: row.auth_header }),
     ...(row.auth_env_var === null ? {} : { authEnvVar: row.auth_env_var }),
+    // `!== 0` rather than `=== 1`: SQLite holds this as an integer, and a row
+    // written before the column existed carries the migration's default. Reading
+    // it as "anything but off" keeps a surprising value on the permissive side,
+    // which is where the behaviour already was.
+    needsNetwork: row.needs_network !== 0,
   };
 }
 
@@ -228,14 +262,16 @@ export class McpServerRegistry {
       ...input,
       args: input.args ?? [],
       env: input.env ?? {},
+      needsNetwork: input.needsNetwork ?? true,
     };
 
     this.#db
       .prepare(
         `INSERT INTO mcp_server
            (id, title, transport, command, args, env, url,
-            auth_kind, auth_header, auth_env_var, installed_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            auth_kind, auth_header, auth_env_var, needs_network,
+            installed_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
            title = excluded.title,
            transport = excluded.transport,
@@ -246,6 +282,7 @@ export class McpServerRegistry {
            auth_kind = excluded.auth_kind,
            auth_header = excluded.auth_header,
            auth_env_var = excluded.auth_env_var,
+           needs_network = excluded.needs_network,
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -259,6 +296,7 @@ export class McpServerRegistry {
         record.auth,
         record.authHeader ?? null,
         record.authEnvVar ?? null,
+        record.needsNetwork ? 1 : 0,
         now,
         now,
       );

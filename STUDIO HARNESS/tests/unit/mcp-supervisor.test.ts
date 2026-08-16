@@ -82,6 +82,7 @@ const RECORD: McpServerRecord = {
   transport: "stdio",
   command: "C:\\tools\\node.exe",
   args: ["server.js"],
+  needsNetwork: true,
   env: {},
   auth: "none",
 };

@@ -264,6 +264,26 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 10,
+    name: "mcp_server_network",
+    up(db) {
+      // Whether *this* server needs the network, which nothing recorded before:
+      // every contained MCP server was granted it, because a record had no way
+      // to say otherwise and shipping them all offline would have produced a
+      // sandbox users switch off.
+      //
+      // **Existing rows default to 1, and that is the point of doing it this
+      // way.** A migration that defaulted to 0 would silently break every server
+      // already installed — the user would meet it as an API client that
+      // stopped working, with nothing connecting the failure to an upgrade. The
+      // default is the behaviour they already have; the *declaration* is the new
+      // thing, and a server can now be installed without one.
+      db.exec(
+        "ALTER TABLE mcp_server ADD COLUMN needs_network INTEGER NOT NULL DEFAULT 1",
+      );
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

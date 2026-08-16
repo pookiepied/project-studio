@@ -77,6 +77,49 @@ process.stdin.on("data", (chunk) => {
   return path;
 }
 
+/**
+ * A server that answers with whether it could open a socket to the internet.
+ *
+ * A public address rather than a hostname, so the answer is about routing and
+ * not about whichever resolver the machine happens to use — and `connect`
+ * rather than a request, because nothing here needs a reply, only to learn
+ * whether the packet had anywhere to go.
+ */
+async function reachabilityServerScript(directory: string): Promise<string> {
+  const path = join(directory, "reach.mjs");
+  await writeFile(
+    path,
+    `
+import net from "node:net";
+let buffer = "";
+process.stdin.on("end", () => process.exit(0));
+process.stdin.on("data", async (chunk) => {
+  buffer += chunk.toString();
+  let index;
+  while ((index = buffer.indexOf("\\n")) !== -1) {
+    const line = buffer.slice(0, index);
+    buffer = buffer.slice(index + 1);
+    if (line.trim() === "") continue;
+    const message = JSON.parse(line);
+    if (message.id === undefined) continue;
+    const reached = await new Promise((resolve) => {
+      const socket = net.connect(443, "1.1.1.1");
+      const finish = (value) => { socket.destroy(); resolve(value); };
+      socket.setTimeout(8000, () => finish(false));
+      socket.on("connect", () => finish(true));
+      socket.on("error", () => finish(false));
+    });
+    process.stdout.write(
+      JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { reached } }) + "\\n",
+    );
+  }
+});
+`,
+    "utf8",
+  );
+  return path;
+}
+
 interface RemoteServer {
   readonly url: string;
   readonly received: IncomingMessage["headers"][];
@@ -110,6 +153,7 @@ function record(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
     args: [],
     env: {},
     auth: "none",
+    needsNetwork: true,
     ...overrides,
   };
 }
@@ -160,6 +204,39 @@ describe("createMcpLauncher", () => {
       expect(answer.cwd.endsWith(project.split(/[\\/]/).pop() ?? "")).toBe(true);
       expect(answer.cwd).not.toBe(process.cwd());
     });
+
+    itContained("gives the network only to a server that declared it needs one", async () => {
+      // #90's whole point, measured through the launcher rather than asserted
+      // against the call it makes. Both directions in one test on purpose: a
+      // test that only proved the refusal would pass on a machine where
+      // containment blocked the network always, which is the state that makes
+      // every API-calling server useless and gets the sandbox switched off.
+      const project = await workspace();
+      const script = await reachabilityServerScript(project);
+      const launch = createMcpLauncher({
+        credentials: new InMemoryCredentialStore(),
+        projectRoot: () => project,
+      });
+
+      const ask = async (needsNetwork: boolean): Promise<boolean> => {
+        const channel = await launch.open(
+          record({
+            id: needsNetwork ? "online" : "offline",
+            command: process.execPath,
+            args: [script],
+            needsNetwork,
+          }),
+        );
+        closers.push(() => channel.close());
+        const answer = (await new McpConnection(channel).request("probe")) as {
+          reached: boolean;
+        };
+        return answer.reached;
+      };
+
+      expect(await ask(false)).toBe(false);
+      expect(await ask(true)).toBe(true);
+    }, 60_000);
 
     itContained("reads the root at the moment of the launch, not when it was built", async () => {
       const first = await workspace();

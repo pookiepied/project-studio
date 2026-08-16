@@ -18,6 +18,7 @@ function server(transport: "stdio" | "http"): McpServerRecord {
     args: [],
     env: {},
     auth: "none",
+    needsNetwork: true,
   };
 }
 

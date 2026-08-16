@@ -315,4 +315,65 @@ describe("the MCP server registry", () => {
       expect(McpServerRegistry.namespaceOf("notion")).toBe("mcp:notion");
     });
   });
+
+  describe("whether a server is given a network", () => {
+    // #90. Every contained MCP server used to be granted the network, because
+    // a record had no way to say otherwise. The grant is now declared.
+
+    it("grants it when nothing says otherwise", () => {
+      // The default is deliberately the permissive one. Most MCP servers exist
+      // to call an API, and an offline-by-default sandbox is one users switch
+      // off — a boundary nobody runs is worth nothing. This also means the
+      // migration changes the behaviour of exactly no installed server.
+      const saved = registry.save({
+        id: "github",
+        title: "GitHub",
+        transport: "stdio",
+        command: programPath("node"),
+        args: ["/opt/github-mcp/index.js"],
+        auth: "none",
+      });
+
+      expect(saved.needsNetwork).toBe(true);
+      expect(registry.get("github")?.needsNetwork).toBe(true);
+    });
+
+    it("remembers a server that declared it does not need one", () => {
+      // The case the field exists for: a filesystem server, a database server,
+      // a formatter. Nothing about them wants the internet, and until this they
+      // got it anyway.
+      registry.save({
+        id: "files",
+        title: "Files",
+        transport: "stdio",
+        command: programPath("node"),
+        args: ["/opt/fs-mcp/index.js"],
+        auth: "none",
+        needsNetwork: false,
+      });
+
+      expect(registry.get("files")?.needsNetwork).toBe(false);
+      expect(registry.list().map((server) => server.needsNetwork)).toEqual([false]);
+    });
+
+    it("carries a changed declaration through a re-save", () => {
+      // Editing a server is a re-save, and the flag has to move with it — a
+      // declaration that only applied at install time would drift out of date
+      // exactly when someone had just decided to change it.
+      const input = {
+        id: "files",
+        title: "Files",
+        transport: "stdio",
+        command: programPath("node"),
+        args: ["/opt/fs-mcp/index.js"],
+        auth: "none",
+      } as const;
+
+      registry.save({ ...input, needsNetwork: false });
+      expect(registry.get("files")?.needsNetwork).toBe(false);
+
+      registry.save({ ...input, needsNetwork: true });
+      expect(registry.get("files")?.needsNetwork).toBe(true);
+    });
+  });
 });
