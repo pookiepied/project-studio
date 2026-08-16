@@ -73,7 +73,16 @@ export function TurnMenu() {
     >
       {modelsByProvider().map(({ provider, models }) => (
         <div key={provider.id}>
-          <MenuLabel>{provider.name}</MenuLabel>
+          {/* The provider's mark sits with its name, once, rather than on
+              every model beneath it. Repeating a logo down a group says the
+              rows differ by provider when what differs is the model -- and the
+              check mark is the only thing in that column that should move. */}
+          <MenuLabel>
+            <span className="flex items-center gap-1.5">
+              <ProviderMark provider={provider.id} />
+              {provider.name}
+            </span>
+          </MenuLabel>
           {models.map((candidate) => (
             <MenuItem
               key={candidate.id}
