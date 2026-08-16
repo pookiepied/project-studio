@@ -96,8 +96,14 @@ function Body({ section }: { section: ArtifactSection }) {
       // Reusing the prose table rules rather than styling one here, so an
       // artifact's table and a markdown table are the same object. Two
       // near-identical table styles is exactly how a design system rots.
+      //
+      // No panel of its own: the shell already provides the sunken ground, and
+      // a table is embedded content -- it sits on that ground the way the
+      // result rows and the timeline do, scrolling inside itself on x. A
+      // second fill under it was the "separate box" look the hierarchy
+      // retired.
       return (
-        <div className="studio-prose studio-scroll-x w-full min-w-0 overflow-x-auto rounded-block-inner bg-code-surface">
+        <div className="studio-prose studio-scroll-x w-full min-w-0 overflow-x-auto">
           <table>
             <thead>
               <tr>

@@ -31,7 +31,7 @@ import {
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
   MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
   RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
-  SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, WrapText, X,
+  SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, Bot, CalendarDays, CircleAlert, CircleCheck, Clapperboard, FileText,
   Link2, Mail, Maximize2, Sparkles, Users,
   type LucideIcon,
@@ -171,7 +171,6 @@ const REGISTRY = {
   themeSystem: { mark: Monitor },
   themeLight: { mark: Sun },
   themeDark: { mark: Moon },
-  wordWrap: { mark: WrapText },
   image: { mark: Image },
 
   // -- Artifacts -----------------------------------------------------------

@@ -7,18 +7,17 @@ import { copyText } from '@/lib/clipboard'
 import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 import { SyntaxHighlighter, displayName, resolveLanguage } from '@/features/chat/markdown/languages'
 
-/** Fold past roughly this many lines. */
-const COLLAPSED_HEIGHT = 360
+/** The preview cap, in px. Roughly a screen of code is not what a preview is. */
+const PREVIEW_HEIGHT = 360
 
 /** How long the copy button holds its confirmation. */
 const COPIED_MS = 2000
 
 /**
- * Fenced code.
+ * Fenced code, as a preview.
  *
- * The frame, the header and the folding are `BlockFrame`'s. What is left here
- * is the three things that are actually about code: highlighting it, wrapping
- * it, and copying it.
+ * The frame, the caption and the cap are `BlockFrame`'s. What is left here is
+ * the two things that are actually about code: highlighting it and copying it.
  *
  * ---- The containment problem ---------------------------------------------
  *
@@ -27,25 +26,26 @@ const COPIED_MS = 2000
  * that happens the transcript column widens and every message reflows -- which
  * is the failure that makes code blocks look broken in most chat interfaces.
  *
- * Three things stop it and all three are required: `min-w-0` here and on every
- * flex ancestor up to the scroll container, `overflow-hidden` on the frame, and
- * exactly one scroller per axis. That last one is easy to get wrong invisibly:
- * the highlighter renders its own `<pre>` with `white-space: pre`, so the
- * `<pre>` *is* the horizontal scroller, and adding `overflow-auto` to a wrapper
- * nests two scrollers on one axis -- after which a wheel gesture is claimed by
- * whichever happens to be under the pointer.
+ * Wrapping is what stops it now. There is no scroller in any direction: the
+ * lines wrap at the column (`pre-wrap`), so there is nothing to overflow, and
+ * `min-w-0` on every flex ancestor up to the scroll container is what lets the
+ * wrapping happen at the column at all. A scroller was the earlier answer, and
+ * it traded the reflow for a second scroll region inside a scrolling transcript
+ * -- reach the bottom of a block while scrolling the page and the page stops
+ * dead. Wrapping has no such failure, and a preview does not owe anyone an
+ * unwrapped 300-character line.
  *
- * ---- Why there is no vertical scroller any more --------------------------
+ * ---- Why there is no expansion -------------------------------------------
  *
- * There used to be a `max-h-96` scroller inside the block. That is a second
- * scroll region inside a scrolling transcript, and reaching the bottom of a
- * code block while scrolling the page stops the page dead. Folding replaces
- * it: collapsed, the block is short; expanded, it is simply as tall as it is
- * and the page scrolls the way it does everywhere else.
+ * "Show all 44 lines" made the block a reader with a mode toggle: the
+ * transcript stopped for as long as the block was tall, and the control that
+ * promised more code was also the control that broke the page's rhythm. A
+ * preview states what the code is and hands over the copy button. The full
+ * text is one click away in the clipboard, which is where long code was always
+ * going anyway.
  */
 export function CodeBlock({ code, fence }: { code: string; fence: string }) {
   const [copied, setCopied] = useState(false)
-  const [wrap, setWrap] = useState(false)
 
   // ```ts:src/utils/get-diff.ts -- the language, then optionally where this came
   // from. A path makes a far better caption than a language name: "TypeScript"
@@ -67,22 +67,11 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
       // The caption goes under the code, and the code is what you came for.
       label={path ?? displayName(language)}
       meta={lines === 1 ? 'Line 1' : `Lines 1–${lines}`}
-      // The highlighter's `<pre>` is the scroller, so it gets the whole panel
-      // and pads itself. See `flush`.
+      // The highlighter pads itself. See `flush`.
       flush
-      collapsedHeight={COLLAPSED_HEIGHT}
-      expandLabel={(folded) => (folded ? `Show all ${lines}` : 'Collapse')}
+      previewHeight={PREVIEW_HEIGHT}
       actions={
         <>
-          <IconButton
-            label={wrap ? 'Stop wrapping lines' : 'Wrap long lines'}
-            size="sm"
-            active={wrap}
-            onClick={() => setWrap((value) => !value)}
-          >
-            <Icons.wordWrap />
-          </IconButton>
-
           {/* The confirmation swaps the glyph in place rather than adding a
               "Copied" label. A label widens the button and shoves its
               neighbours sideways, so the thing you just aimed at moves out
@@ -111,7 +100,7 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
       <SyntaxHighlighter
         language={resolveLanguage(language)}
         useInlineStyles={false}
-        wrapLongLines={wrap}
+        wrapLongLines
         className="studio-code"
         customStyle={{
           margin: 0,

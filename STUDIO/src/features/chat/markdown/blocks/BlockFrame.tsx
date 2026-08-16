@@ -1,10 +1,16 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { DURATION } from '@/design/tokens'
-import { Icons } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /**
- * The frame every block in a reply sits in.
+ * The preview frame: a thing the reader takes away, shown inside a reply.
+ *
+ * Code and writing-as-an-object live here -- tier three of the content
+ * hierarchy (see `RULES.md`). Their shared contract is *preview*: the content
+ * is shown to be recognised and copied, not to be worked in, so past
+ * `previewHeight` it is held at the cap behind a fade and that is the whole of
+ * the interaction. There is no expansion to bring back and no scroller to
+ * wander into. The full text is one copy away, and the transcript keeps
+ * moving.
  *
  * Two boxes, not one. An outer card carries the shadow and the padding, and an
  * inner panel carries the content on a surface of its own. The caption sits
@@ -30,14 +36,14 @@ import { cn } from '@/lib/cn'
  * radius is antialiased, so the fill ends a fraction inside the curve and the
  * corner reads as cut rather than turned. With two boxes the inner panel's
  * *background* is the rounded shape, and its padding means text never reaches
- * the corner in the first place. Nothing is clipped, so nothing is chewed.
+ * the corner in the first place. Nothing is clipped, so nothing is chewed --
+ * which is also why the clip only switches on while the preview cap is holding.
  */
 export function BlockFrame({
   label,
   meta,
   actions,
-  collapsedHeight,
-  expandLabel,
+  previewHeight,
   flush = false,
   children,
 }: {
@@ -55,31 +61,29 @@ export function BlockFrame({
    * enough at rest to sit there permanently.
    */
   actions?: ReactNode
-  /** Fold past this height, in px. Omitted, the block never folds. */
-  collapsedHeight?: number
+  /**
+   * The preview cap, in px. Content taller than this is held at the cap and
+   * faded; shorter content is untouched. Omitted, the block never caps.
+   */
+  previewHeight?: number
   /**
    * The child paints to the panel's edges and supplies its own padding.
    *
-   * Needed by anything that scrolls. A scroller nested inside the frame's
-   * padding puts its scrollbar at the bottom of the *content*, leaving a strip
-   * of panel underneath it -- so the bar floats short of the corner instead of
-   * sitting at the end of the curve. Given the whole panel, the scroller's
-   * bar lands on the panel's own bottom edge where it belongs.
+   * Needed by anything that fills the panel -- the highlighter pads itself, and
+   * a padded child inside the frame's padding is twice the gutter.
    */
   flush?: boolean
-  expandLabel?: (folded: boolean) => string
   children: ReactNode
 }) {
   const body = useRef<HTMLDivElement>(null)
-  const [expanded, setExpanded] = useState(false)
   const [full, setFull] = useState(0)
 
-  // Measured before paint, so a block that needs folding is folded on its very
-  // first frame. In an effect instead, every long block would render at full
-  // height and then visibly collapse.
+  // Measured before paint, so a block that caps is capped on its very first
+  // frame. In an effect instead, every long block would render at full height
+  // and then visibly clamp.
   useLayoutEffect(() => {
     const element = body.current
-    if (!element || collapsedHeight === undefined) return
+    if (!element || previewHeight === undefined) return
 
     const measure = () => setFull(element.scrollHeight)
     measure()
@@ -89,22 +93,20 @@ export function BlockFrame({
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [collapsedHeight, children])
+  }, [previewHeight, children])
 
-  const foldable = collapsedHeight !== undefined && full > collapsedHeight + 24
-  const folded = foldable && !expanded
+  const capped = previewHeight !== undefined && full > previewHeight + 24
 
   return (
     <div className="my-5 w-full min-w-0 rounded-block bg-surface-raised p-2 shadow-lifted">
       <div
         className="relative min-w-0 rounded-block-inner bg-code-surface"
         style={{
-          maxHeight: folded ? collapsedHeight : undefined,
-          // Only while folded. Left on permanently it would clip the corners of
+          maxHeight: capped ? previewHeight : undefined,
+          // Only while capped. Left on permanently it would clip the corners of
           // the very panel whose corners this construction exists to protect.
-          overflow: folded ? 'hidden' : undefined,
-          transition: `max-height ${DURATION.slow}s cubic-bezier(0.16, 1, 0.3, 1)`,
-          ...(folded
+          overflow: capped ? 'hidden' : undefined,
+          ...(capped
             ? {
                 maskImage: 'linear-gradient(to bottom, #000 calc(100% - 4.5rem), transparent)',
                 WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 4.5rem), transparent)',
@@ -122,19 +124,6 @@ export function BlockFrame({
         <span className="min-w-0 truncate text-micro text-muted-foreground">{label}</span>
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          {foldable ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((value) => !value)}
-              className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-            >
-              {expandLabel ? expandLabel(folded) : folded ? 'Expand' : 'Collapse'}
-              <Icons.expand
-                className={cn('transition-transform duration-base', !folded && 'rotate-180')}
-              />
-            </button>
-          ) : null}
-
           {actions}
 
           {meta ? (

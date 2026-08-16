@@ -6,8 +6,8 @@ import { IconButton } from '@/components/primitives'
 import { copyText } from '@/lib/clipboard'
 import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 
-/** Fold past roughly this much prose. Around a dozen lines. */
-const COLLAPSED_HEIGHT = 260
+/** The preview cap, in px. Roughly a dozen lines of prose. */
+const PREVIEW_HEIGHT = 260
 
 const COPIED_MS = 2000
 
@@ -54,8 +54,7 @@ export function TextBlock({ text, fence }: { text: string; fence: string }) {
     <BlockFrame
       label={TEXT_FENCES[fence] ?? 'Text'}
       meta={`${words} ${words === 1 ? 'word' : 'words'}`}
-      collapsedHeight={COLLAPSED_HEIGHT}
-      expandLabel={(folded) => (folded ? 'Show all' : 'Collapse')}
+      previewHeight={PREVIEW_HEIGHT}
       actions={
         <IconButton label={copied ? 'Copied' : 'Copy text'} size="sm" onClick={() => void copy()}>
           <AnimatePresence mode="wait" initial={false}>

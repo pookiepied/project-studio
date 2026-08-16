@@ -200,7 +200,43 @@ disagreeing rule for small screens.
 
 ---
 
-## 9. How to add something
+## 9. The content hierarchy
+
+A reply is not one kind of surface. It is prose with objects in it, and the
+objects are not all the same kind of object. There are three treatments, and
+which one a piece of content gets is decided by what the content *is* — never
+component by component.
+
+**Independent.** An image or a video is the message. It renders as itself, at
+its own measure, with its own viewer. (`MediaArtifact`.)
+
+**Embedded.** Content the model fetched or assembled from elsewhere — a search,
+a mailbox, a repository, a calendar, and a table — sits on one sunken ground:
+`rounded-xl bg-surface-sunken`, no border, no shadow, no caption bar, content
+directly on the surface. It reads as part of the reply that is *about*
+something, not as a second document stacked on the first. Inside an artifact
+the shell already provides the ground, so the content sits on it bare; in bare
+markdown a table brings the same ground with it. (`ArtifactShell`, the table
+rules in `Markdown` and `Sections`.)
+
+**Preview.** Content the reader takes away rather than reads in place — code, a
+draft, a rewrite — gets a dedicated preview container: its own surface, a
+caption, a copy control, and a cap. Past the cap it fades. There is no inner
+scroller and no "show all": the full text is one copy away, and the reply keeps
+moving. (`BlockFrame`.)
+
+Everything else is prose and stays inline. Long prose is clamped behind the
+same fade where it stands (`CollapsibleText`) — never re-housed in a container,
+because a long paragraph is not a different kind of paragraph.
+
+The differences between the three are intentional and they are the only ones: a
+thing you watch (independent), a thing you read about (embedded), a thing you
+take (preview). When a new kind of content arrives, it joins a tier. It does not
+get a fourth look.
+
+---
+
+## 10. How to add something
 
 1. Use a role, a token, a scale step. If none fits, the missing step is the
    change — add it here first.

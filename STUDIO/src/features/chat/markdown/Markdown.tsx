@@ -59,7 +59,21 @@ const SCHEMA = {
 
 const COMPONENTS: Components = {
   /**
-   * Fenced code becomes a `CodeBlock`; inline code is left to the prose rules.
+   * This object is where the content hierarchy is decided. Everything a reply
+   * can contain arrives here as markdown, and each kind joins one of three
+   * tiers -- never its own look. See "The content hierarchy" in `RULES.md` for
+   * the reasoning; the routing is:
+   *
+   * - `artifact` fences and tables are *embedded* -- they sit on the sunken
+   *   ground the integrations use, because they are the reply talking about
+   *   something that happened elsewhere.
+   * - code and writing-as-an-object fences are *previews* -- a `BlockFrame`
+   *   with a cap and a copy button, because they are things the reader takes
+   *   away rather than reads in place.
+   * - everything else is prose and stays inline.
+   *
+   * Images and videos never pass through here; they are artifacts and render
+   * independent of the text, at their own measure.
    *
    * `react-markdown` wraps a fence in a `<pre>`, so `pre` below unwraps it --
    * otherwise the block's own frame would nest inside a second one and inherit
@@ -98,20 +112,22 @@ const COMPONENTS: Components = {
   },
 
   /**
-   * Tables scroll inside their own frame.
+   * A table is embedded content, not a produced object.
    *
-   * A wide table is the second thing after a code block that can stretch the
-   * column, and the same `min-w-0` plus a scroller is the same fix.
+   * It rides on the same sunken ground the integrations use -- `ArtifactShell`'s
+   * container, verbatim -- rather than in the code block's raised card, because
+   * a table is the reply *about* something, the way a search result set is, and
+   * not a thing you take away and use, the way code is. One rule for which
+   * content gets which treatment; see "The content hierarchy" in `RULES.md`.
+   *
+   * A wide table is still the one thing after prose that can stretch the
+   * column, so it scrolls inside itself on x -- the scroller is the ground's
+   * own, and the cell fills carry the shape.
    */
   table({ children }) {
     return (
-      // The same card-and-panel construction the code block uses, for the same
-      // reason: a table is a produced object, and the corners come from the
-      // cells' own fills rather than from a wrapper clipping them.
-      <div className="my-5 w-full min-w-0 rounded-block bg-surface-raised p-2 shadow-lifted">
-        <div className="studio-scroll-x w-full min-w-0 overflow-x-auto rounded-block-inner bg-code-surface">
-          <table>{children}</table>
-        </div>
+      <div className="studio-scroll-x my-5 w-full min-w-0 overflow-x-auto rounded-xl bg-surface-sunken p-3">
+        <table>{children}</table>
       </div>
     )
   },
