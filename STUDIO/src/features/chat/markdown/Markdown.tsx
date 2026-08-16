@@ -66,7 +66,11 @@ const COMPONENTS: Components = {
    * the prose `<pre>` styling on top of its own.
    */
   code({ className, children, ...rest }) {
-    const fence = /language-(\w+)/.exec(className ?? '')?.[1]
+    // Not `\w+`. The info string may carry a path after the language --
+    // ```ts:src/utils/get-diff.ts -- and `\w` stops dead at the colon, which
+    // silently threw the filename away and left the block captioned
+    // "TypeScript" like every other one.
+    const fence = /language-([^\s"']+)/.exec(className ?? '')?.[1]
     const text = String(children).replace(/\n$/, '')
 
     if (fence === undefined) {

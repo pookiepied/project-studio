@@ -313,9 +313,9 @@ A table with room to breathe:
 | \`image_generation\` | dedicated | no |
 | \`github_issue\` | none yet | yes, and it reads fine |
 
-A code block, folded past twenty lines and hover-revealing its controls:
+A code block. The caption sits under the code, because the first line is what you came for — and it names the file, which is the one thing the block cannot tell you itself:
 
-\`\`\`ts
+\`\`\`ts:src/features/chat/streaming/segment.ts
 export function segment(text: string, settled: boolean): Segments {
   if (text.length === 0) return { stable: [], tail: '' }
 

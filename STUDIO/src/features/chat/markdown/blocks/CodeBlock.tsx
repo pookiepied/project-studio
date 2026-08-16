@@ -8,7 +8,7 @@ import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 import { SyntaxHighlighter, displayName, resolveLanguage } from '@/features/chat/markdown/languages'
 
 /** Fold past roughly this many lines. */
-const COLLAPSED_HEIGHT = 320
+const COLLAPSED_HEIGHT = 360
 
 /** How long the copy button holds its confirmation. */
 const COPIED_MS = 2000
@@ -47,6 +47,13 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
   const [copied, setCopied] = useState(false)
   const [wrap, setWrap] = useState(false)
 
+  // ```ts:src/utils/get-diff.ts -- the language, then optionally where this came
+  // from. A path makes a far better caption than a language name: "TypeScript"
+  // is already obvious from the syntax colouring, while *which file* is the one
+  // thing the block cannot tell you itself.
+  const [language, ...rest] = fence.split(':')
+  const path = rest.join(':') || undefined
+
   const lines = code.split('\n').length
 
   const copy = async () => {
@@ -57,10 +64,13 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
 
   return (
     <BlockFrame
-      label={displayName(fence)}
-      meta={`${lines} ${lines === 1 ? 'line' : 'lines'}`}
+      // The caption goes under the code, and the code is what you came for.
+      chrome="bottom"
+      tone="raised"
+      label={path ?? displayName(language)}
+      meta={lines === 1 ? 'Line 1' : `Lines 1–${lines}`}
       collapsedHeight={COLLAPSED_HEIGHT}
-      expandLabel={(folded) => (folded ? `Show all ${lines} lines` : 'Collapse')}
+      expandLabel={(folded) => (folded ? `Show all ${lines}` : 'Collapse')}
       actions={
         <>
           <IconButton
@@ -98,13 +108,13 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
           to the tokens, so it follows the theme with no prop, no re-render and
           no imported colour object. */}
       <SyntaxHighlighter
-        language={resolveLanguage(fence)}
+        language={resolveLanguage(language)}
         useInlineStyles={false}
         wrapLongLines={wrap}
         className="studio-code"
         customStyle={{
           margin: 0,
-          padding: '0 0.875rem',
+          padding: '0 1.125rem',
           fontSize: 'var(--code-size)',
           lineHeight: 1.7,
           background: 'transparent',
