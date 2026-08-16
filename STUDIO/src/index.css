@@ -578,6 +578,29 @@
     background-color: color-mix(in oklch, var(--foreground) 26%, transparent);
   }
 
+  /* The transcript owns its own scroll compensation, so the browser must not
+     also be doing it.
+
+     Chromium's scroll anchoring shifts `scrollTop` when content is inserted
+     above the viewport -- measured, by exactly the height added. That is the
+     same job `useTranscriptWindow` does when it pages in older turns, and both
+     running is a double correction: it threw the reader several hundred pixels
+     the wrong way, which is how this was found.
+
+     Ours is the one that stays, because anchoring is a heuristic that
+     suppresses itself in cases it considers ambiguous -- including around
+     programmatic scrolls, and the follow performs one on every frame of every
+     stream. A correction that silently stops applying under load is worse than
+     one that always runs.
+
+     The descendant selector is required: anchoring picks an anchor *node*
+     inside the scroller, so switching it off on the container alone leaves
+     every child still eligible. */
+  .studio-no-anchor,
+  .studio-no-anchor * {
+    overflow-anchor: none;
+  }
+
   /* Held back from both ends of the track, so the thumb never slides under the
      fades at the top and bottom of a scrolling page and half-disappears.
 

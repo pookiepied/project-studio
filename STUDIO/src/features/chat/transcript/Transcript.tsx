@@ -1,4 +1,5 @@
 import { StudioMark } from '@/components/brand'
+import { EarlierBoundary, useTranscriptWindow } from '@/features/chat/transcript/paging'
 import { AssistantMessage } from '@/features/chat/transcript/AssistantMessage'
 import { UserMessage } from '@/features/chat/transcript/UserMessage'
 import type { Conversation, SessionStatus } from '@/domain/session/types'
@@ -14,21 +15,33 @@ import type { Conversation, SessionStatus } from '@/domain/session/types'
 export function Transcript({
   conversation,
   status,
+  viewport,
   onRetry,
   onEdit,
   onFork,
 }: {
   conversation: Conversation
   status: SessionStatus
+  /** The scroll container, needed to hold position while paging older turns. */
+  viewport: React.RefObject<HTMLElement | null>
   onRetry: () => void
   onEdit: (messageId: string, text: string) => void
   onFork: (messageId: string) => void
 }) {
   const lastId = conversation.messages[conversation.messages.length - 1]?.id
+  const { visible, hasOlder, loading, sentinel } = useTranscriptWindow(
+    conversation.messages,
+    viewport,
+  )
 
   return (
     <div className="flex flex-col gap-6">
-      {conversation.messages.map((message) =>
+      {/* Only when there is history behind the top of the list. On a short
+          conversation this is absent entirely rather than being an empty
+          boundary announcing that nothing came before. */}
+      {hasOlder ? <EarlierBoundary loading={loading} ref={sentinel} /> : null}
+
+      {visible.map((message) =>
         message.role === 'user' ? (
           <UserMessage
             key={message.id}
@@ -50,7 +63,7 @@ export function Transcript({
           nothing else -- no "Thinking..." label, because the glyph already
           animates and a word beside it is the interface narrating something the
           user can see. */}
-      {status === 'thinking' && conversation.messages[conversation.messages.length - 1]?.role === 'user' ? (
+      {status === 'thinking' && visible[visible.length - 1]?.role === 'user' ? (
         <StudioMark busy size={15} className="text-foreground/45" />
       ) : null}
     </div>

@@ -43,7 +43,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
         // Paging and arrowing are scrolling too. Without this the keyboard was
         // the one way to leave the bottom that the follow would silently undo.
         onKeyDown={onKeyDown}
-        className="studio-scroll-inset min-h-0 flex-1 overflow-y-auto"
+        className="studio-scroll-inset studio-no-anchor min-h-0 flex-1 overflow-y-auto"
       >
         <div
           className="mx-auto w-full"
@@ -57,6 +57,7 @@ export function ChatPage({ conversation }: { conversation: Conversation }) {
           <Transcript
             conversation={conversation}
             status={status}
+            viewport={viewport}
             onRetry={() => retry(conversation.id)}
             onEdit={(messageId, text) => editMessage(conversation.id, messageId, text)}
             onFork={forkFrom}

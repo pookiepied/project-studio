@@ -1,4 +1,5 @@
 import { galleryConversation } from '@/domain/session/gallery'
+import { longThread } from '@/domain/session/longThread'
 import { newId } from '@/lib/id'
 import type { Conversation, Message } from '@/domain/session/types'
 import type { Project } from '@/domain/projects/types'
@@ -52,6 +53,8 @@ export const DEMO_CONVERSATIONS: readonly Conversation[] = [
   // First and pinned. It is the fixture every renderer is judged against, and
   // one you have to go looking for is one nobody looks at.
   galleryConversation(),
+  // Three hundred and twenty messages, so the batching is reachable.
+  longThread(),
   {
     id: 'cnv_render',
     title: 'What the transcript can render',
