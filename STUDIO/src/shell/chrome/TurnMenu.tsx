@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
-import { modelsByProvider } from '@/domain/models/catalog'
+import { MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
+import { findModel, modelsByProvider } from '@/domain/models/catalog'
 import { EFFORTS } from '@/domain/models/types'
-import { PERMISSION_MODES } from '@/domain/permissions/modes'
+import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
+import { cn } from '@/lib/cn'
 
 /**
  * The turn settings, gathered behind one mark.
@@ -15,13 +16,25 @@ import { useWorkspace } from '@/stores/workspace'
  * project, title and branch are what the strip is for, and the settings only
  * matter when you go looking for them.
  *
- * The trigger carries no current value. A labelled control has to be read to be
- * dismissed; a mark has to be opened to be judged, and the settings here are
- * changed by decision rather than by glance.
+ * ---- Why the trigger is labelled -----------------------------------------
+ *
+ * It shows the model it will use and the mode it will use it in, because both
+ * are answers to "what happens when I press send" -- and that question is asked
+ * before sending, not after. A bare mark hid them behind a click, so the two
+ * facts that change what the app is about to do to someone's machine were the
+ * two facts not on screen.
+ *
+ * The mode is a mark rather than a word. Three modes reuse three glyphs, so it
+ * becomes recognisable in a way a fourth piece of text beside the model name
+ * does not, and the name stays the thing being read.
  */
 export function TurnMenu() {
   const { settings, setSettings } = useWorkspace()
   const [open, setOpen] = useState(false)
+
+  const model = findModel(settings.modelId)
+  const mode = findPermissionMode(settings.permission)
+  const ModeMark = mode.icon
 
   return (
     <Popover
@@ -31,14 +44,22 @@ export function TurnMenu() {
       align="end"
       className="max-h-[26rem] min-w-64 overflow-y-auto"
       trigger={
-        <IconButton
-          label="Turn settings"
-          tooltipSide="bottom"
-          active={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          <Icons.more />
-        </IconButton>
+        <Tooltip label={`${model?.name ?? 'Model'} · ${mode.name}`} side="bottom">
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-label="Turn settings"
+            className={cn(
+              'flex max-w-56 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui',
+              'text-muted-foreground transition-colors duration-150',
+              open ? 'bg-selected text-foreground' : 'hover:bg-tint',
+            )}
+          >
+            <ModeMark className="shrink-0" />
+            <span className="min-w-0 truncate">{model?.name ?? 'Model'}</span>
+            <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
+          </button>
+        </Tooltip>
       }
     >
       {modelsByProvider().map(({ provider, models }) => (

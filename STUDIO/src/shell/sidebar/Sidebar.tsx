@@ -82,7 +82,6 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
       }}
       transition={SPRING_PANEL}
       className="relative z-20 h-full shrink-0 overflow-hidden border-r bg-surface-sunken"
-      style={{ paddingTop: SHELL.topStrip.height }}
     >
       {/* `inert` while closed. A hidden column that still takes Tab is worse
           than a visible one: focus disappears into a panel nobody can see. */}
@@ -91,11 +90,22 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         className="flex h-full flex-col"
         style={{ width: SHELL.sidebar.expandedWidth }}
       >
-        {/* The brand: mark and wordmark, above everything the sidebar does.
+        {/* The brand: mark and wordmark, occupying the top strip's own band.
             The serif appears exactly twice in the chrome -- here and on dialog
             headers -- so the wordmark says "this is Studio" and nothing else
-            on the page competes for that voice. */}
-        <div className="flex shrink-0 items-center gap-1.5 px-3.5 pt-0.5 pb-2">
+            on the page competes for that voice.
+
+            The height is the strip's height, not padding chosen by eye. The
+            strip only spans the main column, so this band used to be reserved
+            by an equal `paddingTop` on the column and then left empty -- the
+            brand sat below the window controls rather than beside them, and the
+            first thing at the top of the window was nothing. Sharing the one
+            number puts the wordmark, the traffic lights and the panel toggle on
+            a single line, and keeps them there if the strip is ever retuned. */}
+        <div
+          className="flex shrink-0 items-center gap-1.5 px-3.5"
+          style={{ height: SHELL.topStrip.height }}
+        >
           <StudioMark size={17} className="text-foreground" />
           <span className="studio-heading text-foreground">Studio</span>
         </div>
