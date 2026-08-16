@@ -64,10 +64,20 @@ export function TopStrip() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
-        {/* The turn settings belong to a conversation, so that is the only
-            surface they appear on. An app-wide control on every page is a
-            setting you can change in places where changing it means nothing. */}
-        {conversation ? <TurnMenu /> : null}
+        {/* Always present, on every surface.
+
+            This used to render only inside a conversation, on the reasoning
+            that the settings belong to one. They do not: they belong to the
+            *next turn*, and the moment you most need to know which model and
+            which permission mode are about to be used is before the
+            conversation exists -- standing on the home page about to type. A
+            control that appears only once the first message is sent tells you
+            what happened rather than what is about to.
+
+            It is also the one thing on screen that says what the app is going
+            to do to your machine. That should never be a fact you have to open
+            a conversation to see. */}
+        <TurnMenu />
       </div>
     </header>
   )

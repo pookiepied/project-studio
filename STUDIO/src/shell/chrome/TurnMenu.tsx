@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icons } from '@/components/icons'
+import { Icons, ProviderMark } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
 import { findModel, modelsByProvider } from '@/domain/models/catalog'
 import { EFFORTS } from '@/domain/models/types'
@@ -55,8 +55,17 @@ export function TurnMenu() {
               open ? 'bg-selected text-foreground' : 'hover:bg-tint',
             )}
           >
-            <ModeMark className="shrink-0" />
+            {/* Provider, then name, then mode -- who, what, and how far it may
+                go. Reading order matches the sentence the control is answering.
+
+                Both marks are stand-ins, not the vendors' logos: real assets
+                arrive with their own colours and weights, so a row built from
+                them is a row of mismatched brand assets in a monochrome app --
+                and redistributing a trademark is a permission question nobody
+                wants to discover late. See `ProviderMark`. */}
+            {model ? <ProviderMark provider={model.providerId} className="shrink-0" /> : null}
             <span className="min-w-0 truncate">{model?.name ?? 'Model'}</span>
+            <ModeMark className="shrink-0 opacity-70" />
             <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
           </button>
         </Tooltip>

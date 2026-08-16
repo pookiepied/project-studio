@@ -69,13 +69,18 @@ const STEP_PX: Record<Exclude<IconSize, 'text'>, number> = {
 
 /**
  * Open, the divider sits where the expanded sidebar's edge is. Closed, it
- * retreats to the frame's left. Hover leans it a little the way it is about to
- * travel -- the action previewed, without committing to it.
+ * retreats to the frame's left.
+ *
+ * Hover deliberately does not move it. A preview on hover made the mark
+ * restless: the divider twitched every time the pointer crossed the button on
+ * its way somewhere else, which is most of the times it is crossed. The
+ * movement means "the panel changed", so it should happen when the panel
+ * changes and at no other time -- the chip already answers "you are here".
  */
 const SLIDE_X: Record<IconState, number> = {
   rest: 0,
-  hover: 1.1,
-  press: 1.1,
+  hover: 0,
+  press: 0,
   on: 3.4,
   live: 0,
 }
