@@ -11,6 +11,8 @@ import type { DetailedHTMLProps, HTMLAttributes } from 'react'
 type MediaElement = DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
   class?: string
   src?: string
+  /** Seconds of inactivity before the control bar fades. */
+  autohide?: string
 }
 
 declare module 'react' {

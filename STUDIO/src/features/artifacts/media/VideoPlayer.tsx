@@ -1,46 +1,35 @@
 import 'media-chrome'
-import type { CSSProperties } from 'react'
 
 /**
  * The video player.
  *
- * `media-chrome` rather than a hand-written control bar. Playback UI is one of
- * those things that looks like an afternoon and is not: keyboard shortcuts,
- * focus order, screen-reader labelling, scrubbing with a pointer that leaves
- * the bar, buffered ranges, live regions for the time, and the browser
- * differences under all of it. Every one of those is a bug we would find later
- * and fix worse.
+ * `media-chrome` supplies the behaviour -- keyboard shortcuts, focus order,
+ * screen-reader labelling, scrubbing when the pointer leaves the bar, buffered
+ * ranges, and the browser differences under all of it. Every one of those is a
+ * bug we would otherwise find later and fix worse.
  *
- * They are web components, so React renders them as elements and there is no
- * wrapper library in between -- which also means the styling is ours: these are
- * plain custom properties, so the player answers to the same tokens as
- * everything else instead of arriving with a look of its own.
+ * What it does *not* supply is a look. Left alone it renders a browser-default
+ * control strip: a full-width opaque bar, square hit areas that flash a grey
+ * box on hover, and a row of six icons. That is the wrong object for a
+ * generated clip sitting inside a chat message. So the appearance is entirely
+ * ours, in `index.css` under `.studio-player`, and this file is structure.
+ *
+ * ---- Where the black came from -------------------------------------------
+ *
+ * `media-controller` paints `--media-background-color`, which defaults to
+ * black. The clip is 16:9 and the frame it sits in is whatever the artifact
+ * declared, so any mismatch showed as a black band below the picture -- outside
+ * the rounded panel's fill and therefore outside the shape entirely. Setting it
+ * transparent lets the panel's own surface show through, and `object-fit:
+ * cover` means there is nothing to letterbox in the first place.
  *
  * ---- What is deliberately absent ----------------------------------------
  *
- * No speed control, no picture-in-picture, no chapter list, no volume slider.
- * This plays a six-second generated clip inside a chat message. Every control
- * that does not serve that is a control in the way of the two that do, and a
- * dense bar of six icons under a small video reads as a media player someone
- * embedded rather than as part of the reply.
+ * No fullscreen: opening a clip larger is the lightbox's job, and fullscreen is
+ * a mode that takes the whole app away. No speed control, no
+ * picture-in-picture, no chapters. This plays a short clip in a message; every
+ * control that does not serve that is one in the way of the three that do.
  */
-const THEME: CSSProperties = {
-  '--media-primary-color': 'oklch(1 0 0)',
-  '--media-secondary-color': 'oklch(1 0 0 / 22%)',
-  '--media-control-background': 'transparent',
-  '--media-control-hover-background': 'oklch(1 0 0 / 14%)',
-  '--media-range-track-height': '3px',
-  '--media-range-thumb-height': '11px',
-  '--media-range-thumb-width': '11px',
-  '--media-range-thumb-border-radius': '999px',
-  '--media-font-family': 'var(--font-sans)',
-  '--media-font-size': 'var(--text-micro)',
-  '--media-text-color': 'oklch(1 0 0)',
-  // The bar floats over the video rather than adding height below it, so the
-  // frame stays the aspect ratio the artifact declared.
-  '--media-control-bar-display': 'flex',
-} as CSSProperties
-
 export function VideoPlayer({
   src,
   poster,
@@ -53,7 +42,13 @@ export function VideoPlayer({
   autoPlay?: boolean
 }) {
   return (
-    <media-controller style={THEME} class="size-full">
+    <media-controller
+      class="studio-player"
+      // Controls fade out two seconds after the pointer leaves, and come back
+      // on any movement. A permanent bar over a twelve-second clip covers an
+      // eighth of the picture for the whole of it.
+      autohide="2"
+    >
       <video
         slot="media"
         src={src}
@@ -62,21 +57,13 @@ export function VideoPlayer({
         playsInline
         preload="metadata"
         aria-label={title}
-        className="size-full bg-black object-contain"
       />
 
-      {/* One big target over the whole frame. Clicking a video to play it is
-          the gesture everyone already has; making them find a small button
-          first is the thing that makes an embedded player feel fiddly. */}
-      <media-poster-image slot="poster" src={poster} />
-
-      <media-control-bar class="w-full">
+      <media-control-bar>
         <media-play-button />
         <media-time-display />
         <media-time-range />
-        <media-duration-display />
         <media-mute-button />
-        <media-fullscreen-button />
       </media-control-bar>
     </media-controller>
   )

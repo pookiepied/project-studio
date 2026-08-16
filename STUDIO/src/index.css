@@ -918,3 +918,95 @@
 .studio-prose .katex-display > .katex {
   font-size: 1.06em;
 }
+
+/* ---------------------------------------------------------------------------
+   The video player
+
+   `media-chrome` provides behaviour and a browser-default appearance. The
+   appearance is replaced here rather than accepted, because the default is a
+   full-width opaque strip with square hover boxes -- a YouTube-shaped object
+   dropped into a chat message.
+
+   What replaces it is one floating pill: translucent, blurred, round controls,
+   sitting inside the picture rather than under it. The reference is the system
+   player, which stays out of the way of the thing it is playing.
+   --------------------------------------------------------------------------- */
+.studio-player {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The default is black, and it was showing as a band below the picture
+     whenever the clip's ratio did not match the frame -- outside the panel's
+     fill, so outside the rounded shape. */
+  --media-background-color: transparent;
+  --media-object-fit: cover;
+
+  --media-primary-color: oklch(1 0 0);
+  --media-secondary-color: oklch(1 0 0 / 26%);
+  --media-text-color: oklch(1 0 0);
+  --media-font-family: var(--font-sans);
+  --media-font-size: var(--text-micro);
+
+  /* Controls are round and transparent until touched. A default control paints
+     a grey rectangle on hover, which is the single ugliest thing about a stock
+     player at this size. */
+  --media-control-background: transparent;
+  --media-control-hover-background: oklch(1 0 0 / 18%);
+  --media-control-height: 26px;
+  --media-control-padding: 6px;
+  --media-button-icon-width: 15px;
+  --media-button-icon-height: 15px;
+
+  --media-range-track-height: 3px;
+  --media-range-track-background: oklch(1 0 0 / 24%);
+  --media-range-bar-color: oklch(1 0 0);
+  --media-range-thumb-background: oklch(1 0 0);
+  --media-range-thumb-width: 10px;
+  --media-range-thumb-height: 10px;
+  --media-range-thumb-border-radius: 999px;
+
+  /* The library's own tooltips are a second, differently-styled tooltip system
+     inside an app that already has one. */
+  --media-tooltip-display: none;
+}
+
+.studio-player video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* The panel already rounds; matching here keeps the picture inside the curve
+     even while the element is transformed during the lightbox's entrance. */
+  border-radius: inherit;
+}
+
+.studio-player media-control-bar {
+  position: absolute;
+  inset-inline: 10px;
+  bottom: 10px;
+  height: 36px;
+  padding-inline: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  background: oklch(0.16 0 0 / 55%);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 4px 16px -4px oklch(0 0 0 / 45%);
+}
+
+.studio-player media-control-bar > * {
+  border-radius: 999px;
+}
+
+/* The scrubber takes the room left over; everything else is intrinsic. */
+.studio-player media-time-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+}
+
+.studio-player media-time-display {
+  padding-inline: 6px;
+  font-variant-numeric: tabular-nums;
+}

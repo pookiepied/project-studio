@@ -81,7 +81,11 @@ export function MediaLightbox({
             className="flex w-[75vw] max-w-[1100px] flex-col rounded-block bg-surface-raised p-2 shadow-modal"
             style={{ maxHeight: '82vh' }}
           >
-            <div className="relative min-h-0 flex-1 overflow-hidden rounded-block-inner bg-black">
+            {/* The panel's own surface, not black. Black was the default the player
+                painted and it showed as a band wherever the clip's ratio did
+                not match the frame -- which is most of the time, and which
+                read as the video escaping the rounded shape. */}
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-block-inner bg-code-surface">
               {video && src ? (
                 <VideoPlayer src={src} poster={poster} title={title} autoPlay />
               ) : (
