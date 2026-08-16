@@ -34,14 +34,19 @@ export interface RailEntry {
 }
 
 /**
- * How the rail sits in the window.
+ * There is one placement, and this note is why there is not two.
  *
- * `inset` floats it as a panel with the window's ground visible around it,
- * matching the way the page itself is a rounded panel resting on the sidebar.
- * `full` runs it flush from top to bottom, which gives back the vertical
- * margins and is what you want when the thing being read is long.
+ * It shipped with a toggle between a floating inset panel and a flush
+ * full-height one. Both looked fine and that was the problem: it was a control
+ * that changed a great deal, was needed by nobody in particular, and asked the
+ * reader to hold an opinion about window furniture in the middle of a
+ * conversation. A setting whose right answer is "either" is a setting that
+ * should not exist.
+ *
+ * The rail floats, inset, because that is the language the rest of the window
+ * already speaks -- the page is a rounded panel resting on the sidebar, and the
+ * rail is another panel beside it.
  */
-export type RailPlacement = 'inset' | 'full'
 
 /** Beyond this the strip stops being scannable, so the oldest entry goes. */
 const MAX_ENTRIES = 12
@@ -54,14 +59,12 @@ interface RailValue {
   readonly entries: readonly RailEntry[]
   readonly activeId: string | null
   readonly width: number
-  readonly placement: RailPlacement
 
   openArtifact: (artifact: Artifact, conversationId: string, conversationTitle: string) => void
   focus: (id: string) => void
   close: (id: string) => void
   closeAll: () => void
   setWidth: (width: number) => void
-  setPlacement: (placement: RailPlacement) => void
 }
 
 const RailContext = createContext<RailValue | null>(null)
@@ -70,7 +73,6 @@ export function RailProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<readonly RailEntry[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [width, setRawWidth] = useState(420)
-  const [placement, setPlacement] = useState<RailPlacement>('inset')
 
   const openArtifact = useCallback(
     (artifact: Artifact, conversationId: string, conversationTitle: string) => {
@@ -138,15 +140,13 @@ export function RailProvider({ children }: { children: ReactNode }) {
       entries,
       activeId,
       width,
-      placement,
       openArtifact,
       focus: setActiveId,
       close,
       closeAll,
       setWidth,
-      setPlacement,
     }),
-    [entries, activeId, width, placement, openArtifact, close, closeAll, setWidth],
+    [entries, activeId, width, openArtifact, close, closeAll, setWidth],
   )
 
   return <RailContext.Provider value={value}>{children}</RailContext.Provider>

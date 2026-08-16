@@ -62,7 +62,7 @@ export function TopStrip() {
           flex-centred middle child drifts every time either end changes width,
           and both ends here change width with state. */}
       <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-        <div className="pointer-events-auto flex min-w-0 max-w-[60%] justify-center">
+        <div className="@container pointer-events-auto flex min-w-0 max-w-[62%] justify-center">
           {conversation ? <IdentityLine conversation={conversation} /> : null}
         </div>
       </div>

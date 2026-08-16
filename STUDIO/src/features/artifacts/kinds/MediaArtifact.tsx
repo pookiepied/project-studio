@@ -82,7 +82,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
                 video ? 'size-12' : 'size-9 opacity-0 group-hover/media:opacity-100',
               )}
             >
-              {video ? <PlayGlyph /> : <Icons.rail />}
+              {video ? <PlayGlyph /> : <Icons.openLarger />}
             </span>
           </button>
         ) : null}

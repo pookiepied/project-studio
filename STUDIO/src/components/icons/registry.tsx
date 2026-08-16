@@ -33,7 +33,7 @@ import {
   RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, WrapText, X,
   FastForward, Bot, CalendarDays, CircleAlert, CircleCheck, Clapperboard, FileText,
-  Link2, Mail, PanelRight, Sparkles, Users,
+  Link2, Mail, Maximize2, Sparkles, Users,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -183,7 +183,16 @@ const REGISTRY = {
   calendar: { mark: CalendarDays },
   link: { mark: Link2 },
   generate: { mark: Sparkles },
-  rail: { mark: PanelRight },
+
+  /* -- Opening something larger ------------------------------------------
+     `PanelRight` is the sidebar family: a container with an edge, meaning "a
+     column of navigation appears or disappears here". The rail is not that.
+     It is a details view for one thing you picked, reached from a dozen
+     different places, and giving it the sidebar's mark said the button would
+     toggle furniture rather than show you an object. Two arrows pushing
+     outward says the thing you are pointing at gets bigger, which is what
+     happens. */
+  openLarger: { mark: Maximize2 },
 
   // -- Agents ---------------------------------------------------------------
   agent: { mark: Bot },

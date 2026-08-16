@@ -1,12 +1,22 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { RADIUS, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { IconButton, Tooltip } from '@/components/primitives'
+import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
 import { RailTabs } from '@/features/rail/RailTabs'
 import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail } from '@/stores/rail'
-import { cn } from '@/lib/cn'
+
+/**
+ * The narrowest the conversation may become.
+ *
+ * Below this the top strip's centred identity line -- project, title, branch --
+ * runs out of room before its own truncation can save it, and the composer's
+ * controls start colliding. It is a floor for the page, expressed as the rail's
+ * ceiling.
+ */
+const MIN_PAGE_WIDTH = 520
+
 
 /**
  * The side rail.
@@ -32,9 +42,38 @@ import { cn } from '@/lib/cn'
  * depends on what is open right now, not on a preference held across sessions.
  */
 export function SideRail() {
-  const { open, entries, activeId, width, placement, setWidth, setPlacement, closeAll } = useRail()
+  const { open, entries, activeId, width, setWidth, closeAll } = useRail()
+  const frame = useRef<HTMLElement>(null)
+  const [room, setRoom] = useState(Number.POSITIVE_INFINITY)
 
   const active = entries.find((entry) => entry.id === activeId) ?? entries[entries.length - 1]
+
+  /**
+   * The rail may not starve the page.
+   *
+   * Dragging it wide enough squeezed the conversation until the top strip broke
+   * -- the project, the title and the branch are one centred line, and there is
+   * a width below which they simply cannot all be there. The honest fix is to
+   * refuse the drag rather than to let the layout fail: the page keeps a floor,
+   * and the rail's ceiling is whatever is left over.
+   *
+   * Measured from the shell rather than the window, because the sidebar may or
+   * may not be taking space from it, and the answer differs.
+   */
+  useEffect(() => {
+    const shell = frame.current?.parentElement
+    if (!shell) return
+
+    const measure = () => setRoom(shell.clientWidth)
+    measure()
+
+    const observer = new ResizeObserver(measure)
+    observer.observe(shell)
+    return () => observer.disconnect()
+  }, [open])
+
+  const ceiling = Math.max(RAIL_MIN_WIDTH, room - MIN_PAGE_WIDTH)
+  const effective = Math.min(width, ceiling)
 
   return (
     <AnimatePresence initial={false}>
@@ -44,35 +83,20 @@ export function SideRail() {
           // Width animates, and nothing else. Sliding the rail in from off
           // screen would push the conversation sideways for the length of the
           // animation, and the conversation is what the reader is looking at.
+          ref={frame}
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width, opacity: 1 }}
+          animate={{ width: effective, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={SPRING_PANEL}
-          className={cn(
-            'relative flex shrink-0 flex-col overflow-hidden bg-surface',
-            placement === 'inset' ? 'my-2 mr-2 border' : 'border-l',
-          )}
-          style={{ borderRadius: placement === 'inset' ? RADIUS.xl : 0 }}
+          className="relative my-2 mr-2 flex shrink-0 flex-col overflow-hidden border bg-surface"
+          style={{ borderRadius: RADIUS.xl }}
         >
-          <ResizeHandle width={width} onWidth={setWidth} />
+          <ResizeHandle width={effective} ceiling={ceiling} onWidth={setWidth} />
 
           <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
             <span className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
               {active?.artifact.title ?? 'Side rail'}
             </span>
-
-            <Tooltip
-              label={placement === 'inset' ? 'Fill the window height' : 'Float the panel'}
-              side="bottom"
-            >
-              <IconButton
-                label={placement === 'inset' ? 'Fill the window height' : 'Float the panel'}
-                size="sm"
-                onClick={() => setPlacement(placement === 'inset' ? 'full' : 'inset')}
-              >
-                <Icons.rail />
-              </IconButton>
-            </Tooltip>
 
             <IconButton label="Close the rail" size="sm" onClick={closeAll}>
               <Icons.close />
@@ -112,7 +136,15 @@ export function SideRail() {
  * window loses focus mid-drag -- the case that leaves a document listener
  * attached forever.
  */
-function ResizeHandle({ width, onWidth }: { width: number; onWidth: (width: number) => void }) {
+function ResizeHandle({
+  width,
+  ceiling,
+  onWidth,
+}: {
+  width: number
+  ceiling: number
+  onWidth: (width: number) => void
+}) {
   const start = useRef<{ x: number; width: number } | null>(null)
 
   const onPointerDown = useCallback(
@@ -129,9 +161,9 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (width: numb
       if (!start.current) return
       // Dragging left widens: the rail is on the right, so its edge moves
       // against the pointer's direction of travel.
-      onWidth(start.current.width + (start.current.x - event.clientX))
+      onWidth(Math.min(ceiling, start.current.width + (start.current.x - event.clientX)))
     },
-    [onWidth],
+    [ceiling, onWidth],
   )
 
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -155,7 +187,7 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (width: numb
       aria-label="Resize the rail"
       aria-valuenow={width}
       aria-valuemin={RAIL_MIN_WIDTH}
-      aria-valuemax={RAIL_MAX_WIDTH}
+      aria-valuemax={Math.min(RAIL_MAX_WIDTH, ceiling)}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -163,7 +195,7 @@ function ResizeHandle({ width, onWidth }: { width: number; onWidth: (width: numb
       onKeyDown={(event) => {
         // Keyboard resize, because a drag handle that only answers to a mouse
         // is a control some people simply cannot use.
-        if (event.key === 'ArrowLeft') onWidth(width + 24)
+        if (event.key === 'ArrowLeft') onWidth(Math.min(ceiling, width + 24))
         if (event.key === 'ArrowRight') onWidth(width - 24)
       }}
       className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none after:absolute after:inset-y-0 after:-left-1 after:w-3 hover:bg-selected focus-visible:bg-selected"

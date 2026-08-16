@@ -93,13 +93,13 @@ export function ArtifactShell({
         {conversation && !working ? (
           <span className="shrink-0 opacity-0 transition-opacity duration-fast group-hover/artifact:opacity-100">
             <IconButton
-              label="Open in side rail"
+              label="Open larger"
               size="sm"
               onClick={() =>
                 openArtifact(artifact, conversation.id, conversation.title ?? 'Conversation')
               }
             >
-              <Icons.rail />
+              <Icons.openLarger />
             </IconButton>
           </span>
         ) : null}

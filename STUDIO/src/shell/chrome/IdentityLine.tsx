@@ -80,17 +80,20 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
         <button
           type="button"
           onClick={() => openProject(project.id)}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
+          className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[26rem]:flex"
         >
           <ProjectIconMark icon={project.icon} />
-          <span className="max-w-[9rem] truncate">{project.name}</span>
+          <span className="max-w-[7rem] truncate">{project.name}</span>
         </button>
       ) : null}
 
       {project ? (
         // A middle dot, not a chevron: this is an attribution, not a navigable
         // path. A breadcrumb would promise a level to click back to.
-        <span aria-hidden className="shrink-0 text-muted-foreground/50">
+        //
+        // Hidden on the same query as the project it follows, or the line
+        // opens with a stranded dot once the project drops out.
+        <span aria-hidden className="hidden shrink-0 text-muted-foreground/50 @[26rem]:inline">
           &middot;
         </span>
       ) : null}
@@ -111,7 +114,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
             {conversation.pinned ? (
               <Icons.pin className="shrink-0 text-muted-foreground" />
             ) : null}
-            <span className="min-w-0 max-w-[18rem] truncate text-foreground">
+            <span className="min-w-0 max-w-[11rem] truncate text-foreground @[26rem]:max-w-[15rem] @[40rem]:max-w-[20rem]">
               {conversation.title}
             </span>
             <Icons.expand
@@ -198,7 +201,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
 
       {project?.branch ? (
         <>
-          <span aria-hidden className="shrink-0 text-muted-foreground/50">
+          <span aria-hidden className="hidden shrink-0 text-muted-foreground/50 @[34rem]:inline">
             &middot;
           </span>
           <Popover
@@ -212,10 +215,10 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
                 onClick={() => setBranchOpen((open) => !open)}
                 aria-haspopup="menu"
                 aria-expanded={branchOpen}
-                className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
+                className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[34rem]:flex"
               >
                 <Icons.branch />
-                <span className="max-w-[10rem] truncate">{project.branch}</span>
+                <span className="max-w-[8rem] truncate">{project.branch}</span>
               </button>
             }
           >
