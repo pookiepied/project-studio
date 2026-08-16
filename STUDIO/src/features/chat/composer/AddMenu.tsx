@@ -15,7 +15,7 @@ import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/compo
  * of entering text, so it belongs with the other ways of adding to the turn --
  * and it keeps the resting field down to one control on each side.
  */
-export function AddMenu({ onDictate }: { onDictate: () => void }) {
+export function AddMenu() {
   const [open, setOpen] = useState(false)
 
   const pick = (run?: () => void) => () => {
@@ -50,9 +50,6 @@ export function AddMenu({ onDictate }: { onDictate: () => void }) {
       </MenuItem>
       <MenuItem icon={<Icons.image />} onSelect={pick()}>
         Image
-      </MenuItem>
-      <MenuItem icon={<Icons.dictate />} onSelect={pick(onDictate)}>
-        Dictate
       </MenuItem>
 
       <MenuSeparator />

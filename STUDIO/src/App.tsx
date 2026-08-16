@@ -45,10 +45,25 @@ export default function App() {
       <AppearanceProvider>
         <WorkspaceProvider>
           <NavigationProvider>
+            {/* The app is fully painted the whole time; only the splash moves.
+
+                It used to cross-fade -- the shell animating 0 -> 1 while the
+                splash animated 1 -> 0 over a similar duration. Two opacities
+                passing through each other is what read as a flash: at the
+                midpoint both layers are half-transparent, so for a few frames
+                the window is a wash of neither, and then the app snaps into
+                being. Nothing was too fast; there were simply two things
+                dissolving at once and no moment that belonged to either.
+
+                Fading one layer away from a finished one underneath is a
+                reveal, and it only has to be paced once -- see `SplashScreen`.
+                The shell keeps a slight scale so the arrival still has
+                movement, but it starts as soon as the splash begins to leave
+                rather than waiting for it to finish. */}
             <motion.div
               className="h-full"
-              initial={{ opacity: 0, scale: 0.99 }}
-              animate={{ opacity: showSplash ? 0 : 1, scale: showSplash ? 0.99 : 1 }}
+              initial={{ scale: 0.985 }}
+              animate={{ scale: showSplash ? 0.985 : 1 }}
               transition={{ duration: SPLASH.revealDuration, ease: EASE_OUT }}
             >
               <AppShell />

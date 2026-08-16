@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -30,12 +30,23 @@ export function MessageActions({
   copyPayload,
   align = 'start',
   visible,
+  trailing,
 }: {
   actions: readonly MessageAction[]
   /** Text for the built-in copy button, which every message has. */
   copyPayload: string
   align?: 'start' | 'end'
   visible: boolean
+  /**
+   * Sits at the end of the same row -- the model's name, today.
+   *
+   * A slot rather than a sibling, and that is the fix rather than a
+   * convenience. As a sibling in a wrapper it did not share this row's top
+   * margin, so the two were offset by the full 12px and the name floated above
+   * the buttons it belonged to. Inside the row there is one baseline, one
+   * margin and one fade, and they cannot come apart again.
+   */
+  trailing?: ReactNode
 }) {
   const [copied, setCopied] = useState(false)
   const [focusWithin, setFocusWithin] = useState(false)
@@ -88,6 +99,10 @@ export function MessageActions({
           </IconButton>
         )
       })}
+
+      {/* A little clear of the buttons, so the name reads as a caption on the
+          row rather than as a fifth control. */}
+      {trailing ? <span className="ml-1.5 flex items-center">{trailing}</span> : null}
     </motion.div>
   )
 }

@@ -92,8 +92,17 @@ export function staggerDelay(index: number): number {
 export const SPLASH = {
   /** Minimum time the splash is on screen, entrance included. */
   minDurationMs: 1800,
-  /** The fade that hands the window to the app underneath. */
-  exitDuration: 0.5,
+  /**
+   * The fade that hands the window to the app underneath.
+   *
+   * Longer than the mark's own exit, so the two are sequenced rather than
+   * simultaneous: the brand rises away, and the surface it was standing on
+   * follows it out. Fading both at one rate is an image being switched off,
+   * which is what the handover used to feel like.
+   */
+  exitDuration: 0.62,
+  /** The mark, leaving first. */
+  markExitDuration: 0.34,
   /** How long the app settles in as the splash fades. Deliberately slow. */
-  revealDuration: 0.6,
+  revealDuration: 0.7,
 } as const

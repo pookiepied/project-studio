@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { cn } from '@/lib/cn'
 import { findModel } from '@/domain/models/catalog'
 import { Markdown } from '@/features/chat/markdown'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
@@ -51,37 +50,20 @@ export function AssistantMessage({
       {/* No actions on a message still being written: retrying something that
           has not finished arriving is a request nobody means. */}
       {streaming ? null : (
-        <div className="flex items-center gap-2">
-          <MessageActions
-            visible={hovered}
-            copyPayload={message.text}
-            actions={[
-              { id: 'retry', label: 'Try again', icon: Icons.retry, run: onRetry },
-              { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: onFork },
-              { id: 'read', label: 'Read aloud', icon: Icons.readAloud, run: () => undefined },
-            ]}
-          />
-          {/* Same height as the buttons beside it, and faded rather than
-              mounted.
-
-              It was a bare span appearing and disappearing on hover, so it had
-              neither the row's height nor its timing: the name popped in at a
-              different moment from the controls and sat on its own baseline,
-              which is what made the row look assembled from two unrelated
-              pieces. `h-6` is the `sm` button, so both now centre on one line;
-              opacity matches how the actions themselves come and go. */}
-          {model ? (
-            <span
-              className={cn(
-                'flex h-6 items-center text-caption text-muted-foreground',
-                'transition-opacity duration-fast',
-                hovered ? 'opacity-100' : 'opacity-0',
-              )}
-            >
-              {model.name}
-            </span>
-          ) : null}
-        </div>
+        <MessageActions
+          visible={hovered}
+          copyPayload={message.text}
+          actions={[
+            { id: 'retry', label: 'Try again', icon: Icons.retry, run: onRetry },
+            { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: onFork },
+            { id: 'read', label: 'Read aloud', icon: Icons.readAloud, run: () => undefined },
+          ]}
+          // Inside the row, not beside it. As a sibling it missed the row's top
+          // margin and floated 12px above the buttons it names.
+          trailing={
+            model ? <span className="text-caption text-muted-foreground">{model.name}</span> : null
+          }
+        />
       )}
     </div>
   )

@@ -55,9 +55,15 @@ export function useAutoScroll(dependency: unknown) {
   const onScroll = useCallback(() => {
     const element = viewport.current
     if (!element) return
+    // A smooth scroll fires this on every frame of the journey, so the flag
+    // stays set until the trip ends rather than clearing on the first event --
+    // clearing early made the second frame look like the reader scrolling.
     if (programmatic.current) {
-      programmatic.current = false
       lastTop.current = element.scrollTop
+      if (atBottom()) {
+        programmatic.current = false
+        setPinned(true)
+      }
       return
     }
     const upward = element.scrollTop < lastTop.current
@@ -86,10 +92,32 @@ export function useAutoScroll(dependency: unknown) {
   const scrollToBottom = useCallback(() => {
     const element = viewport.current
     if (!element) return
+
+    // `pinned` is deliberately NOT set here, and that is the whole fix.
+    //
+    // Setting it started the smooth scroll and then immediately re-ran the
+    // follow effect below, whose entire job is to jump to the bottom
+    // instantly. So the animation was begun and cancelled in the same tick by
+    // the app's own code -- which is why the button teleported no matter what
+    // `behavior` said. The scroll was never the problem; the state change
+    // racing it was.
+    //
+    // Arrival sets it instead: `scrollend` when the browser offers it,
+    // otherwise the normal scroll handler notices we finished at the bottom.
+    // Either way `pinned` becomes true after the journey rather than before
+    // it, so nothing interrupts the trip.
     programmatic.current = true
-    lastTop.current = element.scrollHeight
+    lastTop.current = element.scrollTop
+
+    const settle = () => {
+      element.removeEventListener('scrollend', settle)
+      programmatic.current = false
+      lastTop.current = element.scrollTop
+      setPinned(true)
+    }
+    element.addEventListener('scrollend', settle)
+
     element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' })
-    setPinned(true)
   }, [])
 
   useEffect(() => {

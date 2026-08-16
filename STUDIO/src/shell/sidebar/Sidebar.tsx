@@ -113,7 +113,14 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         // sidebar leaves a 1px rule down the edge of the window -- the ghost of
         // a panel that is supposed to be gone. Floating, it always has an edge,
         // because it always has content beside it.
-        style={{ borderRightWidth: compact || sidebarOpen ? 1 : 0 }}
+        // Only while floating. Resident, the sidebar has no edge of its own:
+        // the page's rounded corner is the edge, and the sunken ground shows
+        // through the notch it cuts. A hairline there drew a straight rule
+        // across the arc -- the corner rounded on one side of the line and the
+        // panel stopped square on the other, which is the "it is round but the
+        // sidebar does not follow it" seam. Floating over the page it still
+        // needs one, because then it genuinely is a separate object.
+        style={{ borderRightWidth: compact ? 1 : 0 }}
         className={cn(
           // Square. The sidebar is the ground the window is built on; the page
           // is the object sitting on it, and the page is what carries the

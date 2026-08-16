@@ -128,7 +128,7 @@ export function Composer({
           `items-center` on one line is what actually centres the glyphs, and
           the mismatch between those two was the misalignment in the last pass. */}
       <div className={cn('flex gap-1', multiline ? 'items-end' : 'items-center')}>
-        <AddMenu onDictate={focus} />
+        <AddMenu />
 
         <div className="min-w-0 flex-1">
           <ComposerField
@@ -142,6 +142,15 @@ export function Composer({
         </div>
 
         <div className="flex items-center gap-0.5">
+          {/* Dictation sits in the field, not in the plus menu.
+              It acts on this field -- it fills it with what you say -- so it
+              belongs beside the field the way send does. Buried in a menu it
+              was two clicks from the thing it modifies, and it was the only
+              item in that menu that was not "attach something". */}
+          <IconButton label="Dictate" size="lg" onClick={focus}>
+            <Icons.dictate size="md" />
+          </IconButton>
+
           <AnimatePresence initial={false}>
             {canSend || busy ? (
               <motion.div
