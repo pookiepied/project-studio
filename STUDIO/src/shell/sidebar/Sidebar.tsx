@@ -102,12 +102,19 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             first thing at the top of the window was nothing. Sharing the one
             number puts the wordmark, the traffic lights and the panel toggle on
             a single line, and keeps them there if the strip is ever retuned. */}
+        {/* `data-tauri-drag-region` because this band is title bar: it is the
+            window's top edge on the sidebar's side, and a frameless window with
+            a dead strip is one the user cannot move by the part that looks most
+            like a handle. Selection is off for the same reason -- dragging a
+            title bar should move the window, and text that highlights instead
+            makes the brand behave like content. */}
         <div
-          className="flex shrink-0 items-center gap-1.5 px-3.5"
+          data-tauri-drag-region
+          className="flex shrink-0 items-center gap-1.5 px-3.5 select-none"
           style={{ height: SHELL.topStrip.height }}
         >
-          <StudioMark size={17} className="text-foreground" />
-          <span className="studio-heading text-foreground">Studio</span>
+          <StudioMark size={17} className="pointer-events-none text-foreground" />
+          <span className="studio-heading pointer-events-none text-foreground">Studio</span>
         </div>
 
         {/* Spacing in this column separates things that are different in kind,
@@ -115,7 +122,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             other than to the list below them, and the list's groups sit further
             apart than the rows inside a group -- so the eye gets the hierarchy
             from the gaps before it reads a single title. */}
-        <div className="flex shrink-0 flex-col gap-1 px-2 pb-4">
+        <div className="mt-1 flex shrink-0 flex-col gap-1 px-2 pb-5">
           <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
           <Action
             label="Search"
