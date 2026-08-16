@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "studio-ui",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "STUDIO", "dev"],
+      "port": 1420
+    }
+  ]
+}
