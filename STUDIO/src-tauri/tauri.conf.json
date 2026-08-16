@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "STUDIO",
+  "productName": "Studio",
   "version": "0.1.0",
   "identifier": "com.pookiepied.studio",
   "build": {
@@ -12,11 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "STUDIO",
-        "width": 1500,
-        "height": 940,
-        "minWidth": 760,
-        "minHeight": 540,
+        "title": "Studio",
+        "width": 1040,
+        "height": 720,
+        "minWidth": 620,
+        "minHeight": 480,
         "resizable": true,
         "maximizable": true,
         "decorations": false,
@@ -40,9 +40,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
-    }
+    ]
   }
 }
