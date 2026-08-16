@@ -1,7 +1,7 @@
 import type { Effort } from '@/domain/models/types'
 import type { PermissionMode } from '@/domain/permissions/modes'
 
-export type Role = 'user' | 'assistant'
+type Role = 'user' | 'assistant'
 
 /**
  * A reasoning trace.

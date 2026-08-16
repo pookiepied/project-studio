@@ -41,8 +41,3 @@ export function renderArtifact(artifact: Artifact): ReactNode {
   const renderer = RENDERERS[artifact.kind]
   return renderer ? renderer(artifact) : <GenericArtifact artifact={artifact} />
 }
-
-/** Whether a dedicated renderer exists. Used by the demo and by diagnostics. */
-export function hasRenderer(kind: string): boolean {
-  return kind in RENDERERS
-}

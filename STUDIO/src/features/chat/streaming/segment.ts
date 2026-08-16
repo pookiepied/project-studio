@@ -76,7 +76,7 @@ function kindOf(line: string): Kind {
  * no reflow above it, and the real closing fence when it arrives changes
  * nothing at all.
  */
-export function closeOpenFence(text: string): string {
+function closeOpenFence(text: string): string {
   const lines = text.split('\n')
   let marker: string | null = null
 

@@ -118,7 +118,6 @@
 
   --duration-fast: 120ms;
   --duration-base: 180ms;
-  --duration-slow: 260ms;
 
   /* -- Elevation ------------------------------------------------------------
 
@@ -170,10 +169,6 @@
 
 @utility duration-base {
   transition-duration: var(--duration-base);
-}
-
-@utility duration-slow {
-  transition-duration: var(--duration-slow);
 }
 
 /* ---------------------------------------------------------------------------

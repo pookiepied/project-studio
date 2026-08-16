@@ -38,7 +38,7 @@ const ANSWERS = [
 /** Enough to need several batches at any plausible window height. */
 const TURNS = 160
 
-export const LONG_THREAD_ID = 'cnv_long'
+const LONG_THREAD_ID = 'cnv_long'
 
 export function longThread(): Conversation {
   const messages: Message[] = []

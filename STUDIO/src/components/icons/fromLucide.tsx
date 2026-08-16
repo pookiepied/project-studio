@@ -55,7 +55,7 @@ const STEP_PX: Record<Exclude<IconSize, 'text'>, number> = {
 /** A mark sits about a tenth above its text. See the note in `Icon.tsx`. */
 const TEXT_RELATIVE = '1.1em'
 
-export interface LucideIconProps {
+interface LucideIconProps {
   size?: IconSize
   /** Overrides the state inherited from the surrounding control. */
   state?: IconState
@@ -114,5 +114,3 @@ export function fromLucide(Mark: LucideIcon, name: string, variants?: Variants) 
   Concept.displayName = name
   return Concept
 }
-
-export type LucideIconComponent = ReturnType<typeof fromLucide>

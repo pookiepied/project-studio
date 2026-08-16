@@ -20,9 +20,6 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.11.1
         version: 2.11.1
-      '@tauri-apps/plugin-window-state':
-        specifier: ^2.4.1
-        version: 2.4.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -381,9 +378,6 @@ packages:
     resolution: {integrity: sha512-R8xGtMpwyetawSqm9kYOuMmEqkhUbvcUy8n0aNXIxollKBLESUu5f4Fx+64hgASYm1H+jSWq6jCW6zqTnH6hqQ==}
     engines: {node: '>= 10'}
     hasBin: true
-
-  '@tauri-apps/plugin-window-state@2.4.1':
-    resolution: {integrity: sha512-OuvdrzyY8Q5Dbzpj+GcrnV1iCeoZbcFdzMjanZMMcAEUNy/6PH5pxZPXpaZLOR7whlzXiuzx0L9EKZbH7zpdRw==}
 
   '@types/debug@4.1.13':
     resolution: {integrity: sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==}
@@ -1354,10 +1348,6 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.11.4
       '@tauri-apps/cli-win32-ia32-msvc': 2.11.4
       '@tauri-apps/cli-win32-x64-msvc': 2.11.4
-
-  '@tauri-apps/plugin-window-state@2.4.1':
-    dependencies:
-      '@tauri-apps/api': 2.11.1
 
   '@types/debug@4.1.13':
     dependencies:

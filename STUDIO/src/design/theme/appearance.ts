@@ -16,7 +16,7 @@ export interface Appearance {
   readonly pointerCursor: boolean
 }
 
-export const DEFAULT_APPEARANCE: Appearance = {
+const DEFAULT_APPEARANCE: Appearance = {
   theme: 'system',
   uiSize: DEFAULT_UI_SIZE,
   codeSize: DEFAULT_CODE_SIZE,

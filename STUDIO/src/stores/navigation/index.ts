@@ -1,1 +1,1 @@
-export { NavigationProvider, useNavigation, type Route } from './NavigationProvider'
+export { NavigationProvider, useNavigation } from './NavigationProvider'

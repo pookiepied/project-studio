@@ -1,9 +1,6 @@
 import { SCENE_DONE, renderScene } from '@/domain/session/gallery/scene'
 import type { Conversation } from '@/domain/session/types'
 
-export { renderScene, SCENE_DONE, SCENE_START, SCENE_SCRIPT } from '@/domain/session/gallery/scene'
-export type { SceneState, Stage } from '@/domain/session/gallery/scene'
-
 /**
  * The gallery conversation.
  *

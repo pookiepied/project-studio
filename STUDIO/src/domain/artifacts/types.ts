@@ -31,9 +31,6 @@
 
 export type ArtifactStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
 
-/** Where an artifact is being drawn, which changes how much of it is shown. */
-export type ArtifactSurface = 'transcript' | 'rail'
-
 export interface ArtifactStat {
   readonly label: string
   readonly value: string | number
@@ -45,7 +42,7 @@ export interface ArtifactLink {
   readonly description?: string
 }
 
-export interface ArtifactListItem {
+interface ArtifactListItem {
   readonly label?: string
   readonly value?: string | number
   readonly description?: string
@@ -67,7 +64,7 @@ export interface ArtifactFileChange {
   readonly deletions?: number
 }
 
-export interface ArtifactTable {
+interface ArtifactTable {
   readonly columns: readonly string[]
   readonly rows: readonly (readonly (string | number | null)[])[]
 }
@@ -97,7 +94,7 @@ export type ArtifactSection =
       readonly items: readonly ArtifactFileChange[]
     }
 
-export interface ArtifactSource {
+interface ArtifactSource {
   /** The MCP server or connector this came through, in words a person uses. */
   readonly server?: string
   /** The raw tool name. Kept for support, never shown as a label. */

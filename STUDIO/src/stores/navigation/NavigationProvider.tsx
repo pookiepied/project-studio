@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
  * route and not an overlay: it is a real page with its own section tree, and
  * modelling it as a dialog is what makes a settings surface impossible to grow.
  */
-export type Route =
+type Route =
   | { readonly kind: 'home' }
   | { readonly kind: 'chat'; readonly conversationId: string }
   | { readonly kind: 'project'; readonly projectId: string }

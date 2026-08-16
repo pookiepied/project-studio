@@ -40,7 +40,7 @@ const DEFAULT_TURN_SETTINGS: TurnSettings = {
   permission: DEFAULT_PERMISSION_MODE,
 }
 
-export interface NewProjectInput {
+interface NewProjectInput {
   readonly name: string
   readonly icon: Project['icon']
   readonly description: string

@@ -116,10 +116,6 @@ export function findModel(id: string): Model | undefined {
   return MODELS.find((model) => model.id === id)
 }
 
-export function findProvider(id: string): Provider | undefined {
-  return PROVIDERS.find((provider) => provider.id === id)
-}
-
 /** Models grouped under their provider, in catalog order. */
 export function modelsByProvider(): { provider: Provider; models: Model[] }[] {
   return PROVIDERS.map((provider) => ({

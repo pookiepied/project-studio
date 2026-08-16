@@ -89,7 +89,7 @@ export function IconStateProvider({ state, children }: { state: IconState; child
  * `origin` is a transform-origin inside the shape's own box, which is what
  * makes a trash lid hinge at its left end rather than pivot around its middle.
  */
-export interface PartMotion {
+interface PartMotion {
   readonly v: Variants
   readonly origin?: string
 }
@@ -352,5 +352,3 @@ export function defineIcon(glyph: Glyph, name: string) {
   Concept.displayName = name
   return Concept
 }
-
-export type IconComponent = ReturnType<typeof defineIcon>

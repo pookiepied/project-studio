@@ -20,7 +20,7 @@ import type { Artifact } from '@/domain/artifacts/types'
  * looks wrong here it looks wrong everywhere, and it is one file to look at.
  */
 
-export type Stage = 'pending' | 'running' | 'done'
+type Stage = 'pending' | 'running' | 'done'
 
 export interface SceneState {
   readonly search: Stage

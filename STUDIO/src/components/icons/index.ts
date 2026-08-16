@@ -2,9 +2,7 @@ import type { ComponentType, CSSProperties } from 'react'
 import type { IconSize } from '@/design/tokens'
 import type { IconState } from './Icon'
 
-export { IconStateProvider, IconStateContext, defineIcon, type Glyph, type IconState } from './Icon'
-export { fromLucide, type LucideIconProps } from './fromLucide'
-export { Icons, type IconConcept } from './registry'
+export { Icons } from './registry'
 export { ProviderMark, type ProviderId } from './ProviderMark'
 
 /**

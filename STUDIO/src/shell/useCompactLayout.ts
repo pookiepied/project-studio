@@ -27,7 +27,7 @@ import { useRail } from '@/stores/rail'
  * number of times anything here actually needs to change.
  */
 /** The width below which the sidebar stops being worth its space. */
-export const COMPACT_WIDTH = 900
+const COMPACT_WIDTH = 900
 
 /**
  * ---- Why the rail is part of this question -------------------------------

@@ -7,7 +7,7 @@ import type { ProviderId } from '@/components/icons'
  * composer disables controls from them -- a picker that offers vision to a
  * text-only model is a failure the user only discovers after sending.
  */
-export type Capability = 'text' | 'vision' | 'tools' | 'reasoning'
+type Capability = 'text' | 'vision' | 'tools' | 'reasoning'
 
 export interface Model {
   readonly id: string

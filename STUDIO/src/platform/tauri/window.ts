@@ -10,7 +10,7 @@ import { invoke } from '@tauri-apps/api/core'
  */
 
 /** Matches the `width`/`height` defaults in tauri.conf.json. */
-export const DEFAULT_WINDOW_SIZE = { width: 1040, height: 720 } as const
+const DEFAULT_WINDOW_SIZE = { width: 1040, height: 720 } as const
 
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window

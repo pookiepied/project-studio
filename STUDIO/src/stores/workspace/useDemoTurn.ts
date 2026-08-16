@@ -24,7 +24,7 @@ const STREAM_WORDS = 2
 /** How long the model appears to consider before any text arrives. */
 const LEAD_IN = 380
 
-export type TurnPatch = (change: (conversation: Conversation) => Conversation) => void
+type TurnPatch = (change: (conversation: Conversation) => Conversation) => void
 
 export interface TurnRun {
   readonly modelId: string

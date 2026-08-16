@@ -1,3 +1,2 @@
-export { WorkspaceProvider, useWorkspace, type NewProjectInput } from './WorkspaceProvider'
-export { deriveTitle } from './deriveTitle'
+export { WorkspaceProvider, useWorkspace } from './WorkspaceProvider'
 export { useDetachConversation } from './useDetachConversation'

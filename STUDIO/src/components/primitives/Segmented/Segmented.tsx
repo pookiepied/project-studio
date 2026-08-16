@@ -3,7 +3,7 @@ import { SPRING_SNAPPY } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 import type { ReactNode } from 'react'
 
-export interface SegmentedOption<T extends string | number> {
+interface SegmentedOption<T extends string | number> {
   readonly id: T
   readonly label: ReactNode
 }

@@ -20,7 +20,7 @@ import type { Artifact, ArtifactSection, ArtifactStatus } from '@/domain/artifac
  * still be wrong when the stream finishes.
  */
 
-export type ParseResult =
+type ParseResult =
   | { readonly kind: 'artifact'; readonly artifact: Artifact }
   | { readonly kind: 'pending' }
   | { readonly kind: 'error'; readonly message: string }

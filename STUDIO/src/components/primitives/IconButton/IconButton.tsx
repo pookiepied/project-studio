@@ -78,7 +78,7 @@ const TONE_CLASS: Record<Tone, string> = {
   solid: 'bg-primary text-primary-foreground hover:opacity-85 [&_.studio-icon]:text-primary-foreground',
 }
 
-export interface IconButtonProps {
+interface IconButtonProps {
   label: string
   onClick?: () => void
   size?: Size

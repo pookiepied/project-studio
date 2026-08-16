@@ -1,6 +1,6 @@
 import { defineIcon, type Glyph } from '@/components/icons/Icon'
 import type { IconSize } from '@/design/tokens'
-import { PROJECT_ICONS, type ProjectIcon } from '@/domain/projects/types'
+import { type ProjectIcon } from '@/domain/projects/types'
 
 /**
  * Project marks.
@@ -80,5 +80,3 @@ export function ProjectIconMark({
   const Mark = COMPONENTS[icon]
   return <Mark size={size} className={className} />
 }
-
-export { PROJECT_ICONS }

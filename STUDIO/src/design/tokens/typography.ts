@@ -34,9 +34,9 @@
  * as emphasis.
  */
 
-export type TypeRole = 'micro' | 'caption' | 'ui' | 'body' | 'title' | 'display'
+type TypeRole = 'micro' | 'caption' | 'ui' | 'body' | 'title' | 'display'
 
-export interface TypeStep {
+interface TypeStep {
   /** Font size in px, before the user's size preference is applied. */
   readonly size: number
   readonly lineHeight: number
@@ -44,7 +44,7 @@ export interface TypeStep {
   readonly icon: number
 }
 
-export const TYPE: Record<TypeRole, TypeStep> = {
+const TYPE: Record<TypeRole, TypeStep> = {
   /** Section headers, badges, counts. Carries weight and open tracking. */
   micro: { size: 11, lineHeight: 1.45, icon: 12 },
   /** Secondary labels, menu hints, notes. Separated by colour, not size. */
@@ -58,9 +58,6 @@ export const TYPE: Record<TypeRole, TypeStep> = {
   /** Page titles and greetings. Serif. */
   display: { size: 32, lineHeight: 1.15, icon: 32 },
 }
-
-/** Monospace, used by code blocks and inline code. */
-export const CODE_SIZE = 12
 
 /**
  * What the appearance settings may offer.

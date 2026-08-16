@@ -252,4 +252,3 @@ export const Icons = {
   voice: VoiceWave,
 }
 
-export type IconConcept = keyof typeof Icons

@@ -5,7 +5,7 @@
  * the harness needs the path, and deriving one from the other at the call site
  * is how two callers end up disagreeing about what a folder is called.
  */
-export interface SourceFolder {
+interface SourceFolder {
   readonly id: string
   readonly name: string
   readonly path: string

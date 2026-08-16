@@ -173,7 +173,7 @@ const CHANGE_VERB: Record<NonNullable<ArtifactFileChange['action']>, string> = {
   read: 'read',
 }
 
-export function FileChanges({ items }: { items: readonly ArtifactFileChange[] }) {
+function FileChanges({ items }: { items: readonly ArtifactFileChange[] }) {
   return (
     <AnimatedList className="gap-0.5">
       {items.map((item, index) => (

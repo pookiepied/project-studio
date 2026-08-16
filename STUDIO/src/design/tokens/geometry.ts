@@ -34,7 +34,7 @@ export const RADIUS = {
 } as const
 
 /** The 4px spacing grid. Nothing in the app uses a value that is not here. */
-export const SPACE = {
+const SPACE = {
   none: 0,
   hair: 2,
   xs: 4,
