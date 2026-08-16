@@ -5,6 +5,7 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import { ArtifactBlock } from '@/features/artifacts'
 import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/blocks'
 
 /**
@@ -76,9 +77,13 @@ const COMPONENTS: Components = {
       )
     }
 
-    // A fence can mean "here is code" or "here is a piece of writing I made
-    // for you". They are different objects and get different blocks -- see
-    // `TextBlock` for why a rewrite should not be set as monospace.
+    // A fence carries three different intentions and they are three different
+    // objects. `artifact` is structured output the model produced -- a search,
+    // an image, an issue -- and is rendered as a thing rather than as its JSON.
+    if (fence === 'artifact') return <ArtifactBlock source={text} />
+
+    // Code, or a piece of writing made for you. See `TextBlock` for why a
+    // rewrite should not be set as monospace.
     if (fence in TEXT_FENCES) return <TextBlock text={text} fence={fence} />
 
     return <CodeBlock code={text} fence={fence} />

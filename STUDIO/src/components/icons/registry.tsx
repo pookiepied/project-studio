@@ -32,7 +32,8 @@ import {
   MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
   RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, WrapText, X,
-  FastForward,
+  FastForward, Bot, CalendarDays, CircleAlert, CircleCheck, Clapperboard, FileText,
+  Link2, Mail, PanelRight, Sparkles, Users,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -173,8 +174,25 @@ const REGISTRY = {
   wordWrap: { mark: WrapText },
   image: { mark: Image },
 
+  // -- Artifacts -----------------------------------------------------------
+  // Marks for things the model produced. `image` already exists above and is
+  // deliberately not repeated here.
+  video: { mark: Clapperboard },
+  file: { mark: FileText },
+  mail: { mark: Mail },
+  calendar: { mark: CalendarDays },
+  link: { mark: Link2 },
+  generate: { mark: Sparkles },
+  rail: { mark: PanelRight },
+
+  // -- Agents ---------------------------------------------------------------
+  agent: { mark: Bot },
+  agents: { mark: Users },
+
   // -- Confirmation and destructive ----------------------------------------
   check: { mark: Check },
+  succeeded: { mark: CircleCheck },
+  failed: { mark: CircleAlert },
   pin: { mark: Pin },
   delete: { mark: Trash2, motion: LIFT_LID },
   clear: { mark: Eraser },
