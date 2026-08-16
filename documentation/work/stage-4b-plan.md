@@ -276,7 +276,14 @@ Was the only documentation item on this list. ADRs 0019/0022/0024,
 `phases/roadmap.md` and the harness README now carry the conditional sentence;
 the archive is deliberately untouched. Chasing it also surfaced **#95** — ADR
 0022's untrusted-bytes half is entirely unaffected by containment, and an MCP
-server's result is the one place that argument was never applied.
+server's result looked like the one place that argument was never applied.
+
+*It was applied.* #95 is closed as a **correction**: `extend/mcp` carries its own
+label and always did, and the register entry was written from a grep for the
+shared constant's name — which cannot tell "nobody does this" from "somebody
+does this their own way". What was actually missing was smaller and real: the
+constant had no doc comment tying it to the decision, and its coverage was
+incidental rather than stated. Both fixed.
 
 #### Not blockers, recorded so they are not mistaken for gaps
 
