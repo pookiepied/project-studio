@@ -153,7 +153,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                   type="button"
                   aria-label="New project"
                   onClick={onNewProject}
-                  className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground/80 transition-colors duration-150 hover:bg-tint hover:text-foreground"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-150 hover:bg-tint"
                 >
                   <Icons.projectNew />
                 </button>
@@ -171,7 +171,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                   aria-label="Sidebar options"
                   onClick={() => setMenuOpen((value) => !value)}
                   className={cn(
-                    'flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-opacity duration-150 hover:text-foreground',
+                    'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-tint',
                     menuOpen ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100',
                   )}
                 >

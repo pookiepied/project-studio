@@ -85,8 +85,16 @@ export function Tooltip({
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             className={cn(
-              'studio-blur pointer-events-none absolute z-50 whitespace-nowrap rounded-md border px-2 py-1',
-              'text-caption text-foreground shadow-[0_6px_20px_-6px_rgba(0,0,0,0.22)]',
+              // Inverted, and solid. A translucent panel tinted from the same
+              // surface it floats over is the one thing a tooltip must not be:
+              // it borrows the colour of whatever is behind it, so the label
+              // half-dissolves into the row it is explaining. `--primary` is
+              // near-black in light and near-white in dark, so the capsule
+              // flips with the theme and always reads as a separate object
+              // rather than a lighter patch of the same one.
+              'pointer-events-none absolute z-50 whitespace-nowrap rounded-lg px-2 py-1',
+              'bg-primary text-primary-foreground',
+              'text-caption shadow-[0_6px_20px_-6px_rgba(0,0,0,0.28)]',
               SIDE_CLASS[side],
             )}
           >

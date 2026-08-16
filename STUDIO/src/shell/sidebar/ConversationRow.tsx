@@ -79,8 +79,8 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
             aria-label="Conversation options"
             onClick={() => setMenuOpen((open) => !open)}
             className={cn(
-              'flex size-5 shrink-0 items-center justify-center rounded transition-opacity duration-150',
-              'text-muted-foreground hover:text-foreground',
+              'flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-150',
+              'text-muted-foreground hover:bg-tint',
               menuOpen ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
             )}
           >

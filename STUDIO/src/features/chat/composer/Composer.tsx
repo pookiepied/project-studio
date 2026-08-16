@@ -134,7 +134,6 @@ export function Composer({
                 <IconButton
                   label={busy ? 'Stop' : 'Send'}
                   size="lg"
-                  round
                   tone="solid"
                   onClick={busy ? stop : submit}
                 >
@@ -155,7 +154,7 @@ export function Composer({
                     features, so two marks -- the previous build gave them
                     adjacent glyphs and they read as one control with a
                     duplicate. */}
-                <IconButton label="Voice mode" size="lg" round onClick={() => undefined}>
+                <IconButton label="Voice mode" size="lg" onClick={() => undefined}>
                   <Icons.voice size="md" />
                 </IconButton>
               </motion.div>

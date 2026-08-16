@@ -34,7 +34,6 @@ export function AddMenu({ onDictate }: { onDictate: () => void }) {
         <IconButton
           label="Add context"
           size="lg"
-          round
           active={open}
           onClick={() => setOpen((value) => !value)}
         >

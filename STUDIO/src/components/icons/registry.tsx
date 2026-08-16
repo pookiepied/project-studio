@@ -29,9 +29,10 @@ import {
   Archive, ArrowDown, ArrowUp, AudioLines, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
   CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
-  MoreHorizontal, Moon, PanelLeft, Paperclip, Palette, Pencil, Pin, Plug, Plus, RefreshCw, RotateCw,
-  Search, Settings2, Shield, ShieldAlert, ShieldHalf, ShieldOff, SlidersHorizontal, Split, Square,
+  MoreHorizontal, Moon, PanelLeft, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
+  RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, WrapText, X,
+  FastForward,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
@@ -92,8 +93,27 @@ interface Entry {
 const REGISTRY = {
   // -- Window and shell ----------------------------------------------------
   close: { mark: X },
-  sidebar: { mark: PanelLeft },
-  search: { mark: Search },
+  /**
+   * The panel mark leans toward the edge it will move the panel to.
+   *
+   * Open, it nudges left -- the direction the column is about to go. Closed, it
+   * nudges right. It is a small distance on purpose: this is a control used
+   * dozens of times a session, and the motion has to survive being seen that
+   * often, which rules out anything that reads as a flourish the second time.
+   */
+  sidebar: {
+    mark: PanelLeft,
+    motion: {
+      rest: { x: 0 },
+      hover: { x: 1, transition: SNAP },
+      on: { x: -1, transition: SNAP },
+    },
+  },
+  /** Leans into the glass, the way looking closer does. */
+  search: {
+    mark: Search,
+    motion: { rest: { scale: 1 }, hover: { scale: 1.08, transition: SNAP } },
+  },
   command: { mark: Command },
   reload: { mark: RefreshCw, motion: WIND },
   settings: { mark: Settings2, motion: TURN_SLIGHT },
@@ -111,11 +131,18 @@ const REGISTRY = {
   disclosure: { mark: ChevronRight, motion: TURN },
 
   // -- Model and permission ------------------------------------------------
+  //
+  // Not shields. A shield says the app is a hazard being contained, which is
+  // the developer-tool reading of these modes and the wrong one here: choosing
+  // "manual" is not raising a guard, it is asking to be consulted. The triad is
+  // a transport control instead, because that is what the modes actually are --
+  // how far ahead the app may run before it stops for you. Pause, then write,
+  // then run on. Anyone who has used a media player can read it.
   reasoning: { mark: Gauge },
   permission: { mark: Shield },
-  permissionManual: { mark: ShieldAlert },
-  permissionEdits: { mark: ShieldHalf },
-  permissionAuto: { mark: ShieldOff },
+  permissionManual: { mark: Pause },
+  permissionEdits: { mark: PenLine },
+  permissionAuto: { mark: FastForward },
 
   // -- Projects and source control -----------------------------------------
   project: { mark: Folder },

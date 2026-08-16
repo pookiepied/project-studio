@@ -59,7 +59,7 @@ export function ProjectSection({
               aria-label="Project options"
               onClick={() => setMenuOpen((value) => !value)}
               className={cn(
-                'flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-opacity duration-150 hover:text-foreground',
+                'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all duration-150 hover:bg-tint',
                 menuOpen ? 'opacity-100' : 'opacity-0 group-hover/project:opacity-100',
               )}
             >

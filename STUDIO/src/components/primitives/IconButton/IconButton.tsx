@@ -6,10 +6,10 @@ import { cn } from '@/lib/cn'
 /**
  * The one icon-only control in the app.
  *
- * Square by default because it sits in rows of other square controls and a
- * circle among squares reads as a different family. The composer's send and add
- * buttons pass `round`, and there the circle is the point: they are the only
- * single-purpose verbs inside the field.
+ * Always circular. The chip carries the state now (see `TONE_CLASS`), and a
+ * circle is the shape that reads as a resting place for a mark rather than a
+ * button drawn around one -- four corners at 28px are four things asking to be
+ * noticed. There is no `round` prop because there is no second answer.
  *
  * ---- Where icon motion comes from ----------------------------------------
  *
@@ -44,8 +44,25 @@ const SIZE_CLASS: Record<Size, string> = {
   lg: 'size-8',
 }
 
+/**
+ * The background carries the state; the glyph does not.
+ *
+ * `hover:text-foreground` used to ride along with the chip, so a hovered mark
+ * went from `--muted-foreground` to `--foreground` -- a jump of 0.41 in
+ * lightness, in one step, at the same moment a background appeared underneath
+ * it. Two things escalating at once made a hovered icon the highest-contrast
+ * pixel on screen: darker than the body text beside it, for a control the
+ * pointer was merely passing over. That is the whole of the "harsh", "inky",
+ * lit-up quality, and it is what separates this from the platform look.
+ *
+ * macOS moves the chip and leaves the glyph alone, so the answer to "where am
+ * I" is a soft shape appearing, not the icon shouting. The mark stays muted
+ * through rest, hover and press; only `active` -- a control that is genuinely
+ * *on* -- earns full contrast, because that is a state rather than a pointer
+ * position.
+ */
 const TONE_CLASS: Record<Tone, string> = {
-  quiet: 'text-muted-foreground hover:bg-tint hover:text-foreground',
+  quiet: 'text-muted-foreground hover:bg-tint',
   solid: 'bg-primary text-primary-foreground hover:opacity-85',
 }
 
@@ -54,7 +71,6 @@ export interface IconButtonProps {
   onClick?: () => void
   size?: Size
   tone?: Tone
-  round?: boolean
   active?: boolean
   disabled?: boolean
   /** Where the tooltip opens. `bottom` for controls near the window's top. */
@@ -64,7 +80,7 @@ export interface IconButtonProps {
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, onClick, size = 'md', tone = 'quiet', round = false, active = false, disabled = false, tooltipSide = 'top', className, children },
+  { label, onClick, size = 'md', tone = 'quiet', active = false, disabled = false, tooltipSide = 'top', className, children },
   ref,
 ) {
   const [pointer, setPointer] = useState<'rest' | 'hover' | 'press'>('rest')
@@ -93,7 +109,12 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           // across the composer row.
           'leading-none transition-colors duration-150',
           'disabled:pointer-events-none disabled:opacity-40',
-          round ? 'rounded-full' : 'rounded-md',
+          // Circular, because the chip is the whole state signal now and a
+          // circle is the shape that reads as a resting place for a mark rather
+          // than a button drawn around it. A squircle at 28px is four corners
+          // asking to be noticed; the circle is quieter at the same contrast,
+          // which is the entire trade this component is making.
+          'rounded-full',
           SIZE_CLASS[size],
           TONE_CLASS[tone],
           active && tone === 'quiet' && 'bg-selected text-foreground',
