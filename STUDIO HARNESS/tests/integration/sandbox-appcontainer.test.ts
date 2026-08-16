@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hostIsolation } from "../../src/sandbox/isolation/index.js";
+import { profileName } from "../../src/sandbox/isolation/windows/appcontainer.js";
 import { launcherPath } from "../../src/sandbox/isolation/windows/launcher.js";
+import { readLedger } from "../../src/sandbox/isolation/windows/ledger.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
 
@@ -204,7 +206,41 @@ windows("a contained child on Windows", () => {
     expect(await inside(sandbox, NETWORK_PROBE)).toMatch(/reached \d+/);
   }, 60_000);
 
-  it("takes its permission entry back off the user's directory", async () => {
+  it("releases a workspace whose directory has already been deleted", async () => {
+    // The case `pnpm sandbox:release --stale` exists for, and the one `release`
+    // could not do. It revokes the entry on each root before deleting the
+    // profile, the launcher reads a directory's permissions before rewriting
+    // them, and a deleted directory returns `error 2` — so the release threw and
+    // the profile stayed. Every entry `--stale` was built to clear failed, which
+    // is the whole feature inverted.
+    //
+    // Its own workspace rather than the shared one, because the test is that
+    // the directory is *gone* before the release starts.
+    const doomed = await mkdtemp(join(tmpdir(), "studio-appcontainer-gone-"));
+    const sandbox = new LocalSandbox(createSandboxPolicy({ workspaceRoot: doomed }));
+    await sandbox.run("shell", { executable: NODE, args: ["-e", "0"], cwd: doomed });
+    expect(readLedger().some((record) => record.workspaceRoot === doomed)).toBe(true);
+
+    await rm(doomed, { recursive: true, force: true });
+
+    await expect(sandbox.releaseIsolation()).resolves.toBeUndefined();
+    expect(readLedger().some((record) => record.workspaceRoot === doomed)).toBe(false);
+  }, 60_000);
+
+  it("records the profile against a path a person can recognise", async () => {
+    // #94. Removal always worked; what a user could not do was *see* what
+    // existed, because a profile is named `studio-<sha256[0:32]>` and nothing on
+    // the machine relates that back to a project. "You have fourteen of these"
+    // is not something a person can act on.
+    //
+    // Asserted before the release below, since that is the order the two
+    // actually happen in and the release test consumes this workspace.
+    const entry = readLedger().find((record) => record.workspaceRoot === workspace);
+    expect(entry?.name).toBe(profileName(workspace));
+    expect(entry?.createdAt).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("takes its permission entry back off the user's directory, and forgets it", async () => {
     // The disclosed cost of this feature is an ACE on a folder the user owns.
     // A cost that cannot be undone is not a cost, it is a change.
     const before = execFileSync("icacls", [workspace], { encoding: "utf8" });
@@ -214,5 +250,10 @@ windows("a contained child on Windows", () => {
 
     const after = execFileSync("icacls", [workspace], { encoding: "utf8" });
     expect(after).not.toContain("S-1-15-2-");
+
+    // The record goes with it. A listing that still named this workspace would
+    // send a user to remove something already gone, which is the same class of
+    // wrong as not listing it at all.
+    expect(readLedger().some((record) => record.workspaceRoot === workspace)).toBe(false);
   }, 60_000);
 });

@@ -1,4 +1,6 @@
 import { existsSync, rmSync, writeFileSync } from "node:fs";
+
+import { readLedger } from "./isolation/windows/ledger.js";
 import { resolve } from "node:path";
 
 import {
@@ -321,8 +323,104 @@ async function prepare(targets: readonly string[]): Promise<void> {
   if (failed) process.exitCode = 1;
 }
 
+/**
+ * `pnpm sandbox:list` — what containment has left on this machine.
+ *
+ * The half of #94 that was actually missing. Removal already worked and is
+ * already correct; what a user had no way to do was *see* what existed. A
+ * profile is named `studio-<sha256[0:32]>`, the hash cannot be inverted, and
+ * nothing on the machine relates it back to a project — so "you have fourteen of
+ * these" was information a person could not act on.
+ *
+ * Says what it does not know, rather than implying a completeness it cannot
+ * have: this reads Studio's own record, so a profile minted before the record
+ * existed does not appear. Claiming to be the machine's inventory would be the
+ * more useful-sounding answer and the false one.
+ */
+function listProfiles(): void {
+  if (process.platform !== "win32") {
+    // Not a stub. A Linux namespace evaporates with the process that held it,
+    // which is why `release()` there is a genuine no-op — there is nothing to
+    // list because nothing accumulates.
+    process.stdout.write(
+      "Nothing to list: containment on this platform leaves nothing behind.\n" +
+        "A namespace ends with the process that held it.\n",
+    );
+    return;
+  }
+
+  const entries = [...readLedger()].sort((a, b) => a.createdAt - b.createdAt);
+  if (entries.length === 0) {
+    process.stdout.write("No sandbox profiles are recorded for this installation.\n");
+    return;
+  }
+
+  process.stdout.write(
+    `${entries.length} sandbox profile${entries.length === 1 ? "" : "s"}, ` +
+      "one per project that has run a contained program:\n\n",
+  );
+  for (const entry of entries) {
+    const gone = existsSync(entry.workspaceRoot) ? "" : "   (project directory is gone)";
+    const when = new Date(entry.createdAt).toISOString().slice(0, 10);
+    process.stdout.write(`  ${when}  ${entry.workspaceRoot}${gone}\n`);
+  }
+  process.stdout.write(
+    `\nRemove one with:  pnpm sandbox:release <project-directory>\n` +
+      `Remove every one whose project is gone:  pnpm sandbox:release --stale\n` +
+      `\nProfiles created before this list existed are not shown — it records what\n` +
+      `Studio did, and is not an inventory of the machine.\n`,
+  );
+}
+
+/**
+ * `pnpm sandbox:release --stale` — release every profile whose project is gone.
+ *
+ * The one rule that is safe to apply in bulk without a reference count. A second
+ * Studio window working in a project whose directory has been deleted is already
+ * broken in a way this cannot make worse, whereas releasing a *live* project's
+ * profile would strip that window's container mid-call — which is why nothing
+ * does this on exit and why the bulk rule is this narrow rather than "all".
+ */
+async function releaseStale(): Promise<void> {
+  const entries = readLedger().filter((entry) => !existsSync(entry.workspaceRoot));
+  if (entries.length === 0) {
+    process.stdout.write("Nothing to release: every recorded project still exists.\n");
+    return;
+  }
+
+  let failed = false;
+  for (const entry of entries) {
+    const sandbox = new LocalSandbox(
+      createSandboxPolicy({ workspaceRoot: entry.workspaceRoot }),
+    );
+    try {
+      await sandbox.releaseIsolation();
+      process.stdout.write(`Released ${entry.workspaceRoot}\n`);
+    } catch (error) {
+      // Reported and stepped over. One unremovable profile should not strand
+      // the other thirteen, and the record keeps it visible for a retry.
+      process.stderr.write(
+        `${entry.workspaceRoot} — failed: ` +
+          `${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      failed = true;
+    }
+  }
+  if (failed) process.exitCode = 1;
+}
+
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
+
+  if (command === "list") {
+    listProfiles();
+    return;
+  }
+
+  if (command === "--stale") {
+    await releaseStale();
+    return;
+  }
 
   if (command === "prepare") {
     // Dispatched on the platform rather than on what the user typed. "This
@@ -344,7 +442,9 @@ async function main(): Promise<void> {
         ? "Usage: sudo pnpm sandbox:prepare [--undo]\n" +
             "       pnpm sandbox:release <project-directory>\n"
         : "Usage: pnpm sandbox:prepare [project-directory...]\n" +
-            "       pnpm sandbox:release <project-directory>\n",
+            "       pnpm sandbox:release <project-directory>\n" +
+            "       pnpm sandbox:release --stale\n" +
+            "       pnpm sandbox:list\n",
     );
     process.exitCode = 2;
     return;

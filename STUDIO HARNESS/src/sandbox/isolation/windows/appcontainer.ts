@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 
 import { SandboxError } from "../../errors.js";
 import type { SandboxPolicy } from "../../policy.js";
@@ -8,6 +9,7 @@ import type {
   IsolationBackend,
 } from "../backend.js";
 import { containArgs, invokeLauncher, launcherInstalled, launcherPath } from "./launcher.js";
+import { forgetProfile, recordProfile } from "./ledger.js";
 import { ensureTraversable, revokeTraverse } from "./traversal.js";
 
 /**
@@ -202,6 +204,11 @@ class WindowsAppContainerBackend implements IsolationBackend {
       }
       container = { sid, granted: new Set(), traversed: new Set() };
       this.#prepared.set(key, container);
+      // Written here, where the profile is actually minted, so the record
+      // cannot claim something the machine does not have. The name is a hash of
+      // the path and nothing can invert it, so without this a user looking at
+      // `studio-9f86d081…` has no way to learn which project it belongs to.
+      recordProfile(profileName(key), key);
     }
 
     // One grant per path, with the mode already resolved — not a read pass
@@ -224,14 +231,29 @@ class WindowsAppContainerBackend implements IsolationBackend {
     // and the entry stays in the user's folder properties as an unreadable
     // line nobody can attribute or remove without knowing what it was.
     for (const root of new Set([...policy.readRoots, ...policy.writeRoots])) {
+      // A path that is gone has no entry to take back, and asking anyway used to
+      // abort the whole release: the launcher reads a directory's permissions
+      // before rewriting them and returns `error 2` when there is no directory.
+      // Which meant `release` failed for exactly the workspaces most worth
+      // releasing — the finished, deleted ones — leaving the profile behind and
+      // making `--stale` fail on every entry it was built for. Found by running
+      // it on a deleted project, not by reading it.
+      if (!existsSync(root)) continue;
       invokeLauncher(["revoke", "--sid", sid, "--path", root]);
     }
     // The corridor goes too. These are entries on directories the user owns —
     // their home folder among them — and leaving them behind would be the
     // "only ever adds" growth this method exists to prevent.
-    for (const ancestor of container?.traversed ?? []) revokeTraverse(ancestor, sid);
+    for (const ancestor of container?.traversed ?? []) {
+      if (!existsSync(ancestor)) continue;
+      revokeTraverse(ancestor, sid);
+    }
     invokeLauncher(["profile-delete", "--name", profileName(key)]);
     this.#prepared.delete(key);
+    // Last, and only once the profile is actually gone. Forgetting first would
+    // lose the one thing that can tell a user this workspace still has a
+    // profile if the delete failed.
+    forgetProfile(key);
   }
 }
 

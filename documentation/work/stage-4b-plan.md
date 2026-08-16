@@ -180,13 +180,22 @@ around that: a Linux user cannot reach the working state without editing kernel
 settings by hand, and the boundary a granted network draws is not the same on
 the two platforms. Ranked by what stands between this and shipping.
 
-*Updated 2026-08-16: four of the five are closed — #92, #93, #90 and #41 — and
-#95 turned out not to be a defect at all. Only #94 is left. The list is kept in
-its original order and marked, rather than rewritten, because what each item
-failed to anticipate is the useful part: #92 did not foresee that the setup
-command would measure the wrong account, #93 predicted a firewall rule it turned
-out not to need, and #95 was written from a grep that could not tell "nobody
+*Updated 2026-08-16: **all of them are closed** — #92, #93, #90, #94 and #41 —
+and #95 turned out not to be a defect at all. The list is kept in its original
+order and marked, rather than rewritten, because what each item failed to
+anticipate is the useful part: #92 did not foresee that the setup command would
+measure the wrong account, #93 predicted a firewall rule it turned out not to
+need, #94 diagnosed growth when the real problem was that a hash names nothing a
+person can act on, and #95 was written from a grep that could not tell "nobody
 does this" from "somebody does this their own way".*
+
+*The pattern across all five is worth more than any of them: **every one was
+wrong in some part, and running the thing is what said so.** Four separate
+defects — a probe measuring root, an undo that undid nothing, a setup command
+that reported success while installing nothing, and a release that failed on
+exactly the workspaces it was built for — passed review, type-checking and a
+green suite. None would have been found by reading the code, because in each
+case the code said what its author meant.*
 
 #### 1. Linux is correct and unusable out of the box — #92 — **closed 2026-08-16**
 
@@ -274,7 +283,22 @@ sandbox users switch off. This is a schema field, a migration and a dialog line
 is narrow (`internetClient`, no loopback, no LAN); on Linux it is as wide as #93
 says.
 
-#### 4. Windows profiles accumulate, one per project — #94
+#### 4. Windows profiles accumulate, one per project — #94 — **closed 2026-08-16**
+
+**Closed as the maintenance surface, not the reference count.** `pnpm
+sandbox:list` shows every profile against the project path that minted it, and
+`pnpm sandbox:release --stale` clears the ones whose project is gone. Automatic
+release stays refused for the reason below, which has not changed.
+
+The framing below was slightly wrong, and usefully. It treated this as *growth*,
+and the growth was already bounded and disclosed; what actually made it a
+problem is that the name is a hash, so a user could see profiles accumulating
+and had no way to tell which project any of them belonged to. The fix was
+visibility, not removal — removal already worked. Except in one case: releasing
+a workspace whose directory had been deleted threw, which is precisely the case
+`--stale` exists for. Found by running it.
+
+
 
 Creating a container mints an AppContainer profile and writes one access-control
 entry into the project directory. `pnpm sandbox:release <project>` takes both

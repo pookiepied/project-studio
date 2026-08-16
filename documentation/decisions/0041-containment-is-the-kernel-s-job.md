@@ -196,6 +196,30 @@ It is a manual command rather than automatic cleanup on exit. A profile deleted
 while a second Studio window is working in the same project would strip that
 window's container mid-call, and "cleaned up correctly" is not worth that.
 
+That reasoning held, and it left a different gap. One profile per project is
+bounded growth and it was disclosed — but the profile is named
+`studio-<sha256[0:32]>`, the hash cannot be inverted, and nothing on the machine
+relates it back to a project. A user could see them accumulating and could not
+tell which was which, so "you have fourteen of these" was information nobody
+could act on. The answer was **visibility**, not removal: Studio records the
+workspace path beside each profile it mints, `pnpm sandbox:list` prints them,
+and `pnpm sandbox:release --stale` clears the ones whose project directory has
+been deleted — the one bulk rule that is safe without a cross-process reference
+count, because a window working in a deleted directory is already broken.
+
+The record is a log of what Studio did, not an inventory of the machine, and the
+listing says so; a profile minted before it existed does not appear. It is never
+load-bearing, either — a read-only Studio home costs the listing, not the
+sandbox.
+
+Building it exposed the one case where removal genuinely did not work.
+`release()` revokes the entry on each root before deleting the profile, the
+launcher reads a directory's security descriptor before rewriting it, and a
+deleted directory returns `error 2` — so releasing a finished project threw and
+left the profile behind. `--stale` would have failed on every entry it was built
+for. A path that is gone has no entry to take back, and is skipped. Found by
+running the command against a deleted project (#94).
+
 ### The program runs even though the container cannot read it
 
 `node.exe` runs contained while `C:\Program Files\nodejs` is refused to the
