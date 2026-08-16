@@ -135,7 +135,8 @@ export function AppShell() {
           transition={VIEW_TRANSITION.transition}
           className="h-full"
         >
-          <Surface />
+          {/* Called, not rendered as `<Surface />`. See the note on `Surface`. */}
+          {Surface({ route, conversations, projects })}
         </motion.main>
       </div>
 
@@ -145,21 +146,63 @@ export function AppShell() {
     </div>
   )
 
-  function Surface() {
-    if (route.kind === 'settings') return <SettingsPage sectionId={route.sectionId} />
+}
 
-    if (route.kind === 'project') {
-      const project = projects.find((item) => item.id === route.projectId)
-      return project ? <ProjectPage project={project} /> : <HomePage />
-    }
+/**
+ * Which page the route points at.
+ *
+ * ---- Why this is a plain function at module scope --------------------------
+ *
+ * It used to be `function Surface()` declared *inside* `AppShell` and rendered
+ * as `<Surface />`. That one line was the cause of the flicker that survived
+ * five separate attempts to fix it somewhere else.
+ *
+ * A component declared inside another component's body is a brand new function
+ * object on every render, and React identifies component types by reference.
+ * So on each render of `AppShell` the element type changed, React concluded the
+ * old subtree was a different component entirely, and it unmounted the whole
+ * page and mounted a fresh one -- the transcript, every message, the composer,
+ * all of it.
+ *
+ * That is exactly the reported symptom, including the part that made no sense
+ * under any local explanation: *unchanged* bubbles glitching too. They were not
+ * glitching. They were being destroyed and rebuilt, which replays every
+ * Framer entry animation in the list at once.
+ *
+ * And it happened precisely while a reply streamed, because that is when
+ * `AppShell` re-renders -- `useWorkspace()` publishes a new conversation object
+ * on every chunk, roughly every 28ms. Some thirty-five remounts of the entire
+ * page per second, which no amount of tuning masks, fades or measurement
+ * timing could ever have fixed.
+ *
+ * Calling it (`{Surface({...})}`) inlines the elements it returns into the
+ * parent's tree, so there is no component boundary to re-identify and the
+ * children keep their identity across renders. Hoisting it out and rendering it
+ * as `<Surface {...} />` would work equally well; this way keeps the call site
+ * reading as the branch that it is.
+ */
+function Surface({
+  route,
+  conversations,
+  projects,
+}: {
+  route: ReturnType<typeof useNavigation>['route']
+  conversations: ReturnType<typeof useWorkspace>['conversations']
+  projects: ReturnType<typeof useWorkspace>['projects']
+}) {
+  if (route.kind === 'settings') return <SettingsPage sectionId={route.sectionId} />
 
-    if (route.kind === 'chat') {
-      const conversation = conversations.find((item) => item.id === route.conversationId)
-      return conversation ? <ChatPage conversation={conversation} /> : <HomePage />
-    }
-
-    return <HomePage />
+  if (route.kind === 'project') {
+    const project = projects.find((item) => item.id === route.projectId)
+    return project ? <ProjectPage project={project} /> : <HomePage />
   }
+
+  if (route.kind === 'chat') {
+    const conversation = conversations.find((item) => item.id === route.conversationId)
+    return conversation ? <ChatPage conversation={conversation} /> : <HomePage />
+  }
+
+  return <HomePage />
 }
 
 /** One key per destination, so switching sections animates but typing does not. */
