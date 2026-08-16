@@ -56,10 +56,18 @@ const SIZE_CLASS: Record<Size, string> = {
  * lit-up quality, and it is what separates this from the platform look.
  *
  * macOS moves the chip and leaves the glyph alone, so the answer to "where am
- * I" is a soft shape appearing, not the icon shouting. The mark stays muted
- * through rest, hover and press; only `active` -- a control that is genuinely
- * *on* -- earns full contrast, because that is a state rather than a pointer
- * position.
+ * I" is a soft shape appearing, not the icon shouting.
+ *
+ * That holds for `active` too, and the exception it used to make was the
+ * inconsistency worth naming: with `active` also darkening the mark, a control
+ * that was merely on looked *heavier* than everything around it, and whether an
+ * icon thickened depended on whether the surface happened to track an active
+ * state. Same gesture, different result, one screen apart. The capsule says on;
+ * the glyph is the same glyph in every state it can be in.
+ *
+ * What replaces the contrast is motion -- see `drawn.tsx`. A mark that shows its
+ * state by moving a part of itself says more than one that shows it by getting
+ * darker, and it says it without becoming the loudest thing in the window.
  */
 const TONE_CLASS: Record<Tone, string> = {
   quiet: 'text-muted-foreground hover:bg-tint',
@@ -117,7 +125,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           'rounded-full',
           SIZE_CLASS[size],
           TONE_CLASS[tone],
-          active && tone === 'quiet' && 'bg-selected text-foreground',
+          active && tone === 'quiet' && 'bg-selected',
           className,
         )}
       >

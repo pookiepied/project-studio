@@ -93,27 +93,13 @@ interface Entry {
 const REGISTRY = {
   // -- Window and shell ----------------------------------------------------
   close: { mark: X },
-  /**
-   * The panel mark leans toward the edge it will move the panel to.
-   *
-   * Open, it nudges left -- the direction the column is about to go. Closed, it
-   * nudges right. It is a small distance on purpose: this is a control used
-   * dozens of times a session, and the motion has to survive being seen that
-   * often, which rules out anything that reads as a flourish the second time.
-   */
-  sidebar: {
-    mark: PanelLeft,
-    motion: {
-      rest: { x: 0 },
-      hover: { x: 1, transition: SNAP },
-      on: { x: -1, transition: SNAP },
-    },
-  },
-  /** Leans into the glass, the way looking closer does. */
-  search: {
-    mark: Search,
-    motion: { rest: { scale: 1 }, hover: { scale: 1.08, transition: SNAP } },
-  },
+  // No motion on this one. It used to translate the whole mark on hover, which
+  // said the *button* was moving rather than the panel -- the layout looking
+  // unstable under the cursor, on the control used most often in the app. The
+  // motion that would be right here is the divider inside the mark sliding
+  // while the frame holds still, and that needs a drawn glyph; see `drawn.tsx`.
+  sidebar: { mark: PanelLeft },
+  search: { mark: Search },
   command: { mark: Command },
   reload: { mark: RefreshCw, motion: WIND },
   settings: { mark: Settings2, motion: TURN_SLIGHT },

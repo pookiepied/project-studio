@@ -214,47 +214,60 @@ function prepareParts(glyph: Glyph): Parts {
   return out
 }
 
-function shapes(glyph: Glyph, parts: Parts) {
+/**
+ * Every animated part is driven directly, not by inheritance.
+ *
+ * Framer will propagate a variant label from a parent to children that declare
+ * their own `variants`, and relying on that here did not work: the label
+ * reached the root <svg> and stopped, so a glyph whose motion lives entirely in
+ * its parts sat at `rest` for ever. It failed silently -- correct types, no
+ * warning, a mark that simply never moved -- which is the worst way for an
+ * interaction to fail. Passing `animate` to each part costs one prop and cannot
+ * fail quietly.
+ */
+function shapes(glyph: Glyph, parts: Parts, state: IconState) {
   const part = (key: string) => parts[key]
+  const drive = (m: { v: Variants } | undefined) =>
+    m ? ({ variants: m.v, initial: 'rest' as const, animate: state }) : {}
   const solid = { fill: 'currentColor', stroke: 'none' } as const
 
   return (
     <>
       {glyph.f?.map((d, i) => {
         const m = part(`f${i}`)
-        return <MPath key={`f${i}`} d={d} {...solid} variants={m?.v} style={m?.style} />
+        return <MPath key={`f${i}`} d={d} {...solid} {...drive(m)} style={m?.style} />
       })}
 
       {glyph.fr?.map(([x, y, w, h, r], i) => {
         const m = part(`fr${i}`)
         return (
-          <MRect key={`fr${i}`} x={x} y={y} width={w} height={h} rx={r} {...solid} variants={m?.v} style={m?.style} />
+          <MRect key={`fr${i}`} x={x} y={y} width={w} height={h} rx={r} {...solid} {...drive(m)} style={m?.style} />
         )
       })}
 
       {glyph.fc?.map(([cx, cy, r], i) => {
         const m = part(`fc${i}`)
-        return <MCircle key={`fc${i}`} cx={cx} cy={cy} r={r} {...solid} variants={m?.v} style={m?.style} />
+        return <MCircle key={`fc${i}`} cx={cx} cy={cy} r={r} {...solid} {...drive(m)} style={m?.style} />
       })}
 
       {glyph.p?.map((d, i) => {
         const m = part(`p${i}`)
-        return <MPath key={`p${i}`} d={d} variants={m?.v} style={m?.style} />
+        return <MPath key={`p${i}`} d={d} {...drive(m)} style={m?.style} />
       })}
 
       {glyph.r?.map(([x, y, w, h, r], i) => {
         const m = part(`r${i}`)
-        return <MRect key={`r${i}`} x={x} y={y} width={w} height={h} rx={r} variants={m?.v} style={m?.style} />
+        return <MRect key={`r${i}`} x={x} y={y} width={w} height={h} rx={r} {...drive(m)} style={m?.style} />
       })}
 
       {glyph.c?.map(([cx, cy, r], i) => {
         const m = part(`c${i}`)
-        return <MCircle key={`c${i}`} cx={cx} cy={cy} r={r} variants={m?.v} style={m?.style} />
+        return <MCircle key={`c${i}`} cx={cx} cy={cy} r={r} {...drive(m)} style={m?.style} />
       })}
 
       {glyph.l?.map(([x1, y1, x2, y2], i) => {
         const m = part(`l${i}`)
-        return <MLine key={`l${i}`} x1={x1} y1={y1} x2={x2} y2={y2} variants={m?.v} style={m?.style} />
+        return <MLine key={`l${i}`} x1={x1} y1={y1} x2={x2} y2={y2} {...drive(m)} style={m?.style} />
       })}
     </>
   )
@@ -301,7 +314,7 @@ export function defineIcon(glyph: Glyph, name: string) {
         className={cn('shrink-0', className)}
         {...rest}
       >
-        {shapes(glyph, parts)}
+        {shapes(glyph, parts, resolved)}
       </motion.svg>
     )
   })
