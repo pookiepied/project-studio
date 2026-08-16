@@ -71,7 +71,11 @@ const SIZE_CLASS: Record<Size, string> = {
  */
 const TONE_CLASS: Record<Tone, string> = {
   quiet: 'text-muted-foreground hover:bg-tint',
-  solid: 'bg-primary text-primary-foreground hover:opacity-85',
+  // Opting out of the global muted icon colour on purpose: this mark sits on
+  // a filled chip, where muted grey on near-black is unreadable rather than
+  // quiet. The arbitrary variant lands in the utilities layer, which is what
+  // lets it beat the `.studio-icon` default in `index.css`.
+  solid: 'bg-primary text-primary-foreground hover:opacity-85 [&_.studio-icon]:text-primary-foreground',
 }
 
 export interface IconButtonProps {

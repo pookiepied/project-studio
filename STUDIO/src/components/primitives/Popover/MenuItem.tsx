@@ -42,8 +42,13 @@ export function MenuItem({
       className={cn(
         'flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left text-ui',
         'transition-colors duration-100',
-        destructive ? 'text-muted-foreground' : selected ? 'text-foreground' : 'text-muted-foreground',
+        selected ? 'text-foreground' : 'text-muted-foreground',
         'hover:bg-tint hover:text-foreground',
+        // Delete and its kin say so with the mark, since the label alone reads
+        // like every other row until you have finished reading it. This is the
+        // one place a glyph carries meaning by colour, so it opts out of the
+        // muted default rather than the rule being softened for everyone.
+        destructive && '[&_.studio-icon]:text-red-500/80 hover:[&_.studio-icon]:text-red-500',
       )}
     >
       {icon ? (

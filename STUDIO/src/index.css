@@ -279,6 +279,31 @@
     user-select: text;
   }
 
+  /* -- Icon colour, held independent of the text beside it ------------------
+
+     Every mark in the app renders inside `.studio-icon`, and until this rule
+     existed each one simply inherited `currentColor`. That is why "icons stop
+     darkening" kept being fixed and kept coming back: the fix was applied to
+     the buttons whose *own* colour changed, while the real cause was every row
+     whose *text* darkens -- a sidebar row, a menu item, a branch chip, the
+     account button. Fourteen of them. The row darkens its label on hover, the
+     icon inherits, and the mark goes black again. Chasing that per component is
+     unwinnable, because the next row anyone writes reintroduces it.
+
+     Setting the colour here breaks the inheritance once. A mark is
+     `--muted-foreground` no matter what the text around it is doing, in every
+     state that text can be in, which is the rule this interface wanted all
+     along: the surface says where you are, the glyph stays put.
+
+     It sits in `@layer components` so it can still be overridden deliberately.
+     A Tailwind `text-*` utility on the mark -- or on an ancestor via
+     `[&_.studio-icon]:text-*` -- lives in the utilities layer and wins. Two
+     places need that and both are opting in on purpose: the solid send button,
+     whose mark sits on a black chip, and a destructive menu row. */
+  .studio-icon {
+    color: var(--muted-foreground);
+  }
+
   /* Icon stroke, held constant in device pixels.
 
      The marks are drawn on a 24-unit grid and set anywhere from 12 to 22px, so
