@@ -32,6 +32,9 @@ export function TopStrip() {
       ? conversations.find((item) => item.id === route.conversationId) ?? null
       : null
 
+  /** Every surface that carries a composer, which is every surface but one. */
+  const turnSettings = route.kind !== 'settings'
+
   return (
     <header
       data-tauri-drag-region
@@ -64,20 +67,21 @@ export function TopStrip() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
-        {/* Always present, on every surface.
+        {/* Wherever there is a turn to configure, and nowhere else.
 
-            This used to render only inside a conversation, on the reasoning
-            that the settings belong to one. They do not: they belong to the
-            *next turn*, and the moment you most need to know which model and
-            which permission mode are about to be used is before the
-            conversation exists -- standing on the home page about to type. A
-            control that appears only once the first message is sent tells you
-            what happened rather than what is about to.
+            These are the settings for the *next message*, so the rule is
+            simply: is there a composer on this surface? On a conversation, on
+            home, and in a project there is, and the control belongs there --
+            including before the first message, because which model and which
+            permission mode are about to be used is worth knowing before you
+            type, not after.
 
-            It is also the one thing on screen that says what the app is going
-            to do to your machine. That should never be a fact you have to open
-            a conversation to see. */}
-        <TurnMenu />
+            On Settings there is no message to send. A model picker sitting
+            over a preferences page is a control with nothing to act on, and it
+            invites the reading that it is *part of* those preferences -- that
+            changing it here is changing a default. It is not; it is a
+            per-turn choice. Showing it where it cannot mean that is the fix. */}
+        {turnSettings ? <TurnMenu /> : null}
       </div>
     </header>
   )

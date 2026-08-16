@@ -43,8 +43,7 @@ export function ProvidersPane() {
       })}
 
       <div className="py-3">
-        <Button variant="outline" onClick={() => setAdding(true)}>
-          <Icons.add />
+        <Button variant="secondary" icon={<Icons.add />} onClick={() => setAdding(true)}>
           Add provider
         </Button>
       </div>
@@ -78,7 +77,9 @@ function AddProviderDialog({ open, onClose }: { open: boolean; onClose: () => vo
       width="26rem"
       footer={
         <>
-          <Button onClick={close}>Cancel</Button>
+          <Button variant="ghost" onClick={close}>
+            Cancel
+          </Button>
           <Button variant="primary" disabled={!valid} onClick={close}>
             Add provider
           </Button>

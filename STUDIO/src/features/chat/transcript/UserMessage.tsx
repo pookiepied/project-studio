@@ -63,6 +63,8 @@ export function UserMessage({
           />
           <div className="mt-1.5 flex items-center justify-end gap-1.5">
             <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setDraft(message.text)
                 setEditing(false)
@@ -70,7 +72,7 @@ export function UserMessage({
             >
               Cancel
             </Button>
-            <Button variant="primary" onClick={commit}>
+            <Button variant="primary" size="sm" onClick={commit}>
               Send
             </Button>
           </div>

@@ -85,6 +85,8 @@
   --color-ring: var(--ring);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
 
   --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -195,6 +197,21 @@
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
 
+  /* -- The one hue -------------------------------------------------------
+     Everything else in this file is greyscale on purpose, and this is the
+     exception that proves why: greyscale can say "quiet", "loud" and
+     "disabled", but it cannot say "this destroys something". Weight is
+     already spoken for -- the primary action is the heaviest thing on the
+     page -- so a destructive control drawn in grey either outranks the
+     action you actually came to perform, or disappears.
+
+     Muted rather than a signal red. This colour appears on a settings page
+     next to ordinary controls, not on a warning dialog, and full-saturation
+     red at rest is an alarm that never stops sounding.
+     -------------------------------------------------------------------- */
+  --danger: oklch(0.55 0.19 25);
+  --danger-foreground: oklch(0.985 0 0);
+
   /* -- Pointer and selection states ---------------------------------------
      Translucent on purpose. `--muted` is an opaque swatch, and using it for
      hover meant a row did not darken -- it was *replaced* by a grey chip that
@@ -238,6 +255,12 @@
   --ring: oklch(1 0 0 / 45%);
   --primary: oklch(0.94 0 0);
   --primary-foreground: oklch(0.205 0 0);
+
+  /* Lighter and less saturated than the light-mode value. The same red on a
+     0.205 surface is both harder to read and, being the only chroma on a dark
+     screen, considerably louder than it was on white. */
+  --danger: oklch(0.68 0.16 25);
+  --danger-foreground: oklch(0.205 0 0);
 
   /* Slightly stronger than light: a white tint over a dark surface lifts less
      per percent than a black tint darkens a light one. */

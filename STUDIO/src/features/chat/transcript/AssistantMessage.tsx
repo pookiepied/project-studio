@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { findModel } from '@/domain/models/catalog'
-import { Markdown } from '@/features/chat/markdown'
+import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import type { Message } from '@/domain/session/types'
@@ -31,6 +31,8 @@ export function AssistantMessage({
 }) {
   const [hovered, setHovered] = useState(false)
   const model = message.modelId ? findModel(message.modelId) : undefined
+  const shown = useSmoothText(message.text, streaming)
+  const revealing = shown.length < message.text.length
 
   return (
     <div
@@ -39,12 +41,21 @@ export function AssistantMessage({
       className="flex min-w-0 flex-col"
     >
       {message.thinking ? (
-        <ThinkingBlock thinking={message.thinking} live={streaming && message.text.length === 0} />
+        <ThinkingBlock thinking={message.thinking} live={streaming && shown.length === 0} />
       ) : null}
 
+      {/* The text on screen is not `message.text`. It is a prefix of it, paced
+          by `useSmoothText` off the rate the stream is actually arriving at, so
+          a model producing 900 tokens a second and one producing 25 both read
+          as a steady line of writing rather than as bursts and pauses.
+
+          `revealing` is the tail of that: the transport can finish while the
+          reveal is still a sentence behind, and the block must go on being
+          treated as live until the last character is out, or it would settle
+          and re-render mid-sentence. */}
       <div className="studio-prose min-w-0">
-        <Markdown text={message.text} />
-        {streaming ? <StreamingCaret /> : null}
+        <StreamedMarkdown text={shown} streaming={streaming || revealing} />
+        {streaming || revealing ? <StreamingCaret /> : null}
       </div>
 
       {/* Always mounted, never conditional -- and this is the fix for the jump
@@ -63,7 +74,7 @@ export function AssistantMessage({
           reply, so when the row appears nothing else moves. `visible` still
           gates it, so a message being written offers no retry button. */}
       <MessageActions
-          visible={hovered && !streaming}
+          visible={hovered && !streaming && !revealing}
           copyPayload={message.text}
           actions={[
             { id: 'retry', label: 'Try again', icon: Icons.retry, run: onRetry },

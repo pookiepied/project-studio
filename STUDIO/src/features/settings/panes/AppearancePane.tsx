@@ -82,7 +82,7 @@ export function AppearancePane() {
         label="Window"
         hint="Studio remembers the size and position you leave it at."
       >
-        <Button variant="outline" onClick={() => void resetWindowSize()}>
+        <Button variant="secondary" size="sm" onClick={() => void resetWindowSize()}>
           Reset to default size
         </Button>
       </Row>

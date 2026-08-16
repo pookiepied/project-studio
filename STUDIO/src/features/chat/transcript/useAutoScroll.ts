@@ -71,6 +71,17 @@ export function useAutoScroll(dependency: unknown) {
   const wroteAt = useRef(0)
   const smoothing = useRef(false)
 
+  /**
+   * `pinned` for callbacks that outlive the render that created them.
+   *
+   * The resize observer below is installed once and must read the *current*
+   * value, not the one captured when it was created. Re-installing the observer
+   * whenever `pinned` changes would work and is worse: it tears down and
+   * rebuilds an observer during the exact frames the transcript is growing.
+   */
+  const pinnedRef = useRef(pinned)
+  pinnedRef.current = pinned
+
   const atBottom = useCallback(() => {
     const element = viewport.current
     if (!element) return true
@@ -162,14 +173,46 @@ export function useAutoScroll(dependency: unknown) {
     element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' })
   }, [])
 
-  useEffect(() => {
-    if (!pinned) return
+  const follow = useCallback(() => {
     const element = viewport.current
     if (!element) return
     wroteAt.current = performance.now()
     lastTop.current = element.scrollHeight
     element.scrollTop = element.scrollHeight
-  }, [dependency, pinned])
+  }, [])
+
+  useEffect(() => {
+    if (!pinned) return
+    follow()
+  }, [dependency, pinned, follow])
+
+  /**
+   * Follow the content, not the messages.
+   *
+   * The dependency above fires when text *arrives*, which used to be the same
+   * instant it appeared. It is not any more: the reveal is paced on a frame
+   * clock, so between two arrivals the transcript goes on growing for dozens of
+   * frames with no state change here at all. Following arrivals alone would
+   * pin the view to where the text was when the packet landed and let the
+   * caret walk off the bottom of the screen until the next one.
+   *
+   * A `ResizeObserver` on the content is the honest signal, because it fires on
+   * the thing actually being asked about -- how tall is this now -- and it
+   * covers every other cause of growth for free: an image loading, a code block
+   * expanding, the window changing width and reflowing a paragraph.
+   */
+  useEffect(() => {
+    const element = viewport.current
+    const content = element?.firstElementChild
+    if (!content) return
+
+    const observer = new ResizeObserver(() => {
+      if (!pinnedRef.current) return
+      follow()
+    })
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [follow])
 
   return { viewport, pinned, onScroll, onWheel, onPointerDown, scrollToBottom }
 }

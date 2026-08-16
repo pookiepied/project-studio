@@ -49,23 +49,26 @@ export function ArchivePane() {
             <div className="flex items-center gap-1.5">
               {selected.size > 0 ? (
                 <Button
+                  variant="danger"
+                  size="sm"
+                  icon={<Icons.delete />}
                   onClick={() => {
                     removeMany([...selected])
                     setSelected(new Set())
                   }}
                 >
-                  <Icons.delete />
                   Delete selected
                 </Button>
               ) : null}
               <Button
-                variant="outline"
+                variant="danger"
+                size="sm"
+                icon={<Icons.clear />}
                 onClick={() => {
                   removeMany(archived.map((conversation) => conversation.id))
                   setSelected(new Set())
                 }}
               >
-                <Icons.clear />
                 Clear archive
               </Button>
             </div>
@@ -96,7 +99,9 @@ export function ArchivePane() {
                     {conversation.title ?? 'Untitled'}
                   </span>
 
-                  <Button onClick={() => setArchived(conversation.id, false)}>Restore</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setArchived(conversation.id, false)}>
+                    Restore
+                  </Button>
                 </div>
               )
             })}
