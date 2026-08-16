@@ -180,7 +180,29 @@ around that: a Linux user cannot reach the working state without editing kernel
 settings by hand, and the boundary a granted network draws is not the same on
 the two platforms. Ranked by what stands between this and shipping.
 
-#### 1. Linux is correct and unusable out of the box — #92
+*Updated 2026-08-16: the first of those is closed — a Linux user reaches the
+working state with one command and no kernel edit. The list is kept in its
+original order and marked, rather than rewritten, because what each item failed
+to anticipate is the useful part.*
+
+#### 1. Linux is correct and unusable out of the box — #92 — **closed 2026-08-16**
+
+**Closed.** `sudo pnpm sandbox:prepare` installs
+`/etc/apparmor.d/studio-bwrap`, granting `userns` to `bwrap` and nothing else;
+`--undo` unloads and removes it. Verified end to end on the VPS with the sysctl
+left at **1** the whole time — refused, prepared, contained, full Linux suite
+green at 1234 with every containment assertion running, undone, refused again.
+
+The blocker text below stands as written, because the part worth keeping is what
+it did *not* predict: three defects, all of which made the command report success
+while changing nothing, and none of which a test written from the code would have
+caught — it probed root instead of the user, it deleted the profile before the
+command that needed the file to unload it, and it then read the disk instead of
+the kernel to decide whether the grant was gone. ADR 0041 records them, since the
+shared shape — answering from a source that happens to agree on the machine where
+the code was written — is more durable than any of the three fixes.
+
+
 
 **The blocker.** Stock Ubuntu 23.10 and later set
 `kernel.apparmor_restrict_unprivileged_userns=1` and ship no AppArmor profile
@@ -247,8 +269,9 @@ server's result is the one place that argument was never applied.
 - **Windows needs one elevated command per machine.** `pnpm sandbox:prepare`
   adds a traverse entry to the system-owned ancestors of a project — `C:\` and
   `C:\Users` in practice. Everything under the user's own folders is granted per
-  workspace, silently, and removed by `release`. This is finished work, not an
-  open item; it is the model #92 needs to copy.
+  workspace, silently, and removed by `release`. This is finished work, and it
+  is the model #92 copied: same command, same sentence to the user, a different
+  mechanism underneath.
 - **A program that reads its own *data* files from a protected directory cannot
   be contained on Windows.** The launcher opens the executable's image with its
   own rights, so the program runs without its install directory being granted —

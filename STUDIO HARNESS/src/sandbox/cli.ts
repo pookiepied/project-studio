@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
@@ -13,9 +12,13 @@ import {
   elevationInstructions,
   installProfile,
   profileInstalled,
+  profileLoaded,
+  profileText,
+  PROFILE_NAME,
   PROFILE_PATH,
+  removeProfile,
 } from "./isolation/linux/apparmor.js";
-import { bwrapPath, probeContainment } from "./isolation/linux/bwrap.js";
+import { bwrapPath, probeContainment, unprivilegedIdentity } from "./isolation/linux/bwrap.js";
 import { LocalSandbox } from "./local-sandbox.js";
 import { createSandboxPolicy } from "./policy.js";
 
@@ -86,25 +89,75 @@ async function prepareLinux(undo: boolean): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    rmSync(PROFILE_PATH, { force: true });
-    // Unloading is its own act. Removing the file leaves the profile loaded in
-    // the kernel until the next boot, so the sandbox would keep working and the
-    // user would believe they had undone something they had not.
-    try {
-      execFileSync("apparmor_parser", ["-R", PROFILE_PATH], { stdio: "ignore", timeout: 30_000 });
-    } catch {
-      // Already unloaded, or never loaded. Removing what is not there is the
-      // outcome asked for either way.
+    // Two questions, because the answers come apart. What matters is what the
+    // kernel is enforcing; the file only matters because it is how the profile
+    // is named back to `apparmor_parser`.
+    const onDisk = existsSync(PROFILE_PATH);
+    const loaded = profileLoaded();
+
+    if (!onDisk && !loaded) {
+      process.stdout.write(`${PROFILE_PATH} is not installed. Nothing to remove.\n`);
+      return;
     }
-    process.stdout.write(`Removed ${PROFILE_PATH}. The sandbox will refuse work on this machine again.\n`);
+
+    if (!onDisk) {
+      // The kernel is holding the profile and its file is gone — where an
+      // earlier version of this command left machines, and where anyone who
+      // deletes the file by hand lands. `apparmor_parser -R` reads the name out
+      // of a file, so the file is written back in order to take the grant away.
+      // Recovering a state we caused is worth six lines.
+      writeFileSync(PROFILE_PATH, profileText(path), "utf8");
+    }
+
+    try {
+      removeProfile(() => rmSync(PROFILE_PATH, { force: true }));
+    } catch (error) {
+      // The file is deliberately still there. See `removeProfile`: unloading is
+      // what actually stops the grant, and a file deleted after a failed unload
+      // leaves the kernel holding a profile nothing can name until reboot.
+      process.stderr.write(
+        `Could not unload the profile from the kernel: ` +
+          `${error instanceof Error ? error.message : String(error)}\n` +
+          `${PROFILE_PATH} has been left in place so this can be retried — ` +
+          `bubblewrap can still create a namespace until it succeeds.\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    // Measured, not assumed — the same rule the install path follows, and the
+    // reason this one exists at all.
+    if (profileLoaded()) {
+      process.stderr.write(
+        `Removed ${PROFILE_PATH}, and the kernel is still enforcing the\n` +
+          `${PROFILE_NAME} profile. Bubblewrap can still create a namespace.\n` +
+          `A reboot clears it.\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    process.stdout.write(
+      `Unloaded the profile and removed ${PROFILE_PATH}. ` +
+        `The sandbox will refuse work on this machine again.\n`,
+    );
     return;
   }
+
+  // Asked *about the user*, not about the asker. Under `sudo` those differ and
+  // only one of them is the question: see `unprivilegedIdentity`, which exists
+  // because probing as root made this command report success and install
+  // nothing, on a machine where the user was still refused.
+  const subject = unprivilegedIdentity(process.getuid?.(), process.env);
+  const measured = subject === undefined ? "this account" : `uid ${subject.uid}`;
 
   // Asked before anything is changed. A machine whose kernel already hands out
   // namespaces — most non-Ubuntu distributions — needs no profile, and writing
   // one anyway would be a permanent change made for no reason.
-  if (probeContainment(path).ok) {
-    process.stdout.write("The sandbox already works on this machine. Nothing to do.\n");
+  if (probeContainment(path, subject).ok) {
+    process.stdout.write(
+      `The sandbox already works on this machine, measured as ${measured}. Nothing to do.\n`,
+    );
     return;
   }
 
@@ -120,9 +173,10 @@ async function prepareLinux(undo: boolean): Promise<void> {
     // sandbox stays refused, which is the failure this whole cycle is about.
     process.stderr.write(
       `${PROFILE_PATH} is already installed and bubblewrap still cannot create a\n` +
-        `namespace. Something else on this machine is refusing it — a seccomp\n` +
-        `filter or a container runtime are the usual causes. What the kernel said:\n` +
-        `  ${probeContainment(path).detail ?? "(no detail)"}\n`,
+        `namespace for ${measured}. Something else on this machine is refusing it —\n` +
+        `a seccomp filter or a container runtime are the usual causes. What the\n` +
+        `kernel said:\n` +
+        `  ${probeContainment(path, subject).detail ?? "(no detail)"}\n`,
     );
     process.exitCode = 1;
     return;
@@ -142,10 +196,11 @@ async function prepareLinux(undo: boolean): Promise<void> {
   // Measured again rather than assumed. `apparmor_parser` exiting zero means the
   // profile parsed, not that the kernel now allows what we need — and the whole
   // argument of this stage is that those are different questions.
-  const after = probeContainment(path);
+  const after = probeContainment(path, subject);
   if (!after.ok) {
     process.stderr.write(
-      `Installed ${PROFILE_PATH}, and bubblewrap still cannot create a namespace.\n` +
+      `Installed ${PROFILE_PATH}, and bubblewrap still cannot create a namespace\n` +
+        `for ${measured}.\n` +
         `What the kernel said: ${after.detail ?? "(no detail)"}\n` +
         `Undo with: sudo pnpm sandbox:prepare --undo\n`,
     );
@@ -154,7 +209,7 @@ async function prepareLinux(undo: boolean): Promise<void> {
   }
 
   process.stdout.write(
-    `Installed ${PROFILE_PATH} and verified that the sandbox now contains.\n` +
+    `Installed ${PROFILE_PATH} and verified that the sandbox now contains for ${measured}.\n` +
       `Bubblewrap may create a user namespace; nothing else on this machine changed.\n` +
       `Undo with: sudo pnpm sandbox:prepare --undo\n`,
   );

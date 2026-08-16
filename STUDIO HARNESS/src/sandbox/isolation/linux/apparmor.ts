@@ -40,6 +40,39 @@ import { readFileSync } from "node:fs";
 /** Where the profile lives. Fixed by AppArmor's own layout, not by us. */
 export const PROFILE_PATH = "/etc/apparmor.d/studio-bwrap";
 
+/** What the kernel calls it once loaded, which is not the same as where it lives. */
+export const PROFILE_NAME = "studio-bwrap";
+
+/**
+ * Where the kernel lists what it is actually enforcing.
+ *
+ * Root-readable, one profile per line, and the only account of this that cannot
+ * be out of date. Preferred over parsing `aa-status`, which is a program whose
+ * output format is a courtesy rather than an interface.
+ */
+const LOADED_PROFILES = "/sys/kernel/security/apparmor/profiles";
+
+/**
+ * Whether the kernel is holding our profile right now.
+ *
+ * Asked separately from "is the file on disk" because those two answers come
+ * apart, and the gap between them is where the grant hides. A file deleted by
+ * hand — or by an earlier version of this command, which deleted before
+ * unloading — leaves the profile loaded and enforcing with nothing on disk to
+ * show for it. Reporting "not installed" in that state would be true about the
+ * filesystem and false about the machine.
+ */
+export function profileLoaded(): boolean {
+  try {
+    return readFileSync(LOADED_PROFILES, "utf8")
+      .split("\n")
+      .some((line) => line.startsWith(`${PROFILE_NAME} `));
+  } catch {
+    // No AppArmor, or not root. Neither is a machine holding our profile.
+    return false;
+  }
+}
+
 /**
  * The profile text.
  *
@@ -63,7 +96,7 @@ export function profileText(bwrapPath: string): string {
 abi <abi/4.0>,
 include <tunables/global>
 
-profile studio-bwrap ${bwrapPath} flags=(unconfined) {
+profile ${PROFILE_NAME} ${bwrapPath} flags=(unconfined) {
   userns,
 
   # Site-specific additions and overrides. See local/README for details.
@@ -104,6 +137,27 @@ export function installProfile(bwrapPath: string, write: (text: string) => void)
   // that looks like success: the file is there, the kernel has never read it,
   // and the sandbox stays refused until the next reboot.
   execFileSync("apparmor_parser", ["-r", PROFILE_PATH], { stdio: "ignore", timeout: 30_000 });
+}
+
+/**
+ * Unloads the profile, and only then lets the caller delete it.
+ *
+ * **The order is the entire function.** `apparmor_parser -R` reads the file to
+ * learn which profile to unload, so removing the file first leaves the kernel
+ * holding a profile that can no longer be named — until the machine reboots.
+ * The first version of this deleted first and swallowed the parser's failure,
+ * and on Ubuntu 24.04 it printed "the sandbox will refuse work on this machine
+ * again" while bubblewrap went on containing perfectly well. An undo that
+ * reports success and undoes nothing is worse than one that fails loudly,
+ * because the user stops looking.
+ *
+ * Throws rather than pressing on when the unload fails, which is why `remove`
+ * is a callback and not something this does itself: the file has to survive a
+ * failed unload, or the retry becomes impossible for the same reason.
+ */
+export function removeProfile(remove: () => void): void {
+  execFileSync("apparmor_parser", ["-R", PROFILE_PATH], { stdio: "ignore", timeout: 30_000 });
+  remove();
 }
 
 /**

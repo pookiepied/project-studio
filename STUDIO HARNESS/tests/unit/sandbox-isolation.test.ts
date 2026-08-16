@@ -16,6 +16,7 @@ import {
   ancestorsOf,
   bwrapArgs,
   selectIsolation,
+  unprivilegedIdentity,
   type BwrapInput,
   type ContainedCommand,
   type IsolationBackend,
@@ -410,6 +411,50 @@ describe("the Linux machine setup, and the fix it refuses to suggest", () => {
     expect(text).toContain("Project Studio");
     expect(text).toContain("sandbox:prepare");
     expect(text.toLowerCase()).toContain("every program on the machine");
+  });
+
+  describe("who the setup command measures", () => {
+    // Found by running `sudo pnpm sandbox:prepare` on Ubuntu 24.04 rather than
+    // by reading it. Root holds `CAP_SYS_ADMIN`, so AppArmor's `userns` rule
+    // never applies to it and the probe succeeded — the command announced that
+    // the sandbox already worked, installed nothing, and exited zero, on a
+    // machine where the same `bwrap` command failed for the user one line
+    // earlier. A setup command that reports success while the thing stays
+    // broken is the precise failure this seam was built to prevent, so the
+    // mapping from "who is asking" to "who to ask about" is pinned here.
+
+    it("measures the caller when the caller is not root", () => {
+      expect(unprivilegedIdentity(1000, {})).toBeUndefined();
+    });
+
+    it("measures the invoking user, not root, under sudo", () => {
+      expect(unprivilegedIdentity(0, { SUDO_UID: "1000", SUDO_GID: "1001" }))
+        .toEqual({ uid: 1000, gid: 1001 });
+    });
+
+    it("falls back to the user's own id when sudo names no group", () => {
+      expect(unprivilegedIdentity(0, { SUDO_UID: "1000" }))
+        .toEqual({ uid: 1000, gid: 1000 });
+    });
+
+    it("never measures root, even with no unprivileged user to name", () => {
+      // A real root login has no `SUDO_UID`. Probing as root anyway would bring
+      // back the one answer on the machine that cannot be wrong and cannot be
+      // useful, so an unprivileged stand-in is used instead — the restriction
+      // is attached to the program, so any account without the capability
+      // returns the same verdict.
+      for (const env of [{}, { SUDO_UID: "0" }, { SUDO_UID: "nonsense" }]) {
+        const subject = unprivilegedIdentity(0, env);
+        expect(subject).toBeDefined();
+        expect(subject?.uid).not.toBe(0);
+      }
+    });
+
+    it("treats a missing getuid as a caller to measure directly", () => {
+      // Windows, where `process.getuid` does not exist. The Linux setup path is
+      // never reached there, and the mapping should still not invent a subject.
+      expect(unprivilegedIdentity(undefined, {})).toBeUndefined();
+    });
   });
 });
 

@@ -463,13 +463,17 @@ describe("nothing the model chose reaches a process uncontained", () => {
       // The answer cannot be reached any other way, and a backend that guessed
       // it would be the exact failure this whole seam exists to prevent.
       [join("src", "sandbox", "isolation", "linux", "bwrap.ts"), "probes the container"],
-      // The maintenance command. Loads an AppArmor profile so the sandbox can
-      // exist at all, which cannot go through the sandbox for the same reason
-      // the Windows launcher cannot.
-      [join("src", "sandbox", "cli.ts"), "sets the machine up"],
-      // Runs `apparmor_parser` to load that profile. Reached only from the
-      // command above, and only when the caller is root.
-      [join("src", "sandbox", "isolation", "linux", "apparmor.ts"), "loads the profile"],
+      // Runs `apparmor_parser` to load and unload the profile that lets the
+      // sandbox exist at all. Cannot go through the sandbox for the same reason
+      // the Windows launcher cannot, and reached only from `sandbox/cli.ts`,
+      // only when the caller is root. The command itself is deliberately absent
+      // from this list: it drove the parser directly until the undo order bug
+      // moved that here, and keeping the shell-out in one module is what let
+      // the order become a testable property rather than a comment.
+      [
+        join("src", "sandbox", "isolation", "linux", "apparmor.ts"),
+        "loads and unloads the profile",
+      ],
       // Starts the Harness itself, which is the trusted process — a process
       // cannot contain itself (see `isolation/kinds.ts`).
       [join("src", "host", "harness-launcher.ts"), "starts the trusted process"],

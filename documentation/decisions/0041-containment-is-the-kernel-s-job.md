@@ -251,7 +251,50 @@ kernel actually said. The remedy sentence beside it is a list of things known to
 produce that class of failure, kept separate from the observation on purpose:
 deciding the cause and printing only the fix is how an `ETIMEDOUT` got reported
 as "run as administrator" to someone already elevated. Making that refusal
-survivable — the Linux counterpart of `pnpm sandbox:prepare` — is **#92**.
+survivable is the Linux counterpart of `pnpm sandbox:prepare`, and it is below.
+
+### The way out, and the three ways it lied on the way there
+
+`sudo pnpm sandbox:prepare` writes `/etc/apparmor.d/studio-bwrap`: a profile that
+names `bwrap` and grants it `userns`. Not the sysctl. Lowering
+`kernel.apparmor_restrict_unprivileged_userns` is one line and it works, and it
+removes the protection **for every program on the machine** in order to switch
+one sandbox on — an agent that asks its user for that is doing the thing the
+sandbox exists to prevent. The profile is narrower by exactly one program, and it
+is not an invention: `/etc/apparmor.d/` on a stock desktop already carries the
+same shape for Brave, Chrome, VS Code and flatpak.
+
+What is worth recording is not the profile but what running the command taught,
+because **every defect below survived code review, type-checking and a green
+suite, and each one made the command claim success while doing nothing.**
+
+1. **It measured the wrong person.** The pre-check probed the process asking, and
+   under `sudo` that is root — which holds `CAP_SYS_ADMIN`, so AppArmor's
+   `userns` rule never applies to it. The command reported that the sandbox
+   already worked and installed nothing, one line after the identical `bwrap`
+   invocation had failed for the user. A setup command has to ask about *the
+   account that will run the thing*, and `unprivilegedIdentity` is that mapping.
+2. **The undo ran its two steps in the wrong order.** It deleted the profile,
+   then asked `apparmor_parser -R` to unload it — and `-R` reads the file to
+   learn which profile to unload. So the file went, the grant stayed, and the
+   command printed that the sandbox would refuse work again while `bwrap` went on
+   containing perfectly well. The failure was swallowed by a `catch` whose
+   comment correctly described the very outcome it was producing.
+3. **The file was treated as the truth.** Fixing (2) left machines in a state —
+   profile loaded, file gone — where the undo answered "not installed" while the
+   grant was live. True about the filesystem, false about the machine.
+   `/sys/kernel/security/apparmor/profiles` is what the kernel is actually
+   enforcing, and the undo now writes the file back in order to take the grant
+   away.
+
+The shape they share is the one this ADR is about. Each was a question answered
+from the wrong source — the caller instead of the user, the comment instead of
+the argument order, the disk instead of the kernel — and in each case the wrong
+source agreed with the right one on the machine where the code was written. That
+is why the install path re-probes after `apparmor_parser` exits zero, and why the
+undo re-reads the kernel after unloading: a setup command that reports success
+while the thing stays broken is worse than one that fails, because the user stops
+looking. Closes **#92**.
 
 ### The network switch does not mean the same thing on both platforms
 
