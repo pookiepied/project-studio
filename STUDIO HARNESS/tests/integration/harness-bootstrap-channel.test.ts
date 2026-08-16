@@ -6,6 +6,8 @@ import { createInterface } from "node:readline";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { desktopHostSource } from "../desktop-host.js";
+
 /**
  * The Windows bootstrap channel, exercised rather than argued about.
  *
@@ -29,17 +31,8 @@ import { afterEach, describe, expect, it } from "vitest";
  */
 
 const SERVER = join(import.meta.dirname, "..", "..", "dist", "server.mjs");
-const RUST_CHANNEL = join(
-  import.meta.dirname,
-  "..",
-  "..",
-  "..",
-  "STUDIO",
-  "src-tauri",
-  "src",
-  "harness",
-  "channel.rs",
-);
+/** Found rather than assumed — see `tests/desktop-host.ts`. */
+const RUST_CHANNEL = desktopHostSource("channel.rs");
 
 const CREDENTIAL = "c".repeat(43);
 

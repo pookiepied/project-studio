@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { HARNESS_INHERITED_VARIABLES } from "../../src/process/environment.js";
+import { desktopHostSource } from "../desktop-host.js";
 
 /**
  * The Harness inherit-list exists twice, and the copies must agree.
@@ -28,17 +28,12 @@ import { HARNESS_INHERITED_VARIABLES } from "../../src/process/environment.js";
  * its own `#[cfg(test)]` module for the behavioural half.
  */
 
-const RUST_SOURCE = join(
-  import.meta.dirname,
-  "..",
-  "..",
-  "..",
-  "STUDIO",
-  "src-tauri",
-  "src",
-  "harness",
-  "environment.rs",
-);
+/**
+ * Found, not assumed. The folder was called `STUDIO` until it was renamed to
+ * `STUDIO (ON HOLD UI)` and a new UI took the name — see `tests/desktop-host.ts`
+ * for why this resolves the directory rather than hardcoding either one.
+ */
+const RUST_SOURCE = desktopHostSource("environment.rs");
 
 /**
  * Pulls the names out of the Rust `const`.
