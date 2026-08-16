@@ -65,8 +65,6 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
   return (
     <BlockFrame
       // The caption goes under the code, and the code is what you came for.
-      chrome="bottom"
-      tone="raised"
       label={path ?? displayName(language)}
       meta={lines === 1 ? 'Line 1' : `Lines 1–${lines}`}
       collapsedHeight={COLLAPSED_HEIGHT}

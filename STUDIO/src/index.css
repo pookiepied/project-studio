@@ -87,6 +87,17 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
+  --color-code-surface: var(--code-surface);
+
+  /* -- Block radii ---------------------------------------------------------
+     A block is a card with a panel inset in it, and the two radii are not
+     independent: the inner curve has to be the outer curve minus the padding
+     between them, or the gap changes width as it goes round the corner and the
+     eye reads the whole thing as slightly wrong without being able to say why.
+     8px of padding, so 20 and 12.
+     --------------------------------------------------------------------- */
+  --radius-block: 20px;
+  --radius-block-inner: 12px;
 
   --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -212,6 +223,12 @@
   --danger: oklch(0.55 0.19 25);
   --danger-foreground: oklch(0.985 0 0);
 
+  /* The panel a code block is set on: off-white, not white. Against the card
+     it sits in, this is what makes it read as inset rather than as a region of
+     the same sheet. Two steps down is enough -- any darker and it becomes a
+     dark-on-light code editor, which is a different product. */
+  --code-surface: oklch(0.973 0 0);
+
   /* -- Pointer and selection states ---------------------------------------
      Translucent on purpose. `--muted` is an opaque swatch, and using it for
      hover meant a row did not darken -- it was *replaced* by a grey chip that
@@ -261,6 +278,10 @@
      screen, considerably louder than it was on white. */
   --danger: oklch(0.68 0.16 25);
   --danger-foreground: oklch(0.205 0 0);
+
+  /* Darker than the card, where light mode goes lighter. Inset means "further
+     from the light", and on a dark surface that is down, not up. */
+  --code-surface: oklch(0.178 0 0);
 
   /* Slightly stronger than light: a white tint over a dark surface lifts less
      per percent than a black tint darkens a light one. */
@@ -692,6 +713,28 @@
   .studio-prose :is(th, td) {
     @apply px-3 py-2 text-left align-top;
   }
+  /* The corner radius is on the header cells' own fill, not on a wrapper
+     clipping them.
+
+     A rounded wrapper with `overflow: hidden` was cutting the header's
+     background on the pixel grid while the radius itself was antialiased, so
+     the fill stopped a fraction inside the curve and both top corners read as
+     chewed rather than turned. It is the same defect the code block had, and
+     the same fix: let the thing that paints the colour be the thing that is
+     round. */
+  .studio-prose thead th:first-child {
+    border-top-left-radius: var(--radius-block-inner);
+  }
+  .studio-prose thead th:last-child {
+    border-top-right-radius: var(--radius-block-inner);
+  }
+  .studio-prose tbody tr:last-child td:first-child {
+    border-bottom-left-radius: var(--radius-block-inner);
+  }
+  .studio-prose tbody tr:last-child td:last-child {
+    border-bottom-right-radius: var(--radius-block-inner);
+  }
+
   .studio-prose thead th {
     @apply border-b font-medium;
     background: var(--surface-sunken);

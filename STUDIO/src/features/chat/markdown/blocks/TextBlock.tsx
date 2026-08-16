@@ -76,7 +76,7 @@ export function TextBlock({ text, fence }: { text: string; fence: string }) {
       {/* `whitespace-pre-wrap`, not markdown. A draft is literal: if the model
           wrote an asterisk, the asterisk is part of the text you asked for and
           rendering it as emphasis would hand back something you cannot paste. */}
-      <p className="studio-selectable px-3.5 text-body whitespace-pre-wrap text-foreground">
+      <p className="studio-selectable px-4 text-body whitespace-pre-wrap text-foreground">
         {text}
       </p>
     </BlockFrame>

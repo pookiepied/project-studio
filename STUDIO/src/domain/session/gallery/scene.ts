@@ -332,6 +332,55 @@ export function segment(text: string, settled: boolean): Segments {
 }
 \`\`\`
 
+A longer one, folded on arrival — the caption carries the control:
+
+\`\`\`ts:src/features/chat/transcript/scroll/followEngine.ts
+const STIFFNESS = 12
+const EPSILON = 0.5
+const TELEPORT_SCREENS = 3
+
+export interface Follower {
+  step(element: HTMLElement, deltaSeconds: number): number | null
+  stop(): void
+}
+
+export function createFollower(): Follower {
+  let position: number | null = null
+
+  return {
+    stop() {
+      position = null
+    },
+
+    step(element, deltaSeconds) {
+      const target = element.scrollHeight - element.clientHeight
+      if (target <= 0) return null
+
+      const current = element.scrollTop
+      if (position === null || Math.abs(position - current) > 1) position = current
+
+      const distance = target - position
+      if (Math.abs(distance) < EPSILON) {
+        position = target
+        return null
+      }
+
+      if (distance > element.clientHeight * TELEPORT_SCREENS) {
+        position = target
+        element.scrollTop = target
+        return target
+      }
+
+      const fraction = 1 - Math.exp(-STIFFNESS * Math.min(deltaSeconds, 0.05))
+      position += distance * fraction
+
+      element.scrollTop = position
+      return position
+    },
+  }
+}
+\`\`\`
+
 And a text block, which is what a rewrite arrives in so you can take it without selecting around it:
 
 \`\`\`draft

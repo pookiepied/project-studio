@@ -105,8 +105,13 @@ const COMPONENTS: Components = {
    */
   table({ children }) {
     return (
-      <div className="my-4 w-full min-w-0 overflow-x-auto rounded-lg border">
-        <table>{children}</table>
+      // The same card-and-panel construction the code block uses, for the same
+      // reason: a table is a produced object, and the corners come from the
+      // cells' own fills rather than from a wrapper clipping them.
+      <div className="my-5 w-full min-w-0 rounded-block bg-surface-raised p-2 shadow-lifted">
+        <div className="w-full min-w-0 overflow-x-auto rounded-block-inner">
+          <table>{children}</table>
+        </div>
       </div>
     )
   },

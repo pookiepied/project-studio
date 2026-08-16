@@ -97,7 +97,7 @@ function Body({ section }: { section: ArtifactSection }) {
       // artifact's table and a markdown table are the same object. Two
       // near-identical table styles is exactly how a design system rots.
       return (
-        <div className="studio-prose w-full min-w-0 overflow-x-auto rounded-lg">
+        <div className="studio-prose w-full min-w-0 overflow-x-auto rounded-block-inner">
           <table>
             <thead>
               <tr>
