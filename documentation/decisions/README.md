@@ -118,3 +118,10 @@ keeps its text and gained a status line, as the format requires.
 
 Next number, never reuse. Format is in `../README.md` §5. Add it to the right
 domain table above, and cite it from code by number.
+
+## Brand and design
+
+| | |
+|---|---|
+| [0042](0042-two-font-typography-system.md) | Two-font typography system — Newsreader for all content; the editorial voice preserved — **superseded by 0043** |
+| [0043](0043-simple-sans-plus-editorial-display.md) | Simple sans plus editorial display — Inter for everyday content, Instrument Serif for display only |
