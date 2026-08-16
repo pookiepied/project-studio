@@ -110,7 +110,7 @@ function AddProviderDialog({ open, onClose }: { open: boolean; onClose: () => vo
                 onClick={() => setMenuOpen((value) => !value)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                className="flex h-8 w-full items-center justify-between rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-150 hover:bg-tint"
+                className="flex h-8 w-full items-center justify-between rounded-md border bg-surface px-2.5 text-ui text-foreground transition-colors duration-fast hover:bg-tint"
               >
                 {selected?.name}
                 <Icons.expand className="text-muted-foreground" />

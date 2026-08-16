@@ -104,7 +104,7 @@ export function CollapsibleText({ text }: { text: string }) {
         >
           {expanded ? 'Show less' : 'Show more'}
           <Icons.expand
-            className={cn('transition-transform duration-200', expanded && 'rotate-180')}
+            className={cn('transition-transform duration-base', expanded && 'rotate-180')}
           />
         </button>
       ) : null}

@@ -49,7 +49,7 @@ export function Segmented<T extends string | number>({
             onClick={() => onChange(option.id)}
             className={cn(
               'relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5',
-              'text-ui leading-none transition-colors duration-150',
+              'text-ui leading-none transition-colors duration-fast',
               selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
@@ -57,7 +57,7 @@ export function Segmented<T extends string | number>({
               <motion.span
                 layoutId={layoutId}
                 transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-md bg-surface-raised shadow-[0_1px_2px_rgba(0,0,0,0.07)]"
+                className="absolute inset-0 rounded-md bg-surface-raised shadow-chip"
               />
             ) : null}
             <span className="relative z-10 flex items-center gap-1.5">{option.label}</span>

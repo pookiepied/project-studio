@@ -61,7 +61,7 @@ export function Dialog({
             style={{ width }}
             className={cn(
               'studio-blur flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border',
-              'shadow-[0_24px_64px_-18px_rgba(0,0,0,0.36)]',
+              'shadow-modal',
             )}
           >
             <header className="flex shrink-0 items-center justify-between px-4 pt-3.5 pb-2">

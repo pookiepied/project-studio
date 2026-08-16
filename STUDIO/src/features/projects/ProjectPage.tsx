@@ -82,7 +82,7 @@ export function ProjectPage({ project }: { project: Project }) {
                   key={conversation.id}
                   type="button"
                   onClick={() => openChat(conversation.id)}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-tint"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-fast hover:bg-tint"
                 >
                   {conversation.pinned ? (
                     <Icons.pin className="shrink-0 text-muted-foreground" />

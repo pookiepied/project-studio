@@ -32,7 +32,7 @@ export function Button({
       disabled={disabled}
       className={cn(
         'inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5',
-        'text-ui leading-none whitespace-nowrap transition-colors duration-150',
+        'text-ui leading-none whitespace-nowrap transition-colors duration-fast',
         'disabled:pointer-events-none disabled:opacity-40',
         VARIANT[variant],
         className,

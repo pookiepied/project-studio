@@ -90,7 +90,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
                 aria-pressed={icon === candidate}
                 onClick={() => setIcon(candidate)}
                 className={cn(
-                  'flex size-8 items-center justify-center rounded-md border transition-colors duration-150',
+                  'flex size-8 items-center justify-center rounded-md border transition-colors duration-fast',
                   icon === candidate
                     ? 'border-foreground/25 bg-selected text-foreground'
                     : 'border-transparent text-muted-foreground hover:bg-tint hover:text-foreground',
@@ -136,7 +136,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
             <button
               type="button"
               onClick={addFolder}
-              className="flex items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-ui text-muted-foreground transition-colors duration-150 hover:bg-tint hover:text-foreground"
+              className="flex items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
             >
               <Icons.add />
               Add folder

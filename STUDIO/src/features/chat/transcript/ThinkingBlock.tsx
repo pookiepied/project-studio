@@ -34,7 +34,7 @@ export function ThinkingBlock({ thinking, live }: { thinking: Thinking; live: bo
         aria-expanded={open}
         className={cn(
           'group/thinking inline-flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 pl-1',
-          'text-caption text-muted-foreground transition-colors duration-150 hover:text-foreground',
+          'text-caption text-muted-foreground transition-colors duration-fast hover:text-foreground',
         )}
       >
         <StudioMark busy={live} size={13} className="text-current" />

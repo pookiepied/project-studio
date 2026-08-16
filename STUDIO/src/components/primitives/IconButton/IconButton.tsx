@@ -119,7 +119,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           // the glyph on the button's optical centre. Line-height alone leaves an
           // SVG sitting a pixel low, which is the misalignment that showed up
           // across the composer row.
-          'leading-none transition-colors duration-150',
+          'leading-none transition-colors duration-fast',
           'disabled:pointer-events-none disabled:opacity-40',
           // Circular, because the chip is the whole state signal now and a
           // circle is the shape that reads as a resting place for a mark rather

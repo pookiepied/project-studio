@@ -51,7 +51,7 @@ export function TurnMenu() {
             aria-label="Turn settings"
             className={cn(
               'flex max-w-56 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui',
-              'text-muted-foreground transition-colors duration-150',
+              'text-muted-foreground transition-colors duration-fast',
               open ? 'bg-selected text-foreground' : 'hover:bg-tint',
             )}
           >

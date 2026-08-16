@@ -41,7 +41,7 @@ export function MenuItem({
       onClick={onSelect}
       className={cn(
         'flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left text-ui',
-        'transition-colors duration-100',
+        'transition-colors duration-fast',
         selected ? 'text-foreground' : 'text-muted-foreground',
         'hover:bg-tint hover:text-foreground',
         // Delete and its kin say so with the mark, since the label alone reads

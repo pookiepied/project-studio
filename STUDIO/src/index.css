@@ -87,6 +87,52 @@
   --color-primary-foreground: var(--primary-foreground);
 
   --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* -- Duration -------------------------------------------------------------
+
+     The same three steps as `DURATION` in `design/tokens/motion.ts`, exposed as
+     utilities so a CSS transition and a Framer animation cannot disagree. They
+     were disagreeing: fourteen components had reached for `duration-150`, which
+     is not a step in the token file at all, so every hover in the app ran at a
+     number nobody had chosen and the two systems were 30ms apart.
+
+     fast   a state change on something already on screen -- hover, a chip
+     base   something entering or leaving -- a popover, a view
+     slow   a whole surface changing -- the palette, a sheet
+     -------------------------------------------------------------------- */
+  /* Read by `.studio-scroll-inset`; mirrors `SHELL.scrollbarInset`. */
+  --scroll-inset: 44px;
+
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+
+  /* -- Elevation ------------------------------------------------------------
+
+     Five steps, because five things in the app are lifted off the surface and
+     each one is lifted a different amount. Before this they were eight
+     hand-written `shadow-[...]` values spread across eight files, every one a
+     different blur, spread and opacity -- so a popover and a menu, which are
+     the same idea one level apart, cast unrelated shadows.
+
+     The scale is stated as raw shadow values keyed to a colour variable, which
+     is what lets dark mode deepen every step at once. A shadow tuned for white
+     is invisible on near-black; the dark palette raises the opacity rather than
+     each component guessing, which is what `dark:shadow-[...]` in the composer
+     was doing alone.
+
+     chip     a thumb inside a track -- barely off the surface
+     raised   the resting composer, a floating button
+     overlay  a menu or popover, near its trigger
+     modal    a dialog or the palette, over a scrim
+     panel    the compact sidebar, cast sideways over the page
+     -------------------------------------------------------------------- */
+  --shadow-chip: 0 1px 2px var(--shadow-tint-weak);
+  --shadow-raised: 0 2px 10px var(--shadow-tint-weak), 0 0 0 1px var(--shadow-hairline);
+  --shadow-lifted: 0 6px 20px -4px var(--shadow-tint), 0 0 0 1px var(--shadow-hairline);
+  --shadow-overlay: 0 12px 36px -10px var(--shadow-tint-strong);
+  --shadow-modal: 0 24px 64px -18px var(--shadow-tint-strong);
+  --shadow-panel: 8px 0 28px -12px var(--shadow-tint-strong);
 }
 
 /* ---------------------------------------------------------------------------
@@ -137,6 +183,14 @@
      -------------------------------------------------------------------- */
   --tint: oklch(0.145 0 0 / 5%);
   --selected: oklch(0.145 0 0 / 8%);
+
+  /* What the elevation scale is tinted with. Light mode casts a soft grey; the
+     dark override below casts something much closer to black, because a shadow
+     at these opacities simply does not exist against a 0.205 surface. */
+  --shadow-tint-weak: oklch(0 0 0 / 6%);
+  --shadow-tint: oklch(0 0 0 / 12%);
+  --shadow-tint-strong: oklch(0 0 0 / 26%);
+  --shadow-hairline: oklch(0 0 0 / 7%);
 }
 
 .dark {
@@ -161,6 +215,15 @@
      per percent than a black tint darkens a light one. */
   --tint: oklch(1 0 0 / 6.5%);
   --selected: oklch(1 0 0 / 11%);
+
+  /* Deeper, and the hairline inverts: on a dark surface the thing that
+     separates a raised object from its background is a faint *light* edge, not
+     a dark one. A black hairline there is invisible, which is why raised
+     surfaces in dark mode had no defined edge at all. */
+  --shadow-tint-weak: oklch(0 0 0 / 24%);
+  --shadow-tint: oklch(0 0 0 / 38%);
+  --shadow-tint-strong: oklch(0 0 0 / 55%);
+  --shadow-hairline: oklch(1 0 0 / 7%);
 }
 
 @layer base {
@@ -314,7 +377,14 @@
 
      It has to be set on the shapes rather than the <svg>: `vector-effect` is
      not an inherited property, so declaring it on the root does nothing. */
-  .studio-icon svg :is(path, circle, rect, line, polyline, polygon, ellipse) {
+  /* Both selectors are needed because there are two renderers and their roots
+     differ: `fromLucide` wraps a finished component in a <span>, so the shapes
+     are a level down, while `defineIcon` draws the <svg> itself and carries the
+     class on it. The drawn marks went without this for as long as the class was
+     only on the wrapper -- which is why the project marks alone kept both the
+     row's colour and a stroke that thickened with size. */
+  .studio-icon svg :is(path, circle, rect, line, polyline, polygon, ellipse),
+  .studio-icon:is(svg) :is(path, circle, rect, line, polyline, polygon, ellipse) {
     vector-effect: non-scaling-stroke;
   }
 
@@ -436,9 +506,18 @@
     background-color: color-mix(in oklch, var(--foreground) 26%, transparent);
   }
 
+  /* Held back from both ends of the track, so the thumb never slides under the
+     fades at the top and bottom of a scrolling page and half-disappears.
+
+     Opting in is deliberate and this is the rule for it: a scroller gets the
+     inset when it is a *page* -- something with a masked top edge, under the
+     window's top strip. The sidebar, a dialog, a menu and the palette all
+     scroll inside a bounded surface with hard edges, and insetting a thumb
+     there would just make it look short. The number is a variable rather than
+     the literal 44 that used to sit here beside a comment promising it matched
+     `SHELL.scrollbarInset` -- a promise nothing enforced. */
   .studio-scroll-inset::-webkit-scrollbar-track {
-    /* Matches SHELL.scrollbarInset. */
-    margin-block: 44px;
+    margin-block: var(--scroll-inset);
   }
 }
 

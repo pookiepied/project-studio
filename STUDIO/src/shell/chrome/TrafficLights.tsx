@@ -46,7 +46,7 @@ export function TrafficLights() {
           aria-label={label}
           className={[
             'flex items-center justify-center rounded-full',
-            'bg-foreground/15 transition-colors duration-200',
+            'bg-foreground/15 transition-colors duration-base',
             'group-hover/lights:bg-foreground/30 hover:!bg-foreground/45 active:!bg-foreground/60',
           ].join(' ')}
           style={{ width: SHELL.trafficLight.size, height: SHELL.trafficLight.size }}
@@ -54,7 +54,7 @@ export function TrafficLights() {
           <svg
             viewBox="0 0 6 6"
             aria-hidden
-            className="size-full p-[2.5px] opacity-0 transition-opacity duration-200 group-hover/lights:opacity-100"
+            className="size-full p-[2.5px] opacity-0 transition-opacity duration-base group-hover/lights:opacity-100"
           >
             <path
               d={glyph}

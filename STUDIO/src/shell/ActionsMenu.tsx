@@ -100,7 +100,7 @@ export function ActionsMenu() {
           exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast, ease: EASE_OUT } }}
           transition={SPRING_SNAPPY}
           style={{ left: position.x, top: position.y, width: MENU_WIDTH, transformOrigin: 'top left' }}
-          className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-[0_12px_36px_-10px_rgba(0,0,0,0.26)]"
+          className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-overlay"
         >
           {position.selection ? (
             <>

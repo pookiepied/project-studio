@@ -193,9 +193,32 @@ function complete(v: Variants | undefined): Variants {
   }
 }
 
-/** Rotation and translation inside an SVG need an explicit box to act on. */
-function partStyle(origin?: string) {
-  return { transformBox: 'fill-box', transformOrigin: origin ?? 'center' } as const
+/**
+ * Rotation and translation inside an SVG need an explicit box to act on.
+ *
+ * ---- Why `kind` exists ------------------------------------------------------
+ *
+ * This is the bug that made per-part icon motion look impossible for three
+ * attempts. `fill-box` resolves against the shape's own bounding box, and a
+ * horizontal `<line>` has a bounding box of zero height. A degenerate box is not
+ * an error in Chromium -- the transform is simply dropped, silently, with the
+ * shape left at its authored coordinates. So the panel toggle's inner divider
+ * sat at `matrix(1,0,0,1,-2.1,0)` in every state no matter what variant reached
+ * it, and every fix aimed at the variant plumbing was aimed at the wrong thing:
+ * the label was arriving correctly the whole time and being discarded by the
+ * layout box.
+ *
+ * A line therefore transforms against the `view-box` -- the 16-unit grid the
+ * glyph is drawn on -- which always has area. Closed shapes keep `fill-box`,
+ * because a trash lid has to hinge at its own left end and that is only
+ * expressible relative to the shape itself.
+ */
+type ShapeKind = 'line' | 'closed'
+
+function partStyle(origin: string | undefined, kind: ShapeKind) {
+  return kind === 'line'
+    ? ({ transformBox: 'view-box', transformOrigin: origin ?? '8px 8px' } as const)
+    : ({ transformBox: 'fill-box', transformOrigin: origin ?? 'center' } as const)
 }
 
 const MPath = motion.path
@@ -209,7 +232,10 @@ type Parts = Readonly<Record<string, { readonly v: Variants; readonly style: Ret
 function prepareParts(glyph: Glyph): Parts {
   const out: Record<string, { v: Variants; style: ReturnType<typeof partStyle> }> = {}
   for (const [key, m] of Object.entries(glyph.parts ?? {})) {
-    out[key] = { v: complete(m.v), style: partStyle(m.origin) }
+    // The key names the list a shape came from -- `l2` is the third line -- so
+    // the shape's kind is already encoded and does not have to be declared.
+    const kind: ShapeKind = key.startsWith('l') ? 'line' : 'closed'
+    out[key] = { v: complete(m.v), style: partStyle(m.origin, kind) }
   }
   return out
 }
@@ -311,7 +337,12 @@ export function defineIcon(glyph: Glyph, name: string) {
         animate={animated ? resolved : undefined}
         variants={rootVariants}
         style={{ width: box, height: box, ...style }}
-        className={cn('shrink-0', className)}
+        // `studio-icon` is what holds a mark at `--muted-foreground` regardless
+        // of the row it sits in, and what pins its stroke to device pixels. The
+        // drawn marks were outside it while the class lived only on the Lucide
+        // wrapper, so the project marks were the last things in the app still
+        // darkening with their row.
+        className={cn('studio-icon shrink-0', className)}
         {...rest}
       >
         {shapes(glyph, parts, resolved)}

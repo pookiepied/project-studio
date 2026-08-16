@@ -83,7 +83,7 @@ export function ArchivePane() {
                     aria-label={`Select ${conversation.title ?? 'conversation'}`}
                     onClick={() => toggle(conversation.id)}
                     className={cn(
-                      'flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors duration-150',
+                      'flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors duration-fast',
                       checked
                         ? 'border-transparent bg-primary text-primary-foreground'
                         : 'hover:border-foreground/30',

@@ -29,7 +29,7 @@ import {
   Archive, ArrowDown, ArrowUp, AudioLines, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
   CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
-  MoreHorizontal, Moon, PanelLeft, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
+  MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
   RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, WrapText, X,
   FastForward,
@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
+import { SidebarToggle } from '@/components/icons/drawn'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
 const SNAP = { type: 'spring', stiffness: 520, damping: 30, mass: 0.5 } as const
@@ -93,12 +94,8 @@ interface Entry {
 const REGISTRY = {
   // -- Window and shell ----------------------------------------------------
   close: { mark: X },
-  // No motion on this one. It used to translate the whole mark on hover, which
-  // said the *button* was moving rather than the panel -- the layout looking
-  // unstable under the cursor, on the control used most often in the app. The
-  // motion that would be right here is the divider inside the mark sliding
-  // while the frame holds still, and that needs a drawn glyph; see `drawn.tsx`.
-  sidebar: { mark: PanelLeft },
+  // `sidebar` is not here: it is the one drawn mark, because its motion lives
+  // inside the glyph rather than on it. See `drawn.tsx`, and `Icons` below.
   search: { mark: Search },
   command: { mark: Command },
   reload: { mark: RefreshCw, motion: WIND },
@@ -207,14 +204,25 @@ function assertUnique(registry: Record<string, Entry>): void {
 
 if (import.meta.env.DEV) assertUnique(REGISTRY)
 
-type Concept = keyof typeof REGISTRY
+// The concept union now comes from `Icons`, which is REGISTRY plus the drawn marks.
 
-/** Concept name to component. Consumers import from here, never a raw mark. */
-export const Icons = Object.fromEntries(
-  Object.entries(REGISTRY).map(([concept, entry]) => [
-    concept,
-    fromLucide(entry.mark, concept, (entry as Entry).motion),
-  ]),
-) as Record<Concept, ReturnType<typeof fromLucide>>
+/**
+ * Concept name to component. Consumers import from here, never a raw mark.
+ *
+ * The drawn marks are merged in at this line and nowhere else, so a call site
+ * cannot tell which renderer is behind `Icons.sidebar` -- both accept the same
+ * `size` and `state` and both read `IconStateContext`. That is the point of the
+ * registry being a map of concepts: the renderer is an implementation detail
+ * that can differ per mark without leaking into the app.
+ */
+export const Icons = {
+  ...(Object.fromEntries(
+    Object.entries(REGISTRY).map(([concept, entry]) => [
+      concept,
+      fromLucide(entry.mark, concept, (entry as Entry).motion),
+    ]),
+  ) as Record<keyof typeof REGISTRY, ReturnType<typeof fromLucide>>),
+  sidebar: SidebarToggle,
+}
 
-export type IconConcept = Concept
+export type IconConcept = keyof typeof Icons

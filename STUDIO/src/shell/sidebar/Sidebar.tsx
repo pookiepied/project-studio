@@ -116,7 +116,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         style={{ borderRightWidth: compact || sidebarOpen ? 1 : 0 }}
         className={cn(
           'h-full overflow-hidden border-r bg-surface-sunken',
-          compact ? 'absolute inset-y-0 left-0 z-30 shadow-[8px_0_28px_-12px_rgba(0,0,0,0.28)]' : 'relative z-20 shrink-0',
+          compact ? 'absolute inset-y-0 left-0 z-30 shadow-panel' : 'relative z-20 shrink-0',
         )}
       >
       {/* `inert` while closed. A hidden column that still takes Tab is worse
@@ -184,7 +184,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
               type="button"
               onClick={() => setSectionOpen((value) => !value)}
               aria-expanded={sectionOpen}
-              className="flex min-w-0 flex-1 items-center gap-1 rounded text-micro uppercase text-muted-foreground/80 transition-colors duration-150 hover:text-muted-foreground"
+              className="flex min-w-0 flex-1 items-center gap-1 rounded text-micro uppercase text-muted-foreground/80 transition-colors duration-fast hover:text-muted-foreground"
             >
               {/* Sized `sm`, not from its own text. Marks size at 1.1em of the
                   text beside them, and this header is `micro` while the project
@@ -202,7 +202,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                   type="button"
                   aria-label="New project"
                   onClick={onNewProject}
-                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-150 hover:bg-tint"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
                 >
                   <Icons.projectNew />
                 </button>
@@ -220,7 +220,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                   aria-label="Sidebar options"
                   onClick={() => setMenuOpen((value) => !value)}
                   className={cn(
-                    'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-tint',
+                    'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint',
                     menuOpen ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100',
                   )}
                 >
@@ -324,7 +324,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
           <button
             type="button"
             onClick={() => openSettings('account')}
-            className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-150 hover:bg-tint hover:text-foreground"
+            className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
           >
             <Icons.account />
             <span className="truncate">Account</span>
@@ -355,7 +355,7 @@ function Action({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-150 hover:bg-tint hover:text-foreground"
+      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
     >
       {icon}
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>

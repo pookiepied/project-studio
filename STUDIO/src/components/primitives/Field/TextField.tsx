@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn'
 const BASE = [
   'w-full rounded-md border bg-surface px-2.5 py-1.5 text-ui text-foreground',
   'placeholder:text-muted-foreground/70',
-  'transition-[border-color,box-shadow] duration-150 outline-none',
+  'transition-[border-color,box-shadow] duration-fast outline-none',
   'focus:border-foreground/20 focus:shadow-[0_0_0_2px_var(--ring)]',
 ].join(' ')
 

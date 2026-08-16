@@ -80,7 +80,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
         <button
           type="button"
           onClick={() => openProject(project.id)}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-150 hover:bg-tint hover:text-foreground"
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
         >
           <ProjectIconMark icon={project.icon} />
           <span className="max-w-[9rem] truncate">{project.name}</span>
@@ -106,7 +106,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="group/identity flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none transition-colors duration-150 hover:bg-tint"
+            className="group/identity flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none transition-colors duration-fast hover:bg-tint"
           >
             {conversation.pinned ? (
               <Icons.pin className="shrink-0 text-muted-foreground" />
@@ -115,7 +115,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
               {conversation.title}
             </span>
             <Icons.expand
-              className="shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/identity:opacity-100"
+              className="shrink-0 text-muted-foreground opacity-0 transition-opacity duration-fast group-hover/identity:opacity-100"
             />
           </button>
         }
@@ -212,7 +212,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
                 onClick={() => setBranchOpen((open) => !open)}
                 aria-haspopup="menu"
                 aria-expanded={branchOpen}
-                className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-150 hover:bg-tint hover:text-foreground"
+                className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
               >
                 <Icons.branch />
                 <span className="max-w-[10rem] truncate">{project.branch}</span>

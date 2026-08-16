@@ -47,7 +47,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
   return (
     <div
       className={cn(
-        'group/row flex items-center gap-1 rounded-md pr-0.5 transition-colors duration-150',
+        'group/row flex items-center gap-1 rounded-md pr-0.5 transition-colors duration-fast',
         active ? 'bg-selected' : 'hover:bg-tint',
       )}
     >
@@ -79,7 +79,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
             aria-label="Conversation options"
             onClick={() => setMenuOpen((open) => !open)}
             className={cn(
-              'flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-150',
+              'flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-fast',
               'text-muted-foreground hover:bg-tint',
               menuOpen ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
             )}

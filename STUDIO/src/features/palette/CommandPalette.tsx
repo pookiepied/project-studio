@@ -143,7 +143,7 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast } }}
             transition={SPRING_SURFACE}
-            className="studio-blur w-full max-w-[30rem] overflow-hidden rounded-xl border shadow-[0_20px_60px_-16px_rgba(0,0,0,0.34)]"
+            className="studio-blur w-full max-w-[30rem] overflow-hidden rounded-xl border shadow-modal"
           >
             <div className="flex items-center gap-2.5 border-b px-3.5 py-2.5">
               <Icons.search className="text-muted-foreground" />

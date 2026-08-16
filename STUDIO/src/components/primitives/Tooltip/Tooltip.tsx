@@ -94,7 +94,7 @@ export function Tooltip({
               // rather than a lighter patch of the same one.
               'pointer-events-none absolute z-50 whitespace-nowrap rounded-lg px-2 py-1',
               'bg-primary text-primary-foreground',
-              'text-caption shadow-[0_6px_20px_-6px_rgba(0,0,0,0.28)]',
+              'text-caption shadow-overlay',
               SIDE_CLASS[side],
             )}
           >

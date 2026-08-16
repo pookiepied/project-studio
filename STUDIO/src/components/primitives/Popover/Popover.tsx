@@ -96,7 +96,7 @@ export function Popover({
               // `lg` panel with 4px padding puts rows on `sm` -- the concentric
               // rule, so the row corners run parallel to the panel's.
               'studio-blur absolute z-50 min-w-48 rounded-lg border p-1',
-              'shadow-[0_10px_34px_-8px_rgba(0,0,0,0.20)]',
+              'shadow-overlay',
               SIDE_CLASS[side],
               ALIGN_CLASS[align],
               className,
