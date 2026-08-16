@@ -77,7 +77,7 @@ export type IconState = 'rest' | 'hover' | 'press' | 'on' | 'live'
  * area should be whatever the user perceives as the control, and that is
  * usually larger than the button element.
  */
-const IconStateContext = createContext<IconState>('rest')
+export const IconStateContext = createContext<IconState>('rest')
 
 export function IconStateProvider({ state, children }: { state: IconState; children: ReactNode }) {
   return <IconStateContext.Provider value={state}>{children}</IconStateContext.Provider>

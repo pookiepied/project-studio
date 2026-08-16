@@ -272,6 +272,20 @@
     user-select: text;
   }
 
+  /* Icon stroke, held constant in device pixels.
+
+     The marks are drawn on a 24-unit grid and set anywhere from 12 to 22px, so
+     a stroke measured in viewBox units paints 1.17px in a menu and 1.83px in a
+     header -- the same mark at two weights, which is what stops an icon set
+     reading as one family. `non-scaling-stroke` measures the width in device
+     pixels instead, so 1.2 is 1.2 everywhere and pairs with Inter 400/500.
+
+     It has to be set on the shapes rather than the <svg>: `vector-effect` is
+     not an inherited property, so declaring it on the root does nothing. */
+  .studio-icon svg :is(path, circle, rect, line, polyline, polygon, ellipse) {
+    vector-effect: non-scaling-stroke;
+  }
+
   /* The editorial serif. Display sizes carry the page's one statement -- the
      home greeting, a page title. Anywhere else it stops being a voice and
      becomes a second UI font, so the sans carries everything that is read
