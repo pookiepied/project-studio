@@ -512,12 +512,31 @@
     @apply max-w-full rounded-lg;
   }
 
-  /* KaTeX ships its own sizing; hold it to the prose size so a formula does not
-     tower over the sentence containing it. */
-  .studio-prose .katex {
-    font-size: 1.02em;
-  }
   .studio-prose .katex-display {
     @apply my-4 overflow-x-auto overflow-y-hidden py-1;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Holding KaTeX to the type scale
+
+   Deliberately *outside* `@layer components`, and that is the whole point of
+   the rule rather than a stylistic choice.
+
+   `katex.min.css` is imported unlayered, and in the cascade an unlayered rule
+   beats every layered one no matter how specific the layered one is. So the
+   obvious version of this cap -- `.studio-prose .katex` sitting with the rest
+   of the prose styles -- lost to KaTeX's own `.katex { font-size: 1.21em }`
+   despite being more specific, and display math rendered near 17px: the
+   largest text anywhere in the app, in a UI whose everyday size is 13.
+
+   Unlayered here, it competes on specificity and wins. 1.06em keeps a formula
+   a touch above the sentence around it, which is the readability allowance
+   KaTeX is reaching for, without letting it tower over the paragraph.
+   --------------------------------------------------------------------------- */
+.studio-prose .katex {
+  font-size: 1.02em;
+}
+.studio-prose .katex-display > .katex {
+  font-size: 1.06em;
 }
