@@ -6,6 +6,7 @@ import { StudioMark } from '@/components/brand'
 import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
+import { startWindowDrag } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -102,14 +103,24 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             first thing at the top of the window was nothing. Sharing the one
             number puts the wordmark, the traffic lights and the panel toggle on
             a single line, and keeps them there if the strip is ever retuned. */}
-        {/* `data-tauri-drag-region` because this band is title bar: it is the
-            window's top edge on the sidebar's side, and a frameless window with
-            a dead strip is one the user cannot move by the part that looks most
-            like a handle. Selection is off for the same reason -- dragging a
-            title bar should move the window, and text that highlights instead
-            makes the brand behave like content. */}
+        {/* This band is title bar: the window's top edge on the sidebar's side,
+            and a frameless window whose most handle-shaped strip does not move
+            it is one people try to drag and then give up on. Selection is off
+            for the same reason -- dragging a title bar should move the window,
+            not highlight the brand.
+
+            Dragging goes through `startWindowDrag` rather than
+            `data-tauri-drag-region`, and the difference matters: the attribute
+            also toggles maximize on double-click, and this app's rounded corner
+            is a DWM attribute that Windows drops for any maximized window. One
+            stray double-click on the logo turned the whole panel square, with
+            nothing in the CSS to explain it. Maximizing lives in the traffic
+            lights, where it is deliberate. */}
         <div
-          data-tauri-drag-region
+          onPointerDown={(event) => {
+            if (event.button !== 0) return
+            void startWindowDrag()
+          }}
           className="flex shrink-0 items-center gap-1.5 px-3.5 select-none"
           style={{ height: SHELL.topStrip.height }}
         >

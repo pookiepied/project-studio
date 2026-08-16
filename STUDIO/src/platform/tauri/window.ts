@@ -32,6 +32,28 @@ export async function closeWindow(): Promise<void> {
 }
 
 /**
+ * Move the window, and only move it.
+ *
+ * The declarative alternative, `data-tauri-drag-region`, does two things rather
+ * than one: it drags, and it toggles maximize on double-click. That second
+ * behaviour is not wanted anywhere in this app and is actively harmful here,
+ * because the window's rounded corner is a DWM attribute
+ * (`DWMWCP_ROUND`, see `src-tauri/src/window.rs`) and Windows squares the
+ * corners of any maximized window. So one stray double-click on the title bar
+ * turns a frameless, round-cornered panel into a hard rectangle -- and it looks
+ * like the app broke, because nothing in the CSS changed and nothing says the
+ * window is now maximized.
+ *
+ * Calling `startDragging` from a pointerdown gives the drag without the second
+ * behaviour. Maximizing stays where it is discoverable and deliberate: the zoom
+ * control in the traffic lights.
+ */
+export async function startWindowDrag(): Promise<void> {
+  if (!isTauri()) return
+  await getCurrentWindow().startDragging()
+}
+
+/**
  * Put the window back to the size it ships with.
  *
  * The counterpart to remembering the size across launches: once a window

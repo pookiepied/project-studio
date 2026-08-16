@@ -3,6 +3,7 @@ export {
   minimizeWindow,
   toggleMaximizeWindow,
   closeWindow,
+  startWindowDrag,
   resetWindowSize,
   signalAppReady,
   DEFAULT_WINDOW_SIZE,
