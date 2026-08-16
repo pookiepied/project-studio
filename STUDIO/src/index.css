@@ -136,6 +136,34 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Duration utilities.
+
+   Declared by hand because Tailwind has no `--duration-*` theme namespace. That
+   is worth stating plainly: putting the three steps in `@theme` and writing
+   `duration-fast` looked right, typechecked, and generated *nothing* -- the
+   class landed in the markup, matched no rule, and every element fell back to
+   Tailwind's default 150ms. Which is precisely the stray number the whole
+   exercise was meant to remove, now invisible instead of merely undocumented.
+
+   `--shadow-*` is a real namespace and worked, which is what made the failure
+   so easy to miss: half the change took and half of it silently did not.
+
+   `@utility` is the supported way to add one, and it keeps variants working --
+   `hover:duration-fast` and the rest still compile.
+   --------------------------------------------------------------------------- */
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+}
+
+/* ---------------------------------------------------------------------------
    Palette -- monochrome, with no exception.
 
    Every colour here is oklch with chroma 0. Nothing in the system UI carries a

@@ -115,13 +115,10 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         // because it always has content beside it.
         style={{ borderRightWidth: compact || sidebarOpen ? 1 : 0 }}
         className={cn(
-          // Rounded on the right only. The other three edges meet the window's
-          // own corners, so rounding them would draw a second arc a pixel
-          // inside the first; the right edge is the one that faces the page and
-          // is the only one that reads as this panel's own shape. It turns the
-          // sidebar from a region the window is divided into to an object
-          // sitting in it, which is the whole of the difference in feel.
-          'h-full overflow-hidden rounded-r-xl border-r bg-surface-sunken',
+          // Square. The sidebar is the ground the window is built on; the page
+          // is the object sitting on it, and the page is what carries the
+          // radius. See the note in `AppShell`.
+          'h-full overflow-hidden border-r bg-surface-sunken',
           compact ? 'absolute inset-y-0 left-0 z-30 shadow-panel' : 'relative z-20 shrink-0',
         )}
       >

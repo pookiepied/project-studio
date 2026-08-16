@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { SHELL, VIEW_TRANSITION } from '@/design/tokens'
+import { RADIUS, SHELL, VIEW_TRANSITION } from '@/design/tokens'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
 import { CommandPalette } from '@/features/palette'
@@ -9,6 +9,7 @@ import { SettingsPage } from '@/features/settings'
 import { ActionsMenu } from '@/shell/ActionsMenu'
 import { TopStrip } from '@/shell/chrome/TopStrip'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
+import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 
@@ -24,10 +25,14 @@ import { useWorkspace } from '@/stores/workspace'
  * transcript paints square right through the rounded edge.
  */
 export function AppShell() {
-  const { route, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
+  const { route, sidebarOpen, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
     useNavigation()
+  const compact = useCompactLayout()
   const { conversations, projects } = useWorkspace()
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+
+  /** The page only rounds when there is a sidebar beside it to rest on. */
+  const rounded = sidebarOpen && !compact
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -64,12 +69,47 @@ export function AppShell() {
 
   return (
     <div
-      className="relative flex h-full w-full overflow-hidden border border-hairline bg-surface"
+      // Sunken, not `surface`. The page's rounded corner cuts away to whatever
+      // is behind it, and behind it was the same white the page is painted in
+      // -- so the radius existed and was invisible. The window's own ground is
+      // the sunken tone the sidebar uses, which is what makes the corner read
+      // as the page lifting off it. With the sidebar closed the page covers
+      // this completely, so nothing shows through.
+      className="relative flex h-full w-full overflow-hidden border border-hairline bg-surface-sunken"
       style={{ borderRadius: SHELL.windowRadius }}
     >
       <Sidebar onNewProject={() => setNewProjectOpen(true)} />
 
-      <div className="relative min-w-0 flex-1">
+      {/* The page is a panel resting on the sidebar, and only while the sidebar
+          is there to rest on.
+
+          The radius belongs to the centre, not to the column beside it. Rounding
+          the sidebar's edge made it a floating object with the page poured
+          around it, which reads as two panels arguing about which one is the
+          background. Rounding the page instead states the hierarchy: the
+          sidebar is the ground -- flush to the window on all four sides -- and
+          the conversation is the thing sitting on it. It is also what makes the
+          sunken surface behind visible as a seam rather than as a border.
+
+          Only the left corners, because only the left edge has anything to sit
+          against; the other three meet the window's own corners, and a second
+          arc a pixel inside the first is the thing that looks unfinished.
+
+          And it goes away when the sidebar does. With no column beside it the
+          page is not resting on anything -- a rounded corner against the bare
+          window edge would be a panel floating over nothing, which is exactly
+          the "why is this cut off" look. Closed, the page is simply the window
+          again. */}
+      <div
+        className="relative min-w-0 flex-1 overflow-hidden bg-surface transition-[border-radius] duration-base ease-out"
+        // Inline rather than `rounded-l-xl`, so the radius comes from the same
+        // token the window's own corner does and the two cannot drift apart.
+        // A utility would work equally well; this just keeps one source.
+        style={{
+          borderTopLeftRadius: rounded ? RADIUS.xl : 0,
+          borderBottomLeftRadius: rounded ? RADIUS.xl : 0,
+        }}
+      >
         <TopStrip />
 
         {/*
