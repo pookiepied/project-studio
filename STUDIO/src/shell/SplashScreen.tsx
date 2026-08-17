@@ -39,7 +39,12 @@ export function SplashScreen() {
         transition={{ duration: 0.8, ease: EASE_OUT }}
         className="text-foreground"
       >
-        <StudioMark entrance size={112} />
+        {/* 88, not 112: the mark was drawn for a taller window, and on the
+            720px default it filled a sixth of the height -- the splash read
+            as a poster rather than a boot state. One step down keeps the
+            staircase legible while giving the mark the same margin of quiet
+            around it the home greeting has. */}
+        <StudioMark entrance size={88} />
       </motion.div>
     </motion.div>
   )

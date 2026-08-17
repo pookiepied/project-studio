@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
-import { Icons } from '@/components/icons'
-import { MenuItem, MenuSeparator } from '@/components/primitives'
-import { copyText } from '@/lib/clipboard'
-import { useNavigation } from '@/stores/navigation'
+import { ActionItems } from '@/shell/ActionItems'
 
 /**
  * The right-click menu.
@@ -19,6 +16,11 @@ import { useNavigation } from '@/stores/navigation'
  * about the text: copy it, select it all, or ask about it as a new conversation.
  * With no selection it is about the app: a new conversation, a reload of the
  * interface, search, and settings.
+ *
+ * The verbs themselves are shared with the selection menu through
+ * `ActionItems`, so the two cannot drift apart -- they are the same list of
+ * actions, summoned two ways, and the duplication that preceded the shared
+ * component was how one would eventually change without the other.
  *
  * Placement is clamped to the window rather than left to overflow, because a
  * context menu opens wherever the pointer happens to be, and near the bottom
@@ -37,7 +39,6 @@ interface Position {
 }
 
 export function ActionsMenu() {
-  const { goHome, setPaletteOpen, openSettings } = useNavigation()
   const menuRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<Position | null>(null)
 
@@ -75,18 +76,7 @@ export function ActionsMenu() {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [menuRef, close, goHome, setPaletteOpen, openSettings])
-
-  const selectAll = () => {
-    if (!position) return
-    const root = position.target?.closest('.studio-prose, .studio-selectable, .studio-scroll-inset')
-    const selection = window.getSelection()
-    if (!selection || !root) return
-    const range = document.createRange()
-    range.selectNodeContents(root)
-    selection.removeAllRanges()
-    selection.addRange(range)
-  }
+  }, [menuRef, close])
 
   return (
     <AnimatePresence>
@@ -102,72 +92,7 @@ export function ActionsMenu() {
           style={{ left: position.x, top: position.y, width: MENU_WIDTH, transformOrigin: 'top left' }}
           className="studio-blur fixed z-[60] rounded-lg border p-1 shadow-overlay"
         >
-          {position.selection ? (
-            <>
-              <MenuItem
-                icon={<Icons.copy />}
-                onSelect={() => {
-                  void copyText(position.selection)
-                  close()
-                }}
-              >
-                Copy
-              </MenuItem>
-              <MenuItem icon={<Icons.check />} onSelect={selectAll}>
-                Select all
-              </MenuItem>
-              <MenuItem
-                icon={<Icons.newChat />}
-                onSelect={() => {
-                  goHome()
-                  close()
-                }}
-              >
-                Ask about this
-              </MenuItem>
-              <MenuSeparator />
-            </>
-          ) : null}
-
-          <MenuItem
-            icon={<Icons.newChat />}
-            onSelect={() => {
-              goHome()
-              close()
-            }}
-          >
-            New conversation
-          </MenuItem>
-          <MenuItem
-            icon={<Icons.reload />}
-            onSelect={() => {
-              close()
-              window.location.reload()
-            }}
-          >
-            Reload interface
-          </MenuItem>
-          <MenuItem
-            icon={<Icons.command />}
-            hint="Ctrl K"
-            onSelect={() => {
-              setPaletteOpen(true)
-              close()
-            }}
-          >
-            Search
-          </MenuItem>
-
-          <MenuSeparator />
-          <MenuItem
-            icon={<Icons.settings />}
-            onSelect={() => {
-              openSettings()
-              close()
-            }}
-          >
-            Settings
-          </MenuItem>
+          <ActionItems selection={position.selection} target={position.target} close={close} />
         </motion.div>
       ) : null}
     </AnimatePresence>

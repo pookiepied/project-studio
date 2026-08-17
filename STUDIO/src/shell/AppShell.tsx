@@ -6,7 +6,9 @@ import { HomePage } from '@/features/home'
 import { CommandPalette } from '@/features/palette'
 import { NewProjectDialog, ProjectPage } from '@/features/projects'
 import { SettingsPage } from '@/features/settings'
+import { VoiceModeProvider } from '@/features/voice'
 import { ActionsMenu } from '@/shell/ActionsMenu'
+import { SelectionMenu } from '@/shell/SelectionMenu'
 import { TopStrip } from '@/shell/chrome/TopStrip'
 import { SideRail } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
@@ -81,7 +83,12 @@ export function AppShell() {
       className="relative flex h-full w-full overflow-hidden border border-hairline bg-surface-sunken"
       style={{ borderRadius: SHELL.windowRadius }}
     >
-      <Sidebar onNewProject={() => setNewProjectOpen(true)} />
+      {/* Voice mode mounts inside the rounded root, not at the app root, so
+          the stage is clipped by the same window corner everything else is
+          and cannot paint outside it. It is the last child for the same
+          reason: the stage covers the sidebar and the page on purpose. */}
+      <VoiceModeProvider>
+        <Sidebar onNewProject={() => setNewProjectOpen(true)} />
 
       {/* The page is a panel resting on the sidebar, and only while the sidebar
           is there to rest on.
@@ -158,6 +165,12 @@ export function AppShell() {
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
       <ActionsMenu />
+      {/* The same actions, offered the moment text is selected rather than
+          after a right-click. Mounted beside `ActionsMenu` because the two
+          share their verbs (`ActionItems`) and hand off to each other -- a
+          right-click closes this one; this one never opens over that one. */}
+      <SelectionMenu />
+      </VoiceModeProvider>
     </div>
   )
 

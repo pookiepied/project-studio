@@ -1,5 +1,6 @@
 import { SHELL } from '@/design/tokens'
 import { ChatPage } from '@/features/chat'
+import { VoiceModeProvider } from '@/features/voice'
 import { startWindowDrag } from '@/platform/tauri'
 import { IdentityLine } from '@/shell/chrome/IdentityLine'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
@@ -49,6 +50,9 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
       className="relative flex h-full w-full overflow-hidden border border-hairline bg-surface"
       style={{ borderRadius: SHELL.windowRadius }}
     >
+      {/* Same stage, same place, as the studio window: over everything this
+          window holds, clipped by its rounded frame. See `AppShell`. */}
+      <VoiceModeProvider>
       <div className="relative min-w-0 flex-1 overflow-hidden">
         <header
           onPointerDown={(event) => {
@@ -78,6 +82,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
 
         <ChatPage conversation={conversation} onForked={openFork} />
       </div>
+      </VoiceModeProvider>
     </div>
   )
 }
