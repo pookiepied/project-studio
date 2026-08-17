@@ -48,7 +48,7 @@ function Section({ section }: { section: ArtifactSection }) {
 function Body({ section }: { section: ArtifactSection }) {
   switch (section.type) {
     case 'text':
-      return <p className="text-ui leading-relaxed text-muted-foreground">{section.content}</p>
+      return <p className="text-ui text-muted-foreground">{section.content}</p>
 
     case 'stats':
       return <Stats items={section.items} />
@@ -79,7 +79,13 @@ function Body({ section }: { section: ArtifactSection }) {
                 rel="noreferrer noopener"
                 className="group/link flex items-start gap-2 rounded-lg px-1.5 py-1.5 transition-colors duration-fast hover:bg-tint"
               >
-                <Icons.link className="mt-0.5 shrink-0" />
+                {/* One line tall, centred: the mark sits on the label's line
+                    rather than being nudged toward it. `text-ui` on the wrapper
+                    names which line that is, so `1lh` cannot resolve against
+                    whatever size happens to be inherited here. */}
+                <span className="flex h-[1lh] shrink-0 items-center text-ui">
+                  <Icons.link />
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-ui text-foreground">{item.label}</span>
                   <span className="block truncate text-caption text-muted-foreground">

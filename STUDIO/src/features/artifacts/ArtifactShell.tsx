@@ -108,7 +108,7 @@ export function ArtifactShell({
       {/* The summary belongs to the shell, not to the kind. It was drawn by
           each renderer before, at three different sizes. */}
       {artifact.summary ? (
-        <p className="mt-2.5 text-ui leading-relaxed text-muted-foreground">{artifact.summary}</p>
+        <p className="mt-2.5 text-ui text-muted-foreground">{artifact.summary}</p>
       ) : null}
 
       {children ? <div className="mt-3 min-w-0">{children}</div> : null}

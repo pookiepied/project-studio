@@ -37,11 +37,23 @@ import { cn } from '@/lib/cn'
 type Size = 'sm' | 'md' | 'lg'
 type Tone = 'quiet' | 'solid'
 
-/** `lg` is 32px, matching `COMPOSER.controlSize` -- the controls inside the field. */
+/**
+ * The three control steps, read from the scale rather than written as rem.
+ *
+ * These were `size-6 / size-7 / size-8` -- 24, 28 and 32 on Tailwind's rem
+ * grid, which is anchored to a root font-size that deliberately never moves.
+ * So the most common control in the app was the one thing in it that could not
+ * follow `--ui-size`: text got smaller, every button stayed exactly where it
+ * was, and the gap between them read as "the text is too small for its
+ * buttons". It was, and no amount of changing the text could have fixed it.
+ *
+ * `--control-*` derives from `--ui-size`, so a size preference now moves the
+ * button and the label inside it by the same proportion.
+ */
 const SIZE_CLASS: Record<Size, string> = {
-  sm: 'size-6',
-  md: 'size-7',
-  lg: 'size-8',
+  sm: 'size-[var(--control-sm)]',
+  md: 'size-[var(--control-md)]',
+  lg: 'size-[var(--control-lg)]',
 }
 
 /**

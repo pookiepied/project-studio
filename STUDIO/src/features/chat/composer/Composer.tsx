@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -7,6 +7,8 @@ import { AddMenu } from '@/features/chat/composer/AddMenu'
 import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
+import { DictationBar, useDictation } from '@/features/voice'
+import { useVoiceModeContext } from '@/features/voice'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 
@@ -52,12 +54,30 @@ export function Composer({
   const [focused, setFocused] = useState(false)
   const [multiline, setMultiline] = useState(false)
   const field = useRef<ComposerFieldHandle>(null)
+  const voice = useVoiceModeContext()
+
+  const dictation = useDictation({
+    // Appended, not assigned: dictation is one input among several, and a
+    // sentence typed before speaking is not made wrong by being spoken after.
+    onText: (spoken) =>
+      setText((current) => (current.trim().length > 0 ? `${current.trimEnd()} ${spoken}` : spoken)),
+  })
+
+  // Coming out of dictation, the caret goes back where it was -- the field
+  // remounts as the strip leaves, so the focus has to wait for the return
+  // rather than firing from the hook's completion.
+  const wasDictating = useRef(false)
+  useEffect(() => {
+    if (dictation.stage === 'idle' && wasDictating.current) field.current?.focus()
+    wasDictating.current = dictation.stage !== 'idle'
+  }, [dictation.stage])
 
   const focus = useCallback(() => field.current?.focus(), [])
   useTypeToFocus(true, focus)
 
   const busy = status !== 'idle'
   const canSend = text.trim().length > 0 && !busy
+  const dictating = dictation.stage !== 'idle'
 
   const submit = () => {
     if (!canSend) return
@@ -87,6 +107,13 @@ export function Composer({
       // fight the textarea's own height.
       style={{
         paddingInline: COMPOSER.paddingInline,
+        // Block padding is a token here rather than a `py-*` utility because
+        // it is one of the two inputs the resting height is computed from --
+        // see `COMPOSER_RESTING_HEIGHT`. As a class it was a third number that
+        // had to be kept in step with the other two by hand, and it was the
+        // one that silently disagreed: the field measured 52 while the token
+        // said what it should be.
+        paddingBlock: COMPOSER.paddingBlock,
         borderRadius: multiline ? COMPOSER.multilineRadius : COMPOSER.restingRadius,
         transitionDuration: `${DURATION.base}s`,
       }}
@@ -108,7 +135,6 @@ export function Composer({
         // correcting itself. The roomier size was better in both states, so it
         // is simply the size now. Focus is still acknowledged -- by the shadow,
         // which costs no layout.
-        'py-2.5',
         'transition-[box-shadow,border-radius,padding] duration-base ease-out',
         // Both properties, or the radius does not animate at all: naming only
         // `box-shadow` sets `transition-property` to exactly that, so the
@@ -140,14 +166,46 @@ export function Composer({
         <PermissionControl />
 
         <div className="min-w-0 flex-1">
-          <ComposerField
-            handleRef={field}
-            value={text}
-            onChange={setText}
-            onSubmit={submit}
-            onMultilineChange={setMultiline}
-            placeholder={placeholder}
-          />
+          {/* While dictation is live the field steps aside and the strip of
+              real level takes its place -- same slot, same line height, so
+              the capsule neither grows nor reshapes. `popLayout` keeps the
+              outgoing field in the flow's memory for the length of its exit
+              rather than collapsing the row for one frame. */}
+          <AnimatePresence initial={false} mode="popLayout">
+            {dictating ? (
+              <motion.div
+                key="dictation"
+                initial={{ opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              >
+                <DictationBar
+                  stage={dictation.stage}
+                  elapsedMs={dictation.elapsedMs}
+                  denied={dictation.denied}
+                  onFrame={dictation.mic.onFrame}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="field"
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 6 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              >
+                <ComposerField
+                  handleRef={field}
+                  value={text}
+                  onChange={setText}
+                  onSubmit={submit}
+                  onMultilineChange={setMultiline}
+                  placeholder={placeholder}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex items-center gap-0.5">
@@ -155,11 +213,27 @@ export function Composer({
               It acts on this field -- it fills it with what you say -- so it
               belongs beside the field the way send does. Buried in a menu it
               was two clicks from the thing it modifies, and it was the only
-              item in that menu that was not "attach something". */}
-          <IconButton label="Dictate" size="lg" onClick={focus}>
-            <Icons.dictate size="md" />
+              item in that menu that was not "attach something".
+
+              The mark becomes the transport while recording: the mic gathers,
+              the square stops. Same control, two states, one meaning -- the
+              way send becomes stop while a reply streams. */}
+          <IconButton
+            label={dictation.stage === 'recording' ? 'Stop and transcribe' : 'Dictate'}
+            size="md"
+            active={dictation.stage === 'recording'}
+            disabled={dictation.stage === 'requesting' || dictation.stage === 'processing'}
+            onClick={() =>
+              dictation.stage === 'recording' ? void dictation.stop() : void dictation.start()
+            }
+          >
+            {dictation.stage === 'recording' ? <Icons.stop size="md" /> : <Icons.dictate size="md" />}
           </IconButton>
 
+          {/* While the microphone owns the field there is nothing to send and
+              no voice mode to offer -- the strip is the message in progress,
+              and the mic beside it is its only control. */}
+          {!dictating && (
           <AnimatePresence initial={false}>
             {canSend || busy ? (
               <motion.div
@@ -171,7 +245,7 @@ export function Composer({
               >
                 <IconButton
                   label={busy ? 'Stop' : 'Send'}
-                  size="lg"
+                  size="md"
                   tone="solid"
                   onClick={busy ? stop : submit}
                 >
@@ -187,17 +261,18 @@ export function Composer({
                 transition={{ duration: DURATION.fast, ease: EASE_OUT }}
               >
                 {/* Voice mode, not dictation. Dictation turns speech into text
-                    in this field and lives in the plus menu; this starts a
+                    in this field and lives beside it; this starts a
                     spoken conversation and replaces the field entirely. Two
                     features, so two marks -- the previous build gave them
                     adjacent glyphs and they read as one control with a
                     duplicate. */}
-                <IconButton label="Voice mode" size="lg" onClick={() => undefined}>
+                <IconButton label="Voice mode" size="md" onClick={voice.enter}>
                   <Icons.voice size="md" />
                 </IconButton>
               </motion.div>
             )}
           </AnimatePresence>
+          )}
         </div>
       </div>
     </div>

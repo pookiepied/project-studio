@@ -81,7 +81,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
         <button
           type="button"
           onClick={() => openProject(project.id)}
-          className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[26rem]:flex"
+          className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[26rem]:flex"
         >
           <ProjectIconMark icon={project.icon} />
           <span className="max-w-[7rem] truncate">{project.name}</span>
@@ -110,7 +110,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="group/identity flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none transition-colors duration-fast hover:bg-tint"
+            className="group/identity flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui transition-colors duration-fast hover:bg-tint"
           >
             {conversation.pinned ? (
               <Icons.pin className="shrink-0 text-muted-foreground" />
@@ -219,7 +219,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
                 onClick={() => setBranchOpen((open) => !open)}
                 aria-haspopup="menu"
                 aria-expanded={branchOpen}
-                className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui leading-none text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[34rem]:flex"
+                className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground @[34rem]:flex"
               >
                 <Icons.branch />
                 <span className="max-w-[8rem] truncate">{project.branch}</span>

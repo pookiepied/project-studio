@@ -1,6 +1,6 @@
 import { createContext, forwardRef, useContext, type ReactNode } from 'react'
 import { motion, type SVGMotionProps, type Variants } from 'framer-motion'
-import { ICON, type IconSize } from '@/design/tokens'
+import { ICON_STEP, type IconSize } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -155,22 +155,16 @@ export interface IconProps extends Omit<SVGMotionProps<SVGSVGElement>, 'ref' | '
 const TEXT_RELATIVE = '1.1em'
 
 /**
- * Absolute steps, in px, for marks that are *not* beside text -- an icon alone
- * in a square button, a mark in a rail.
+ * Absolute steps, for marks that are *not* beside text -- an icon alone in a
+ * square button, a mark in a rail.
  *
- * Deliberately px and deliberately inline. Tailwind's `size-*` utilities are
- * `rem`, and this app sets the root font-size to the user's UI size, so `rem`
- * is not 16px here -- at the 13px default every `rem` utility silently paints
- * at 0.8125x. That is what shrank `size-3` to 9.7px while its own width
- * attribute said 12, because the class beat the attribute. Any unit that
- * depends on the root is unusable for this, so the scale states px outright.
+ * They resolve to the `--icon-*` variables, which derive from `--ui-size`, so
+ * a standalone mark moves with the size preference exactly as a text-paired
+ * one does. The old table was fixed px, and at every setting but the default
+ * the two kinds of mark sat at different offsets from each other -- which is
+ * how a page of labelled rows and a page of round controls came to disagree
+ * about how big a mark is.
  */
-const STEP_PX: Record<Exclude<IconSize, 'text'>, number> = {
-  xs: ICON.xs,
-  sm: ICON.sm,
-  md: ICON.md,
-  lg: ICON.lg,
-}
 
 /**
  * Fills in the states a glyph did not bother to declare, pointing them at
@@ -314,7 +308,7 @@ export function defineIcon(glyph: Glyph, name: string) {
     // looking open while the cursor moves across it.
     const resolved = state ?? inherited
 
-    const box = size === 'text' ? TEXT_RELATIVE : `${STEP_PX[size]}px`
+    const box = size === 'text' ? TEXT_RELATIVE : ICON_STEP[size]
 
     return (
       <motion.svg

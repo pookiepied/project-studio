@@ -1,5 +1,5 @@
 import { siAnthropic, siDeepseek, siGooglegemini, siMeta, siMistralai } from 'simple-icons'
-import { ICON, type IconSize } from '@/design/tokens'
+import { ICON_STEP, type IconSize } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -91,7 +91,7 @@ export function ProviderMark({
 }) {
   // Sized from its text like every other mark, so a provider badge beside a
   // model name matches that name rather than a step chosen at the call site.
-  const box = size === 'text' ? '1.1em' : `${ICON[size]}px`
+  const box = size === 'text' ? '1.1em' : ICON_STEP[size]
   const brand = BRAND[provider]
 
   return (

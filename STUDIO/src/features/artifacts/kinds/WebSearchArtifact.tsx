@@ -53,12 +53,14 @@ export function WebSearchArtifact({ artifact }: { artifact: Artifact }) {
                   {hostOf(result.href)}
                 </span>
                 {result.description ? (
-                  <span className="mt-1 line-clamp-2 block text-caption leading-relaxed text-muted-foreground">
+                  <span className="mt-1 line-clamp-2 block text-caption text-muted-foreground">
                     {result.description}
                   </span>
                 ) : null}
               </span>
-              <Icons.openExternal className="mt-0.5 shrink-0 opacity-0 transition-opacity duration-fast group-hover/result:opacity-100" />
+              <span className="flex h-[1lh] shrink-0 items-center text-ui">
+                <Icons.openExternal className="opacity-0 transition-opacity duration-fast group-hover/result:opacity-100" />
+              </span>
             </a>
           </AnimatedItem>
         ))}
@@ -76,11 +78,14 @@ export function WebSearchArtifact({ artifact }: { artifact: Artifact }) {
 function Initial({ href }: { href: string }) {
   const host = hostOf(href)
   return (
-    <span
-      aria-hidden
-      className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-selected text-micro font-semibold text-muted-foreground"
-    >
-      {host.charAt(0).toUpperCase()}
+    // The outer box is one line of the result's title tall, so the disc
+    // centres on that line instead of being nudged down toward it. The disc
+    // keeps its own size on the inside -- it is a shape, not a glyph, and it
+    // should not resize with the line it happens to sit on.
+    <span aria-hidden className="flex h-[1lh] shrink-0 items-center text-ui">
+      <span className="flex size-5 items-center justify-center rounded-full bg-selected text-micro font-semibold text-muted-foreground">
+        {host.charAt(0).toUpperCase()}
+      </span>
     </span>
   )
 }

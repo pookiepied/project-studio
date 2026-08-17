@@ -1,3 +1,5 @@
+import { DEFAULT_UI_SIZE } from './typography'
+
 /**
  * Radius, spacing, and shell geometry.
  *
@@ -31,6 +33,34 @@ export const RADIUS = {
   window: 20,
   /** A capsule. The one radius that is concentric with anything. */
   pill: 9999,
+} as const
+
+/**
+ * Control heights, as multiples of the interface text size.
+ *
+ * The ratios are `--control-*` in `index.css`, and this is the numeric mirror
+ * of them: Framer cannot spring a `calc()`, so the handful of controls that
+ * animate a height or a radius need real numbers. Derived rather than restated,
+ * so the two cannot drift the way the type scale and the geometry did -- which
+ * is the whole reason this block exists.
+ *
+ * The multiplication comes before the division on both sides, so the steps are
+ * exact integers at the default rather than a rounded decimal here and an
+ * unrounded `calc()` there.
+ *
+ * That drift is worth naming, because it is what "changing the font size did
+ * nothing" actually was. Text was driven by `--ui-size`; these numbers were
+ * fixed px from when the interface text was 14. Nothing recomputed them at 12,
+ * so every box kept the proportions of a larger scale and a size preference
+ * moved the text while the sidebar, the chrome and the composer stood still.
+ */
+export const CONTROL = {
+  /** Compact: row overflow buttons, menu affordances. */
+  sm: (DEFAULT_UI_SIZE * 2) / 1,
+  /** The default: icon buttons in the chrome, and the composer's row. */
+  md: (DEFAULT_UI_SIZE * 7) / 3,
+  /** The largest round control -- voice mode's transport. */
+  lg: (DEFAULT_UI_SIZE * 8) / 3,
 } as const
 
 /** The 4px spacing grid. Nothing in the app uses a value that is not here. */
@@ -72,11 +102,13 @@ export const SHELL = {
   /**
    * Reading measure for the transcript and the composer.
    *
-   * 44rem is about 76 characters at 14px, the upper end of comfortable prose.
-   * The composer shares it so a reply lands exactly as wide as the field that
-   * produced it.
+   * 46 em of body text, which is about 76 characters -- the upper end of
+   * comfortable prose. Stated against `--text-body` because the measure has to
+   * track the text it is measuring; the root font-size is the layout grid now,
+   * not the text size. The composer shares it so a reply lands exactly as wide
+   * as the field that produced it.
    */
-  measure: '44rem',
+  measure: 'calc(var(--text-body) * 46)',
 
   /** Shared content gutter, so nothing sits at a different x between views. */
   gutter: SPACE['2xl'],
@@ -93,10 +125,36 @@ export const SHELL = {
   scrollbarInset: 44,
 } as const
 
+/*
+ * The composer's height, and why it is no longer a number of its own.
+ *
+ * It used to be 52, and 52 was never chosen for the text -- it was 32px round
+ * controls plus 10px of padding, twice. The field was sized by its buttons, and
+ * the text inside it had no say at all: setting the composer to 8px or 16px
+ * left the capsule exactly 52 tall either way. That is why every attempt to fix
+ * "the field is huge and the text is tiny" by changing a font size failed. The
+ * font was never in the equation.
+ *
+ * Measured, the field held 11px text in a 52px box -- 4.7x. Every other control
+ * in the app sat between 2.2x and 2.4x. It was not that the composer looked
+ * wrong next to the text; it was the one control in the interface not drawn to
+ * the same proportion as the rest of it.
+ *
+ * Both inputs are tokens now, so the height is an outcome rather than a
+ * constant: the control row is `CONTROL.md`, the same step every other icon
+ * button uses, and the padding is one step of the spacing grid. At the default
+ * that lands on 40 -- which is also `SHELL.topStrip.height`, so the field and
+ * the window's chrome finally agree without either being told to.
+ */
+const COMPOSER_PADDING_BLOCK = SPACE.sm
+const COMPOSER_RESTING_HEIGHT = CONTROL.md + COMPOSER_PADDING_BLOCK * 2
+
 /** The composer, which is a capsule when single-line and a rounded box when not. */
 export const COMPOSER = {
+  /** Above and below the control row. The resting height derives from it. */
+  paddingBlock: COMPOSER_PADDING_BLOCK,
   /** Height of the resting single-line field. Radius is half of this. */
-  restingHeight: 52,
+  restingHeight: COMPOSER_RESTING_HEIGHT,
   /**
    * The single-line radius: half the field's own height, so it is a capsule.
    *
@@ -111,17 +169,24 @@ export const COMPOSER = {
    * changed, is exactly the "it changes shape and then reverts" the user kept
    * seeing. The measurement was never late; the interpolation was.
    *
-   * From 24 to 18 the transition is short, monotonic and visible the whole way,
+   * From 26 to 18 the transition is short, monotonic and visible the whole way,
    * which is what makes it read as one object relaxing rather than two shapes
-   * swapping.
+   * swapping. (Half of 52 exactly -- it only adds up now that the rem grid
+   * paints at nominal; for as long as the root carried the text size, the
+   * field's real height was ~42px and this number described a box it never
+   * sat on.)
+   *
+   * Half of the height rather than a hand-written copy of half the height --
+   * the capsule stays a capsule when the height moves, instead of the two
+   * needing to be remembered together.
    */
-  restingRadius: 24,
+  restingRadius: COMPOSER_RESTING_HEIGHT / 2,
 
   /** Past this the field is a box, not a capsule. */
   multilineRadius: RADIUS.xl,
   /** Grow to about eight lines, then scroll inside. */
   maxHeight: 184,
   paddingInline: SPACE.sm,
-  /** Every round control inside the field. */
-  controlSize: 32,
+  /** Every round control inside the field -- the same step as the chrome's. */
+  controlSize: CONTROL.md,
 } as const

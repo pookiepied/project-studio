@@ -64,7 +64,7 @@ export function Transcript({
           animates and a word beside it is the interface narrating something the
           user can see. */}
       {status === 'thinking' && visible[visible.length - 1]?.role === 'user' ? (
-        <StudioMark busy size={15} className="text-foreground/45" />
+        <StudioMark busy size={16} className="text-foreground/45" />
       ) : null}
     </div>
   )

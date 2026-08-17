@@ -79,7 +79,13 @@ export function ComposerField({
       }}
       className={[
         'studio-selectable block w-full resize-none bg-transparent',
-        'text-body text-foreground outline-none placeholder:text-muted-foreground/70',
+        // `text-ui`, not `text-body`. The composer is a control, and it reads
+        // as one: it sits in the chrome, beside buttons, and its text should
+        // match the row of controls it shares a capsule with rather than the
+        // transcript above it. Under `text-body` it was 11px inside a 52px
+        // field while the buttons beside it were 12 -- the smallest text in
+        // the app, in the largest control in the app.
+        'text-ui text-foreground outline-none placeholder:text-muted-foreground/70',
         // No vertical padding: the row centres its children, and padding here
         // would fight that and leave the caret sitting low in the capsule.
         'px-1 py-0',

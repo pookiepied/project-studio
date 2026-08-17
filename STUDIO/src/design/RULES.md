@@ -133,11 +133,46 @@ voice and becomes a second UI font.
 
 **Roles, never sizes.** Components name `text-body`, `text-ui`, `text-caption`,
 `text-micro`, `text-title`. Nothing writes `text-sm`. Every role derives from
-`--ui-size`, so the whole app scales from one number.
+`--ui-size`, so the whole text system scales from one number.
+
+**The root font-size is 16px, and text size never touches it.** The root is the
+rem grid the layout is drawn on — control heights, paddings, dialog widths.
+Setting it to the UI text size once put every rem utility at 0.81× of the
+geometry it was authored as while the px-based marks, radii and tokens painted
+full size, so the whole app was a negotiation between two unit systems
+disagreeing by 23%, and every size preference rescaled the layout without
+moving the marks. Text sizes are px variables applied by the roles; the default
+size sits on `body` so un-roled text inherits it exactly as before.
+
+**Control geometry derives from `--ui-size` too.** `--control-sm/md/lg` are
+multiples of the interface text (2, 2.33, 2.67), and `IconButton` reads them
+instead of `size-6/7/8`. This is the other half of the rule above, and for a
+long time it was missing: text scaled from one number and every box was a fixed
+px or rem constant calibrated when the text was 14. At 12 the boxes kept the
+proportions of the larger scale, and a size preference moved the text while the
+sidebar, the chrome and the composer stood still — which is exactly what
+"changing the font size does nothing" was. Nothing that holds text may state its
+height as a rem utility or a literal; it names a control step.
+
+**A container's height is an outcome, not a constant.** The composer was 52px
+because it held 32px controls with 10px of padding, and the text inside had no
+say at all — 11px text in a 52px box, 4.7× where every other control in the app
+was 2.2–2.4×. Setting the font to anything at all left the field exactly 52
+tall, which is why no amount of type tuning ever fixed it. `COMPOSER` now
+computes its height and its radius from the control step and the padding.
 
 **Overridable, never overridden.** Roles live in `@layer components`, so a
 deliberate utility at a call site still wins. That is the balance the system is
-aiming at: default everywhere, locked nowhere.
+aiming at: default everywhere, locked nowhere — and it is also the sharpest
+edge in the system, because "still wins" includes winning by accident.
+
+**One size, one leading.** A role carries size *and* leading, and a `leading-*`
+utility beside a role class sits in the utilities layer and silently outranks
+it. Eleven call sites did this, and the result was 11px rendering at three
+different leadings and 12px at two — identical pixels at a different rhythm,
+which reads as a size difference nobody can locate in the code because no size
+was ever changed. Leading belongs to the role. If a control needs its glyph
+optically centred, centre it with flex, not by flattening the line box.
 
 Two things this cost us, both worth knowing:
 
@@ -147,10 +182,32 @@ Two things this cost us, both worth knowing:
 - Unlayered CSS beats *all* layered CSS regardless of specificity. KaTeX ships
   unlayered, so the math cap had to move out of `@layer components` to work.
 
+**A mark centres on a line, never on a margin.** For a single-line row that is
+`items-center` and nothing else. For a mark that must sit on the *first* line of
+a multi-line block, the wrapper is `flex h-[1lh] items-center` and the row stays
+`items-start` — the box is exactly one line tall, so the glyph centres inside
+the line it belongs to. Never `mt-px` or `mt-0.5`. Those are measured by eye
+against one specific line-height, and they are silently wrong the moment that
+leading changes: `MenuItem`'s `mt-px` was tuned against `leading-tight`, and
+when the label took its role's real leading the nudge left every icon in every
+menu 1.26px above the text's cap height. Put `text-ui` (or whichever role owns
+that line) on the wrapper too — `1lh` resolves against the element's *own*
+line-height, so an unqualified wrapper measures whatever it happened to inherit,
+and a `text-micro` hint measures its own 14.5px line rather than the 18.6px line
+it is aligning to.
+
+**Cap height is the reference, not the ink box.** Descenders drag a text run's
+ink centre down by a pixel or more, so "centre the icon on the text" measured
+against full ink extents produces a mark that sits visibly low. Align to the
+midpoint between baseline and cap height; `items-center` on a line box already
+does this, which is why the correct rows measure 0.00 against it.
+
 **Icons size from their text** (`1.1em`), so a mark in a caption is caption-
-sized and the same mark in a heading grows. The absolute steps are px, never
-rem — the root font-size is the user's UI size here, so every `rem` utility
-silently paints at 0.81×.
+sized and the same mark in a heading grows. The absolute steps for standalone
+marks are CSS variables (`--icon-*`) derived from `--ui-size`, so a mark in a
+round control tracks the size preference exactly as a mark beside a label
+does — the two stopped agreeing the moment the steps were fixed px and the
+text was not.
 
 ---
 

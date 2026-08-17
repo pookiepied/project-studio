@@ -49,7 +49,7 @@ export function Segmented<T extends string | number>({
             onClick={() => onChange(option.id)}
             className={cn(
               'relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5',
-              'text-ui leading-none transition-colors duration-fast',
+              'text-ui transition-colors duration-fast',
               selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >

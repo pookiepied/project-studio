@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 
 import { IconStateContext, type IconState } from '@/components/icons/Icon'
-import { ICON, type IconSize } from '@/design/tokens'
+import { ICON_STEP, type IconSize } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -69,7 +69,7 @@ import { cn } from '@/lib/cn'
  */
 function drawnMark(d: string, name: string) {
   function Mark({ size = 'text', className, style }: { size?: IconSize; className?: string; style?: React.CSSProperties }) {
-    const box = size === 'text' ? '1.1em' : `${STEP_PX[size]}px`
+    const box = size === 'text' ? '1.1em' : ICON_STEP[size]
     return (
       <svg
         viewBox="0 0 16 16"
@@ -89,13 +89,6 @@ function drawnMark(d: string, name: string) {
   }
   Mark.displayName = name
   return Mark
-}
-
-const STEP_PX: Record<Exclude<IconSize, 'text'>, number> = {
-  xs: ICON.xs,
-  sm: ICON.sm,
-  md: ICON.md,
-  lg: ICON.lg,
 }
 
 /**
@@ -154,7 +147,7 @@ export function SidebarToggle({
 }) {
   const inherited = useContext(IconStateContext)
   const active = state ?? inherited
-  const box = size === 'text' ? '1.1em' : `${STEP_PX[size]}px`
+  const box = size === 'text' ? '1.1em' : ICON_STEP[size]
 
   const svg = {
     viewBox: '0 0 16 16',

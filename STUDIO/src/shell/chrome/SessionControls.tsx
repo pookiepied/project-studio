@@ -19,7 +19,7 @@ export function ContextMeter({ used }: { used: number }) {
 
   return (
     <Tooltip label={`${percent}% of the context window used`} side="bottom">
-      <span className="flex h-6 shrink-0 items-center gap-1 px-1.5 text-caption leading-none text-muted-foreground">
+      <span className="flex h-6 shrink-0 items-center gap-1 px-1.5 text-caption text-muted-foreground">
         <svg viewBox="0 0 14 14" className="size-3.5 -rotate-90" aria-hidden>
           <circle cx="7" cy="7" r={radius} fill="none" strokeWidth="2" className="stroke-foreground/15" />
           <circle

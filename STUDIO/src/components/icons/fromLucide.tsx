@@ -2,7 +2,7 @@ import { forwardRef, useContext } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import { IconStateContext, type IconState } from '@/components/icons/Icon'
-import { ICON, type IconSize } from '@/design/tokens'
+import { ICON_STEP, type IconSize } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -44,14 +44,6 @@ import { cn } from '@/lib/cn'
  * text around it, so `size` is `100%` and the division yields NaN.
  */
 
-/** Absolute px steps, for marks with no text beside them. See `Icon.tsx`. */
-const STEP_PX: Record<Exclude<IconSize, 'text'>, number> = {
-  xs: ICON.xs,
-  sm: ICON.sm,
-  md: ICON.md,
-  lg: ICON.lg,
-}
-
 /** A mark sits about a tenth above its text. See the note in `Icon.tsx`. */
 const TEXT_RELATIVE = '1.1em'
 
@@ -89,7 +81,7 @@ export function fromLucide(Mark: LucideIcon, name: string, variants?: Variants) 
   ) {
     const inherited = useContext(IconStateContext)
     const active = state ?? inherited
-    const box = size === 'text' ? TEXT_RELATIVE : `${STEP_PX[size]}px`
+    const box = size === 'text' ? TEXT_RELATIVE : ICON_STEP[size]
 
     return (
       <motion.span

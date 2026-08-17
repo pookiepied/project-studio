@@ -59,7 +59,12 @@ export function PermissionControl() {
               // Matches the other controls in the row, so the field's contents
               // sit on one line rather than one of them being a different
               // height and pulling the row's centre off.
-              'h-8 text-muted-foreground transition-colors duration-fast',
+              // The control step, not `h-8`. This sits in the composer's row
+              // beside three icon buttons, and as a rem class it was the one
+              // that did not move with them -- 32 against their 28, which set
+              // the whole field's height and made the capsule 4px taller than
+              // its own tokens said it was.
+              'h-[var(--control-md)] text-muted-foreground transition-colors duration-fast',
               open ? 'bg-selected' : 'hover:bg-tint',
             )}
           >

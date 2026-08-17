@@ -1,10 +1,10 @@
 import { Icons } from '@/components/icons'
 import { Button, Segmented } from '@/components/primitives'
 import { useAppearance } from '@/design/theme'
-import { CODE_SIZE_CHOICES, UI_SIZE_CHOICES } from '@/design/tokens'
+import { CODE_OFFSET_CHOICES, UI_SIZE_CHOICES, codeSizeFor } from '@/design/tokens'
 import { resetWindowSize } from '@/platform/tauri'
 import { Row, Pane } from '@/features/settings/panes/Pane'
-import type { CodeSize, UiSize } from '@/design/tokens'
+import type { CodeOffset, UiSize } from '@/design/tokens'
 
 /**
  * Appearance.
@@ -52,13 +52,22 @@ export function AppearancePane() {
         />
       </Row>
 
-      <Row label="Code text" hint="Code blocks and inline code.">
+      {/* The choice stored is an offset from the interface text, but the label
+          shows what that offset actually resolves to, so the row reads as a
+          size and re-labels itself the moment the interface size above it
+          changes. Storing the relationship and displaying the number is what
+          keeps "one step under" true at every setting instead of only at the
+          default -- see `CODE_OFFSET_CHOICES`. */}
+      <Row label="Code text" hint="Code blocks and inline code, kept a step under the interface.">
         <Segmented
           layoutId="settings-code-size"
           ariaLabel="Code text size"
-          value={appearance.codeSize}
-          onChange={(codeSize: CodeSize) => update({ codeSize })}
-          options={CODE_SIZE_CHOICES.map((size) => ({ id: size, label: `${size}px` }))}
+          value={appearance.codeOffset}
+          onChange={(codeOffset: CodeOffset) => update({ codeOffset })}
+          options={CODE_OFFSET_CHOICES.map((offset) => ({
+            id: offset,
+            label: `${codeSizeFor(appearance.uiSize, offset)}px`,
+          }))}
         />
       </Row>
 

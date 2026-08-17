@@ -37,7 +37,7 @@ export function ThinkingBlock({ thinking, live }: { thinking: Thinking; live: bo
           'text-caption text-muted-foreground transition-colors duration-fast hover:text-foreground',
         )}
       >
-        <StudioMark busy={live} size={13} className="text-current" />
+        <StudioMark busy={live} size={12} className="text-current" />
 
         <span>{live ? 'Thinking' : `Thought for ${formatSeconds(thinking.seconds)}`}</span>
 

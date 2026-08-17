@@ -99,7 +99,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
       />
 
       {data.prompt ? (
-        <p className="mt-2.5 text-caption leading-relaxed text-muted-foreground">
+        <p className="mt-2.5 text-caption text-muted-foreground">
           <span className="font-medium text-foreground">Prompt </span>
           {data.prompt}
         </p>

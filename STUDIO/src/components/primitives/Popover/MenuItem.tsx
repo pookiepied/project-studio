@@ -51,24 +51,43 @@ export function MenuItem({
         destructive && '[&_.studio-icon]:text-red-500/80 hover:[&_.studio-icon]:text-red-500',
       )}
     >
-      {icon ? (
-        <span className="mt-px flex size-3.5 shrink-0 items-center justify-center">{icon}</span>
-      ) : (
-        // Reserved rather than conditional: a check that appears and pushes the
-        // label sideways makes the whole menu twitch as the selection moves.
-        <span className="mt-px flex size-3.5 shrink-0 items-center justify-center">
-          {selected ? <Icons.check /> : null}
-        </span>
-      )}
+      {/* The icon column is exactly one line tall, and the mark is centred in
+          it. That is what makes the glyph sit on the row's first line whether
+          or not a note follows it -- `items-start` keeps the column at the top,
+          and `1lh` gives it the height of the line it is aligning to.
+
+          It used to be `size-3.5` nudged down by `mt-px`. A 14px box on a
+          18.6px line is 2.3px short of centred, and the `mt-px` was the half of
+          that someone measured by eye -- against a label that was then
+          `leading-tight`. The moment the label took its role's real leading the
+          nudge was compensating for a line box that no longer existed, and the
+          icon sat 1.26px above the text's cap height in every menu in the app,
+          including the right-click one. A hand-tuned margin cannot survive a
+          change to the thing it was tuned against; a derived height can.
+
+          Reserved rather than conditional: a check that appears and pushes the
+          label sideways makes the whole menu twitch as the selection moves. */}
+      <span className="flex h-[1lh] w-[1.1em] shrink-0 items-center justify-center">
+        {icon ?? (selected ? <Icons.check /> : null)}
+      </span>
 
       <span className="min-w-0 flex-1">
-        <span className="block truncate leading-tight">{children}</span>
+        <span className="block truncate">{children}</span>
         {note ? (
-          <span className="mt-0.5 block text-micro leading-tight text-muted-foreground">{note}</span>
+          <span className="mt-0.5 block text-micro text-muted-foreground">{note}</span>
         ) : null}
       </span>
 
-      {hint ? <span className="mt-px shrink-0 text-micro text-muted-foreground">{hint}</span> : null}
+      {/* Same trick, and the wrapper is load-bearing: `1lh` resolves against
+          the element's *own* line-height, so putting it on the `text-micro`
+          span would measure the hint's 14.5px line rather than the label's
+          18.6px one. The outer box inherits the row's `text-ui`; the micro
+          styling goes inside it. */}
+      {hint ? (
+        <span className="flex h-[1lh] shrink-0 items-center">
+          <span className="text-micro text-muted-foreground">{hint}</span>
+        </span>
+      ) : null}
     </button>
   )
 }

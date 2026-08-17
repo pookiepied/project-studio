@@ -17,8 +17,8 @@ import { extendTailwindMerge } from 'tailwind-merge'
  *     cn('text-ui', muted && 'text-muted-foreground')
  *
  * silently emitted `text-muted-foreground` alone. The role class never reached
- * the DOM. The element then inherited the root 13px at the browser's default
- * line-height instead of the role's own, which is why sizing looked almost
+ * the DOM. The element then inherited the default UI size at the browser's own
+ * line-height instead of the role's, which is why sizing looked almost
  * right almost everywhere and exactly right nowhere -- and why the effect moved
  * around as components were edited: it depended on whether a colour happened to
  * share the `cn()` call.

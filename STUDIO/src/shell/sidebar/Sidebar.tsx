@@ -169,7 +169,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
           className="flex shrink-0 items-center gap-1.5 px-3.5 select-none"
           style={{ height: SHELL.topStrip.height }}
         >
-          <StudioMark size={17} className="pointer-events-none text-foreground" />
+          <StudioMark size={16} className="pointer-events-none text-foreground" />
           <span className="studio-heading pointer-events-none text-foreground">Studio</span>
         </div>
 
@@ -376,7 +376,7 @@ function Action({
       {hint ? (
         // A keychord, drawn as the key itself: a chip, not plain text, so it
         // reads as something you press rather than something you read.
-        <kbd className="shrink-0 rounded-xs border px-1 py-0.5 font-sans text-micro leading-none text-muted-foreground/70">
+        <kbd className="shrink-0 rounded-xs border px-1 py-0.5 font-sans text-micro text-muted-foreground/70">
           {hint}
         </kbd>
       ) : null}

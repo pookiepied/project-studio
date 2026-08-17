@@ -31,7 +31,7 @@ export function ArtifactBlock({ source }: { source: string }) {
 
   return (
     <div className="my-4 flex items-start gap-2.5 rounded-xl bg-surface-sunken p-3">
-      <span className="mt-0.5 text-danger">
+      <span className="flex h-[1lh] items-center text-ui text-danger">
         <Icons.failed />
       </span>
       <div className="min-w-0">

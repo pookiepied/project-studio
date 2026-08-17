@@ -33,7 +33,7 @@ export function AddMenu() {
       trigger={
         <IconButton
           label="Add context"
-          size="lg"
+          size="md"
           active={open}
           onClick={() => setOpen((value) => !value)}
         >
