@@ -1,8 +1,8 @@
 # Project Studio V2 Harness
 
 Local-first TypeScript agent harness built on Flue and Pi. This repository currently contains the
-backend runtime foundation only. It does not contain the existing React UI, a custom application
-API, or either production model gateway.
+backend runtime foundation only. It does not contain the existing React UI or either production
+model gateway; the HTTP surface it does serve (`src/transport/http`) is the harness's own API.
 
 ## Runtime Ownership
 
@@ -28,17 +28,22 @@ workflow functions are not resumable.
 
 ```text
 src/
+  admission/
+    context.ts                AuthContext, client types, session identity
+    credential.ts             Per-launch bearer credential generation and validation
+    errors.ts                 Typed admission errors
+    scopes.ts                 Named admission scopes and their lookup
+    verifier.ts               Timing-safe bearer verification and session construction
   agents/
     studio.ts                 First continuing Flue agent
   application/
+    approval-broker.ts        Durable approval broker over the pending store
     harness-client.ts         UI-facing send/wait/observe/cancel/history boundary
+    mcp-management.ts         McpAdministration port and service the routes take
+    provider-management.ts    ProviderAdministration port and service the routes take
+    studio-runtime.ts         Runtime composition: MCP registry, supervisor, sandbox
+    tool-name.ts              Stable model-facing tool names across MCP identities
   app.ts                      Model-provider bootstrap + telemetry init + Flue mount
-  context/
-    context-optimizer.ts      Passthrough optimizer and future Headroom port
-  contracts/
-    capabilities.ts           Capability identity, effects, provenance, execution scope
-    errors.ts                 StudioError base, domain taxonomy, safe report shape
-    models.ts                 Gateway-neutral model references, capability, adapter contract
   auth/
     cli.ts                    pnpm auth sign-in / status / sign-out
     config.ts                 Validated auth service URL and desktop OAuth client id
@@ -48,10 +53,53 @@ src/
     session.ts                Session storage over the keychain, JWT expiry reading
     session-token-provider.ts Session-backed AccessTokenProvider, single-flight refresh
     login.ts                  Sign-in/out orchestration
+  context/
+    context-optimizer.ts      Passthrough optimizer and future Headroom port
+  contracts/
+    agents.ts                 Agent identity
+    capabilities.ts           Capability identity, effects, provenance, execution scope
+    effects.ts                What each effect requires; the one table that answers
+    errors.ts                 StudioError base, domain taxonomy, safe report shape
+    models.ts                 Gateway-neutral model references, capability, adapter contract
+    providers.ts              ProviderConnection/ProviderPort contract over language,
+                              media, and retrieval providers
   credentials/
     credential-store.ts       SecureCredentialStore port, key/secret validation, typed errors
     keyring-store.ts          OS keychain implementation; no plaintext fallback
     memory-store.ts           In-memory store for tests, same validation rules
+  db.ts                       File-backed Flue SQLite adapter
+  execution/
+    context.ts                AsyncLocalStorage execution context and operation ids
+    outcomes.ts               Stop/timeout/cancellation outcome classification
+  extend/
+    errors.ts                 How the extend spine fails
+    inventory.ts              What exists on this machine, and what this project chose
+    reconcile.ts              Making what runs match what the user chose
+    selection.ts              What the user chose to switch on, per project
+    mcp/
+      capabilities.ts         MCP tools presented through the capability contract
+      connection.ts           One MCP connection: framing, JSON-RPC, pending correlation
+      handshake.ts            The first exchange with an MCP server, and the era probe
+      http-channel.ts         HTTP transport channel for MCP servers
+      input-security.ts       Scrubbing secret-shaped fields from server arguments
+      launcher.ts             Launching MCP servers under sandbox containment
+      reconcile.ts            MCP flavor of the reconcile plan
+      registry.ts             Persisted MCP server registry
+      stdio-channel.ts        stdio transport channel for MCP servers
+      supervisor.ts           MCP server lifecycle: start, handshake, retry, stop
+      wire/
+        backoff.ts            Retry backoff for a server that fails to start
+        definition-hash.ts    Stable hash of a tool definition
+        era.ts                Era probe deciding which wire era to speak
+        framing.ts            Newline-delimited JSON framing over stdio
+        jsonrpc.ts            JSON-RPC 2.0 shapes as MCP uses them
+        lifecycle.ts          Connection lifecycle for one MCP server
+        pending.ts            Correlation for JSON-RPC requests over one connection
+  host/
+    harness-launcher.ts       Headless launcher seam the Tauri Host consumes
+    readiness.ts              Structured readiness frames on the launcher channel
+  identity/
+    uuid.ts                   UUIDs for records and operations Project Studio owns
   models/
     adapters/
       test-adapter.ts         Deterministic Pi provider behind the adapter contract
@@ -80,23 +128,10 @@ src/
     bootstrap.ts              Provider bootstrap coordinator and startup validation
     model-registry.ts         Model-source resolver and capability aggregator
     provider-config.ts        Validated model-source configuration
-  permissions/
-    kernel.ts                 The single source of authority for every capability
-    policy.ts                 Verdicts, decision sources, base rules, defaults
-    grant-store.ts            Persisted, listable, revocable user approvals
-    errors.ts                 Typed permission errors, never carrying arguments
-  sandbox/
-    policy.ts                 Closed-by-default containment policy and isolation levels
-    paths.ts                  Path containment: traversal, symlinks, prefixes, Windows
-    local-sandbox.ts          Path containment, and the one door to a contained child
-    isolation/                OS containment: kinds, backends, and the single verdict
-      windows/                AppContainer, via the studio-contain launcher we ship
-      linux/                  bwrap and pasta, as the distribution ships them
-    errors.ts                 Typed sandbox errors, never echoing the attempted path
-  storage/
-    database.ts               Application-owned SQLite connection and transactions
-    migrations.ts             Versioned schema, applied once, with a no-secrets guard
-    errors.ts                 Typed storage errors and driver-failure classification
+  net/
+    destination.ts            Destination judgment: loopback, own ports, DNS
+    http.ts                   Typed HTTP client with destination checks and timeouts
+    own-ports.ts              The ports this process listens on
   observability/
     config.ts                 Validated exporter and content-capture config
     error-reporter.ts         The one path a failure takes: log, span, counter
@@ -105,10 +140,101 @@ src/
     index.ts                  initialize/shutdown boundary
     logger.ts                 Structured logger with trace correlation
     redaction.ts              GenAI content redaction transform
+    redaction-rules.ts        The redaction catalog
     sdk.ts                    OpenTelemetry Node SDK lifecycle
+    telemetry-errors.ts       Failures in the telemetry subsystem itself
+  permissions/
+    kernel.ts                 The single source of authority for every capability
+    policy.ts                 Verdicts, decision sources, base rules, defaults
+    grant-store.ts            Persisted, listable, revocable user approvals
+    matcher.ts                Matching a call's resource against a permission pattern
+    mode.ts                   What "ask" means right now
+    pending-approvals.ts      Durable pending approval queue
+    scopes.ts                 The choices offered when the user is asked to approve
+    trust.ts                  Per-project trust decisions
+    errors.ts                 Typed permission errors, never carrying arguments
+  platform/
+    paths.ts                  The Studio home, install, and project locations
+    runtime.ts                Which Node the project requires, and which runs it
+  process/
+    environment.ts            What a child may inherit, in one place
+    errors.ts                 Typed process errors
+    exec.ts                   Spawning and killing child processes
+  providers/
+    connection-store.ts       Provider connection records; keychain-first removal
+    model-catalog.ts          Built-in, manual, and overridden models; defaults
+  retrieval/
+    errors.ts                 How a retrieval provider failed
+    http.ts                   The one HTTP call every provider adapter makes
+    registry.ts               Registered search and reader providers
+    service.ts                RetrievalService over providers and settings
+    settings.ts               Persisted retrieval provider settings
+    slots.ts                  Two slots, and the rule for moving between them
+    types.ts                  What a retrieval provider is
+    providers/
+      brave.ts                Brave Search
+      exa.ts                  Exa search
+      firecrawl.ts            Firecrawl reader
+      jina.ts                 Jina reader
+      tavily.ts               Tavily search (the default)
+  sandbox/
+    cli.ts                    pnpm sandbox:prepare / list / release
+    policy.ts                 Closed-by-default containment policy and isolation levels
+    paths.ts                  Path containment: traversal, symlinks, prefixes, Windows
+    local-sandbox.ts          Path containment, and the one door to a contained child
+    isolation/                OS containment: kinds, backends, and the single verdict
+      backend.ts              The backend contract and support probing
+      contain.ts              Asserting availability and containing a command
+      index.ts                The isolation seam
+      kinds.ts                Which children need containment
+      program-roots.ts        Directories a contained program must read to run
+      registry.ts             The registered backends, per platform
+      windows/                AppContainer, via the studio-contain launcher we ship
+        appcontainer.ts       The Windows AppContainer backend
+        launcher.ts           The studio-contain launcher we ship
+        ledger.ts             Persisted record of what was contained
+        traversal.ts          Getting a contained program to its first line
+      linux/                  bwrap and pasta, as the distribution ships them
+        apparmor.ts           One-time machine setup a Linux sandbox needs
+        bwrap.ts              The bubblewrap backend
+        identity.ts           Whose ability is being measured
+        network.ts            The pasta network backend
+    errors.ts                 Typed sandbox errors, never echoing the attempted path
+  snapshots/
+    errors.ts                 Typed snapshot errors
+    index.ts                  The snapshots public surface
+    shadow-repo.ts            Per-project shadow git repositories
+    store.ts                  Snapshot storage under the Studio home
+    turn.ts                   Turn snapshots and restore hooks
+  storage/
+    app-settings.ts           The one owner of the app_setting table
+    database.ts               Application-owned SQLite connection and transactions
+    migrations.ts             Versioned schema, applied once, with a no-secrets guard
+    errors.ts                 Typed storage errors and driver-failure classification
   tools/
+    bounds.ts                 Per-capability call bounds
+    errors.ts                 Typed tool errors
+    gate.ts                   The call gate: who may call what, and how often
+    types.ts                  Tool definition shape and registration
     workspace-summary.ts      Typed tool used to prove tool continuation
-  db.ts                       File-backed Flue SQLite adapter
+    filesystem/               Read, write, and edit tools, and the access log
+    git/                      Git tools: argv building and subcommand classification
+    native/                   Native tools over the product runtime
+    search/                   Glob and ripgrep-backed grep tools
+    shell/                    Shell tools with command resolution
+    web/                      Fetch and web-search tools, untrusted content labeled
+  transport/
+    http/
+      create-app.ts           HTTP composition: admission middleware, routes, Flue mount
+      middleware/
+        admission.ts          Bearer verification and scope checking middleware
+      routes/
+        mcp.ts                MCP management routes
+        permissions.ts        Approval routes
+        providers.ts          Provider administration routes
+  vendor/
+    errors.ts                 Typed vendor errors
+    resolver.ts               Resolving shipped or managed binaries
 tests/
   integration/
     harness.test.ts           Real server, SQLite, cancellation, and restart tests
@@ -124,8 +250,6 @@ tests/
     local-providers.test.ts   Credential chunking, serialized writes, specifiers
     model-providers.test.ts   Provider config, adapters, registry, bootstrap
     observability.test.ts     Config, init-once, logger, errors, redaction
-docs/
-  decisions/                  Architecture decision records
 ```
 
 There are no placeholder directories. New capability folders should be added only when they
@@ -150,15 +274,15 @@ contain an implemented boundary.
 
 The deterministic provider is intentionally in-process. It makes the harness fully testable
 without credentials or network calls and sits behind the same `ModelProviderAdapter` contract the
-Studio Gateway adapter now implements and the future local/BYOK adapter will implement. Agent and
-persistence code do not change when the source changes.
+Studio Gateway and local/BYOK adapters implement. Agent and persistence code do not change when the
+source changes.
 
 `src/app.ts` validates and bootstraps model providers before initializing observability, then
 creates the authenticated HTTP composition in `src/transport/http/create-app.ts`. One admission
-middleware protects Flue, MCP management, and approval routes; operation scopes remain separate
-from capability policy. The headless launcher in `src/host/` now supplies the explicit loopback
-and structured readiness seam recorded in ADR 0028; packaged Tauri Host ownership remains a
-separate task.
+middleware protects Flue, MCP management, approval, and provider-administration routes; operation
+scopes remain separate from capability policy. The headless launcher in `src/host/` now supplies
+the explicit loopback and structured readiness seam recorded in ADR 0028; packaged Tauri Host
+ownership remains a separate task.
 
 ## Commands
 
@@ -182,7 +306,7 @@ pnpm check
 ```
 
 `pnpm test` builds the generated Flue server before running tests. The restart test intentionally
-waits for Flue's expired lease to be reclaimed, so the full suite takes about one minute.
+waits for Flue's expired lease to be reclaimed, so the full suite takes several minutes.
 
 To run the generated server for local development, inject a private per-launch admission
 credential. The value is never a URL or product setting; tests pass it through the child process
@@ -225,15 +349,15 @@ integration (see the ADR and the roadmap).
 | --- | --- | --- |
 | `test` | Yes | In-process deterministic Pi provider; network-free default |
 | `studio-cloud` | Yes | Studio Gateway over its native SSE contract |
-| `local` (BYOK) | No | Recognized by config; bootstrap fails with `ProviderConfigurationError` until secure OS credential storage and the BYOK runtime ship |
+| `local` (BYOK) | Yes | Built-in Pi providers plus user-declared custom providers; keys in the OS keychain |
 
 A `ProviderBootstrapCoordinator` runs once, creates the adapter for the selected source, registers
 it with Flue, builds a `ModelRegistry`, and validates the default model reference through it.
-Selecting `local`, or selecting `studio-cloud` without a valid URL, default model, and token, is a
-deliberate startup failure, not a silent no-op: there is no placeholder adapter that reports
-success without being able to serve a model, and no source is ever automatically substituted for
-another. Studio configuration is validated before Flue registration, registry construction, and
-OpenTelemetry initialization.
+Selecting `studio-cloud` without a valid URL, default model, and token, or selecting `local` with
+no default model or an unreadable settings database, is a deliberate startup failure, not a silent
+no-op: there is no placeholder adapter that reports success without being able to serve a model,
+and no source is ever automatically substituted for another. Studio configuration is validated
+before Flue registration, registry construction, and OpenTelemetry initialization.
 
 The `studio` agent references `STUDIO_MODEL_ID` (`"project-studio/default"`), a stable,
 gateway-neutral constant that names no source, provider, or implementation. Switching sources
@@ -265,8 +389,10 @@ upstream connection.
 
 `PROJECT_STUDIO_GATEWAY_TOKEN` backs a **development-only** bootstrap token provider. It is a
 convenience for pointing a local harness at a gateway; it is not secure credential storage and not
-the BYOK mechanism. In production the public Project Studio application injects an
-`AccessTokenProvider` backed by the authenticated Studio session; that integration is deferred.
+the BYOK mechanism. Without it, gateway authentication is session-backed: `SessionAccessTokenProvider`
+reads the signed-in session from the OS keychain and refreshes it against the Studio auth service
+(`src/auth/session-token-provider.ts`), which is the default mode when no dev token is set
+(`resolveGatewayAuthMode`, `src/models/bootstrap.ts`).
 
 ### Studio Gateway Deployment Assumption
 
@@ -275,6 +401,12 @@ It is invoked only through a Cloudflare **service binding** from the public API,
 owns end-user authentication. The gateway therefore performs no inbound end-user auth of its own
 and must not trust arbitrary public identity headers. Propagating trusted user identity from the
 API to the gateway is deferred until the API proxy contract is implemented.
+
+> **The Worker's source is no longer in this repository.** It was removed in
+> commit `bd4d389`; `src/models/studio-cloud/` remains and the `studio-cloud`
+> source is still selectable, so whether it works depends entirely on a service
+> deployed outside this tree. Nothing here builds or deploys that service. The
+> name "gateway" is deliberately left free for a future user-hosted one.
 
 ### Catalog Lifecycle
 
@@ -305,18 +437,38 @@ execution and continuation. Cancellation closes the upstream stream. Gateway fai
 `StudioGatewayError`s built from status and the gateway's own normalized error code; raw upstream
 bodies are never surfaced.
 
+## Provider Administration
+
+Separate from the model source (which is one process-level choice), the provider subsystem
+administers user-declared connections to language, media, and retrieval providers and the models
+they expose:
+
+- `src/contracts/providers.ts` — `ProviderConnection` / `ProviderPort` contract: connections,
+  models, capability slots, and defaults, shared by the stores and the HTTP surface.
+- `src/providers/` — `ConnectionStore` persists connection records (keys live in the OS keychain,
+  never the database) and `ModelCatalog` serves built-in catalogs, manual models, overrides, and
+  per-slot defaults.
+- `src/application/provider-management.ts` — `ProviderAdministration`, the port the HTTP surface
+  takes, composed over the two stores in `app.ts`.
+- `src/transport/http/routes/providers.ts` — routes under `/api/providers`, behind the
+  `provider-management` admission scope.
+- Migrations 11–13: `provider_connection_record` (11), the model tables
+  `provider_model_override` / `provider_model_manual` / `provider_default` (12), and the rebuild
+  that gives all three foreign keys with `ON DELETE CASCADE` to the connection record (13).
+
 ## Persistence And Recovery
 
 There are two databases, deliberately.
 
-`src/db.ts` is Flue's, defaulting to `./data/flue.db` and overridden by `PROJECT_STUDIO_DB_PATH`.
-It holds the canonical transcript, the submission journal, and run state, behind an opaque
-persistence adapter Flue owns.
+`src/db.ts` is Flue's, defaulting to `~/.studio/data/flue.db` (the Studio home, via
+`flueDatabasePath()`) and overridden by `PROJECT_STUDIO_DB_PATH`. It holds the canonical
+transcript, the submission journal, and run state, behind an opaque persistence adapter Flue owns.
 
-`src/storage/` is the product's, defaulting to `./data/studio.db` and overridden by
-`PROJECT_STUDIO_STORE_PATH`. It holds provider settings today and the registries later phases add.
-Secrets never go in it — those are in the OS keychain, and a migration fails if a column name
-looks like credential storage. See ADR 0010.
+`src/storage/` is the product's, defaulting to `~/.studio/data/studio.db` (the Studio home, via
+`databasePath()`) and overridden by `PROJECT_STUDIO_STORE_PATH`. It holds provider settings and
+connection records, the MCP server registry, and the approval and trust tables. Secrets never go
+in it — those are in the OS keychain, and a migration fails if a column name looks like credential
+storage. See ADR 0010.
 
 The Flue database and accepted-run record are both required for recovery:
 
@@ -338,24 +490,12 @@ Only one live Node process may own a given agent instance.
 
 The next implementation phase should add adapters, not replace the harness:
 
-1. **Production Studio authentication.** Inject an `AccessTokenProvider` backed by the authenticated
-   public-application session (the API proxy contract), replacing the development bootstrap token.
-2. **Account settings and per-run routing.** Product-owned account model/source preference and,
+1. **Account settings and per-run routing.** Product-owned account model/source preference and,
    only if a real requirement emerges, a run-level routing record. This phase intentionally ships
    no such abstraction rather than a dead one that tests cover but nothing calls.
-3. **Secure OS credential storage.** A keychain-backed store for user-controlled provider keys,
-   with no plaintext-on-disk fallback and no key ever reaching a model-visible value, log, event,
-   telemetry attribute, or persisted conversation. Prerequisite for the next item.
-4. **Local BYOK provider runtime.** A `LocalModelProviderAdapter` behind the same contract,
-   selectable via the `local` source. Local and Studio gateway internals and catalogs stay separate.
-5. MCP connection registry for local and authenticated cloud servers.
-6. Skill catalog, subagent profiles, sandbox adapters, and schedules.
-7. Product-owned event projections over Flue envelopes.
-8. Optional Headroom sidecar behind `ContextOptimizer`.
-
-Until secure storage and the local runtime land, selecting `local` fails with
-`ProviderConfigurationError` and is never answered by routing the run to the Studio gateway
-instead.
+2. **Skill catalog, subagent profiles, sandbox adapters, and schedules.**
+3. **Product-owned event projections over Flue envelopes.**
+4. **Optional Headroom sidecar behind `ContextOptimizer`.**
 
 Headroom is not installed in this phase. Its TypeScript package is a client for a separate
 Python/Rust proxy and does not directly wrap Flue's Pi loop. A future adapter must preserve the
@@ -364,9 +504,9 @@ instructions, recent turns, or incomplete tool-call pairs.
 
 ## Architecture Decisions
 
-- [Harness boundaries](docs/decisions/0001-harness-boundaries.md)
-- [Two-gateway model](docs/decisions/0002-two-gateway-model.md)
-- [Context optimization](docs/decisions/0003-context-optimization.md)
-- [Observability foundation](docs/decisions/0004-observability.md)
-- [Model-provider composition](docs/decisions/0005-model-provider-composition.md)
-- [Studio Gateway integration](docs/decisions/0006-studio-gateway-integration.md)
+- [Harness boundaries](../documentation/decisions/0001-harness-boundaries.md)
+- [Two-gateway model](../documentation/decisions/0002-two-gateway-model.md)
+- [Context optimization](../documentation/decisions/0003-context-optimization.md)
+- [Observability foundation](../documentation/decisions/0004-observability.md)
+- [Model-provider composition](../documentation/decisions/0005-model-provider-composition.md)
+- [Studio Gateway integration](../documentation/decisions/0006-studio-gateway-integration.md)
