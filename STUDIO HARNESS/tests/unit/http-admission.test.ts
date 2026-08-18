@@ -5,6 +5,7 @@ import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
+import type { ProviderAdministration } from "../../src/application/provider-management.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 import {
   authContext,
@@ -93,6 +94,7 @@ describe("Harness HTTP admission", () => {
     let flueEntered = 0;
     let mcpEntered = 0;
     let permissionEntered = 0;
+    let providerEntered = 0;
     flueApp.get("/probe", () => {
       flueEntered += 1;
       return new Response("entered");
@@ -107,6 +109,12 @@ describe("Harness HTTP admission", () => {
           return [];
         },
       } as unknown as McpAdministration,
+      providers: {
+        listConnections: () => {
+          providerEntered += 1;
+          return [];
+        },
+      } as unknown as ProviderAdministration,
       approvals: {
         list: () => {
           permissionEntered += 1;
@@ -117,7 +125,12 @@ describe("Harness HTTP admission", () => {
       flueApp,
     });
 
-    for (const path of ["/probe", "/api/mcp/servers", "/api/permissions/pending"]) {
+    for (const path of [
+      "/probe",
+      "/api/mcp/servers",
+      "/api/permissions/pending",
+      "/api/providers/connections",
+    ]) {
       const response = await app.request(`http://harness.test${path}`);
       expect(response.status, path).toBe(401);
 
@@ -129,6 +142,7 @@ describe("Harness HTTP admission", () => {
     expect(flueEntered).toBe(0);
     expect(mcpEntered).toBe(0);
     expect(permissionEntered).toBe(0);
+    expect(providerEntered).toBe(0);
 
     const admittedProbe = await app.request("http://harness.test/probe", {
       headers: { authorization: `Bearer ${session.credential}` },
@@ -139,12 +153,20 @@ describe("Harness HTTP admission", () => {
     const admittedPermissions = await app.request("http://harness.test/api/permissions/pending", {
       headers: { authorization: `Bearer ${session.credential}` },
     });
+    const admittedProviders = await app.request(
+      "http://harness.test/api/providers/connections",
+      {
+        headers: { authorization: `Bearer ${session.credential}` },
+      },
+    );
     expect(admittedProbe.status).toBe(200);
     expect(await admittedProbe.text()).toBe("entered");
     expect(admittedMcp.status).toBe(200);
     expect(admittedPermissions.status).toBe(200);
+    expect(admittedProviders.status).toBe(200);
     expect(flueEntered).toBe(1);
     expect(mcpEntered).toBe(1);
     expect(permissionEntered).toBe(1);
+    expect(providerEntered).toBe(1);
   });
 });

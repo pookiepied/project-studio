@@ -107,12 +107,6 @@ const providerConnectionLanguageSchema = v.object({
   baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
   enabled: v.boolean(),
   /**
-   * Whether a credential exists. This type NEVER carries an API key, in
-   * either direction. Only whether one exists. Keys move through the
-   * credential store alone, so a serialized connection cannot leak a secret
-   * and a fetched connection cannot be used to write one back.
-   */
-  /**
    * Which built-in catalog this connection draws its models from, if any.
    *
    * Separate from `id` because they answer different questions. `id` is the
@@ -126,6 +120,12 @@ const providerConnectionLanguageSchema = v.object({
    * the models the user enters by hand.
    */
   catalogProvider: v.optional(v.pipe(v.string(), v.minLength(1))),
+  /**
+   * Whether a credential exists. This type NEVER carries an API key, in
+   * either direction. Only whether one exists. Keys move through the
+   * credential store alone, so a serialized connection cannot leak a secret
+   * and a fetched connection cannot be used to write one back.
+   */
   credential: credentialStatusSchema,
   protocol: languageProtocolSchema,
 });
@@ -138,12 +138,6 @@ const providerConnectionMediaSchema = v.object({
   baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
   enabled: v.boolean(),
   /**
-   * Whether a credential exists. This type NEVER carries an API key, in
-   * either direction. Only whether one exists. Keys move through the
-   * credential store alone, so a serialized connection cannot leak a secret
-   * and a fetched connection cannot be used to write one back.
-   */
-  /**
    * Which built-in catalog this connection draws its models from, if any.
    *
    * Separate from `id` because they answer different questions. `id` is the
@@ -157,6 +151,12 @@ const providerConnectionMediaSchema = v.object({
    * the models the user enters by hand.
    */
   catalogProvider: v.optional(v.pipe(v.string(), v.minLength(1))),
+  /**
+   * Whether a credential exists. This type NEVER carries an API key, in
+   * either direction. Only whether one exists. Keys move through the
+   * credential store alone, so a serialized connection cannot leak a secret
+   * and a fetched connection cannot be used to write one back.
+   */
   credential: credentialStatusSchema,
   protocol: mediaProtocolSchema,
 });
@@ -169,12 +169,6 @@ const providerConnectionRetrievalSchema = v.object({
   baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
   enabled: v.boolean(),
   /**
-   * Whether a credential exists. This type NEVER carries an API key, in
-   * either direction. Only whether one exists. Keys move through the
-   * credential store alone, so a serialized connection cannot leak a secret
-   * and a fetched connection cannot be used to write one back.
-   */
-  /**
    * Which built-in catalog this connection draws its models from, if any.
    *
    * Separate from `id` because they answer different questions. `id` is the
@@ -188,6 +182,12 @@ const providerConnectionRetrievalSchema = v.object({
    * the models the user enters by hand.
    */
   catalogProvider: v.optional(v.pipe(v.string(), v.minLength(1))),
+  /**
+   * Whether a credential exists. This type NEVER carries an API key, in
+   * either direction. Only whether one exists. Keys move through the
+   * credential store alone, so a serialized connection cannot leak a secret
+   * and a fetched connection cannot be used to write one back.
+   */
   credential: credentialStatusSchema,
   protocol: retrievalProtocolSchema,
 });
@@ -250,14 +250,16 @@ export type ProviderModel = v.InferOutput<typeof providerModelSchema>;
  * `streaming` describe how a model behaves, not what it is for, so they are
  * not slots a user would pick a default for.
  */
-export const capabilitySlotSchema = v.picklist([
+export const CAPABILITY_SLOTS = [
   "textGeneration",
   "imageGeneration",
   "videoGeneration",
   "speechGeneration",
   "transcription",
   "embeddings",
-]);
+] as const satisfies readonly (keyof ModelCapability)[];
+
+export const capabilitySlotSchema = v.picklist(CAPABILITY_SLOTS);
 
 export type CapabilitySlot = v.InferOutput<typeof capabilitySlotSchema>;
 
@@ -269,44 +271,27 @@ export type CapabilitySlot = v.InferOutput<typeof capabilitySlotSchema>;
  * renamed model does not orphan the preference; it either still resolves or
  * visibly does not.
  */
-export const defaultSelectionSchema = v.object({
-  textGeneration: v.optional(
-    v.object({
-      connectionId: v.pipe(v.string(), v.minLength(1)),
-      modelId: v.pipe(v.string(), v.minLength(1)),
-    }),
-  ),
-  imageGeneration: v.optional(
-    v.object({
-      connectionId: v.pipe(v.string(), v.minLength(1)),
-      modelId: v.pipe(v.string(), v.minLength(1)),
-    }),
-  ),
-  videoGeneration: v.optional(
-    v.object({
-      connectionId: v.pipe(v.string(), v.minLength(1)),
-      modelId: v.pipe(v.string(), v.minLength(1)),
-    }),
-  ),
-  speechGeneration: v.optional(
-    v.object({
-      connectionId: v.pipe(v.string(), v.minLength(1)),
-      modelId: v.pipe(v.string(), v.minLength(1)),
-    }),
-  ),
-  transcription: v.optional(
-    v.object({
-      connectionId: v.pipe(v.string(), v.minLength(1)),
-      modelId: v.pipe(v.string(), v.minLength(1)),
-    }),
-  ),
-  embeddings: v.optional(
-    v.object({
-      connectionId: v.pipe(v.string(), v.minLength(1)),
-      modelId: v.pipe(v.string(), v.minLength(1)),
-    }),
-  ),
+export const modelReferenceSlotSchema = v.object({
+  connectionId: v.pipe(v.string(), v.minLength(1)),
+  modelId: v.pipe(v.string(), v.minLength(1)),
 });
+
+/**
+ * Built from CAPABILITY_SLOTS rather than written out a second time.
+ *
+ * These were two hand-maintained copies of the same six names with nothing
+ * forcing them to agree: a seventh slot added to the list compiled cleanly
+ * while DefaultSelection silently could not express it. Deriving the object
+ * means the list is the only place a slot is declared.
+ */
+export const defaultSelectionSchema = v.object(
+  Object.fromEntries(
+    CAPABILITY_SLOTS.map((slot) => [slot, v.optional(modelReferenceSlotSchema)]),
+  ) as Record<
+    CapabilitySlot,
+    v.OptionalSchema<typeof modelReferenceSlotSchema, undefined>
+  >,
+);
 
 export type DefaultSelection = v.InferOutput<typeof defaultSelectionSchema>;
 

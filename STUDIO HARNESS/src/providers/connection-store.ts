@@ -270,6 +270,9 @@ export class ConnectionStore {
       kind: draft.kind,
       source: draft.source,
       ...(baseUrl === undefined ? {} : { baseUrl }),
+      ...(draft.catalogProvider === undefined
+        ? {}
+        : { catalogProvider: draft.catalogProvider }),
       enabled: draft.enabled,
       credential: status,
       protocol: draft.protocol,
@@ -293,6 +296,9 @@ export class ConnectionStore {
       kind: current.kind,
       source: current.source,
       ...(baseUrl === undefined ? {} : { baseUrl }),
+      ...(current.catalogProvider === undefined
+        ? {}
+        : { catalogProvider: current.catalogProvider }),
       enabled,
       credential: status,
       protocol,

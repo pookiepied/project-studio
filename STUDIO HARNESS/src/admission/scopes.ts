@@ -6,6 +6,7 @@ export const ADMISSION_SCOPES = {
   APPROVAL: "approval",
   PROJECT: "project",
   DIAGNOSTIC: "diagnostic",
+  PROVIDER_MANAGEMENT: "provider-management",
 } as const;
 
 export type AdmissionScope =
@@ -17,6 +18,7 @@ export const ALL_ADMISSION_SCOPES: readonly AdmissionScope[] = Object.freeze([
   ADMISSION_SCOPES.APPROVAL,
   ADMISSION_SCOPES.PROJECT,
   ADMISSION_SCOPES.DIAGNOSTIC,
+  ADMISSION_SCOPES.PROVIDER_MANAGEMENT,
 ]);
 
 export function hasAdmissionScope(

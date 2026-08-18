@@ -13,6 +13,7 @@ import {
   providerModelSchema,
   type CapabilitySlot,
   type DefaultSelection,
+  type InvocationShape,
   type ModelPricing,
   type ProviderConnection,
   type ProviderKind,
@@ -44,6 +45,30 @@ type ModelOverride = {
 type ModelOverridePatch = {
   readonly displayName?: string;
   readonly hidden?: boolean;
+};
+
+/**
+ * Optional halves of the capability and pricing shapes, with `undefined`
+ * allowed explicitly so a schema-parsed input (whose optional fields infer as
+ * `T | undefined`) is assignable under `exactOptionalPropertyTypes`. An
+ * explicit `undefined` still fails the model schema downstream, so it cannot
+ * become a stored value.
+ */
+type PartialCapabilityInput = {
+  readonly [K in keyof ModelCapability]?: ModelCapability[K] | undefined;
+};
+
+type PartialPricingInput = {
+  readonly [K in keyof ModelPricing]?: ModelPricing[K] | undefined;
+};
+
+/** A manual model as the caller supplies it; unspecified fields stay unknown. */
+export type ManualModelInput = {
+  readonly modelId: string;
+  readonly displayName: string;
+  readonly capability?: PartialCapabilityInput;
+  readonly pricing?: PartialPricingInput;
+  readonly shape?: InvocationShape;
 };
 
 type ModelFilter = {
@@ -120,6 +145,13 @@ export class ModelCatalog {
     return models;
   }
 
+  /**
+   * Patches a model that already exists on the connection.
+   *
+   * An override for an unknown id is an error, not an add. If a rename could
+   * also create, a typo in a model id becomes a permanent model with no
+   * capabilities rather than an error — the add gesture is `addManualModel`.
+   */
   async setOverride(
     connectionId: string,
     modelId: string,
@@ -133,23 +165,16 @@ export class ModelCatalog {
       );
     }
 
-    const manuals = this.#readManuals();
-    let base = this.#baseModels(connection, manuals, getBuiltinProviders()).find(
-      (model) => model.modelId === modelId,
-    );
+    const base = this.#baseModels(
+      connection,
+      this.#readManuals(),
+      getBuiltinProviders(),
+    ).find((model) => model.modelId === modelId);
 
     if (base === undefined) {
-      // The public provider contract has no addManualModel operation. Treating
-      // an override for an unknown id as the add gesture keeps manual models
-      // usable without expanding that contract. Runtime metadata is preferred;
-      // a model typed without metadata remains honestly unknown.
-      base = this.#manualModel(connection, modelId);
-      if (base === undefined) {
-        throw new ProviderConfigurationError(
-          `Model "${connectionId}/${modelId}" cannot be added to this connection.`,
-        );
-      }
-      this.#writeManual(base);
+      throw new ProviderConfigurationError(
+        `Model "${connectionId}/${modelId}" does not exist on this connection.`,
+      );
     }
 
     this.#upsertOverride(connectionId, modelId, change);
@@ -163,6 +188,54 @@ export class ModelCatalog {
       );
     }
     return result;
+  }
+
+  /**
+   * Adds a model the built-in catalog does not know about.
+   *
+   * Refuses a modelId that already exists on the connection — catalog or
+   * manual — so there is no gesture that silently overwrites a live model's
+   * capabilities. Unspecified fields stay honestly `unknown` rather than being
+   * recorded as `unsupported`, which would advertise a limit nobody confirmed.
+   */
+  async addManualModel(
+    connectionId: string,
+    model: ManualModelInput,
+  ): Promise<ProviderModel> {
+    const connection = await this.#connections.get(connectionId);
+    if (connection === undefined) {
+      throw new ProviderConfigurationError(
+        `Provider connection "${connectionId}" does not exist.`,
+      );
+    }
+
+    const existing = this.#baseModels(
+      connection,
+      this.#readManuals(),
+      getBuiltinProviders(),
+    ).find((entry) => entry.modelId === model.modelId);
+    if (existing !== undefined) {
+      throw new ProviderConfigurationError(
+        `Model "${connectionId}/${model.modelId}" already exists on this connection.`,
+      );
+    }
+
+    const base = this.#manualModel(connection, model.modelId);
+    if (base === undefined) {
+      throw new ProviderConfigurationError(
+        `Model "${connectionId}/${model.modelId}" cannot be added to this connection.`,
+      );
+    }
+
+    const created = validateProviderModel({
+      ...base,
+      displayName: model.displayName,
+      capability: { ...unknownCapability(), ...(model.capability ?? {}) },
+      pricing: { ...unknownPricing(), ...(model.pricing ?? {}) },
+      shape: model.shape ?? "stream",
+    });
+    this.#writeManual(created);
+    return created;
   }
 
   async removeModel(connectionId: string, modelId: string): Promise<void> {
@@ -298,10 +371,33 @@ export class ModelCatalog {
     const manualModels =
       manuals.get(connection.id) ?? new Map<string, ProviderModel>();
     const models = [...manualModels.values()];
+
+    // No catalogProvider means the user pointed at something the built-in
+    // catalog has never heard of — the normal self-hosted case, not an error.
+    // Such a connection serves only the models entered by hand.
+    const catalogProvider = connection.catalogProvider;
+    if (catalogProvider === undefined) return models;
+
+    // The catalog is keyed by the vendor the connection draws from, never by
+    // the connection's own id: two OpenAI accounts are two connections with
+    // one vendor, and keying on the id would make "work-openai" silently
+    // modelless.
     const builtinProvider = builtinProviders.find(
-      (provider) => provider === connection.id,
+      (provider) => provider === catalogProvider,
     );
-    if (builtinProvider === undefined) return models;
+    if (builtinProvider === undefined) {
+      this.#reporter.report(
+        new ProviderConfigurationError(
+          `Provider connection "${connection.id}" names catalog provider "${catalogProvider}", which the built-in catalog does not know.`,
+        ),
+        {
+          operation: "providers.models.catalog",
+          connection_id: connection.id,
+          catalog_provider: catalogProvider,
+        },
+      );
+      return models;
+    }
 
     for (const model of getBuiltinModels(builtinProvider)) {
       if (manualModels.has(model.id)) continue;
@@ -316,11 +412,19 @@ export class ModelCatalog {
   ): ProviderModel | undefined {
     if (connection.kind !== "language") return undefined;
 
-    const runtimeModel = this.#runtime
-      ?.listModels()
-      .find((model) => model.provider === connection.id && model.id === modelId);
-    if (runtimeModel !== undefined) {
-      return providerModelFromPi(connection.id, runtimeModel, "manual");
+    // Same keying as #baseModels: runtime metadata belongs to the vendor, so
+    // the lookup goes through catalogProvider and is skipped entirely for a
+    // self-hosted connection, whose runtime models are keyed by their own ids.
+    const catalogProvider = connection.catalogProvider;
+    if (catalogProvider !== undefined) {
+      const runtimeModel = this.#runtime
+        ?.listModels()
+        .find(
+          (model) => model.provider === catalogProvider && model.id === modelId,
+        );
+      if (runtimeModel !== undefined) {
+        return providerModelFromPi(connection.id, runtimeModel, "manual");
+      }
     }
 
     return validateProviderModel({

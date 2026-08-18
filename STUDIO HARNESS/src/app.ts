@@ -21,6 +21,10 @@ import {
 import { reportNodeRuntime } from "./platform/runtime.js";
 import { createHttpApp } from "./transport/http/create-app.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
+import { KeyringCredentialStore } from "./credentials/keyring-store.js";
+import { ConnectionStore } from "./providers/connection-store.js";
+import { ModelCatalog } from "./providers/model-catalog.js";
+import { ProviderManagementService } from "./application/provider-management.js";
 
 interface HarnessApplication {
   readonly app: ReturnType<typeof createHttpApp>;
@@ -98,8 +102,25 @@ function createHarnessApplication(): HarnessApplication {
       });
     }
 
+    // Same database, same construction style as `servers`: the provider
+    // surface is composed here so the connection it reads from is the one this
+    // root owns and closes. Keys go to the OS credential store, never the
+    // database, which is ConnectionStore's own rule to enforce.
+    const providerConnections = new ConnectionStore({
+      db: database,
+      credentials: new KeyringCredentialStore(),
+    });
+    const providers = new ProviderManagementService({
+      connections: providerConnections,
+      catalog: new ModelCatalog({
+        db: database,
+        connections: providerConnections,
+      }),
+    });
+
     const app = createHttpApp({
       servers: runtime.servers,
+      providers,
       approvals,
       admission: admission.verifier,
     });

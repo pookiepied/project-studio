@@ -5,17 +5,25 @@ import {
 } from "../../src/contracts/providers.js";
 import { ProviderConfigurationError } from "../../src/contracts/models.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
+import {
+  toErrorReport,
+  type ErrorReportContext,
+  type ErrorReporter,
+} from "../../src/observability/error-reporter.js";
 import { ConnectionStore } from "../../src/providers/connection-store.js";
 import { ModelCatalog } from "../../src/providers/model-catalog.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
+// id and catalogProvider are deliberately different: keying the catalog on the
+// connection id is the defect Part 2 of the wiring task removes.
 const OPENAI: ProviderConnectionDraft = {
-  id: "openai",
-  displayName: "OpenAI",
+  id: "work-openai",
+  displayName: "Work OpenAI",
   kind: "language",
   source: "local",
   baseUrl: "https://api.openai.com/v1",
   enabled: true,
+  catalogProvider: "openai",
   protocol: "openai-responses",
 };
 
@@ -28,6 +36,19 @@ const MEDIA: ProviderConnectionDraft = {
   enabled: true,
   protocol: "openai-images",
 };
+
+function reporterFor(reports: unknown[]): ErrorReporter {
+  const reporter: ErrorReporter = {
+    report(error: unknown, _context?: ErrorReportContext) {
+      reports.push(error);
+      return toErrorReport(error);
+    },
+    child(_fields) {
+      return reporter;
+    },
+  };
+  return reporter;
+}
 
 let db: StudioDatabase;
 let connections: ConnectionStore;
@@ -50,10 +71,11 @@ describe("provider model catalog", () => {
   it("maps a known provider's live catalog with capabilities and pricing", async () => {
     await connections.add(OPENAI);
 
-    const models = await catalog.listModels({ connectionId: "openai" });
+    const models = await catalog.listModels({ connectionId: "work-openai" });
 
     expect(models.length).toBeGreaterThan(0);
     expect(models.every((model) => model.origin === "catalog")).toBe(true);
+    expect(models.every((model) => model.connectionId === "work-openai")).toBe(true);
     expect(models[0]?.capability).toMatchObject({
       textGeneration: "supported",
       toolCalling: "unknown",
@@ -66,41 +88,192 @@ describe("provider model catalog", () => {
     });
   });
 
-  it("adds, lists, and deletes a manual model", async () => {
+  it("serves one vendor's catalog to two connections and isolates their overrides", async () => {
+    await connections.add(OPENAI);
+    await connections.add({
+      ...OPENAI,
+      id: "personal-openai",
+      displayName: "Personal OpenAI",
+    });
+
+    const work = await catalog.listModels({ connectionId: "work-openai" });
+    const personal = await catalog.listModels({
+      connectionId: "personal-openai",
+    });
+
+    expect(work.length).toBeGreaterThan(0);
+    expect(work.length).toBe(personal.length);
+    expect(
+      personal.every((model) => model.connectionId === "personal-openai"),
+    ).toBe(true);
+
+    const target = work[0];
+    if (target === undefined) {
+      throw new ProviderConfigurationError("The builtin test catalog is empty.");
+    }
+    await catalog.setOverride("work-openai", target.modelId, { hidden: true });
+
+    const workAfter = await catalog.listModels({ connectionId: "work-openai" });
+    const personalAfter = await catalog.listModels({
+      connectionId: "personal-openai",
+    });
+    expect(
+      workAfter.find((model) => model.modelId === target.modelId)?.hidden,
+    ).toBe(true);
+    expect(
+      personalAfter.find((model) => model.modelId === target.modelId)?.hidden,
+    ).toBe(false);
+  });
+
+  it("serves only manual models when the connection names no catalog provider", async () => {
+    const selfHosted: ProviderConnectionDraft = {
+      id: "ollama",
+      displayName: "Ollama",
+      kind: "language",
+      source: "local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      enabled: true,
+      protocol: "openai-completions",
+    };
+    await connections.add(selfHosted);
+
+    expect(await catalog.listModels({ connectionId: "ollama" })).toEqual([]);
+
+    const added = await catalog.addManualModel("ollama", {
+      modelId: "llama3",
+      displayName: "Llama 3",
+    });
+    expect(await catalog.listModels({ connectionId: "ollama" })).toEqual([added]);
+  });
+
+  it("reports once per call when a catalog provider is unknown to the built-in catalog", async () => {
+    const reports: unknown[] = [];
+    const reportingCatalog = new ModelCatalog({
+      db,
+      connections,
+      reporter: reporterFor(reports),
+    });
+    await connections.add(OPENAI);
+    await connections.add({
+      ...OPENAI,
+      id: "vendor-x",
+      displayName: "Vendor X",
+      catalogProvider: "not-a-real-vendor",
+    });
+
+    const models = await reportingCatalog.listModels();
+
+    expect(
+      models.filter((model) => model.connectionId === "vendor-x"),
+    ).toEqual([]);
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toBeInstanceOf(ProviderConfigurationError);
+
+    await reportingCatalog.listModels();
+    expect(reports).toHaveLength(2);
+  });
+
+  it("refuses to create a model through setOverride and writes nothing", async () => {
     await connections.add(OPENAI);
 
-    const added = await catalog.setOverride("openai", "typed-model", {
+    await expect(
+      catalog.setOverride("work-openai", "typo-model", {
+        displayName: "Typo Model",
+      }),
+    ).rejects.toThrow(ProviderConfigurationError);
+
+    expect(
+      db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM provider_model_manual WHERE connection_id = ?",
+        )
+        .get("work-openai"),
+    ).toEqual({ count: 0 });
+  });
+
+  it("adds a manual model with unknown defaults, never unsupported", async () => {
+    await connections.add(OPENAI);
+
+    const added = await catalog.addManualModel("work-openai", {
+      modelId: "typed-model",
       displayName: "Typed Model",
+      capability: { toolCalling: "supported" },
     });
+
     expect(added).toMatchObject({
-      connectionId: "openai",
+      connectionId: "work-openai",
       modelId: "typed-model",
       displayName: "Typed Model",
       origin: "manual",
+      hidden: false,
     });
+    expect(added.capability.toolCalling).toBe("supported");
+    expect(added.capability.textGeneration).toBe("unknown");
+    expect(added.capability.vision).toBe("unknown");
+    expect(added.shape).toBe("stream");
+    expect(added.pricing).toEqual({
+      input: "unknown",
+      output: "unknown",
+      cacheRead: "unknown",
+      cacheWrite: "unknown",
+    });
+
     expect(
-      (await catalog.listModels({ connectionId: "openai" })).find(
+      (await catalog.listModels({ connectionId: "work-openai" })).find(
         (model) => model.modelId === "typed-model",
       ),
     ).toEqual(added);
 
-    await catalog.removeModel("openai", "typed-model");
+    await catalog.removeModel("work-openai", "typed-model");
 
     expect(
-      (await catalog.listModels({ connectionId: "openai" })).find(
+      (await catalog.listModels({ connectionId: "work-openai" })).find(
         (model) => model.modelId === "typed-model",
       ),
     ).toBeUndefined();
   });
 
+  it("refuses a manual model that collides with a catalog or manual model", async () => {
+    await connections.add(OPENAI);
+    const catalogModel = (
+      await catalog.listModels({ connectionId: "work-openai" })
+    )[0];
+    if (catalogModel === undefined) {
+      throw new ProviderConfigurationError("The builtin test catalog is empty.");
+    }
+    await catalog.addManualModel("work-openai", {
+      modelId: "typed-model",
+      displayName: "Typed Model",
+    });
+
+    await expect(
+      catalog.addManualModel("work-openai", {
+        modelId: catalogModel.modelId,
+        displayName: "Catalog Collision",
+      }),
+    ).rejects.toThrow(ProviderConfigurationError);
+    await expect(
+      catalog.addManualModel("work-openai", {
+        modelId: "typed-model",
+        displayName: "Manual Collision",
+      }),
+    ).rejects.toThrow(ProviderConfigurationError);
+    await expect(
+      catalog.addManualModel("missing-connection", {
+        modelId: "anything",
+        displayName: "Anything",
+      }),
+    ).rejects.toThrow(ProviderConfigurationError);
+  });
+
   it("keeps a catalog rename as an override instead of copying the model", async () => {
     await connections.add(OPENAI);
-    const original = (await catalog.listModels({ connectionId: "openai" }))[0];
+    const original = (await catalog.listModels({ connectionId: "work-openai" }))[0];
     if (original === undefined) {
       throw new ProviderConfigurationError("The builtin test catalog is empty.");
     }
 
-    const renamed = await catalog.setOverride("openai", original.modelId, {
+    const renamed = await catalog.setOverride("work-openai", original.modelId, {
       displayName: "User Name",
     });
 
@@ -110,10 +283,10 @@ describe("provider model catalog", () => {
         .prepare(
           "SELECT COUNT(*) AS count FROM provider_model_manual WHERE connection_id = ? AND model_id = ?",
         )
-        .get("openai", original.modelId),
+        .get("work-openai", original.modelId),
     ).toEqual({ count: 0 });
     expect(
-      (await catalog.listModels({ connectionId: "openai" })).find(
+      (await catalog.listModels({ connectionId: "work-openai" })).find(
         (model) => model.modelId === original.modelId,
       )?.displayName,
     ).toBe("User Name");
@@ -121,14 +294,14 @@ describe("provider model catalog", () => {
 
   it("hides a catalog model without removing it from the list", async () => {
     await connections.add(OPENAI);
-    const original = (await catalog.listModels({ connectionId: "openai" }))[0];
+    const original = (await catalog.listModels({ connectionId: "work-openai" }))[0];
     if (original === undefined) {
       throw new ProviderConfigurationError("The builtin test catalog is empty.");
     }
 
-    await catalog.removeModel("openai", original.modelId);
+    await catalog.removeModel("work-openai", original.modelId);
 
-    const hidden = (await catalog.listModels({ connectionId: "openai" })).find(
+    const hidden = (await catalog.listModels({ connectionId: "work-openai" })).find(
       (model) => model.modelId === original.modelId,
     );
     expect(hidden).toMatchObject({ origin: "catalog", hidden: true });
@@ -136,7 +309,7 @@ describe("provider model catalog", () => {
 
   it("rejects unsupported default slots but accepts unknown capability state", async () => {
     await connections.add(OPENAI);
-    const catalogModels = await catalog.listModels({ connectionId: "openai" });
+    const catalogModels = await catalog.listModels({ connectionId: "work-openai" });
     const unsupported = catalogModels.find(
       (model) => model.capability.transcription === "unsupported",
     );
@@ -146,32 +319,38 @@ describe("provider model catalog", () => {
 
     await expect(
       catalog.setDefault("transcription", {
-        connectionId: "openai",
+        connectionId: "work-openai",
         modelId: unsupported.modelId,
       }),
     ).rejects.toThrow(ProviderConfigurationError);
 
-    await catalog.setOverride("openai", "unknown-model", {});
+    await catalog.addManualModel("work-openai", {
+      modelId: "unknown-model",
+      displayName: "Unknown Model",
+    });
     await catalog.setDefault("transcription", {
-      connectionId: "openai",
+      connectionId: "work-openai",
       modelId: "unknown-model",
     });
 
     expect((await catalog.getDefaults()).transcription).toEqual({
-      connectionId: "openai",
+      connectionId: "work-openai",
       modelId: "unknown-model",
     });
   });
 
   it("returns a vanished default as absent and keeps its row", async () => {
     await connections.add(OPENAI);
-    await catalog.setOverride("openai", "vanished-model", {});
+    await catalog.addManualModel("work-openai", {
+      modelId: "vanished-model",
+      displayName: "Vanished Model",
+    });
     await catalog.setDefault("textGeneration", {
-      connectionId: "openai",
+      connectionId: "work-openai",
       modelId: "vanished-model",
     });
 
-    await catalog.removeModel("openai", "vanished-model");
+    await catalog.removeModel("work-openai", "vanished-model");
 
     expect((await catalog.getDefaults()).textGeneration).toBeUndefined();
     expect(
@@ -181,7 +360,7 @@ describe("provider model catalog", () => {
         )
         .get("textGeneration"),
     ).toEqual({
-      connection_id: "openai",
+      connection_id: "work-openai",
       model_id: "vanished-model",
     });
   });

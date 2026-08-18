@@ -78,6 +78,98 @@ describe("migrations", () => {
     );
   });
 
+  it("drops orphaned model rows when migration 13 rebuilds the tables", () => {
+    // Asserted against the tables, not the catalog API: this is a test of what
+    // the database itself does, and a route through application code would
+    // prove nothing about the copy.
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle, MIGRATIONS.slice(0, 12));
+
+    handle.exec("PRAGMA foreign_keys = OFF");
+    const now = Date.now();
+    handle
+      .prepare(
+        "INSERT INTO provider_model_override (connection_id, model_id, display_name, hidden, updated_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run("ghost", "m1", null, 0, now);
+    handle
+      .prepare(
+        "INSERT INTO provider_model_manual (connection_id, model_id, record_json, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("ghost", "m1", "{}", now);
+    handle
+      .prepare(
+        "INSERT INTO provider_default (slot, connection_id, model_id, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("textGeneration", "ghost", "m1", now);
+
+    migrate(handle);
+
+    const table = (name: string): number =>
+      (
+        handle.prepare(`SELECT COUNT(*) AS count FROM ${name}`).get() as {
+          count: number;
+        }
+      ).count;
+    expect(table("provider_model_override")).toBe(0);
+    expect(table("provider_model_manual")).toBe(0);
+    expect(table("provider_default")).toBe(0);
+    handle.close();
+  });
+
+  it("cascades model rows when a connection record is deleted after migration 13", () => {
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle);
+    handle.exec("PRAGMA foreign_keys = ON");
+
+    const now = Date.now();
+    handle
+      .prepare(
+        "INSERT INTO provider_connection_record (id, record_json, updated_at) VALUES (?, ?, ?)",
+      )
+      .run("work-openai", "{}", now);
+    handle
+      .prepare(
+        "INSERT INTO provider_model_override (connection_id, model_id, display_name, hidden, updated_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run("work-openai", "m1", "Renamed", 1, now);
+    handle
+      .prepare(
+        "INSERT INTO provider_model_manual (connection_id, model_id, record_json, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("work-openai", "m2", "{}", now);
+    handle
+      .prepare(
+        "INSERT INTO provider_default (slot, connection_id, model_id, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("textGeneration", "work-openai", "m2", now);
+
+    handle
+      .prepare("DELETE FROM provider_connection_record WHERE id = ?")
+      .run("work-openai");
+
+    const table = (name: string): number =>
+      (
+        handle.prepare(`SELECT COUNT(*) AS count FROM ${name}`).get() as {
+          count: number;
+        }
+      ).count;
+    expect(table("provider_model_override")).toBe(0);
+    expect(table("provider_model_manual")).toBe(0);
+    expect(table("provider_default")).toBe(0);
+
+    // The constraint, not convention, is what stops a new orphan: an insert
+    // naming a connection that does not exist is refused by SQLite itself.
+    expect(() =>
+      handle
+        .prepare(
+          "INSERT INTO provider_model_override (connection_id, model_id, display_name, hidden, updated_at) VALUES (?, ?, ?, ?, ?)",
+        )
+        .run("ghost", "m1", null, 0, now),
+    ).toThrow();
+    handle.close();
+  });
+
   it("refuses a database written by a newer build instead of corrupting it", () => {
     const db = open();
     db.exec("PRAGMA user_version = 999");

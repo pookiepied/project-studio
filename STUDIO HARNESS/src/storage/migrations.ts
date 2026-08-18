@@ -354,6 +354,86 @@ export const MIGRATIONS: readonly Migration[] = [
         ) STRICT;
       `);
     },
+  },
+  {
+    version: 13,
+    name: "provider_model_foreign_keys",
+    up(db) {
+      // Deleting a connection record used to leave its overrides, manual
+      // models, and defaults behind: no foreign key existed, and cleanup was
+      // each store's own responsibility, which is exactly the kind of rule a
+      // second writer forgets. The database owns the relationship now.
+      //
+      // The rebuild is the standard SQLite pattern because ALTER TABLE cannot
+      // add a constraint to an existing table: create under a temp name, copy
+      // the rows across, drop the old, rename. The copy's WHERE clause is the
+      // orphan sweep — a row whose connection_id matches no connection record
+      // is dropped here rather than carried forward, because carrying it would
+      // violate the very constraint this migration exists to add.
+      //
+      // `PRAGMA foreign_keys` is already ON before migrations run, so SQLite
+      // enforces the cascade from here on and neither store has to remember.
+      db.exec(`
+        CREATE TABLE provider_model_override_v13 (
+          connection_id TEXT NOT NULL,
+          model_id      TEXT NOT NULL,
+          display_name  TEXT,
+          hidden        INTEGER NOT NULL DEFAULT 0,
+          updated_at    INTEGER NOT NULL,
+          PRIMARY KEY (connection_id, model_id),
+          FOREIGN KEY (connection_id)
+            REFERENCES provider_connection_record(id) ON DELETE CASCADE
+        ) STRICT;
+
+        INSERT INTO provider_model_override_v13
+               (connection_id, model_id, display_name, hidden, updated_at)
+        SELECT connection_id, model_id, display_name, hidden, updated_at
+          FROM provider_model_override
+         WHERE connection_id IN (SELECT id FROM provider_connection_record);
+
+        CREATE TABLE provider_model_manual_v13 (
+          connection_id TEXT NOT NULL,
+          model_id      TEXT NOT NULL,
+          record_json   TEXT NOT NULL,
+          updated_at    INTEGER NOT NULL,
+          PRIMARY KEY (connection_id, model_id),
+          FOREIGN KEY (connection_id)
+            REFERENCES provider_connection_record(id) ON DELETE CASCADE
+        ) STRICT;
+
+        INSERT INTO provider_model_manual_v13
+               (connection_id, model_id, record_json, updated_at)
+        SELECT connection_id, model_id, record_json, updated_at
+          FROM provider_model_manual
+         WHERE connection_id IN (SELECT id FROM provider_connection_record);
+
+        CREATE TABLE provider_default_v13 (
+          slot          TEXT PRIMARY KEY,
+          connection_id TEXT NOT NULL,
+          model_id      TEXT NOT NULL,
+          updated_at    INTEGER NOT NULL,
+          FOREIGN KEY (connection_id)
+            REFERENCES provider_connection_record(id) ON DELETE CASCADE
+        ) STRICT;
+
+        INSERT INTO provider_default_v13
+               (slot, connection_id, model_id, updated_at)
+        SELECT slot, connection_id, model_id, updated_at
+          FROM provider_default
+         WHERE connection_id IN (SELECT id FROM provider_connection_record);
+
+        DROP TABLE provider_model_override;
+        DROP TABLE provider_model_manual;
+        DROP TABLE provider_default;
+
+        ALTER TABLE provider_model_override_v13
+          RENAME TO provider_model_override;
+        ALTER TABLE provider_model_manual_v13
+          RENAME TO provider_model_manual;
+        ALTER TABLE provider_default_v13
+          RENAME TO provider_default;
+      `);
+    },
   },];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
