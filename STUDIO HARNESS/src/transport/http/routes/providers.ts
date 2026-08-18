@@ -61,7 +61,10 @@ function connectionDraft(value: unknown): ProviderConnectionDraft {
 
 const connectionPatchSchema = v.object({
   displayName: v.optional(v.pipe(v.string(), v.minLength(1))),
-  baseUrl: v.optional(v.pipe(v.string(), v.minLength(1))),
+  // null clears the base URL; undefined (absent key) leaves it alone. The
+  // contract documents the same distinction — the wire repeats it so a null
+  // is validated rather than smuggled.
+  baseUrl: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
   enabled: v.optional(v.boolean()),
   protocol: v.optional(
     v.union([
@@ -210,6 +213,22 @@ export function createProviderRoutes(
     try {
       await providers.removeConnection(context.req.param("id"), authContext(context));
       return context.body(null, 204);
+    } catch (error) {
+      return context.json(failure(error), 400);
+    }
+  });
+
+  routes.post("/connections/:id/probe", async (context) => {
+    try {
+      const id = context.req.param("id");
+      const current = await providers.getConnection(id);
+      if (current === undefined) {
+        return context.json({ error: "That provider connection does not exist." }, 404);
+      }
+      // A refused key or a dead endpoint is a 200 with ok:false — the probe
+      // succeeded as a probe; only a missing connection is a 404 above or a
+      // malformed request a 400 below.
+      return context.json(await providers.probeConnection(id, authContext(context)));
     } catch (error) {
       return context.json(failure(error), 400);
     }

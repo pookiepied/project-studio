@@ -341,7 +341,17 @@ export type ProviderConnectionDraft = DistributiveOmit<
  */
 export type ProviderConnectionPatch = {
   readonly displayName?: string;
-  readonly baseUrl?: string;
+  /**
+   * `null` clears the base URL back to absent; `undefined` leaves it alone.
+   *
+   * The distinction is the whole point. Without an explicit clear, a
+   * connection that once had an override could only ever be reassigned, never
+   * returned to the protocol's own default — an omission, not a decision.
+   * `null` rather than a magic empty string because `""` is already refused
+   * by the connection schema, and a sentinel that resembles a value invites
+   * exactly the typo it exists to prevent.
+   */
+  readonly baseUrl?: string | null;
   readonly enabled?: boolean;
   readonly protocol?: LanguageProtocol | MediaProtocol | RetrievalProtocol;
   readonly apiKey?: string;

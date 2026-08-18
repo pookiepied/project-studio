@@ -2,12 +2,15 @@ import type { AuthContext } from "../admission/context.js";
 import type {
   CapabilitySlot,
   DefaultSelection,
+  ProbeResult,
   ProviderConnection,
   ProviderConnectionDraft,
   ProviderConnectionPatch,
   ProviderKind,
   ProviderModel,
 } from "../contracts/providers.js";
+import { ProviderConfigurationError } from "../contracts/models.js";
+import { probeProviderConnection } from "../providers/connection-probe.js";
 import type { ConnectionStore } from "../providers/connection-store.js";
 import type { ManualModelInput, ModelCatalog } from "../providers/model-catalog.js";
 
@@ -32,10 +35,8 @@ export type DefaultReference = {
  *
  * `ProviderPort` is the shape the frontend talks to; this is the slice a route
  * actually calls, composed the way `McpAdministration` is (ADR 0035 §2). The
- * omissions are deliberate: `getConnection` serves no route in the surface,
- * and `probeConnection` has no implementation to delegate to — a method that
- * always fails would be worse than an absent one, so it is left off rather
- * than stubbed.
+ * omissions are deliberate: `getConnection` serves the update and probe
+ * routes' existence checks rather than a route of its own.
  */
 export interface ProviderAdministration {
   listConnections(): Promise<readonly ProviderConnection[]>;
@@ -50,6 +51,14 @@ export interface ProviderAdministration {
     auth: AuthContext,
   ): Promise<ProviderConnection>;
   removeConnection(id: string, auth: AuthContext): Promise<void>;
+  /**
+   * Tests one connection against its live endpoint.
+   *
+   * Every provider-side outcome comes back inside the `ProbeResult`; the only
+   * throw is a connection that does not exist, so a route can hand the body
+   * straight back without sorting exceptions into successes.
+   */
+  probeConnection(id: string, auth: AuthContext): Promise<ProbeResult>;
 
   listModels(filter?: ProviderModelFilter): Promise<readonly ProviderModel[]>;
   addManualModel(
@@ -129,6 +138,32 @@ export class ProviderManagementService implements ProviderAdministration {
     // Keychain first, then the row; the model tables follow by cascade, which
     // the database enforces rather than this service remembering.
     return this.#connections.remove(id);
+  }
+
+  async probeConnection(id: string, _auth: AuthContext): Promise<ProbeResult> {
+    const connection = await this.#connections.get(id);
+    if (connection === undefined) {
+      throw new ProviderConfigurationError(
+        `Provider connection "${id}" does not exist.`,
+      );
+    }
+
+    let apiKey: string | undefined;
+    try {
+      apiKey = await this.#connections.credentialFor(id);
+    } catch {
+      // A locked keychain is our side of the fence, not the provider's, and
+      // probing without the key would misreport a 401 the provider never
+      // issued. Said plainly instead.
+      return {
+        ok: false,
+        reachedAt: Date.now(),
+        failure:
+          "The credential for this connection could not be read from the secure store, so it was not probed.",
+      };
+    }
+
+    return probeProviderConnection(connection, apiKey);
   }
 
   listModels(

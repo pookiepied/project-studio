@@ -146,6 +146,39 @@ describe("provider connection store", () => {
     expect(await store.get("openai")).toEqual(original);
   });
 
+  it("sets, clears, and reads back a cleared baseUrl as absent", async () => {
+    // Every assertion is a read-back through get/list — the round trip is
+    // the defect this test exists to prevent, so the return value of update
+    // proves nothing on its own.
+    await store.add(draft());
+
+    await store.update("openai", { baseUrl: "https://changed.example.test/v1" });
+    expect((await store.get("openai"))?.baseUrl).toBe("https://changed.example.test/v1");
+
+    await store.update("openai", { baseUrl: null });
+    expect((await store.get("openai"))?.baseUrl).toBeUndefined();
+    expect((await store.list()).find((entry) => entry.id === "openai")?.baseUrl).toBeUndefined();
+  });
+
+  it("leaves a stored baseUrl alone when the patch does not mention it", async () => {
+    await store.add(draft());
+
+    await store.update("openai", { displayName: "Renamed" });
+
+    expect((await store.get("openai"))?.displayName).toBe("Renamed");
+    expect((await store.get("openai"))?.baseUrl).toBe("https://api.example.test/v1");
+  });
+
+  it("refuses an empty-string baseUrl rather than reading it as a clear", async () => {
+    await store.add(draft());
+
+    await expect(store.update("openai", { baseUrl: "" })).rejects.toThrow(
+      ProviderConfigurationError,
+    );
+    // The refused patch changed nothing.
+    expect((await store.get("openai"))?.baseUrl).toBe("https://api.example.test/v1");
+  });
+
   it("removes the record and its credential", async () => {
     await store.add(draft("openai", "sk-to-delete"));
 

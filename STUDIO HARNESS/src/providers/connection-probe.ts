@@ -1,0 +1,244 @@
+import type { ProbeResult, ProviderConnection } from "../contracts/providers.js";
+import { DestinationError } from "../net/destination.js";
+import {
+  HttpError,
+  requestDirect,
+  type HttpResponse,
+} from "../net/http.js";
+
+/**
+ * 8 seconds. A model list is one small JSON document — served from a warm
+ * local process or an edge cache — so a provider that has not answered by
+ * then is not slow, it is stuck, and a stuck probe must not hold a settings
+ * screen open. Eight rather than five leaves room for a cold Ollama or LM
+ * Studio answering its first request while it loads, and for one sluggish
+ * transcontinental TLS handshake; it stays under ten because a probe is a
+ * convenience and never worth a longer wait.
+ */
+export const PROBE_TIMEOUT_MS = 8_000;
+
+/**
+ * Probes one provider connection with a single request.
+ *
+ * The probe is the user's "test this connection" gesture, so it reports the
+ * truth about the far end and nothing else: every provider-side outcome — a
+ * refused key, a missing endpoint, a hung server — becomes a `failure` string
+ * the user can act on, never a throw. The only throwing condition is a
+ * connection that does not exist, which is a caller's mistake rather than a
+ * fact about the provider, and is raised by the caller before this runs.
+ *
+ * The request goes through `net/http.ts` like every outbound connection this
+ * process opens, so the `C-17` policy in `destination.ts` applies unchanged.
+ * The author is the user who configured the connection: that is what keeps a
+ * loopback provider (Ollama, LM Studio) probeable while an address a model
+ * produced inside a turn stays refused. A provider squatting on one of our
+ * own listening ports is refused whoever asked — reaching our own control
+ * plane through a "probe" would be escalation, not a test.
+ */
+
+interface ProbeTarget {
+  /** The exact URL the probe requests. */
+  readonly url: string;
+  readonly headers: Record<string, string>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Where "list models" lives for each protocol, and how the credential is
+ * presented there.
+ *
+ * Retrieval protocols have no model list anywhere in their APIs, so their
+ * probe is the base address itself: reachability plus whether the credential
+ * was accepted. `modelCount` stays absent for them — reporting 0 would claim
+ * a count nobody can make.
+ */
+function probeTarget(
+  connection: ProviderConnection,
+  apiKey: string | undefined,
+): ProbeTarget | undefined {
+  const base = connection.baseUrl;
+  if (base === undefined) return undefined;
+  const origin = base.endsWith("/") ? base.slice(0, -1) : base;
+
+  const headers: Record<string, string> = { accept: "application/json" };
+  const bearer = apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
+
+  switch (connection.protocol) {
+    case "openai-completions":
+    case "openai-responses":
+    case "openai-images":
+    case "openrouter-images":
+      return { url: `${origin}/models`, headers: { ...headers, ...bearer } };
+    case "anthropic-messages":
+      return {
+        url: `${origin}/v1/models`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
+          "anthropic-version": "2023-06-01",
+        },
+      };
+    case "google-generative-ai":
+      return {
+        url: `${origin}/v1beta/models`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-goog-api-key": apiKey }),
+        },
+      };
+    case "brave":
+      return {
+        url: origin,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-subscription-token": apiKey }),
+        },
+      };
+    case "exa":
+      return {
+        url: origin,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
+        },
+      };
+    case "tavily":
+    case "firecrawl":
+    case "jina":
+      return { url: origin, headers: { ...headers, ...bearer } };
+  }
+}
+
+/**
+ * Counts what the endpoint listed, or returns undefined when it listed
+ * nothing countable.
+ *
+ * An empty array is a real answer — zero models — while a body with no array
+ * in it is "we could not tell", and the two must not collapse into the same
+ * 0. Anthropic paginates its model list, so the count there is the first
+ * page's; a probe that paged to exhaustion would stop being one request.
+ */
+function countModels(connection: ProviderConnection, body: string): number | undefined {
+  if (connection.kind === "retrieval") return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) return undefined;
+
+  const list = connection.protocol === "google-generative-ai" ? parsed.models : parsed.data;
+  if (!Array.isArray(list)) return undefined;
+  return list.length;
+}
+
+/**
+ * A transport failure in the register of the rest of the file: what happened,
+ * in words a person reading a settings screen can act on. The credential
+ * never appears — it travelled in a header, and a failure message is not a
+ * place it can accidentally reach.
+ */
+function failureForTransport(
+  connection: ProviderConnection,
+  error: unknown,
+  timeoutMs: number,
+): string {
+  if (error instanceof HttpError) {
+    if (error.kind === "unreachable") {
+      return `${connection.displayName} could not be reached.`;
+    }
+    if (error.kind === "timeout") {
+      // Never "0 seconds": a caller may pass a sub-second deadline in a test,
+      // and a message that rounds the wait away misdescribes it.
+      const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+      return `${connection.displayName} did not answer within ${seconds} second${seconds === 1 ? "" : "s"}.`;
+    }
+    return `${connection.displayName}: ${error.message}`;
+  }
+  if (error instanceof DestinationError) {
+    // Already written for a reader: "That address is Project Studio's own
+    // service..." says more than a status code could.
+    return error.message;
+  }
+  return `${connection.displayName} could not be probed.`;
+}
+
+export interface ProbeOptions {
+  readonly timeoutMs?: number;
+}
+
+export async function probeProviderConnection(
+  connection: ProviderConnection,
+  apiKey: string | undefined,
+  options: ProbeOptions = {},
+): Promise<ProbeResult> {
+  const timeoutMs = options.timeoutMs ?? PROBE_TIMEOUT_MS;
+  const reachedAt = Date.now();
+
+  const target = probeTarget(connection, apiKey);
+  if (target === undefined) {
+    return {
+      ok: false,
+      reachedAt,
+      failure: `${connection.displayName} has no base URL to probe.`,
+    };
+  }
+
+  let response: HttpResponse;
+  try {
+    response = await requestDirect({
+      url: target.url,
+      // The person who configured the connection chose this address, not a
+      // model mid-turn — that judgement is what allows the loopback base
+      // URLs Ollama and LM Studio live behind.
+      author: "user",
+      headers: target.headers,
+      timeoutMs,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      reachedAt,
+      failure: failureForTransport(connection, error, timeoutMs),
+    };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      reachedAt,
+      failure:
+        apiKey === undefined
+          ? `${connection.displayName} requires a credential and none is set for this connection.`
+          : `${connection.displayName} rejected the credential for this connection.`,
+    };
+  }
+
+  if (response.status === 404) {
+    return {
+      ok: false,
+      reachedAt,
+      failure: `${connection.displayName} has no model list at the configured address.`,
+    };
+  }
+
+  if (response.status < 200 || response.status >= 300) {
+    return {
+      ok: false,
+      reachedAt,
+      failure: `${connection.displayName} answered with HTTP ${response.status}.`,
+    };
+  }
+
+  const modelCount = countModels(connection, response.body);
+  return {
+    ok: true,
+    reachedAt,
+    ...(modelCount === undefined ? {} : { modelCount }),
+  };
+}

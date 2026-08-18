@@ -284,9 +284,17 @@ export class ConnectionStore {
     patch: ProviderConnectionPatch,
     status: CredentialStatus,
   ): unknown {
-    const displayName =
-      patch.displayName === undefined ? current.displayName : patch.displayName;
-    const baseUrl = patch.baseUrl === undefined ? current.baseUrl : patch.baseUrl;
+  const displayName =
+    patch.displayName === undefined ? current.displayName : patch.displayName;
+  // null is the explicit clear: the merged record simply omits the field, so
+  // what lands in the database is the same shape a connection that never had
+  // a base URL produces. undefined keeps whatever is stored.
+  const baseUrl =
+    patch.baseUrl === undefined
+      ? current.baseUrl
+      : patch.baseUrl === null
+        ? undefined
+        : patch.baseUrl;
     const enabled = patch.enabled === undefined ? current.enabled : patch.enabled;
     const protocol = patch.protocol === undefined ? current.protocol : patch.protocol;
 
@@ -374,6 +382,34 @@ export class ConnectionStore {
         "Provider connection id is not valid for credential storage.",
       );
     }
+  }
+
+  /**
+   * The secret a probe presents, or undefined when there is none to send.
+   *
+   * Resolution mirrors `#credentialStatus` — the stored key, then the
+   * provider's environment variable — but returns the value, because a probe
+   * is the one operation that must present it rather than describe it. The
+   * value goes to an outbound header and nowhere else: not into a record, a
+   * log line, or a result a route could serialize.
+   */
+  async credentialFor(id: string): Promise<string | undefined> {
+    const key = this.#credentialKey(id);
+    let stored: string | null;
+    try {
+      stored = await this.#credentials.get(key);
+    } catch {
+      throw new ProviderConfigurationError(
+        "Provider credential could not be read.",
+      );
+    }
+
+    if (stored !== null && stored !== "") return stored;
+
+    const envValue = process.env[customProviderEnvVar(id)];
+    return envValue !== undefined && envValue.trim() !== ""
+      ? envValue
+      : undefined;
   }
 
   async #credentialStatus(id: string): Promise<CredentialStatus> {

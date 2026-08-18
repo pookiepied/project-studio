@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
@@ -32,6 +33,8 @@ let db: StudioDatabase;
 let credentials: InMemoryCredentialStore;
 let app: ReturnType<typeof createHttpApp>;
 let session: ReturnType<typeof createAdmissionSession>;
+let probeServer: Server | undefined;
+let probeRequests: IncomingMessage[];
 
 function authorized(path: string, init: RequestInit = {}): Promise<Response> {
   return Promise.resolve(
@@ -67,6 +70,11 @@ beforeEach(() => {
 
 afterEach(() => {
   db.close();
+  if (probeServer !== undefined) {
+    probeServer.closeAllConnections();
+    probeServer.close();
+    probeServer = undefined;
+  }
 });
 
 describe("provider routes", () => {
@@ -220,5 +228,88 @@ describe("provider routes", () => {
       "/api/providers/models?capability=not-a-slot",
     );
     expect(badFilter.status).toBe(400);
+  });
+
+  it("probes a connection through the route and reports what it found", async () => {
+    // A live loopback endpoint standing in for the provider: the probe has to
+    // cross the real admission, service, and net layers to reach it.
+    probeRequests = [];
+    const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+      probeRequests.push(request);
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ data: [{ id: "m1" }, { id: "m2" }] }));
+    });
+    probeServer = server;
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("The mock provider did not report a TCP port.");
+    }
+
+    const secret = "sk-route-probe-secret-77aa";
+    const created = await authorized("/api/providers/connections", {
+      method: "POST",
+      body: JSON.stringify({
+        ...OPENAI_DRAFT,
+        id: "probe-target",
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        apiKey: secret,
+      }),
+    });
+    expect(created.status).toBe(201);
+
+    const probe = await authorized("/api/providers/connections/probe-target/probe", {
+      method: "POST",
+    });
+    expect(probe.status).toBe(200);
+    const probeBody = await probe.text();
+    expect(probeBody).not.toContain(secret);
+    expect(JSON.parse(probeBody)).toMatchObject({ ok: true, modelCount: 2 });
+
+    expect(probeRequests).toHaveLength(1);
+    expect(probeRequests[0]?.url).toBe("/v1/models");
+    expect(probeRequests[0]?.headers.authorization).toBe(`Bearer ${secret}`);
+
+    // A provider-side failure is still 200 with ok:false — the probe itself
+    // worked; only a missing connection is a 404.
+    const unknown = await authorized("/api/providers/connections/never-existed/probe", {
+      method: "POST",
+    });
+    expect(unknown.status).toBe(404);
+  });
+
+  it("clears a baseUrl over HTTP with null and reads it back absent", async () => {
+    const created = await authorized("/api/providers/connections", {
+      method: "POST",
+      body: JSON.stringify(OPENAI_DRAFT),
+    });
+    expect(created.status).toBe(201);
+    expect(JSON.parse(await created.text()).baseUrl).toBe("https://api.openai.com/v1");
+
+    const cleared = await authorized("/api/providers/connections/work-openai", {
+      method: "PATCH",
+      body: JSON.stringify({ baseUrl: null }),
+    });
+    expect(cleared.status).toBe(200);
+    const clearedText = await cleared.text();
+    expect(JSON.parse(clearedText).baseUrl).toBeUndefined();
+
+    // The read-back, not the patch's return value, is the assertion that
+    // matters: a fresh GET must show the field gone.
+    const listed = await authorized("/api/providers/connections");
+    const connections = JSON.parse(await listed.text());
+    expect(connections).toHaveLength(1);
+    expect(connections[0].baseUrl).toBeUndefined();
+    expect("baseUrl" in connections[0]).toBe(false);
+
+    // And undefined-shaped patches still leave everything alone.
+    const untouched = await authorized("/api/providers/connections/work-openai", {
+      method: "PATCH",
+      body: JSON.stringify({ displayName: "Renamed Once" }),
+    });
+    expect(untouched.status).toBe(200);
+    expect(JSON.parse(await untouched.text()).displayName).toBe("Renamed Once");
+    const relisted = JSON.parse(await (await authorized("/api/providers/connections")).text());
+    expect("baseUrl" in relisted[0]).toBe(false);
   });
 });
