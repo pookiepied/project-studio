@@ -284,7 +284,77 @@ export const MIGRATIONS: readonly Migration[] = [
       );
     },
   },
-];
+  {
+    version: 11,
+    name: "provider_connection_record",
+    up(db) {
+      // The provider contract's connection record: language, media, and web
+      // retrieval in one table, because they differ only in `kind` and
+      // `protocol` and a table per kind would make that difference structural.
+      //
+      // This does not replace `provider_connection` from migration 2. That one
+      // records *that* a built-in provider was connected; this one is the full
+      // user-declared connection the contract describes. They will be merged,
+      // and until they are, two tables saying different things is honest and
+      // one table saying both would not be.
+      //
+      // **`record_json` is the reason this comment is long.** The column guard
+      // reads column *names*, so it cannot see inside a JSON blob -- the
+      // protection here is instead that every write is parsed through
+      // `providerConnectionSchema`, which has no key field and strips unknown
+      // ones, and every read refuses a record carrying `apiKey`. A column named
+      // for a secret would be caught; a secret smuggled into this blob would
+      // not, so the schema parse on the write path is load-bearing and must
+      // never be removed.
+      db.exec(`
+        CREATE TABLE provider_connection_record (
+          id          TEXT PRIMARY KEY,
+          record_json TEXT NOT NULL,
+          updated_at  INTEGER NOT NULL
+        ) STRICT;
+      `);
+    },
+  },
+  {
+    version: 12,
+    name: "provider_model_catalog",
+    up(db) {
+      // These three tables keep three different user decisions separate:
+      // an override patches a live catalog model, a manual model is a model in
+      // its own right, and a default points at either one. Merging them would
+      // make it impossible to tell whether a model was renamed or created.
+      //
+      // **`record_json` is not a secret column.** It carries a ProviderModel,
+      // which has no credential field, and every write and read parses it
+      // through providerModelSchema. The column-name guard cannot inspect the
+      // contents of a JSON blob, so that schema validation is the protection.
+      db.exec(`
+        CREATE TABLE provider_model_override (
+          connection_id TEXT NOT NULL,
+          model_id      TEXT NOT NULL,
+          display_name  TEXT,
+          hidden        INTEGER NOT NULL DEFAULT 0,
+          updated_at    INTEGER NOT NULL,
+          PRIMARY KEY (connection_id, model_id)
+        ) STRICT;
+
+        CREATE TABLE provider_model_manual (
+          connection_id TEXT NOT NULL,
+          model_id      TEXT NOT NULL,
+          record_json   TEXT NOT NULL,
+          updated_at    INTEGER NOT NULL,
+          PRIMARY KEY (connection_id, model_id)
+        ) STRICT;
+
+        CREATE TABLE provider_default (
+          slot          TEXT PRIMARY KEY,
+          connection_id TEXT NOT NULL,
+          model_id      TEXT NOT NULL,
+          updated_at    INTEGER NOT NULL
+        ) STRICT;
+      `);
+    },
+  },];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
 

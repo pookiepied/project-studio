@@ -23,7 +23,13 @@ export type ModelReference = v.InferOutput<typeof modelReferenceSchema>;
  * confirmed "unsupported". Numeric limits use "unknown" rather than 0 for the
  * same reason.
  */
-export type CapabilityState = "supported" | "unsupported" | "unknown";
+export const capabilityStateSchema = v.picklist([
+  "supported",
+  "unsupported",
+  "unknown",
+]);
+
+export type CapabilityState = v.InferOutput<typeof capabilityStateSchema>;
 
 export interface ModelCapability {
   readonly textGeneration: CapabilityState;
@@ -40,6 +46,35 @@ export interface ModelCapability {
   readonly contextWindow: number | "unknown";
   readonly maxOutputTokens: number | "unknown";
 }
+
+/**
+ * The runtime counterpart of ModelCapability, kept beside it on purpose.
+ *
+ * A second copy of this shape written by hand somewhere else compiles happily
+ * after a field is added here and then validates the old shape forever. One
+ * schema, checked against the interface, is what makes adding a capability a
+ * compile error everywhere it needs to be one.
+ */
+export const modelCapabilitySchema = v.object({
+  textGeneration: capabilityStateSchema,
+  streaming: capabilityStateSchema,
+  reasoning: capabilityStateSchema,
+  toolCalling: capabilityStateSchema,
+  vision: capabilityStateSchema,
+  embeddings: capabilityStateSchema,
+  reranking: capabilityStateSchema,
+  imageGeneration: capabilityStateSchema,
+  videoGeneration: capabilityStateSchema,
+  speechGeneration: capabilityStateSchema,
+  transcription: capabilityStateSchema,
+  contextWindow: v.union([v.number(), v.literal("unknown")]),
+  maxOutputTokens: v.union([v.number(), v.literal("unknown")]),
+});
+
+// Fails to compile the moment the schema and the interface disagree.
+const _capabilityShapesAgree: ModelCapability =
+  undefined as unknown as v.InferOutput<typeof modelCapabilitySchema>;
+void _capabilityShapesAgree;
 
 export interface ModelDescriptor {
   readonly source: ModelSource;
