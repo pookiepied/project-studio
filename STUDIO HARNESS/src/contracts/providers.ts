@@ -92,6 +92,21 @@ export const credentialStatusSchema = v.picklist(["set", "from-env", "absent"]);
 export type CredentialStatus = v.InferOutput<typeof credentialStatusSchema>;
 
 /**
+ * A connection id names a keychain entry of its very own, so its shape is a
+ * security boundary, not a style guide: lowercase letters, digits, and single
+ * hyphens, beginning and ending with a letter or digit. The slug shape is
+ * also what makes the credential key predictable — it must survive the
+ * credential store's own id validation unchanged.
+ */
+export const providerConnectionIdSchema = v.pipe(
+  v.string(),
+  v.regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Provider connection ids are lowercase letters, digits, and single hyphens, starting and ending with a letter or digit.",
+  ),
+);
+
+/**
  * A provider connection as the UI and the harness see it.
  *
  * Discriminated on `kind` so the type system refuses a language protocol on a
@@ -100,7 +115,7 @@ export type CredentialStatus = v.InferOutput<typeof credentialStatusSchema>;
  * secret or an internal row id.
  */
 const providerConnectionLanguageSchema = v.object({
-  id: v.pipe(v.string(), v.minLength(1)),
+  id: providerConnectionIdSchema,
   displayName: v.pipe(v.string(), v.minLength(1)),
   kind: v.literal("language"),
   source: providerSourceSchema,
@@ -131,7 +146,7 @@ const providerConnectionLanguageSchema = v.object({
 });
 
 const providerConnectionMediaSchema = v.object({
-  id: v.pipe(v.string(), v.minLength(1)),
+  id: providerConnectionIdSchema,
   displayName: v.pipe(v.string(), v.minLength(1)),
   kind: v.literal("media"),
   source: providerSourceSchema,
@@ -162,7 +177,7 @@ const providerConnectionMediaSchema = v.object({
 });
 
 const providerConnectionRetrievalSchema = v.object({
-  id: v.pipe(v.string(), v.minLength(1)),
+  id: providerConnectionIdSchema,
   displayName: v.pipe(v.string(), v.minLength(1)),
   kind: v.literal("retrieval"),
   source: providerSourceSchema,
@@ -303,12 +318,20 @@ export type DefaultSelection = v.InferOutput<typeof defaultSelectionSchema>;
  * when the probe could enumerate, and `failure` is present only when it could
  * not — never both as a substitute. The type is deliberately narrow so a
  * probe that cannot reach the provider is not misread as "zero models".
+ *
+ * `status` and `latencyMs` are what the UI branches on; `failure` is the
+ * human sentence it shows. Both are optional because both can be honestly
+ * absent: a transport failure — DNS refusal, timeout — never produced an
+ * HTTP status, and a probe that never left the process (no address to
+ * probe) has no latency to report.
  */
 export const probeResultSchema = v.object({
   ok: v.boolean(),
   reachedAt: v.number(),
   modelCount: v.optional(v.number()),
   failure: v.optional(v.string()),
+  status: v.optional(v.number()),
+  latencyMs: v.optional(v.number()),
 });
 
 export type ProbeResult = v.InferOutput<typeof probeResultSchema>;

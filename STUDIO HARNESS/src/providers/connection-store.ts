@@ -376,7 +376,13 @@ export class ConnectionStore {
 
   #credentialKey(id: string): CredentialKey {
     try {
-      return assertValidKey({ scope: "provider", id });
+      // Not "provider": connection ids are arbitrary user strings, and
+      // "provider" is shared with fixed-id tenants — the local BYOK bridge
+      // (Pi provider ids) and the retrieval registry (five constant ids). A
+      // connection named "openai" under "provider" would overwrite the
+      // bridge's key; one named "tavily" would hijack the web-search key.
+      // A scope no fixed id can be named into is the separation.
+      return assertValidKey({ scope: "provider-connection", id });
     } catch {
       throw new ProviderConfigurationError(
         "Provider connection id is not valid for credential storage.",

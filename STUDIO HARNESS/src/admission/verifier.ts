@@ -7,7 +7,7 @@ import {
   type AdmissionCredential,
 } from "./credential.js";
 import { AdmissionError } from "./errors.js";
-import { ALL_ADMISSION_SCOPES, type AdmissionScope } from "./scopes.js";
+import { DEFAULT_SCOPES_BY_CLIENT_TYPE, type AdmissionScope } from "./scopes.js";
 import { createStudioUuid } from "../identity/uuid.js";
 
 export interface AdmissionSessionOptions {
@@ -108,11 +108,15 @@ export function createAdmissionSession(
 ): AdmissionSession {
   const clientId = validIdentity(options.clientId, "studio");
   const sessionId = validIdentity(options.sessionId, createStudioUuid());
-  const scopes = options.scopes ?? ALL_ADMISSION_SCOPES;
+  const clientType = options.clientType ?? "standalone";
+  // Scopes follow from who the client is, not from possession of the
+  // credential: a session that did not say what it may do gets what its type
+  // is trusted with (ADR 0028 §7).
+  const scopes = options.scopes ?? DEFAULT_SCOPES_BY_CLIENT_TYPE[clientType];
   const credential = options.credential ?? createAdmissionCredential();
   const context = immutableContext({
     clientId,
-    clientType: options.clientType ?? "standalone",
+    clientType,
     sessionId,
     scopes,
   });

@@ -25,6 +25,8 @@ import { KeyringCredentialStore } from "./credentials/keyring-store.js";
 import { ConnectionStore } from "./providers/connection-store.js";
 import { ModelCatalog } from "./providers/model-catalog.js";
 import { ProviderManagementService } from "./application/provider-management.js";
+import { RetrievalManagementService } from "./application/retrieval-management.js";
+import { RetrievalSettingsStore } from "./retrieval/settings.js";
 
 interface HarnessApplication {
   readonly app: ReturnType<typeof createHttpApp>;
@@ -118,9 +120,18 @@ function createHarnessApplication(): HarnessApplication {
       }),
     });
 
+    // Reads and writes the same app_setting keys and keychain entries the
+    // retrieval tool path uses; its own store instances over the same
+    // database and OS keyring, the way every consumer here builds one.
+    const retrieval = new RetrievalManagementService({
+      settings: new RetrievalSettingsStore(database),
+      credentials: new KeyringCredentialStore(),
+    });
+
     const app = createHttpApp({
       servers: runtime.servers,
       providers,
+      retrieval,
       approvals,
       admission: admission.verifier,
     });

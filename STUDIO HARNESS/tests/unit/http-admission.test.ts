@@ -95,6 +95,7 @@ describe("Harness HTTP admission", () => {
     let mcpEntered = 0;
     let permissionEntered = 0;
     let providerEntered = 0;
+    let retrievalEntered = 0;
     flueApp.get("/probe", () => {
       flueEntered += 1;
       return new Response("entered");
@@ -115,6 +116,31 @@ describe("Harness HTTP admission", () => {
           return [];
         },
       } as unknown as ProviderAdministration,
+      retrieval: {
+        // A retrieval port double in the same minimal spirit as the others;
+        // the full shape without a cast, because admission never gets that
+        // far on the paths this test walks.
+        listRetrieval: () => {
+          retrievalEntered += 1;
+          return Promise.resolve({
+            search: {
+              capability: "search",
+              providers: [],
+              primary: "tavily",
+              fallback: undefined,
+            },
+            reader: {
+              capability: "reader",
+              providers: [],
+              primary: "jina",
+              fallback: undefined,
+            },
+          });
+        },
+        setRetrievalKey: () => Promise.resolve(undefined),
+        clearRetrievalKey: () => Promise.resolve(undefined),
+        setRetrievalSlot: () => Promise.resolve(undefined),
+      },
       approvals: {
         list: () => {
           permissionEntered += 1;
@@ -130,6 +156,7 @@ describe("Harness HTTP admission", () => {
       "/api/mcp/servers",
       "/api/permissions/pending",
       "/api/providers/connections",
+      "/api/providers/retrieval",
     ]) {
       const response = await app.request(`http://harness.test${path}`);
       expect(response.status, path).toBe(401);
@@ -143,6 +170,7 @@ describe("Harness HTTP admission", () => {
     expect(mcpEntered).toBe(0);
     expect(permissionEntered).toBe(0);
     expect(providerEntered).toBe(0);
+    expect(retrievalEntered).toBe(0);
 
     const admittedProbe = await app.request("http://harness.test/probe", {
       headers: { authorization: `Bearer ${session.credential}` },

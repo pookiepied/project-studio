@@ -5,6 +5,7 @@ import {
   requestDirect,
   type HttpResponse,
 } from "../net/http.js";
+import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 
 /**
  * 8 seconds. A model list is one small JSON document — served from a warm
@@ -47,6 +48,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * The base URL a catalog-backed connection probes when the user never typed
+ * one.
+ *
+ * Pi's generated catalog carries `baseUrl` per model, not per provider, and
+ * for five providers the models disagree (region- or path-shaped differences:
+ * amazon-bedrock's two regions, cloudflare-ai-gateway's per-upstream paths,
+ * fireworks/opencode/opencode-go differing by a trailing `/v1`). The rule is
+ * the majority URL, ties broken by first occurrence in catalog order —
+ * deterministic, and when models disagree there is no answer that is right
+ * for all of them, only one that is right for most. `azure-openai-responses`
+ * has no baseUrl on any model (its URLs are per-deployment), so it resolves
+ * to undefined and such a connection keeps the honest no-address message
+ * until the user supplies one.
+ */
+export function catalogBaseUrlFor(catalogProvider: string): string | undefined {
+  const known = getBuiltinProviders().find((provider) => provider === catalogProvider);
+  if (known === undefined) return undefined;
+
+  const counts = new Map<string, number>();
+  for (const model of getBuiltinModels(known)) {
+    const url = model.baseUrl;
+    if (typeof url !== "string" || url.length === 0) continue;
+    counts.set(url, (counts.get(url) ?? 0) + 1);
+  }
+
+  // Strictly-greater over an insertion-ordered Map: first-seen wins ties.
+  let best: string | undefined;
+  let bestCount = 0;
+  for (const [url, count] of counts) {
+    if (count > bestCount) {
+      best = url;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+/**
  * Where "list models" lives for each protocol, and how the credential is
  * presented there.
  *
@@ -59,7 +98,11 @@ function probeTarget(
   connection: ProviderConnection,
   apiKey: string | undefined,
 ): ProbeTarget | undefined {
-  const base = connection.baseUrl;
+  // An explicit baseUrl always wins — a user who typed a URL meant it. Only
+  // when the connection never had one does the catalog answer, and where the
+  // URL came from is an implementation detail the result never mentions.
+  const base =
+    connection.baseUrl ?? catalogBaseUrlFor(connection.catalogProvider ?? "");
   if (base === undefined) return undefined;
   const origin = base.endsWith("/") ? base.slice(0, -1) : base;
 
@@ -189,6 +232,10 @@ export async function probeProviderConnection(
     };
   }
 
+  // Measured around the one request and nothing else — not target
+  // resolution, not response parsing — so the number is what the far end
+  // cost, which is what a UI sorting connections by responsiveness wants.
+  const startedAt = Date.now();
   let response: HttpResponse;
   try {
     response = await requestDirect({
@@ -205,8 +252,11 @@ export async function probeProviderConnection(
       ok: false,
       reachedAt,
       failure: failureForTransport(connection, error, timeoutMs),
+      latencyMs: Date.now() - startedAt,
     };
   }
+
+  const latencyMs = Date.now() - startedAt;
 
   if (response.status === 401 || response.status === 403) {
     return {
@@ -216,6 +266,8 @@ export async function probeProviderConnection(
         apiKey === undefined
           ? `${connection.displayName} requires a credential and none is set for this connection.`
           : `${connection.displayName} rejected the credential for this connection.`,
+      status: response.status,
+      latencyMs,
     };
   }
 
@@ -224,6 +276,8 @@ export async function probeProviderConnection(
       ok: false,
       reachedAt,
       failure: `${connection.displayName} has no model list at the configured address.`,
+      status: response.status,
+      latencyMs,
     };
   }
 
@@ -232,6 +286,8 @@ export async function probeProviderConnection(
       ok: false,
       reachedAt,
       failure: `${connection.displayName} answered with HTTP ${response.status}.`,
+      status: response.status,
+      latencyMs,
     };
   }
 
@@ -239,6 +295,8 @@ export async function probeProviderConnection(
   return {
     ok: true,
     reachedAt,
+    status: response.status,
+    latencyMs,
     ...(modelCount === undefined ? {} : { modelCount }),
   };
 }

@@ -52,18 +52,29 @@ export class CredentialStoreError extends StudioError {
 /**
  * What a stored secret belongs to.
  *
- * `session` holds the Studio access/refresh tokens. `provider` holds one BYOK
- * credential for one provider. `mcp` holds the one secret an MCP server needs
- * — a bearer token for a remote endpoint, or the value of an environment
- * variable a local server reads a key from. Keeping them in separate entries
- * rather than one serialized bundle is a platform requirement, not a
- * preference: see `MAX_SECRET_LENGTH`.
+ * `session` holds the Studio access/refresh tokens. `provider` holds BYOK
+ * model keys for *known* provider ids — the Pi catalog ids the local bridge
+ * writes and the five retrieval registry ids — where every id is a fixed,
+ * disjoint constant. `provider-connection` holds keys for user-created
+ * provider connections, whose ids are arbitrary user strings: a connection
+ * named `openai` must not alias the bridge's key, and one named `tavily`
+ * must not hijack the web-search key, so connections get a scope no fixed-id
+ * tenant can ever be named into. `mcp` holds the one secret an MCP server
+ * needs — a bearer token for a remote endpoint, or the value of an
+ * environment variable a local server reads a key from. Keeping them in
+ * separate entries rather than one serialized bundle is a platform
+ * requirement, not a preference: see `MAX_SECRET_LENGTH`.
  *
  * `mcp` is a scope here rather than a column in `mcp_server` because that is
  * the whole keychain/database split: the row says a secret exists and what it
  * is called, and the store is the only thing that holds what it is.
  */
-export const CREDENTIAL_SCOPES = ["session", "provider", "mcp"] as const;
+export const CREDENTIAL_SCOPES = [
+  "session",
+  "provider",
+  "provider-connection",
+  "mcp",
+] as const;
 
 export type CredentialScope = (typeof CREDENTIAL_SCOPES)[number];
 

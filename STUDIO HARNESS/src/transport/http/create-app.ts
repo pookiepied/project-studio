@@ -6,16 +6,23 @@ import { ADMISSION_SCOPES } from "../../admission/scopes.js";
 import type { PermissionApprovalBroker } from "../../application/approval-broker.js";
 import type { McpAdministration } from "../../application/mcp-management.js";
 import type { ProviderAdministration } from "../../application/provider-management.js";
+import type { RetrievalAdministration } from "../../application/retrieval-management.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 import { createProviderRoutes } from "./routes/providers.js";
+import { createRetrievalRoutes } from "./routes/retrieval.js";
 
 export interface CreateHttpAppOptions {
   /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
   readonly servers: McpAdministration;
   /** The provider administration surface — a port of the same shape. */
   readonly providers: ProviderAdministration;
+  /**
+   * The retrieval settings surface — a sibling of `providers` over the same
+   * tree and scope, kept separate because its storage and vocabulary are.
+   */
+  readonly retrieval: RetrievalAdministration;
   readonly approvals: PermissionApprovalBroker;
   readonly admission: AdmissionVerifier;
   /** Injectable Flue app for tests; production uses the generated Flue app. */
@@ -33,6 +40,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
 
   app.route("/api/mcp", createMcpRoutes(options.servers));
   app.route("/api/providers", createProviderRoutes(options.providers));
+  app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
 
   const agentRoutes = new Hono<AdmissionEnv>();

@@ -24,6 +24,18 @@ For 1.0, `StudioRuntime` remains a **bounded orchestrator + lifecycle** with an 
 2. `StudioDatabase.handle` remains public for the 6 existing stores, but new code **must** go through a domain repository/port. `architecture.test.ts` fails on any new `storage/database` import outside `src/storage`, `src/app.ts`, `src/application/studio-runtime.ts`, `src/models/bootstrap.ts`, `src/models/local/cli.ts`, `src/auth/cli.ts`, and tests.
 3. Transport routes (`src/transport/http/routes/mcp.ts:115`, `src/transport/http/create-app.ts:27`) currently take `StudioRuntime` concrete. New routes must take typed ports (`src/application/ports.ts`). Existing routes are grandfathered until 008.21.
 
+> **Status note, 2026-08-19.** The item above was half true when this ADR was
+> written — transport did take `StudioRuntime` concrete — and half never true
+> at all: `src/application/ports.ts` was never created. It is left in place
+> because an ADR records what was believed when a decision was taken, and a
+> correction is more honest than a rewrite. The typed-port rule shipped
+> anyway: the port landed as `McpAdministration` in
+> `STUDIO HARNESS/src/application/mcp-management.ts` (ADR 0035 §2), the
+> provider surface followed the same shape in
+> `STUDIO HARNESS/src/application/provider-management.ts`, and
+> `src/transport/http/create-app.ts` takes those ports rather than the
+> runtime.
+
 ## Consequences
 
 - 008.3 is considered **Done** with this ADR — the gate is enforced for *new* violations, not retroactively for the 6 stores.

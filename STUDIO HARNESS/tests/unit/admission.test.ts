@@ -9,8 +9,11 @@ import {
 } from "../../src/admission/credential.js";
 import {
   ADMISSION_SCOPES,
+  ALL_ADMISSION_SCOPES,
+  DEFAULT_SCOPES_BY_CLIENT_TYPE,
   hasAdmissionScope,
 } from "../../src/admission/scopes.js";
+import { CLIENT_TYPES } from "../../src/admission/context.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 
 describe("Harness admission verifier", () => {
@@ -82,5 +85,47 @@ describe("Harness admission verifier", () => {
     } catch (error) {
       expect(JSON.stringify(error)).not.toContain(secret);
     }
+  });
+});
+
+describe("default scopes by client type", () => {
+  it("gives the studio-host every scope, so the shipped app is unchanged", () => {
+    const session = createAdmissionSession({ clientType: "studio-host" });
+
+    expect(session.context.scopes).toEqual(ALL_ADMISSION_SCOPES);
+  });
+
+  it("narrows a studio-client to the product surface it consumes", () => {
+    const session = createAdmissionSession({ clientType: "studio-client" });
+
+    expect(session.context.scopes).toEqual([
+      ADMISSION_SCOPES.AGENT_RUN,
+      ADMISSION_SCOPES.APPROVAL,
+    ]);
+  });
+
+  it("keeps the operational surface for hand-launched and test sessions", () => {
+    const operational = [
+      ADMISSION_SCOPES.AGENT_RUN,
+      ADMISSION_SCOPES.EXTENSION_MANAGEMENT,
+      ADMISSION_SCOPES.APPROVAL,
+      ADMISSION_SCOPES.PROJECT,
+      ADMISSION_SCOPES.PROVIDER_MANAGEMENT,
+    ];
+
+    expect(
+      createAdmissionSession({ clientType: "standalone" }).context.scopes,
+    ).toEqual(operational);
+    expect(
+      createAdmissionSession({ clientType: "test" }).context.scopes,
+    ).toEqual(operational);
+  });
+
+  it("declares a scope set for every client type, not just the ones used today", () => {
+    // The Record type forces this at compile time; the runtime check exists so
+    // a future weakening of the type cannot silently reopen the gap.
+    expect(Object.keys(DEFAULT_SCOPES_BY_CLIENT_TYPE).sort()).toEqual(
+      [...CLIENT_TYPES].sort(),
+    );
   });
 });

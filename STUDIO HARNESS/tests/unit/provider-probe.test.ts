@@ -14,6 +14,7 @@ import { ProviderManagementService } from "../../src/application/provider-manage
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import {
   PROBE_TIMEOUT_MS,
+  catalogBaseUrlFor,
   probeProviderConnection,
 } from "../../src/providers/connection-probe.js";
 import { ConnectionStore } from "../../src/providers/connection-store.js";
@@ -150,6 +151,8 @@ describe("provider probe", () => {
     expect(probe.modelCount).toBe(3);
     expect(typeof probe.reachedAt).toBe("number");
     expect(probe.failure).toBeUndefined();
+    expect(probe.status).toBe(200);
+    expect(typeof probe.latencyMs).toBe("number");
 
     // One request, to the protocol's model list, with the stored key.
     expect(target.requests).toHaveLength(1);
@@ -192,6 +195,8 @@ describe("provider probe", () => {
     expect(probe.ok).toBe(false);
     expect(probe.failure).toMatch(/rejected the credential/i);
     expect(probe.modelCount).toBeUndefined();
+    expect(probe.status).toBe(401);
+    expect(typeof probe.latencyMs).toBe("number");
   });
 
   it("treats a dead endpoint as a failure, not a throw", async () => {
@@ -209,6 +214,10 @@ describe("provider probe", () => {
     expect(probe.ok).toBe(false);
     expect(probe.failure).toMatch(/could not be reached/i);
     expect(probe.modelCount).toBeUndefined();
+    // The request left the process and failed below HTTP, so there is a
+    // latency but never a status.
+    expect(probe.status).toBeUndefined();
+    expect(typeof probe.latencyMs).toBe("number");
   });
 
   it("cuts off a hung provider at the deadline", async () => {
@@ -225,6 +234,8 @@ describe("provider probe", () => {
 
     expect(probe.ok).toBe(false);
     expect(probe.failure).toMatch(/did not answer within 1 second/i);
+    expect(probe.status).toBeUndefined();
+    expect(typeof probe.latencyMs).toBe("number");
   });
 
   it("throws for an unknown connection id", async () => {
@@ -339,5 +350,39 @@ describe("provider probe", () => {
 
     expect(probe.ok).toBe(false);
     expect(probe.failure).toMatch(/no base URL/i);
+    // Never left the process: no status, and no latency to report.
+    expect(probe.status).toBeUndefined();
+    expect(probe.latencyMs).toBeUndefined();
+  });
+});
+
+describe("catalog base URL resolution", () => {
+  it("resolves a catalog provider's models to one majority URL", () => {
+    const resolved = catalogBaseUrlFor("openai");
+
+    expect(resolved).toBeDefined();
+    if (resolved === undefined) return;
+    expect(resolved.startsWith("https://api.openai.com")).toBe(true);
+  });
+
+  it("returns undefined for a provider whose models carry no baseUrl", () => {
+    // Azure URLs are per-deployment; Pi's records rightly have none.
+    expect(catalogBaseUrlFor("azure-openai-responses")).toBeUndefined();
+  });
+
+  it("returns undefined for a provider the catalog does not know", () => {
+    expect(catalogBaseUrlFor("not-a-real-provider")).toBeUndefined();
+  });
+
+  it("applies the majority rule when a provider's models disagree", () => {
+    // amazon-bedrock's models split across two regional endpoints; the rule
+    // must pick one of the documented URLs, deterministically.
+    const resolved = catalogBaseUrlFor("amazon-bedrock");
+
+    expect([
+      "https://bedrock-runtime.us-east-1.amazonaws.com",
+      "https://bedrock-runtime.eu-central-1.amazonaws.com",
+    ]).toContain(resolved);
+    expect(catalogBaseUrlFor("amazon-bedrock")).toBe(resolved);
   });
 });

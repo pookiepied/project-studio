@@ -253,7 +253,8 @@ export const MIGRATIONS: readonly Migration[] = [
       //
       // `request` and `decision` are the JSON the UI renders; they describe a
       // capability and a target, never a credential. `asked_at` is what orders
-      // the queue and what lets a stale row be recognised as stale.
+      // the queue. Nothing expires a row by age: durability is the design
+      // (ADR 0036), so a row leaves only when it is answered or cancelled.
       db.exec(`
         CREATE TABLE pending_approval (
           id        TEXT PRIMARY KEY,

@@ -7,6 +7,8 @@ import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
 import { ProviderManagementService } from "../../src/application/provider-management.js";
+import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
+import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ConnectionStore } from "../../src/providers/connection-store.js";
 import { ModelCatalog } from "../../src/providers/model-catalog.js";
@@ -14,6 +16,7 @@ import { createHttpApp } from "../../src/transport/http/create-app.js";
 import { createProviderRoutes } from "../../src/transport/http/routes/providers.js";
 import {
   createAdmissionMiddleware,
+  requireAdmissionScope,
   type AdmissionEnv,
 } from "../../src/transport/http/middleware/admission.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -62,6 +65,10 @@ beforeEach(() => {
       connections,
       catalog: new ModelCatalog({ db, connections }),
     }),
+    retrieval: new RetrievalManagementService({
+      settings: new RetrievalSettingsStore(db),
+      credentials,
+    }),
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
     admission: session.verifier,
     flueApp,
@@ -104,6 +111,69 @@ describe("provider routes", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("narrows what a studio-client session may do by default", async () => {
+    // No explicit scopes: whatever a studio-client is trusted with arrives
+    // from the client-type table, which is the behavior under test.
+    const client = createAdmissionSession({ clientType: "studio-client" });
+    const connections = new ConnectionStore({ db, credentials });
+    const clientApp = new Hono<AdmissionEnv>();
+    clientApp.use("*", createAdmissionMiddleware(client.verifier));
+    clientApp.use("/probe", requireAdmissionScope(ADMISSION_SCOPES.AGENT_RUN));
+    clientApp.get("/probe", () => new Response("entered"));
+    clientApp.route(
+      "/api/providers",
+      createProviderRoutes(
+        new ProviderManagementService({
+          connections,
+          catalog: new ModelCatalog({ db, connections }),
+        }),
+      ),
+    );
+    const headers = { authorization: `Bearer ${client.credential}` };
+
+    // Inside the default set: the agent route (agent:run).
+    const agent = await clientApp.request("http://harness.test/probe", {
+      headers,
+    });
+    expect(agent.status).toBe(200);
+
+    // Outside it: provider management. The refusal must be the scope guard's
+    // 403 shape, not a crashed handler's 500.
+    const refused = await clientApp.request(
+      "http://harness.test/api/providers/connections",
+      { headers },
+    );
+    expect(refused.status).toBe(403);
+    expect(JSON.parse(await refused.text())).toEqual({
+      error: "The authenticated client is not authorized for this operation.",
+      code: "admission.scope_required",
+      scope: "provider-management",
+    });
+  });
+
+  it("keeps every scope for the studio-host the shipped app speaks as", async () => {
+    const host = createAdmissionSession({ clientType: "studio-host" });
+    const connections = new ConnectionStore({ db, credentials });
+    const hostApp = new Hono<AdmissionEnv>();
+    hostApp.use("*", createAdmissionMiddleware(host.verifier));
+    hostApp.route(
+      "/api/providers",
+      createProviderRoutes(
+        new ProviderManagementService({
+          connections,
+          catalog: new ModelCatalog({ db, connections }),
+        }),
+      ),
+    );
+
+    const response = await hostApp.request(
+      "http://harness.test/api/providers/connections",
+      { headers: { authorization: `Bearer ${host.credential}` } },
+    );
+
+    expect(response.status).toBe(200);
   });
 
   it("never echoes a submitted API key in any response", async () => {
@@ -208,7 +278,7 @@ describe("provider routes", () => {
     expect(
       JSON.parse(await (await authorized("/api/providers/connections")).text()),
     ).toEqual([]);
-    expect(await credentials.get({ scope: "provider", id: "work-openai" })).toBeNull();
+    expect(await credentials.get({ scope: "provider-connection", id: "work-openai" })).toBeNull();
   });
 
   it("reports a bad body as 400 and a missing connection as 404", async () => {
@@ -230,12 +300,28 @@ describe("provider routes", () => {
     expect(badFilter.status).toBe(400);
   });
 
+  it("rejects a non-slug connection id at the route before anything is written", async () => {
+    const response = await authorized("/api/providers/connections", {
+      method: "POST",
+      body: JSON.stringify({ ...OPENAI_DRAFT, id: "Not A Slug!" }),
+    });
+    expect(response.status).toBe(400);
+
+    expect(JSON.parse(await (await authorized("/api/providers/connections")).text())).toEqual([]);
+    expect(credentials.size).toBe(0);
+  });
+
   it("probes a connection through the route and reports what it found", async () => {
     // A live loopback endpoint standing in for the provider: the probe has to
     // cross the real admission, service, and net layers to reach it.
     probeRequests = [];
     const server = createServer((request: IncomingMessage, response: ServerResponse) => {
       probeRequests.push(request);
+      if ((request.url ?? "").startsWith("/refused")) {
+        response.writeHead(401, { "content-type": "application/json" });
+        response.end("{}");
+        return;
+      }
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ data: [{ id: "m1" }, { id: "m2" }] }));
     });
@@ -264,11 +350,41 @@ describe("provider routes", () => {
     expect(probe.status).toBe(200);
     const probeBody = await probe.text();
     expect(probeBody).not.toContain(secret);
-    expect(JSON.parse(probeBody)).toMatchObject({ ok: true, modelCount: 2 });
+    // The branching fields survive the route: an HTTP status the UI can
+    // switch on and a latency it can sort by, not just the sentence.
+    expect(JSON.parse(probeBody)).toMatchObject({
+      ok: true,
+      modelCount: 2,
+      status: 200,
+    });
+    expect(typeof JSON.parse(probeBody).latencyMs).toBe("number");
 
     expect(probeRequests).toHaveLength(1);
     expect(probeRequests[0]?.url).toBe("/v1/models");
     expect(probeRequests[0]?.headers.authorization).toBe(`Bearer ${secret}`);
+
+    // The failure branch round-trips too: a refused key is still HTTP 200
+    // with ok:false, and carries the 401 the UI branches on.
+    const refusedCreated = await authorized("/api/providers/connections", {
+      method: "POST",
+      body: JSON.stringify({
+        ...OPENAI_DRAFT,
+        id: "probe-refused",
+        baseUrl: `http://127.0.0.1:${address.port}/refused`,
+        apiKey: secret,
+      }),
+    });
+    expect(refusedCreated.status).toBe(201);
+
+    const refusedProbe = await authorized("/api/providers/connections/probe-refused/probe", {
+      method: "POST",
+    });
+    expect(refusedProbe.status).toBe(200);
+    const refusedBody = JSON.parse(await refusedProbe.text());
+    expect(refusedBody.ok).toBe(false);
+    expect(refusedBody.status).toBe(401);
+    expect(typeof refusedBody.latencyMs).toBe("number");
+    expect(refusedBody.failure).toMatch(/rejected the credential/i);
 
     // A provider-side failure is still 200 with ok:false — the probe itself
     // worked; only a missing connection is a 404.

@@ -106,7 +106,7 @@ describe("provider connection store", () => {
     );
 
     expect(storedFiles.join("\n")).not.toContain(secret);
-    expect(await credentials.get({ scope: "provider", id: "openai" })).toBe(secret);
+    expect(await credentials.get({ scope: "provider-connection", id: "openai" })).toBe(secret);
   });
 
   it("derives credential status from the secure store and environment", async () => {
@@ -186,7 +186,49 @@ describe("provider connection store", () => {
 
     expect(await store.get("openai")).toBeUndefined();
     expect(await store.list()).toEqual([]);
-    expect(await credentials.get({ scope: "provider", id: "openai" })).toBeNull();
+    expect(await credentials.get({ scope: "provider-connection", id: "openai" })).toBeNull();
+    expect(credentials.size).toBe(0);
+  });
+
+  it("cannot alias another tenant's credential by naming a connection after it", async () => {
+    // The tenant under "provider": a local BYOK key for the Pi provider id
+    // "openai", exactly what the credential bridge writes. A connection
+    // sharing the id — with a different key — must leave it untouched.
+    const byokSecret = "sk-byok-openai-tenant";
+    await credentials.set({ scope: "provider", id: "openai" }, byokSecret);
+
+    const connectionSecret = "sk-connection-openai-other-key";
+    await store.add(draft("openai", connectionSecret));
+
+    // Both survive, under their own scopes.
+    await expect(
+      credentials.get({ scope: "provider", id: "openai" }),
+    ).resolves.toBe(byokSecret);
+    await expect(
+      credentials.get({ scope: "provider-connection", id: "openai" }),
+    ).resolves.toBe(connectionSecret);
+
+    // The probe's key is the connection's own, not the BYOK tenant's.
+    await expect(store.credentialFor("openai")).resolves.toBe(connectionSecret);
+
+    // Removing the connection removes only the connection's key.
+    await store.remove("openai");
+    await expect(
+      credentials.get({ scope: "provider", id: "openai" }),
+    ).resolves.toBe(byokSecret);
+    await expect(
+      credentials.get({ scope: "provider-connection", id: "openai" }),
+    ).resolves.toBeNull();
+  });
+
+  it("rejects a non-slug id without writing a row or a key", async () => {
+    for (const id of ["OpenAI", "my llm", "-leading", "trailing-", "double--hyphen", ""]) {
+      await expect(store.add(draft(id, "sk-rejected"))).rejects.toThrow(
+        ProviderConfigurationError,
+      );
+    }
+
+    expect(await store.list()).toEqual([]);
     expect(credentials.size).toBe(0);
   });
 
