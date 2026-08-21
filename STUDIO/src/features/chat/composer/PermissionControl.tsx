@@ -64,12 +64,23 @@ export function PermissionControl() {
               // that did not move with them -- 32 against their 28, which set
               // the whole field's height and made the capsule 4px taller than
               // its own tokens said it was.
-              'h-[var(--control-md)] text-muted-foreground transition-colors duration-fast',
-              open ? 'bg-selected' : 'hover:bg-tint',
+              'h-[var(--control-md)] transition-colors duration-fast',
+              // Every mode is now a mark and nothing else -- the three used to
+              // disagree, with `auto` alone also spelling its name, so the
+              // control changed width when you changed mode and the row
+              // reflowed around it.
+              //
+              // The reason `auto` spelled itself is still real: it is the one
+              // mode where sending means the app proceeds without asking, and
+              // a glyph can be glanced past. So the signal stays and only the
+              // text goes -- unattended is the one state that paints itself,
+              // which reads at the edge of vision the way a word never did,
+              // and costs no width.
+              loud ? 'text-foreground' : 'text-muted-foreground',
+              open ? 'bg-selected' : loud ? 'bg-tint hover:bg-selected' : 'hover:bg-tint',
             )}
           >
             <Mark className="shrink-0" />
-            {loud ? <span className="truncate">{mode.name}</span> : null}
           </button>
         </Tooltip>
       }

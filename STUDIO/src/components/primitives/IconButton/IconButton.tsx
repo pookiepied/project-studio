@@ -34,7 +34,7 @@ import { cn } from '@/lib/cn'
  * gesture cannot leave the glyph stuck mid-press.
  */
 
-type Size = 'sm' | 'md' | 'lg'
+type Size = 'sm' | 'md' | 'lg' | 'xl'
 type Tone = 'quiet' | 'solid'
 
 /**
@@ -54,6 +54,7 @@ const SIZE_CLASS: Record<Size, string> = {
   sm: 'size-[var(--control-sm)]',
   md: 'size-[var(--control-md)]',
   lg: 'size-[var(--control-lg)]',
+  xl: 'size-[var(--control-xl)]',
 }
 
 /**

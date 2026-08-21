@@ -59,8 +59,10 @@ export const CONTROL = {
   sm: (DEFAULT_UI_SIZE * 2) / 1,
   /** The default: icon buttons in the chrome, and the composer's row. */
   md: (DEFAULT_UI_SIZE * 7) / 3,
-  /** The largest round control -- voice mode's transport. */
+  /** The largest round control in the chrome. */
   lg: (DEFAULT_UI_SIZE * 8) / 3,
+  /** The stage control: voice mode's transport, and nothing else. */
+  xl: (DEFAULT_UI_SIZE * 11) / 3,
 } as const
 
 /** The 4px spacing grid. Nothing in the app uses a value that is not here. */
@@ -121,8 +123,20 @@ export const SHELL = {
    * disappears. Insetting the track keeps the thumb inside the legible band
    * without taking away any scroll range -- the content still reaches both
    * ends, only the indicator is shorter.
+   *
+   * Two values, because the ends are not symmetrical, and each is the sum of
+   * what is actually painted over the scroller there rather than a number
+   * picked to look about right. A single 44 cleared the strip and then stopped
+   * one pixel inside the gradient beneath it, so the thumb still faded out at
+   * the top -- the bug that outlived several attempts to tune the one number.
+   *
+   *   top     `topStrip.height` (solid) + 20 (the gradient below it)
+   *   bottom  40 (the composer's gradient; the composer itself paints no fill)
+   *
+   * Mirrored by `--scroll-inset-top` / `--scroll-inset-bottom` in `index.css`,
+   * which is what `.studio-scroll-inset` actually reads.
    */
-  scrollbarInset: 44,
+  scrollbarInset: { top: 40 + 20, bottom: 40 },
 } as const
 
 /*
