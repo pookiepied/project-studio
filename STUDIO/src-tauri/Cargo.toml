@@ -21,6 +21,13 @@ log = "0.4"
 tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-window-state = "2"
+# Preferences live in a real JSON file in the OS config directory, not in the
+# webview's localStorage. localStorage is browser cache: it is scoped to the
+# webview's origin, it is wiped by anything that clears site data, and it is
+# invisible to the user -- so a stale value silently outranked the defaults for
+# weeks with no way to see it or reset it. A file can be read, edited, backed
+# up and deleted.
+tauri-plugin-store = "2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # DWM round-corner attribute for the outer window edge.

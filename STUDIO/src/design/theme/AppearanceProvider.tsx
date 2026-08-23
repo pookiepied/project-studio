@@ -1,9 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAppearance,
-  readAppearance,
+  forgetAppearance,
+  isDefaultAppearance,
   resolveTheme,
-  writeAppearance,
+  saveAppearance,
+  DEFAULT_APPEARANCE,
   type Appearance,
   type ResolvedTheme,
 } from '@/design/theme/appearance'
@@ -11,7 +13,11 @@ import {
 interface AppearanceContextValue {
   readonly appearance: Appearance
   readonly resolvedTheme: ResolvedTheme
+  /** True when nothing here differs from what the app ships with. */
+  readonly isDefault: boolean
   update: (change: Partial<Appearance>) => void
+  /** Forget every stored preference and return to the shipped defaults. */
+  reset: () => void
 }
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null)
@@ -20,15 +26,48 @@ const AppearanceContext = createContext<AppearanceContextValue | null>(null)
  * Owns every appearance decision: theme, text sizes, cursor, persistence, and
  * the class and variables on <html> that the whole token system reads.
  */
-export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const [appearance, setAppearance] = useState<Appearance>(readAppearance)
+export function AppearanceProvider({
+  initial,
+  children,
+}: {
+  /**
+   * Read from the store before React mounts -- see `main.tsx`.
+   *
+   * Passed in rather than loaded here because the store is a file and reading
+   * it is asynchronous, and a provider that starts at the defaults and
+   * corrects itself an effect later would paint one frame at the wrong size
+   * and theme. The window is hidden until `app_ready`, so the read costs
+   * nothing visible; a flash would have cost the whole startup.
+   */
+  initial: Appearance
+  children: ReactNode
+}) {
+  const [appearance, setAppearance] = useState<Appearance>(initial)
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(appearance.theme),
   )
+  // The first run would rewrite the file with exactly what was just read out
+  // of it, which turns "never chosen anything" into a stored opinion and
+  // quietly defeats the reset.
+  const hydrated = useRef(false)
 
   useEffect(() => {
     setResolvedTheme(applyAppearance(appearance))
-    writeAppearance(appearance)
+    if (hydrated.current) {
+      // Only a *deviation* is stored. Matching the defaults deletes the entry
+      // rather than writing the defaults into it, and the difference is the
+      // whole point: an absent value means "no opinion", so a future change to
+      // what Studio ships with reaches everyone who never expressed one.
+      // Writing the defaults in would freeze today's numbers into every
+      // install that ever opened this pane.
+      //
+      // This is also what makes Reset actually reset. It used to delete the
+      // stored value and then this effect immediately wrote it straight back
+      // -- the live state returned to the defaults, the file did not, and the
+      // reset was undone one tick after it ran.
+      void (isDefaultAppearance(appearance) ? forgetAppearance() : saveAppearance(appearance))
+    }
+    hydrated.current = true
 
     if (appearance.theme !== 'system') return
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -41,7 +80,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     () => ({
       appearance,
       resolvedTheme,
+      isDefault: isDefaultAppearance(appearance),
       update: (change) => setAppearance((current) => ({ ...current, ...change })),
+      // Returning the live state to the defaults is enough: the effect above
+      // sees an appearance that matches them and clears the stored entry.
+      reset: () => setAppearance(DEFAULT_APPEARANCE),
     }),
     [appearance, resolvedTheme],
   )

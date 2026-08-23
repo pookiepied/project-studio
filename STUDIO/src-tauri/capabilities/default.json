@@ -2,8 +2,10 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
+  "//": "A detached conversation is built as `conversation-<id>` (see `open_conversation_window` in lib.rs). Listing only `main` here granted it no window permissions at all, so its traffic lights did nothing and its title bar could not drag the window -- the frontend called `startDragging`, `minimize` and `close`, and Tauri rejected every one because the capability did not cover that label. Decorations are off on both kinds of window, so the app *is* the title bar; without these the second window had no way to be moved, resized or closed.",
   "windows": [
-    "main"
+    "main",
+    "conversation-*"
   ],
   "permissions": [
     "core:default",
@@ -14,6 +16,12 @@
     "core:window:allow-set-size",
     "core:window:allow-center",
     "core:window:allow-start-dragging",
-    "window-state:default"
-  ]
+    "window-state:default",
+    "store:allow-load",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-delete",
+    "store:allow-save"
+  ],
+  "//store": "FE-02. This was `store:default`, which the generated ACL manifest expands to all fourteen store operations (load, get-store, set, get, has, delete, clear, reset, keys, values, entries, length, reload, save) on any file the webview names. The appearance feature calls exactly five of them against exactly one file: `load` opens `preferences.json`, then `get`, `set`, `delete`, `save` (src/design/theme/appearance.ts:58, 76, 83/97, 119, 84/98/120). Those five are what is granted now. A path scope was wanted here too and is not available: tauri-plugin-store 2.4.4 declares `global_scope_schema: null` in gen/schemas/acl-manifests.json, so the plugin defines no scope vocabulary and there is nothing to pin `preferences.json` with. The file therefore remains reachable by name only, and the standing rule stands on its own: this store is plaintext JSON in the app config dir and no credential ever enters it."
 }

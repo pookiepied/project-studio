@@ -92,6 +92,7 @@ pub fn run() {
     // and on a second monitor that is the difference between usable and not.
     // `resetWindowSize` in the frontend is the way back to the default.
     .plugin(tauri_plugin_window_state::Builder::default().build())
+    .plugin(tauri_plugin_store::Builder::default().build())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

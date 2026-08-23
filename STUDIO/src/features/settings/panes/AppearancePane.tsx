@@ -21,7 +21,7 @@ import type { CodeOffset, UiSize } from '@/design/tokens'
  * a settings row.
  */
 export function AppearancePane() {
-  const { appearance, update } = useAppearance()
+  const { appearance, update, isDefault, reset } = useAppearance()
 
   return (
     <Pane
@@ -93,6 +93,25 @@ export function AppearancePane() {
       >
         <Button variant="secondary" size="sm" onClick={() => void resetWindowSize()}>
           Reset to default size
+        </Button>
+      </Row>
+
+      {/* Says which of the two states you are in, and gets you out of one of
+          them. Worth a row of its own because the alternative was unknowable:
+          preferences persist, a stored value always outranks the default, and
+          nothing on this screen distinguished "this is what Studio ships with"
+          from "this is something you picked once months ago". A size chosen
+          during one experiment sat there for weeks doing exactly that. */}
+      <Row
+        label="Defaults"
+        hint={
+          isDefault
+            ? 'Everything here is what Studio ships with.'
+            : 'Some of these differ from what Studio ships with.'
+        }
+      >
+        <Button variant="secondary" size="sm" disabled={isDefault} onClick={reset}>
+          {isDefault ? 'Using defaults' : 'Reset to defaults'}
         </Button>
       </Row>
     </Pane>

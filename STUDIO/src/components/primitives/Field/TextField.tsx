@@ -25,14 +25,49 @@ export const TextField = forwardRef<
     onChange: (value: string) => void
     placeholder?: string
     autoFocus?: boolean
+    /**
+     * `password` masks the value and is the only other type this field takes.
+     *
+     * There is no `email`, `number` or `url` here on purpose: those types
+     * bring browser validation bubbles and spinner affordances that this
+     * design system has no drawing for, and a field that renders a native
+     * error balloon over a modal is a UI nobody designed. Masking is
+     * different -- it is a security property of the input, not a validation
+     * behaviour, and the app now has one place that needs it (an API key on
+     * its way to the harness credential store).
+     */
+    type?: 'text' | 'password'
+    /**
+     * Defaults to `off`. A password manager offering to save a harness API key
+     * into a browser vault is the exact opposite of what that key's handling
+     * is for -- it is submitted once and forgotten, never read back.
+     */
+    autoComplete?: string
+    ariaLabel?: string
     onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void
     className?: string
   }
->(function TextField({ value, onChange, placeholder, autoFocus, onKeyDown, className }, ref) {
+>(function TextField(
+  {
+    value,
+    onChange,
+    placeholder,
+    autoFocus,
+    type = 'text',
+    autoComplete = 'off',
+    ariaLabel,
+    onKeyDown,
+    className,
+  },
+  ref,
+) {
   return (
     <input
       ref={ref}
       value={value}
+      type={type}
+      autoComplete={autoComplete}
+      aria-label={ariaLabel}
       autoFocus={autoFocus}
       placeholder={placeholder}
       onChange={(event) => onChange(event.target.value)}

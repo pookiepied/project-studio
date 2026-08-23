@@ -35,7 +35,28 @@ import { cn } from '@/lib/cn'
  * there is no brand to show.
  */
 
-export type ProviderId = 'anthropic' | 'openai' | 'google' | 'meta' | 'deepseek' | 'mistral' | 'custom'
+/**
+ * The vendors this app has a mark for.
+ *
+ * Closed, and it stays closed -- it is a list of drawings we possess, not a
+ * list of providers that may exist. The offline catalog in `domain/models`
+ * types its rows against this because that catalog *is* these six; a harness
+ * connection does not, because a user can point one at any vendor in the
+ * world and most of them are not here. See `markFor` for how that gap is
+ * closed at the boundary, and audit finding FE-05 for why it was a bug that
+ * the two ever shared one type.
+ */
+const PROVIDER_IDS = [
+  'anthropic',
+  'openai',
+  'google',
+  'meta',
+  'deepseek',
+  'mistral',
+  'custom',
+] as const
+
+export type ProviderId = (typeof PROVIDER_IDS)[number]
 
 /**
  * A brand path, or `null` for the marks we draw ourselves.
@@ -60,7 +81,7 @@ const BRAND: Record<ProviderId, string | null> = {
  * Stroked rather than filled, on the same 24-unit grid as the brand paths, so
  * they sit at a similar optical weight beside them.
  */
-const DRAWN: Record<'openai' | 'custom', React.ReactNode> = {
+const DRAWN: Partial<Record<ProviderId, React.ReactNode>> = {
   // A ring with a gap -- a node in a loop. Deliberately not the OpenAI knot.
   openai: (
     <path
@@ -80,25 +101,55 @@ const DRAWN: Record<'openai' | 'custom', React.ReactNode> = {
   ),
 }
 
+/**
+ * A vendor name to the mark that stands for it.
+ *
+ * The prop is a `string` rather than `ProviderId` because the value that
+ * arrives here for a harness connection is `catalogProvider` -- the vendor a
+ * connection draws its models from -- and that field is open by contract: it
+ * is whatever the built-in catalog calls the vendor, or absent entirely for a
+ * self-hosted endpoint the catalog has never heard of. A closed union could
+ * not name "together-ai" or "a box in the next room", so the component would
+ * have had to be lied to at every call site.
+ *
+ * Note what must NOT be passed: a connection's `id`. That is the user's own
+ * name for one account -- "work-openai", "spare-key" -- and the harness keeps
+ * it deliberately separate from the vendor for exactly this reason.
+ *
+ * Anything unrecognised, including the empty string, resolves to `custom`.
+ * A missing drawing is not an error worth a crash on a settings page.
+ */
+function markFor(provider: string): ProviderId {
+  for (const id of PROVIDER_IDS) if (id === provider) return id
+  return 'custom'
+}
+
 export function ProviderMark({
   provider,
   size = 'text',
   className,
 }: {
-  provider: ProviderId
+  /** A vendor name -- `catalogProvider`, or a catalog row's id. Not a connection id. */
+  provider: string
   size?: IconSize
   className?: string
 }) {
   // Sized from its text like every other mark, so a provider badge beside a
   // model name matches that name rather than a step chosen at the call site.
   const box = size === 'text' ? '1.1em' : ICON_STEP[size]
-  const brand = BRAND[provider]
+  const id = markFor(provider)
+  const brand = BRAND[id]
 
   return (
     <svg
       style={{ width: box, height: box }}
       viewBox="0 0 24 24"
       aria-hidden
+      // The mark is decorative, so it carries no accessible name and the row
+      // beside it does the naming. This says which drawing was resolved, which
+      // is the one thing an inspector or a test cannot otherwise recover from
+      // a path element.
+      data-provider={id}
       shapeRendering="geometricPrecision"
       className={cn('studio-icon shrink-0', className)}
     >
@@ -108,7 +159,10 @@ export function ProviderMark({
         // outlined marks, which is why `stroke` is explicitly none.
         <path d={brand} fill="currentColor" stroke="none" />
       ) : (
-        DRAWN[provider as 'openai' | 'custom']
+        // A null brand means one of the two we draw ourselves. The fallback is
+        // belt and braces rather than a real branch: `markFor` cannot return an
+        // id that is neither in BRAND nor in DRAWN.
+        (DRAWN[id] ?? DRAWN.custom)
       )}
     </svg>
   )
