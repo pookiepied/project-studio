@@ -299,7 +299,7 @@ mod tests {
     /// it. Same constraint as `harness/integration.rs`.
     #[tokio::test]
     async fn service_fetch_answers_through_the_credential_rust_holds() {
-        let _serial = ONE_HARNESS_AT_A_TIME.lock().unwrap();
+        let _serial = ONE_HARNESS_AT_A_TIME.lock().await;
         let supervisor = HarnessSupervisor::new();
         let endpoint = match supervisor.start() {
             Ok(endpoint) => endpoint,
@@ -339,7 +339,7 @@ mod tests {
     /// failure -- scrubs in `request_failure` and is tested above.
     #[tokio::test]
     async fn no_error_a_live_harness_produces_contains_its_token() {
-        let _serial = ONE_HARNESS_AT_A_TIME.lock().unwrap();
+        let _serial = ONE_HARNESS_AT_A_TIME.lock().await;
         let supervisor = HarnessSupervisor::new();
         let endpoint = match supervisor.start() {
             Ok(endpoint) => endpoint,

@@ -336,8 +336,8 @@ impl HarnessSupervisor {
     pub fn start(&self) -> Result<HarnessEndpoint, String> {
         let mut guard = self.inner.lock().unwrap();
         Self::reap_dead_locked(&mut guard);
-        if guard.running.is_some() {
-            return Ok(guard.running.as_ref().unwrap().endpoint.clone());
+        if let Some(running) = &guard.running {
+            return Ok(running.endpoint.clone());
         }
         // Kept, not just returned. `run()` starts the Harness on a background
         // thread before any window exists, so the caller that sees this error

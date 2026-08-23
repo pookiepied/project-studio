@@ -206,7 +206,7 @@ mod tests {
         // here alone produces a Harness that starts, never reads a credential,
         // and rejects every request as unadmitted.
         let mut cmd = Command::new("node");
-        let channel = BootstrapChannel::attach(&mut cmd).expect("attach");
+        let _channel = BootstrapChannel::attach(&mut cmd).expect("attach");
 
         let names: Vec<String> = cmd
             .get_envs()
@@ -216,8 +216,6 @@ mod tests {
         assert!(names
             .iter()
             .any(|n| n == "PROJECT_STUDIO_ADMISSION_BOOTSTRAP_FD"));
-
-        drop(channel);
     }
 
     #[test]
@@ -225,7 +223,7 @@ mod tests {
         // The whole reason the channel exists. If the credential could be
         // passed as an environment variable there would be no pipe here at all.
         let mut cmd = Command::new("node");
-        let channel = BootstrapChannel::attach(&mut cmd).expect("attach");
+        let _channel = BootstrapChannel::attach(&mut cmd).expect("attach");
 
         for (name, value) in cmd.get_envs() {
             let name = name.to_string_lossy().into_owned();
@@ -237,8 +235,6 @@ mod tests {
                 );
             }
         }
-
-        drop(channel);
     }
 
     #[test]

@@ -47,9 +47,10 @@ rand = "0.8"
 os_pipe = "1.2"
 
 [dev-dependencies]
-# The service-seam tests drive async code (`#[tokio::test]`). tauri already
-# compiles tokio, so this adds the attribute and nothing else.
-tokio = { version = "1", features = ["rt", "macros"] }
+# The service-seam tests drive async code (`#[tokio::test]`) and share a
+# tokio Mutex with the sync integration test. tauri already compiles tokio,
+# so this adds the attribute and the sync primitive, nothing else.
+tokio = { version = "1", features = ["rt", "macros", "sync"] }
 
 # POSIX-only, and previously declared as if they were not -- which is why the
 # Host crate had never compiled on Windows (meta-task #87). `command-fds` maps

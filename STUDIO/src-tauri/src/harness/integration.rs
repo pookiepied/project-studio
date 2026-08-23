@@ -85,7 +85,10 @@ fn get(endpoint: &HarnessEndpoint, path: &str, bearer: Option<&str>) -> (u16, St
 
 #[test]
 fn a_real_harness_starts_publishes_a_loopback_endpoint_and_answers_an_admitted_request() {
-    let _serial = ONE_HARNESS_AT_A_TIME.lock().unwrap();
+    // `blocking_lock` rather than `.lock().await` because this test is sync;
+    // it owns no runtime, so parking this thread until the async tests let go
+    // is exactly the wait wanted here.
+    let _serial = ONE_HARNESS_AT_A_TIME.blocking_lock();
     let supervisor = HarnessSupervisor::new();
     let endpoint = match supervisor.start() {
         Ok(endpoint) => endpoint,
