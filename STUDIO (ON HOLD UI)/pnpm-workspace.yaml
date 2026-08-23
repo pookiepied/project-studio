@@ -1,8 +1,0 @@
-packages:
-  - .
-
-# No patched dependencies. The `@flue/sdk` idempotency patch that used to live
-# here was removed under meta-task #12, along with its twin in the Harness. It
-# was the less safe of the two: its `index` lines read `0000000..0000000`, so
-# `git apply` matched on surrounding context alone and a version bump whose
-# context still lined up would have applied silently instead of failing loudly.
