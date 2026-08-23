@@ -6,12 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 /**
  * Which way a harness request goes out, and when that is decided.
  *
- * The plugin itself is not under test -- it is not ours, and it cannot run
- * outside a webview anyway. It is replaced with a spy so the only thing these
- * assertions can be about is the dispatch: did we pick the right destination,
- * and did we pick it late enough.
+ * The command itself is not under test -- it is ours but it lives in Rust,
+ * with its own tests there (`src-tauri/src/services.rs`). The invoke is
+ * replaced with a spy so the only thing these assertions can be about is the
+ * dispatch: did we pick the right destination, did we send it a path and a
+ * service id rather than a URL, and did we pick late enough.
  *
- * "Late enough" is the point of the file. A module-scope
+ * "Late enough" is the point of the per-call tests. A module-scope
  * `const transport = isTauri() ? a : b` would evaluate once, at import, and
  * `window.__TAURI_INTERNALS__` is injected by the webview on its own schedule
  * -- so the wrong answer would be cached forever. The harness shipped this
@@ -19,14 +20,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
  * call. These tests are what stop it coming back.
  */
 
-// Typed with the parameters it actually receives, so the spy's assertions are
-// about the same call shape the real plugin would see.
-const pluginFetch = vi.fn(
-  async (_input: URL | Request | string, _init?: RequestInit) =>
-    new Response('from the plugin'),
-)
+/** The payload shape the command receives, so the spy's assertions are typed. */
+interface ServiceFetchArgs {
+  service: string
+  path: string
+  init: {
+    method?: string
+    headers: ReadonlyArray<readonly [string, string]>
+    body?: string
+  }
+}
 
-vi.mock('@tauri-apps/plugin-http', () => ({ fetch: pluginFetch }))
+const invoke = vi.fn(async (_command: string, _args: ServiceFetchArgs): Promise<unknown> => undefined)
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke }))
 
 const { harnessTransport } = await import('./transport')
 
@@ -46,7 +53,7 @@ function leaveTauri() {
 afterEach(() => {
   leaveTauri()
   vi.unstubAllGlobals()
-  pluginFetch.mockClear()
+  invoke.mockReset()
 })
 
 describe('outside Tauri', () => {
@@ -58,7 +65,7 @@ describe('outside Tauri', () => {
 
     expect(await response.text()).toBe('from the global')
     expect(global).toHaveBeenCalledTimes(1)
-    expect(pluginFetch).not.toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalled()
   })
 
   it('passes the request and its init through untouched', async () => {
@@ -83,16 +90,88 @@ describe('outside Tauri', () => {
 })
 
 describe('inside Tauri', () => {
-  it('goes through the plugin instead', async () => {
+  it('goes through the service seam instead, sending a path and a service id', async () => {
     const global = vi.fn(async () => new Response('from the global'))
     vi.stubGlobal('fetch', global)
     enterTauri()
+    invoke.mockResolvedValueOnce({
+      status: 200,
+      headers: [['content-type', 'application/json']],
+      body: '[]',
+    })
 
-    const response = await harnessTransport('http://127.0.0.1:4319/api/providers/models')
+    const response = await harnessTransport(
+      'http://127.0.0.1:4319/api/providers/models?kind=anthropic',
+      { method: 'GET', headers: { Authorization: 'Bearer host-attached' } },
+    )
 
-    expect(await response.text()).toBe('from the plugin')
-    expect(pluginFetch).toHaveBeenCalledTimes(1)
+    expect(await response.text()).toBe('[]')
+    expect(response.status).toBe(200)
     expect(global).not.toHaveBeenCalled()
+    expect(invoke).toHaveBeenCalledTimes(1)
+
+    const [command, payload] = invoke.mock.calls[0]
+    expect(command).toBe('service_fetch')
+    expect(payload.service).toBe('harness')
+    // A path, query included -- not the URL. Rust re-addresses it.
+    expect(payload.path).toBe('/api/providers/models?kind=anthropic')
+    expect(payload.init.method).toBe('GET')
+    // Lowercased by the Headers normalisation; replaced by Rust before it
+    // reaches the harness either way.
+    expect(payload.init.headers).toEqual([['authorization', 'Bearer host-attached']])
+    expect(payload.init.body).toBeUndefined()
+  })
+
+  it('rebuilds a 204 without a body, which the Response constructor refuses to take', async () => {
+    enterTauri()
+    invoke.mockResolvedValueOnce({ status: 204, headers: [], body: '' })
+
+    const response = await harnessTransport(
+      'http://127.0.0.1:4319/api/providers/connections/abc',
+      { method: 'DELETE' },
+    )
+
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+  })
+
+  it('surfaces a not-running service as a distinguishable error', async () => {
+    enterTauri()
+    invoke.mockRejectedValueOnce({ kind: 'not-running' })
+
+    const request = harnessTransport('http://127.0.0.1:4319/api/providers/connections')
+
+    await expect(request).rejects.toMatchObject({
+      name: 'ServiceFetchError',
+      kind: 'not-running',
+      message: 'The harness is not running.',
+    })
+  })
+
+  it('refuses without dispatching when the signal is already aborted', async () => {
+    enterTauri()
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      harnessTransport('http://127.0.0.1:4319/api/providers/connections', {
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('stops waiting when the caller aborts mid-flight, the way fetch does', async () => {
+    enterTauri()
+    invoke.mockImplementationOnce(() => new Promise(() => {}))
+    const controller = new AbortController()
+
+    const request = harnessTransport('http://127.0.0.1:4319/api/providers/connections', {
+      signal: controller.signal,
+    })
+    controller.abort()
+
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
 
@@ -106,12 +185,13 @@ describe('the choice is made per call', () => {
 
     await harnessTransport('http://127.0.0.1:4319/first')
     expect(global).toHaveBeenCalledTimes(1)
-    expect(pluginFetch).not.toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalled()
 
     enterTauri()
+    invoke.mockResolvedValueOnce({ status: 200, headers: [], body: 'ok' })
     await harnessTransport('http://127.0.0.1:4319/second')
 
-    expect(pluginFetch).toHaveBeenCalledTimes(1)
+    expect(invoke).toHaveBeenCalledTimes(1)
     expect(global).toHaveBeenCalledTimes(1)
   })
 

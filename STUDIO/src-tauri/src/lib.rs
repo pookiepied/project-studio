@@ -1,6 +1,9 @@
+mod harness;
+mod services;
 mod window;
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
+use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 /// The frontend invokes this once it has mounted and painted. Windows start
 /// hidden (`visible: false` in tauri.conf.json, and explicitly for detached
@@ -84,19 +87,88 @@ fn urlencoding(value: &str) -> String {
     .collect()
 }
 
+/// Start the Harness if it is not already up, and hand back where it is.
+///
+/// The view, not the endpoint: the bearer stays in Rust, spent only by
+/// `service_fetch`. Nothing returns it any more.
+///
+/// The supervisor is managed directly rather than behind a `Mutex`. It is
+/// already `Clone` over an `Arc<Mutex<Inner>>` and every method takes `&self`,
+/// so an outer lock guarded nothing the inner one did not -- it only added
+/// three `lock().map_err(...)` calls and a poisoning case that could never be
+/// reached through them.
+#[tauri::command]
+fn get_harness_endpoint(
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+) -> Result<HarnessEndpointView, String> {
+  supervisor.start().map(HarnessEndpointView::from)
+}
+
+#[tauri::command]
+fn restart_harness(
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+) -> Result<HarnessEndpointView, String> {
+  supervisor.restart().map(HarnessEndpointView::from)
+}
+
+/// What the Harness is doing, including a start that already failed.
+///
+/// This returns a status rather than an `Option<HarnessEndpoint>` because the
+/// eager start in `run()` happens on a background thread before any window
+/// exists: a failure there had no caller to return to and ended in
+/// `log::error!`. `HarnessStatus` distinguishes "failed, and here is why" from
+/// "nothing has started yet", which is the difference between something the UI
+/// can render and a line in a log file.
+#[tauri::command]
+fn get_harness_status(
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+) -> Result<HarnessStatus, String> {
+  Ok(supervisor.status())
+}
+
+/// One seam for side systems: the webview names a service and a path, and
+/// Rust decides everything else -- above all the credential, which the
+/// supervisor holds and this attaches. See `services.rs` for why that is an
+/// enum with one arm and not a registry.
+#[tauri::command]
+async fn service_fetch(
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+  service: services::ServiceId,
+  path: String,
+  init: services::ServiceRequestInit,
+) -> Result<services::SerializedResponse, services::ServiceError> {
+  services::service_fetch(&supervisor, service, path, init).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  let supervisor = HarnessSupervisor::new();
+
+  // Eager, and off Tauri's setup thread, so the Harness is starting while the
+  // window is still being built rather than after the first request for it.
+  // A failure here is not fatal and is no longer only logged: the supervisor
+  // keeps it, and `get_harness_status` reports it once a webview exists to ask.
+  let eager_supervisor = supervisor.clone();
+  std::thread::spawn(move || {
+    match eager_supervisor.start() {
+      Ok(ep) => log::info!(
+        "Harness supervisor: eager start ok pid={} {}:{}",
+        ep.pid,
+        ep.host,
+        ep.port
+      ),
+      Err(e) => log::error!("Harness supervisor: eager start failed: {e}"),
+    }
+  });
+
   tauri::Builder::default()
+    .manage(supervisor)
     // Remembers size and position across launches. A desktop app that reopens
     // at a fixed size every time is one the user has to re-arrange every time,
     // and on a second monitor that is the difference between usable and not.
     // `resetWindowSize` in the frontend is the way back to the default.
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_store::Builder::default().build())
-    // Outbound HTTP for the frontend's harness client, issued from Rust so it
-    // carries no webview origin and triggers no CORS preflight. What it may
-    // reach is fixed in the capability, not here.
-    .plugin(tauri_plugin_http::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -110,7 +182,37 @@ pub fn run() {
       }
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![app_ready, open_conversation_window])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    // Closing the main window ends the app, and the Harness is a child process
+    // that would otherwise be left holding its port. Both events are handled:
+    // `Destroyed` fires as the window goes, `ExitRequested`/`Exit` as the run
+    // loop unwinds, and `shutdown_all` is idempotent, so whichever arrives
+    // first does the work.
+    //
+    // Only `main`. Detached conversation windows are destroyed whenever the
+    // user closes one, and they share this Harness -- reacting to their label
+    // would kill it out from under the window the user is still working in.
+    .on_window_event(|window, event| {
+      if matches!(event, WindowEvent::Destroyed) && window.label() == "main" {
+        if let Some(sup) = window.try_state::<HarnessSupervisor>() {
+          sup.shutdown_all();
+        }
+      }
+    })
+    .invoke_handler(tauri::generate_handler![
+      app_ready,
+      open_conversation_window,
+      get_harness_endpoint,
+      restart_harness,
+      get_harness_status,
+      service_fetch
+    ])
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(move |app_handle, event| {
+      if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
+        if let Some(sup) = app_handle.try_state::<HarnessSupervisor>() {
+          sup.shutdown_all();
+        }
+      }
+    });
 }

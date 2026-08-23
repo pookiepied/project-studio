@@ -17,6 +17,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
@@ -28,16 +30,41 @@ tauri-plugin-window-state = "2"
 # weeks with no way to see it or reset it. A file can be read, edited, backed
 # up and deleted.
 tauri-plugin-store = "2"
-# Harness traffic goes through Rust rather than the webview's own fetch. The
-# harness serves no CORS headers -- deliberately, since a loopback service
-# holding provider credentials should not be reachable by any origin a browser
-# is willing to preflight -- and the webview's origin is `http://tauri.localhost`,
-# which is cross-origin to a loopback port. Every browser fetch therefore died
-# at the preflight. A request issued from Rust has no origin and no preflight,
-# so the question stops existing. The capability scopes it to loopback only;
-# see `capabilities/default.json`.
-tauri-plugin-http = "2"
+
+# The HTTP client behind `service_fetch` (`services.rs`): harness traffic
+# issued from Rust, carrying the bearer the supervisor minted. Plain HTTP to
+# one loopback address, so no TLS backend is linked in -- a scheme this client
+# cannot speak is one more place it cannot be steered into -- and no redirects
+# are followed, so the credential cannot arrive anywhere but the origin the
+# supervisor resolved.
+#
+# Replaces `tauri-plugin-http`: with the transport in a command, the webview
+# no longer names URLs, so there was nothing left for the plugin to grant.
+reqwest = { version = "0.12", default-features = false }
+
+base64 = "0.22"
+rand = "0.8"
+os_pipe = "1.2"
+
+[dev-dependencies]
+# The service-seam tests drive async code (`#[tokio::test]`). tauri already
+# compiles tokio, so this adds the attribute and nothing else.
+tokio = { version = "1", features = ["rt", "macros"] }
+
+# POSIX-only, and previously declared as if they were not -- which is why the
+# Host crate had never compiled on Windows (meta-task #87). `command-fds` maps
+# descriptors with `dup2` inside a `pre_exec` hook and fails inside its own
+# source on a Windows target, before anything of ours is reached; `nix` is a
+# libc binding by definition. Both are reachable only from `#[cfg(unix)]` code,
+# so the declaration was the whole bug.
+[target.'cfg(unix)'.dependencies]
+command-fds = "0.2"
+nix = { version = "0.27", features = ["process", "signal"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-# DWM round-corner attribute for the outer window edge.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+# `Win32_Graphics_Dwm` is the round-corner attribute for the outer window edge.
+# `Win32_System_JobObjects` is the Windows counterpart to `process_group(0)`:
+# the Harness and every process it starts are assigned to one Job Object with
+# `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so an MCP child cannot outlive the Host
+# holding a port or a file lock (meta-task #89).
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_JobObjects"] }
