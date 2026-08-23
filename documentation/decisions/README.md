@@ -44,6 +44,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0008](0008-harness-owned-sign-in.md) | Harness-owned sign-in |
 | [0028](0028-harness-client-admission-and-local-access.md) | Harness client admission and local access |
 | [0030](0030-local-execution-identity-and-deferred-multi-user.md) | Local execution identity; multi-user deferred |
+| [0044](0044-the-host-supervises-and-holds-the-credential.md) | The Host supervises, and holds the credential — why the webview never sees a bearer, and why a named seam is not a service registry |
 
 ### Permissions, trust, and containment
 | | |

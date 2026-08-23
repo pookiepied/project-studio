@@ -5,6 +5,10 @@
 the same boundary, the other direction. 0039 says what the Harness may
 *inherit*; this says how it is *handed* the one thing it must never inherit.
 
+**Followed by:** [ADR 0044](0044-the-host-supervises-and-holds-the-credential.md)
+— the Host side of this channel, and the Job Object that closes meta-task
+#89.
+
 ## Context
 
 The desktop Host gives the Harness its per-launch admission credential over a
