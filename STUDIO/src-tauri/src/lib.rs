@@ -93,6 +93,10 @@ pub fn run() {
     // `resetWindowSize` in the frontend is the way back to the default.
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_store::Builder::default().build())
+    // Outbound HTTP for the frontend's harness client, issued from Rust so it
+    // carries no webview origin and triggers no CORS preflight. What it may
+    // reach is fixed in the capability, not here.
+    .plugin(tauri_plugin_http::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

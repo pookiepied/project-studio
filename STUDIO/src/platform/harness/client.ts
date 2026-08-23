@@ -38,6 +38,7 @@ import {
   type ProviderKind,
   type ProviderModel,
 } from './contracts'
+import { harnessTransport } from './transport'
 
 /**
  * Long enough that the slowest honest answer still arrives.
@@ -191,7 +192,15 @@ async function failureFor(response: Response): Promise<HarnessFailure> {
 
 export function createHarnessClient(options: HarnessClientOptions): HarnessClient {
   const { baseUrl, credential } = options
-  const send = options.fetch ?? globalThis.fetch.bind(globalThis)
+  // The default goes through Rust, not the webview. The harness serves no CORS
+  // headers and the webview's origin is cross-origin to a loopback port, so a
+  // browser fetch never gets past the preflight; a request issued from Rust has
+  // no origin to preflight. `transport.ts` says why at length, and the
+  // capability -- not this module -- is what limits where it may go.
+  //
+  // Still just a `typeof globalThis.fetch`, so the injection seam above is
+  // unchanged and every test that supplies its own transport is unaffected.
+  const send = options.fetch ?? harnessTransport
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   /**

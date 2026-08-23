@@ -28,6 +28,15 @@ tauri-plugin-window-state = "2"
 # weeks with no way to see it or reset it. A file can be read, edited, backed
 # up and deleted.
 tauri-plugin-store = "2"
+# Harness traffic goes through Rust rather than the webview's own fetch. The
+# harness serves no CORS headers -- deliberately, since a loopback service
+# holding provider credentials should not be reachable by any origin a browser
+# is willing to preflight -- and the webview's origin is `http://tauri.localhost`,
+# which is cross-origin to a loopback port. Every browser fetch therefore died
+# at the preflight. A request issued from Rust has no origin and no preflight,
+# so the question stops existing. The capability scopes it to loopback only;
+# see `capabilities/default.json`.
+tauri-plugin-http = "2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # DWM round-corner attribute for the outer window edge.

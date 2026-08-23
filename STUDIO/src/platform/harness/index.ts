@@ -4,7 +4,8 @@
  * `contracts` is the hand-maintained mirror of the harness wire types and the
  * parsers that refuse anything else. `client` is the only module in STUDIO
  * that speaks HTTP. `connection` is the only module that decides where the
- * harness is. Import from here, not from the files.
+ * harness is. `transport` is the only module that decides how a request
+ * leaves the process. Import from here, not from the files.
  */
 
 export {
@@ -19,6 +20,8 @@ export {
 } from './client'
 
 export { resolveHarnessAddress } from './connection'
+
+export { harnessTransport } from './transport'
 
 export {
   CAPABILITY_SLOTS,
