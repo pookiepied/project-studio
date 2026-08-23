@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { AppearanceProvider } from '@/design/theme'
+import { AppearanceProvider, type Appearance } from '@/design/theme'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
 import { detachedConversationId, signalAppReady, suppressWebviewChrome } from '@/platform/tauri'
 import { AppShell } from '@/shell/AppShell'
@@ -22,7 +22,7 @@ import { WorkspaceProvider } from '@/stores/workspace'
  * reaches navigation. A slimmer stack would work until the first artifact
  * opened, then throw.
  */
-export default function App() {
+export default function App({ initialAppearance }: { initialAppearance: Appearance }) {
   // Read once and never stored: the URL is fixed for the life of a window, so
   // this is a fact about which window this is, not state.
   const detached = detachedConversationId()
@@ -47,7 +47,7 @@ export default function App() {
       branch on the preference inside a component -- one switch, here.
     */
     <MotionConfig reducedMotion="user">
-      <AppearanceProvider>
+      <AppearanceProvider initial={initialAppearance}>
         <WorkspaceProvider>
         <RailProvider>
           <NavigationProvider>

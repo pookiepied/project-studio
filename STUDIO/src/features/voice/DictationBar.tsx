@@ -35,7 +35,18 @@ import { cn } from '@/lib/cn'
  * frame.
  */
 
-const BAR_COUNT = 22
+/**
+ * Enough bars to fill the field at its widest, not enough to be counted.
+ *
+ * It was 22, which drew a ~107px strip and left the rest of the composer
+ * empty -- the dictation state used a third of the field and the remaining
+ * two thirds were blank, which is what made it read as unfinished rather than
+ * as the field doing something. The row is anchored right and clips on the
+ * left, so this is a ceiling rather than an exact fit: the history always
+ * reaches both edges whatever width the composer happens to be, with the
+ * sidebar open or shut.
+ */
+const BAR_COUNT = 64
 /** The sliver that stays visible in silence: a resting row, not an empty one. */
 const BAR_MIN = 0.1
 
@@ -58,14 +69,22 @@ function LevelBars({ onFrame }: { onFrame: (listener: MicFrameListener) => () =>
   }, [onFrame])
 
   return (
-    <span aria-hidden className="flex h-5 items-center gap-[3px]">
+    // `justify-end` plus `overflow-hidden` is what makes one fixed bar count
+    // fit every field width: the newest sample is pinned to the right edge and
+    // anything that does not fit falls off the left, which is also the correct
+    // reading of the data -- this is the last two seconds, scrolling.
+    <span
+      aria-hidden
+      className="flex min-w-0 flex-1 items-center justify-end gap-[3px] overflow-hidden"
+      style={{ height: 'calc(var(--text-ui) * var(--leading-ui))' }}
+    >
       {Array.from({ length: BAR_COUNT }, (_, i) => (
         <span
           key={i}
           ref={(element) => {
             bars.current[i] = element
           }}
-          className="h-full w-[2px] origin-center rounded-full bg-foreground/65"
+          className="h-full w-[2px] shrink-0 origin-center rounded-full bg-foreground/65"
           style={{ transform: `scaleY(${BAR_MIN})`, willChange: 'transform' }}
         />
       ))}
@@ -101,7 +120,21 @@ export function DictationBar({
   onFrame: (listener: MicFrameListener) => () => void
 }) {
   return (
-    <div className="flex min-h-8 items-center gap-3 px-1 text-caption text-muted-foreground">
+    // Exactly one line of composer text tall -- the same box `ComposerField`'s
+    // textarea occupies, so swapping one for the other cannot change the
+    // capsule's height.
+    //
+    // This was `min-h-8`: 32px against the field's 18.6px line, so starting
+    // dictation grew the composer by 13px and ended it by shrinking back. The
+    // component's own docstring promised the opposite ("holds the same line
+    // height, so the composer neither grows nor reshapes") -- the contract was
+    // right and the number was never derived from it. Stated against the `ui`
+    // role rather than this row's `caption`, because the height has to match
+    // the *field*, and `1lh` here would measure the caption text inside it.
+    <div
+      className="flex w-full items-center gap-3 px-1 text-caption text-muted-foreground"
+      style={{ minHeight: 'calc(var(--text-ui) * var(--leading-ui))' }}
+    >
       <AnimatePresence initial={false} mode="wait">
         {stage === 'recording' ? (
           <motion.div
@@ -110,7 +143,7 @@ export function DictationBar({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -6 }}
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-            className="flex min-w-0 items-center gap-3"
+            className="flex w-full min-w-0 items-center gap-3"
           >
             <LevelBars onFrame={onFrame} />
             {/* The clock is the one number here that is not audio, and it

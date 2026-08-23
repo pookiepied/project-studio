@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { RADIUS, SPRING_PANEL } from '@/design/tokens'
+import { SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
@@ -88,8 +88,22 @@ export function SideRail() {
           animate={{ width: effective, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={SPRING_PANEL}
-          className="relative my-2 mr-2 flex shrink-0 flex-col overflow-hidden border bg-surface"
-          style={{ borderRadius: RADIUS.xl }}
+          // Square, flush, and sunken -- the mirror of the sidebar, for the
+          // reason spelled out in `AppShell`: the radius belongs to the centre,
+          // not to the column beside it.
+          //
+          // This was `my-2 mr-2 border` with its own `RADIUS.xl`, which made it
+          // a rounded card floating in a gutter while the left column was the
+          // ground the page rests on. Two columns either side of the same page,
+          // built on opposite principles -- and the page was already rounding
+          // its right corners against this edge (`railOpen` in `AppShell`), so
+          // there were two arcs a few pixels apart curving away from each
+          // other. That gap is what read as "the rail became a rounded object".
+          //
+          // No hairline, same as the docked sidebar: the page's corner cuts a
+          // notch through this edge, and a border would draw a straight rule
+          // across the arc. The sunken surface is the seam.
+          className="relative flex shrink-0 flex-col overflow-hidden bg-surface-sunken"
         >
           <ResizeHandle width={effective} ceiling={ceiling} onWidth={setWidth} />
 
@@ -200,14 +214,18 @@ function ResizeHandle({
       }}
       className="group/resize absolute inset-y-0 left-0 z-10 w-3 cursor-col-resize touch-none"
     >
-      {/* The visible edge is one hairline at the centre of the reach. The
-          reach is 12px because a 1px target is a target nobody hits on the
-          first try; the line is 1px because a separator that announces itself
-          as a bar is a wall, not a seam. Faint at rest, where it only has to
-          say "the layers part here", and firmer once the pointer arrives or
-          the handle holds focus -- the moment there is something to reach
-          for. */}
-      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 rounded-full bg-foreground/15 transition-colors duration-fast group-hover/resize:bg-foreground/45 group-active/resize:bg-foreground/45 group-focus-visible/resize:bg-foreground/45" />
+      {/* A grip at the middle of the edge, not a rule down the whole of it.
+          The reach stays full height -- you can still grab the seam anywhere
+          along it -- but the *mark* is a short centred line, because a hairline
+          running floor to ceiling is a wall between two panels rather than a
+          handle on one. It also duplicated the seam the sunken surface already
+          draws, so the edge carried two lines saying the same thing.
+
+          One control step tall, so the grip matches the buttons it sits near
+          instead of being a length chosen by eye. Faint at rest, where it only
+          has to say "this can be pulled", and firmer once the pointer arrives
+          or the handle takes focus. */}
+      <span className="absolute top-1/2 left-1/2 h-[var(--control-lg)] w-px -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/20 transition-colors duration-fast group-hover/resize:bg-foreground/45 group-active/resize:bg-foreground/45 group-focus-visible/resize:bg-foreground/45" />
     </div>
   )
 }

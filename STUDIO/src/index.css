@@ -137,8 +137,10 @@
   --control-sm: calc(var(--ui-size) * 2);
   /** The default: icon buttons in the chrome, and the composer's row. */
   --control-md: calc(var(--ui-size) * 7 / 3);
-  /** The largest round control -- voice mode's transport. */
+  /** The largest round control in the chrome. */
   --control-lg: calc(var(--ui-size) * 8 / 3);
+  /** The stage control: voice mode's transport, and nothing else. */
+  --control-xl: calc(var(--ui-size) * 11 / 3);
 }
 
 @theme inline {
@@ -210,8 +212,28 @@
      base   something entering or leaving -- a popover, a view
      slow   a whole surface changing -- the palette, a sheet
      -------------------------------------------------------------------- */
-  /* Read by `.studio-scroll-inset`; mirrors `SHELL.scrollbarInset`. */
-  --scroll-inset: 44px;
+  /* Read by `.studio-scroll-inset`. Two values, because the two ends of a page
+     are not symmetrical and one number could only ever be right at one of them.
+
+     It was a single 44px, chosen to clear the 40px top strip -- which it did,
+     and then stopped one pixel into the 20px gradient below the strip. So the
+     thumb cleared the chrome and still spent its last 16px fading out, which is
+     the "it goes slightly under the fade at the top" that survived every
+     attempt to fix it by nudging one number.
+
+     Derived from what is actually painted over the scroller, rather than
+     guessed at:
+
+       top     the strip is solid for its own height (`SHELL.topStrip.height`,
+               40) and then fades for 20 more -- so 60 is the first pixel the
+               thumb is fully legible on.
+       bottom  the composer paints no fill; only its 40px gradient sits over
+               the transcript, so 40 clears it exactly.
+
+     If either gradient changes, these change with it -- they are the same
+     numbers, written once. */
+  --scroll-inset-top: 60px;
+  --scroll-inset-bottom: 40px;
 
   --duration-fast: 120ms;
   --duration-base: 180ms;
@@ -315,6 +337,31 @@
   --danger: oklch(0.55 0.19 25);
   --danger-foreground: oklch(0.985 0 0);
 
+  /* -- Voice states ---------------------------------------------------------
+
+     The second place in this file that carries hue, and it is a deliberate
+     exception to the rule stated just above -- so it is worth saying why it
+     does not simply break it.
+
+     The greyscale rule protects the *chrome*: a palette spread across menus,
+     rows and buttons is what makes an interface loud, and greyscale can
+     already say quiet, loud and disabled. Voice mode is not chrome. It is one
+     object, alone on a full-screen surface, and the thing it has to
+     communicate is precisely the thing greyscale cannot: which of four states
+     the machine is in, readable from across a room, without reading a word.
+     Weight is spoken for, size would mean something else, and motion alone
+     cannot distinguish listening from speaking when both are moving.
+
+     Muted rather than saturated, and each one a single step of chroma, so the
+     stage reads as lit rather than as a status light. The hues are the
+     conventional ones on purpose: this is not a place to be original.
+     -------------------------------------------------------------------- */
+  --voice-connecting: oklch(0.62 0 0);
+  --voice-listening: oklch(0.58 0.12 245);
+  --voice-thinking: oklch(0.68 0.12 80);
+  --voice-speaking: oklch(0.58 0.11 155);
+  --voice-blocked: var(--danger);
+
   /* The panel a code block is set on: off-white, not white. Against the card
      it sits in, this is what makes it read as inset rather than as a region of
      the same sheet. Two steps down is enough -- any darker and it becomes a
@@ -370,6 +417,14 @@
      screen, considerably louder than it was on white. */
   --danger: oklch(0.68 0.16 25);
   --danger-foreground: oklch(0.205 0 0);
+
+  /* Lifted, like every other colour here: the same lightness that reads as
+     calm on white disappears into a 0.205 surface. */
+  --voice-connecting: oklch(0.62 0 0);
+  --voice-listening: oklch(0.72 0.13 245);
+  --voice-thinking: oklch(0.8 0.13 80);
+  --voice-speaking: oklch(0.72 0.13 155);
+  --voice-blocked: var(--danger);
 
   /* Darker than the card, where light mode goes lighter. Inset means "further
      from the light", and on a dark surface that is down, not up. */
@@ -720,7 +775,28 @@
      the literal 44 that used to sit here beside a comment promising it matched
      `SHELL.scrollbarInset` -- a promise nothing enforced. */
   .studio-scroll-inset::-webkit-scrollbar-track {
-    margin-block: var(--scroll-inset);
+    margin-block: var(--scroll-inset-top) var(--scroll-inset-bottom);
+  }
+
+  /* A *bounded* scroller: a menu, a palette, a dialog. The page inset above is
+     wrong here -- there are no fades to keep a thumb out of -- but two other
+     things are needed, and neither was being done.
+
+     `scrollbar-gutter: stable` reserves the track whether or not it is
+     occupied. Without it the bar appears the moment a list outgrows its box and
+     takes its width out of the content, so every row jumps sideways as you
+     scroll -- which is exactly what the model menu was doing.
+
+     The track is then held back by the surface's own corner radius, so the
+     thumb stops before the curve instead of running into it. A straight bar
+     drawn into a rounded corner is the detail that makes a menu look
+     unfinished. */
+  .studio-scroll-bounded {
+    scrollbar-gutter: stable;
+  }
+
+  .studio-scroll-bounded::-webkit-scrollbar-track {
+    margin-block: var(--radius-lg);
   }
 }
 

@@ -31,11 +31,26 @@ export interface WorkspaceSnapshot {
   readonly projects: readonly Project[]
 }
 
-/** The opening window's state, or null when there is nothing usable there. */
+/**
+ * The opening window's state, or null when there is nothing usable there.
+ *
+ * Consumed, not just read. This snapshot is a seed for a window being born and
+ * is documented as read exactly once -- but it used to be left behind
+ * afterwards, so an entire conversation's messages sat in `localStorage`
+ * indefinitely after the window that needed them had opened, growing with
+ * every detach and never collected. Removing it on read makes the lifetime
+ * match the contract: it exists between the open and the first render, and
+ * nowhere else. A restart is a clean slate, which is only true if the slate is
+ * actually wiped.
+ *
+ * Removed before parsing, so a snapshot that cannot be read still clears
+ * itself rather than being retried on every launch forever.
+ */
 export function readHandoff(): WorkspaceSnapshot | null {
   try {
     const raw = window.localStorage.getItem(KEY)
     if (raw === null) return null
+    window.localStorage.removeItem(KEY)
 
     const parsed: unknown = JSON.parse(raw)
     return isSnapshot(parsed) ? parsed : null

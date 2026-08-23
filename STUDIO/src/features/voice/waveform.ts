@@ -116,6 +116,18 @@ export function thinkingPulse(timeSeconds: number): number {
   return 0.05 + 0.035 * (0.5 + 0.5 * Math.sin(timeSeconds * Math.PI * 2 * 0.3))
 }
 
+/**
+ * The resting breath: the orb while the stage is opening or idle.
+ *
+ * Slower than a pulse and shallower than any state that means something, so
+ * "waiting" cannot be mistaken for "listening" at a glance. Not flat, though
+ * -- a perfectly still orb reads as a frozen app, and the one thing this
+ * screen must never look like is stopped.
+ */
+export function idleBreath(timeSeconds: number): number {
+  return 0.06 + 0.05 * (0.5 + 0.5 * Math.sin(timeSeconds * Math.PI * 2 * 0.18))
+}
+
 /** `m:ss`, the way every recorder in the room already reads. */
 export function formatClock(elapsedMs: number): string {
   const seconds = Math.floor(elapsedMs / 1000)

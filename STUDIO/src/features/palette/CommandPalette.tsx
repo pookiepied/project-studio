@@ -173,7 +173,7 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
               />
             </div>
 
-            <div className="max-h-[min(22rem,44vh)] overflow-y-auto p-1.5">
+            <div className="studio-scroll-bounded max-h-[min(22rem,44vh)] overflow-y-auto p-1.5">
               {entries.length === 0 ? (
                 <p className="px-2.5 py-6 text-center text-ui text-muted-foreground">
                   Nothing matches that.

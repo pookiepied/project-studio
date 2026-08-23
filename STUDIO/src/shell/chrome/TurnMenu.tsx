@@ -10,7 +10,6 @@ import {
 } from '@/components/primitives'
 import { findModel, modelsByProvider } from '@/domain/models/catalog'
 import { EFFORTS } from '@/domain/models/types'
-import { findPermissionMode } from '@/domain/permissions/modes'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -51,9 +50,7 @@ export function TurnMenu() {
   const [view, setView] = useState<'root' | 'reasoning'>('root')
 
   const model = findModel(settings.modelId)
-  const mode = findPermissionMode(settings.permission)
   const effort = EFFORTS.find((candidate) => candidate.id === settings.effort)
-  const ModeMark = mode.icon
 
   // Reopening lands on the top level. A menu that remembers it was left on a
   // sub-page reopens showing something other than what its trigger describes.
@@ -67,9 +64,12 @@ export function TurnMenu() {
       onOpenChange={setOpen}
       side="bottom"
       align="end"
-      className="max-h-[28rem] w-72 overflow-y-auto"
+      className="studio-scroll-bounded max-h-[28rem] w-72 overflow-y-auto"
       trigger={
-        <Tooltip label={`${model?.name ?? 'Model'} · ${effort?.name ?? ''} · ${mode.name}`} side="bottom">
+        <Tooltip
+          label={[model?.name ?? 'Model', effort?.name].filter(Boolean).join(' · ')}
+          side="bottom"
+        >
           <button
             type="button"
             onClick={() => setOpen(!open)}
@@ -82,10 +82,14 @@ export function TurnMenu() {
               open ? 'bg-selected text-foreground' : 'hover:bg-tint',
             )}
           >
-            {/* Provider, name, mode: who, what, and how far it may go. */}
+            {/* Provider and name: who and what. Not how far it may go --
+                that is the composer's permission control, sitting inside the
+                field where the sentence it governs is being written. Stated
+                twice, the two marks were a question ("do these mean the same
+                thing?") rather than an answer, and this copy was the one with
+                no way to change it. One fact, one place. */}
             {model ? <ProviderMark provider={model.providerId} className="shrink-0" /> : null}
             <span className="min-w-0 truncate">{model?.name ?? 'Model'}</span>
-            <ModeMark className="shrink-0 opacity-70" />
             <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
           </button>
         </Tooltip>

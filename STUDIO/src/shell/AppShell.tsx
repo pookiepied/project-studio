@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { RADIUS, SHELL, VIEW_TRANSITION } from '@/design/tokens'
+import { AnimatePresence, motion } from 'framer-motion'
+import { DURATION, EASE_OUT, RADIUS, SHELL, VIEW_TRANSITION } from '@/design/tokens'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
 import { CommandPalette } from '@/features/palette'
@@ -16,6 +16,8 @@ import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
 import { useRail } from '@/stores/rail'
 import { useWorkspace } from '@/stores/workspace'
+import { Icons } from '@/components/icons'
+import { cn } from '@/lib/cn'
 
 /**
  * The window.
@@ -33,11 +35,42 @@ export function AppShell() {
     useNavigation()
   const compact = useCompactLayout()
   const { conversations, projects } = useWorkspace()
-  const { open: railOpen } = useRail()
+  const {
+    open: railOpen,
+    collapsed: railCollapsed,
+    entries: railEntries,
+    collapse: collapseRail,
+    expand: expandRail,
+  } = useRail()
+  const railEntryCount = railEntries.length
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
   /** The page only rounds when there is a sidebar beside it to rest on. */
   const rounded = sidebarOpen && !compact
+
+  /**
+   * The two columns are mutually exclusive.
+   *
+   * Not a stylistic call: at any width where both fit, the conversation between
+   * them is narrower than either one of them, which is the failure
+   * `useCompactLayout` already exists to prevent from the other direction. The
+   * old behaviour let the sidebar float over the page while the rail kept its
+   * space, so the reading column was covered on one side and squeezed on the
+   * other, by two panels neither of which you were reading.
+   *
+   * The sidebar wins the gesture, because opening it is always deliberate --
+   * you clicked the toggle. The rail is folded rather than closed, so its
+   * contents survive, and it says so with the pill below.
+   */
+  useEffect(() => {
+    if (sidebarOpen && railOpen) collapseRail()
+  }, [sidebarOpen, railOpen, collapseRail])
+
+  /** Bringing the rail back closes the sidebar, the same trade in reverse. */
+  const restoreRail = () => {
+    if (sidebarOpen) toggleSidebar()
+    expandRail()
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -161,6 +194,36 @@ export function AppShell() {
           conversation rather than something floating over it. The page keeps
           its own corners; the rail brings its own. */}
       <SideRail />
+
+      {/* The rail, folded, saying so.
+          Only this side gets a prompt. The sidebar is summoned by a control
+          that is always visible in the strip, so a second reminder of where it
+          went would be noise -- but the rail has no permanent handle, and
+          something you opened vanishing with no trace is indistinguishable
+          from having been closed. A tab on the edge it went behind is the
+          smallest thing that says "still here, this way". */}
+      <AnimatePresence>
+        {railCollapsed ? (
+          <motion.button
+            type="button"
+            onClick={restoreRail}
+            aria-label={`Show the side rail (${railEntryCount} open)`}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 8 }}
+            transition={{ duration: DURATION.base, ease: EASE_OUT }}
+            className={cn(
+              'absolute top-1/2 right-0 z-30 -translate-y-1/2',
+              'flex items-center gap-1.5 rounded-l-md py-2 pr-1 pl-1.5',
+              'bg-surface-sunken text-muted-foreground shadow-panel',
+              'transition-colors duration-fast hover:text-foreground',
+            )}
+          >
+            <Icons.openLarger className="shrink-0" />
+            <span className="text-micro tabular-nums">{railEntryCount}</span>
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
 
       <CommandPalette onNewProject={() => setNewProjectOpen(true)} />
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />

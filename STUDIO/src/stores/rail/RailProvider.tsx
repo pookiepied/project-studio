@@ -55,7 +55,20 @@ const MIN_WIDTH = 320
 const MAX_WIDTH = 760
 
 interface RailValue {
+  /** Showing: it holds something *and* has not been folded away. */
   readonly open: boolean
+  /**
+   * Holding something that is not currently on screen.
+   *
+   * The distinction between this and `open` is the whole point. Closing the
+   * rail throws its contents away; collapsing it does not. The sidebar and the
+   * rail cannot both have the window -- at any width where both fit, the
+   * conversation between them is narrower than either -- so opening one folds
+   * the other. Folding must be recoverable without the user having to find the
+   * artifact in the transcript again, which is why this is a separate flag
+   * rather than a call to `closeAll`.
+   */
+  readonly collapsed: boolean
   readonly entries: readonly RailEntry[]
   readonly activeId: string | null
   readonly width: number
@@ -64,6 +77,10 @@ interface RailValue {
   focus: (id: string) => void
   close: (id: string) => void
   closeAll: () => void
+  /** Fold away, keeping every entry. */
+  collapse: () => void
+  /** Bring it back, exactly as it was. */
+  expand: () => void
   setWidth: (width: number) => void
 }
 
@@ -73,6 +90,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<readonly RailEntry[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [width, setRawWidth] = useState(420)
+  const [collapsed, setCollapsed] = useState(false)
 
   const openArtifact = useCallback(
     (artifact: Artifact, conversationId: string, conversationTitle: string) => {
@@ -102,6 +120,9 @@ export function RailProvider({ children }: { children: ReactNode }) {
       })
 
       setActiveId(artifact.id)
+      // Opening something is a request to see it. Arriving into a rail that is
+      // folded away would look like the button did nothing.
+      setCollapsed(false)
     },
     [],
   )
@@ -136,7 +157,8 @@ export function RailProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<RailValue>(
     () => ({
-      open: entries.length > 0,
+      open: entries.length > 0 && !collapsed,
+      collapsed: entries.length > 0 && collapsed,
       entries,
       activeId,
       width,
@@ -144,9 +166,11 @@ export function RailProvider({ children }: { children: ReactNode }) {
       focus: setActiveId,
       close,
       closeAll,
+      collapse: () => setCollapsed(true),
+      expand: () => setCollapsed(false),
       setWidth,
     }),
-    [entries, activeId, width, openArtifact, close, closeAll, setWidth],
+    [entries, activeId, width, collapsed, openArtifact, close, closeAll, setWidth],
   )
 
   return <RailContext.Provider value={value}>{children}</RailContext.Provider>

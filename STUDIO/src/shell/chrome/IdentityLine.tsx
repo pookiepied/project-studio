@@ -27,7 +27,9 @@ import type { Conversation } from '@/domain/session/types'
  * list as "move this chat to a folder".
  */
 export function IdentityLine({ conversation }: { conversation: Conversation }) {
-  const { projects, rename, setProject, setBranch, togglePin, setArchived, remove } = useWorkspace()
+  // `projects` stays: the line still *shows* which project a conversation is
+  // in. Only `setProject` is gone, with the menu that reassigned it.
+  const { projects, rename, setBranch, togglePin, setArchived, remove } = useWorkspace()
   const detach = useDetachConversation()
   const { openProject, goHome } = useNavigation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -154,30 +156,14 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
           Open in new window
         </MenuItem>
 
-        <MenuSeparator />
-        <MenuLabel>Project</MenuLabel>
-        <MenuItem
-          selected={conversation.projectId === null}
-          onSelect={() => {
-            setProject(conversation.id, null)
-            setMenuOpen(false)
-          }}
-        >
-          None
-        </MenuItem>
-        {projects.map((item) => (
-          <MenuItem
-            key={item.id}
-            selected={conversation.projectId === item.id}
-            onSelect={() => {
-              setProject(conversation.id, item.id)
-              setMenuOpen(false)
-            }}
-          >
-            {item.name}
-          </MenuItem>
-        ))}
-
+        {/* No project list here.
+            This menu hangs off the conversation's own title, opened from
+            inside that conversation -- which means the project is already
+            answered by where you are standing. Listing every project as a
+            selectable row made the most common case (looking at a title you
+            are already in) carry the entire filing system, and grew the menu
+            by one row per project forever. Filing is a sidebar decision, and
+            the sidebar is where it stays. */}
         <MenuSeparator />
         <MenuItem
           icon={<Icons.archive />}

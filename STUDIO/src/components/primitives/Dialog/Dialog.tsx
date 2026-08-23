@@ -71,7 +71,7 @@ export function Dialog({
               </IconButton>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{children}</div>
+            <div className="studio-scroll-bounded min-h-0 flex-1 overflow-y-auto px-4 pb-4">{children}</div>
 
             {footer ? (
               <footer className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3">
