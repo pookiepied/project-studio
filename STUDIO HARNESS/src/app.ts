@@ -9,10 +9,7 @@ import {
   StudioRuntime,
 } from "./application/studio-runtime.js";
 import { resolveProviderConfig } from "./models/provider-config.js";
-import {
-  bootstrapModelProviders,
-  resolveGatewayAuthMode,
-} from "./models/bootstrap.js";
+import { bootstrapModelProviders } from "./models/bootstrap.js";
 import {
   initializeObservability,
   registerFlueTurnBoundary,
@@ -94,15 +91,6 @@ function createHarnessApplication(): HarnessApplication {
         "MCP startup reconciliation failed; inspect server status for details.",
       );
     });
-
-    // Reported after the logger exists. A development bootstrap token overrides
-    // a real signed-in session, so which one is in force must be visible rather
-    // than inferred from environment variables.
-    if (providerConfig.source === "studio-cloud") {
-      observability.logger.info("Studio gateway authentication configured", {
-        mode: resolveGatewayAuthMode(),
-      });
-    }
 
     // Same database, same construction style as `servers`: the provider
     // surface is composed here so the connection it reads from is the one this

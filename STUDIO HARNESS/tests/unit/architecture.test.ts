@@ -59,11 +59,6 @@ describe("model-provider composition", () => {
     expect(() => createModelProviderAdapter("local")).toThrow();
   });
 
-  it("does not create a studio-cloud adapter without validated configuration", () => {
-    delete process.env.PROJECT_STUDIO_GATEWAY_URL;
-    expect(() => createModelProviderAdapter("studio-cloud")).toThrow();
-  });
-
   it("rejects invalid source values", () => {
     expect(() => resolveProviderConfig({ source: "invalid" as never })).toThrow(
       /Invalid model source/,
@@ -80,7 +75,7 @@ describe("studio agent has no gateway or provider side effects", () => {
 
     expect(source).not.toMatch(/https?:\/\//i);
     expect(source).not.toMatch(/apiKey|api_key|token|secret/i);
-    expect(source).not.toMatch(/deterministic|test-adapter|local-adapter|studio-cloud-adapter/i);
+    expect(source).not.toMatch(/deterministic|test-adapter|local-adapter/i);
     expect(source).toContain("STUDIO_MODEL_ID");
   });
 
@@ -130,31 +125,6 @@ describe("startup ordering and adapter boundaries", () => {
     );
 
     expect(source).not.toMatch(/\bfetch\b|node:http|XMLHttpRequest|undici/);
-  });
-
-  it("does not leak the gateway's Vercel AI SDK types into the harness", async () => {
-    for (const path of [
-      "../../src/models/adapters/studio-cloud-adapter.ts",
-      "../../src/models/studio-cloud/client.ts",
-      "../../src/models/studio-cloud/event-mapper.ts",
-      "../../src/models/studio-cloud/stream-events.ts",
-      "../../src/models/studio-cloud/request-mapper.ts",
-    ]) {
-      const source = await readFile(new URL(path, import.meta.url), "utf8");
-      expect(source).not.toMatch(/from "ai"|@ai-sdk\//);
-    }
-  });
-
-  it("keeps the gateway wire vocabulary independent of the Pi protocol", async () => {
-    // stream-events.ts describes what the gateway emits. Projecting that onto
-    // Pi belongs to event-mapper.ts; if the wire module starts importing Pi,
-    // the two responsibilities have merged again.
-    const source = await readFile(
-      new URL("../../src/models/studio-cloud/stream-events.ts", import.meta.url),
-      "utf8",
-    );
-
-    expect(source).not.toMatch(/@earendil-works\/pi-ai|@flue\//);
   });
 
   it("gives the credential store no plaintext fallback", async () => {
@@ -273,9 +243,6 @@ describe("the failure taxonomy is actually adopted", () => {
       "../../src/credentials/credential-store.js"
     );
     const { StorageError } = await import("../../src/storage/errors.js");
-    const { StudioGatewayError } = await import(
-      "../../src/models/studio-cloud/errors.js"
-    );
     const { TelemetryError } = await import(
       "../../src/observability/telemetry-errors.js"
     );
@@ -288,7 +255,6 @@ describe("the failure taxonomy is actually adopted", () => {
       new StudioAuthError("internal").domain,
       new CredentialStoreError("internal").domain,
       new StorageError("internal").domain,
-      new StudioGatewayError("internal").domain,
       new TelemetryError("configuration").domain,
       new ProviderConfigurationError("x").domain,
     ]);
@@ -298,7 +264,6 @@ describe("the failure taxonomy is actually adopted", () => {
       "admission",
       "auth",
       "credentials",
-      "gateway",
       "models",
       "observability",
       "storage",

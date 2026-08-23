@@ -8,12 +8,8 @@ import {
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { StudioAuthClient } from "../../src/auth/auth-client.js";
 import type { StudioAuthConfig } from "../../src/auth/config.js";
-import { StudioAuthError } from "../../src/auth/errors.js";
 import { signIn, isSignedIn, signOut } from "../../src/auth/login.js";
-import { SessionAccessTokenProvider } from "../../src/auth/session-token-provider.js";
-import { SessionStore } from "../../src/auth/session.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { isOwnPort } from "../../src/net/own-ports.js";
 
@@ -43,19 +39,12 @@ interface MockServices {
   origin: string;
   /** Every code exchange Google saw, so PKCE can be asserted. */
   exchanges: Array<Record<string, string>>;
-  refreshCalls: string[];
-  issuedRefreshTokens: string[];
-  setRefreshStatus: (status: number) => void;
   authorizeRequests: string[];
 }
 
 async function startMockServices(): Promise<MockServices> {
   const exchanges: Array<Record<string, string>> = [];
-  const refreshCalls: string[] = [];
-  const issuedRefreshTokens: string[] = [];
   const authorizeRequests: string[] = [];
-  let refreshStatus = 200;
-  let refreshCounter = 0;
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     void (async () => {
@@ -80,37 +69,13 @@ async function startMockServices(): Promise<MockServices> {
           response.end(JSON.stringify({ error: "Invalid ID token" }));
           return;
         }
-        const refreshToken = jwt(604_800, "refresh-0");
-        issuedRefreshTokens.push(refreshToken);
         response.writeHead(200, { "content-type": "application/json" });
         response.end(
           JSON.stringify({
             accessToken: jwt(3600),
-            refreshToken,
+            refreshToken: jwt(604_800, "refresh-0"),
             expiresIn: 3600,
             user: { id: "user-1", email: "user@example.com", name: "Test User", role: "user" },
-          }),
-        );
-        return;
-      }
-
-      if (url.pathname === "/refresh") {
-        const body = JSON.parse(raw) as { refreshToken?: string };
-        refreshCalls.push(body.refreshToken ?? "");
-        if (refreshStatus !== 200) {
-          response.writeHead(refreshStatus, { "content-type": "application/json" });
-          response.end(JSON.stringify({ error: "Invalid refresh token" }));
-          return;
-        }
-        refreshCounter += 1;
-        const rotated = jwt(604_800, `refresh-${refreshCounter}`);
-        issuedRefreshTokens.push(rotated);
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(
-          JSON.stringify({
-            accessToken: jwt(3600, `access-${refreshCounter}`),
-            refreshToken: rotated,
-            expiresIn: 3600,
           }),
         );
         return;
@@ -128,12 +93,7 @@ async function startMockServices(): Promise<MockServices> {
     server,
     origin: `http://127.0.0.1:${address.port}`,
     exchanges,
-    refreshCalls,
-    issuedRefreshTokens,
     authorizeRequests,
-    setRefreshStatus: (status: number) => {
-      refreshStatus = status;
-    },
   };
 }
 
@@ -286,125 +246,5 @@ describe("sign-in", () => {
 
     expect(await isSignedIn(credentials)).toBe(false);
     expect(credentials.size).toBe(0);
-  });
-});
-
-describe("session access token provider", () => {
-  async function providerWithSession() {
-    await signIn({ config, credentials, openBrowser: browserThatApproves() });
-    const sessions = new SessionStore(credentials);
-    return {
-      sessions,
-      provider: new SessionAccessTokenProvider({
-        sessions,
-        client: new StudioAuthClient(config),
-      }),
-    };
-  }
-
-  it("returns the stored token while it is still valid", async () => {
-    const { provider } = await providerWithSession();
-
-    await provider.getAccessToken();
-    expect(mock.refreshCalls).toHaveLength(0);
-  });
-
-  it("refuses to produce a token when signed out", async () => {
-    const provider = new SessionAccessTokenProvider({
-      sessions: new SessionStore(credentials),
-      client: new StudioAuthClient(config),
-    });
-
-    await expect(provider.getAccessToken()).rejects.toMatchObject({
-      kind: "signed_out",
-    });
-  });
-
-  it("renews an expiring token and stores the rotated refresh token", async () => {
-    const { sessions, provider } = await providerWithSession();
-    // A token already past its expiry, as if the harness had been idle.
-    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
-
-    const token = await provider.getAccessToken();
-
-    expect(mock.refreshCalls).toHaveLength(1);
-    const stored = await sessions.load();
-    expect(stored?.accessToken).toBe(token);
-    // The rotated refresh token replaced the one that was just spent.
-    expect(stored?.refreshToken).toBe(mock.issuedRefreshTokens.at(-1));
-  });
-
-  /**
-   * The service rotates refresh tokens, so a second concurrent refresh would be
-   * redeeming a token the first had already invalidated.
-   */
-  it("performs only one refresh for concurrent callers", async () => {
-    const { sessions, provider } = await providerWithSession();
-    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
-
-    const tokens = await Promise.all([
-      provider.getAccessToken(),
-      provider.getAccessToken(),
-      provider.getAccessToken(),
-    ]);
-
-    expect(mock.refreshCalls).toHaveLength(1);
-    expect(new Set(tokens).size).toBe(1);
-  });
-
-  it("lets one caller cancel without failing the others", async () => {
-    // The refresh is shared, so it used to run under whichever caller arrived
-    // first. Cancelling that one failed everybody who had joined it.
-    const { sessions, provider } = await providerWithSession();
-    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
-
-    const first = new AbortController();
-    const cancelled = provider.getAccessToken(first.signal);
-    const survivor = provider.getAccessToken();
-    first.abort();
-
-    await expect(cancelled).rejects.toBeDefined();
-    await expect(survivor).resolves.toBeTypeOf("string");
-    expect(mock.refreshCalls).toHaveLength(1);
-  });
-
-  it("cancels the caller who asked, not the refresh itself", async () => {
-    // The refresh belongs to the provider. If everyone walks away it still
-    // finishes and saves, because the next call needs the result.
-    const { sessions, provider } = await providerWithSession();
-    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
-
-    const controller = new AbortController();
-    const cancelled = provider.getAccessToken(controller.signal);
-    controller.abort();
-
-    await expect(cancelled).rejects.toBeDefined();
-
-    const token = await provider.getAccessToken();
-    expect(token).toBeTypeOf("string");
-    // One refresh: the abandoned one completed and its result was reused.
-    expect(mock.refreshCalls).toHaveLength(1);
-  });
-
-  it("clears the session when the refresh token is rejected", async () => {
-    const { sessions, provider } = await providerWithSession();
-    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
-    mock.setRefreshStatus(401);
-
-    await expect(provider.getAccessToken()).rejects.toBeInstanceOf(StudioAuthError);
-
-    // Signed out rather than stuck retrying a token the service will not accept.
-    expect(await sessions.load()).toBeNull();
-  });
-
-  it("keeps the session when a refresh fails for a transient reason", async () => {
-    const { sessions, provider } = await providerWithSession();
-    await sessions.save({ accessToken: jwt(-10), refreshToken: jwt(604_800, "refresh-0") });
-    mock.setRefreshStatus(503);
-
-    await expect(provider.getAccessToken()).rejects.toMatchObject({
-      kind: "unavailable",
-    });
-    expect(await sessions.load()).not.toBeNull();
   });
 });

@@ -51,7 +51,6 @@ src/
     google-login.ts           PKCE loopback flow against Google
     auth-client.ts            HTTP boundary for the Studio auth service
     session.ts                Session storage over the keychain, JWT expiry reading
-    session-token-provider.ts Session-backed AccessTokenProvider, single-flight refresh
     login.ts                  Sign-in/out orchestration
   context/
     context-optimizer.ts      Passthrough optimizer and future Headroom port
@@ -103,7 +102,6 @@ src/
   models/
     adapters/
       test-adapter.ts         Deterministic Pi provider behind the adapter contract
-      studio-cloud-adapter.ts Studio Gateway source and its Pi wire protocol
       local-adapter.ts        Local BYOK source; alias protocol over Pi's Models
     local/
       apis.ts                 Supported custom-provider wire protocols
@@ -114,17 +112,6 @@ src/
       settings-store.ts       Durable provider settings; the non-secret half of BYOK
       provider-service.ts     Connect/disconnect/select contracts for settings
       cli.ts                  pnpm providers list / models / connect / add / select
-    studio-cloud/
-      config.ts               Validated gateway URL, required default model, timeout
-      access-token.ts         Injected outbound token provider and header safety
-                              (calling the gateway, not user login)
-      client.ts               Origin-scoped HTTPS transport for the gateway
-      sse-parser.ts           Server-sent event framing
-      stream-events.ts        Gateway SSE vocabulary, parsing, duplicate collapsing
-      event-mapper.ts         Gateway events projected onto Pi's event protocol
-      request-mapper.ts       Pi transcript and tools to the gateway chat contract
-      catalog.ts              /v1/models to ModelDescriptor and capabilities
-      errors.ts               Safe typed gateway errors
     bootstrap.ts              Provider bootstrap coordinator and startup validation
     model-registry.ts         Model-source resolver and capability aggregator
     provider-config.ts        Validated model-source configuration
@@ -239,8 +226,6 @@ tests/
   integration/
     harness.test.ts           Real server, SQLite, cancellation, and restart tests
     observability.test.ts     Span hierarchy, metrics, redaction, cancellation
-    studio-gateway.test.ts    Adapter unit slice: catalog, streaming, tools, errors, cancellation
-    studio-flue.test.ts       Real generated Flue server against a mock gateway
     credential-keyring.test.ts Real OS credential store; skips where none exists
     auth-login.test.ts        Full PKCE flow against a mock Google and auth service
     local-byok.test.ts        Stored key to the wire against a mock OpenAI-compatible server
@@ -268,13 +253,12 @@ contain an implemented boundary.
 - Pi streaming and typed tool-call continuation.
 - Gateway-neutral model contracts with provider adapter composition.
 - Process-level model-source selection with no automatic cross-source fallback.
-- Studio Gateway source with its native Pi wire protocol, streaming, and tool continuation.
 - Context optimization port with a fail-open passthrough implementation.
 - OpenTelemetry foundation with Flue GenAI instrumentation, structured logs, and safe errors.
 
 The deterministic provider is intentionally in-process. It makes the harness fully testable
 without credentials or network calls and sits behind the same `ModelProviderAdapter` contract the
-Studio Gateway and local/BYOK adapters implement. Agent and persistence code do not change when the
+local/BYOK adapter implements. Agent and persistence code do not change when the
 source changes.
 
 `src/app.ts` validates and bootstraps model providers before initializing observability, then
@@ -348,94 +332,26 @@ integration (see the ADR and the roadmap).
 | Source | Operational | Description |
 | --- | --- | --- |
 | `test` | Yes | In-process deterministic Pi provider; network-free default |
-| `studio-cloud` | Yes | Studio Gateway over its native SSE contract |
 | `local` (BYOK) | Yes | Built-in Pi providers plus user-declared custom providers; keys in the OS keychain |
 
 A `ProviderBootstrapCoordinator` runs once, creates the adapter for the selected source, registers
 it with Flue, builds a `ModelRegistry`, and validates the default model reference through it.
-Selecting `studio-cloud` without a valid URL, default model, and token, or selecting `local` with
-no default model or an unreadable settings database, is a deliberate startup failure, not a silent
-no-op: there is no placeholder adapter that reports success without being able to serve a model,
-and no source is ever automatically substituted for another. Studio configuration is validated
-before Flue registration, registry construction, and OpenTelemetry initialization.
+Selecting `local` with no default model or an unreadable settings database is a deliberate startup
+failure, not a silent no-op: there is no placeholder adapter that reports success without being
+able to serve a model, and no source is ever automatically substituted for another. Configuration
+is validated before Flue registration, registry construction, and OpenTelemetry initialization.
 
 The `studio` agent references `STUDIO_MODEL_ID` (`"project-studio/default"`), a stable,
 gateway-neutral constant that names no source, provider, or implementation. Switching sources
-requires only a config change; the agent definition is not edited, and the Studio adapter resolves
+requires only a config change; the agent definition is not edited, and the local adapter resolves
 the same alias.
 
-### Studio Gateway Settings
-
-| Setting | Required | Purpose |
-| --- | --- | --- |
-| `PROJECT_STUDIO_GATEWAY_URL` | Yes | Gateway root; HTTPS required except for loopback hosts |
-| `PROJECT_STUDIO_GATEWAY_TOKEN` | Dev only | Development bootstrap access token (see below) |
-| `PROJECT_STUDIO_GATEWAY_DEFAULT_MODEL` | Yes | Gateway model id the stable alias routes to |
-| `PROJECT_STUDIO_GATEWAY_TIMEOUT_MS` | No | Response (connect + headers) timeout, default `120000` (1s to 600s) |
-
-There is no canonical default model in the gateway contract, so `PROJECT_STUDIO_GATEWAY_DEFAULT_MODEL`
-must be set explicitly rather than guessed; when the catalog is loaded it is checked to exist. A
-base URL carrying embedded credentials, a query string, a fragment, or a non-HTTPS scheme on a
-non-loopback host is rejected.
-
-The access token is pulled from an injected `AccessTokenProvider` at request time, never from a
-prompt, a model reference, or mutable global model state, and is attached only to requests whose
-resolved URL is on the configured gateway origin. Redirects are not followed.
-
-The timeout guards establishing the response (connect plus headers) and is cleared once headers
-arrive; from then on the caller's `AbortSignal` governs the body. A long but healthy generation is
-therefore never truncated by the connect budget, while cancelling a run still tears down the
-upstream connection.
-
-`PROJECT_STUDIO_GATEWAY_TOKEN` backs a **development-only** bootstrap token provider. It is a
-convenience for pointing a local harness at a gateway; it is not secure credential storage and not
-the BYOK mechanism. Without it, gateway authentication is session-backed: `SessionAccessTokenProvider`
-reads the signed-in session from the OS keychain and refreshes it against the Studio auth service
-(`src/auth/session-token-provider.ts`), which is the default mode when no dev token is set
-(`resolveGatewayAuthMode`, `src/models/bootstrap.ts`).
-
-### Studio Gateway Deployment Assumption
-
-Studio Gateway is a **private** Cloudflare Worker: no `workers.dev` subdomain and no custom route.
-It is invoked only through a Cloudflare **service binding** from the public API, and the public API
-owns end-user authentication. The gateway therefore performs no inbound end-user auth of its own
-and must not trust arbitrary public identity headers. Propagating trusted user identity from the
-API to the gateway is deferred until the API proxy contract is implemented.
-
-> **The Worker's source is no longer in this repository.** It was removed in
-> commit `bd4d389`; `src/models/studio-cloud/` remains and the `studio-cloud`
-> source is still selectable, so whether it works depends entirely on a service
-> deployed outside this tree. Nothing here builds or deploys that service. The
-> name "gateway" is deliberately left free for a future user-hosted one.
-
-### Catalog Lifecycle
-
-Production Phase 7 behavior is scoped to the stable default alias, which resolves without a network
-round trip, so bootstrap never blocks on catalog loading. Discovering the full model list is an
-explicit, callable service: `StudioCloudModelProviderAdapter.loadCatalog()` fetches and normalizes
-`/v1/models`, registers per-model context/token limits, and verifies the configured default model
-exists. Wiring an application lifecycle component that calls and refreshes it is deferred to product
-integration.
-
-### Studio Gateway Adapter
-
-The gateway keeps its Vercel AI SDK implementation and no AI SDK type crosses into the harness.
-The adapter registers a dedicated Pi wire protocol, `project-studio-gateway`, and parses the
-gateway's own SSE contract directly rather than treating it as OpenAI streaming. It maps
-`stream.started`, text deltas, reasoning deltas, completed tool calls, usage, `model.completed`,
-`stream.error`, and `[DONE]` into Pi events, preserving tool-call ids and order, usage, and finish
-reason.
-
-The gateway publishes each semantic event twice, under a compatibility name and a canonical
-`model.*` name. The mapper holds a compatibility event for exactly one event: if its canonical
-twin follows with an identical payload the compatibility copy is dropped, otherwise it is released
-unchanged, so a gateway emitting only one form still produces exactly one unit of output. The
-terminal `tool_calls` aggregate is reconciled against already-seen ids rather than re-emitted.
-
-The adapter never executes a tool. A turn containing tool calls settles as `toolUse` and Flue owns
-execution and continuation. Cancellation closes the upstream stream. Gateway failures become typed
-`StudioGatewayError`s built from status and the gateway's own normalized error code; raw upstream
-bodies are never surfaced.
+> **The Studio Cloud gateway was cancelled.** Its Worker source was removed in commit `bd4d389`,
+> and the Harness's client for it — the `studio-cloud` model source, adapter, SSE parser, and
+> catalog — has been removed with it. The sign-in flow in `src/auth/` remains: it is the
+> harness-owned Project Studio account session, distinct from any model gateway. The name
+> "gateway" stays reserved in the provider contract for a possible future user-hosted source;
+> ADR 0031 records that the cancelled contract was already wrong.
 
 ## Provider Administration
 

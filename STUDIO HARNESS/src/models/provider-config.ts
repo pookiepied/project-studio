@@ -35,7 +35,6 @@ function readEnv(name: string): string | undefined {
  * account settings and per-run routing are deferred to product integration.
  *
  *  - `test`         in-process deterministic provider; network-free default;
- *  - `studio-cloud` the authenticated Studio Gateway source;
  *  - `local`        recognized but not operational (BYOK), and never silently
  *                   substituted with another source.
  */
@@ -49,7 +48,7 @@ export function resolveProviderConfig(
     return v.parse(providerConfigSchema, { source: rawSource });
   } catch {
     throw new ProviderConfigurationError(
-      `Invalid model source "${rawSource}". Expected one of: test, local, studio-cloud.`,
+      `Invalid model source "${rawSource}". Expected one of: test, local.`,
     );
   }
 }

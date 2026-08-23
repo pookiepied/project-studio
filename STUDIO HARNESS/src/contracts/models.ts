@@ -4,7 +4,6 @@ import { StudioError } from "./errors.js";
 
 export const modelSourceSchema = v.picklist([
   "local",
-  "studio-cloud",
   "test",
 ]);
 

@@ -48,12 +48,9 @@ describe("provider configuration", () => {
     expect(resolveProviderConfig().source).toBe("test");
   });
 
-  it("recognizes test, local, and studio-cloud", () => {
+  it("recognizes test and local", () => {
     expect(resolveProviderConfig({ source: "test" }).source).toBe("test");
     expect(resolveProviderConfig({ source: "local" }).source).toBe("local");
-    expect(resolveProviderConfig({ source: "studio-cloud" }).source).toBe(
-      "studio-cloud",
-    );
   });
 
   it("reads source from PROJECT_STUDIO_MODEL_SOURCE", () => {
@@ -177,16 +174,6 @@ describe("createModelProviderAdapter", () => {
     expect(adapter.operational).toBe(true);
   });
 
-  it("fails clearly for studio-cloud when it is not configured", () => {
-    delete process.env.PROJECT_STUDIO_GATEWAY_URL;
-    expect(() => createModelProviderAdapter("studio-cloud")).toThrow(
-      ProviderConfigurationError,
-    );
-    expect(() => createModelProviderAdapter("studio-cloud")).toThrow(
-      /PROJECT_STUDIO_GATEWAY_URL/,
-    );
-  });
-
   it("throws for an unknown source", () => {
     expect(() => createModelProviderAdapter("invalid" as never)).toThrow(
       ProviderConfigurationError,
@@ -297,14 +284,6 @@ describe("provider bootstrap coordinator", () => {
 
     expect(result.descriptor.operational).toBe(true);
     expect(result.descriptor.resolvedModelId).toBe(STUDIO_MODEL_ID);
-  });
-
-  it("fails clearly when studio-cloud is selected without configuration", () => {
-    delete process.env.PROJECT_STUDIO_GATEWAY_URL;
-    const coordinator = createProviderBootstrapCoordinator();
-    expect(() => coordinator.bootstrap({ source: "studio-cloud" })).toThrow(
-      ProviderConfigurationError,
-    );
   });
 
   it("rejects a second bootstrap call on the same coordinator", () => {

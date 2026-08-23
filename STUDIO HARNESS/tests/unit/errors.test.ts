@@ -14,7 +14,6 @@ import {
 } from "../../src/observability/error-reporter.js";
 import { createLogger } from "../../src/observability/logger.js";
 import { TelemetryError } from "../../src/observability/telemetry-errors.js";
-import { StudioGatewayError } from "../../src/models/studio-cloud/errors.js";
 import { StorageError } from "../../src/storage/errors.js";
 
 function captureLogger() {
@@ -151,7 +150,6 @@ describe("the domain taxonomy", () => {
       new StudioAuthError("internal").domain,
       new CredentialStoreError("internal").domain,
       new StorageError("internal").domain,
-      new StudioGatewayError("internal").domain,
       new TelemetryError("configuration").domain,
       new ProviderConfigurationError("x").domain,
     ]);
@@ -159,35 +157,9 @@ describe("the domain taxonomy", () => {
     expect([...raised].sort()).toEqual([
       "auth",
       "credentials",
-      "gateway",
       "models",
       "observability",
       "storage",
     ]);
-  });
-
-  it("keeps the gateway out of the models domain", () => {
-    // Both have a `configuration` failure. Sharing a domain would give two
-    // unrelated conditions the same code, which is worse than no code at all.
-    expect(new StudioGatewayError("configuration").code).toBe("gateway.configuration");
-    expect(new ProviderConfigurationError("x").code).toBe("models.configuration");
-  });
-
-  it("marks only transient gateway failures as retryable", () => {
-    expect(new StudioGatewayError("rate_limited").retryable).toBe(true);
-    expect(new StudioGatewayError("timeout").retryable).toBe(true);
-    expect(new StudioGatewayError("unavailable").retryable).toBe(true);
-    expect(new StudioGatewayError("authentication").retryable).toBe(false);
-    expect(new StudioGatewayError("validation").retryable).toBe(false);
-  });
-
-  it("keeps the gateway's transport detail out of the reported shape", () => {
-    const report = new StudioGatewayError("rate_limited", {
-      status: 429,
-      gatewayCode: "PROVIDER_RATE_LIMITED",
-    }).toReport();
-
-    expect(report.code).toBe("gateway.rate_limited");
-    expect(JSON.stringify(report)).not.toContain("429");
   });
 });
