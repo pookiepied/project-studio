@@ -45,6 +45,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0028](0028-harness-client-admission-and-local-access.md) | Harness client admission and local access |
 | [0030](0030-local-execution-identity-and-deferred-multi-user.md) | Local execution identity; multi-user deferred |
 | [0044](0044-the-host-supervises-and-holds-the-credential.md) | The Host supervises, and holds the credential — why the webview never sees a bearer, and why a named seam is not a service registry |
+| [0045](0045-a-run-outlives-the-window-that-started-it.md) | A run outlives the window that started it — resume by offset, and why there is no "what is in flight?" endpoint |
 
 ### Permissions, trust, and containment
 | | |
