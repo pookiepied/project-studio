@@ -1,9 +1,24 @@
 # ADR 0005: Model-Provider Composition
 
-Status: Accepted; partially superseded by
-[ADR 0006](0006-studio-gateway-integration.md), which makes `studio-cloud`
-operational. The composition, capability, and registry decisions below still
-hold, as does the treatment of `local` as recognized-but-unavailable.
+Status: Accepted; partially superseded — 2026-08-24.
+
+The composition, capability, and registry decisions below still hold: the
+adapter contract, the bootstrap coordinator, and the rule that recognizing a
+source is a config-parsing concern separate from whether it is operational.
+
+Two things in the original status line no longer are true, and both changed
+after it was written:
+
+- It named [ADR 0006](0006-studio-gateway-integration.md) as the partial
+  superseder because 0006 made `studio-cloud` operational. 0006 is itself
+  superseded now, and `studio-cloud` is gone — Worker in `bd4d389`, Harness
+  client in `45233d5`. `ModelSource` is `"local" | "test"`.
+- It said `local` was recognized-but-unavailable. `local` is the operational
+  source, and [ADR 0009](0009-local-byok-providers.md) records it.
+
+So the three-source enumeration below reads as history. The two-source one is
+in `STUDIO HARNESS/src/contracts/models.ts`. The text below is left as
+written.
 
 ## Context
 

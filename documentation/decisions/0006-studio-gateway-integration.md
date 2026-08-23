@@ -1,5 +1,13 @@
 # ADR 0006: Studio Gateway Integration
 
+Status: Superseded by [ADR 0009](0009-local-byok-providers.md) — 2026-08-24.
+The Studio Cloud gateway is cancelled and the client this made operational —
+adapter, SSE parser, event mapper, catalog, session-token provider — was
+removed in `45233d5`. `studio-cloud` is no longer a model source; `local`
+BYOK, recorded by ADR 0009, is the operational source. The name "gateway"
+stays reserved in `ProviderSource` for a possible future user-hosted source.
+The text below is left as written.
+
 Status: Accepted
 
 ## Context

@@ -86,9 +86,9 @@ wrong answer, and why we believed it, is the useful part.
 ### Gateway
 | | |
 |---|---|
-| [0002](0002-two-gateway-model.md) | Two-gateway model |
-| [0006](0006-studio-gateway-integration.md) | Studio Gateway integration |
-| [0031](0031-harness-gateway-contract-is-not-current-worker-contract.md) | The Harness/Gateway contract is not the current Worker contract |
+| [0002](0002-two-gateway-model.md) | Two-gateway model — **superseded by 0009** |
+| [0006](0006-studio-gateway-integration.md) | Studio Gateway integration — **superseded by 0009** |
+| [0031](0031-harness-gateway-contract-is-not-current-worker-contract.md) | The Harness/Gateway contract is not the current Worker contract — **superseded 2026-08-24, with the gateway it described** |
 
 ### MCP
 | | |
@@ -114,6 +114,17 @@ written alongside it asserted the violations rather than their absence.
 **Closed 2026-08-15** by meta-task #4–#8 and #19–#24. [ADR
 0035](0035-runtime-composition-and-ports.md) states what actually holds; 0034
 keeps its text and gained a status line, as the format requires.
+
+## ADRs 0002, 0006, and 0031 are superseded
+
+One decision in three parts: two model-access paths anchored by a centrally
+operated gateway (0002), the Harness client that made it operational (0006),
+and the contract gap between that client and the Worker (0031). The gateway
+was cancelled — the Worker went in `bd4d389`, the Harness client in
+`45233d5` — and what model access actually is now is
+[ADR 0009](0009-local-byok-providers.md): local BYOK. The name "gateway"
+stays reserved in `ProviderSource` for a possible future user-hosted
+gateway; that door is open, not closed.
 
 ## Adding one
 

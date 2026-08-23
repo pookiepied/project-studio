@@ -1,5 +1,13 @@
 # ADR 0031 - Harness Gateway Contract Is Not The Current Worker Contract
 
+**Status:** superseded — 2026-08-24. Both sides of the disagreement are
+deleted — the Worker in `bd4d389`, the Harness adapter in `45233d5` — so
+this record has run out of subject rather than turned wrong. If a
+user-hosted gateway is ever built (the name is reserved in `ProviderSource`,
+`STUDIO HARNESS/src/contracts/providers.ts`), the "Deferred Work" below is
+where that effort starts: one authoritative contract, tested across
+projects. The text below is left as written.
+
 **Status:** accepted boundary
 
 **Amends:** ADR 0002 and ADR 0006 for the current repository state.
