@@ -141,6 +141,109 @@ taking ADR 0032 and ADR 0045 seriously:
    chose for processes: retry once per window, then a human decides. Infinite retry is
    the other failure mode — a harness that looks busy while accomplishing nothing.
 
+## The retry policy, and why its budget is coupled to visibility
+
+Written 2026-08-25, from a working conversation, after reading Flue's retry loop and
+watching a real failure on the wire. This is the shape to build toward; almost none of it
+exists yet.
+
+### Rate limiting is one of seven, and we handle about half
+
+| Class | Example | Handled by | State |
+|---|---|---|---|
+| Transient provider / transport | 429, 5xx, connection reset, socket hang up | Flue, 3 attempts | works; classifier too narrow |
+| Quota / billing exhaustion | `insufficient_quota`, out of budget | nobody | retried pointlessly |
+| Output cap | `stop_reason: length` | nobody | ends mid-sentence, silently |
+| Context overflow | window exceeded | Flue: compact, retry once | works |
+| User abort | the stop button | Flue, and us | works |
+| Loop exit without a tool call | "now I'll edit the file", as prose | nobody | open, and genuinely hard |
+| Stream interruption mid-message | connection dies mid-stream | Flue: `stream_interrupted` / `stream_continued` | partly |
+
+The sixth is worth naming as permanently hard rather than merely unbuilt. A model that
+narrates an action instead of calling a tool produces a well-formed, `stop`-reasoned,
+entirely finished turn. There is no signal to detect it by; the transcript is valid. Any
+"did it actually do the thing" check is a product judgement, not an error class, and it
+does not belong in this document's machinery.
+
+### The budget is per class, not one number
+
+One global retry count is the wrong shape. What a failure is telling you differs:
+
+- **429 carrying `Retry-After`** — honour the provider's number. It is not a guess.
+- **429 without one** — exponential and generous. This is the case worth 8-10 attempts.
+- **5xx / overloaded** — medium, 3-5.
+- **Connection reset, socket hang up** — fast, 2-3. If the network is gone, waiting does
+  not help, and Durable Streams make resuming cheap anyway.
+- **Quota, billing, monthly limit** — **zero**. Retrying a billing failure only delays
+  the one message that would tell the person what to do.
+
+### The constants are not ours, and that is the interesting constraint
+
+`MAX_TRANSIENT_MODEL_RETRIES = 3` and `TRANSIENT_MODEL_RETRY_BASE_DELAY_MS = 2000` live
+inside `@flue/runtime`'s bundle. Neither is exported and there is no override hook. Three
+routes exist, and they are not equally good:
+
+1. **Patch Flue.** There is precedent (`patches/`). Cheapest, but we then own a fork of a
+   dependency's retry loop, and it breaks quietly on upgrade.
+2. **Our own retry above Flue.** More dangerous than it looks. `submitTurn` documents that
+   an identical resend is a SECOND TURN, not a continuation — the harness pins that
+   behaviour in its own test. This route needs Flue's resume semantics, not a resend loop,
+   or it manufactures duplicate work while looking like reliability.
+3. **Leave the budget alone; surface the failure properly.** Accept roughly fourteen
+   seconds, then a clear failure with one-click retry and an offered model switch.
+
+### Why the ordering is forced
+
+**Flue's retry is a log line, not a record.** `waitForTransientModelRetry` calls
+`internalLog("warn", "[flue:model-retry] ...")` with the attempt, the max, the delay and
+the error — and writes no event. Nothing reaches the chunk stream. From the client, a
+retrying turn is indistinguishable from a stalled one: repeated empty
+`message-started`/`message-completed` pairs, and then a settlement.
+
+Inferring "it is retrying" from those repeated empties is exactly the kind of guess this
+codebase refuses elsewhere, and it would be wrong in the one case that matters — a model
+that legitimately answers with nothing looks identical.
+
+So:
+
+> **A retry budget may only be lengthened once the retry is visible. Invisible retry must
+> stay short, because every second of it is indistinguishable from a hang.**
+
+Three attempts and fourteen silent seconds is defensible *because* it is silent. Copying
+another harness's ten attempts at thirty seconds without first emitting progress does not
+buy reliability; it buys a five-minute hang. Visibility is the prerequisite, not the
+polish, and it requires route 1 — a Flue patch that emits a retry signal — or nothing.
+
+### Switching models: offer, never automatic
+
+An automatic switch means the answer came from a model the person did not choose. Cost
+changes, capability changes, and the system did something other than what it appears to
+have done — the same family as a fabricated success, which is the one thing this document
+exists to prevent.
+
+The offered version is nearly free and strictly better: bounded retry on the same model, a
+visible failure carrying the provider's own sentence, then **Retry** and **Switch to ...**
+as choices. The person decides, and the transcript records what actually ran.
+
+One exception: a fallback chain the user configured explicitly may be honoured, because
+they asked for it. Note that OpenRouter already routes between providers underneath a
+single model name, so some of this happens below us regardless.
+
+### What has to be true before any of this is worth building
+
+The order is fixed by the coupling above, and each step is only worth doing once the one
+before it is done:
+
+1. **A failure is visible at all**, carrying the provider's sentence. Buildable today —
+   the data is already on the wire. This is Task 26.
+2. **Quota and billing fail fast**, instead of burning three retries. Needs the
+   non-retryable guard Flue lacks, so it is a patch or a check above it.
+3. **The classifier widens** to match Pi's, particularly OpenRouter's own wrapper wording.
+4. **Retry becomes visible** — a wire signal, which does not exist yet.
+5. **Only then**, per-class budgets worth tuning.
+6. **The offered model switch**, which needs step 1 and nothing else, and could come
+   earlier if it earns its place.
+
 ## On dogfooding Studio to build Studio
 
 The goal is right and the ordering instinct — reliability before features — is right.
