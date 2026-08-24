@@ -78,14 +78,48 @@ taking ADR 0032 and ADR 0045 seriously:
 
 ## The gaps, honestly
 
-1. **`stop_reason: max_tokens` continuation.** Flue owns the agent loop, so this is
-   probably Flue's job — but that must be *verified by reading Flue*, not assumed. If it
-   does not continue the turn, we inherit cause #2 wholesale.
-2. **Provider-level retry** with backoff and jitter on 429/5xx/connection-reset.
+1. **`stop_reason: max_tokens` continuation — answered, and the answer is no.**
+   Read in `@flue/runtime` on 2026-08-25. Flue's completion predicate is
+   `isCompletedAssistantResponse`, and it is literally
+   `stopReason === "stop" || stopReason === "length"`. A model that stops because it hit
+   its output cap is classified `completed`, and the live turn loop returns on it for the
+   same reason: a `length` stop is neither an overflow nor a retryable error, so nothing
+   continues it. **We inherit cause #2 wholesale.** A turn truncated at the output cap is
+   recorded as a finished turn, and the person sees an answer that stops mid-sentence with
+   nothing saying why. This is Flue's design decision, not a bug in our code, so closing it
+   means either patching Flue (there is precedent — `patches/`) or continuing the turn a
+   layer above. Decide deliberately; do not let it stay open because it is inconvenient.
+2. **Provider-level retry — mostly present, and better than assumed.** Flue retries
+   transient model errors three times (`MAX_TRANSIENT_MODEL_RETRIES`) with backoff, gives
+   up, and settles `failed` carrying the provider's own sentence. Pi does not retry at all;
+   it *classifies* (`isRetryableAssistantError`) and says in its own docblock that callers
+   own the policy. So the retry gap is narrower than this document first claimed: what is
+   missing is jitter and any surface for "this is being retried right now", not the retry
+   itself.
+
+   The Task 25 report claimed a rate-limited turn is recorded as `completed` with no
+   content. That is **wrong**, and it was worth the trouble of proving: driving a real
+   harness with a provider that refuses on demand (`[fail]`, beside the older `[slow]`)
+   settles `failed` with `429 rate limit exceeded: temporarily rate-limited upstream`.
+   The harness is honest. The silence was ours — see item 3.
 3. **Never render an incomplete turn as complete.** The rule: a turn is complete only
    when a settlement chunk says so — never because bytes stopped arriving.
    `useConversation`'s `interrupted` state is the right shape; it must never be
    collapsed into `idle` for tidiness.
+
+   As of 2026-08-25 this is where the silent stop actually lives, and it is in code this
+   repo owns. Feeding a real rate-limited turn through the shipped parser and reducer
+   renders **four empty assistant messages, every one of them marked complete**, with no
+   sign anything went wrong. Two causes, both in Task 25's code:
+
+   - The settlement's `error` object is on the wire and `readChunkFacts` drops it, so
+     `errorText` is `null` and the one sentence explaining the failure never arrives.
+   - Each retry attempt emits its own `message-started`/`message-completed` pair, so every
+     attempt is `complete` by the time the failed settlement lands — and the rule that a
+     failed settlement only marks *still-open* messages then correctly touches none of them.
+
+   `message-completed` means "this attempt's record is closed", not "this turn succeeded".
+   Conflating the two is how a faithful log still produces a fabricated success.
 4. **Bounded, visible auto-resume for streams**, following the shape Task 23 already
    chose for processes: retry once per window, then a human decides. Infinite retry is
    the other failure mode — a harness that looks busy while accomplishing nothing.
