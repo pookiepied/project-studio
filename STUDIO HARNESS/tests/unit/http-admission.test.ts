@@ -148,6 +148,9 @@ describe("Harness HTTP admission", () => {
         },
       } as unknown as PermissionApprovalBroker,
       admission: session.verifier,
+      // Never exercised here; required so the route cannot be mounted without
+      // a way to actually stop the process.
+      requestShutdown: () => undefined,
       flueApp,
     });
 

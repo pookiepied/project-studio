@@ -71,6 +71,9 @@ beforeEach(() => {
     }),
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
     admission: session.verifier,
+    // This suite never posts to the shutdown route; the no-op keeps the
+    // process out of a composition that would otherwise be able to end it.
+    requestShutdown: () => undefined,
     flueApp,
   });
 });

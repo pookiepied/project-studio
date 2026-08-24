@@ -28,6 +28,20 @@ pub use supervisor::{HarnessStatus, HarnessSupervisor};
 #[cfg(test)]
 pub(crate) mod test_support {
     pub static ONE_HARNESS_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// Shuts a supervisor down even when an assertion between start and stop
+    /// panics.
+    ///
+    /// Without this a failing live test leaks a Node process holding a
+    /// loopback port and the data home for the rest of the machine's uptime,
+    /// and the next run inherits the mess.
+    pub struct StopOnDrop(pub super::supervisor::HarnessSupervisor);
+
+    impl Drop for StopOnDrop {
+        fn drop(&mut self) {
+            self.0.shutdown_all();
+        }
+    }
 }
 
 #[cfg(test)]

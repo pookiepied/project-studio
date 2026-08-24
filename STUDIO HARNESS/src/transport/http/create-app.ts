@@ -8,6 +8,7 @@ import type { McpAdministration } from "../../application/mcp-management.js";
 import type { ProviderAdministration } from "../../application/provider-management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
+import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 import { createProviderRoutes } from "./routes/providers.js";
@@ -25,6 +26,12 @@ export interface CreateHttpAppOptions {
   readonly retrieval: RetrievalAdministration;
   readonly approvals: PermissionApprovalBroker;
   readonly admission: AdmissionVerifier;
+  /**
+   * Begins this process's graceful shutdown when the Studio Host asks over
+   * `POST /api/shutdown`. Required rather than optional so a composition
+   * cannot wire the route while forgetting that it has to end the process.
+   */
+  readonly requestShutdown: () => void;
   /** Injectable Flue app for tests; production uses the generated Flue app. */
   readonly flueApp?: Hono;
 }
@@ -42,6 +49,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
+  app.route("/api", createLifecycleRoutes({ requestShutdown: options.requestShutdown }));
 
   const agentRoutes = new Hono<AdmissionEnv>();
   agentRoutes.use("*", requireAdmissionScope(ADMISSION_SCOPES.AGENT_RUN));

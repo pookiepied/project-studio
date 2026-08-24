@@ -111,14 +111,16 @@ fn restart_harness(
   supervisor.restart().map(HarnessEndpointView::from)
 }
 
-/// What the Harness is doing, including a start that already failed.
+/// What the Harness is doing, including a start that already failed and one
+/// still in flight.
 ///
 /// This returns a status rather than an `Option<HarnessEndpoint>` because the
 /// eager start in `run()` happens on a background thread before any window
 /// exists: a failure there had no caller to return to and ended in
 /// `log::error!`. `HarnessStatus` distinguishes "failed, and here is why" from
-/// "nothing has started yet", which is the difference between something the UI
-/// can render and a line in a log file.
+/// "nothing has started yet" -- which is the difference between something the
+/// UI can render and a line in a log file -- and answers `starting` promptly
+/// during a spawn rather than blocking behind it.
 #[tauri::command]
 fn get_harness_status(
   supervisor: tauri::State<'_, HarnessSupervisor>,
@@ -178,6 +180,15 @@ pub fn run() {
     }
   });
 
+  // The supervisor tells the webview what happens to the Harness as it
+  // happens -- starting, started (the view, never the token), stopped,
+  // failed, restarting -- instead of the frontend having to poll for all of
+  // it. Attached here because emission needs an app handle; events raised
+  // before this point, notably the eager start's `harness-starting`, go to
+  // no listener, which costs nothing: the webview's first look is a status
+  // call, not an event backlog.
+  let lifecycle_supervisor = supervisor.clone();
+
   tauri::Builder::default()
     .manage(supervisor)
     // Remembers size and position across launches. A desktop app that reopens
@@ -186,7 +197,7 @@ pub fn run() {
     // `resetWindowSize` in the frontend is the way back to the default.
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_store::Builder::default().build())
-    .setup(|app| {
+    .setup(move |app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -194,6 +205,7 @@ pub fn run() {
             .build(),
         )?;
       }
+      lifecycle_supervisor.attach_lifecycle_emitter(app.handle().clone());
       if let Some(main_window) = app.get_webview_window("main") {
         window::apply_rounded_corners(&main_window);
       }

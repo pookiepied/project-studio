@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use serde::Serialize;
 use std::time::{Duration, Instant};
@@ -23,6 +24,8 @@ use windows::Win32::System::JobObjects::{
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 
+use tauri::{AppHandle, Emitter};
+
 use crate::harness::bootstrap::{generate_bootstrap, AdmissionBootstrap};
 use crate::harness::channel::{BootstrapChannel, ReadinessStream};
 use crate::harness::environment::apply_harness_environment;
@@ -39,6 +42,37 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 /// `terminate_child`.
 #[cfg(unix)]
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
+
+/// How long the polite shutdown request waits to be acknowledged.
+///
+/// The Harness answers `POST /api/shutdown` before it begins draining -- the
+/// response is fire-and-forget on its side -- so on loopback the answer should
+/// arrive in milliseconds. Five seconds tolerates a paused process without
+/// letting a quit hang on a request that will never be answered.
+const SHUTDOWN_ACK_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long a drain may take before the fallback termination runs.
+///
+/// The bound matters more than its value: a drain that waits forever is a
+/// window that will not close. Ten seconds is generous headroom over the work
+/// a graceful shutdown honestly does -- stop each MCP server (awaited, each
+/// typically well under a second) and close two SQLite databases (checkpoint
+/// included, sub-second on local disk) -- because nothing in it waits for an
+/// in-flight model turn: unfinished submissions stay reclaimable by design
+/// (ADR 0032 §3). Past the bound, today's termination is the answer, and the
+/// log line that precedes it is how we learn the mechanism broke.
+const DRAIN_BOUND: Duration = Duration::from_secs(10);
+
+/// How long a crash may be followed by an automatic restart.
+///
+/// Once per window, not once ever: a harness that crashes again within sixty
+/// seconds of the last unexpected exit is one the replacement did not save,
+/// and restarting it in a loop looks like activity while fixing nothing.
+/// Sixty seconds is two startup budgets -- a harness that cannot start
+/// demonstrates that within [`STARTUP_TIMEOUT`] -- so the window always spans
+/// enough to see the restart fail, and never strands a user whose harness
+/// crashed twice an hour ago.
+const RESTART_WINDOW: Duration = Duration::from_secs(60);
 
 /// How many lines of the child's own output are kept for a startup failure.
 ///
@@ -110,14 +144,67 @@ fn tail(text: String) -> String {
     format!("…{}", &text[start..])
 }
 
+/// What the supervisor tells the webview as the Harness lifecycle moves.
+///
+/// The names are the contract the frontend subscribes to; the payloads are
+/// narrow on purpose. [`LifecycleEvent::Started`] carries the endpoint *view*
+/// -- `HarnessEndpoint` cannot be serialized, so the bearer physically cannot
+/// ride the event -- and [`LifecycleEvent::Failed`] carries a sentence that is
+/// redacted at its source like every other diagnostic.
+#[derive(Debug, Clone)]
+pub(crate) enum LifecycleEvent {
+    Starting,
+    Started(HarnessEndpointView),
+    Stopped,
+    Failed(String),
+    Restarting,
+}
+
+impl LifecycleEvent {
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            LifecycleEvent::Starting => "harness-starting",
+            LifecycleEvent::Started(_) => "harness-started",
+            LifecycleEvent::Stopped => "harness-stopped",
+            LifecycleEvent::Failed(_) => "harness-failed",
+            LifecycleEvent::Restarting => "harness-restarting",
+        }
+    }
+}
+
+/// Serialised flat rather than wrapped, so a subscriber reads the view or the
+/// message directly instead of unwrapping `{ payload: ... }` first.
+impl Serialize for LifecycleEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            LifecycleEvent::Started(view) => view.serialize(serializer),
+            LifecycleEvent::Failed(message) => message.serialize(serializer),
+            LifecycleEvent::Starting | LifecycleEvent::Stopped | LifecycleEvent::Restarting => {
+                serializer.serialize_unit()
+            }
+        }
+    }
+}
+
+/// Receives every lifecycle event, named and carrying its payload.
+///
+/// A closure rather than a Tauri type so the supervisor's tests can record
+/// events without an application, so this module never imports more of Tauri
+/// than the emitter wiring, and so emission is defined as "tell whoever is
+/// listening" -- which is nobody, correctly, before any webview exists.
+pub(crate) type LifecycleSink = Box<dyn Fn(&LifecycleEvent) + Send + Sync>;
+
 /// Keeps the Harness and everything it starts inside one killable container.
 ///
 /// One name, two mechanisms, the same shape as `channel.rs`. On Unix the
 /// container is a process group and it is established *before* the spawn, by
-/// `cmd.process_group(0)` in `spawn_child`, so there is nothing left for this
-/// type to do afterwards. On Windows there is no process group, and the
-/// counterpart -- a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` -- can
-/// only be joined by a process that already exists, so it acts after the spawn.
+/// `cmd.process_group(0)` in `launch`, so there is nothing left for this type
+/// to do afterwards. On Windows there is no process group, and the counterpart
+/// -- a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` -- can only be
+/// joined by a process that already exists, so it acts after the spawn.
 ///
 /// The Windows half is meta-task **#89**: `cmd.process_group(0)` is
 /// `#[cfg(unix)]` and had no counterpart, so an MCP server the Harness started
@@ -244,10 +331,46 @@ struct Inner {
     /// Last endpoint before stop, for stale-token checks in tests
     last_endpoint: Option<HarnessEndpoint>,
     start_count: u64,
-    /// Why the last start attempt failed, if one did and none has succeeded
-    /// since. See [`HarnessSupervisor::status`].
+    /// Why the last start attempt failed, or why the last unexpected exit
+    /// happened, if either did and nothing healthy has happened since. See
+    /// [`HarnessSupervisor::status`].
     last_error: Option<String>,
+    /// True while a spawn is in flight. The spawn does its waiting *without*
+    /// the lock (see [`HarnessSupervisor::spawn`]), so this flag is how
+    /// `status` answers `starting` instead of blocking behind the spawn, and
+    /// how a concurrent `start` waits rather than double-spawning.
+    starting: bool,
+    /// Set by `shutdown_all` while a spawn is in flight. The spawn polls it
+    /// throughout the readiness wait and lands its child dead rather than
+    /// installing a harness nobody wants; without it, quitting during the
+    /// startup window could bring a Harness to life behind the app's back.
+    abort_start: bool,
+    /// True between "a stop was asked of the live child" and that child being
+    /// reaped. An exit under this flag is the stop landing, not a crash: it
+    /// reports `stopped` rather than `failed`, and restarts nothing. Reset on
+    /// install, on reap, and wherever a stop sequence finishes, so a stale
+    /// flag can never teach the next crash to masquerade as a stop.
+    expected_exit: bool,
+    /// When the last unexpected exit was observed. Bounds automatic restarts
+    /// to once per [`RESTART_WINDOW`].
+    last_unexpected_exit: Option<Instant>,
     containment: ProcessContainment,
+}
+
+/// The supervisor's shared state, split by holding time.
+///
+/// `state` guards bookkeeping and is held only for the length of a field
+/// update; the long work of a spawn runs without it. `spawn_settled` wakes the
+/// callers waiting on an in-flight spawn. `lifecycle` is held for the length
+/// of one callback, and no callback ever takes `state`, so the two cannot
+/// cycle. This split *is* Part 3: a lock held across spawn plus readiness was
+/// a status call that waited up to thirty seconds for an answer it could have
+/// given immediately.
+#[derive(Default)]
+struct Shared {
+    state: Mutex<Inner>,
+    spawn_settled: Condvar,
+    lifecycle: Mutex<Option<LifecycleSink>>,
 }
 
 /// What the webview is told when it asks how the Harness is doing.
@@ -256,9 +379,13 @@ struct Inner {
 /// failed thirty seconds ago" from "nothing has tried to start yet", and the
 /// eager start happens before any window exists, so a failure had nowhere to go
 /// but `log::error!`. A log line is not a thing a user can be shown. This is.
+///
+/// `starting` is new because the spawn no longer holds the state lock while it
+/// waits: a status call during the eager start now answers promptly instead of
+/// blocking behind readiness, and what it answers is that a start is underway.
 #[derive(Debug, Clone, Serialize)]
 pub struct HarnessStatus {
-    /// `running`, `failed`, or `stopped`.
+    /// `running`, `starting`, `failed`, or `stopped`.
     pub state: &'static str,
     /// Present exactly when `state` is `running`. The view, not the endpoint:
     /// this crosses to the webview and the bearer does not.
@@ -268,15 +395,21 @@ pub struct HarnessStatus {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HarnessSupervisor {
-    inner: Arc<Mutex<Inner>>,
+    shared: Arc<Shared>,
+}
+
+impl std::fmt::Debug for HarnessSupervisor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HarnessSupervisor").finish_non_exhaustive()
+    }
 }
 
 impl Default for HarnessSupervisor {
     fn default() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Inner::default())),
+            shared: Arc::new(Shared::default()),
         }
     }
 }
@@ -284,6 +417,37 @@ impl Default for HarnessSupervisor {
 impl HarnessSupervisor {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Installs the lifecycle sink. `lib.rs` passes the Tauri emitter; tests
+    /// pass a recorder. Events emitted with no sink installed go nowhere,
+    /// which is correct before any webview exists to hear them.
+    pub(crate) fn set_lifecycle_sink(&self, sink: LifecycleSink) {
+        *self.shared.lifecycle.lock().unwrap() = Some(sink);
+    }
+
+    /// Wires lifecycle events to the webview. Called once, from setup, once
+    /// the application handle exists; the eager start usually began earlier
+    /// and its `starting` went unheard, which costs nothing -- the webview's
+    /// first look is a `status()` call, not an event backlog.
+    pub(crate) fn attach_lifecycle_emitter(&self, app: AppHandle) {
+        self.set_lifecycle_sink(Box::new(move |event| {
+            if let Err(error) = app.emit(event.name(), event) {
+                log::debug!("harness event {} undelivered: {error}", event.name());
+            }
+        }));
+    }
+
+    /// Emits through the sink, if anyone installed one. Never takes the state
+    /// lock, and no sink takes it either, so emitting from inside a locked
+    /// region cannot deadlock -- though callers still emit after unlocking,
+    /// because a callback that observes half-finished bookkeeping is a bug
+    /// waiting for a second subscriber.
+    fn emit(&self, event: LifecycleEvent) {
+        let sink = self.shared.lifecycle.lock().unwrap();
+        if let Some(sink) = sink.as_ref() {
+            sink(&event);
+        }
     }
 
     /// Resolve the built Harness server entrypoint.
@@ -328,28 +492,180 @@ impl HarnessSupervisor {
     }
 
     pub fn get_endpoint(&self) -> Option<HarnessEndpoint> {
-        let mut guard = self.inner.lock().unwrap();
-        Self::reap_dead_locked(&mut guard);
+        self.observe();
+        let guard = self.shared.state.lock().unwrap();
         guard.running.as_ref().map(|r| r.endpoint.clone())
     }
 
     pub fn start(&self) -> Result<HarnessEndpoint, String> {
-        let mut guard = self.inner.lock().unwrap();
-        Self::reap_dead_locked(&mut guard);
-        if let Some(running) = &guard.running {
-            return Ok(running.endpoint.clone());
+        self.spawn_installed(false)
+    }
+
+    /// Reaps a dead child and reacts to what its death was.
+    ///
+    /// Nobody watches the child between calls, so death is *observed* through
+    /// the read paths -- every `get_endpoint`, `status`, and `start` looks
+    /// first. Observation is where the consequences happen: the failure is
+    /// recorded for `status`, the webview is told, and, once per
+    /// [`RESTART_WINDOW`], the replacement begins.
+    fn observe(&self) {
+        let crash = {
+            let mut guard = self.shared.state.lock().unwrap();
+            Self::reap_locked(&mut guard)
+        };
+        let Some(crash) = crash else {
+            return;
+        };
+
+        self.emit(LifecycleEvent::Failed(crash));
+
+        let eligible = {
+            let mut guard = self.shared.state.lock().unwrap();
+            let eligible = guard
+                .last_unexpected_exit
+                .map_or(true, |at| at.elapsed() >= RESTART_WINDOW);
+            guard.last_unexpected_exit = Some(Instant::now());
+            eligible
+        };
+        if !eligible {
+            // Already reported `failed`; the second chance is spent, and a
+            // person decides what happens next.
+            return;
         }
-        // Kept, not just returned. `run()` starts the Harness on a background
-        // thread before any window exists, so the caller that sees this error
-        // is a thread with nobody to tell; `status` is how the webview learns
-        // about it afterwards.
-        let outcome = self.spawn_locked(&mut guard);
-        let endpoint = Self::record(&mut guard, outcome)?;
-        Ok(endpoint)
+
+        // No `restarting` here: the announcement belongs to the spawn itself,
+        // so there is exactly one per replacement even when several observers
+        // trip over the same crash.
+        let supervisor = self.clone();
+        std::thread::spawn(move || {
+            if let Err(error) = supervisor.spawn_installed(true) {
+                log::error!("Harness supervisor: automatic restart failed: {error}");
+            }
+        });
+    }
+
+    /// Starts the Harness, single-flight.
+    ///
+    /// The previous version held the supervisor lock through spawn plus
+    /// readiness -- up to [`STARTUP_TIMEOUT`] -- so a status call during the
+    /// eager start blocked on that lock for the whole startup window. The lock
+    /// is now taken for bookkeeping only: `starting` marks the flight, the
+    /// long work runs without it, and a concurrent caller waits on the condvar
+    /// to inherit the outcome rather than spawning a second Harness.
+    ///
+    /// The spawn path is synchronous, so nothing here holds a lock across an
+    /// await; the discipline is the same one Clippy demanded of the async
+    /// version, applied to reads as well.
+    fn spawn_installed(&self, restarted: bool) -> Result<HarnessEndpoint, String> {
+        let mut guard = self.shared.state.lock().unwrap();
+        loop {
+            // Hygiene, not reaction: if the previous child died while nobody
+            // looked, move it out so a dead endpoint is never returned here.
+            // The announcement of that death belongs to `observe`, which owns
+            // the restart policy; this path *is* a replacement beginning.
+            let _ = Self::reap_locked(&mut guard);
+
+            if let Some(running) = &guard.running {
+                return Ok(running.endpoint.clone());
+            }
+
+            if !guard.starting {
+                guard.starting = true;
+                // A child that does not exist yet owes no exit: whatever a
+                // previous stop expected applies to the child it named, and a
+                // stale flag here would teach this spawn's crash to masquerade
+                // as a deliberate stop.
+                guard.expected_exit = false;
+                drop(guard);
+
+                self.emit(if restarted {
+                    LifecycleEvent::Restarting
+                } else {
+                    LifecycleEvent::Starting
+                });
+
+                let outcome = self.spawn();
+
+                let mut guard = self.shared.state.lock().unwrap();
+                guard.starting = false;
+                self.shared.spawn_settled.notify_all();
+
+                if guard.abort_start {
+                    // A shutdown arrived while this spawn was in flight; the
+                    // child is already dead (`spawn` polls the flag). Nothing
+                    // installs, and no failure is recorded: the app is on its
+                    // way out, and "failed" would be a lie a reopening window
+                    // would show.
+                    guard.abort_start = false;
+                    guard.last_error = None;
+                    return Err("harness start aborted by shutdown".to_string());
+                }
+
+                let result = Self::record_install(&mut guard, outcome);
+                drop(guard);
+
+                match &result {
+                    Ok(endpoint) => self.emit(LifecycleEvent::Started(
+                        HarnessEndpointView::from(endpoint.clone()),
+                    )),
+                    Err(error) => self.emit(LifecycleEvent::Failed(error.clone())),
+                }
+                return result;
+            }
+
+            // Another caller's spawn is in flight. Wait to inherit its result;
+            // the spawn path always settles -- every stage inside it is bounded
+            // -- so a timeout here means something is wedged beyond all of its
+            // own bounds, which is worth reporting rather than out-staring.
+            let (next, settled) = self
+                .shared
+                .spawn_settled
+                .wait_timeout(guard, STARTUP_TIMEOUT + DRAIN_BOUND)
+                .unwrap();
+            if settled.timed_out() {
+                return Err("a harness start is in flight and did not settle".to_string());
+            }
+            guard = next;
+        }
+    }
+
+    /// Installs a finished spawn, or records why there is nothing to install.
+    ///
+    /// A success clears the previous failure rather than leaving it beside a
+    /// live endpoint, where the next reader would have to decide which of the
+    /// two to believe.
+    fn record_install(
+        guard: &mut Inner,
+        outcome: Result<(Child, HarnessEndpoint), String>,
+    ) -> Result<HarnessEndpoint, String> {
+        match outcome {
+            Ok((child, endpoint)) => {
+                guard.running = Some(RunningHarness {
+                    child,
+                    endpoint: endpoint.clone(),
+                });
+                guard.start_count += 1;
+                guard.last_endpoint = Some(endpoint.clone());
+                guard.last_error = None;
+                Ok(endpoint)
+            }
+            Err(error) => {
+                // Kept, not just returned. `run()` starts the Harness on a
+                // background thread before any window exists, so the caller
+                // that sees this error may be a thread with nobody to tell;
+                // `status` is how the webview learns about it afterwards.
+                guard.last_error = Some(error.clone());
+                Err(error)
+            }
+        }
     }
 
     /// The state a UI can render, including a start that failed with no window
-    /// yet open to receive the error.
+    /// yet open to receive the error, and one that has not finished yet.
+    ///
+    /// Prompt by construction: `get_endpoint` and the lock below are both held
+    /// for microseconds of bookkeeping, never across the spawn, so a status
+    /// call during a start answers `starting` instead of queueing behind it.
     pub fn status(&self) -> HarnessStatus {
         // `get_endpoint` reaps a dead child first, so a Harness that exited
         // reports as failed-or-stopped here rather than as running.
@@ -361,7 +677,14 @@ impl HarnessSupervisor {
             };
         }
 
-        let guard = self.inner.lock().unwrap();
+        let guard = self.shared.state.lock().unwrap();
+        if guard.starting {
+            return HarnessStatus {
+                state: "starting",
+                endpoint: None,
+                error: None,
+            };
+        }
         match guard.last_error.as_ref() {
             Some(error) => HarnessStatus {
                 state: "failed",
@@ -376,31 +699,54 @@ impl HarnessSupervisor {
         }
     }
 
-    /// Remembers the outcome of a start attempt.
+    /// Stops the current Harness politely and starts a fresh one.
     ///
-    /// A success clears the previous failure rather than leaving it beside a
-    /// live endpoint, where the next reader would have to decide which of the
-    /// two to believe.
-    fn record(
-        guard: &mut Inner,
-        outcome: Result<HarnessEndpoint, String>,
-    ) -> Result<HarnessEndpoint, String> {
-        match &outcome {
-            Ok(_) => guard.last_error = None,
-            Err(error) => guard.last_error = Some(error.clone()),
-        }
-        outcome
-    }
-
+    /// Deliberately routed through the same graceful stop as quitting: a
+    /// manual restart that hard-killed would leave exactly the hot WAL this
+    /// whole task exists to stop leaving.
     pub fn restart(&self) -> Result<HarnessEndpoint, String> {
-        let mut guard = self.inner.lock().unwrap();
-        // Stop existing if any
-        if let Some(mut running) = guard.running.take() {
+        let old = {
+            let mut guard = self.shared.state.lock().unwrap();
+            let old = guard.running.take();
+            if old.is_some() {
+                guard.expected_exit = true;
+            }
+            old
+        };
+        if let Some(mut running) = old {
+            log::info!(
+                "Harness supervisor: stopping harness pid={} for restart",
+                running.endpoint.pid
+            );
+            match Self::stop_politely(
+                &mut running.child,
+                &running.endpoint,
+                SHUTDOWN_ACK_TIMEOUT,
+                DRAIN_BOUND,
+            ) {
+                PoliteOutcome::Exited => {}
+                PoliteOutcome::RequestFailed(reason) => log::warn!(
+                    "Harness supervisor: the polite shutdown did not work ({reason}); terminated pid={}",
+                    running.endpoint.pid
+                ),
+                PoliteOutcome::DrainExceeded => log::warn!(
+                    "Harness supervisor: the polite shutdown did not work (did not exit within {}ms); terminated pid={}",
+                    DRAIN_BOUND.as_millis(),
+                    running.endpoint.pid
+                ),
+            }
+            // Unconditional sweep, polite path included: the group should be
+            // empty, and on Unix a descendant that outlived its parent is what
+            // the group address is for.
             Self::terminate_child(&mut running.child);
-            log::info!("Harness supervisor: stopped old harness pid={} for restart", running.endpoint.pid);
+
+            let mut guard = self.shared.state.lock().unwrap();
+            guard.last_endpoint = Some(running.endpoint);
+            guard.last_error = None;
+            guard.expected_exit = false;
         }
-        let outcome = self.spawn_locked(&mut guard);
-        let endpoint = Self::record(&mut guard, outcome)?;
+
+        let endpoint = self.spawn_installed(true)?;
         log::info!(
             "Harness supervisor: restarted harness pid={} port={} session={}",
             endpoint.pid,
@@ -416,7 +762,10 @@ impl HarnessSupervisor {
     // is a second thing to keep correct. Removed with #87, when compiling on
     // Windows made the crate's dead code visible for the first time.
 
-    fn spawn_locked(&self, guard: &mut Inner) -> Result<HarnessEndpoint, String> {
+    /// Spawns the child and waits for readiness, holding no lock across the
+    /// wait. Returns the child so the caller can install it atomically with
+    /// its endpoint under the lock.
+    fn spawn(&self) -> Result<(Child, HarnessEndpoint), String> {
         let server_path = self.resolve_server_path()?;
         let client_id = "studio-host".to_string();
         let generated = generate_bootstrap(client_id);
@@ -430,38 +779,76 @@ impl HarnessSupervisor {
             bootstrap.session_id
         );
 
-        let endpoint = Self::spawn_child(
-            &mut guard.containment,
-            server_path,
-            bootstrap,
-            token.clone(),
-        )?;
+        let (mut child, readiness_stream) = self.launch(server_path, bootstrap)?;
 
-        guard.running = Some(RunningHarness {
-            child: endpoint.0,
-            endpoint: endpoint.1.clone(),
-        });
-        guard.start_count += 1;
-        guard.last_endpoint = Some(endpoint.1.clone());
+        // Checked throughout the readiness wait, every 50ms tick: a shutdown
+        // that arrives mid-spawn lands this child dead instead of installed.
+        let abort = {
+            let shared = self.shared.clone();
+            move || {
+                shared
+                    .state
+                    .lock()
+                    .map(|guard| guard.abort_start)
+                    .unwrap_or(false)
+            }
+        };
+
+        let readiness = match Self::wait_for_readiness(readiness_stream, &mut child, &token, &abort)
+        {
+            Ok(readiness) => readiness,
+            Err(error) => {
+                Self::terminate_child(&mut child);
+                return Err(error);
+            }
+        };
+
+        // Verify endpoint host is loopback
+        if readiness.host != "127.0.0.1" {
+            Self::terminate_child(&mut child);
+            return Err(format!(
+                "harness readiness host must be 127.0.0.1, got {}",
+                readiness.host
+            ));
+        }
+
+        let endpoint = match HarnessEndpoint::from_readiness(readiness, token.clone()) {
+            Some(endpoint) => endpoint,
+            None => {
+                Self::terminate_child(&mut child);
+                return Err("invalid readiness frame".to_string());
+            }
+        };
+
+        // Startup is over, so nothing is reading the child's pipes any more.
+        // From here they are drained for their whole life, not sampled on
+        // failure.
+        Self::drain_output(&mut child);
 
         // Do not log token
         log::info!(
             "Harness supervisor: harness ready pid={} {}:{} session={} (token redacted)",
-            endpoint.1.pid,
-            endpoint.1.host,
-            endpoint.1.port,
-            endpoint.1.session_id
+            endpoint.pid,
+            endpoint.host,
+            endpoint.port,
+            endpoint.session_id
         );
 
-        Ok(endpoint.1)
+        Ok((child, endpoint))
     }
 
-    fn spawn_child(
-        containment: &mut ProcessContainment,
+    /// Creates the Node child: environment policy, descriptors, containment.
+    ///
+    /// Split out of the old monolithic `spawn_child` so the readiness wait --
+    /// the only slow part -- can run without the supervisor lock. The one step
+    /// that needs it is the Windows job assignment, and that is a few
+    /// syscalls; it is also the only reason this is a method rather than a
+    /// free function.
+    fn launch(
+        &self,
         server_path: PathBuf,
         bootstrap: AdmissionBootstrap,
-        token: String,
-    ) -> Result<(Child, HarnessEndpoint), String> {
+    ) -> Result<(Child, ReadinessStream), String> {
         // Prepare bootstrap JSON (credential + ids)
         let bootstrap_json = serde_json::to_string(&bootstrap)
             .map_err(|e| format!("failed to serialize bootstrap: {e}"))?;
@@ -503,13 +890,25 @@ impl HarnessSupervisor {
         #[cfg(unix)]
         cmd.process_group(0);
 
-        let mut child = cmd.spawn().map_err(|e| format!("failed to spawn node harness: {e} (path={})", server_path.display()))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            format!(
+                "failed to spawn node harness: {e} (path={})",
+                server_path.display()
+            )
+        })?;
 
         // The other half of the containment above, for the platform that can
         // only do it once the process exists. Fatal rather than logged: a
         // Harness outside the job is one whose MCP children can outlive it,
         // which is the condition this exists to prevent.
-        if let Err(error) = containment.contain(&child) {
+        //
+        // Under the bookkeeping lock for the instant of the assignment. The
+        // lock is released before any slow step, so this cannot contend with
+        // a status call for longer than a few syscalls.
+        if let Err(error) = {
+            let mut guard = self.shared.state.lock().unwrap();
+            guard.containment.contain(&child)
+        } {
             Self::terminate_child(&mut child);
             return Err(error);
         }
@@ -522,27 +921,7 @@ impl HarnessSupervisor {
             }
         };
 
-        // Read readiness with timeout
-        let readiness = Self::wait_for_readiness(readiness_stream, &mut child, &token)?;
-
-        // Verify endpoint host is loopback
-        if readiness.host != "127.0.0.1" {
-            Self::terminate_child(&mut child);
-            return Err(format!("harness readiness host must be 127.0.0.1, got {}", readiness.host));
-        }
-
-        let endpoint = HarnessEndpoint::from_readiness(readiness, token.clone())
-            .ok_or_else(|| {
-                Self::terminate_child(&mut child);
-                "invalid readiness frame".to_string()
-            })?;
-
-        // Startup is over, so nothing is reading the child's pipes any more.
-        // From here they are drained for their whole life, not sampled on
-        // failure.
-        Self::drain_output(&mut child);
-
-        Ok((child, endpoint))
+        Ok((child, readiness_stream))
     }
 
     /// Waits for the readiness frame, or explains why it never came.
@@ -560,6 +939,7 @@ impl HarnessSupervisor {
         stream: ReadinessStream,
         child: &mut Child,
         token: &str,
+        abort: &dyn Fn() -> bool,
     ) -> Result<HarnessReadiness, String> {
         use std::sync::mpsc;
 
@@ -669,7 +1049,16 @@ impl HarnessSupervisor {
                     remember(trimmed);
                 }
                 Ok(Err(e)) => return Err(format!("failed to read readiness: {e}")),
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // The abort check lives in the polling tick because this is
+                    // the only loop a spawn spends real time inside; a shutdown
+                    // that arrives mid-spawn therefore lands within one tick.
+                    if abort() {
+                        Self::terminate_child(child);
+                        return Err("harness start aborted by shutdown".to_string());
+                    }
+                    continue;
+                }
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
                     return Err(format!(
                         "Harness readiness stream closed without a frame. {}",
@@ -755,35 +1144,260 @@ impl HarnessSupervisor {
         }
     }
 
-    fn reap_dead_locked(guard: &mut Inner) {
-        let exited = guard
+    /// Moves out a child found dead, recording what its exit meant.
+    ///
+    /// Returns the sentence when the exit was unexpected: nobody asked for it,
+    /// so it is a crash, and `status` must be able to say so rather than
+    /// reporting `stopped` with nothing. An exit under `expected_exit` is a
+    /// stop landing -- the flag is consumed with the child so it cannot leak
+    /// into the next lifecycle.
+    fn reap_locked(guard: &mut Inner) -> Option<String> {
+        let status = guard
             .running
             .as_mut()
-            .and_then(|running| running.child.try_wait().ok().flatten())
-            .is_some();
+            .and_then(|running| running.child.try_wait().ok().flatten())?;
+        let mut running = guard.running.take().expect("the status came from running");
 
-        if !exited {
-            return;
-        }
+        let sentence = redact(
+            &format!("Harness exited unexpectedly: {status}"),
+            &running.endpoint.token,
+        );
+        // The root is gone, but descendants may not be; the sweep is the same
+        // one a deliberate stop gets.
+        Self::terminate_child(&mut running.child);
 
-        if let Some(mut running) = guard.running.take() {
-            Self::terminate_child(&mut running.child);
-            guard.last_endpoint = Some(running.endpoint);
+        let deliberate = guard.expected_exit;
+        guard.expected_exit = false;
+        guard.last_endpoint = Some(running.endpoint);
+        if deliberate {
+            // The stop that was asked for. A failure sentence here would be a
+            // lie told to whoever opens the app next.
+            guard.last_error = None;
+            None
+        } else {
+            guard.last_error = Some(sentence.clone());
+            Some(sentence)
         }
     }
 
+    /// Stops the Harness, politely first.
+    ///
+    /// Every quit used to run the crash path: `terminate_child` on Windows is
+    /// `TerminateProcess`, no handler runs, the databases are never closed,
+    /// and a hot `-wal` sat beside `studio.db` after every stop. The Harness
+    /// answers `POST /api/shutdown` by invalidating admission, draining its
+    /// MCP servers, and closing both databases; this waits for that with a
+    /// bounded patience ([`DRAIN_BOUND`]) and falls back to termination past
+    /// it, loudly -- a silent fallback means the mechanism broke and nobody
+    /// learned.
     pub fn shutdown_all(&self) {
-        let mut guard = self.inner.lock().unwrap();
-        if let Some(mut running) = guard.running.take() {
-            log::info!("Harness supervisor: shutting down harness pid={}", running.endpoint.pid);
-            Self::terminate_child(&mut running.child);
+        // Poison-tolerant, and only here: this runs on the exit path, where
+        // the alternative to recovering is a process that cannot stop its own
+        // child because some other thread died mid-bookkeeping. A half-updated
+        // Inner costs at most a mislabelled event during quit; an aborted
+        // cleanup leaks a Harness holding a port.
+        //
+        // Stop admitting first: taking the child out means `get_endpoint`
+        // answers None and the service seam refuses new work before the ask
+        // goes out. An in-flight spawn is told to land dead.
+        let (running, was_starting) = {
+            let mut guard = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            let was_starting = guard.starting;
+            if was_starting {
+                guard.abort_start = true;
+            }
+            if guard.running.is_some() {
+                guard.expected_exit = true;
+            }
+            (guard.running.take(), was_starting)
+        };
+
+        // Wait for the in-flight spawn to settle so a quit cannot race a
+        // Harness into existence behind the app's back. Bounded: past the
+        // bound the process containment -- job object or process group -- is
+        // the backstop, which is what it exists for.
+        if was_starting {
+            let guard = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            let (guard, settled) = self
+                .shared
+                .spawn_settled
+                .wait_timeout(guard, DRAIN_BOUND)
+                .unwrap_or_else(|p| p.into_inner());
+            drop(guard);
+            if settled.timed_out() {
+                log::warn!(
+                    "Harness supervisor: an in-flight start did not settle within {}ms of a shutdown; relying on process containment",
+                    DRAIN_BOUND.as_millis()
+                );
+            }
         }
+
+        let Some(mut running) = running else {
+            return;
+        };
+
+        log::info!(
+            "Harness supervisor: shutting down harness pid={}",
+            running.endpoint.pid
+        );
+        match Self::stop_politely(
+            &mut running.child,
+            &running.endpoint,
+            SHUTDOWN_ACK_TIMEOUT,
+            DRAIN_BOUND,
+        ) {
+            PoliteOutcome::Exited => {}
+            PoliteOutcome::RequestFailed(reason) => log::warn!(
+                "Harness supervisor: the polite shutdown did not work ({reason}); terminated pid={}",
+                running.endpoint.pid
+            ),
+            PoliteOutcome::DrainExceeded => log::warn!(
+                "Harness supervisor: the polite shutdown did not work (did not exit within {}ms); terminated pid={}",
+                DRAIN_BOUND.as_millis(),
+                running.endpoint.pid
+            ),
+        }
+        // Unconditional sweep, polite path included: the Harness stops its own
+        // MCP servers before exiting, so the group should be empty -- but the
+        // cost of checking twice is zero and the cost of an orphan is a port.
+        Self::terminate_child(&mut running.child);
+
+        {
+            let mut guard = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            guard.last_endpoint = Some(running.endpoint);
+            guard.last_error = None;
+            guard.expected_exit = false;
+        }
+        self.emit(LifecycleEvent::Stopped);
     }
+
+    /// Asks the child to stop itself, then watches it with a bounded patience.
+    ///
+    /// Never terminates: deciding to fall back is the caller's, so the warning
+    /// log and the kill come from the same place and cannot drift apart.
+    ///
+    /// The request is a hand-written loopback POST rather than the service
+    /// seam's client: `shutdown_all` runs synchronously on the exit path,
+    /// where no async runtime is guaranteed to still exist, and this crate
+    /// already speaks bare HTTP/1.1 to this exact peer in `integration.rs`.
+    /// The bearer is attached here, in Rust, and reaches no log.
+    fn stop_politely(
+        child: &mut Child,
+        endpoint: &HarnessEndpoint,
+        ack_timeout: Duration,
+        drain_bound: Duration,
+    ) -> PoliteOutcome {
+        match Self::post_shutdown(endpoint, ack_timeout) {
+            Ok(code) if (200..300).contains(&code) => {}
+            Ok(code) => {
+                return PoliteOutcome::RequestFailed(format!(
+                    "the harness refused the shutdown request with status {code}"
+                ))
+            }
+            Err(reason) => return PoliteOutcome::RequestFailed(reason),
+        }
+
+        let start = Instant::now();
+        while start.elapsed() < drain_bound {
+            match child.try_wait() {
+                Ok(Some(_)) => return PoliteOutcome::Exited,
+                Ok(None) => std::thread::sleep(Duration::from_millis(25)),
+                Err(error) => {
+                    return PoliteOutcome::RequestFailed(format!("failed to poll child: {error}"))
+                }
+            }
+        }
+        PoliteOutcome::DrainExceeded
+    }
+
+    /// `POST /api/shutdown` with the per-launch bearer. Reads headers only:
+    /// the acknowledgment arrives before the drain, and waiting for EOF would
+    /// wait for the process to die -- turning the ack timeout into a second,
+    /// shorter drain bound with less honesty about which phase stalled.
+    fn post_shutdown(endpoint: &HarnessEndpoint, timeout: Duration) -> Result<u16, String> {
+        let address = format!("{}:{}", endpoint.host, endpoint.port)
+            .to_socket_addrs()
+            .map_err(|e| redact(&format!("could not resolve the harness address: {e}"), &endpoint.token))?
+            .next()
+            .ok_or_else(|| "the harness address resolved to nothing".to_string())?;
+
+        let mut stream = TcpStream::connect_timeout(&address, timeout).map_err(|e| {
+            redact(
+                &format!("could not reach the harness to ask it to stop: {e}"),
+                &endpoint.token,
+            )
+        })?;
+        stream.set_read_timeout(Some(timeout)).map_err(|e| e.to_string())?;
+        stream.set_write_timeout(Some(timeout)).map_err(|e| e.to_string())?;
+
+        let request = format!(
+            "POST /api/shutdown HTTP/1.1\r\nHost: {}:{}\r\nAuthorization: Bearer {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            endpoint.host, endpoint.port, endpoint.token
+        );
+        stream.write_all(request.as_bytes()).map_err(|e| {
+            redact(&format!("the shutdown request could not be written: {e}"), &endpoint.token)
+        })?;
+        stream.flush().map_err(|e| e.to_string())?;
+
+        let mut raw = Vec::new();
+        let mut chunk = [0u8; 512];
+        while !raw.windows(4).any(|window| window == b"\r\n\r\n") && raw.len() < 8192 {
+            let read = stream.read(&mut chunk).map_err(|e| {
+                redact(
+                    &format!("the harness did not acknowledge the shutdown request: {e}"),
+                    &endpoint.token,
+                )
+            })?;
+            if read == 0 {
+                break;
+            }
+            raw.extend_from_slice(&chunk[..read]);
+        }
+
+        let response = String::from_utf8_lossy(&raw).into_owned();
+        response
+            .split_whitespace()
+            .nth(1)
+            .and_then(|code| code.parse::<u16>().ok())
+            .ok_or_else(|| {
+                redact(
+                    &format!("no status line in the shutdown response: {response}"),
+                    &endpoint.token,
+                )
+            })
+    }
+}
+
+/// What came of asking the Harness to stop itself.
+#[derive(Debug)]
+enum PoliteOutcome {
+    /// It acknowledged and exited within the drain bound.
+    Exited,
+    /// The request itself failed: refused, unreachable, or unanswered.
+    RequestFailed(String),
+    /// It acknowledged but outlived the drain bound.
+    DrainExceeded,
 }
 
 #[cfg(test)]
 mod tests {
+    use std::net::TcpListener;
+    use std::sync::{Arc, Mutex};
+
     use super::*;
+    use crate::harness::test_support::{ONE_HARNESS_AT_A_TIME, StopOnDrop};
 
     /// Long text keeps its tail, and does not panic doing it.
     ///
@@ -864,5 +1478,391 @@ mod tests {
 
         let _ = child.kill();
         let _ = child.wait();
+    }
+
+    /// Events as `name payload-json` strings, for asserting order and for
+    /// proving the bearer rides none of them.
+    fn recording_events() -> (Arc<Mutex<Vec<String>>>, LifecycleSink) {
+        let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+        let sink: LifecycleSink = {
+            let seen = seen.clone();
+            Box::new(move |event: &LifecycleEvent| {
+                let payload = serde_json::to_string(event).expect("an event serialises");
+                seen.lock().unwrap().push(format!("{} {payload}", event.name()));
+            })
+        };
+        (seen, sink)
+    }
+
+    /// Where the Harness keeps `studio.db` when nothing overrides the home --
+    /// which is every launch this crate makes, because the environment
+    /// allowlist deliberately does not pass `PROJECT_STUDIO_HOME`.
+    fn studio_wal_path() -> PathBuf {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .expect("a home directory");
+        PathBuf::from(home)
+            .join(".studio")
+            .join("data")
+            .join("studio.db-wal")
+    }
+
+    /// The old shutdown, kept as the contrast case: `TerminateProcess` on
+    /// Windows, SIGKILL on Unix -- no handler runs, nothing is checkpointed.
+    fn hard_kill(pid: u32) {
+        #[cfg(windows)]
+        {
+            let output = Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .output()
+                .expect("run taskkill");
+            assert!(
+                output.status.success(),
+                "taskkill failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        #[cfg(unix)]
+        {
+            nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(pid as i32),
+                nix::sys::signal::Signal::SIGKILL,
+            )
+            .expect("kill -9 the harness");
+        }
+    }
+
+    /// Polls until `probe` holds or the deadline passes. Used only where the
+    /// awaited condition is a real asynchronous event (a crash being observed,
+    /// a replacement coming up), never to paper over a deterministic answer.
+    fn eventually(deadline: Duration, mut probe: impl FnMut() -> bool) -> bool {
+        let start = Instant::now();
+        while start.elapsed() < deadline {
+            if probe() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        false
+    }
+
+    /// One-shot stub HTTP server answering `code` to the shutdown POST.
+    ///
+    /// `hold` keeps the connection open afterwards, standing in for a harness
+    /// that acknowledged but never exits; the real one closes the connection
+    /// by dying.
+    fn stub_shutdown_endpoint(code: u16, hold: bool) -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a stub listener");
+        let port = listener.local_addr().expect("a local address").port();
+        std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().expect("accept one connection");
+            let mut buffer = Vec::new();
+            let mut chunk = [0u8; 512];
+            while !buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+                let read = socket.read(&mut chunk).expect("read the request");
+                if read == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..read]);
+            }
+            let response =
+                format!("HTTP/1.1 {code} Stub\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            socket.write_all(response.as_bytes()).expect("write the response");
+            socket.flush().expect("flush the response");
+            if hold {
+                std::thread::sleep(Duration::from_secs(5));
+            }
+        });
+        port
+    }
+
+    /// A child that stays alive until killed, standing in for a harness whose
+    /// polite request did not land.
+    fn stubborn_child() -> Child {
+        let mut cmd = stubborn_command();
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
+        cmd.spawn().expect("spawn a stand-in child")
+    }
+
+    #[cfg(windows)]
+    fn stubborn_command() -> Command {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/c", "ping -n 30 127.0.0.1 >NUL"]);
+        cmd
+    }
+
+    #[cfg(unix)]
+    fn stubborn_command() -> Command {
+        let mut cmd = Command::new("sleep");
+        cmd.arg("30");
+        cmd
+    }
+
+    fn fabricated_endpoint(port: u16) -> HarnessEndpoint {
+        HarnessEndpoint {
+            host: "127.0.0.1".to_string(),
+            port,
+            pid: 4242,
+            url: format!("http://127.0.0.1:{port}"),
+            client_id: "studio-host".to_string(),
+            session_id: "test-session".to_string(),
+            token: "stub-bearer-value".to_string(),
+        }
+    }
+
+    /// The observable proof of the graceful stop: a clean close checkpoints
+    /// and removes the WAL, so nothing hot is left beside `studio.db`. The
+    /// file existing *while the harness runs* is what makes the final
+    /// assertion mean something rather than trivially holding.
+    #[test]
+    fn a_deliberate_stop_reports_stopped_and_leaves_no_hot_wal() {
+        let _serial = ONE_HARNESS_AT_A_TIME.blocking_lock();
+        let supervisor = HarnessSupervisor::new();
+        let (events, sink) = recording_events();
+        supervisor.set_lifecycle_sink(sink);
+
+        let endpoint = supervisor.start().expect("the harness must start");
+        let _stop = StopOnDrop(supervisor.clone());
+
+        assert_eq!(supervisor.status().state, "running");
+
+        let wal = studio_wal_path();
+        assert!(
+            wal.exists(),
+            "the WAL sits beside studio.db while the harness runs: {}",
+            wal.display()
+        );
+
+        supervisor.shutdown_all();
+
+        assert_eq!(supervisor.status().state, "stopped");
+        assert!(supervisor.get_endpoint().is_none());
+        assert!(
+            !wal.exists(),
+            "a polite stop leaves no hot WAL beside studio.db: {}",
+            wal.display()
+        );
+
+        let recorded = events.lock().unwrap().clone();
+        assert!(
+            recorded.iter().any(|e| e.starts_with("harness-started")),
+            "the start was not announced: {recorded:?}"
+        );
+        assert!(
+            recorded.iter().any(|e| e.starts_with("harness-stopped")),
+            "the stop was not announced: {recorded:?}"
+        );
+        assert!(
+            !recorded.iter().any(|e| e.contains(&endpoint.token)),
+            "the bearer must not ride an event: {recorded:?}"
+        );
+    }
+
+    /// A crash nobody asked for reports `failed` with a reason, tells the
+    /// webview, and brings the harness back exactly once. The WAL assertion
+    /// before any observation is the contrast case for the polite stop: this
+    /// is what every quit left behind before the shutdown route existed,
+    /// produced here by the same mechanism (`TerminateProcess`) it used.
+    #[test]
+    fn an_unexpected_exit_reports_failed_and_restarts_once() {
+        let _serial = ONE_HARNESS_AT_A_TIME.blocking_lock();
+        let supervisor = HarnessSupervisor::new();
+        let (events, sink) = recording_events();
+        supervisor.set_lifecycle_sink(sink);
+
+        let endpoint = supervisor.start().expect("the harness must start");
+        let _stop = StopOnDrop(supervisor.clone());
+
+        hard_kill(endpoint.pid);
+
+        // Nothing has looked yet, so nothing has reacted: the WAL is still
+        // hot, and no restart has been scheduled.
+        let wal = studio_wal_path();
+        assert!(wal.exists(), "a hard kill leaves the WAL un-checkpointed");
+
+        assert!(
+            eventually(Duration::from_secs(10), || supervisor.status().state != "running"),
+            "the crash must surface through the read paths"
+        );
+        assert!(
+            eventually(
+                STARTUP_TIMEOUT + Duration::from_secs(10),
+                || supervisor.status().state == "running"
+            ),
+            "one unexpected exit must restart automatically"
+        );
+        assert_eq!(
+            supervisor.shared.state.lock().unwrap().start_count,
+            2,
+            "the replacement is the second start"
+        );
+
+        let recorded = events.lock().unwrap().clone();
+        let failed = recorded
+            .iter()
+            .position(|e| e.starts_with("harness-failed"))
+            .expect("the crash was announced");
+        assert!(
+            recorded[failed].contains("unexpectedly"),
+            "the failure must say why: {}",
+            recorded[failed]
+        );
+        let restarting = recorded
+            .iter()
+            .position(|e| e.starts_with("harness-restarting"))
+            .expect("the restart was announced");
+        assert!(failed < restarting, "failure precedes the restart: {recorded:?}");
+        assert!(
+            !recorded.iter().any(|e| e.contains(&endpoint.token)),
+            "the bearer must not ride an event: {recorded:?}"
+        );
+    }
+
+    /// The second crash inside the window gets neither a third harness nor an
+    /// endless spinner: terminal `failed`, and the count proves nothing is
+    /// quietly starting behind it. Restart loops look like activity while
+    /// fixing nothing; this is the anti-loop.
+    #[test]
+    fn a_second_crash_inside_the_window_does_not_restart() {
+        let _serial = ONE_HARNESS_AT_A_TIME.blocking_lock();
+        let supervisor = HarnessSupervisor::new();
+        let (events, sink) = recording_events();
+        supervisor.set_lifecycle_sink(sink);
+
+        let first = supervisor.start().expect("the harness must start");
+        let _stop = StopOnDrop(supervisor.clone());
+
+        hard_kill(first.pid);
+
+        // Wait for the death to be *observed* before waiting for the
+        // replacement. The first poll can outrun the kill becoming visible to
+        // `try_wait` -- "running" then describes a corpse, and a test that
+        // waited for `== "running"` would pass without any restart at all.
+        assert!(
+            eventually(Duration::from_secs(10), || supervisor.status().state != "running"),
+            "the first crash must surface"
+        );
+        assert!(
+            eventually(
+                STARTUP_TIMEOUT + Duration::from_secs(10),
+                || supervisor.status().state == "running"
+            ),
+            "the first crash must restart"
+        );
+        assert_eq!(supervisor.shared.state.lock().unwrap().start_count, 2);
+        let second = supervisor
+            .get_endpoint()
+            .expect("the restarted harness publishes an endpoint");
+        assert_ne!(second.pid, first.pid, "a different process came up");
+
+        hard_kill(second.pid);
+        assert!(
+            eventually(Duration::from_secs(10), || supervisor.status().state == "failed"),
+            "the second crash must report failed with a message"
+        );
+        let error = supervisor.status().error.expect("a failure sentence");
+        assert!(error.contains("unexpectedly"), "{error}");
+
+        // Long enough that a wrongly-scheduled restart would have flipped the
+        // count or the state; neither may move.
+        std::thread::sleep(Duration::from_secs(3));
+        assert_eq!(
+            supervisor.shared.state.lock().unwrap().start_count,
+            2,
+            "no third start may follow a second crash inside the window"
+        );
+        assert_eq!(supervisor.status().state, "failed");
+
+        let recorded = events.lock().unwrap().clone();
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|e| e.starts_with("harness-restarting"))
+                .count(),
+            1,
+            "exactly one restart was offered: {recorded:?}"
+        );
+    }
+
+    /// The read path must answer during a spawn, not queue behind it. The
+    /// poller starts first and samples faster than the spawn can possibly
+    /// progress, so `starting` -- a state that lasts for a whole Node boot --
+    /// cannot be missed; this is sampling a wide window, not racing one.
+    #[test]
+    fn status_answers_starting_while_a_spawn_is_in_flight() {
+        let _serial = ONE_HARNESS_AT_A_TIME.blocking_lock();
+        let supervisor = HarnessSupervisor::new();
+        let _stop = StopOnDrop(supervisor.clone());
+
+        let seen: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
+        let poller = {
+            let seen = seen.clone();
+            let supervisor = supervisor.clone();
+            std::thread::spawn(move || loop {
+                let state = supervisor.status().state;
+                seen.lock().unwrap().push(state);
+                if state == "running" || state == "failed" {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            })
+        };
+
+        // Ahead of the start, so the states recorded are the ones it passes
+        // through rather than the ones it left behind.
+        std::thread::sleep(Duration::from_millis(20));
+        supervisor.start().expect("the harness must start");
+        poller.join().expect("the poller must finish");
+
+        let observed = seen.lock().unwrap().clone();
+        assert!(
+            observed.contains(&"starting"),
+            "a spawn in flight must read as starting, got: {observed:?}"
+        );
+        assert_eq!(observed.last().copied(), Some("running"));
+    }
+
+    /// A refusal must not silently become success: the outcome says the
+    /// request failed, which is what makes the caller log the fallback before
+    /// terminating. Without this, a broken shutdown route would degrade into
+    /// the old hard kill with nobody the wiser.
+    #[test]
+    fn a_refused_polite_request_reports_failure_for_the_fallback() {
+        let port = stub_shutdown_endpoint(403, false);
+        let mut child = stubborn_child();
+
+        let outcome = HarnessSupervisor::stop_politely(
+            &mut child,
+            &fabricated_endpoint(port),
+            SHUTDOWN_ACK_TIMEOUT,
+            Duration::from_millis(300),
+        );
+
+        assert!(
+            matches!(outcome, PoliteOutcome::RequestFailed(_)),
+            "{outcome:?}"
+        );
+        HarnessSupervisor::terminate_child(&mut child);
+        assert!(child.try_wait().expect("poll the child").is_some());
+    }
+
+    /// Acknowledged-but-alive-past-the-bound is the other way the polite path
+    /// can fail, and it must be distinguishable from success for the same
+    /// reason: the fallback log is how a stuck drain is ever noticed.
+    #[test]
+    fn an_acknowledged_harness_that_outlives_the_drain_bound_reports_it() {
+        let port = stub_shutdown_endpoint(202, true);
+        let mut child = stubborn_child();
+
+        let outcome = HarnessSupervisor::stop_politely(
+            &mut child,
+            &fabricated_endpoint(port),
+            SHUTDOWN_ACK_TIMEOUT,
+            Duration::from_millis(300),
+        );
+
+        assert!(matches!(outcome, PoliteOutcome::DrainExceeded), "{outcome:?}");
+        HarnessSupervisor::terminate_child(&mut child);
+        assert!(child.try_wait().expect("poll the child").is_some());
     }
 }

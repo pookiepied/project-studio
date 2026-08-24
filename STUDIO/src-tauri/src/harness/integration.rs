@@ -21,23 +21,10 @@ use std::time::Duration;
 
 use super::endpoint::HarnessEndpoint;
 use super::supervisor::HarnessSupervisor;
-use super::test_support::ONE_HARNESS_AT_A_TIME;
+use super::test_support::{ONE_HARNESS_AT_A_TIME, StopOnDrop};
 
 /// Long enough for a cold Node start plus the supervisor's own 30s budget.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// Shuts the Harness down even when an assertion between start and stop panics.
-///
-/// Without this a failing assertion leaks a Node process holding a loopback
-/// port for the rest of the machine's uptime, and the next run of this test
-/// inherits the mess.
-struct StopOnDrop(HarnessSupervisor);
-
-impl Drop for StopOnDrop {
-    fn drop(&mut self) {
-        self.0.shutdown_all();
-    }
-}
 
 /// A one-shot HTTP/1.1 GET, written by hand.
 ///

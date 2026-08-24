@@ -116,14 +116,6 @@ function createHarnessApplication(): HarnessApplication {
       credentials: new KeyringCredentialStore(),
     });
 
-    const app = createHttpApp({
-      servers: runtime.servers,
-      providers,
-      retrieval,
-      approvals,
-      admission: admission.verifier,
-    });
-
     let shutdownPromise: Promise<void> | undefined;
     const shutdown = (): Promise<void> => {
       shutdownPromise ??= (async () => {
@@ -139,6 +131,21 @@ function createHarnessApplication(): HarnessApplication {
       })();
       return shutdownPromise;
     };
+
+    const app = createHttpApp({
+      servers: runtime.servers,
+      providers,
+      retrieval,
+      approvals,
+      admission: admission.verifier,
+      // The same drain the signal handlers run, reached over HTTP because the
+      // Host has no deliverable signal on Windows (see the route module). The
+      // response goes out first: `requestShutdown` only starts the async drain,
+      // and the exit at its end is always after the socket has flushed.
+      requestShutdown: () => {
+        void shutdown().finally(() => process.exit(0));
+      },
+    });
 
     return { app, shutdown };
   } catch (error) {
@@ -166,8 +173,11 @@ const { app, shutdown } = createHarnessApplication();
  * `TerminateProcess`, which ends the process without running a handler. So the
  * database was never closed and its WAL never checkpointed, leaving a hot
  * `-wal` beside every stopped harness. `SIGINT` and `SIGBREAK` do arrive on
- * Windows, and the parent-owned `shutdown` message works regardless of
- * platform, so a supervisor always has one way to ask.
+ * Windows, and the TypeScript launcher can send the parent-owned `shutdown`
+ * message. The Rust Host uses none of those: it asks over
+ * `POST /api/shutdown` with the admission bearer, which works identically on
+ * both platforms and is the reason this process can always be stopped politely
+ * by the one that owns it.
  */
 for (const signal of ["SIGTERM", "SIGINT", "SIGBREAK"] as const) {
   process.once(signal, () => {
