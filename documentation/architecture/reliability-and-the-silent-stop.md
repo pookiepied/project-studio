@@ -93,9 +93,26 @@ taking ADR 0032 and ADR 0045 seriously:
    transient model errors three times (`MAX_TRANSIENT_MODEL_RETRIES`) with backoff, gives
    up, and settles `failed` carrying the provider's own sentence. Pi does not retry at all;
    it *classifies* (`isRetryableAssistantError`) and says in its own docblock that callers
-   own the policy. So the retry gap is narrower than this document first claimed: what is
-   missing is jitter and any surface for "this is being retried right now", not the retry
-   itself.
+   own the policy. The budget is `MAX_TRANSIENT_MODEL_RETRIES = 3` with
+   `TRANSIENT_MODEL_RETRY_BASE_DELAY_MS = 2000`, exponential, and jitter *is* applied
+   (`baseDelay * (0.75 + random * 0.25)`) — so roughly 2s, 4s, 8s, about fourteen seconds
+   of silence before it gives up.
+
+   Two real gaps remain, and neither is the one this document originally guessed:
+
+   - **Flue's classifier is narrower than Pi's.** Pi matches `provider.?returned.?error`
+     (its comment names OpenRouter's "Provider returned error" wrapper specifically),
+     `ended without`, `stream ended before message_stop`, `http2 request did not get a
+     response`, `websocket.?closed`, `upstream.?connect`, `reset before headers`, `524`,
+     and `ResourceExhausted`. Flue's inline regex matches none of them. On OpenRouter that
+     is not academic: the wrapper's own transient-failure wording is not retried.
+   - **Flue has no non-retryable guard.** Pi excludes quota and billing exhaustion
+     (`insufficient_quota`, `out of budget`, `quota exceeded`, `billing`, monthly-limit
+     text) from retry. Flue does not, and OpenAI returns `insufficient_quota` as HTTP
+     **429** — which Flue's regex matches. A billing failure is therefore retried three
+     times, delaying the one message that would actually tell the person what to do.
+
+   Neither constant is exported or overridable; both are baked into the bundle.
 
    The Task 25 report claimed a rate-limited turn is recorded as `completed` with no
    content. That is **wrong**, and it was worth the trouble of proving: driving a real
