@@ -229,6 +229,47 @@ One exception: a fallback chain the user configured explicitly may be honoured, 
 they asked for it. Note that OpenRouter already routes between providers underneath a
 single model name, so some of this happens below us regardless.
 
+#### Switching mid-conversation is safe, and one thing about it is not
+
+Verified by reading Pi on 2026-08-25, because the answer decides whether offering a switch
+is reckless. It is not: **Pi renormalizes the transcript for whatever model is being called**
+(`pi-ai/dist/api/transform-messages.js`). Every assistant message carries `{api, provider,
+model}`, and Flue persists exactly those three as `modelInfo` on `assistant_message_started`
+— it destructures `role`, `content`, `stopReason`, `errorMessage`, `timestamp` and `usage`
+off the message and keeps the rest — so each turn holds its originating identity forever and
+the comparison is per message, not per conversation.
+
+On a mismatch, Pi: drops redacted thinking entirely (opaque encrypted content, valid only
+for the model that produced it); drops the signature and downgrades signed thinking to plain
+text; deletes `thoughtSignature` from tool calls; normalizes tool call IDs (OpenAI Responses
+emits 450+ character IDs containing `|`, Anthropic requires `^[a-zA-Z0-9_-]+$` at 64 chars);
+inserts synthetic empty tool results for orphaned tool calls so the API contract still holds;
+and replaces images with placeholder text for a model that cannot see.
+
+This is the two-projections rule (`transcript-and-rendering.md` §1) paying off from an angle
+we did not anticipate. Because the CANONICAL record keeps per-message model identity, the
+model-facing projection can be rebuilt correctly for any target. Had the UI projection been
+the source, this would be impossible — the UI does not track per-message provider identity,
+and never should.
+
+Three costs are acceptable and one is not:
+
+- Reasoning becomes prose. Model B reads model A's thinking as ordinary text. Fine, but it
+  is context now rather than reasoning, and it is tokens.
+- Redacted thinking disappears with no marker. Small, real, silent.
+- The prompt cache dies. A different model is a different cache, so the first turn after a
+  switch pays full input tokens. On a long conversation that is the true price of switching.
+- **Context window is the real risk, and Pi does not solve it.** Switching from a 200k model
+  to a 32k one mid-conversation may simply not fit. Flue reacts — `checkCompaction` reads
+  the model's `contextWindow`, and overflow triggers compaction — but compaction is lossy,
+  and the person did not ask for it. They would lose transcript to a decision they
+  experienced as "pick a different model".
+
+> **The rule for whenever the switch button gets built:** never offer a model whose context
+> window is smaller than the conversation's current token count without saying plainly that
+> switching will compact. Filter the list, or warn in the same breath as the offer. This is
+> the only part of switching that needs guarding, and it is invisible until it bites.
+
 ### What has to be true before any of this is worth building
 
 The order is fixed by the coupling above, and each step is only worth doing once the one
@@ -242,7 +283,9 @@ before it is done:
 4. **Retry becomes visible** — a wire signal, which does not exist yet.
 5. **Only then**, per-class budgets worth tuning.
 6. **The offered model switch**, which needs step 1 and nothing else, and could come
-   earlier if it earns its place.
+   earlier if it earns its place — with the context-window guard above. Switching itself
+   is safe (Pi renormalizes the transcript); offering a model that cannot hold the
+   conversation is not.
 
 ## On dogfooding Studio to build Studio
 
