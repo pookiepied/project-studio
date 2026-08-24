@@ -140,6 +140,23 @@ async fn service_fetch(
   services::service_fetch(&supervisor, service, path, init).await
 }
 
+/// The same seam, streaming: the webview additionally names the offset it
+/// last saw, and events arrive over the channel as they happen -- each
+/// carrying the offset to resume from, so any interruption is answered by
+/// re-invoking this rather than by losing the run (ADR 0045). The
+/// credential stays in Rust exactly as `service_fetch` holds it.
+#[tauri::command]
+async fn service_stream(
+  supervisor: tauri::State<'_, HarnessSupervisor>,
+  service: services::ServiceId,
+  path: String,
+  init: services::ServiceRequestInit,
+  offset: String,
+  channel: tauri::ipc::Channel<services::StreamEvent>,
+) -> Result<(), services::ServiceError> {
+  services::service_stream(&supervisor, service, path, init, offset, channel).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let supervisor = HarnessSupervisor::new();
@@ -204,7 +221,8 @@ pub fn run() {
       get_harness_endpoint,
       restart_harness,
       get_harness_status,
-      service_fetch
+      service_fetch,
+      service_stream
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
