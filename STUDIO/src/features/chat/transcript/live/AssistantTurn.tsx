@@ -1,5 +1,9 @@
 import { Icons } from '@/components/icons'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
+import {
+  classifyFailureKind,
+  failureRemedy,
+} from '@/features/chat/transcript/failure-kind'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import { ToolGroups } from '@/features/chat/transcript/live/ToolGroups'
 import type {
@@ -13,7 +17,7 @@ import type {
  *
  * The rule that outranks everything here: **how the message ended comes from
  * the log, never from silence.** A message with no completion fact renders
- * unfinished -- a quiet "stopped" line under it -- whatever stopped it: an
+ * unfinished — a quiet "stopped" line under it — whatever stopped it: an
  * abort, a crash, a provider that gave up mid-sentence. Only
  * `message-completed` (or a snapshot's own `done` states) lets it read as
  * finished.
@@ -30,8 +34,8 @@ export function AssistantTurn({
   /** This message is the newest one and its turn has not settled yet. */
   live: boolean
 }) {
-  // Only the final text run may pace its reveal. Everything else -- history
-  // replayed at a reattach, earlier runs of this same message -- must be on
+  // Only the final text run may pace its reveal. Everything else — history
+  // replayed at a reattach, earlier runs of this same message — must be on
   // the page the moment it arrives; a transcript that retypes itself is
   // telling the reader a story about timing that never happened.
   const lastIndex = item.segments.length - 1
@@ -74,9 +78,9 @@ function Segment({
 /**
  * One written run, revealed smoothly while it is the one being written.
  *
- * Whether this specific run is still growing is not decidable locally --
+ * Whether this specific run is still growing is not decidable locally —
  * growth is "a newer delta kept landing in this run", which only the parent
- * knows by position -- so every text run of a live turn paces its own tail,
+ * knows by position — so every text run of a live turn paces its own tail,
  * and `useSmoothText` settles instantly once the text stops changing.
  */
 function TextSegment({
@@ -104,11 +108,11 @@ function TextSegment({
 }
 
 /**
- * The honest ending. Complete says nothing at all -- a finished reply needs
+ * The honest ending. Complete says nothing at all — a finished reply needs
  * no footnote about having finished. Everything else names what happened,
  * because a turn that died must never be mistaken for one that landed. The
  * settlement's own sentence rides under a failed or aborted line when the
- * wire carried one; when it did not, nothing is invented -- the outcome
+ * wire carried one; when it did not, nothing is invented — the outcome
  * alone is the fact.
  */
 function EndLine({ end }: { end: MessageEnd }) {
@@ -119,6 +123,9 @@ function EndLine({ end }: { end: MessageEnd }) {
     aborted: { text: 'Aborted', icon: Icons.stop },
   }[end.state]
   const reason = end.state === 'stopped' ? null : end.reason
+  // A provider failure gets the remedy line when its sentence names one; an
+  // abort is the person's own act and needs no advice appended to it.
+  const remedy = end.state === 'failed' ? failureRemedy(classifyFailureKind(reason)) : null
   return (
     <div className="mt-1 flex flex-col items-start gap-0.5">
       <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
@@ -132,6 +139,11 @@ function EndLine({ end }: { end: MessageEnd }) {
       {reason !== null ? (
         <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
           {reason}
+        </p>
+      ) : null}
+      {remedy !== null ? (
+        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+          {remedy}
         </p>
       ) : null}
     </div>

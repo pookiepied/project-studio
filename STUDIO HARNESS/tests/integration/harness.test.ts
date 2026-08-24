@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import type { FlueConversationMessage } from "@flue/sdk";
+import type { FlueConversationMessage, FlueConversationSnapshot } from "@flue/sdk";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
@@ -207,6 +207,30 @@ function textFromMessage(message: FlueConversationMessage): string {
     .join("");
 }
 
+/**
+ * How many provider attempts a submission actually made, read back from
+ * history rather than assumed: every attempt appends its own assistant record,
+ * and the records belonging to one submission are exactly the assistants that
+ * follow its user message. Position is the only honest association — history
+ * snapshots carry no submissionId on assistant messages (Task 26), so this is
+ * the same fact the Studio projection uses on cold starts.
+ */
+function attemptCount(history: FlueConversationSnapshot, userTextIncludes: string): number {
+  const anchor = history.messages.findIndex(
+    (message) =>
+      message.role === "user" && textFromMessage(message).includes(userTextIncludes),
+  );
+  if (anchor === -1) {
+    throw new Error(`No user message matching ${JSON.stringify(userTextIncludes)} in history.`);
+  }
+  let attempts = 0;
+  for (const message of history.messages.slice(anchor + 1)) {
+    if (message.role !== "assistant") break;
+    attempts += 1;
+  }
+  return attempts;
+}
+
 afterEach(async () => {
   await Promise.all([...processes].map(stopHarness));
   await Promise.all(
@@ -299,7 +323,7 @@ describe.sequential("Flue harness vertical slice", () => {
 
       // The test provider answers `[fail]` with a transient 429, every time.
       // Flue retries it a bounded number of times and then gives up, and what
-      // it records must be a FAILURE carrying the reason -- not a completed
+      // it records must be a FAILURE carrying the reason — not a completed
       // turn that happens to be empty. A rate-limited turn rendering as a
       // silent success is the one failure mode reliability-and-the-silent-
       // stop.md calls unacceptable, so this pins the harness side of it.
@@ -314,6 +338,129 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(JSON.stringify(settlement)).toContain("rate limit");
     },
     90_000,
+  );
+
+  it(
+    "fails fast on quota exhaustion instead of burning the retry budget",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // OpenAI reports exhausted billing as HTTP 429 — which the old inline
+      // classifier retried three times before showing the person the one
+      // sentence that could actually help. The patched policy refuses to
+      // retry it at all: one attempt, straight to a visible failure.
+      const run = await client.send(
+        "quota",
+        "[fail: You exceeded your current quota, please check your plan and billing details (insufficient_quota)] please answer.",
+      );
+      await expect(client.wait(run)).rejects.toThrow();
+
+      const history = await client.history("quota");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("failed");
+      expect(JSON.stringify(settlement)).toContain("insufficient_quota");
+      expect(attemptCount(history, "[fail: You exceeded your current quota")).toBe(1);
+    },
+    30_000,
+  );
+
+  it(
+    "does not retry billing exhaustion that arrives dressed as a 429",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // The adversarial shape: a sentence matching BOTH lists at once. The
+      // non-retryable guard runs first in pi-ai's classifier (and therefore in
+      // the patched runtime), so the 429 must not win.
+      const run = await client.send(
+        "billing-429",
+        "[fail: You exceeded your current quota, please check your plan and billing details (insufficient_quota). (HTTP 429)] please answer.",
+      );
+      await expect(client.wait(run)).rejects.toThrow();
+
+      const history = await client.history("billing-429");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("failed");
+      expect(attemptCount(history, "[fail: You exceeded your current quota")).toBe(1);
+    },
+    30_000,
+  );
+
+  it(
+    "retries transient wording the old classifier missed until the budget is spent",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // OpenRouter's wrapper sentence matched nothing in the old inline regex,
+      // so this failure was never retried and lost its work on the first try.
+      // The patched policy recognizes it; four assistant records on the wire
+      // are the proof — first attempt plus the full retry budget.
+      const run = await client.send("openrouter", "[fail: Provider returned error] please answer.");
+      await expect(client.wait(run)).rejects.toThrow();
+
+      const history = await client.history("openrouter");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("failed");
+      expect(attemptCount(history, "[fail: Provider returned error")).toBe(4);
+    },
+    90_000,
+  );
+
+  it(
+    "recovers when a transient refusal clears on the second attempt",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // Retry must still WORK, not merely fail with better manners: one
+      // refused attempt, then a normal answer on the retry, settling complete
+      // — two attempts on the wire, exactly.
+      const run = await client.send("retry-recovers", "[fail-once] please answer.");
+      const result = await client.wait(run);
+      expect(result.text).toContain("Echo:");
+
+      const history = await client.history("retry-recovers");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("completed");
+      expect(attemptCount(history, "[fail-once]")).toBe(2);
+    },
+    30_000,
+  );
+
+  it(
+    "leaves an unrecognized provider failure at one attempt rather than guessing",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // A sentence matching nothing stays unclassified: no retry, no invented
+      // category — the settlement carries the provider's own words untouched.
+      const run = await client.send(
+        "unrecognized",
+        "[fail: The upstream planet is misaligned] please answer.",
+      );
+      await expect(client.wait(run)).rejects.toThrow();
+
+      const history = await client.history("unrecognized");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("failed");
+      expect(JSON.stringify(settlement)).toContain("The upstream planet is misaligned");
+      expect(attemptCount(history, "[fail: The upstream planet")).toBe(1);
+    },
+    30_000,
   );
 
   it(

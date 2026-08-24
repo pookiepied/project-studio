@@ -11,8 +11,20 @@ allowBuilds:
   workerd: true
 
 # The @flue/runtime and @flue/sdk idempotency patches were removed under
-# meta-task #12. The remaining patch is load-bearing: its hostname hunk is the
-# only thing that supplies the loopback bind address, and without it Flue binds
-# every interface (ADR 0028).
+# meta-task #12. The remaining patches are load-bearing:
+#
+# @flue/cli — its hostname hunk is the only thing that supplies the loopback
+#   bind address, and without it Flue binds every interface (ADR 0028).
+#
+# @flue/runtime — replaces the transient-model-error classifier inline in
+#   conversation-projections-*.mjs with a delegation to pi-ai's
+#   isRetryableAssistantError. The shipped regex missed genuinely transient
+#   wordings (OpenRouter's "Provider returned error" among them), which then
+#   were never retried, and had no quota/billing guard, so OpenAI's
+#   insufficient_quota (an HTTP 429) burned three retries before the person
+#   saw the one sentence that could help. The bundle filename carries a
+#   content hash, so an upgrade fails this patch loudly rather than silently;
+#   the patch file itself says how to re-derive it.
 patchedDependencies:
   '@flue/cli@1.0.0-beta.9': patches/@flue__cli@1.0.0-beta.9.patch
+  '@flue/runtime@1.0.0-beta.9': patches/@flue__runtime@1.0.0-beta.9.patch

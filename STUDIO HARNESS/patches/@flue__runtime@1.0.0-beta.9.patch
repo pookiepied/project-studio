@@ -1,0 +1,34 @@
+diff --git a/dist/conversation-projections-XMug3C6A.mjs b/dist/conversation-projections-XMug3C6A.mjs
+index d05220033fe9d56662329e478c7ebc7db283f3ba..ded0dabe1facf4499af534b271431f534a2d6947 100644
+--- a/dist/conversation-projections-XMug3C6A.mjs
++++ b/dist/conversation-projections-XMug3C6A.mjs	
+@@ -4,6 +4,7 @@ import { C as DirectAgentPayloadSchema, a as isBufferedRunEvent, b as isUuid, f
+ import * as v from "valibot";
+ import { ulid } from "ulidx";
+ import { completeSimple, isContextOverflow } from "@earendil-works/pi-ai/compat";
++import { isRetryableAssistantError } from "@earendil-works/pi-ai";
+ //#region src/action.ts
+ const definedActions = /* @__PURE__ */ new WeakSet();
+ function defineAction(options) {
+@@ -2437,8 +2438,19 @@ function findTrailingPartialToolBatch(following) {
+ 	};
+ }
+ function isRetryableModelError(message) {
+-	if (message.stopReason !== "error" || !message.errorMessage) return false;
+-	return /overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|network.?error|connection.?(?:reset|refused|lost)|socket hang up|fetch failed|timed? out|timeout|terminated/i.test(message.errorMessage);
++	// [project-studio patch] Delegate transient-error classification to
++	// @earendil-works/pi-ai's isRetryableAssistantError instead of the inline
++	// regex this bundle shipped. The shipped pattern was too narrow (it missed,
++	// among others, OpenRouter's "Provider returned error" wrapper, so real
++	// transient failures were never retried) and had no non-retryable guard
++	// (OpenAI returns insufficient_quota as HTTP 429, so billing exhaustion
++	// burned the full retry budget before reaching the person). Pi's version
++	// checks its quota/billing exclusions FIRST, so a sentence matching both
++	// lists is not retried; its retryable list is a strict superset. The policy
++	// therefore tracks pi-ai's semver range instead of a copied regex that
++	// rots. If an upgrade renames this hash and the patch fails to apply,
++	// re-derive it from this comment -- do not restore the narrower regex.
++	return isRetryableAssistantError(message);
+ }
+ function isCompletedAssistantResponse(message) {
+ 	return message.stopReason === "stop" || message.stopReason === "length";

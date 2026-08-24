@@ -104,13 +104,43 @@ function mcpToolName(context: Context): string | undefined {
 }
 
 /** The provider sentence `[fail]` asks for, or undefined when it is absent. */
-function failureRequest(userText: string): string | undefined {
-  const match = /\[fail(?::\s*([^\]]*))?\]/i.exec(userText);
+function failureRequest(userText: string): FailureRequest | undefined {
+  const match = /\[fail(-once)?(?::\s*([^\]]*))?\]/i.exec(userText);
   if (match === null) return undefined;
-  const named = match[1]?.trim();
-  return named === undefined || named === ""
-    ? "429 rate limit exceeded: temporarily rate-limited upstream"
-    : named;
+  const named = match[2]?.trim();
+  return {
+    once: match[1] !== undefined,
+    sentence:
+      named === undefined || named === ""
+        ? "429 rate limit exceeded: temporarily rate-limited upstream"
+        : named,
+  };
+}
+
+interface FailureRequest {
+  /** False refuses every attempt; true refuses only the first one. */
+  readonly once: boolean;
+  /** The provider sentence the failure carries. */
+  readonly sentence: string;
+}
+
+/**
+ * `[fail-once]` cannot read prior attempts out of `context`: Flue's
+ * model-context projection drops assistant records whose stopReason is
+ * "error", so attempt two arrives byte-identical to attempt one and nothing
+ * in Context carries an attempt number. The count therefore lives here, keyed
+ * by the exact refusal sentence — exact for the retry loop this seam exists
+ * to exercise, since every attempt re-enters stream() with the same latest
+ * user text. Each scenario should use its own sentence; the map lives for the
+ * process lifetime.
+ */
+const onceFailureCounts = new Map<string, number>();
+
+function shouldRefuse(failure: FailureRequest): boolean {
+  if (!failure.once) return true;
+  const refused = onceFailureCounts.get(failure.sentence) ?? 0;
+  onceFailureCounts.set(failure.sentence, refused + 1);
+  return refused === 0;
 }
 
 async function waitForDelay(
@@ -145,16 +175,18 @@ function stream(
       }
 
       // A provider failure, on demand. `[fail]` alone reads as a transient
-      // 429 -- the case Flue retries and then gives up on -- and
-      // `[fail: <text>]` names any other provider sentence, so a
+      // 429 — the case Flue retries and then gives up on —
+      // `[fail-once]` refuses exactly once and answers normally afterwards,
+      // so a retry that recovers can be told apart from one that merely fails
+      // faster, and `[fail: <text>]` names any other provider sentence, so a
       // non-retryable failure can be exercised through the same door.
       // Without a seam like this the only way to reach the failure paths is
       // to wait for a real provider to have a bad day.
       const failure = failureRequest(userText);
-      if (failure !== undefined) {
+      if (failure !== undefined && shouldRefuse(failure)) {
         const message = createMessage(model);
         message.stopReason = "error";
-        message.errorMessage = failure;
+        message.errorMessage = failure.sentence;
         events.push({ type: "error", reason: "error", error: message });
         return;
       }

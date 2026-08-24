@@ -1,4 +1,8 @@
 import { Icons } from '@/components/icons'
+import {
+  classifyFailureKind,
+  failureRemedy,
+} from '@/features/chat/transcript/failure-kind'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 
 type FailedItem = Extract<TranscriptItem, { kind: 'submission-failed' }>
@@ -9,7 +13,7 @@ type FailedItem = Extract<TranscriptItem, { kind: 'submission-failed' }>
  *
  * This is the thing a rate-limited turn becomes instead of four empty
  * bubbles: one line naming the outcome, and under it the provider's own
- * sentence -- the words the harness carried back and Task 25's parser used
+ * sentence — the words the harness carried back and Task 25's parser used
  * to drop. When the settlement arrived with no error object at all, the
  * reason line says so rather than inventing a cause; a failure with no
  * sentence is still a failure.
@@ -17,6 +21,7 @@ type FailedItem = Extract<TranscriptItem, { kind: 'submission-failed' }>
 export function SubmissionFailed({ item }: { item: FailedItem }) {
   const headline =
     item.outcome === 'aborted' ? 'This turn was aborted' : 'This turn failed'
+  const remedy = failureRemedy(classifyFailureKind(item.reason))
   return (
     <div className="flex flex-col items-start gap-0.5">
       <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
@@ -30,6 +35,12 @@ export function SubmissionFailed({ item }: { item: FailedItem }) {
       >
         {item.reason ?? 'No reason arrived with the failure.'}
       </p>
+      {remedy !== null ? (
+        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+          {remedy}
+        </p>
+      ) : null}
     </div>
   )
 }
+
