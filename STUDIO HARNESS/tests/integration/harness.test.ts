@@ -292,6 +292,31 @@ describe.sequential("Flue harness vertical slice", () => {
   );
 
   it(
+    "settles a submission that the provider kept refusing as failed, in the provider own words",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // The test provider answers `[fail]` with a transient 429, every time.
+      // Flue retries it a bounded number of times and then gives up, and what
+      // it records must be a FAILURE carrying the reason -- not a completed
+      // turn that happens to be empty. A rate-limited turn rendering as a
+      // silent success is the one failure mode reliability-and-the-silent-
+      // stop.md calls unacceptable, so this pins the harness side of it.
+      const run = await client.send("provider-failure", "[fail] please answer.");
+      await expect(client.wait(run)).rejects.toThrow();
+
+      const history = await client.history("provider-failure");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("failed");
+      expect(JSON.stringify(settlement)).toContain("rate limit");
+    },
+    90_000,
+  );
+
+  it(
     "resumes an accepted submission after a Node process restart",
     async () => {
       const databasePath = await createDatabasePath();

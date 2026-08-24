@@ -103,6 +103,16 @@ function mcpToolName(context: Context): string | undefined {
   return context.tools?.find((tool) => tool.name.startsWith("mcp__"))?.name;
 }
 
+/** The provider sentence `[fail]` asks for, or undefined when it is absent. */
+function failureRequest(userText: string): string | undefined {
+  const match = /\[fail(?::\s*([^\]]*))?\]/i.exec(userText);
+  if (match === null) return undefined;
+  const named = match[1]?.trim();
+  return named === undefined || named === ""
+    ? "429 rate limit exceeded: temporarily rate-limited upstream"
+    : named;
+}
+
 async function waitForDelay(
   milliseconds: number,
   signal: AbortSignal | undefined,
@@ -132,6 +142,21 @@ function stream(
       const userText = latestUserText(context);
       if (userText.includes("[slow]")) {
         await waitForDelay(10_000, options?.signal);
+      }
+
+      // A provider failure, on demand. `[fail]` alone reads as a transient
+      // 429 -- the case Flue retries and then gives up on -- and
+      // `[fail: <text>]` names any other provider sentence, so a
+      // non-retryable failure can be exercised through the same door.
+      // Without a seam like this the only way to reach the failure paths is
+      // to wait for a real provider to have a bad day.
+      const failure = failureRequest(userText);
+      if (failure !== undefined) {
+        const message = createMessage(model);
+        message.stopReason = "error";
+        message.errorMessage = failure;
+        events.push({ type: "error", reason: "error", error: message });
+        return;
       }
 
       const initial = createMessage(model);
