@@ -84,7 +84,7 @@ export function useDictation({ onText }: { onText: (text: string) => void }) {
 
   // Escape means discard, not stop-and-process. It is bound to the document
   // because the field is hidden while recording, so focus is nowhere useful
-  // to bind it to -- the same reasoning as the Dialog's Escape.
+  // to bind it to — the same reasoning as the Dialog's Escape.
   useEffect(() => {
     if (stage !== 'recording') return
     const onKeyDown = (event: KeyboardEvent) => {

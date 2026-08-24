@@ -6,7 +6,7 @@ export interface LifecycleRoutesOptions {
   /**
    * Begins this process's graceful shutdown. Fire-and-forget on purpose: the
    * caller is the Studio Host, which does not read a completion state off this
-   * response -- it watches the process exit. The composition root owns what
+   * response — it watches the process exit. The composition root owns what
    * "shut down" means (drain, close, exit); this route only decides who may
    * ask for it.
    */
@@ -17,7 +17,7 @@ export interface LifecycleRoutesOptions {
  * The one route that ends the process, and why it is HTTP rather than a signal.
  *
  * The Host cannot use the polite channels the process already has. `SIGTERM`
- * is not deliverable on Windows -- `process.kill` there maps to
+ * is not deliverable on Windows — `process.kill` there maps to
  * `TerminateProcess`, which runs no handler, so the database is never closed
  * and its WAL never checkpointed (a hot `-wal` beside every stopped harness).
  * `SIGINT`/`SIGBREAK` arrive, but sending them from a GUI process means
@@ -29,7 +29,7 @@ export interface LifecycleRoutesOptions {
  *
  * Restricted to the `studio-host` client type rather than an admission scope:
  * the scope list is ADR 0028's to change, and the distinction this route needs
- * -- "the process that owns this process" versus "a UI consuming it" -- is
+ * — "the process that owns this process" versus "a UI consuming it" — is
  * exactly what the client-type model already says. Note what this check can
  * and cannot do: production mints exactly one credential, typed
  * `studio-host` and shared by the Host and its webview, so from in here they

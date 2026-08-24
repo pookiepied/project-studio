@@ -19,7 +19,7 @@ import type {
  *
  * Dedicated renderers use these too, for the parts that are not special. A web
  * search draws its own result rows because a result row is the whole point of a
- * search, and then hands its timeline straight to `Timeline` -- because a list
+ * search, and then hands its timeline straight to `Timeline` — because a list
  * of steps with statuses is not a thing about searching.
  */
 export function Sections({ sections }: { sections: readonly ArtifactSection[] }) {
@@ -104,7 +104,7 @@ function Body({ section }: { section: ArtifactSection }) {
       // near-identical table styles is exactly how a design system rots.
       //
       // No panel of its own: the shell already provides the sunken ground, and
-      // a table is embedded content -- it sits on that ground the way the
+      // a table is embedded content — it sits on that ground the way the
       // result rows and the timeline do, scrolling inside itself on x. A
       // second fill under it was the "separate box" look the hierarchy
       // retired.
@@ -194,7 +194,7 @@ function FileChanges({ items }: { items: readonly ArtifactFileChange[] }) {
 
           {/* The path truncates from the *left*. A repo path is
               `src/features/chat/transcript/AssistantMessage.tsx`, and the end
-              is the part that identifies it -- truncating the usual way leaves
+              is the part that identifies it — truncating the usual way leaves
               a column of "src/features/chat/tra…" telling you nothing. */}
           <span className="min-w-0 flex-1 truncate text-caption text-foreground [direction:rtl] [text-align:left]">
             {item.path}

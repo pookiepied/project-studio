@@ -5,8 +5,8 @@ import { createRateEstimator, DEFAULT_CPS } from '@/features/chat/streaming/rate
  * The reveal clock.
  *
  * Between the transport and the screen sits a buffer. Text goes in at whatever
- * rate the model and the network produce it -- lumpy, bursty, and anywhere from
- * 20 to 1000 tokens a second -- and comes out on a frame clock at a rate that
+ * rate the model and the network produce it — lumpy, bursty, and anywhere from
+ * 20 to 1000 tokens a second — and comes out on a frame clock at a rate that
  * tracks the measured average rather than the instantaneous one.
  *
  * That single indirection is what makes fast and slow models look the same.
@@ -21,7 +21,7 @@ import { createRateEstimator, DEFAULT_CPS } from '@/features/chat/streaming/rate
  * accelerates. So the rate is multiplied by a factor that grows with the
  * backlog: a little behind and it reveals at very nearly the measured rate; a
  * long way behind and it moves at several times that until the gap closes.
- * The curve is gentle on purpose -- snapping to the end on every overshoot is
+ * The curve is gentle on purpose — snapping to the end on every overshoot is
  * the stutter this exists to remove.
  *
  * When the stream ends the backlog is drained rather than dropped, quickly
@@ -48,8 +48,8 @@ const DRAIN_SECONDS = 0.35
  * Reveal `target` progressively while `active`, and settle on it when not.
  *
  * Returns the text that should be on screen this frame. The value is a prefix
- * of `target`, so every consumer downstream -- the segmenter, the markdown
- * parser, the code blocks -- sees ordinary, valid, growing text and needs to
+ * of `target`, so every consumer downstream — the segmenter, the markdown
+ * parser, the code blocks — sees ordinary, valid, growing text and needs to
  * know nothing about streaming.
  */
 export function useSmoothText(target: string, active: boolean): string {
@@ -64,7 +64,7 @@ export function useSmoothText(target: string, active: boolean): string {
   // new text lands, which is the event whose spacing is being measured.
   useEffect(() => {
     // Not a continuation. A retry, an edit, or a different message reusing the
-    // hook -- in each case there is no reveal to continue, so present the new
+    // hook — in each case there is no reveal to continue, so present the new
     // text as it is rather than typing it out from wherever we happened to be.
     if (!target.startsWith(previous.current)) {
       rate.current.reset()

@@ -33,8 +33,8 @@ const STORAGE_KEY = 'studio.appearance'
 /**
  * Where preferences live.
  *
- * A JSON file in the OS config directory -- `%APPDATA%/com.pookiepied.studio/`
- * on Windows -- rather than the webview's `localStorage`.
+ * A JSON file in the OS config directory — `%APPDATA%/com.pookiepied.studio/`
+ * on Windows — rather than the webview's `localStorage`.
  *
  * The distinction is not academic, and this app has already paid for it.
  * `localStorage` is browser cache: scoped to the webview's origin, wiped by
@@ -42,7 +42,7 @@ const STORAGE_KEY = 'studio.appearance'
  * with no way to inspect or reset it short of devtools. A size chosen once
  * during an experiment sat there for weeks silently outranking every default
  * the design shipped, and no amount of changing those defaults could dislodge
- * it -- because the stored value is read first, always.
+ * it — because the stored value is read first, always.
  *
  * A file is the opposite of all of that: it can be opened, read, edited,
  * copied, backed up, and deleted. `Reset to defaults` in the appearance pane
@@ -63,7 +63,7 @@ async function openStore() {
  * Reads the stored preferences, migrating anything still in `localStorage`.
  *
  * The migration runs once and then removes the old key, so an install that
- * predates the store keeps its choices instead of being silently reset -- and
+ * predates the store keeps its choices instead of being silently reset — and
  * so the stale copy cannot come back to outrank the file later. Under
  * `pnpm dev` in a plain browser there is no Tauri and therefore no store;
  * `localStorage` remains the fallback there rather than the app losing its
@@ -101,7 +101,7 @@ export async function saveAppearance(appearance: Appearance): Promise<void> {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appearance))
   } catch {
-    /* storage unavailable -- the preference stays session-only */
+    /* storage unavailable — the preference stays session-only */
   }
 }
 
@@ -110,7 +110,7 @@ export async function saveAppearance(appearance: Appearance): Promise<void> {
  *
  * Deletes rather than writes the defaults in. Writing them would leave a file
  * that *looks* like a choice and would keep overriding any future change to
- * the defaults -- which is the exact trap this whole change exists to close.
+ * the defaults — which is the exact trap this whole change exists to close.
  * An absent value means "no opinion", and no opinion is what a reset is.
  */
 export async function forgetAppearance(): Promise<void> {
@@ -144,7 +144,7 @@ function clearLegacy(): void {
 /**
  * Field by field, because a stored blob is untrusted input: it may come from
  * an older build with a shape this one never wrote, or from a file someone
- * edited by hand -- which is now a supported thing to do.
+ * edited by hand — which is now a supported thing to do.
  */
 function coerce(parsed: unknown): Appearance {
   if (typeof parsed !== 'object' || parsed === null) return DEFAULT_APPEARANCE
@@ -181,7 +181,7 @@ function isTheme(value: unknown): value is Theme {
    version was a second copy of the same list, and the two are the kind of pair
    that drifts: change the array, forget the guard, and every stored preference
    holding a now-unlisted value is silently discarded in favour of the default
-   -- the user's setting "not applying", with nothing in the code failing. */
+   — the user's setting "not applying", with nothing in the code failing. */
 const UI_SIZES: readonly unknown[] = UI_SIZE_CHOICES
 const CODE_OFFSETS: readonly unknown[] = CODE_OFFSET_CHOICES
 
@@ -198,7 +198,7 @@ function isCodeOffset(value: unknown): value is CodeOffset {
  *
  * Code size used to be stored as an absolute px (`codeSize: 11`). Dropping that
  * key silently would reset every existing install to the default, so the old
- * value is turned into the offset it was actually expressing -- 11 stored
+ * value is turned into the offset it was actually expressing — 11 stored
  * against a 12px interface *meant* "one step under", and that is what carries
  * forward. Offsets outside the offered range clamp rather than fall back, so
  * someone who had deliberately set code far below the UI keeps the closest

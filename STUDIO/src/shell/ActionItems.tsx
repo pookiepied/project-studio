@@ -6,8 +6,8 @@ import { useNavigation } from '@/stores/navigation'
 /**
  * The app's action list, written once.
  *
- * Two menus offer these actions -- the right-click menu and the selection
- * menu -- and they must never drift apart, because they are not two features:
+ * Two menus offer these actions — the right-click menu and the selection
+ * menu — and they must never drift apart, because they are not two features:
  * they are the same verbs, summoned two ways. Before this existed as a shared
  * component, "Ask about this" and "New conversation" were copy-pasted between
  * trigger handlers, which is exactly the shape in which one of them quietly
@@ -35,7 +35,7 @@ export function ActionItems({
   // Widens within the block the selection started in, never the whole
   // document: "select all" on one reply that quietly grabs four others is a
   // surprise, and surprises in a destructive-adjacent verb are how text gets
-  // lost. The roots are the selectable surfaces -- prose, the field, a page.
+  // lost. The roots are the selectable surfaces — prose, the field, a page.
   const selectAll = () => {
     const root = target?.closest('.studio-prose, .studio-selectable, .studio-scroll-inset')
     const active = window.getSelection()

@@ -7,7 +7,7 @@
  * stops being readable: once a shape means both "the model is thinking" and
  * "how hard it should think", neither reading is safe and the user has to fall
  * back on position to tell them apart. `assertUnique` enforces it at module
- * load in development, because this is a rule that fails silently -- a
+ * load in development, because this is a rule that fails silently — a
  * duplicate looks fine in the diff that adds it and only becomes confusing
  * three screens later.
  *
@@ -69,7 +69,7 @@ const WIND: Variants = {
   hover: { rotate: -38, transition: SNAP },
 }
 
-/** The plus becomes a cross when its menu is open -- one shape, two states. */
+/** The plus becomes a cross when its menu is open — one shape, two states. */
 const CROSS: Variants = {
   rest: { rotate: 0 },
   on: { rotate: 45, transition: SNAP },
@@ -81,7 +81,7 @@ const TURN_SLIGHT: Variants = {
   hover: { rotate: 22, transition: SNAP },
 }
 
-/** The lid comes off before you commit -- the consequence, previewed. */
+/** The lid comes off before you commit — the consequence, previewed. */
 const LIFT_LID: Variants = {
   rest: { y: 0 },
   hover: { y: -1, transition: SNAP },
@@ -93,7 +93,7 @@ interface Entry {
 }
 
 const REGISTRY = {
-  // -- Window and shell ----------------------------------------------------
+  // — Window and shell ----------------------------------------------------
   close: { mark: X },
   // `sidebar` is not here: it is the one drawn mark, because its motion lives
   // inside the glyph rather than on it. See `drawn.tsx`, and `Icons` below.
@@ -102,24 +102,24 @@ const REGISTRY = {
   reload: { mark: RefreshCw, motion: WIND },
   settings: { mark: Settings2, motion: TURN_SLIGHT },
 
-  // -- Conversation --------------------------------------------------------
+  // — Conversation --------------------------------------------------------
   newChat: { mark: SquarePen },
   chat: { mark: MessageSquare },
   more: { mark: MoreHorizontal },
   openExternal: { mark: ExternalLink },
   jumpToLatest: { mark: ArrowDown, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
 
-  // -- Disclosure ----------------------------------------------------------
+  // — Disclosure ----------------------------------------------------------
   expand: { mark: ChevronDown },
   collapse: { mark: ChevronUp },
   disclosure: { mark: ChevronRight, motion: TURN },
 
-  // -- Model and permission ------------------------------------------------
+  // — Model and permission ------------------------------------------------
   //
   // Not shields. A shield says the app is a hazard being contained, which is
   // the developer-tool reading of these modes and the wrong one here: choosing
   // "manual" is not raising a guard, it is asking to be consulted. The triad is
-  // a transport control instead, because that is what the modes actually are --
+  // a transport control instead, because that is what the modes actually are —
   // how far ahead the app may run before it stops for you. Pause, then write,
   // then run on. Anyone who has used a media player can read it.
   reasoning: { mark: Gauge },
@@ -128,28 +128,28 @@ const REGISTRY = {
   permissionEdits: { mark: PenLine },
   permissionAuto: { mark: FastForward },
 
-  // -- Projects and source control -----------------------------------------
+  // — Projects and source control -----------------------------------------
   project: { mark: Folder },
   projectOpen: { mark: FolderOpen },
   projectNew: { mark: FolderPlus },
   branch: { mark: GitBranch },
   worktree: { mark: GitFork },
 
-  // -- Message actions -----------------------------------------------------
+  // — Message actions -----------------------------------------------------
   copy: { mark: Copy },
   retry: { mark: RotateCw, motion: WIND },
   edit: { mark: Pencil },
   fork: { mark: Split },
   readAloud: { mark: Volume2 },
 
-  // -- Composer ------------------------------------------------------------
+  // — Composer ------------------------------------------------------------
   add: { mark: Plus, motion: CROSS },
   attach: { mark: Paperclip },
   dictate: { mark: Mic },
   send: { mark: ArrowUp, motion: LIFT },
   stop: { mark: Square },
 
-  // -- Capabilities --------------------------------------------------------
+  // — Capabilities --------------------------------------------------------
   goal: { mark: Target },
   plan: { mark: ListChecks },
   mcp: { mark: Plug },
@@ -158,7 +158,7 @@ const REGISTRY = {
   hook: { mark: Webhook },
   browserUse: { mark: Globe },
 
-  // -- Settings sections ---------------------------------------------------
+  // — Settings sections ---------------------------------------------------
   general: { mark: SlidersHorizontal },
   appearance: { mark: Palette },
   personalization: { mark: UserCog },
@@ -167,13 +167,13 @@ const REGISTRY = {
   coding: { mark: Code },
   archive: { mark: Archive },
 
-  // -- Appearance ----------------------------------------------------------
+  // — Appearance ----------------------------------------------------------
   themeSystem: { mark: Monitor },
   themeLight: { mark: Sun },
   themeDark: { mark: Moon },
   image: { mark: Image },
 
-  // -- Artifacts -----------------------------------------------------------
+  // — Artifacts -----------------------------------------------------------
   // Marks for things the model produced. `image` already exists above and is
   // deliberately not repeated here.
   video: { mark: Clapperboard },
@@ -183,7 +183,7 @@ const REGISTRY = {
   link: { mark: Link2 },
   generate: { mark: Sparkles },
 
-  /* -- Opening something larger ------------------------------------------
+  /* — Opening something larger ------------------------------------------
      `PanelRight` is the sidebar family: a container with an edge, meaning "a
      column of navigation appears or disappears here". The rail is not that.
      It is a details view for one thing you picked, reached from a dozen
@@ -193,11 +193,11 @@ const REGISTRY = {
      happens. */
   openLarger: { mark: Maximize2 },
 
-  // -- Agents ---------------------------------------------------------------
+  // — Agents ---------------------------------------------------------------
   agent: { mark: Bot },
   agents: { mark: Users },
 
-  // -- Confirmation and destructive ----------------------------------------
+  // — Confirmation and destructive ----------------------------------------
   check: { mark: Check },
   succeeded: { mark: CircleCheck },
   failed: { mark: CircleAlert },
@@ -211,7 +211,7 @@ const REGISTRY = {
  *
  * Development only. The previous registry compared drawn coordinates; with a
  * library the identity of the component is the same check, and it still catches
- * the mistake that matters -- two ideas quietly sharing one shape.
+ * the mistake that matters — two ideas quietly sharing one shape.
  */
 function assertUnique(registry: Record<string, Entry>): void {
   const seen = new Map<LucideIcon, string>()
@@ -235,7 +235,7 @@ if (import.meta.env.DEV) assertUnique(REGISTRY)
  * Concept name to component. Consumers import from here, never a raw mark.
  *
  * The drawn marks are merged in at this line and nowhere else, so a call site
- * cannot tell which renderer is behind `Icons.sidebar` -- both accept the same
+ * cannot tell which renderer is behind `Icons.sidebar` — both accept the same
  * `size` and `state` and both read `IconStateContext`. That is the point of the
  * registry being a map of concepts: the renderer is an implementation detail
  * that can differ per mark without leaking into the app.

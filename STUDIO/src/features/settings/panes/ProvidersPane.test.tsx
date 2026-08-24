@@ -11,7 +11,7 @@ import { KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from '@/features/settings/conn
  *
  * Nothing in this file mocks a module of ours. The harness address comes from
  * the same two Vite env vars `connection.ts` reads in production, and the only
- * substitution is `fetch` -- so a passing test here exercises the real
+ * substitution is `fetch` — so a passing test here exercises the real
  * resolver, the real client, and the real parsers, and a change that breaks any
  * of them fails here rather than in front of a user.
  *
@@ -84,7 +84,7 @@ afterEach(() => {
  * The open dialog by name.
  *
  * Scoped rather than global because the footer button repeats the dialog's own
- * title -- "Add connection" opens it and "Add connection" submits it -- which
+ * title — "Add connection" opens it and "Add connection" submits it — which
  * is right on screen and ambiguous to a query.
  */
 function dialog(name: string): HTMLElement {

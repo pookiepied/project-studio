@@ -16,7 +16,7 @@
 //! studio-contain grant  --sid <sid> --path <path> --mode traverse|read|write
 //! studio-contain revoke --sid <sid> --path <path> [--mode traverse|read|write]
 //! studio-contain check  --sid <sid> --path <path> --mode traverse|read|write
-//! studio-contain run    --sid <sid> [--cwd <dir>] [--capability <name>]... -- <program> [args...]
+//! studio-contain run    --sid <sid> [--cwd <dir>] [--capability <name>]... — <program> [args...]
 //! ```
 //!
 //! `run` exits with the child's own exit code, so a contained `git` reports

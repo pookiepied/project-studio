@@ -15,7 +15,7 @@ import { parseArtifact } from '@/domain/artifacts/parse'
  * This runs on every frame of a stream, which means it spends most of an
  * artifact's life holding a JSON document that is not finished arriving. That
  * is not an error, and showing one would put a red message in the transcript
- * that flickers for a second and then resolves itself -- which is worse than
+ * that flickers for a second and then resolves itself — which is worse than
  * showing nothing at all, because the user has already started reading it.
  *
  * So a half-arrived artifact renders as a placeholder that occupies the shape
@@ -46,7 +46,7 @@ export function ArtifactBlock({ source }: { source: string }) {
  * The shape of an artifact that has not finished arriving.
  *
  * Same frame, same padding, same bubble position as the real thing, so when the
- * artifact resolves the only change is the content -- not the geometry. A
+ * artifact resolves the only change is the content — not the geometry. A
  * placeholder of a different size guarantees a jump at the exact moment the
  * artifact appears, which is precisely when the eye is on it.
  */

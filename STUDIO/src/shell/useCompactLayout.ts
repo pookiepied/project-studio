@@ -7,7 +7,7 @@ import { useRail } from '@/stores/rail'
  * ---- Why a breakpoint at all -----------------------------------------------
  *
  * The sidebar is a fixed 236px taken out of the window's width. At 1040 that is
- * a quarter of the app and reasonable. At 620 -- the configured minimum -- it is
+ * a quarter of the app and reasonable. At 620 — the configured minimum — it is
  * well over a third, and what is left cannot hold the transcript's reading
  * measure, so the conversation is squeezed into a column narrower than the
  * sidebar beside it. The window does not break at any single width; it stops
@@ -22,8 +22,8 @@ import { useRail } from '@/stores/rail'
  * ---- Why `matchMedia` and not a resize listener ---------------------------
  *
  * A resize handler fires continuously through a drag and asks React to
- * re-render on every frame of it. `matchMedia` fires twice for the same drag --
- * once when the query starts matching and once when it stops -- which is the
+ * re-render on every frame of it. `matchMedia` fires twice for the same drag —
+ * once when the query starts matching and once when it stops — which is the
  * number of times anything here actually needs to change.
  */
 /** The width below which the sidebar stops being worth its space. */
@@ -37,7 +37,7 @@ const COMPACT_WIDTH = 900
  * matters: at 1200px the window is comfortably wide, but a 420px rail leaves
  * 780 for the sidebar *and* the conversation, which is below the threshold this
  * whole hook exists to defend. The sidebar stayed resident and the transcript
- * was squeezed into a column narrower than the sidebar beside it -- the exact
+ * was squeezed into a column narrower than the sidebar beside it — the exact
  * failure the breakpoint was written to prevent, walked into from the other
  * side.
  *
@@ -45,7 +45,7 @@ const COMPACT_WIDTH = 900
  * medium window and the sidebar becomes the floating column it already becomes
  * on a small one: summoned rather than resident, over the page rather than
  * beside it, with the scrim it already has. Nothing is hidden and nothing new
- * had to be designed -- the two panels simply stop competing for the same
+ * had to be designed — the two panels simply stop competing for the same
  * pixels.
  */
 export function useCompactLayout(): boolean {

@@ -4,13 +4,13 @@
  * What the model receives and what renders here are two projections of the
  * same event log, and neither is derived from the other (transcript-and-
  * rendering.md section 1). This module owns the UI side. It consumes what
- * `useConversation` forwards -- history snapshots and update chunks -- and
+ * `useConversation` forwards — history snapshots and update chunks — and
  * produces the ordered items a person reads. Nothing here ever flows back up
  * into a request.
  *
  * ---- Grouping is structural, never inferred -------------------------------
  *
- * The unit is ONE ASSISTANT MESSAGE'S tool calls, bucketed by tool kind --
+ * The unit is ONE ASSISTANT MESSAGE'S tool calls, bucketed by tool kind —
  * both halves are facts already in the log (the message id on every
  * `tool-input`, the tool name beside it). No semantic labels exist here and
  * none may be added: a label the model did not emit is a guess wearing a
@@ -20,7 +20,7 @@
  * ---- Thinking blocks are segments, not a mutable block --------------------
  *
  * Reasoning deltas accumulate into per-segment blocks positioned where they
- * occurred, keyed by message id and ordinal -- because we reattach at an
+ * occurred, keyed by message id and ordinal — because we reattach at an
  * offset, and a single global block has no stable identity across a replay.
  *
  * ---- Idempotent under replay ----------------------------------------------
@@ -35,7 +35,7 @@
  *
  * A message is complete only when `message-completed` says so (or the
  * snapshot's own part states do); a submission is finished only when a
- * settlement says so. Silence proves nothing -- a stream that stops
+ * settlement says so. Silence proves nothing — a stream that stops
  * mid-sentence leaves a visibly unfinished message behind, whatever the
  * connection does afterwards.
  *
@@ -43,23 +43,23 @@
  *
  * `message-completed` means "this attempt's record is closed", not "this
  * turn succeeded". Each retry attempt of a failing turn closes its own
- * record cleanly -- so by the time the settlement arrives, four empty
+ * record cleanly — so by the time the settlement arrives, four empty
  * attempts all read complete, and a rule that only touches still-open
  * messages correctly changes nothing. The rule here:
  *
  *  - an OPEN message of the failed submission takes the outcome, with the
  *    settlement's sentence beside it when the wire carried one;
- *  - a message that closed WITHOUT EVER PRODUCING CONTENT is withdrawn --
+ *  - a message that closed WITHOUT EVER PRODUCING CONTENT is withdrawn —
  *    it was a retry attempt that never got to speak, and four empty bubbles
  *    are a fabricated success however they are labelled;
- *  - a message that closed WITH content keeps its completion -- a late
+ *  - a message that closed WITH content keeps its completion — a late
  *    failure never retroactively falsifies real work;
  *  - if withdrawal leaves nothing of the submission standing, one failure
  *    item takes the attempts' place, carrying the provider's sentence.
  *
  * Everything here is derivable from wire facts alone: content means a delta
  * or a tool input arrived for that message id. No counting, no emptiness
- * test over text -- and a legitimately silent model is never misrepresented,
+ * test over text — and a legitimately silent model is never misrepresented,
  * because silence under a COMPLETED settlement touches nothing at all.
  */
 
@@ -108,7 +108,7 @@ export type MessageEnd =
   | { readonly state: 'stopped' }
   /**
    * The submission settled failed/aborted over this record. `reason` is the
-   * settlement's own sentence -- the provider's words, or null when the wire
+   * settlement's own sentence — the provider's words, or null when the wire
    * carried none. Never invented here; "unknown" renders as unknown.
    */
   | { readonly state: 'failed'; readonly reason: string | null }
@@ -144,7 +144,7 @@ export type TranscriptItem =
       /**
        * A failed or aborted submission standing where its contentless retry
        * attempts stood. Exists so a rate-limited turn reads as ONE visible
-       * failure instead of four empty bubbles -- the display projection
+       * failure instead of four empty bubbles — the display projection
        * collapsing records that carry nothing of their own. What the
        * attempts said (nothing) and what the settlement said (the failure)
        * are both still in the log; this is the honest rendering of them.
@@ -191,7 +191,7 @@ export interface TranscriptProjection {
 /**
  * The mutable working shape behind an immutable `TranscriptProjection`.
  * Functions below clone shallowly, apply a whole batch, and hand back a new
- * immutable projection -- React sees fresh objects, nothing downstream can
+ * immutable projection — React sees fresh objects, nothing downstream can
  * observe a half-applied batch.
  */
 interface Draft {
@@ -291,7 +291,7 @@ function appendDelta(
 
 /**
  * Adds a tool call to the message's OPEN tools segment, or opens a new one
- * after whatever was being written -- the interleaving is the story of the
+ * after whatever was being written — the interleaving is the story of the
  * turn, and grouping must not flatten it away.
  */
 function appendToolCall(
@@ -383,7 +383,7 @@ type BelongsTo = (item: AssistantItem, index: number) => boolean
  * with nothing standing gets one failure item where its attempts were.
  *
  * Returns whether anything changed. `items` is mutated; callers that keep
- * id-indexed maps rebuild them when this returns true -- withdrawal and
+ * id-indexed maps rebuild them when this returns true — withdrawal and
  * insertion shift every index after the first one touched.
  */
 function settleSubmissionFailure(
@@ -478,7 +478,7 @@ function callSitesOf(items: readonly TranscriptItem[]): Map<string, CallSite> {
 }
 
 /**
- * Builds items from a whole materialized conversation -- the history view's
+ * Builds items from a whole materialized conversation — the history view's
  * answer, or a reset chunk's identical payload. Replaces everything: a
  * snapshot IS the state, not a patch on it.
  *
@@ -578,14 +578,14 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
   }
 
   // Settlements are facts about how submissions ended, and history carries
-  // them precisely so a cold start knows what a crash knew. The live rule --
+  // them precisely so a cold start knows what a crash knew. The live rule —
   // open tail takes the outcome, finished work stays finished, empty retry
-  // attempts withdraw -- applies here through the same function.
+  // attempts withdraw — applies here through the same function.
   //
   // One thing history forces on top: ASSISTANT messages in a snapshot carry
   // no submissionId (observed on a live harness; the SDK type calls the
   // field optional and the projection omits it), so matching by id alone
-  // finds nothing -- that is how a cold start came to render four empty
+  // finds nothing — that is how a cold start came to render four empty
   // complete bubbles. A submission's records are therefore also recognised
   // by position: in a linear append-only log, the assistant messages between
   // ITS user message and the next one are its attempts, and nothing else.
@@ -638,7 +638,7 @@ export function emptyProjection(): TranscriptProjection {
  *
  * A seed leaves its trailing text/thinking segment continuable: whatever
  * produced the stream may emit another delta for it, and that delta belongs
- * ON the tail -- splitting "kept" and " grown" into adjacent segments
+ * ON the tail — splitting "kept" and " grown" into adjacent segments
  * renders one paragraph as two for no reason. The last segment is the
  * continuation point by construction.
  */
@@ -657,7 +657,7 @@ function openRunsOf(items: readonly TranscriptItem[]): Map<string, OpenRun> {
  * Whether this message is being written right now.
  *
  * Three facts must agree, and silence in any of them means no: the turn is
- * running (the phase says so -- bytes stopping proves nothing), this is the
+ * running (the phase says so — bytes stopping proves nothing), this is the
  * newest message, and the message itself has NOT reached an end state. A
  * crash-recovered `stopped` message under a live connection therefore shows
  * no caret: rendering an interrupted turn as actively writing is the same
@@ -675,7 +675,7 @@ export function isMessageBeingWritten(
   )
 }
 
-/** A projection built from nothing but a snapshot -- the cold start's opening state. */
+/** A projection built from nothing but a snapshot — the cold start's opening state. */
 export function seededProjection(snapshot: ConversationSnapshotFacts): TranscriptProjection {
   const items = seededFrom(snapshot)
   return {
@@ -708,7 +708,7 @@ export function applyChunks(
     changed = true
   }
 
-  // A batch that was entirely redelivery changes nothing -- returning the
+  // A batch that was entirely redelivery changes nothing — returning the
   // input untouched lets React bail out of the render it would cause.
   return changed ? settle(draft) : projection
 }
@@ -717,7 +717,7 @@ function applyChunk(draft: Draft, chunk: ChunkFacts): void {
   switch (chunk.type) {
     case 'conversation-reset': {
       if (chunk.snapshot === null) return
-      // A reset IS the state: everything accumulated so far is replaced --
+      // A reset IS the state: everything accumulated so far is replaced —
       // including the indexes. A stale id index here would silently route
       // post-reset content to the wrong item or drop it.
       draft.items = seededFrom(chunk.snapshot)

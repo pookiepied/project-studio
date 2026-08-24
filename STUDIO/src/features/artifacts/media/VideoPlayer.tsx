@@ -3,7 +3,7 @@ import 'media-chrome'
 /**
  * The video player.
  *
- * `media-chrome` supplies the behaviour -- keyboard shortcuts, focus order,
+ * `media-chrome` supplies the behaviour — keyboard shortcuts, focus order,
  * screen-reader labelling, scrubbing when the pointer leaves the bar, buffered
  * ranges, and the browser differences under all of it. Every one of those is a
  * bug we would otherwise find later and fix worse.
@@ -18,7 +18,7 @@ import 'media-chrome'
  *
  * `media-controller` paints `--media-background-color`, which defaults to
  * black. The clip is 16:9 and the frame it sits in is whatever the artifact
- * declared, so any mismatch showed as a black band below the picture -- outside
+ * declared, so any mismatch showed as a black band below the picture — outside
  * the rounded panel's fill and therefore outside the shape entirely. Setting it
  * transparent lets the panel's own surface show through, and `object-fit:
  * cover` means there is nothing to letterbox in the first place.

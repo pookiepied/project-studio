@@ -1,8 +1,8 @@
 /**
  * The conversation content wire contract, mirrored by hand.
  *
- * Task 24's `contracts.ts` carried chunk FACTS only -- type, position, ids,
- * outcome -- because nothing rendered yet. Rendering needs what the chunks
+ * Task 24's `contracts.ts` carried chunk FACTS only — type, position, ids,
+ * outcome — because nothing rendered yet. Rendering needs what the chunks
  * SAY, and the history snapshot too, so the mirror lives here now, beside the
  * facts it extends. Source of truth:
  * `STUDIO HARNESS/node_modules/@flue/runtime/dist/internal.d.mts`
@@ -14,8 +14,8 @@
  *
  * - The `updates` view's chunks, which describe operations (a delta arrived, a
  *   tool call was made).
- * - The `history` view's snapshot -- and the `conversation-reset` chunk, which
- *   carries the identical snapshot object -- which describes STATE. Seeding a
+ * - The `history` view's snapshot — and the `conversation-reset` chunk, which
+ *   carries the identical snapshot object — which describes STATE. Seeding a
  *   projection from history and replacing one from a reset chunk is the same
  *   operation for exactly this reason.
  *
@@ -55,8 +55,8 @@ function oneOf<T extends string>(allowed: readonly T[], value: unknown): T | nul
 
 /**
  * The monotonic ordering token stamped on every projected chunk,
- * lexicographic by batch then index. It exists so a redelivered batch -- an
- * SSE reconnect replays the batch that was in flight -- can be dropped
+ * lexicographic by batch then index. It exists so a redelivered batch — an
+ * SSE reconnect replays the batch that was in flight — can be dropped
  * instead of double-applied. Like offsets: opaque, never interpreted.
  */
 export interface ChunkPosition {
@@ -84,7 +84,7 @@ export type PartState = 'streaming' | 'done'
 /**
  * One materialized part of a message. `text` and `reasoning` arrive complete
  * here (history and resets project state, not deltas); their `state` says
- * whether the message was still being written -- the snapshot's own word for
+ * whether the message was still being written — the snapshot's own word for
  * "this turn never finished", which rendering must honour rather than infer
  * from silence. A tool part carries its call and whatever answer exists for
  * it at projection time.
@@ -144,7 +144,7 @@ export interface SettlementFacts {
   readonly result: { readonly present: boolean; readonly value: unknown }
   /**
    * What the harness said went wrong, parsed. A failure the wire carried no
-   * error object for reads as `present: false` -- still a failure, just one
+   * error object for reads as `present: false` — still a failure, just one
    * with no sentence to show. An error object this side cannot read (not a
    * record) is `present: true` with every field null, for the same reason:
    * "there was a reason, and it is unknown" is a different fact from "there
@@ -169,9 +169,9 @@ export interface SettlementFacts {
 export interface SettlementErrorFacts {
   /** Whether the wire carried an error object at all. */
   readonly present: boolean
-  /** The error class name -- "FlueError", "FlueHttpError". */
+  /** The error class name — "FlueError", "FlueHttpError". */
   readonly name: string | null
-  /** Flue's stable error type -- "operation_failed", not the message. */
+  /** Flue's stable error type — "operation_failed", not the message. */
   readonly type: string | null
   /** The sentence a person could act on. Never synthesised when absent. */
   readonly message: string | null
@@ -198,7 +198,7 @@ function readSettlementError(value: unknown): SettlementErrorFacts {
 /**
  * `AgentConversationSnapshot`: the materialized conversation at a durable
  * offset. `offset` is the physical stream tail INCLUDING records this
- * conversation's projection omits -- the offset to resume updates from, not a
+ * conversation's projection omits — the offset to resume updates from, not a
  * count of anything.
  */
 export interface ConversationSnapshotFacts {
@@ -408,7 +408,7 @@ export type TurnOutcome = 'completed' | 'failed' | 'aborted'
 /**
  * What one projected chunk says, mirrored from `ConversationStreamChunk`.
  *
- * One flat record with `null` for every field the wire omitted -- the same
+ * One flat record with `null` for every field the wire omitted — the same
  * shape Task 24 mirrored before rendering existed, extended with the fields
  * content needs. An unrecognised chunk type comes back carrying only its
  * identity fields, which is deliberate: dropping an unknown chunk would
@@ -450,7 +450,7 @@ export interface ChunkFacts {
   readonly errorText: string | null
   /**
    * `submission-settled`: who signed the failure, and what it said. Null
-   * whenever the wire omitted the error or the field -- never invented, so a
+   * whenever the wire omitted the error or the field — never invented, so a
    * renderer can show "reason unknown" without lying.
    */
   readonly errorName: string | null
@@ -610,7 +610,7 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
     }
     default:
       // An unknown chunk type survives as identity only. Everything else it
-      // may carry is unread by definition -- this side has never heard of it.
+      // may carry is unread by definition — this side has never heard of it.
       return {
         ...base,
         messageId: null,

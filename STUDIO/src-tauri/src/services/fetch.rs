@@ -30,7 +30,7 @@ pub struct SerializedResponse {
 }
 
 /// The one arm. Everything about reaching the Harness is decided by the
-/// supervisor rather than the caller -- the address above all, and with it
+/// supervisor rather than the caller — the address above all, and with it
 /// the credential: read here, at call time, held only for this request,
 /// returned to no one.
 async fn harness_fetch(
@@ -159,8 +159,8 @@ mod tests {
     /// The bearer only exists while the supervisor is running, so this is the
     /// one place the claim can be tested against the real value. Two error
     /// paths are drivable from outside: a path refused before any request
-    /// exists, and a service that is not running. The third -- a transport
-    /// failure -- scrubs in `request_failure` and is tested above.
+    /// exists, and a service that is not running. The third — a transport
+    /// failure — scrubs in `request_failure` and is tested above.
     #[tokio::test]
     async fn no_error_a_live_harness_produces_contains_its_token() {
         let _serial = ONE_HARNESS_AT_A_TIME.lock().await;

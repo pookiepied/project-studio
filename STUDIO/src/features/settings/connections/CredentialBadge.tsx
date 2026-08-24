@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn'
  *
  * None of the three is red. The app's only hue outside the voice tokens is
  * `--danger`, reserved for things that lose data, and a connection without a
- * key is not a failure -- it is a connection to an endpoint that does not want
+ * key is not a failure — it is a connection to an endpoint that does not want
  * one, or one that reads its key from the environment. Weight carries the
  * distinction instead: a filled dot for a key that exists, a hollow one for
  * none.
@@ -27,7 +27,7 @@ const LABEL: Record<CredentialStatus, string> = {
   set: 'Key stored',
   // The harness process inherited one from its environment. Worth naming
   // separately from `set`: nothing in this app put it there, and nothing in
-  // this app can remove it -- deleting the connection will not.
+  // this app can remove it — deleting the connection will not.
   'from-env': 'Key from environment',
   // Nothing was found. Fine for a local endpoint, fatal for a hosted one, and
   // the probe is what tells the two apart.

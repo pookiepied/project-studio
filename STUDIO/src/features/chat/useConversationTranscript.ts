@@ -16,8 +16,8 @@ import {
  * `useConversation` owns the connection and forwards content; this hook owns
  * the reduction. The split is the one the architecture doc asks for: the
  * connection state machine never touches content, and this file never talks
- * to the harness. What a component gets is exactly two things -- items to
- * render and the phase they were produced in -- and nothing here can leak
+ * to the harness. What a component gets is exactly two things — items to
+ * render and the phase they were produced in — and nothing here can leak
  * either into a request.
  *
  * A snapshot REPLACES the projection; chunks apply on top. Both arrive from

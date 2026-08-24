@@ -11,8 +11,8 @@ import type { Project } from '@/domain/projects/types'
  * the two seed calls and the one reply call in `SessionProvider`, so removing
  * the demo is deleting this module and fixing three import errors.
  *
- * The canned reply deliberately exercises every renderer the transcript has --
- * headings, lists, a table, inline and fenced code, math, and a rule -- because
+ * The canned reply deliberately exercises every renderer the transcript has —
+ * headings, lists, a table, inline and fenced code, math, and a rule — because
  * a demo that only emits plain paragraphs proves nothing about the layout that
  * has to survive real output.
  */

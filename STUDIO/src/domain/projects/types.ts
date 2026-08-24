@@ -34,7 +34,7 @@ export interface Project {
 /**
  * The marks a project may wear.
  *
- * A closed set, not free choice, and deliberately abstract -- see the note in
+ * A closed set, not free choice, and deliberately abstract — see the note in
  * `ProjectIconMark`. They are named for their geometry rather than for any
  * subject, because the moment a mark is called `flask` someone will reasonably
  * expect picking it to say something about the project.

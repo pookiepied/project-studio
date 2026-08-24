@@ -15,7 +15,7 @@ import { VideoPlayer } from '@/features/artifacts/media/VideoPlayer'
  * back is a deliberate act. That is right for watching something and wrong for
  * *looking at* something the model just made, which is a glance you take in the
  * middle of a conversation. So this takes about three quarters of the window
- * and leaves the rest visible behind a scrim -- big enough to judge the result,
+ * and leaves the rest visible behind a scrim — big enough to judge the result,
  * small enough that the conversation is still obviously there and one click
  * away.
  *
@@ -83,7 +83,7 @@ export function MediaLightbox({
           >
             {/* The panel's own surface, not black. Black was the default the player
                 painted and it showed as a band wherever the clip's ratio did
-                not match the frame -- which is most of the time, and which
+                not match the frame — which is most of the time, and which
                 read as the video escaping the rounded shape. */}
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-block-inner bg-code-surface">
               {video && src ? (

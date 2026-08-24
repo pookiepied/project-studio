@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 /**
  * The half of `resolveHarnessAddress` that runs inside Tauri.
  *
- * The other half -- the browser-branch env reads -- is covered by
+ * The other half — the browser-branch env reads — is covered by
  * `connection.test.ts`, which runs outside Tauri. These tests need a `window`
  * to enter Tauri with and a mocked invoke, because the real command answers
  * with a supervisor this environment does not have.

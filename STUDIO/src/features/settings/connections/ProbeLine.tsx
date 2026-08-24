@@ -7,7 +7,7 @@ import type { ProbeState } from './useConnections'
  *
  * A probe answers three different questions and the contract keeps them apart,
  * so this does too. `ok` is whether the endpoint answered acceptably.
- * `modelCount` is present only when the endpoint could actually enumerate --
+ * `modelCount` is present only when the endpoint could actually enumerate —
  * absent is "we could not tell", which is not zero, and rendering "0 models"
  * for it would be inventing a fact. `status` is absent when the attempt never
  * produced an HTTP response at all (a refused connection, a DNS failure), and
@@ -16,7 +16,7 @@ import type { ProbeState } from './useConnections'
  *
  * So every field is rendered only when it is there, and nothing is defaulted.
  *
- * A transport failure -- the harness itself unreachable -- is a different
+ * A transport failure — the harness itself unreachable — is a different
  * thing from a probe that ran and failed, and says so: one is "Studio could
  * not ask", the other is "we asked and the provider said no".
  */

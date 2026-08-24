@@ -1,14 +1,14 @@
 /**
  * Waveform geometry and envelopes.
  *
- * Pure functions and one small buffer -- nothing here touches React, the DOM
+ * Pure functions and one small buffer — nothing here touches React, the DOM
  * or the microphone, so the same numbers drive both renderings of the voice
  * (the composer's bars and the stage's ridge) and the two cannot disagree
  * about what a level looks like.
  *
  * ---- The ridge, not the bar chart ------------------------------------------
  *
- * Both visualisations show the same thing -- recent level over time -- but the
+ * Both visualisations show the same thing — recent level over time — but the
  * stage draws it as one continuous mirrored line rather than a row of bars,
  * for the same reason the voice mark is a line (`drawn.tsx`): a bar chart of
  * amplitude is a picture of equipment, a shape that swells and settles is a
@@ -56,7 +56,7 @@ function smoothed(history: LevelHistory, index: number): number {
  * The top edge runs left to right through the samples; the bottom edge is the
  * top reflected around the midline and run back right to left, so the shape
  * closes around the centre and reads as a single object breathing rather than
- * two lines tracking each other. Silence is a hairline, not nothing -- a flat
+ * two lines tracking each other. Silence is a hairline, not nothing — a flat
  * line is the honest rendering of a quiet room and still shows the feature is
  * alive.
  */
@@ -91,7 +91,7 @@ export function ridgePath(history: LevelHistory, width: number, height: number):
 /**
  * The speaking envelope, for the stage's talking state.
  *
- * There is no real voice to measure yet -- no TTS exists behind this app --
+ * There is no real voice to measure yet — no TTS exists behind this app —
  * so the shape is synthesised from a few sine bands at speech-like rates
  * (syllables around 3Hz, words around 0.5Hz). It is the one knowingly fake
  * signal in this feature and it stays contained here, behind the same
@@ -108,8 +108,8 @@ export function speakingEnvelope(timeSeconds: number, seed: number): number {
 
 /**
  * The thinking pulse: barely above the hairline, slow. It exists so the
- * collapse from speech to thought is continuous -- the ridge settles rather
- * than snapping flat -- and it is quiet because thinking is the one state
+ * collapse from speech to thought is continuous — the ridge settles rather
+ * than snapping flat — and it is quiet because thinking is the one state
  * with nothing to measure. Quiet is the honest rendering of nothing.
  */
 export function thinkingPulse(timeSeconds: number): number {
@@ -121,7 +121,7 @@ export function thinkingPulse(timeSeconds: number): number {
  *
  * Slower than a pulse and shallower than any state that means something, so
  * "waiting" cannot be mistaken for "listening" at a glance. Not flat, though
- * -- a perfectly still orb reads as a frozen app, and the one thing this
+ * — a perfectly still orb reads as a frozen app, and the one thing this
  * screen must never look like is stopped.
  */
 export function idleBreath(timeSeconds: number): number {
@@ -139,8 +139,8 @@ export function formatClock(elapsedMs: number): string {
  *
  * `<MotionConfig reducedMotion="user">` covers everything Framer animates; the
  * waveform writes to the DOM directly from a frame loop, so it checks here.
- * Live measurement keeps updating -- it is data, and pausing it would say the
- * microphone had -- but the decorative envelopes (breathing, speaking cadence)
+ * Live measurement keeps updating — it is data, and pausing it would say the
+ * microphone had — but the decorative envelopes (breathing, speaking cadence)
  * settle to a constant, and the reveal animations collapse the usual way.
  */
 export function prefersReducedMotion(): boolean {

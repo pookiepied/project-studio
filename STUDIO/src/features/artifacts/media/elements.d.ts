@@ -3,7 +3,7 @@ import type { DetailedHTMLProps, HTMLAttributes } from 'react'
 /**
  * `media-chrome` ships web components, and React needs to be told they exist.
  *
- * Declared narrowly -- only the elements actually used -- rather than with a
+ * Declared narrowly — only the elements actually used — rather than with a
  * catch-all index signature. A catch-all would silence typos in every custom
  * element name in the app, which is the one thing the type system is useful for
  * here.

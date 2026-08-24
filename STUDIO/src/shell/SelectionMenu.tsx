@@ -8,7 +8,7 @@ import { ActionItems } from '@/shell/ActionItems'
  *
  * ---- What it is ------------------------------------------------------------
  *
- * The same action list the right-click menu carries (`ActionItems` -- one
+ * The same action list the right-click menu carries (`ActionItems` — one
  * list, two ways to summon it), offered the moment text is selected rather
  * than after a right-click. Selecting a phrase and acting on it is one
  * gesture in the user's head; routing it through a second gesture was the
@@ -18,7 +18,7 @@ import { ActionItems } from '@/shell/ActionItems'
  *
  * On the pointer *rising* from a drag, on a double-click, and on the keys
  * that make a selection (Shift, the arrows, Home and friends). Never during
- * the drag itself -- a menu chasing a moving caret is noise -- and never from
+ * the drag itself — a menu chasing a moving caret is noise — and never from
  * a click that selected nothing.
  *
  * ---- Where it appears ------------------------------------------------------
@@ -26,7 +26,7 @@ import { ActionItems } from '@/shell/ActionItems'
  * Centred over the selection's own rectangle: above it where there is room,
  * below it at the top of the window, growing from whichever edge it hugs. The
  * transcript scrolls under the top fades, so the menu follows its selection
- * on scroll rather than being dismissed by it -- a menu that vanishes because
+ * on scroll rather than being dismissed by it — a menu that vanishes because
  * the page moved is a menu that punished the user for reading.
  *
  * ---- When it leaves --------------------------------------------------------
@@ -128,7 +128,7 @@ export function SelectionMenu() {
       place()
     }
 
-    // A pointer falling outside the menu ends its turn -- including the start
+    // A pointer falling outside the menu ends its turn — including the start
     // of a fresh drag, which will reopen the menu wherever the new selection
     // lands. Inside the menu, the rows handle their own clicks.
     const onPointerDown = (event: PointerEvent) => {
@@ -138,7 +138,7 @@ export function SelectionMenu() {
 
     // A key rising over a live selection. Unfiltered on purpose: a selection
     // can only exist because the user made it, so any key-up that finds one
-    // is a cue -- and filtering by key was wrong twice in practice. Typing
+    // is a cue — and filtering by key was wrong twice in practice. Typing
     // into the composer collapses the selection and finds nothing, and a
     // synthetic Ctrl+A can deliver its key-up as the modifier alone, which a
     // key filter silently drops.
@@ -163,7 +163,7 @@ export function SelectionMenu() {
 
     // While open, the menu tracks its selection: "Select all" widens it, and
     // the text Copy will use must be the text now selected. A collapsed
-    // selection means the user clicked or typed it away -- the menu goes too.
+    // selection means the user clicked or typed it away — the menu goes too.
     const onSelectionChange = () => {
       if (!openRef.current) return
       place()

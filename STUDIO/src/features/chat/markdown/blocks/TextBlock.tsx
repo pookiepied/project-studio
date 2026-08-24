@@ -18,7 +18,7 @@ const COPIED_MS = 2000
  * kinds of text: the explanation, which is the model talking to you, and the
  * rewrite, which is a thing you are meant to take away and use. Running them
  * together as one column of prose is the reason people end up hunting for
- * where the actual draft starts and stops -- and then select it by hand and
+ * where the actual draft starts and stops — and then select it by hand and
  * get the sentence before it as well.
  *
  * So a draft gets the same treatment code gets: a frame, a name, a copy
@@ -26,7 +26,7 @@ const COPIED_MS = 2000
  * "here is a thing you can take" is one idea and should look like one.
  *
  * Where code is monospaced and unwrapped, this is body text at reading measure
- * -- the point is to judge how it *reads*, so it has to be set the way it will
+ * — the point is to judge how it *reads*, so it has to be set the way it will
  * eventually be read.
  */
 

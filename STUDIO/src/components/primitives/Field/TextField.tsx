@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
  * The field treatment used everywhere except the composer.
  *
  * Focus is a border and a 2px ring at 14% alpha. The previous shell used a 3px
- * ring at 26%, which on a white surface read as a thick grey halo -- the thing
+ * ring at 26%, which on a white surface read as a thick grey halo — the thing
  * that made clicking a field look like an error state. A monochrome ring has to
  * stay quiet, because unlike a blue one it cannot rely on hue to say "this is
  * focus rather than a warning".
@@ -32,7 +32,7 @@ export const TextField = forwardRef<
      * bring browser validation bubbles and spinner affordances that this
      * design system has no drawing for, and a field that renders a native
      * error balloon over a modal is a UI nobody designed. Masking is
-     * different -- it is a security property of the input, not a validation
+     * different — it is a security property of the input, not a validation
      * behaviour, and the app now has one place that needs it (an API key on
      * its way to the harness credential store).
      */
@@ -40,7 +40,7 @@ export const TextField = forwardRef<
     /**
      * Defaults to `off`. A password manager offering to save a harness API key
      * into a browser vault is the exact opposite of what that key's handling
-     * is for -- it is submitted once and forgotten, never read back.
+     * is for — it is submitted once and forgotten, never read back.
      */
     autoComplete?: string
     ariaLabel?: string

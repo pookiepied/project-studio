@@ -11,7 +11,7 @@ import {
 /**
  * The conversation client against scripted answers.
  *
- * Both seams are injected -- the invoke and the channel constructor -- so
+ * Both seams are injected — the invoke and the channel constructor — so
  * nothing here touches Tauri or a harness. What is asserted is the wire
  * behaviour the app depends on: where requests go, what a receipt must look
  * like, that a cold start is history FIRST and updates AFTER it, and above
@@ -21,7 +21,7 @@ import {
  *
  * The request shapes here were confirmed against a live harness: history
  * refuses `offset`/`live` outright, and a conversation with no stream yet
- * answers 404 -- both are pinned below so neither can quietly regress.
+ * answers 404 — both are pinned below so neither can quietly regress.
  */
 
 interface RecordedCall {
@@ -173,13 +173,13 @@ describe('attaching to a run', () => {
     // THE sequence the protocol prescribes when local state is unavailable:
     // an updates connection resumed without its projection state would
     // render deltas whose messages never began. The live harness refuses a
-    // bare path too -- Rust appends offset/live, which history rejects --
+    // bare path too — Rust appends offset/live, which history rejects —
     // so the old bare-path request was refused on EVERY attach.
     let streamOpened = false
     const { invoke, calls } = scriptedInvoke({
       service_fetch: (args) => {
         // History must be asked for before any stream exists, by path, with
-        // no offset or live parameter -- those are exactly what it refuses.
+        // no offset or live parameter — those are exactly what it refuses.
         if (streamOpened) throw new Error('history read after the stream opened')
         const init = args['init'] as { method: string }
         expect(init.method).toBe('GET')
@@ -220,7 +220,7 @@ describe('attaching to a run', () => {
   it('reports a fresh conversation as absent instead of dressing a 404 up as a break', async () => {
     // The harness creates the stream when the agent instance receives its
     // first prompt. A conversation nobody has spoken into has none, the
-    // history view says 404, and there is nothing to attach to -- a normal
+    // history view says 404, and there is nothing to attach to — a normal
     // state a first submission leaves, never a broken read.
     const { invoke, calls } = scriptedInvoke({
       service_fetch: () =>
@@ -532,7 +532,7 @@ describe('attaching to a run', () => {
       .map((call) => call.args['streamId'])
     expect(cancelIds).toHaveLength(1)
     expect(cancelIds[0]).toBe(calls[0].args['streamId'])
-    // The superseded read settles cancelled -- the fake resolves it when its
+    // The superseded read settles cancelled — the fake resolves it when its
     // cancel lands, exactly as the registry does in Rust.
     await expect(first.settled).resolves.toEqual({ outcome: 'cancelled' })
     expect(client.attached()).toBe(true)
@@ -581,7 +581,7 @@ describe('aborting a run', () => {
  *
  * `cancel()` is asynchronous by nature: the registry stops the reader in
  * Rust, but frames already in the channel's queue still arrive afterwards.
- * A superseded read that keeps delivering is not merely untidy -- it writes
+ * A superseded read that keeps delivering is not merely untidy — it writes
  * the client's tracked offset, and an older read's late frame can drag that
  * offset BACKWARDS past what the newer read has already seen.
  */

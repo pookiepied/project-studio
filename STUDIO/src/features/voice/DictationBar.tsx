@@ -10,18 +10,18 @@ import { cn } from '@/lib/cn'
  * The composer while it is being spoken to.
  *
  * Takes the field's place inside the capsule and holds the same line height,
- * so the composer neither grows nor reshapes -- the surface stays put and only
+ * so the composer neither grows nor reshapes — the surface stays put and only
  * its contents change, which is the same contract the field itself follows on
  * focus.
  *
  * Three faces, one slot:
  *
  *   recording   real level as scrolling bars plus the clock. The bars are the
- *               last two seconds of measured level, newest on the right --
+ *               last two seconds of measured level, newest on the right —
  *               each bar one frame of what the microphone actually heard, so
  *               a silent room shows a still row and only speaking moves it.
  *   processing  transcribing, with an ellipsis that cycles. Motion here is a
- *               state being reported, not decoration -- the same licence the
+ *               state being reported, not decoration — the same licence the
  *               thinking sparkle runs on.
  *   blocked     what went wrong, in one line, in the caption voice. It clears
  *               itself (see `useDictation`) rather than demanding a dismissal.
@@ -39,7 +39,7 @@ import { cn } from '@/lib/cn'
  * Enough bars to fill the field at its widest, not enough to be counted.
  *
  * It was 22, which drew a ~107px strip and left the rest of the composer
- * empty -- the dictation state used a third of the field and the remaining
+ * empty — the dictation state used a third of the field and the remaining
  * two thirds were blank, which is what made it read as unfinished rather than
  * as the field doing something. The row is anchored right and clips on the
  * left, so this is a ceiling rather than an exact fit: the history always
@@ -72,7 +72,7 @@ function LevelBars({ onFrame }: { onFrame: (listener: MicFrameListener) => () =>
     // `justify-end` plus `overflow-hidden` is what makes one fixed bar count
     // fit every field width: the newest sample is pinned to the right edge and
     // anything that does not fit falls off the left, which is also the correct
-    // reading of the data -- this is the last two seconds, scrolling.
+    // reading of the data — this is the last two seconds, scrolling.
     <span
       aria-hidden
       className="flex min-w-0 flex-1 items-center justify-end gap-[3px] overflow-hidden"
@@ -120,14 +120,14 @@ export function DictationBar({
   onFrame: (listener: MicFrameListener) => () => void
 }) {
   return (
-    // Exactly one line of composer text tall -- the same box `ComposerField`'s
+    // Exactly one line of composer text tall — the same box `ComposerField`'s
     // textarea occupies, so swapping one for the other cannot change the
     // capsule's height.
     //
     // This was `min-h-8`: 32px against the field's 18.6px line, so starting
     // dictation grew the composer by 13px and ended it by shrinking back. The
     // component's own docstring promised the opposite ("holds the same line
-    // height, so the composer neither grows nor reshapes") -- the contract was
+    // height, so the composer neither grows nor reshapes") — the contract was
     // right and the number was never derived from it. Stated against the `ui`
     // role rather than this row's `caption`, because the height has to match
     // the *field*, and `1lh` here would measure the caption text inside it.

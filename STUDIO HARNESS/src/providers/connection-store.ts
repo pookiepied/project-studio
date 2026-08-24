@@ -24,7 +24,7 @@ import type { StudioDatabase } from "../storage/database.js";
  * Created by migration 8, not here.
  *
  * A table made on the fly in a constructor is a table `assertNoSecretColumns`
- * never sees and `PRAGMA user_version` never accounts for -- the schema guard
+ * never sees and `PRAGMA user_version` never accounts for — the schema guard
  * runs inside `migrate()` alone. Owning the DDL here would have put this table
  * outside both.
  */

@@ -205,7 +205,7 @@ export const MIGRATIONS: readonly Migration[] = [
       // **No column holds a secret, and the guard enforces it.** A bearer token
       // or a password lives in the OS credential store under the server's id.
       // `auth_env_var` is the *name* of the environment variable the secret is
-      // injected into at spawn time -- a name is configuration, the value never
+      // injected into at spawn time — a name is configuration, the value never
       // touches this file. An earlier draft called it `secret_env_name` and the
       // migration guard refused it, correctly, which is the guard doing exactly
       // what it is for.
@@ -300,7 +300,7 @@ export const MIGRATIONS: readonly Migration[] = [
       // one table saying both would not be.
       //
       // **`record_json` is the reason this comment is long.** The column guard
-      // reads column *names*, so it cannot see inside a JSON blob -- the
+      // reads column *names*, so it cannot see inside a JSON blob — the
       // protection here is instead that every write is parsed through
       // `providerConnectionSchema`, which has no key field and strips unknown
       // ones, and every read refuses a record carrying `apiKey`. A column named

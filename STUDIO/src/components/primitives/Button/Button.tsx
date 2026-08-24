@@ -22,7 +22,7 @@ import { DURATION, EASE_OUT } from '@/design/tokens'
  *
  *   primary     the one thing this page wants you to do
  *   secondary   a real action, equal in weight to its neighbours
- *   ghost       an action that should not compete -- inside rows, beside text
+ *   ghost       an action that should not compete — inside rows, beside text
  *   danger      loses data, or cannot be undone
  *
  * `danger` is deliberately outlined rather than filled. A filled red button is
@@ -30,7 +30,7 @@ import { DURATION, EASE_OUT } from '@/design/tokens'
  * settings page daring you to click it. Filled red belongs on the confirmation
  * step, where the choice has already been narrowed to yes or no.
  *
- * Icon-only controls are not this component -- they are round, they are
+ * Icon-only controls are not this component — they are round, they are
  * tooltip-labelled, and they are `IconButton`.
  */
 

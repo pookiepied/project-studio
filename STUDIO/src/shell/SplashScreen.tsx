@@ -7,7 +7,7 @@ import { EASE_OUT, SPLASH } from '@/design/tokens'
  *
  * Plays once at startup, over the shell that has already painted beneath it.
  * The surface is the app's own, so the splash never reads as a different
- * program taking the window -- it is the same object, still waking up. The
+ * program taking the window — it is the same object, still waking up. The
  * tiles assemble on the mark's own clock (`StudioMark`'s entrance); this
  * component owns only the container's slow settle and the exit fade that hands
  * the window over.
@@ -25,7 +25,7 @@ export function SplashScreen() {
           feel like a cut: the brand and the ground it sits on disappeared at
           exactly the same rate, so there was no moment of *departure*, just an
           image being switched off. Letting the mark rise and go first, and the
-          surface follow, gives the exit an order -- the thing you were looking
+          surface follow, gives the exit an order — the thing you were looking
           at leaves, then the room it was in. It costs 200ms and it is the whole
           difference between a transition and a flash. */}
       <motion.div
@@ -40,7 +40,7 @@ export function SplashScreen() {
         className="text-foreground"
       >
         {/* 88, not 112: the mark was drawn for a taller window, and on the
-            720px default it filled a sixth of the height -- the splash read
+            720px default it filled a sixth of the height — the splash read
             as a poster rather than a boot state. One step down keeps the
             staircase legible while giving the mark the same margin of quiet
             around it the home greeting has. */}

@@ -18,7 +18,7 @@ import { useWorkspace } from '@/stores/workspace'
  *
  * Left is the window: controls and the sidebar toggle, plus the context meter
  * once a conversation is far enough along to have one. Centre is what you are
- * looking at -- and it gets the room, because the identity line (project,
+ * looking at — and it gets the room, because the identity line (project,
  * title, branch) is the thing worth reading here. Right is the turn settings
  * behind one mark, and only on a conversation: everywhere else the strip ends
  * in nothing, so the page's own content is the last thing at the top of the
@@ -58,7 +58,7 @@ export function TopStrip() {
       </div>
 
       {/* Centred on the page, not on the window. The identity names the
-          conversation, and the conversation lives in the page -- so when the
+          conversation, and the conversation lives in the page — so when the
           sidebar or the rail changes the column's bounds, the title moves with
           the column, exactly as the transcript under it does. A window-centred
           title would hold still while everything beneath it slid sideways,
@@ -73,7 +73,7 @@ export function TopStrip() {
           That box carries `@container`, and a container with
           `container-type: inline-size` is sized *as if it had no contents*.
           As a plain flex child that computes to zero width, and the identity
-          then overflows from the centre point to the right -- the title sits
+          then overflows from the centre point to the right — the title sits
           half a column right of centre no matter what the surrounding rule
           says. `w-full` gives the box a definite width for the container
           queries to resolve against; `max-w-[62%]` caps it, and the two
@@ -97,7 +97,7 @@ export function TopStrip() {
 
             On Settings there is no message to send. A model picker sitting
             over a preferences page is a control with nothing to act on, and it
-            invites the reading that it is *part of* those preferences -- that
+            invites the reading that it is *part of* those preferences — that
             changing it here is changing a default. It is not; it is a
             per-turn choice. Showing it where it cannot mean that is the fix. */}
         {turnSettings ? <TurnMenu /> : null}

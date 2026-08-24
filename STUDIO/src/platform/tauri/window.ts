@@ -40,7 +40,7 @@ export async function closeWindow(): Promise<void> {
  * because the window's rounded corner is a DWM attribute
  * (`DWMWCP_ROUND`, see `src-tauri/src/window.rs`) and Windows squares the
  * corners of any maximized window. So one stray double-click on the title bar
- * turns a frameless, round-cornered panel into a hard rectangle -- and it looks
+ * turns a frameless, round-cornered panel into a hard rectangle — and it looks
  * like the app broke, because nothing in the CSS changed and nothing says the
  * window is now maximized.
  *

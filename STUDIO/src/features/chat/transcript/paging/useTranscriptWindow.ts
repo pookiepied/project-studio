@@ -22,7 +22,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
  *
  * Batching sidesteps the whole category. Rows keep their natural height,
  * nothing is measured, and the only thing that has to be right is not moving
- * the reader when older content appears above them -- which is the point of the
+ * the reader when older content appears above them — which is the point of the
  * layout effect below and the one genuinely hard part of this file.
  */
 
@@ -90,7 +90,7 @@ export function useTranscriptWindow<T extends WindowedItem>(
    * This is the whole difficulty. Content added above the viewport pushes
    * everything down by its own height, so without compensation the reader is
    * thrown backwards by a screen and a half at the exact moment they were
-   * reading -- and the auto-scroll follow, seeing an upward jump, would then
+   * reading — and the auto-scroll follow, seeing an upward jump, would then
    * unpin as though they had done it deliberately.
    *
    * `useLayoutEffect` runs after the DOM is updated and before the browser
@@ -101,7 +101,7 @@ export function useTranscriptWindow<T extends WindowedItem>(
    *
    * Browsers already do a version of this. Chromium's scroll anchoring watches
    * for content inserted above the viewport and shifts `scrollTop` to keep the
-   * visible content still -- and measured, it moves it by *exactly* the height
+   * visible content still — and measured, it moves it by *exactly* the height
    * that was added.
    *
    * Which means leaving it on and also correcting here is a double correction,
@@ -112,7 +112,7 @@ export function useTranscriptWindow<T extends WindowedItem>(
    * So anchoring is switched off on the viewport (`overflow-anchor: none` in
    * `index.css`) and this owns the correction outright. Deferring to the
    * browser instead would work today and is the more fragile choice: anchoring
-   * is a heuristic that suppresses itself in cases it considers ambiguous --
+   * is a heuristic that suppresses itself in cases it considers ambiguous —
    * including around programmatic scrolls, which the follow performs on every
    * frame of every stream. A correction that silently stops applying under load
    * is worse than one that always runs.
@@ -153,7 +153,7 @@ export function useTranscriptWindow<T extends WindowedItem>(
    *
    * A scroll handler would run on every frame of every scroll and recompute a
    * threshold that only matters near the top. An observer fires when the
-   * boundary is genuinely approached and costs nothing the rest of the time --
+   * boundary is genuinely approached and costs nothing the rest of the time —
    * and it also handles the case a scroll handler misses entirely, where a
    * batch arrives shorter than the viewport and the boundary is *still* on
    * screen, so the next batch is requested immediately.

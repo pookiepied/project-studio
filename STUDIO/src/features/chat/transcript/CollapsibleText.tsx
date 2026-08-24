@@ -32,7 +32,7 @@ export function CollapsibleText({ text }: { text: string }) {
    *
    * Measuring takes a paint: the paragraph renders unclamped, and only then does
    * the layout effect cap it. With a transition already armed that first cap is
-   * a visible 0.3s collapse on every message that mounts -- the "glitch" on
+   * a visible 0.3s collapse on every message that mounts — the "glitch" on
    * paste. Armed one frame later, the cap lands as the message's initial state
    * and only a real toggle animates.
    */
@@ -74,7 +74,7 @@ export function CollapsibleText({ text }: { text: string }) {
           tried to reproduce the bubble's fill: `color-mix(in oklch,
           var(--surface), var(--foreground) 8%)`. That can never be right. The
           bubble is `bg-selected`, which is `--foreground` at 8% *alpha*,
-          composited by the browser in sRGB -- while `color-mix(in oklch, ...)`
+          composited by the browser in sRGB — while `color-mix(in oklch, ...)`
           interpolates in a different space entirely. Two different
           computations of "the same" colour, so the band was always a shade
           off, and it showed as a pale seam across the bottom of the bubble.

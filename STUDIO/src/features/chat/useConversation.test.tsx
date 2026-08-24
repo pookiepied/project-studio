@@ -23,7 +23,7 @@ import {
  * The conversation state machine, end to end at the data layer.
  *
  * The hook runs against a REAL conversation client whose seams are scripted
- * -- the same substitution pattern the settings pane tests use -- so what is
+ * — the same substitution pattern the settings pane tests use — so what is
  * exercised is everything below the component: lifecycle events, attach,
  * offset tracking, chunk reduction, and the prompt cancellation of a read
  * when the conversation changes or the hook goes away.
@@ -248,7 +248,7 @@ describe('the phases the run itself puts a conversation in', () => {
     const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
 
     // History replays: a past, finished message arrives before up-to-date,
-    // marked as replay -- and none of it is mistaken for a live turn.
+    // marked as replay — and none of it is mistaken for a live turn.
     act(() => {
       channels.feeds[0](
         dataFrame('1_0', [{ type: 'message-appended', position: { batch: 1, index: 0 } }]),
@@ -331,7 +331,7 @@ describe('the phases the run itself puts a conversation in', () => {
     })
     await waitFor(() => expect(rendered.result.current.phase).toEqual({ status: 'idle' }))
 
-    // The same batch again, the way a reconnect delivers it -- except the
+    // The same batch again, the way a reconnect delivers it — except the
     // story underneath changed, which is exactly what dedupe must refuse.
     act(() => {
       channels.feeds[0](
@@ -443,7 +443,7 @@ describe('what a conversation switch and a closed pane must do', () => {  it('ca
       streams.calls.find((call) => call.command === 'service_stream')?.args['streamId'],
     )
     // Not once anywhere was a run told to stop. Reading stopped; the run did
-    // not -- ADR 0045 section 5, held where it is easiest to break.
+    // not — ADR 0045 section 5, held where it is easiest to break.
     expect(streams.calls.some((call) => String(call.args['path']).endsWith('/abort'))).toBe(false)
     const secondRead = streams.calls.filter((call) => call.command === 'service_stream')[1]
     expect(secondRead.args['path']).toBe('/agents/studio/cnv_2?view=updates')
@@ -473,7 +473,7 @@ describe('what a conversation switch and a closed pane must do', () => {  it('ca
 /**
  * Task 26, Part C: a refused submission must change something on screen.
  * The refusal lands beside the phases (not as one) because a send can be
- * refused while an earlier turn is still streaming -- and the state machine
+ * refused while an earlier turn is still streaming — and the state machine
  * has no status that means both at once.
  */
 describe('a refused submission has somewhere to land', () => {
@@ -541,7 +541,7 @@ describe('a refused submission has somewhere to land', () => {
 
   it('refuses a send while an earlier turn is still streaming, and keeps streaming', async () => {
     // The adversarial case: the state machine must not be hijacked by the
-    // refusal -- the earlier run is still producing, and the caret must not
+    // refusal — the earlier run is still producing, and the caret must not
     // blink out because a second POST bounced.
     const streams = submitScripting({ reject: true })
     const channels = recordingChannels()
@@ -566,7 +566,7 @@ describe('a refused submission has somewhere to land', () => {
 
   it('retires the refusal once a later send gets through', async () => {
     // The script reads this each call, so the same harness can refuse the
-    // first send and accept the second -- which is the point: the refusal
+    // first send and accept the second — which is the point: the refusal
     // must survive until something actually got through.
     const mode = { reject: true }
     const streams = submitScripting(mode)
@@ -601,7 +601,7 @@ describe('a refused submission has somewhere to land', () => {
     const receipt = await rendered.result.current.submit('anyone there?')
     expect(receipt.ok).toBe(false)
     // Whatever sentence the seam produced, the phase already owns this
-    // diagnosis permanently -- so nothing may land beside it.
+    // diagnosis permanently — so nothing may land beside it.
     await waitFor(() => expect(rendered.result.current.refused).toBeNull())
   })
 

@@ -31,7 +31,7 @@ export function AppearanceProvider({
   children,
 }: {
   /**
-   * Read from the store before React mounts -- see `main.tsx`.
+   * Read from the store before React mounts — see `main.tsx`.
    *
    * Passed in rather than loaded here because the store is a file and reading
    * it is asynchronous, and a provider that starts at the defaults and
@@ -63,7 +63,7 @@ export function AppearanceProvider({
       //
       // This is also what makes Reset actually reset. It used to delete the
       // stored value and then this effect immediately wrote it straight back
-      // -- the live state returned to the defaults, the file did not, and the
+      // — the live state returned to the defaults, the file did not, and the
       // reset was undone one tick after it ran.
       void (isDefaultAppearance(appearance) ? forgetAppearance() : saveAppearance(appearance))
     }

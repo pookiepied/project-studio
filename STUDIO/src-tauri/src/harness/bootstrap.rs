@@ -11,7 +11,7 @@ const CREDENTIAL_BYTES: usize = 32;
 /// `bootstrap.clientId` and `bootstrap.sessionId` and throws
 /// `[flue] Invalid Project Studio admission bootstrap.` for anything else.
 /// Without them Rust emitted `client_id`/`session_id`, and the Harness died
-/// during module evaluation on every launch -- the whole port, working, right
+/// during module evaluation on every launch — the whole port, working, right
 /// up to the point where a Harness actually ran. `endpoint.rs` renames the same
 /// two fields in the other direction, for the same reason.
 #[derive(Debug, Clone, Serialize, Deserialize)]

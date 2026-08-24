@@ -14,7 +14,7 @@ import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/bloc
  * ---- Why raw HTML is allowed, and why it is sanitised --------------------
  *
  * Models emit HTML, and refusing to render it means a reply that used a `<sub>`
- * or a small table shows its tags as text. So `rehype-raw` parses it -- and
+ * or a small table shows its tags as text. So `rehype-raw` parses it — and
  * `rehype-sanitize` immediately runs behind it, because model output is
  * untrusted content by the same rule that governs anything arriving from the
  * network. Without the sanitiser this pipeline would execute a `<script>` a
@@ -46,7 +46,7 @@ const SCHEMA = {
     // on the node, and `rehype-katex` reads that class to decide which one to
     // render. The sanitiser runs in between and strips unlisted classes, so
     // without these two entries every display formula silently renders as
-    // inline -- centred blocks collapse into the sentence above them.
+    // inline — centred blocks collapse into the sentence above them.
     //
     // The values are listed explicitly rather than allowing `className`
     // outright. A bare allow would let model output carry any class it liked
@@ -61,13 +61,13 @@ const COMPONENTS: Components = {
   /**
    * This object is where the content hierarchy is decided. Everything a reply
    * can contain arrives here as markdown, and each kind joins one of three
-   * tiers -- never its own look. See "The content hierarchy" in `RULES.md` for
+   * tiers — never its own look. See "The content hierarchy" in `RULES.md` for
    * the reasoning; the routing is:
    *
-   * - `artifact` fences and tables are *embedded* -- they sit on the sunken
+   * - `artifact` fences and tables are *embedded* — they sit on the sunken
    *   ground the integrations use, because they are the reply talking about
    *   something that happened elsewhere.
-   * - code and writing-as-an-object fences are *previews* -- a `BlockFrame`
+   * - code and writing-as-an-object fences are *previews* — a `BlockFrame`
    *   with a cap and a copy button, because they are things the reader takes
    *   away rather than reads in place.
    * - everything else is prose and stays inline.
@@ -75,13 +75,13 @@ const COMPONENTS: Components = {
    * Images and videos never pass through here; they are artifacts and render
    * independent of the text, at their own measure.
    *
-   * `react-markdown` wraps a fence in a `<pre>`, so `pre` below unwraps it --
+   * `react-markdown` wraps a fence in a `<pre>`, so `pre` below unwraps it —
    * otherwise the block's own frame would nest inside a second one and inherit
    * the prose `<pre>` styling on top of its own.
    */
   code({ className, children, ...rest }) {
-    // Not `\w+`. The info string may carry a path after the language --
-    // ```ts:src/utils/get-diff.ts -- and `\w` stops dead at the colon, which
+    // Not `\w+`. The info string may carry a path after the language —
+    // ```ts:src/utils/get-diff.ts — and `\w` stops dead at the colon, which
     // silently threw the filename away and left the block captioned
     // "TypeScript" like every other one.
     const fence = /language-([^\s"']+)/.exec(className ?? '')?.[1]
@@ -96,8 +96,8 @@ const COMPONENTS: Components = {
     }
 
     // A fence carries three different intentions and they are three different
-    // objects. `artifact` is structured output the model produced -- a search,
-    // an image, an issue -- and is rendered as a thing rather than as its JSON.
+    // objects. `artifact` is structured output the model produced — a search,
+    // an image, an issue — and is rendered as a thing rather than as its JSON.
     if (fence === 'artifact') return <ArtifactBlock source={text} />
 
     // Code, or a piece of writing made for you. See `TextBlock` for why a
@@ -114,14 +114,14 @@ const COMPONENTS: Components = {
   /**
    * A table is embedded content, not a produced object.
    *
-   * It rides on the same sunken ground the integrations use -- `ArtifactShell`'s
-   * container, verbatim -- rather than in the code block's raised card, because
+   * It rides on the same sunken ground the integrations use — `ArtifactShell`'s
+   * container, verbatim — rather than in the code block's raised card, because
    * a table is the reply *about* something, the way a search result set is, and
    * not a thing you take away and use, the way code is. One rule for which
    * content gets which treatment; see "The content hierarchy" in `RULES.md`.
    *
    * A wide table is still the one thing after prose that can stretch the
-   * column, so it scrolls inside itself on x -- the scroller is the ground's
+   * column, so it scrolls inside itself on x — the scroller is the ground's
    * own, and the cell fills carry the shape.
    */
   table({ children }) {

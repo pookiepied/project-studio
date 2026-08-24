@@ -3,8 +3,8 @@
  *
  * A Tauri app is a browser engine wearing a native costume, and the costume
  * slips in two places: right-click offers Back, Reload, View Source and Inspect
- * -- commands from a document viewer, several of which do visible damage in an
- * app with no address bar -- and the developer shortcuts open a panel over the
+ * — commands from a document viewer, several of which do visible damage in an
+ * app with no address bar — and the developer shortcuts open a panel over the
  * window with no way back that a user would recognise.
  *
  * The two are split on purpose:

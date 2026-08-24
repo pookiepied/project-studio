@@ -7,7 +7,7 @@
  * 900 and a slow one reveals its buffer in a burst and then sits blank.
  *
  * So this measures. Each arrival contributes chars-per-second, and an
- * exponential moving average smooths it, because arrivals are lumpy -- a
+ * exponential moving average smooths it, because arrivals are lumpy — a
  * transport delivers three tokens in one frame and then nothing for 80ms, and
  * pacing off the last sample alone would make the text pulse at exactly that
  * lumpiness.
@@ -19,7 +19,7 @@ const ALPHA = 0.2
 /**
  * Samples further apart than this start a new measurement rather than
  * contributing a near-zero rate. A gap this long is the model pausing, or the
- * turn starting -- not evidence that it types slowly.
+ * turn starting — not evidence that it types slowly.
  */
 const GAP_MS = 900
 

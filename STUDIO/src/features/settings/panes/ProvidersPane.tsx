@@ -26,7 +26,7 @@ import { cn } from '@/lib/cn'
  * place to start that habit."
  *
  * That reasoning was correct and its premise is now false. It was written when
- * there was nowhere safe to send a key -- no transport, no harness, and the
+ * there was nowhere safe to send a key — no transport, no harness, and the
  * only persistent surface the webview had was a plaintext JSON file. There is
  * somewhere safe now: the harness accepts a key in the body of a create,
  * strips it into the OS credential store, and files the connection record
@@ -36,7 +36,7 @@ import { cn } from '@/lib/cn'
  * So the pane asks for one, and the whole of the old caution survives as the
  * rule the dialog is built around: the key lives in that component's state and
  * nowhere else, for as long as it takes to submit one request. See
- * `AddConnectionDialog` -- the reasoning that matters now lives beside the
+ * `AddConnectionDialog` — the reasoning that matters now lives beside the
  * field it governs rather than up here.
  *
  * ---- Two lists, one pane ---------------------------------------------------
@@ -44,8 +44,8 @@ import { cn } from '@/lib/cn'
  * With no harness configured this shows the built-in catalog exactly as it
  * always has, with one quiet line saying so. That is not a degraded mode and
  * must not be drawn as one: running Studio with no harness is the shipped
- * behaviour and a reasonable way to use it. The rows are plainly inert --
- * no credential badge, no controls -- which is what tells them apart from real
+ * behaviour and a reasonable way to use it. The rows are plainly inert —
+ * no credential badge, no controls — which is what tells them apart from real
  * connections without a legend anywhere on the page.
  */
 export function ProvidersPane() {
@@ -88,8 +88,8 @@ function PaneBody({ connections }: { connections: Connections }) {
  *
  * Kept because it is the honest answer to "what can this app talk to" when
  * nothing is running behind it, and because it is what every other part of the
- * app is still driven by. It gains no controls -- there is nothing to enable,
- * nothing to probe, and no credential to report -- and that inertness is the
+ * app is still driven by. It gains no controls — there is nothing to enable,
+ * nothing to probe, and no credential to report — and that inertness is the
  * visual difference from a real connection.
  */
 function BuiltInCatalog() {
@@ -222,7 +222,7 @@ function ConnectionRow({
   return (
     <div className="flex items-start gap-2.5 py-3">
       {/* The mark is resolved from `catalogProvider`, the vendor whose model
-          list applies -- never from `id`, which is this connection's own name.
+          list applies — never from `id`, which is this connection's own name.
           A vendor the app has no drawing for falls back to the custom mark,
           which is the normal case for a self-hosted endpoint. */}
       <span
@@ -262,7 +262,7 @@ function ConnectionRow({
 
       <div className="flex shrink-0 items-center gap-1.5">
         {/* The probe reaches the provider's own endpoint and the harness gives
-            that eight seconds, so `busy` is not decoration here -- without it
+            that eight seconds, so `busy` is not decoration here — without it
             the row looks broken for most of a working check. */}
         <Button variant="secondary" size="sm" busy={probing} onClick={onProbe}>
           {probe === undefined ? 'Check' : 'Check again'}

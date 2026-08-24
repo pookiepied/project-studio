@@ -15,7 +15,7 @@ import { cn } from '@/lib/cn'
  * A project and the conversations inside it.
  *
  * In the rail this is the mark alone, named by a tooltip. That is not a
- * compromise for narrow widths -- it is the better version. A mark you learn is
+ * compromise for narrow widths — it is the better version. A mark you learn is
  * faster to find than a name you read, and a column of marks stays quiet in a
  * way a column of truncated names never does.
  */

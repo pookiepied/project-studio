@@ -1,6 +1,6 @@
 //! The end-to-end check: a real Harness, started the real way.
 //!
-//! Every other test in this module tree examines one piece in isolation --
+//! Every other test in this module tree examines one piece in isolation —
 //! which environment variables a `Command` carries, whether a readiness line
 //! parses. None of them can fail if the bootstrap transport is wrong, because
 //! none of them ever runs the Node entrypoint that reads it. This one does.
@@ -9,7 +9,7 @@
 //! means it exercises the whole chain in the order the app uses it: the
 //! environment allowlist, the platform's bootstrap transport, the readiness
 //! reader, and the admission credential the Harness only ever learns over a
-//! pipe. The proof that the credential arrived is the last step -- an
+//! pipe. The proof that the credential arrived is the last step — an
 //! authenticated request the Harness answers, and the same request without the
 //! bearer that it refuses.
 //!
@@ -109,7 +109,7 @@ fn a_real_harness_starts_publishes_a_loopback_endpoint_and_answers_an_admitted_r
 
     // The credential reached the child. It was never in the environment and
     // never on the command line, so a 200 here is only possible if the
-    // bootstrap pipe delivered it -- which is the whole reason the channel
+    // bootstrap pipe delivered it — which is the whole reason the channel
     // exists, and the thing no unit test in this module can observe.
     let (status, body) = get(&endpoint, "/api/mcp/servers", Some(&endpoint.token));
     assert_eq!(status, 200, "admitted request was refused: {body}");

@@ -23,11 +23,11 @@
 export const EASE_OUT = [0.16, 1, 0.3, 1] as const
 
 export const DURATION = {
-  /** A state change on something already visible -- hover, a chip. */
+  /** A state change on something already visible — hover, a chip. */
   fast: 0.12,
-  /** An element entering or leaving -- popovers, view crossfades. */
+  /** An element entering or leaving — popovers, view crossfades. */
   base: 0.18,
-  /** A whole surface changing -- the palette, a sheet. */
+  /** A whole surface changing — the palette, a sheet. */
   slow: 0.26,
 } as const
 
@@ -61,7 +61,7 @@ export const VIEW_TRANSITION = {
 } as const
 
 /**
- * A height collapse -- a thinking block, a disclosure.
+ * A height collapse — a thinking block, a disclosure.
  *
  * `height: auto` is measured every frame, so this is the one place a spring is
  * genuinely wrong: overshoot on a measured height reflows everything below it.
@@ -79,14 +79,14 @@ export function staggerDelay(index: number): number {
 }
 
 /**
- * The startup splash -- the one place motion is allowed to be slow.
+ * The startup splash — the one place motion is allowed to be slow.
  *
  * The ~300ms ceiling above governs interaction, where every millisecond is
  * latency the user pays for twice. The splash is not interaction: it plays
  * once, before anything can be clicked, and its job is the brand arriving
  * rather than getting out of the way. The mark assembles on its own clock (see
  * `StudioMark`'s entrance), holds a beat, and leaves on a fade. The minimum is
- * what that entrance plus the beat costs -- any shorter and the mark would be
+ * what that entrance plus the beat costs — any shorter and the mark would be
  * interrupted mid-arrival.
  */
 export const SPLASH = {

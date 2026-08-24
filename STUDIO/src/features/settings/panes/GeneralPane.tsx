@@ -9,7 +9,7 @@ import { useState } from 'react'
  * General.
  *
  * The default execution mode lives here, and it is the same list the composer's
- * control shows -- both read `PERMISSION_MODES`, so there is one description of
+ * control shows — both read `PERMISSION_MODES`, so there is one description of
  * each mode in the app and the settings copy can never drift from the picker
  * copy.
  */

@@ -21,7 +21,7 @@ export default defineConfig({
     host: host || false,
     hmr: host ? { protocol: 'ws', host, port: 1421 } : undefined,
     watch: {
-      // Ignore Cargo build artifacts -- on Windows the compiler locks .dll
+      // Ignore Cargo build artifacts — on Windows the compiler locks .dll
       // files, causing EBUSY errors in Vite's file watcher.
       ignored: ['**/src-tauri/target/**'],
     },

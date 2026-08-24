@@ -1,8 +1,8 @@
 /**
  * The artifact envelope.
  *
- * An artifact is a structured thing the model produced -- a search it ran, an
- * image it made, an issue it opened -- emitted as JSON in a fenced block and
+ * An artifact is a structured thing the model produced — a search it ran, an
+ * image it made, an issue it opened — emitted as JSON in a fenced block and
  * rendered as an object rather than as prose. The envelope is a *contract*, so
  * it lives in `domain` beside the other contracts and not next to the
  * components that happen to draw it today.
@@ -20,7 +20,7 @@
  *
  * The vocabulary this grew out of had eleven: `completed` and `success`,
  * `failed` and `error`, `loading` and `streaming` and `pending`. They were
- * synonyms, and the cost landed in every renderer -- each one wrote
+ * synonyms, and the cost landed in every renderer — each one wrote
  * `status === "completed" || status === "success"`, and each one had a
  * slightly different opinion about which of the eleven meant "still going".
  * One of them treated `error` as finished-and-fine.
@@ -73,8 +73,8 @@ interface ArtifactTable {
  * A generic piece of an artifact.
  *
  * These exist so an unrecognised kind is still worth looking at. A dedicated
- * renderer is free to ignore them and read `data` instead -- most do, for the
- * parts that are particular to it -- but anything it does not draw itself can
+ * renderer is free to ignore them and read `data` instead — most do, for the
+ * parts that are particular to it — but anything it does not draw itself can
  * be expressed here and will be drawn by the fallback.
  */
 export type ArtifactSection =

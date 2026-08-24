@@ -11,7 +11,7 @@ import type { ToolCallView, ToolGroupView } from '@/features/chat/transcript/pro
  * names: a collapsed count per tool kind, the individual calls, and one
  * call's input and output.
  *
- * Every label here is a fact -- the verb is the tool's own name, humanized;
+ * Every label here is a fact — the verb is the tool's own name, humanized;
  * the number is how many calls that kind made within one assistant message.
  * No semantic summary exists at any level and none may be added: a group
  * collapsed on screen is still fully present in what was sent, and this
@@ -129,7 +129,7 @@ function Detail({
 
 /**
  * The verb for a tool name, where the harness's own tools are concerned.
- * Anything else renders under its raw name -- a name we have never heard of
+ * Anything else renders under its raw name — a name we have never heard of
  * gets shown, not guessed at.
  */
 const TOOL_VERBS: Record<string, string> = {
@@ -154,7 +154,7 @@ function callLine(call: ToolCallView): string {
 }
 
 /**
- * The one fact worth showing per expanded call: which file, which command --
+ * The one fact worth showing per expanded call: which file, which command —
  * taken from the input the model actually sent, by field name, never inferred.
  */
 function subjectOf(call: ToolCallView): string | null {

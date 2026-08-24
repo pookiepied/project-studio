@@ -5,8 +5,8 @@ import type { ArtifactStatus } from '@/domain/artifacts/types'
 /**
  * A step's state, as one dot.
  *
- * Four states and one shape. The alternative -- a tick, a spinner, a cross, a
- * hollow circle -- puts four different silhouettes in a vertical column, and a
+ * Four states and one shape. The alternative — a tick, a spinner, a cross, a
+ * hollow circle — puts four different silhouettes in a vertical column, and a
  * column of mixed silhouettes cannot be scanned: the eye stops at each one to
  * identify it instead of running down the list. Same dot, different fill, and
  * the only one that moves is the one happening now.

@@ -7,7 +7,7 @@
  * reason that has nothing to do with how fast the text arrives.
  *
  * Text reflows by whole lines. A paragraph being written does not get one pixel
- * taller per character -- it stays exactly the same height for a dozen frames
+ * taller per character — it stays exactly the same height for a dozen frames
  * and then, when a word wraps, grows by a full line box at once. So the
  * document height is a staircase, and an assignment that pins the viewport to
  * the bottom of it reproduces the staircase exactly: nothing, nothing, nothing,
@@ -27,7 +27,7 @@
  * frame-rate dependent: at 144Hz it converges in a quarter the wall-clock time
  * it takes at 30Hz, so the scroll feels different on different machines and
  * changes character when the window is busy. `1 - exp(-k * dt)` is the same
- * curve sampled correctly -- the fraction closed depends on elapsed *time*, not
+ * curve sampled correctly — the fraction closed depends on elapsed *time*, not
  * on how many frames happened to fit in it.
  */
 
@@ -45,7 +45,7 @@ const EPSILON = 0.5
 
 /**
  * A jump this much larger than the viewport is not a stream, it is a
- * navigation -- opening a long conversation, or a code block expanding. Gliding
+ * navigation — opening a long conversation, or a code block expanding. Gliding
  * through several screens of content is a long, disorienting flight to a place
  * the reader did not ask to travel to, so those are taken instantly.
  */
@@ -61,7 +61,7 @@ export interface Follower {
 export function createFollower(): Follower {
   // Tracked as a float. Reading `scrollTop` back each frame would round to the
   // browser's device-pixel grid, and at small deltas that rounding is the whole
-  // movement -- the position would quantise and the glide would stutter for the
+  // movement — the position would quantise and the glide would stutter for the
   // second time, having just been fixed once.
   let position: number | null = null
 
@@ -75,7 +75,7 @@ export function createFollower(): Follower {
       if (target <= 0) return null
 
       // Resync to reality before moving. Something other than this engine may
-      // have scrolled the element -- a jump-to-latest, an anchor, the user --
+      // have scrolled the element — a jump-to-latest, an anchor, the user —
       // and continuing from a remembered position would yank the view back.
       const current = element.scrollTop
       if (position === null || Math.abs(position - current) > 1) position = current
@@ -94,7 +94,7 @@ export function createFollower(): Follower {
 
       // Frame-rate independent exponential approach. The delta is clamped
       // because a backgrounded tab delivers one frame worth several seconds,
-      // and `exp` of that is 1 -- which would teleport on the way back.
+      // and `exp` of that is 1 — which would teleport on the way back.
       const fraction = 1 - Math.exp(-STIFFNESS * Math.min(deltaSeconds, 0.05))
       position += distance * fraction
 

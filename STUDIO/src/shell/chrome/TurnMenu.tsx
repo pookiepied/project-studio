@@ -20,8 +20,8 @@ import { cn } from '@/lib/cn'
  * ---- Why it is one control again -------------------------------------------
  *
  * This was briefly three segments in a bordered capsule with dividers between
- * them. That solved the right problem -- a single scrolling column cannot hold
- * a model library plus two settings -- and introduced a worse one: a bordered,
+ * them. That solved the right problem — a single scrolling column cannot hold
+ * a model library plus two settings — and introduced a worse one: a bordered,
  * divided container in the top strip reads as a toolbar, and a toolbar is the
  * developer-tool look this app is defined against. Three outlines and two rules
  * where there had been one quiet word is more furniture, not less.
@@ -37,7 +37,7 @@ import { cn } from '@/lib/cn'
  * specifically, they want "more than medium". A column of rows says these are
  * five unrelated options and hides the ordering that is the entire meaning.
  *
- * It also absorbs the thing that will otherwise break this screen later --
+ * It also absorbs the thing that will otherwise break this screen later —
  * models disagree about their scales. Four steps, six steps, a differently
  * named top end. A track is the same control at any length; a list of rows
  * changes height and position every time the model changes, moving the setting
@@ -103,7 +103,7 @@ export function TurnMenu() {
             className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-ui text-muted-foreground hover:bg-tint"
           >
             {/* Pointing back the way it came. The same mark the disclosures
-                use, turned -- one idea of "there is more this way". */}
+                use, turned — one idea of "there is more this way". */}
             <Icons.disclosure className="shrink-0 rotate-180" />
             Reasoning
           </button>

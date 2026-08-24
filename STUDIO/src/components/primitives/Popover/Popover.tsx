@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn'
  * simple construction and is wrong the moment a trigger sits inside anything
  * that scrolls or clips. Both of ours do: the sidebar's list is
  * `overflow-y-auto`, so a conversation's three-dot menu was clipped by the
- * column it opened in -- the panel was rendered correctly and then cut in half
+ * column it opened in — the panel was rendered correctly and then cut in half
  * by an ancestor, which looks like a layout bug in the menu and is not one.
  *
  * A portal to `document.body` removes the whole class of problem: nothing can
@@ -65,7 +65,7 @@ export function Popover({
    * Places the panel against the viewport.
    *
    * Measured after layout and before paint, so the menu never shows for a frame
-   * at the wrong coordinates -- which is exactly what a `useEffect` here would
+   * at the wrong coordinates — which is exactly what a `useEffect` here would
    * produce, and it is visible as a flick on every open.
    */
   const place = useCallback(() => {
@@ -93,7 +93,7 @@ export function Popover({
           : trigger.left
 
     // Pulled back inside the window on both axes. A menu that hangs off the
-    // edge is not merely ugly -- the rows past the edge cannot be clicked.
+    // edge is not merely ugly — the rows past the edge cannot be clicked.
     const left = Math.min(Math.max(preferred, MARGIN), window.innerWidth - box.width - MARGIN)
     const clampedTop = Math.min(Math.max(top, MARGIN), window.innerHeight - box.height - MARGIN)
 
@@ -170,11 +170,11 @@ export function Popover({
                 transformOrigin: (position?.side ?? side) === 'top' ? 'bottom center' : 'top center',
                 // Hidden until measured. The panel has to be in the DOM to have
                 // a height worth measuring, so it renders first and is placed
-                // immediately after -- one frame in which it must not be seen.
+                // immediately after — one frame in which it must not be seen.
                 visibility: position ? 'visible' : 'hidden',
               }}
               className={cn(
-                // `lg` panel with 4px padding puts rows on `sm` -- the
+                // `lg` panel with 4px padding puts rows on `sm` — the
                 // concentric rule, so the row corners run parallel to the
                 // panel's.
                 'studio-blur fixed z-50 min-w-48 rounded-lg border p-1',

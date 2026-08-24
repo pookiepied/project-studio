@@ -6,7 +6,7 @@ import { EASE_OUT } from '@/design/tokens'
  *
  * Draws in `currentColor`, so it inherits text colour and works in both themes
  * without a second asset. This is the brand rather than system chrome, so the
- * monochrome rule does not constrain it -- it simply happens not to need a hue.
+ * monochrome rule does not constrain it — it simply happens not to need a hue.
  *
  * `busy` ripples the tiles to signal work in flight. It reads as active without
  * spinning, and it is the same glyph at rest, so nothing jumps when a turn
@@ -67,7 +67,7 @@ export function StudioMark({
   className,
 }: {
   busy?: boolean
-  /** One-shot staggered assembly -- the splash entrance. */
+  /** One-shot staggered assembly — the splash entrance. */
   entrance?: boolean
   /** Rendered height in px; the mark keeps its 3:4 ratio. */
   size?: number

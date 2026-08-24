@@ -26,7 +26,7 @@ import { createFollower } from '@/features/chat/transcript/scroll/followEngine'
  *      writes on *every* frame for the length of a stream, so there is no quiet
  *      moment in which an echo could be distinguished by timing.
  *   2. Gestures are intent, and they outrank everything. A wheel, a press, or a
- *      navigation key releases the pin directly -- before the position they
+ *      navigation key releases the pin directly — before the position they
  *      will cause has even been applied. That is what makes interrupting
  *      reliable rather than a race against the follow.
  */
@@ -131,7 +131,7 @@ export function useAutoScroll(dependency: unknown) {
 
     // Direction beats distance. On a trackpad a slow scroll up moves a few
     // pixels at a time, and if only distance counted the next chunk would
-    // re-pin before the reader had left the slack zone -- they could not
+    // re-pin before the reader had left the slack zone — they could not
     // escape the pull, which is the bug this whole file exists to prevent.
     const upward = element.scrollTop < lastTop.current
     lastTop.current = element.scrollTop
@@ -200,7 +200,7 @@ export function useAutoScroll(dependency: unknown) {
    * Follow the content, not the messages.
    *
    * Message arrivals used to be the same instant the text appeared. They are
-   * not any more -- the reveal runs on a frame clock, so between two arrivals
+   * not any more — the reveal runs on a frame clock, so between two arrivals
    * the transcript goes on growing for dozens of frames with no state change
    * here at all. A `ResizeObserver` fires on the thing actually being asked
    * about, and covers every other cause of growth for free: an image loading, a

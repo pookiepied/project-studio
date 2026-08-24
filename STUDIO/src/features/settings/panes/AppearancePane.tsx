@@ -57,7 +57,7 @@ export function AppearancePane() {
           size and re-labels itself the moment the interface size above it
           changes. Storing the relationship and displaying the number is what
           keeps "one step under" true at every setting instead of only at the
-          default -- see `CODE_OFFSET_CHOICES`. */}
+          default — see `CODE_OFFSET_CHOICES`. */}
       <Row label="Code text" hint="Code blocks and inline code, kept a step under the interface.">
         <Segmented
           layoutId="settings-code-size"

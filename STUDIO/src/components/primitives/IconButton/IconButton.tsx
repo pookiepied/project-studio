@@ -8,13 +8,13 @@ import { cn } from '@/lib/cn'
  *
  * Always circular. The chip carries the state now (see `TONE_CLASS`), and a
  * circle is the shape that reads as a resting place for a mark rather than a
- * button drawn around one -- four corners at 28px are four things asking to be
+ * button drawn around one — four corners at 28px are four things asking to be
  * noticed. There is no `round` prop because there is no second answer.
  *
  * ---- Where icon motion comes from ----------------------------------------
  *
  * This is the component that drives it. The button tracks pointer state itself
- * and publishes one word -- rest, hover, press, on -- to every mark inside it.
+ * and publishes one word — rest, hover, press, on — to every mark inside it.
  * The glyph decides what to do about that word: the trash lid tilts, the gear
  * turns, send lifts, the plus becomes a cross.
  *
@@ -40,7 +40,7 @@ type Tone = 'quiet' | 'solid'
 /**
  * The three control steps, read from the scale rather than written as rem.
  *
- * These were `size-6 / size-7 / size-8` -- 24, 28 and 32 on Tailwind's rem
+ * These were `size-6 / size-7 / size-8` — 24, 28 and 32 on Tailwind's rem
  * grid, which is anchored to a root font-size that deliberately never moves.
  * So the most common control in the app was the one thing in it that could not
  * follow `--ui-size`: text got smaller, every button stayed exactly where it
@@ -61,7 +61,7 @@ const SIZE_CLASS: Record<Size, string> = {
  * The background carries the state; the glyph does not.
  *
  * `hover:text-foreground` used to ride along with the chip, so a hovered mark
- * went from `--muted-foreground` to `--foreground` -- a jump of 0.41 in
+ * went from `--muted-foreground` to `--foreground` — a jump of 0.41 in
  * lightness, in one step, at the same moment a background appeared underneath
  * it. Two things escalating at once made a hovered icon the highest-contrast
  * pixel on screen: darker than the body text beside it, for a control the
@@ -78,7 +78,7 @@ const SIZE_CLASS: Record<Size, string> = {
  * state. Same gesture, different result, one screen apart. The capsule says on;
  * the glyph is the same glyph in every state it can be in.
  *
- * What replaces the contrast is motion -- see `drawn.tsx`. A mark that shows its
+ * What replaces the contrast is motion — see `drawn.tsx`. A mark that shows its
  * state by moving a part of itself says more than one that shows it by getting
  * darker, and it says it without becoming the loudest thing in the window.
  */

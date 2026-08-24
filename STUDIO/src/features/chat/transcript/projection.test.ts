@@ -16,7 +16,7 @@ import {
  * The transcript projection against hand-built chunks.
  *
  * Every case here was shaped by what a live harness actually put on the
- * wire -- including the awkward parts: answers that arrive after the
+ * wire — including the awkward parts: answers that arrive after the
  * message that issued the call has already completed, batches redelivered
  * after a reattach, streams that stop mid-turn, and chunk types this
  * client has never heard of.
@@ -389,7 +389,7 @@ describe('an interrupted turn is never a finished one', () => {
   }
 
   it('leaves a stream that stops mid-turn visibly unfinished', () => {
-    // Bytes stopping proves nothing. No completion, no settlement -- so the
+    // Bytes stopping proves nothing. No completion, no settlement — so the
     // message stays `stopped`, whatever the connection does next.
     const reply = startTurn().items[0]
     if (reply.kind !== 'assistant') throw new Error('expected an assistant item')
@@ -522,7 +522,7 @@ describe('a reset rebuilds the indexes content lands through', () => {
 describe('seeded turns honour what their submission settled as', () => {
   it('marks the unfinished tail of a failed submission failed, not merely stopped', () => {
     // History is what a cold start knows. A message still being written when
-    // its submission settled failed must not read as an ordinary pause --
+    // its submission settled failed must not read as an ordinary pause —
     // interrupted means something, at the transcript layer too.
     const items = seededFrom({
       version: 1,
@@ -634,13 +634,13 @@ describe('which message is being written right now', () => {
  * that closed without ever producing content is a retry attempt that never
  * spoke and is withdrawn into one visible failure; open messages take the
  * outcome; closed-with-content messages are never falsified by a later
- * failure. Content means a delta or tool input arrived -- nothing else.
+ * failure. Content means a delta or tool input arrived — nothing else.
  */
 describe('a failed submission must not look like a completed one', () => {
   const SENTENCE = 'direct(sub_1) failed: 429 rate limit exceeded'
 
   function rateLimitedTurn() {
-    // Four retry attempts, each closing cleanly with nothing in them --
+    // Four retry attempts, each closing cleanly with nothing in them —
     // the shape the real captured wire has (wire-contract.test.ts pins it).
     let projection = applyChunks(
       emptyProjection(),

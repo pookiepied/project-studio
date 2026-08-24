@@ -15,7 +15,7 @@ import { useMicInput } from '@/features/voice/useMicInput'
  *
  * Two ways, and both are real inputs: the listener taps the transport, or the
  * microphone goes quiet. The second is voice-detection over the same measured
- * level the ridge draws -- speech must be confirmed (a sustained level above
+ * level the ridge draws — speech must be confirmed (a sustained level above
  * the speech threshold) before silence can end anything, so a stage opened
  * into a quiet room never fires by itself, and only silence *after* speech
  * advances. There is no timer-only fallback, because a timeout that ends a
@@ -24,7 +24,7 @@ import { useMicInput } from '@/features/voice/useMicInput'
  * ---- The loop, and where it is honest --------------------------------------
  *
  * listening and thinking are entirely real. The reply spoken in `speaking`
- * is a stand-in -- no model and no voice exist behind this app yet -- and the
+ * is a stand-in — no model and no voice exist behind this app yet — and the
  * loop turns regardless, because the point of the stage is that the states,
  * the hand-offs and the interruptions all behave today. When a transport
  * arrives, `speaking` starts consuming real tokens and real audio level and

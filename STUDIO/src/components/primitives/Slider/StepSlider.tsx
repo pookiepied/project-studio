@@ -8,14 +8,14 @@ import { cn } from '@/lib/cn'
  *
  * Reasoning effort is the one setting in the app that is genuinely a *dial*.
  * The steps are ordered, adjacent ones are near-equivalent, and the thing being
- * chosen is a position on a scale rather than a named option -- nobody wants
+ * chosen is a position on a scale rather than a named option — nobody wants
  * "high" specifically, they want "more than medium". A column of radio rows
  * says these are five unrelated choices and hides the ordering that is the
  * whole point.
  *
  * It also survives the real problem: the steps differ per model. Some offer
- * four, some six, some name the top one differently. A slider absorbs that --
- * the track is the same control at any length -- where a list of rows changes
+ * four, some six, some name the top one differently. A slider absorbs that —
+ * the track is the same control at any length — where a list of rows changes
  * shape and position every time the model changes, and the user has to re-find
  * the setting they were adjusting.
  *
@@ -26,8 +26,8 @@ import { cn } from '@/lib/cn'
  * The native input is invisible and stretched over the track, so the styling is
  * entirely ours and the behaviour is entirely the platform's.
  *
- * The ends are labelled with what the choice *does* -- faster against smarter
- * -- rather than with the step names. The names are for the value readout; the
+ * The ends are labelled with what the choice *does* — faster against smarter
+ * — rather than with the step names. The names are for the value readout; the
  * ends are there so someone who has never seen the setting knows which way to
  * drag before they know what "medium" means here.
  */

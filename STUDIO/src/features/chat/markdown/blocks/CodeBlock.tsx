@@ -23,7 +23,7 @@ const COPIED_MS = 2000
  *
  * A code block is the one piece of model output that can be arbitrarily wide,
  * and a wide `<pre>` stretches its parent rather than scrolling inside it. Once
- * that happens the transcript column widens and every message reflows -- which
+ * that happens the transcript column widens and every message reflows — which
  * is the failure that makes code blocks look broken in most chat interfaces.
  *
  * Wrapping is what stops it now. There is no scroller in any direction: the
@@ -31,7 +31,7 @@ const COPIED_MS = 2000
  * `min-w-0` on every flex ancestor up to the scroll container is what lets the
  * wrapping happen at the column at all. A scroller was the earlier answer, and
  * it traded the reflow for a second scroll region inside a scrolling transcript
- * -- reach the bottom of a block while scrolling the page and the page stops
+ * — reach the bottom of a block while scrolling the page and the page stops
  * dead. Wrapping has no such failure, and a preview does not owe anyone an
  * unwrapped 300-character line.
  *
@@ -47,7 +47,7 @@ const COPIED_MS = 2000
 export function CodeBlock({ code, fence }: { code: string; fence: string }) {
   const [copied, setCopied] = useState(false)
 
-  // ```ts:src/utils/get-diff.ts -- the language, then optionally where this came
+  // ```ts:src/utils/get-diff.ts — the language, then optionally where this came
   // from. A path makes a far better caption than a language name: "TypeScript"
   // is already obvious from the syntax colouring, while *which file* is the one
   // thing the block cannot tell you itself.
@@ -106,7 +106,7 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
           margin: 0,
           padding: '0.875rem 1.125rem',
           // Stated, not `inherit`. `inherit` resolves against the immediate
-          // parent -- the frame's plain body wrapper, which has no radius --
+          // parent — the frame's plain body wrapper, which has no radius —
           // so it silently computed to 0 and the scrollbar squared off the
           // corner it now sits in.
           borderRadius: 'var(--radius-block-inner)',

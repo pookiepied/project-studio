@@ -14,7 +14,7 @@ import type { IconComponent } from '@/components/icons'
  *   Archived    conversations you kept but put away
  *
  * Skills and Hooks sit under Coding rather than Extensions on purpose. An
- * extension adds reach -- a new server, a new connector. A skill or a hook
+ * extension adds reach — a new server, a new connector. A skill or a hook
  * changes behaviour with the reach it already has. Filing them together would
  * make "what can this thing touch?" unanswerable from the tree.
  */

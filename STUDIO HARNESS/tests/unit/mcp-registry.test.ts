@@ -133,7 +133,7 @@ describe("the MCP server registry", () => {
       //
       // The message is asserted, not merely the refusal: on Windows the
       // extension check refuses this path anyway, so a test that only asked
-      // "did it throw" would still pass with the shim rule deleted -- and the
+      // "did it throw" would still pass with the shim rule deleted — and the
       // whole value of the shim rule is that it says what to do instead.
       expect(() =>
         registry.save({

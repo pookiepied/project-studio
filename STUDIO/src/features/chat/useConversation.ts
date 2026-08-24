@@ -18,19 +18,19 @@ import { isTauri } from '@/platform/tauri/window'
  * The states a conversation's connection to its run can be in.
  *
  * One tagged union, because each of these renders as a different thing, and
- * the combinations booleans allow -- attaching *and* live, streaming *and*
- * interrupted -- are not states a conversation has.
+ * the combinations booleans allow — attaching *and* live, streaming *and*
+ * interrupted — are not states a conversation has.
  *
  * - `no-harness` / `harness-starting`: Task 23's lifecycle events, finally
  *   consumed. `harness-starting` is now a real state, not a placeholder.
  * - `attaching`: a read is in flight and history is being replayed into it.
- * - `live`: the `up-to-date` transition happened -- the replay is over and
+ * - `live`: the `up-to-date` transition happened — the replay is over and
  *   what follows is history being made.
  * - `streaming`: a turn is being produced, carrying the submission it
  *   belongs to when one has been seen.
- * - `idle`: the last turn settled completed -- or the harness has no stream
+ * - `idle`: the last turn settled completed — or the harness has no stream
  *   for this conversation yet, which is how every fresh conversation starts.
- * - `interrupted`: the read broke -- transport failure, harness crash,
+ * - `interrupted`: the read broke — transport failure, harness crash,
  *   harness stop. The offset is retained, so this is resumable, not lost.
  * - `run-failed`: a settlement said `failed` or `aborted`. Sticky until the
  *   user acts, because a failure that heals silently was never shown.
@@ -50,7 +50,7 @@ export type ConversationPhase =
       readonly message: string
       /**
        * The provider's own sentence for the failure, when the wire carried
-       * one -- the part that names the cause. Null when it did not; nothing
+       * one — the part that names the cause. Null when it did not; nothing
        * invents a reason the harness never gave.
        */
       readonly detail: string | null
@@ -59,7 +59,7 @@ export type ConversationPhase =
 /**
  * The content half of a delivery: everything rendering reduces into the
  * transcript. Connection-only deliveries (liveness, foreign frames) stop at
- * this hook and never reach the projection -- heartbeats are not content,
+ * this hook and never reach the projection — heartbeats are not content,
  * and the boundary between the two lives here rather than in every consumer.
  */
 export type ConversationContent =
@@ -69,7 +69,7 @@ export type ConversationContent =
 export interface ConversationView {
   readonly phase: ConversationPhase
   /**
-   * The last offset any delivery reported -- everything durably known about
+   * The last offset any delivery reported — everything durably known about
    * where this webview has read to (ADR 0045), and what the next attach
    * resumes from.
    */
@@ -83,7 +83,7 @@ export interface ConversationView {
   /**
    * Submits one user turn through the harness. Never retried here: an
    * identical resend would be a SECOND turn, so a failed submission is
-   * surfaced, not repeated. On success, makes sure a read is attached --
+   * surfaced, not repeated. On success, makes sure a read is attached —
    * a conversation's very first turn creates the stream this page has
    * been unable to find since it mounts.
    */
@@ -93,7 +93,7 @@ export interface ConversationView {
   /**
    * The last submission this connection refused to carry, held where the
    * other connection states render until the person dismisses it or the
-   * next send succeeds. A refused POST used to change nothing at all --
+   * next send succeeds. A refused POST used to change nothing at all —
    * the person typed, pressed send, and watched the app do exactly
    * nothing, which reads as a broken key rather than a broken connection.
    * The one exception is `no-harness`: while the phase machine is already
@@ -169,7 +169,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * built here is one per conversation by construction. Outside Tauri there is
  * no supervisor to ask, and the shipped no-harness behaviour applies.
  *
- * Whatever comes back must be stable across renders -- it is an effect
+ * Whatever comes back must be stable across renders — it is an effect
  * dependency, like the settings pane's connect seam.
  */
 function defaultContactFor(conversationId: string): ContactHarness {
@@ -205,7 +205,7 @@ function atOrBefore(a: ChunkPosition, b: ChunkPosition): boolean {
  * after an interruption replays the batch that was in flight, and the
  * projection's own ordering token is what makes that at-least-once delivery
  * safe to apply twice. Content goes through the transcript projection, which
- * keeps the same discipline over the same positions -- this function reads
+ * keeps the same discipline over the same positions — this function reads
  * only what connection phases need, so the two concerns stay out of each
  * other's way.
  *
@@ -263,7 +263,7 @@ export interface UseConversationOptions {
   /**
    * Receives everything rendering is allowed to see: snapshots and chunk
    * batches, in arrival order, from the current read only. Must be stable
-   * across renders -- it rides beside `contact` as an effect dependency.
+   * across renders — it rides beside `contact` as an effect dependency.
    */
   readonly onContent?: (content: ConversationContent) => void
 }
@@ -284,11 +284,11 @@ export function useConversation(
   const [offset, setOffset] = useState<string | null>(null)
   // A refused submission. Deliberately NOT a phase: a send can be refused
   // while an earlier turn is still streaming, and the state machine has no
-  // status that means "streaming AND refused" -- booleans are how the
+  // status that means "streaming AND refused" — booleans are how the
   // combinations start lying (see ConversationPhase above). The refusal
   // renders beside whatever phase is real.
   const [refused, setRefused] = useState<SeamFailure | null>(null)
-  // Mirror for callbacks that must judge the CURRENT phase -- a closure over
+  // Mirror for callbacks that must judge the CURRENT phase — a closure over
   // `phase` would see the render the callback was created in.
   const phaseRef = useRef(phase)
   phaseRef.current = phase
@@ -332,7 +332,7 @@ export function useConversation(
             return
           case 'snapshot':
             // History's whole answer: content to seed the projection with.
-            // The phase stays `attaching` -- the updates connection that
+            // The phase stays `attaching` — the updates connection that
             // follows still has to catch up before anything is live.
             onContent?.({ kind: 'snapshot', snapshot: delivery.snapshot })
             return
@@ -404,7 +404,7 @@ export function useConversation(
         setPhase({ status: 'interrupted', reason })
       }
       // `ended` and `absent` already arrived as deliveries; `cancelled`
-      // means this read was superseded or the hook went away -- both
+      // means this read was superseded or the hook went away — both
       // handled where that happens, not here.
     })
   }, [onContent])
@@ -470,7 +470,7 @@ export function useConversation(
       disposed = true
       liveRef.current = false
       // The prompt half of cancellation: switching conversations or leaving
-      // stops THIS READ immediately. It never touches the run -- a dead
+      // stops THIS READ immediately. It never touches the run — a dead
       // window cancels nothing (ADR 0045 section 5).
       void handleRef.current?.cancel()
       handleRef.current = null

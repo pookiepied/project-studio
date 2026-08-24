@@ -8,7 +8,7 @@ import { type ProjectIcon } from '@/domain/projects/types'
  * ---- Why none of these is a picture of anything --------------------------
  *
  * The obvious set is a cube, a flask, a leaf, a compass. It is also the wrong
- * set, and not because those were drawn badly -- a literal object is the dated
+ * set, and not because those were drawn badly — a literal object is the dated
  * idea itself. Pictorial marks carry meaning the user did not ask for: a flask
  * says the project is an experiment, a leaf says it is small or new, and the
  * user picking one to tell two projects apart ends up making a claim about the
@@ -19,7 +19,7 @@ import { type ProjectIcon } from '@/domain/projects/types'
  * These are abstract instead: arcs, a stack, a grid, a ring, a wave, a burst, a
  * triangle, a diamond. None of them means anything, which is the requirement.
  * They differ by silhouette rather than subject, so they are still instantly
- * distinguishable at 14px in a rail -- and being pure geometry, they sit in the
+ * distinguishable at 14px in a rail — and being pure geometry, they sit in the
  * same visual family as the interface around them instead of decorating it.
  *
  * This is also why the registry's uniqueness rule does not reach here: a mark
@@ -58,7 +58,7 @@ const MARKS: Record<ProjectIcon, Glyph> = {
 
 /**
  * A mark is an identity, not a control, so it does not react to the pointer on
- * its own -- the row it sits in owns the highlight. It lifts very slightly with
+ * its own — the row it sits in owns the highlight. It lifts very slightly with
  * that row, which is enough to tie the two together without the mark competing
  * with the title beside it.
  */

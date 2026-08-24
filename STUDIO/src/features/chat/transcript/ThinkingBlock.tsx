@@ -10,14 +10,14 @@ import { cn } from '@/lib/cn'
  *
  * Collapsed by default, always. The trace is working-out, not the answer, and
  * opening it by default puts the least useful text in a reply at the top of it
- * -- the reader has to scroll past somebody else's notes to reach the point.
+ * — the reader has to scroll past somebody else's notes to reach the point.
  * It stays collapsed while streaming too, so the block does not expand and
  * shove the reply down the screen mid-sentence.
  *
  * The header still earns its place while collapsed by carrying the duration:
  * "Thought for 4s" is the one fact about the trace that is worth a glance
- * without opening it. A segment whose span nobody recorded -- the live wire
- * carries no per-segment timing -- says only "Thought", which is honest.
+ * without opening it. A segment whose span nobody recorded — the live wire
+ * carries no per-segment timing — says only "Thought", which is honest.
  *
  * The mark is the brand mark, not a glyph: the same StudioMark that assembles
  * on the splash ripples here while the model works. "Studio is thinking" is

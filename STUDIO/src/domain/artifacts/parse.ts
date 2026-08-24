@@ -6,7 +6,7 @@ import type { Artifact, ArtifactSection, ArtifactStatus } from '@/domain/artifac
  * The input is model output, which means it is untrusted and frequently
  * half-written: this parser runs on every frame of a stream, so most of the
  * time it is handed a truncated JSON document that is not valid yet. That is
- * the normal case, not the error case, and it must be silent -- an error
+ * the normal case, not the error case, and it must be silent — an error
  * message that flickers in the transcript for two seconds while an artifact
  * streams in is worse than showing nothing.
  *
@@ -30,7 +30,7 @@ type ParseResult =
  *
  * The gateway, the connectors and three generations of this app all named
  * these differently. Accepting every spelling here is what keeps the aliases
- * out of every renderer -- see the note in `types.ts`.
+ * out of every renderer — see the note in `types.ts`.
  */
 const STATUS_ALIASES: Readonly<Record<string, ArtifactStatus>> = {
   pending: 'pending',
@@ -74,7 +74,7 @@ function text(value: unknown): string | undefined {
  * Keep the sections that are well formed and drop the rest.
  *
  * Dropping rather than failing is deliberate. One malformed section in an
- * artifact carrying five should cost you that section, not the artifact -- and
+ * artifact carrying five should cost you that section, not the artifact — and
  * during a stream, the last section is *always* malformed for a moment.
  */
 function sectionsOf(value: unknown): readonly ArtifactSection[] | undefined {
@@ -95,14 +95,14 @@ function sectionsOf(value: unknown): readonly ArtifactSection[] | undefined {
  * getting it wrong the optimistic way means a red error card flashing in the
  * transcript every time an artifact streams.
  *
- * The cheap version -- starts with `{`, does not end with `}` -- is wrong, and
+ * The cheap version — starts with `{`, does not end with `}` — is wrong, and
  * wrong specifically on pretty-printed JSON, which is what a model emits. Any
  * prefix that happens to stop just after a *nested* object closes ends with `}`
  * and reads as complete. In a document with one nested section that is a dozen
  * prefixes reported as broken while they were merely unfinished.
  *
  * So the nesting is actually counted, with a string scanner, because a brace
- * inside a string value is not structure -- and prompts contain braces. Depth
+ * inside a string value is not structure — and prompts contain braces. Depth
  * above zero, or ending mid-string, means more is coming.
  */
 function looksTruncated(source: string): boolean {

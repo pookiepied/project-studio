@@ -12,12 +12,12 @@ import type { HarnessFailure, ProviderConnection } from '@/platform/harness'
  *
  * The stored credential going too is stated for the same reason. It is not a
  * detail: the harness deletes the keychain entry first and the row second, so
- * this is irreversible in a way that re-adding the connection will not undo --
+ * this is irreversible in a way that re-adding the connection will not undo —
  * the key has to be pasted again, and it may not be anywhere else.
  *
  * Filled red is right here and wrong in the list. This is the step where the
  * choice has already been narrowed to yes or no, which is the one place
- * `danger` earns being the loudest thing on screen -- see Button's docblock.
+ * `danger` earns being the loudest thing on screen — see Button's docblock.
  */
 export function RemoveConnectionDialog({
   connection,

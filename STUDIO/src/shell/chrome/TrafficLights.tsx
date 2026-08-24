@@ -9,7 +9,7 @@ type LightKind = 'close' | 'minimize' | 'maximize'
  * The macOS red, amber and green are the obvious thing to draw here and this
  * app does not draw them. They would be the only saturated pixels in the entire
  * interface, which makes them the first thing the eye lands on every time the
- * window opens -- three bright dots in a corner, louder than anything the user
+ * window opens — three bright dots in a corner, louder than anything the user
  * came to read, and borrowed from another company's shell besides.
  *
  * What survives their removal is what was carrying the meaning anyway: three
@@ -35,7 +35,7 @@ export function TrafficLights() {
     // No `data-tauri-drag-region` here or on the buttons: Tauri tests the event
     // target for the attribute rather than walking up the tree, so children of
     // the dragging strip are click targets by default. Setting it to `false`
-    // would be worse than useless -- React emits the string "false" and
+    // would be worse than useless — React emits the string "false" and
     // `hasAttribute` reports it as present.
     <div className="group/lights flex shrink-0 items-center" style={{ gap: SHELL.trafficLight.gap }}>
       {LIGHTS.map(({ kind, label, glyph, action }) => (

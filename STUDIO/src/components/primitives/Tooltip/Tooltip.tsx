@@ -9,13 +9,13 @@ import { cn } from '@/lib/cn'
  *
  * Load-bearing rather than decorative: icon-only controls have no label of
  * their own, so this is the only thing that says what a glyph does. It replaces
- * the `title` attribute -- which renders the OS's own web tooltip, a chunk of
+ * the `title` attribute — which renders the OS's own web tooltip, a chunk of
  * unstyled browser chrome dropped into an otherwise consistent surface.
  *
  * The delay matters. Instant tooltips fire while the pointer is merely crossing
  * a row on its way somewhere else, which turns a quiet column into a strobe.
  * 400ms is long enough that the pointer has stopped, and the group keeps no
- * shared "already warmed" state -- each trigger waits on its own, because
+ * shared "already warmed" state — each trigger waits on its own, because
  * skipping the delay for the second one is what makes a strip feel twitchy.
  *
  * Keyboard focus opens it too, gated on `:focus-visible` so a click that lands

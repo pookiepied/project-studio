@@ -23,8 +23,8 @@ async fn app_ready(window: tauri::WebviewWindow) -> Result<(), String> {
 /// Open one conversation in its own window.
 ///
 /// The same frontend bundle with a query parameter, not a second app. The
-/// detached window reads it and renders that conversation alone -- no sidebar,
-/// no navigation -- which keeps one implementation of the transcript, the
+/// detached window reads it and renders that conversation alone — no sidebar,
+/// no navigation — which keeps one implementation of the transcript, the
 /// composer and the shell rather than a stripped copy that drifts.
 ///
 /// Every window property here is deliberately the same as the main window's:
@@ -94,7 +94,7 @@ fn urlencoding(value: &str) -> String {
 ///
 /// The supervisor is managed directly rather than behind a `Mutex`. It is
 /// already `Clone` over an `Arc<Mutex<Inner>>` and every method takes `&self`,
-/// so an outer lock guarded nothing the inner one did not -- it only added
+/// so an outer lock guarded nothing the inner one did not — it only added
 /// three `lock().map_err(...)` calls and a poisoning case that could never be
 /// reached through them.
 #[tauri::command]
@@ -118,8 +118,8 @@ fn restart_harness(
 /// eager start in `run()` happens on a background thread before any window
 /// exists: a failure there had no caller to return to and ended in
 /// `log::error!`. `HarnessStatus` distinguishes "failed, and here is why" from
-/// "nothing has started yet" -- which is the difference between something the
-/// UI can render and a line in a log file -- and answers `starting` promptly
+/// "nothing has started yet" — which is the difference between something the
+/// UI can render and a line in a log file — and answers `starting` promptly
 /// during a spawn rather than blocking behind it.
 #[tauri::command]
 fn get_harness_status(
@@ -129,7 +129,7 @@ fn get_harness_status(
 }
 
 /// One seam for side systems: the webview names a service and a path, and
-/// Rust decides everything else -- above all the credential, which the
+/// Rust decides everything else — above all the credential, which the
 /// supervisor holds and this attaches. See `services.rs` for why that is an
 /// enum with one arm and not a registry.
 #[tauri::command]
@@ -143,7 +143,7 @@ async fn service_fetch(
 }
 
 /// The same seam, streaming: the webview additionally names the offset it
-/// last saw, and events arrive over the channel as they happen -- each
+/// last saw, and events arrive over the channel as they happen — each
 /// carrying the offset to resume from, so any interruption is answered by
 /// re-invoking this rather than by losing the run (ADR 0045). The
 /// credential stays in Rust exactly as `service_fetch` holds it.
@@ -183,7 +183,7 @@ async fn service_stream(
 /// Cancels one live stream by the id its reader chose. Idempotent by
 /// construction: an unknown id, a stream that already finished, and a cancel
 /// sent twice all find nothing to do and succeed quietly (ADR 0045's rule is
-/// untouched here -- this stops READING a run, never the run itself; aborting
+/// untouched here — this stops READING a run, never the run itself; aborting
 /// work is Flue's `POST /agents/:name/:id/abort`, and only ever called on
 /// purpose).
 #[tauri::command]
@@ -221,8 +221,8 @@ pub fn run() {
   });
 
   // The supervisor tells the webview what happens to the Harness as it
-  // happens -- starting, started (the view, never the token), stopped,
-  // failed, restarting -- instead of the frontend having to poll for all of
+  // happens — starting, started (the view, never the token), stopped,
+  // failed, restarting — instead of the frontend having to poll for all of
   // it. Attached here because emission needs an app handle; events raised
   // before this point, notably the eager start's `harness-starting`, go to
   // no listener, which costs nothing: the webview's first look is a status
@@ -259,7 +259,7 @@ pub fn run() {
     // first does the work.
     //
     // Only `main`. Detached conversation windows are destroyed whenever the
-    // user closes one, and they share this Harness -- reacting to their label
+    // user closes one, and they share this Harness — reacting to their label
     // would kill it out from under the window the user is still working in.
     .on_window_event(|window, event| {
       if matches!(event, WindowEvent::Destroyed) && window.label() == "main" {

@@ -17,8 +17,8 @@ import { cn } from '@/lib/cn'
  *
  * The capsule becoming a box is four motions at once: the field's height, the
  * footer track growing in, the controls relocating and the frame's radius
- * relaxing. All four share `DURATION.slow` and the house ease-out -- the
- * vocabulary's "a whole surface changing" -- because when they run on
+ * relaxing. All four share `DURATION.slow` and the house ease-out — the
+ * vocabulary's "a whole surface changing" — because when they run on
  * different clocks the parts read as separate events happening near each
  * other, which is what an unanimated instant change degenerates into the
  * moment only some of it is animated.
@@ -26,15 +26,15 @@ import { cn } from '@/lib/cn'
  * The shared curve is also what makes the relocation *compose* rather than
  * add: Framer animates the controls' offset from where the grid just placed
  * them, and the grid's own track grows under them by the same amount on the
- * same curve -- the offset shrinks exactly as the track rises, so the two
+ * same curve — the offset shrinks exactly as the track rises, so the two
  * read as one continuous glide.
  */
 const SHAPE_MOTION = { duration: DURATION.slow, ease: EASE_OUT }
 const TRACK_TRANSITION = `grid-template-rows ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
 /**
  * The footer track: the air above the controls plus the control row itself,
- * as one number. Carrying the air *in the track* -- rather than as a row gap
- * -- is what lets the track transition its height: a gap between rows appears
+ * as one number. Carrying the air *in the track* — rather than as a row gap
+ * — is what lets the track transition its height: a gap between rows appears
  * at full size the moment a second row exists, which is a step in the frame's
  * bottom edge no matter how smoothly everything else moves.
  */
@@ -46,8 +46,8 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  * ---- What it is not ------------------------------------------------------
  *
  * It carries no model picker, no permission control and no context meter. All
- * three moved to the top strip, because they are session facts -- who you are
- * talking to and what it may do -- rather than properties of the sentence you
+ * three moved to the top strip, because they are session facts — who you are
+ * talking to and what it may do — rather than properties of the sentence you
  * are writing. Kept here they turned the field into a toolbar, which is the
  * single loudest way a text box stops looking calm.
  *
@@ -57,7 +57,7 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  * ---- Where a send goes -----------------------------------------------------
  *
  * By default it goes through the workspace store, which plays a local demo
- * turn -- that is the home page's new-conversation flow and the gallery.
+ * turn — that is the home page's new-conversation flow and the gallery.
  * A conversation backed by the harness passes `onSend`/`busy`/`onStop`, and
  * those take over completely: the text leaves for the harness, stop aborts
  * the RUN (the only thing that means abort), and this component never
@@ -65,7 +65,7 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  *
  * A live send answers with a receipt, and the field holds the words until
  * the receipt says the harness took them. Clearing optimistically turned a
- * refused POST into a silent swallow -- the message vanished, nothing
+ * refused POST into a silent swallow — the message vanished, nothing
  * anywhere said why, and the person retyped it into a connection that would
  * refuse it again. Now a refusal leaves the text exactly where it was, with
  * the notice explaining itself above this component.
@@ -109,7 +109,7 @@ export function Composer({
   const { status, send, stop } = useWorkspace()
   const [text, setText] = useState('')
   // Mirror of `text` for callbacks that must judge the CURRENT field against
-  // what was sent -- the closure below would otherwise see the render in
+  // what was sent — the closure below would otherwise see the render in
   // which the send began.
   const textRef = useRef('')
   textRef.current = text
@@ -129,7 +129,7 @@ export function Composer({
       setText((current) => (current.trim().length > 0 ? `${current.trimEnd()} ${spoken}` : spoken)),
   })
 
-  // Coming out of dictation, the caret goes back where it was -- the field
+  // Coming out of dictation, the caret goes back where it was — the field
   // remounts as the strip leaves, so the focus has to wait for the return
   // rather than firing from the hook's completion.
   const wasDictating = useRef(false)
@@ -143,7 +143,7 @@ export function Composer({
 
   const live = onSend !== undefined
   // OR, never a fallback. The page passes a boolean for the whole POST round
-  // trip -- `false`, because the turn has not started streaming yet -- so
+  // trip — `false`, because the turn has not started streaming yet — so
   // `busyOverride ?? sending` would never reach `sending` where it is wired,
   // and the in-flight lock would exist only for callers that omit the prop.
   const busy = live ? (busyOverride ?? false) || sending : status !== 'idle'
@@ -159,7 +159,7 @@ export function Composer({
         (receipt) => {
           setSending(false)
           // Clear only what the harness actually took, and only if the
-          // field still holds exactly that -- words typed during the round
+          // field still holds exactly that — words typed during the round
           // trip belong to the next message, not this receipt.
           if (!receipt.ok || textRef.current !== outgoing) return
           setText('')
@@ -197,19 +197,19 @@ export function Composer({
       // The radius is a real style with a CSS transition, not a Framer
       // `animate`. A Framer value is only applied once the animation loop
       // runs, so the resting shape of the most important control in the app
-      // would depend on frames being scheduled -- and it renders as a square
+      // would depend on frames being scheduled — and it renders as a square
       // box in any situation where they are not. CSS interpolates one property
       // just as well and always paints the correct shape on the first frame.
       // The duration is the reshape clock (`SHAPE_MOTION`): the height and
       // the footer track below animate on it too, and a radius on a shorter
       // one would finish early and leave a box still wearing capsule corners
-      // -- the same "changes shape and corrects itself" read this whole block
+      // — the same "changes shape and corrects itself" read this whole block
       // exists to prevent. The shadow is what gives the lift, and it does not
       // fight the textarea's own height.
       style={{
         paddingInline: COMPOSER.paddingInline,
         // Block padding is a token here rather than a `py-*` utility because
-        // it is one of the two inputs the resting height is computed from --
+        // it is one of the two inputs the resting height is computed from —
         // see `COMPOSER_RESTING_HEIGHT`. As a class it was a third number that
         // had to be kept in step with the other two by hand, and it was the
         // one that silently disagreed: the field measured 52 while the token
@@ -223,7 +223,7 @@ export function Composer({
         'bg-surface-raised',
         // The field breathes on focus: a little taller, lifted a little further
         // off the page. Both are small enough to register without being watched
-        // -- the point is that the surface acknowledges the caret arriving, not
+        // — the point is that the surface acknowledges the caret arriving, not
         // that it performs. A control this central looking identical whether or
         // not it is ready for typing is the specific thing that made the page
         // read as a picture of an app rather than one you are using.
@@ -235,35 +235,35 @@ export function Composer({
         // into it, and on paste the height and the radius resolved a frame
         // apart, which is what read as the composer changing shape and
         // correcting itself. The roomier size was better in both states, so it
-        // is simply the size now. Focus is still acknowledged -- by the shadow,
+        // is simply the size now. Focus is still acknowledged — by the shadow,
         // which costs no layout.
         // Both properties, or the radius does not animate at all: naming only
         // `box-shadow` sets `transition-property` to exactly that, so the
         // capsule-to-box change snapped a frame after the field had already
-        // grown. That mismatch -- height first, shape a frame later -- is what
+        // grown. That mismatch — height first, shape a frame later — is what
         // read as the composer changing shape and correcting itself on paste.
         'transition-[box-shadow,border-radius,padding]',
         // Both properties, or the radius does not animate at all: naming only
         // `box-shadow` sets `transition-property` to exactly that, so the
         // capsule-to-box change snapped a frame after the field had already
-        // grown. That mismatch -- height first, shape a frame later -- is what
+        // grown. That mismatch — height first, shape a frame later — is what
         // read as the composer changing shape and correcting itself on paste.
         // Two steps of the shared elevation scale rather than three hand-mixed
         // shadows. The third of those was the bug: `dark:shadow-[...]` had no
         // `focused` condition, so in dark mode it overrode *both* branches and
-        // the field stopped lifting on focus entirely -- the breathing worked in
+        // the field stopped lifting on focus entirely — the breathing worked in
         // light mode only. The scale carries its own dark values, so there is
         // nothing left here to get out of step.
         focused ? 'shadow-lifted' : 'shadow-raised',
       )}
     >
-      {/* One grid, two arrangements, the same three columns -- and always two
+      {/* One grid, two arrangements, the same three columns — and always two
           rows, so nothing has to appear or vanish. On one line the second
           track is zeroed and the clusters sit in the side columns with the
           field between them: the capsule, exactly the height its tokens say,
           everything on a single row. Past the first line the field takes the
           first row across all three columns and both clusters drop into the
-          second track, a footer along the bottom of the frame -- the text then
+          second track, a footer along the bottom of the frame — the text then
           wraps the full width of the field, and no line of it reaches the row
           the controls are on. While the buttons stayed beside the text, every
           wrapped line was squeezed into the width four controls left between
@@ -272,14 +272,14 @@ export function Composer({
           A grid rather than the row re-rendered two ways: the controls never
           move in the DOM, so nothing remounts and an open menu stays open, and
           the relocation hangs off the same `multiline` signal that reshapes
-          the frame -- the capsule-to-box radius and the footer cannot
+          the frame — the capsule-to-box radius and the footer cannot
           disagree about which state the field is in.
 
           The reshape is animated on the one clock, in two halves that meet.
           The track and the field's own height are CSS transitions, so the
           frame grows continuously. The controls are `layout="position"`:
           Framer glides them from where they were to where the grid has just
-          slotted them, and -- on the same curve -- that glide cancels the
+          slotted them, and — on the same curve — that glide cancels the
           instant re-slotting underneath it. Position only, never a full
           `layout`: size changes would be scale, and a scaled field stretches
           the text it holds while its width moves. Reduced motion collapses
@@ -305,7 +305,7 @@ export function Composer({
           {/* What Studio may do, next to the thing that will make it do it.
               The mode is the one setting whose consequence lands on the user's
               machine, and it is the one you reconsider while looking at what
-              you are about to send -- so it sits by the send button rather
+              you are about to send — so it sits by the send button rather
               than three clicks deep in a menu in the window chrome. Mark only
               at rest; the name is a hover and a click away. */}
           <PermissionControl />
@@ -320,7 +320,7 @@ export function Composer({
           )}
         >
           {/* While dictation is live the field steps aside and the strip of
-              real level takes its place -- same slot, same line height, so
+              real level takes its place — same slot, same line height, so
               the capsule neither grows nor reshapes. `popLayout` keeps the
               outgoing field in the flow's memory for the length of its exit
               rather than collapsing the row for one frame. */}
@@ -371,13 +371,13 @@ export function Composer({
           )}
         >
           {/* Dictation sits in the field, not in the plus menu.
-              It acts on this field -- it fills it with what you say -- so it
+              It acts on this field — it fills it with what you say — so it
               belongs beside the field the way send does. Buried in a menu it
               was two clicks from the thing it modifies, and it was the only
               item in that menu that was not "attach something".
 
               The mark becomes the transport while recording: the mic gathers,
-              the square stops. Same control, two states, one meaning -- the
+              the square stops. Same control, two states, one meaning — the
               way send becomes stop while a reply streams. */}
           <IconButton
             label={dictation.stage === 'recording' ? 'Stop and transcribe' : 'Dictate'}
@@ -392,7 +392,7 @@ export function Composer({
           </IconButton>
 
           {/* While the microphone owns the field there is nothing to send and
-              no voice mode to offer -- the strip is the message in progress,
+              no voice mode to offer — the strip is the message in progress,
               and the mic beside it is its only control. */}
           {!dictating && (
           <AnimatePresence initial={false}>
@@ -424,7 +424,7 @@ export function Composer({
                 {/* Voice mode, not dictation. Dictation turns speech into text
                     in this field and lives beside it; this starts a
                     spoken conversation and replaces the field entirely. Two
-                    features, so two marks -- the previous build gave them
+                    features, so two marks — the previous build gave them
                     adjacent glyphs and they read as one control with a
                     duplicate. */}
                 <IconButton label="Voice mode" size="md" onClick={voice.enter}>

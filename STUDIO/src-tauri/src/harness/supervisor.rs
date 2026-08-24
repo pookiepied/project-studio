@@ -45,8 +45,8 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 /// How long the polite shutdown request waits to be acknowledged.
 ///
-/// The Harness answers `POST /api/shutdown` before it begins draining -- the
-/// response is fire-and-forget on its side -- so on loopback the answer should
+/// The Harness answers `POST /api/shutdown` before it begins draining — the
+/// response is fire-and-forget on its side — so on loopback the answer should
 /// arrive in milliseconds. Five seconds tolerates a paused process without
 /// letting a quit hang on a request that will never be answered.
 const SHUTDOWN_ACK_TIMEOUT: Duration = Duration::from_secs(5);
@@ -55,9 +55,9 @@ const SHUTDOWN_ACK_TIMEOUT: Duration = Duration::from_secs(5);
 ///
 /// The bound matters more than its value: a drain that waits forever is a
 /// window that will not close. Ten seconds is generous headroom over the work
-/// a graceful shutdown honestly does -- stop each MCP server (awaited, each
+/// a graceful shutdown honestly does — stop each MCP server (awaited, each
 /// typically well under a second) and close two SQLite databases (checkpoint
-/// included, sub-second on local disk) -- because nothing in it waits for an
+/// included, sub-second on local disk) — because nothing in it waits for an
 /// in-flight model turn: unfinished submissions stay reclaimable by design
 /// (ADR 0032 §3). Past the bound, today's termination is the answer, and the
 /// log line that precedes it is how we learn the mechanism broke.
@@ -68,8 +68,8 @@ const DRAIN_BOUND: Duration = Duration::from_secs(10);
 /// Once per window, not once ever: a harness that crashes again within sixty
 /// seconds of the last unexpected exit is one the replacement did not save,
 /// and restarting it in a loop looks like activity while fixing nothing.
-/// Sixty seconds is two startup budgets -- a harness that cannot start
-/// demonstrates that within [`STARTUP_TIMEOUT`] -- so the window always spans
+/// Sixty seconds is two startup budgets — a harness that cannot start
+/// demonstrates that within [`STARTUP_TIMEOUT`] — so the window always spans
 /// enough to see the restart fail, and never strands a user whose harness
 /// crashed twice an hour ago.
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
@@ -90,7 +90,7 @@ const DIAGNOSTIC_BYTES: usize = 2000;
 /// exactly the text a user pastes into a bug report.
 /// Canonicalises a resolved server path, minus the prefix Windows adds.
 ///
-/// `canonicalize` returns a verbatim path on Windows -- `\?\D:\...` -- and Node
+/// `canonicalize` returns a verbatim path on Windows — `\?\D:\...` — and Node
 /// reads the leading `\` as the start of a UNC share, so the main module it
 /// tries to stat is `D:`. Measured, not predicted: the integration test failed
 /// with `EISDIR: illegal operation on a directory, lstat 'D:'` on every run
@@ -148,8 +148,8 @@ fn tail(text: String) -> String {
 ///
 /// The names are the contract the frontend subscribes to; the payloads are
 /// narrow on purpose. [`LifecycleEvent::Started`] carries the endpoint *view*
-/// -- `HarnessEndpoint` cannot be serialized, so the bearer physically cannot
-/// ride the event -- and [`LifecycleEvent::Failed`] carries a sentence that is
+/// — `HarnessEndpoint` cannot be serialized, so the bearer physically cannot
+/// ride the event — and [`LifecycleEvent::Failed`] carries a sentence that is
 /// redacted at its source like every other diagnostic.
 #[derive(Debug, Clone)]
 pub(crate) enum LifecycleEvent {
@@ -194,7 +194,7 @@ impl Serialize for LifecycleEvent {
 /// A closure rather than a Tauri type so the supervisor's tests can record
 /// events without an application, so this module never imports more of Tauri
 /// than the emitter wiring, and so emission is defined as "tell whoever is
-/// listening" -- which is nobody, correctly, before any webview exists.
+/// listening" — which is nobody, correctly, before any webview exists.
 pub(crate) type LifecycleSink = Box<dyn Fn(&LifecycleEvent) + Send + Sync>;
 
 /// Keeps the Harness and everything it starts inside one killable container.
@@ -203,7 +203,7 @@ pub(crate) type LifecycleSink = Box<dyn Fn(&LifecycleEvent) + Send + Sync>;
 /// container is a process group and it is established *before* the spawn, by
 /// `cmd.process_group(0)` in `launch`, so there is nothing left for this type
 /// to do afterwards. On Windows there is no process group, and the counterpart
-/// -- a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` -- can only be
+/// — a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` — can only be
 /// joined by a process that already exists, so it acts after the spawn.
 ///
 /// The Windows half is meta-task **#89**: `cmd.process_group(0)` is
@@ -215,7 +215,7 @@ pub(crate) type LifecycleSink = Box<dyn Fn(&LifecycleEvent) + Send + Sync>;
 struct ProcessContainment {
     /// Created on the first spawn and held until the supervisor is dropped.
     /// Closing this handle is what kills the contents, so its lifetime *is* the
-    /// containment -- it is deliberately not scoped to one child, because a
+    /// containment — it is deliberately not scoped to one child, because a
     /// restart must not release the descendants of the launch before it.
     #[cfg(windows)]
     job: Option<JobObject>,
@@ -235,8 +235,8 @@ impl ProcessContainment {
     /// no job. `CREATE_SUSPENDED` would close it, and `std::process::Command`
     /// cannot ask for it; the alternative is a hand-rolled `CreateProcessW`,
     /// which would mean reimplementing stdio inheritance as well. The Harness
-    /// starts no MCP server in that window -- it has not opened its database
-    /// yet -- so the exposure is a few milliseconds of a process that has not
+    /// starts no MCP server in that window — it has not opened its database
+    /// yet — so the exposure is a few milliseconds of a process that has not
     /// begun its own work.
     #[cfg(windows)]
     fn contain(&mut self, child: &Child) -> Result<(), String> {
@@ -255,8 +255,8 @@ impl ProcessContainment {
 ///
 /// `unsafe impl Send`/`Sync` because `HANDLE` wraps a raw pointer and is
 /// therefore neither by default. A Win32 kernel handle is a process-wide
-/// value -- any thread may use it, and the calls below are the only ones this
-/// type makes -- so the marker is a statement about `HANDLE`'s representation,
+/// value — any thread may use it, and the calls below are the only ones this
+/// type makes — so the marker is a statement about `HANDLE`'s representation,
 /// not about this type doing anything clever.
 #[cfg(windows)]
 #[derive(Debug)]
@@ -280,7 +280,7 @@ impl JobObject {
 
         // `KILL_ON_JOB_CLOSE` is the whole point: it makes the handle's lifetime
         // the contents' lifetime. It fires on any close, including the one the
-        // kernel performs when this process dies -- so a Host that crashes still
+        // kernel performs when this process dies — so a Host that crashes still
         // takes its descendants with it, which a `shutdown_all` on exit cannot.
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -390,7 +390,7 @@ pub struct HarnessStatus {
     /// Present exactly when `state` is `running`. The view, not the endpoint:
     /// this crosses to the webview and the bearer does not.
     pub endpoint: Option<HarnessEndpointView>,
-    /// Present exactly when `state` is `failed`. Already redacted -- every
+    /// Present exactly when `state` is `failed`. Already redacted — every
     /// error the supervisor produces goes through `redact` first.
     pub error: Option<String>,
 }
@@ -428,7 +428,7 @@ impl HarnessSupervisor {
 
     /// Wires lifecycle events to the webview. Called once, from setup, once
     /// the application handle exists; the eager start usually began earlier
-    /// and its `starting` went unheard, which costs nothing -- the webview's
+    /// and its `starting` went unheard, which costs nothing — the webview's
     /// first look is a `status()` call, not an event backlog.
     pub(crate) fn attach_lifecycle_emitter(&self, app: AppHandle) {
         self.set_lifecycle_sink(Box::new(move |event| {
@@ -440,7 +440,7 @@ impl HarnessSupervisor {
 
     /// Emits through the sink, if anyone installed one. Never takes the state
     /// lock, and no sink takes it either, so emitting from inside a locked
-    /// region cannot deadlock -- though callers still emit after unlocking,
+    /// region cannot deadlock — though callers still emit after unlocking,
     /// because a callback that observes half-finished bookkeeping is a bug
     /// waiting for a second subscriber.
     fn emit(&self, event: LifecycleEvent) {
@@ -484,8 +484,8 @@ impl HarnessSupervisor {
         }
         // `pnpm build` in `STUDIO HARNESS/`, not `pnpm --filter project-studio-v2
         // build`. The package is named `project-studio-v2`, but it is not a
-        // member of any workspace this repository defines -- `STUDIO/pnpm-workspace.yaml`
-        // covers `STUDIO/` alone -- so there is nowhere `--filter` resolves it
+        // member of any workspace this repository defines — `STUDIO/pnpm-workspace.yaml`
+        // covers `STUDIO/` alone — so there is nowhere `--filter` resolves it
         // from. Its `build` script is `flue build --target node`, which is what
         // writes `dist/server.mjs`.
         Err("Harness server not found. Run `pnpm build` in `STUDIO HARNESS/` and ensure dist/server.mjs exists.".to_string())
@@ -504,7 +504,7 @@ impl HarnessSupervisor {
     /// Reaps a dead child and reacts to what its death was.
     ///
     /// Nobody watches the child between calls, so death is *observed* through
-    /// the read paths -- every `get_endpoint`, `status`, and `start` looks
+    /// the read paths — every `get_endpoint`, `status`, and `start` looks
     /// first. Observation is where the consequences happen: the failure is
     /// recorded for `status`, the webview is told, and, once per
     /// [`RESTART_WINDOW`], the replacement begins.
@@ -547,7 +547,7 @@ impl HarnessSupervisor {
     /// Starts the Harness, single-flight.
     ///
     /// The previous version held the supervisor lock through spawn plus
-    /// readiness -- up to [`STARTUP_TIMEOUT`] -- so a status call during the
+    /// readiness — up to [`STARTUP_TIMEOUT`] — so a status call during the
     /// eager start blocked on that lock for the whole startup window. The lock
     /// is now taken for bookkeeping only: `starting` marks the flight, the
     /// long work runs without it, and a concurrent caller waits on the condvar
@@ -614,8 +614,8 @@ impl HarnessSupervisor {
             }
 
             // Another caller's spawn is in flight. Wait to inherit its result;
-            // the spawn path always settles -- every stage inside it is bounded
-            // -- so a timeout here means something is wedged beyond all of its
+            // the spawn path always settles — every stage inside it is bounded
+            // — so a timeout here means something is wedged beyond all of its
             // own bounds, which is worth reporting rather than out-staring.
             let (next, settled) = self
                 .shared
@@ -839,8 +839,8 @@ impl HarnessSupervisor {
 
     /// Creates the Node child: environment policy, descriptors, containment.
     ///
-    /// Split out of the old monolithic `spawn_child` so the readiness wait --
-    /// the only slow part -- can run without the supervisor lock. The one step
+    /// Split out of the old monolithic `spawn_child` so the readiness wait —
+    /// the only slow part — can run without the supervisor lock. The one step
     /// that needs it is the Windows job assignment, and that is a few
     /// syscalls; it is also the only reason this is a method rather than a
     /// free function.
@@ -885,7 +885,7 @@ impl HarnessSupervisor {
         //
         // This is the Unix half only, because a process group is the one part
         // of the containment that has to be requested before the spawn. The
-        // Windows half is a Job Object and is joined after it -- see
+        // Windows half is a Job Object and is joined after it — see
         // `ProcessContainment` and the `containment.contain` call below.
         #[cfg(unix)]
         cmd.process_group(0);
@@ -1149,7 +1149,7 @@ impl HarnessSupervisor {
     /// Returns the sentence when the exit was unexpected: nobody asked for it,
     /// so it is a crash, and `status` must be able to say so rather than
     /// reporting `stopped` with nothing. An exit under `expected_exit` is a
-    /// stop landing -- the flag is consumed with the child so it cannot leak
+    /// stop landing — the flag is consumed with the child so it cannot leak
     /// into the next lifecycle.
     fn reap_locked(guard: &mut Inner) -> Option<String> {
         let status = guard
@@ -1188,7 +1188,7 @@ impl HarnessSupervisor {
     /// answers `POST /api/shutdown` by invalidating admission, draining its
     /// MCP servers, and closing both databases; this waits for that with a
     /// bounded patience ([`DRAIN_BOUND`]) and falls back to termination past
-    /// it, loudly -- a silent fallback means the mechanism broke and nobody
+    /// it, loudly — a silent fallback means the mechanism broke and nobody
     /// learned.
     pub fn shutdown_all(&self) {
         // Poison-tolerant, and only here: this runs on the exit path, where
@@ -1218,7 +1218,7 @@ impl HarnessSupervisor {
 
         // Wait for the in-flight spawn to settle so a quit cannot race a
         // Harness into existence behind the app's back. Bounded: past the
-        // bound the process containment -- job object or process group -- is
+        // bound the process containment — job object or process group — is
         // the backstop, which is what it exists for.
         if was_starting {
             let guard = self
@@ -1266,7 +1266,7 @@ impl HarnessSupervisor {
             ),
         }
         // Unconditional sweep, polite path included: the Harness stops its own
-        // MCP servers before exiting, so the group should be empty -- but the
+        // MCP servers before exiting, so the group should be empty — but the
         // cost of checking twice is zero and the cost of an orphan is a port.
         Self::terminate_child(&mut running.child);
 
@@ -1324,7 +1324,7 @@ impl HarnessSupervisor {
 
     /// `POST /api/shutdown` with the per-launch bearer. Reads headers only:
     /// the acknowledgment arrives before the drain, and waiting for EOF would
-    /// wait for the process to die -- turning the ack timeout into a second,
+    /// wait for the process to die — turning the ack timeout into a second,
     /// shorter drain bound with less honesty about which phase stalled.
     fn post_shutdown(endpoint: &HarnessEndpoint, timeout: Duration) -> Result<u16, String> {
         let address = format!("{}:{}", endpoint.host, endpoint.port)
@@ -1402,7 +1402,7 @@ mod tests {
     /// Long text keeps its tail, and does not panic doing it.
     ///
     /// `tail` slices by byte offset, and the text it slices is whatever a child
-    /// process wrote -- a Windows user profile path with a non-ASCII character
+    /// process wrote — a Windows user profile path with a non-ASCII character
     /// in it is ordinary, and landing mid-codepoint would abort the very error
     /// report that was trying to explain a failure.
     #[test]
@@ -1445,7 +1445,7 @@ mod tests {
     ///
     /// Asserted against *this* job rather than "any job", because a child
     /// inherits its parent's job membership on Windows and a test runner is
-    /// often already in one -- so `IsProcessInJob(child, None)` would have been
+    /// often already in one — so `IsProcessInJob(child, None)` would have been
     /// true before this code existed and would have proved nothing.
     #[test]
     #[cfg(windows)]
@@ -1494,7 +1494,7 @@ mod tests {
         (seen, sink)
     }
 
-    /// Where the Harness keeps `studio.db` when nothing overrides the home --
+    /// Where the Harness keeps `studio.db` when nothing overrides the home —
     /// which is every launch this crate makes, because the environment
     /// allowlist deliberately does not pass `PROJECT_STUDIO_HOME`.
     fn studio_wal_path() -> PathBuf {
@@ -1508,7 +1508,7 @@ mod tests {
     }
 
     /// The old shutdown, kept as the contrast case: `TerminateProcess` on
-    /// Windows, SIGKILL on Unix -- no handler runs, nothing is checkpointed.
+    /// Windows, SIGKILL on Unix — no handler runs, nothing is checkpointed.
     fn hard_kill(pid: u32) {
         #[cfg(windows)]
         {
@@ -1736,7 +1736,7 @@ mod tests {
 
         // Wait for the death to be *observed* before waiting for the
         // replacement. The first poll can outrun the kill becoming visible to
-        // `try_wait` -- "running" then describes a corpse, and a test that
+        // `try_wait` — "running" then describes a corpse, and a test that
         // waited for `== "running"` would pass without any restart at all.
         assert!(
             eventually(Duration::from_secs(10), || supervisor.status().state != "running"),
@@ -1786,7 +1786,7 @@ mod tests {
 
     /// The read path must answer during a spawn, not queue behind it. The
     /// poller starts first and samples faster than the spawn can possibly
-    /// progress, so `starting` -- a state that lasts for a whole Node boot --
+    /// progress, so `starting` — a state that lasts for a whole Node boot —
     /// cannot be missed; this is sampling a wide window, not racing one.
     #[test]
     fn status_answers_starting_while_a_spawn_is_in_flight() {

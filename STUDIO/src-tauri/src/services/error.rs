@@ -20,14 +20,14 @@ use crate::harness::supervisor::redact;
 /// `service_fetch`, because a stream can fail after it has begun. A caller
 /// distinguishes three ends:
 ///
-/// - **never started** -- `NotRunning` (no harness), `InvalidPath`,
+/// - **never started** — `NotRunning` (no harness), `InvalidPath`,
 ///   `InvalidRequest`, `StreamRefused` (the server answered, but not with a
 ///   stream: unauthorized above all). Nothing happened; the words are
 ///   "could not start".
-/// - **started and then broke** -- `StreamBroken`, or `Request` when the
+/// - **started and then broke** — `StreamBroken`, or `Request` when the
 ///   transport failed before the first byte. Recoverable by reattaching at
 ///   the last delivered offset; the words are "lost the stream".
-/// - **ended normally** -- not an error at all: `Ok(())`, preceded by an
+/// - **ended normally** — not an error at all: `Ok(())`, preceded by an
 ///   `Ended` event on the channel. The words are "finished".
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -47,7 +47,7 @@ pub enum ServiceError {
     /// protocol it promised.
     ///
     /// Recoverable by reattaching at the last offset a delivered event
-    /// carried -- that offset is why every event has one.
+    /// carried — that offset is why every event has one.
     StreamBroken { message: String },
 }
 

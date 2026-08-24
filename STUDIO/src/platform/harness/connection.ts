@@ -2,8 +2,8 @@
  * Where the harness is, and what proves we may talk to it.
  *
  * This is the ONLY place in STUDIO that decides the source of the harness
- * address and credential. Everything else -- the client, the panes that will
- * use it -- takes them as arguments. That is the point of the module: the
+ * address and credential. Everything else — the client, the panes that will
+ * use it — takes them as arguments. That is the point of the module: the
  * Tauri supervisor landed (tasks 15-19), and this body now asks Rust where
  * the harness is instead of reading configuration.
  *
@@ -14,7 +14,7 @@
  * address. The credential is NOT here and cannot be: no Tauri command returns
  * it any more, because the transport (`service_fetch`, via `transport.ts`)
  * attaches it in Rust. The `credential` field the client's interface requires
- * is filled with `HOST_ATTACHED_CREDENTIAL` -- a marker, not a token. It
+ * is filled with `HOST_ATTACHED_CREDENTIAL` — a marker, not a token. It
  * rides in the client's `Authorization` header only until `service_fetch`
  * replaces that header with the real bearer; if the marker ever reached a
  * harness by mistake it would be refused as an unknown credential, which is
@@ -23,7 +23,7 @@
  * `null` when the supervisor is not running (still starting, failed,
  * stopped): callers treat that as the normal no-harness case and the pane
  * falls back to the built-in catalog. A status the command cannot answer is
- * the same thing rather than an error -- there is no address to use either
+ * the same thing rather than an error — there is no address to use either
  * way, and the hook that calls this has no error state for it to become.
  *
  * The base URL inside Tauri is advisory. It builds the URLs the client hands
@@ -34,7 +34,7 @@
  * ---- Outside Tauri ---------------------------------------------------------
  *
  * A browser has no supervisor, so a harness started by hand is configuration:
- * two Vite env vars, read only where `import.meta.env.DEV` is true --
+ * two Vite env vars, read only where `import.meta.env.DEV` is true —
  * `vite dev`, and vitest. The gate is load-bearing: `import.meta.env` is
  * inlined at build time, so a reference that survived into a production
  * build would bake the value into the shipped bundle. The gate makes the
@@ -50,7 +50,7 @@
  * an error.
  *
  * Two things this module must never become. It must never write either value
- * anywhere -- not the Tauri store, not localStorage -- because a credential
+ * anywhere — not the Tauri store, not localStorage — because a credential
  * that outlives the launch that minted it is a credential someone can steal
  * from a plaintext file. And it must never log the token; the only thing worth
  * saying out loud is whether an address was found.

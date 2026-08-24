@@ -9,7 +9,7 @@ import { useNavigation } from '@/stores/navigation'
  * Settings: one page, one section at a time.
  *
  * This file is layout and routing and nothing else. It does not know what is in
- * a section -- `registry.tsx` resolves that -- and it does not know what the
+ * a section — `registry.tsx` resolves that — and it does not know what the
  * sections are, only that `sections.ts` has a list. It used to know all three,
  * which is how it reached two hundred lines and became the place every new
  * setting was pasted into.

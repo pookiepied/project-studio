@@ -14,7 +14,7 @@ pub use supervisor::{HarnessStatus, HarnessSupervisor};
 /// Serialises the tests that each start a real Harness.
 ///
 /// Not an optimisation. Two Harnesses started concurrently do not fail
-/// loudly -- they hang: measured with three live tests at once, every one
+/// loudly — they hang: measured with three live tests at once, every one
 /// timed out after 30s having printed nothing at all, while each passes alone
 /// in about two seconds. Whatever the shared thing is (the Harness opens a
 /// database on startup, and a second process waiting on it logs nothing

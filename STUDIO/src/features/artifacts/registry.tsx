@@ -12,7 +12,7 @@ import type { Artifact } from '@/domain/artifacts/types'
  * The design this came from had one: a hand-maintained map of about eighty
  * kinds onto ten families, and then families onto components. Every new tool
  * meant editing a table in the middle, and the table was already wrong in
- * places -- `task_action` and `todoist_action` sat in different families for no
+ * places — `task_action` and `todoist_action` sat in different families for no
  * reason anybody could reconstruct. It was indirection that cost a maintenance
  * burden and bought nothing, because the families were never used for anything
  * except picking a component, which is what a map from kind to component does
@@ -29,7 +29,7 @@ const RENDERERS: Readonly<Record<string, Renderer>> = {
   web_research: (artifact) => <WebSearchArtifact artifact={artifact} />,
 
   // Aliases rather than a normalisation step, because the alias list *is* the
-  // knowledge -- hiding it inside a rewrite makes it harder to find, not
+  // knowledge — hiding it inside a rewrite makes it harder to find, not
   // cleaner.
   image_generation: (artifact) => <MediaArtifact artifact={artifact} video={false} />,
   generated_image: (artifact) => <MediaArtifact artifact={artifact} video={false} />,

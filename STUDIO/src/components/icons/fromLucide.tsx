@@ -13,7 +13,7 @@ import { cn } from '@/lib/cn'
  * The hand-drawn set was built on a 16-unit grid so its coordinates landed on
  * whole pixels, which is genuinely the right way to draw for 14px. What it
  * could not do was vary detail with size: every mark painted a ~1.2px stroke
- * whatever it was drawn at, so the dense glyphs -- the gear, the paperclip --
+ * whatever it was drawn at, so the dense glyphs — the gear, the paperclip —
  * closed their own gaps and filled in. A mark whose interior gaps fall below
  * its stroke width is not a drawing problem that can be nudged; it is one glyph
  * being asked to serve two sizes.
@@ -89,7 +89,7 @@ export function fromLucide(Mark: LucideIcon, name: string, variants?: Variants) 
         aria-hidden
         // The motion lives on a wrapper rather than on the SVG's parts. Lucide
         // ships finished components, so there is nothing addressable inside
-        // them -- and everything this app actually animates (a chevron turning,
+        // them — and everything this app actually animates (a chevron turning,
         // retry winding up, the plus becoming a cross) is a transform of the
         // whole mark anyway.
         initial={resolved ? 'rest' : undefined}

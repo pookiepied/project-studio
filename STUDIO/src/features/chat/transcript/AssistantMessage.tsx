@@ -15,7 +15,7 @@ import type { Message } from '@/domain/session/types'
  *
  * The model name sits under the reply rather than above it, in the action row.
  * Above, it is a header you read before every answer; below, it is available
- * the moment you think to ask which model said this -- which is afterwards.
+ * the moment you think to ask which model said this — which is afterwards.
  */
 export function AssistantMessage({
   message,
@@ -58,7 +58,7 @@ export function AssistantMessage({
         {streaming || revealing ? <StreamingCaret /> : null}
       </div>
 
-      {/* Always mounted, never conditional -- and this is the fix for the jump
+      {/* Always mounted, never conditional — and this is the fix for the jump
           at the end of a reply.
 
           It used to be `{streaming ? null : <MessageActions/>}`. So the instant
@@ -69,7 +69,7 @@ export function AssistantMessage({
           was being shoved by a row arriving late.
 
           `MessageActions` already promises to hold its height while hidden and
-          fade rather than mount -- this component was the one place breaking
+          fade rather than mount — this component was the one place breaking
           that promise. Now the space is reserved from the first frame of the
           reply, so when the row appears nothing else moves. `visible` still
           gates it, so a message being written offers no retry button. */}

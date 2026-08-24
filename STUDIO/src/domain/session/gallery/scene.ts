@@ -9,7 +9,7 @@ import type { Artifact } from '@/domain/artifacts/types'
  * The obvious way to demo a lifecycle is to write out the "searching" version
  * and the "found five sources" version and play them in order. That gives you
  * two copies of every artifact to keep in sync, and they drift the first time
- * anyone edits one -- which makes the demo lie about what the renderer does.
+ * anyone edits one — which makes the demo lie about what the renderer does.
  *
  * So there is one description of each artifact, parameterised by its stage, and
  * the scene is rendered from a state object. Advancing the demo means changing
@@ -396,7 +396,7 @@ The window is one rounded panel. There is no tray and no inset, so there is exac
  * Render the whole reply for a given state.
  *
  * Artifacts at `pending` are omitted rather than drawn as empty cards, so the
- * gallery builds up the way a real reply does -- text first, then each object
+ * gallery builds up the way a real reply does — text first, then each object
  * as the model gets to it.
  */
 export function renderScene(state: SceneState): string {

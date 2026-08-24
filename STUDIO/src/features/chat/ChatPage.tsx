@@ -16,8 +16,8 @@ import type { Conversation } from '@/domain/session/types'
  *
  * The composer is the same component and the same measure as on home, so
  * sending the first message moves the field up the screen rather than replacing
- * it with a different one. Nothing about the control changes -- only its
- * position -- which makes the transition read as the room rearranging rather
+ * it with a different one. Nothing about the control changes — only its
+ * position — which makes the transition read as the room rearranging rather
  * than as a new page.
  *
  * Both ends fade into the surface instead of meeting a bar. The strip above and
@@ -30,7 +30,7 @@ import type { Conversation } from '@/domain/session/types'
  * Every ordinary conversation renders LIVE: the transcript is a projection of
  * the harness's event stream (`useConversationTranscript`), and the composer
  * submits to the harness. What the UI shows and what the model receives are
- * two projections of one log here, never derived from each other -- nothing
+ * two projections of one log here, never derived from each other — nothing
  * in the live path reads rendered state to build a request.
  *
  * The artifact gallery is the one exception: its replies are a local demo of
@@ -104,7 +104,7 @@ export function ChatPage({
       {/* Solid for the strip's own height, then a short fade below it.
 
           It used to be one gradient the whole way down, which meant the band
-          holding the identity line was already partly transparent -- so a line
+          holding the identity line was already partly transparent — so a line
           of the transcript sliding underneath showed *through* the project
           name and branch. Two pieces of text occupying the same pixels is not
           a soft edge, it is a collision, and it is worst exactly when the page
@@ -128,7 +128,7 @@ export function ChatPage({
         {/* Behind the composer, not over it.
 
             Without the stacking order stated, the fade painted on top of the
-            field's upper edge -- the composer's outline is a 1px ring in its
+            field's upper edge — the composer's outline is a 1px ring in its
             box-shadow, and a gradient laid over it ate the top of that ring.
             The field looked like it had three sides. The fade's job is to
             dissolve the *transcript*, so it belongs under everything the

@@ -21,7 +21,7 @@ import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
  * languages nobody in it will open.
  *
  * Adding one is an import and a register line. Anything unregistered still
- * renders -- it just renders unhighlighted, which is the correct failure.
+ * renders — it just renders unhighlighted, which is the correct failure.
  */
 const GRAMMARS: Record<string, unknown> = {
   bash,

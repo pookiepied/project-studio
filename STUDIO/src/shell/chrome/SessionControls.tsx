@@ -5,7 +5,7 @@ import { Tooltip } from '@/components/primitives'
  *
  * A ring, and not drawn at all below the threshold. A meter that is always
  * present is a number the user is invited to watch, and watching it is never
- * the work -- for most of a conversation the honest reading is "this is not
+ * the work — for most of a conversation the honest reading is "this is not
  * something you need to think about", and the honest way to render that is
  * nothing. It appears at 60%: early enough to change what you do next, late
  * enough to be news.

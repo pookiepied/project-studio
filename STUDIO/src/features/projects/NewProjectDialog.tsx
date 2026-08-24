@@ -15,7 +15,7 @@ import { cn } from '@/lib/cn'
  * something the agent can actually work in, and the form says so by refusing to
  * submit without at least one.
  *
- * The picker is demo-only in this build -- it appends a plausible path rather
+ * The picker is demo-only in this build — it appends a plausible path rather
  * than opening the OS dialog, because the real one is a Tauri capability that
  * belongs with the harness work. The shape of what it produces is real, so
  * swapping it is one function.

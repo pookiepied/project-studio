@@ -26,7 +26,7 @@ import { newId } from '@/lib/id'
  * One store, because they are one graph: a conversation belongs to a project, a
  * message belongs to a conversation, and the turn settings decide what the next
  * message does. Splitting them into a provider each is the shape that made the
- * previous shell hard to follow -- four contexts describing one surface means
+ * previous shell hard to follow — four contexts describing one surface means
  * four places to look when the surface is wrong.
  *
  * Navigation is deliberately *not* here. Where the user is looking is a
@@ -57,7 +57,7 @@ interface WorkspaceValue {
    * `status` is a single value describing *the one you are looking at*, which
    * was fine while a turn could only run in the foreground. It cannot answer
    * "is anything happening in the other three", and that is the question the
-   * sidebar has to answer -- so this is a set rather than another flag.
+   * sidebar has to answer — so this is a set rather than another flag.
    */
   readonly running: ReadonlySet<string>
   readonly settings: TurnSettings
@@ -90,7 +90,7 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // A detached window opens with the workspace as its opening window saw it,
-  // not with the demo seed -- the conversation it was opened for may be one
+  // not with the demo seed — the conversation it was opened for may be one
   // the seed has never heard of. Read once for the life of the window: the
   // snapshot was written at the moment of opening (see `useDetachConversation`)
   // and is a birth certificate, not a subscription.
@@ -122,7 +122,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
    * One conversation in the demo set is the artifact gallery, and replying in
    * it plays every artifact through its stages instead of typing a canned
    * paragraph. Deciding that here rather than inside the runner keeps both
-   * runners ignorant of each other and of conversation ids -- and it is the
+   * runners ignorant of each other and of conversation ids — and it is the
    * single seam a real transport replaces, since `run` is the only thing the
    * four call sites below know about.
    */
@@ -151,7 +151,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setStatus('idle')
   }, [cancel])
 
-  // -- Projects ----------------------------------------------------------
+  // — Projects ----------------------------------------------------------
 
   const createProject = useCallback((input: NewProjectInput): Project => {
     const project: Project = {
@@ -186,7 +186,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
-  // -- Turns -------------------------------------------------------------
+  // — Turns -------------------------------------------------------------
 
   const send = useCallback(
     (conversationId: string | null, text: string, projectId: string | null): string => {
@@ -340,7 +340,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [conversations],
   )
 
-  // -- Conversation records ---------------------------------------------
+  // — Conversation records ---------------------------------------------
 
   const rename = useCallback(
     (conversationId: string, title: string) => {

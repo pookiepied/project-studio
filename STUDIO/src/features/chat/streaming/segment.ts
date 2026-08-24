@@ -5,7 +5,7 @@
  *
  * The first is cost. Re-parsing a whole reply's markdown on every frame is
  * quadratic in the length of the reply, and it is felt exactly where it hurts
- * most -- the end of a long answer, where the reader is already invested. But
+ * most — the end of a long answer, where the reader is already invested. But
  * text only ever grows at the tail, so everything before the last block is
  * finished and will never change again. Parsed once and memoised, it costs
  * nothing on subsequent frames, and only the block being written is re-parsed.
@@ -65,7 +65,7 @@ function kindOf(line: string): Kind {
  * Close an unterminated fence.
  *
  * This is the fix for code blocks arriving with a jump. While a fence is open
- * the document is, to a markdown parser, an unclosed block -- and parsers vary
+ * the document is, to a markdown parser, an unclosed block — and parsers vary
  * on what that means mid-document. The visible result is the worst kind of
  * layout change: several lines render as paragraph text, then the closing
  * backticks arrive and the same lines are suddenly a bordered, monospaced,

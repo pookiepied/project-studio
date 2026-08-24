@@ -3,7 +3,7 @@
 //! ADR 0045 is the specification: a run outlives the window that started it,
 //! so the desktop app re-reads a run at an offset rather than holding a
 //! connection as the thing that keeps it alive. This command is the reading
-//! half -- the Durable Streams reader at `GET /agents/:name/:id`, resumed
+//! half — the Durable Streams reader at `GET /agents/:name/:id`, resumed
 //! with `?offset=<x>&live=sse`, delivered to the webview over a channel as
 //! it happens.
 //!
@@ -21,7 +21,7 @@
 //!   frame from the harness advances it. Resume is a replay from the last
 //!   reported offset, never a skip past an unacknowledged event.
 //! - **A stream is bounded by idleness, not by age.** The harness heartbeats
-//!   every 15s with comment lines -- bytes that complete no frame -- so a
+//!   every 15s with comment lines — bytes that complete no frame — so a
 //!   read that stays silent past [`READ_IDLE_TIMEOUT`] is a dead or frozen
 //!   server, while a healthy stream can run for hours. A total timeout,
 //!   like `service_fetch`'s 30s, would make every long turn a failure.
@@ -29,11 +29,11 @@
 //!   carry no notification from the webview to Rust; the only signal is a
 //!   send failing, which it does once the webview was destroyed. Sending
 //!   [`CHANNEL_HEARTBEAT`] regularly bounds how long an unread stream keeps
-//!   its connection open to that discovery -- the backstop, bounded by
+//!   its connection open to that discovery — the backstop, bounded by
 //!   idleness. The prompt path is deliberate: the webview names the stream
 //!   when it starts it and cancels it through [`StreamRegistry`]
 //!   (`stream_control.rs`) while the session is still alive, which is the
-//!   routine case -- switching conversations, closing a pane -- and cannot
+//!   routine case — switching conversations, closing a pane — and cannot
 //!   wait fifteen seconds for a heartbeat to notice anything.
 
 use std::sync::Arc;
@@ -90,7 +90,7 @@ const CHANNEL_HEARTBEAT: Duration = Duration::from_secs(15);
 ///
 /// The value is where to re-read from, not where the event was stored: it is
 /// the last offset the stream reported, so resuming replays this event
-/// rather than skipping it. Replay is the safe direction -- the store's
+/// rather than skipping it. Replay is the safe direction — the store's
 /// reads are by offset and its appends are idempotent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -117,7 +117,7 @@ pub enum StreamEvent {
 
 /// What the body-reader task reports upward. The terminal states are exactly
 /// two: the body ended, or the transport failed. Which of those means
-/// "broken" is decided above this type, by the close frame -- not here,
+/// "broken" is decided above this type, by the close frame — not here,
 /// where the body is bytes and the protocol is not yet parsed.
 enum BodyChunk {
     Bytes(Vec<u8>),
@@ -146,8 +146,8 @@ enum Outcome {
 
 /// What delivering one frame did.
 ///
-/// `Err` is the stream broken by protocol violation -- a `control` frame
-/// that is not the protocol -- and carries the message for `StreamBroken`.
+/// `Err` is the stream broken by protocol violation — a `control` frame
+/// that is not the protocol — and carries the message for `StreamBroken`.
 /// A gone reader is `Ok(Delivery::ReaderGone)`: nothing is wrong with the
 /// stream, only with its audience.
 enum Delivery {
@@ -215,7 +215,7 @@ pub async fn service_stream(
 /// A closed signal source counts as cancelled too: the registry drops a
 /// sender when its entry is released or overwritten, and a stream whose
 /// registration is gone has no business still reading. Used in both selects
-/// -- the connect and the consume loop -- so there is no phase of a stream
+/// — the connect and the consume loop — so there is no phase of a stream
 /// where cancellation waits on the harness instead of the user.
 async fn cancelled(cancel: &mut watch::Receiver<bool>) {
     let _ = cancel.changed().await;
@@ -297,7 +297,7 @@ pub(crate) async fn harness_stream(
     // because the loop must also watch a heartbeat and an idle deadline.
     // Awaiting `chunk()` directly inside `select!` would rely on its
     // cancellation safety across a drop; a task with a channel does not rely
-    // on anything -- aborting the task drops the response, and dropping the
+    // on anything — aborting the task drops the response, and dropping the
     // response is what cancels the HTTP request.
     let (chunks_tx, mut chunks_rx) = tokio::sync::mpsc::channel::<BodyChunk>(8);
     let reader_token = endpoint.token.clone();
@@ -414,15 +414,15 @@ pub(crate) async fn harness_stream(
         Outcome::Closed => Ok(()),
         Outcome::ReaderGone => {
             // Nothing is wrong with the stream; its consumer is gone. There
-            // is nobody to tell, so this is a log line, not an error -- and
+            // is nobody to tell, so this is a log line, not an error — and
             // not a silent `Ok(())` either, which would be indistinguishable
             // from a finished run in any future diagnostic that counted them.
             log::debug!("service_stream: the channel stopped accepting; request cancelled");
             Ok(())
         }
         Outcome::Cancelled => {
-            // Same audience problem as `ReaderGone` -- the canceller asked
-            // for exactly this -- but a different fact worth being able to
+            // Same audience problem as `ReaderGone` — the canceller asked
+            // for exactly this — but a different fact worth being able to
             // tell apart in the logs: this session ended its own stream,
             // which is routine (a conversation switch), not a death.
             // Reattaching is the caller's business; the offset it needs was
@@ -434,7 +434,7 @@ pub(crate) async fn harness_stream(
             // The server closed the connection without the close frame that
             // ends a finished run, so this is a break, not an end. Frames
             // that completed before the wire went quiet are real and are
-            // delivered first -- with their offsets, so the reattach this
+            // delivered first — with their offsets, so the reattach this
             // error asks for starts from the last one.
             match parser.finish() {
                 Ok(frames) => {
@@ -463,8 +463,8 @@ pub(crate) async fn harness_stream(
 
 /// Classifies and delivers one parsed frame.
 ///
-/// `control` frames are the harness talking about the stream -- the next
-/// offset, whether the reader is live, whether the run is over -- and are
+/// `control` frames are the harness talking about the stream — the next
+/// offset, whether the reader is live, whether the run is over — and are
 /// consumed here rather than forwarded: their facts reach the webview as the
 /// offset on every event and as `UpToDate`/`Ended`. Everything else is the
 /// run itself, and goes through untouched.
@@ -512,8 +512,8 @@ fn deliver(
         }
     } else if !now_up_to_date {
         // Behind the tail again after having been live: new events are being
-        // replayed into the stream. No event for this direction -- frames
-        // arriving says it -- but the transition must re-arm so a later
+        // replayed into the stream. No event for this direction — frames
+        // arriving says it — but the transition must re-arm so a later
         // catch-up is reported again.
         *up_to_date = false;
     }
@@ -536,7 +536,7 @@ fn deliver(
 /// and `live=sse` unless the caller chose a live mode themselves.
 ///
 /// The offset is this command's to add, so a path that already carries one
-/// is refused rather than sent -- the reader would reject two, and the error
+/// is refused rather than sent — the reader would reject two, and the error
 /// would name the wrong layer. A fragment is refused for the same reason:
 /// anything appended after `#` is not query, and the offset would silently
 /// join the fragment instead of the request.
@@ -634,8 +634,8 @@ mod tests {
     const NO_HEARTBEAT: Duration = Duration::from_secs(600);
 
     /// A cancellation receiver nobody will ever fire, for the tests that are
-    /// about some other outcome. The sender comes back too so the scope --
-    /// not the registry -- decides how long the stream can be cancelled.
+    /// about some other outcome. The sender comes back too so the scope —
+    /// not the registry — decides how long the stream can be cancelled.
     fn uncancelled() -> (watch::Sender<bool>, watch::Receiver<bool>) {
         watch::channel(false)
     }
@@ -659,7 +659,7 @@ mod tests {
     /// std rather than a test-server crate: the responses these tests need
     /// are a head, some frames, a pause and a close, and owning the socket
     /// is what makes "the server observed the disconnect" assertable at
-    /// all -- a real HTTP framework would have to be asked for that.
+    /// all — a real HTTP framework would have to be asked for that.
     ///
     /// After `script` returns, the stub keeps writing SSE comment lines
     /// until the client goes away, and records that it noticed. Comments
@@ -883,7 +883,7 @@ mod tests {
     async fn events_arrive_incrementally_not_in_one_batch_at_the_end() {
         // The server records when it wrote the second frame; the client
         // records when each event was delivered. Delivering the first before
-        // the second was even written is the thing being asserted -- a
+        // the second was even written is the thing being asserted — a
         // buffered implementation cannot pass it.
         let second_write = Arc::new(Mutex::new(None::<Instant>));
         let second_write_here = second_write.clone();
@@ -1413,7 +1413,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_cancel_that_arrives_while_connecting_does_not_wait_for_the_harness() {
-        // Accepts and then says nothing -- no response head at all -- so the
+        // Accepts and then says nothing — no response head at all — so the
         // connect phase itself hangs until the cancel lands. A stub framework
         // is not used here because the probe comments it writes before any
         // head would themselves be a malformed HTTP answer.

@@ -127,7 +127,7 @@ const providerConnectionLanguageSchema = v.object({
    * Separate from `id` because they answer different questions. `id` is the
    * user's name for *this connection*; this is the vendor whose model list
    * applies to it. Collapsing them makes two accounts with the same vendor
-   * impossible -- two OpenAI keys would both have to be called "openai" --
+   * impossible — two OpenAI keys would both have to be called "openai" —
    * and makes a connection named "work-openai" silently produce no models.
    *
    * Undefined means a provider the built-in catalog has never heard of, which
@@ -158,7 +158,7 @@ const providerConnectionMediaSchema = v.object({
    * Separate from `id` because they answer different questions. `id` is the
    * user's name for *this connection*; this is the vendor whose model list
    * applies to it. Collapsing them makes two accounts with the same vendor
-   * impossible -- two OpenAI keys would both have to be called "openai" --
+   * impossible — two OpenAI keys would both have to be called "openai" —
    * and makes a connection named "work-openai" silently produce no models.
    *
    * Undefined means a provider the built-in catalog has never heard of, which
@@ -189,7 +189,7 @@ const providerConnectionRetrievalSchema = v.object({
    * Separate from `id` because they answer different questions. `id` is the
    * user's name for *this connection*; this is the vendor whose model list
    * applies to it. Collapsing them makes two accounts with the same vendor
-   * impossible -- two OpenAI keys would both have to be called "openai" --
+   * impossible — two OpenAI keys would both have to be called "openai" —
    * and makes a connection named "work-openai" silently produce no models.
    *
    * Undefined means a provider the built-in catalog has never heard of, which

@@ -8,7 +8,7 @@ import { isWorking, type Artifact } from '@/domain/artifacts/types'
  *
  * This is the most important file in the folder, which is not obvious. Every
  * other renderer here is a nicety for a kind we happened to design; this one
- * decides what happens for every kind we have not -- which, over the life of a
+ * decides what happens for every kind we have not — which, over the life of a
  * harness that keeps growing tools, is most of them.
  *
  * The failure it prevents is the one where a new tool ships, the client does

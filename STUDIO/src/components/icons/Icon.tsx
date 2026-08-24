@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn'
  * sticker sheet at 14px: the marks are round, evenly weighted and slightly too
  * small inside their own box, so they float rather than sit on the baseline.
  *
- * System icon sets are drawn the other way round -- for one size, on that
+ * System icon sets are drawn the other way round — for one size, on that
  * size's pixel grid. That is the whole difference, and it cannot be recovered
  * by picking better names out of a library.
  *
@@ -46,7 +46,7 @@ import { cn } from '@/lib/cn'
  *
  * Hover and press are not set on the icon. They arrive from the control that
  * owns it through `IconStateProvider`, which is why the mark reacts to the
- * whole 28px button rather than to the 14px glyph -- the difference between a
+ * whole 28px button rather than to the 14px glyph — the difference between a
  * control that feels alive and one with a small dead hitbox in the middle.
  *
  * That context is deliberate rather than incidental. Framer will propagate a
@@ -54,7 +54,7 @@ import { cn } from '@/lib/cn'
  * on it here does not work: a node only joins the variant tree if it has
  * `variants` of its own, so an icon whose motion lives on its parts silently
  * drops the label before it reaches them. It fails by doing nothing, which is
- * the worst way for an interaction to fail -- everything types, builds and
+ * the worst way for an interaction to fail — everything types, builds and
  * renders, and the interface is simply dead under the cursor. An explicit
  * context has one behaviour and can be tested.
  *
@@ -72,8 +72,8 @@ export type IconState = 'rest' | 'hover' | 'press' | 'on' | 'live'
 /**
  * How a control tells the marks inside it what is happening.
  *
- * Anything can drive icon motion by wrapping its children in this -- a row, a
- * menu item, a card -- not only `IconButton`. That matters because the reactive
+ * Anything can drive icon motion by wrapping its children in this — a row, a
+ * menu item, a card — not only `IconButton`. That matters because the reactive
  * area should be whatever the user perceives as the control, and that is
  * usually larger than the button element.
  */
@@ -94,7 +94,7 @@ interface PartMotion {
   readonly origin?: string
 }
 
-/** A glyph is data, not markup -- see `assertUnique` in the registry. */
+/** A glyph is data, not markup — see `assertUnique` in the registry. */
 export interface Glyph {
   /** Stroked paths. */
   readonly p?: readonly string[]
@@ -121,7 +121,7 @@ export interface IconProps extends Omit<SVGMotionProps<SVGSVGElement>, 'ref' | '
    * Defaults to `text`: sized from whatever text the mark sits in.
    *
    * The named steps exist for marks with no text beside them. Reach for one
-   * only in that case -- passing a step next to a label is how the pairing
+   * only in that case — passing a step next to a label is how the pairing
    * drifts, and it drifted badly: nearly every icon in the app had been pinned
    * to `xs` regardless of its surroundings, so a 12px mark sat beside 13px text
    * everywhere and the interface read as undersized throughout.
@@ -131,8 +131,8 @@ export interface IconProps extends Omit<SVGMotionProps<SVGSVGElement>, 'ref' | '
    * Drives the glyph's own state.
    *
    * Left undefined the icon inherits hover and press from the control around
-   * it. Setting it means this glyph has a state of its own -- a menu that is
-   * open, a model that is thinking -- and that state outranks the pointer.
+   * it. Setting it means this glyph has a state of its own — a menu that is
+   * open, a model that is thinking — and that state outranks the pointer.
    */
   state?: IconState
 }
@@ -141,7 +141,7 @@ export interface IconProps extends Omit<SVGMotionProps<SVGSVGElement>, 'ref' | '
  * How much larger than its text a mark should be.
  *
  * A glyph is mostly negative space and an icon is a solid mark, so at equal
- * nominal size the icon reads bigger -- but at equal *painted* size it reads
+ * nominal size the icon reads bigger — but at equal *painted* size it reads
  * smaller, because the letter beside it has ascenders and descenders using the
  * full em while the icon sits inside a square. About a tenth over is where the
  * two stop competing.
@@ -150,18 +150,18 @@ export interface IconProps extends Omit<SVGMotionProps<SVGSVGElement>, 'ref' | '
  * of the text an icon sits in rather than a number chosen at each call site.
  * Put a mark next to caption text and it is caption-sized; put the same mark in
  * a heading and it grows to match. Nothing to remember and nothing to keep in
- * sync -- see the note on `IconSize` for what the alternative cost us.
+ * sync — see the note on `IconSize` for what the alternative cost us.
  */
 const TEXT_RELATIVE = '1.1em'
 
 /**
- * Absolute steps, for marks that are *not* beside text -- an icon alone in a
+ * Absolute steps, for marks that are *not* beside text — an icon alone in a
  * square button, a mark in a rail.
  *
  * They resolve to the `--icon-*` variables, which derive from `--ui-size`, so
  * a standalone mark moves with the size preference exactly as a text-paired
  * one does. The old table was fixed px, and at every setting but the default
- * the two kinds of mark sat at different offsets from each other -- which is
+ * the two kinds of mark sat at different offsets from each other — which is
  * how a page of labelled rows and a page of round controls came to disagree
  * about how big a mark is.
  */
@@ -172,7 +172,7 @@ const TEXT_RELATIVE = '1.1em'
  *
  * Without this, animating to a label a glyph has no entry for leaves the shape
  * wherever it happened to be. A trash lid hovered, then pressed, would stay
- * tilted after the pointer left -- the icon would slowly accumulate poses. Each
+ * tilted after the pointer left — the icon would slowly accumulate poses. Each
  * missing state falling back to `rest` means every glyph always has somewhere
  * definite to return to.
  */
@@ -195,15 +195,15 @@ function complete(v: Variants | undefined): Variants {
  * This is the bug that made per-part icon motion look impossible for three
  * attempts. `fill-box` resolves against the shape's own bounding box, and a
  * horizontal `<line>` has a bounding box of zero height. A degenerate box is not
- * an error in Chromium -- the transform is simply dropped, silently, with the
+ * an error in Chromium — the transform is simply dropped, silently, with the
  * shape left at its authored coordinates. So the panel toggle's inner divider
  * sat at `matrix(1,0,0,1,-2.1,0)` in every state no matter what variant reached
  * it, and every fix aimed at the variant plumbing was aimed at the wrong thing:
  * the label was arriving correctly the whole time and being discarded by the
  * layout box.
  *
- * A line therefore transforms against the `view-box` -- the 16-unit grid the
- * glyph is drawn on -- which always has area. Closed shapes keep `fill-box`,
+ * A line therefore transforms against the `view-box` — the 16-unit grid the
+ * glyph is drawn on — which always has area. Closed shapes keep `fill-box`,
  * because a trash lid has to hinge at its own left end and that is only
  * expressible relative to the shape itself.
  */
@@ -226,7 +226,7 @@ type Parts = Readonly<Record<string, { readonly v: Variants; readonly style: Ret
 function prepareParts(glyph: Glyph): Parts {
   const out: Record<string, { v: Variants; style: ReturnType<typeof partStyle> }> = {}
   for (const [key, m] of Object.entries(glyph.parts ?? {})) {
-    // The key names the list a shape came from -- `l2` is the third line -- so
+    // The key names the list a shape came from — `l2` is the third line — so
     // the shape's kind is already encoded and does not have to be declared.
     const kind: ShapeKind = key.startsWith('l') ? 'line' : 'closed'
     out[key] = { v: complete(m.v), style: partStyle(m.origin, kind) }
@@ -240,8 +240,8 @@ function prepareParts(glyph: Glyph): Parts {
  * Framer will propagate a variant label from a parent to children that declare
  * their own `variants`, and relying on that here did not work: the label
  * reached the root <svg> and stopped, so a glyph whose motion lives entirely in
- * its parts sat at `rest` for ever. It failed silently -- correct types, no
- * warning, a mark that simply never moved -- which is the worst way for an
+ * its parts sat at `rest` for ever. It failed silently — correct types, no
+ * warning, a mark that simply never moved — which is the worst way for an
  * interaction to fail. Passing `animate` to each part costs one prop and cannot
  * fail quietly.
  */

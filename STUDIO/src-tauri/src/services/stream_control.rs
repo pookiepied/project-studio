@@ -3,8 +3,8 @@
 //! The stream's own module (`stream.rs`) documents why a Tauri channel cannot
 //! carry a signal from the webview back to Rust: the only built-in discovery
 //! of a gone reader is a send failing, and that happens once the webview is
-//! destroyed. Within one live session -- the user switches conversations,
-//! closes a pane, navigates away -- nothing bounded how long the old read kept
+//! destroyed. Within one live session — the user switches conversations,
+//! closes a pane, navigates away — nothing bounded how long the old read kept
 //! its HTTP connection open. This module is the prompt path: the webview names
 //! its stream with an id when it starts one, and asks Rust to cancel that id
 //! when it is done with it.
@@ -13,7 +13,7 @@
 //!
 //! - **Prompt, not eventually.** The registry hands the stream a `watch`
 //!   receiver that sits in the consume loop's `select!`, so a cancel wakes the
-//!   loop immediately -- not at the next heartbeat, and not after
+//!   loop immediately — not at the next heartbeat, and not after
 //!   [`READ_IDLE_TIMEOUT`](super::stream::READ_IDLE_TIMEOUT).
 //! - **Idempotent, not fussy.** Cancelling an unknown id (never registered),
 //!   a finished stream (already released), or the same stream twice removes
@@ -21,8 +21,8 @@
 //!   have to track which cancels "count".
 //! - **No graves.** An entry lives exactly as long as its registration: the
 //!   registration's `Drop` unregisters it if the stream ended on its own
-//!   first, so every exit path -- including the ones that leave through an
-//!   error -- cleans up. And registering over a live id signals the previous
+//!   first, so every exit path — including the ones that leave through an
+//!   error — cleans up. And registering over a live id signals the previous
 //!   reader outright, so two streams cannot accumulate behind one id.
 
 use std::collections::HashMap;
@@ -112,7 +112,7 @@ impl StreamRegistry {
 /// Keeps one stream's registry entry alive until dropped or cancelled.
 ///
 /// Held by `service_stream` across the whole request. Dropping it releases the
-/// entry -- that is the path by which streams that end on their own leave
+/// entry — that is the path by which streams that end on their own leave
 /// nothing behind, including exits through a broken transport or a refused
 /// request, where an explicit cleanup call would be easy to forget.
 pub(crate) struct StreamRegistration {

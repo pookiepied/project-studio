@@ -25,8 +25,8 @@ import {
  * ---- The four states -------------------------------------------------------
  *
  * They are a tagged union rather than three booleans because each one renders
- * as a different page, and the combinations booleans allow -- loading *and*
- * failed, ready *and* no harness -- are not states this feature has.
+ * as a different page, and the combinations booleans allow — loading *and*
+ * failed, ready *and* no harness — are not states this feature has.
  *
  * `no-harness` is the one to be careful with. It is not an error and must not
  * be drawn as one: no harness configured is the app's shipped behaviour today
@@ -38,7 +38,7 @@ import {
  * An API key. It never enters this file. `create` takes a draft that may carry
  * one, hands it to the client, and keeps no reference; the value lives in the
  * dialog's own state and dies when the dialog unmounts. Nothing here is
- * persisted anywhere -- not the Tauri store, not localStorage. There is
+ * persisted anywhere — not the Tauri store, not localStorage. There is
  * nothing to persist: the harness is the store, and it never returns a key.
  */
 
@@ -75,7 +75,7 @@ export interface Connections {
  *
  * A function rather than a client, because deciding there is no harness is
  * itself one of the four states and has to be reachable from the same seam.
- * Whatever is passed must be stable across renders -- it is an effect
+ * Whatever is passed must be stable across renders — it is an effect
  * dependency.
  */
 export type HarnessConnect = () => Promise<HarnessClient | null>
@@ -88,8 +88,8 @@ export async function connectToHarness(): Promise<HarnessClient | null> {
 /**
  * What a mutation answers with when there is no client at all.
  *
- * It should be unreachable -- every control that mutates is only rendered in
- * the `ready` state -- but a mutation has to return something, and returning a
+ * It should be unreachable — every control that mutates is only rendered in
+ * the `ready` state — but a mutation has to return something, and returning a
  * failure the UI already knows how to draw beats inventing a fifth case or
  * throwing into a component that has no boundary.
  */
@@ -159,8 +159,8 @@ export function useConnections(connect: HarnessConnect = connectToHarness): Conn
    * Runs a mutation and re-reads on success.
    *
    * The re-read is not an optimisation to remove later. The harness owns
-   * derived facts this side cannot compute -- the credential status after a
-   * key is stored, the model list a new connection resolves to -- so patching
+   * derived facts this side cannot compute — the credential status after a
+   * key is stored, the model list a new connection resolves to — so patching
    * the local array would show a record that disagrees with the one on disk.
    */
   const mutate = useCallback(

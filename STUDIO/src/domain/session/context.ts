@@ -11,7 +11,7 @@ import type { Conversation } from '@/domain/session/types'
  * were wrong with that, and the second is the one that showed.
  *
  * A stored figure can disagree with the messages it claims to describe. Edit a
- * turn, fork, retry, delete a reply -- the transcript changes and the number
+ * turn, fork, retry, delete a reply — the transcript changes and the number
  * does not, because nothing recomputes it. It only ever went up.
  *
  * And seeding it meant every conversation in the demo opened above the

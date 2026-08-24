@@ -7,8 +7,8 @@ import { cn } from '@/lib/cn'
  *
  * A flat strip of tabs works until about six, and then stops: the labels shrink
  * past reading, the strip scrolls sideways, and finding the thing you opened
- * two minutes ago means dragging through it. Artifacts arrive in bursts -- a
- * single coding turn can produce five -- so six is a normal afternoon, not an
+ * two minutes ago means dragging through it. Artifacts arrive in bursts — a
+ * single coding turn can produce five — so six is a normal afternoon, not an
  * edge case.
  *
  * So entries are grouped by the conversation that produced them, and the group

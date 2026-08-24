@@ -23,7 +23,7 @@ import { asIdentity, type ProbeIdentity } from "./identity.js";
  * command inside it. That composes with `bwrap` rather than replacing it:
  *
  * ```
- * pasta --config-net … -- sh -c <setup> sh  bwrap --unshare-all --share-net … -- child
+ * pasta --config-net … — sh -c <setup> sh  bwrap --unshare-all --share-net … — child
  * ```
  *
  * `--share-net` still says "share the parent's network namespace" — the parent is

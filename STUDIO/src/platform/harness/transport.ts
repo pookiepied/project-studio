@@ -9,7 +9,7 @@ import { isTauri } from '@/platform/tauri'
  * The harness serves no CORS headers. That is deliberate on its side and
  * should stay that way: it is a loopback service holding provider credentials,
  * and a service like that has no business being reachable by any origin a
- * browser is willing to preflight. An allow-list would not fix it either --
+ * browser is willing to preflight. An allow-list would not fix it either —
  * an allow-list is a config value, and config values get widened to `*` during
  * one debugging session and never narrowed again.
  *
@@ -21,8 +21,8 @@ import { isTauri } from '@/platform/tauri'
  *
  * Inside Tauri the request therefore leaves through the service seam: the
  * `service_fetch` command in `src-tauri/src/services.rs`. The webview sends a
- * service id and a path -- never a URL it chose, never a credential it holds
- * -- and Rust resolves the address from the supervisor, attaches the bearer
+ * service id and a path — never a URL it chose, never a credential it holds
+ * — and Rust resolves the address from the supervisor, attaches the bearer
  * the supervisor minted, and refuses any path that could steer the request
  * off the harness's origin. This is also why the client's `Authorization`
  * header is inert here: Rust replaces it, so the placeholder the connection
@@ -107,7 +107,7 @@ function toError(value: unknown): Error {
  *
  * The client builds `baseUrl + path` because its seam is `fetch`, which takes
  * a URL; this takes the path back out because the other side of the seam
- * refuses URLs on purpose. The origin here is advisory only -- if the harness
+ * refuses URLs on purpose. The origin here is advisory only — if the harness
  * restarted since the address was resolved, Rust sends this path to the new
  * endpoint with the new credential, which is the correct request.
  *
@@ -130,7 +130,7 @@ function servicePath(input: RequestInfo | URL): string {
  *
  * An `Error` with the `AbortError` name rather than a `DOMException`, because
  * consumers branch on `name` and on `instanceof Error` (as `toError` below
- * does), and the two disagree in some environments -- jsdom's DOMException,
+ * does), and the two disagree in some environments — jsdom's DOMException,
  * for one, is not an `Error` instance. Nothing anywhere checks for
  * `instanceof DOMException`.
  */
@@ -143,8 +143,8 @@ function abortError(): Error {
 /**
  * Stops waiting when the signal fires, exactly as `fetch` does.
  *
- * The invoke underneath cannot be cancelled from JS -- the command runs to
- * completion in Rust, bounded by its own timeout -- but the client's timeout
+ * The invoke underneath cannot be cancelled from JS — the command runs to
+ * completion in Rust, bounded by its own timeout — but the client's timeout
  * only works if this side stops waiting, and an `AbortError` is how `fetch`
  * says "the caller gave up" rather than "the other end is gone". `client.ts`
  * reads the difference (`timedOut`).
@@ -209,8 +209,8 @@ async function throughServiceSeam(input: RequestInfo | URL, init?: RequestInit):
   const responseHeaders = new Headers()
   for (const [name, value] of serialized.headers) responseHeaders.append(name, value)
 
-  // A null-body status cannot be given even an empty string -- the `Response`
-  // constructor throws -- and a 204 (the DELETE reply) is routine here.
+  // A null-body status cannot be given even an empty string — the `Response`
+  // constructor throws — and a 204 (the DELETE reply) is routine here.
   const body = serialized.body === '' ? null : serialized.body
   return new Response(body, {
     status: serialized.status,

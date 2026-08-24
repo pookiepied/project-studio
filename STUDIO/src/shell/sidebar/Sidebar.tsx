@@ -24,7 +24,7 @@ import { cn } from '@/lib/cn'
  * cannot show a conversation title, so it shows marks whose meaning has to be
  * learned, and it leaves the app with two navigation surfaces that disagree
  * about how much they will tell you. Collapsing to a strip of unexplained
- * glyphs is not a quieter interface -- it is the same interface with the words
+ * glyphs is not a quieter interface — it is the same interface with the words
  * removed.
  *
  * Closed, the window is the conversation and nothing else, which is the point
@@ -41,8 +41,8 @@ import { cn } from '@/lib/cn'
  * ---- Why the inner column is a fixed width -------------------------------
  *
  * The `aside` animates its width; the column inside keeps its own. Without
- * that, every row would reflow on each frame of the animation -- titles
- * re-truncating, rows re-wrapping -- which is both visibly noisy and the
+ * that, every row would reflow on each frame of the animation — titles
+ * re-truncating, rows re-wrapping — which is both visibly noisy and the
  * expensive kind of layout work. Fixed inside a clipping parent means the
  * column is simply revealed, and nothing inside it is asked to re-measure.
  */
@@ -101,7 +101,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         // animates its width, so the page is genuinely narrower while it is
         // open. Narrow, it leaves the flow entirely and slides over the page,
         // because 236px out of a 620px window leaves the transcript thinner
-        // than the sidebar beside it -- a split that makes the conversation the
+        // than the sidebar beside it — a split that makes the conversation the
         // smaller half of its own screen.
         animate={
           compact
@@ -110,13 +110,13 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         }
         transition={SPRING_PANEL}
         // The border goes with the width when it collapses: left on, a closed
-        // sidebar leaves a 1px rule down the edge of the window -- the ghost of
+        // sidebar leaves a 1px rule down the edge of the window — the ghost of
         // a panel that is supposed to be gone. Floating, it always has an edge,
         // because it always has content beside it.
         // Only while floating. Resident, the sidebar has no edge of its own:
         // the page's rounded corner is the edge, and the sunken ground shows
         // through the notch it cuts. A hairline there drew a straight rule
-        // across the arc -- the corner rounded on one side of the line and the
+        // across the arc — the corner rounded on one side of the line and the
         // panel stopped square on the other, which is the "it is round but the
         // sidebar does not follow it" seam. Floating over the page it still
         // needs one, because then it genuinely is a separate object.
@@ -137,13 +137,13 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         style={{ width: SHELL.sidebar.expandedWidth }}
       >
         {/* The brand: mark and wordmark, occupying the top strip's own band.
-            The serif appears exactly twice in the chrome -- here and on dialog
-            headers -- so the wordmark says "this is Studio" and nothing else
+            The serif appears exactly twice in the chrome — here and on dialog
+            headers — so the wordmark says "this is Studio" and nothing else
             on the page competes for that voice.
 
             The height is the strip's height, not padding chosen by eye. The
             strip only spans the main column, so this band used to be reserved
-            by an equal `paddingTop` on the column and then left empty -- the
+            by an equal `paddingTop` on the column and then left empty — the
             brand sat below the window controls rather than beside them, and the
             first thing at the top of the window was nothing. Sharing the one
             number puts the wordmark, the traffic lights and the panel toggle on
@@ -151,7 +151,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         {/* This band is title bar: the window's top edge on the sidebar's side,
             and a frameless window whose most handle-shaped strip does not move
             it is one people try to drag and then give up on. Selection is off
-            for the same reason -- dragging a title bar should move the window,
+            for the same reason — dragging a title bar should move the window,
             not highlight the brand.
 
             Dragging goes through `startWindowDrag` rather than
@@ -176,7 +176,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
         {/* Spacing in this column separates things that are different in kind,
             not merely adjacent. The two standing actions sit closer to each
             other than to the list below them, and the list's groups sit further
-            apart than the rows inside a group -- so the eye gets the hierarchy
+            apart than the rows inside a group — so the eye gets the hierarchy
             from the gaps before it reads a single title. */}
         <div className="mt-1 flex shrink-0 flex-col gap-1 px-2 pb-5">
           <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
@@ -198,7 +198,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             >
               {/* Sized `sm`, not from its own text. Marks size at 1.1em of the
                   text beside them, and this header is `micro` while the project
-                  rows under it are `ui` -- so the parent's arrow came out
+                  rows under it are `ui` — so the parent's arrow came out
                   *smaller* than its children's, which inverts the hierarchy the
                   arrows exist to express. A disclosure belongs to the tree, not
                   to the label it happens to sit next to. */}

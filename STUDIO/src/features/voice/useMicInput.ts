@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * Every waveform in this app is driven by the level this hook reports. Nothing
  * downstream may invent motion: a bar that dances while the room is silent is
  * not a visualisation, it is a lie the user can hear the absence of. When the
- * microphone picks up nothing, the waveform sits still -- that honesty is the
+ * microphone picks up nothing, the waveform sits still — that honesty is the
  * feature, because it is what tells the person speaking that the app is
  * actually listening rather than performing listening.
  *
@@ -55,7 +55,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const NOISE_FLOOR = 0.012
 /** Raw RMS that maps to a full bar. Ordinary speech peaks near 0.2. */
 const LEVEL_CEILING = 0.17
-/** Perceptual lift for quiet speech -- see the chain notes above. */
+/** Perceptual lift for quiet speech — see the chain notes above. */
 const GAMMA = 0.8
 /** Fraction of the gap closed per 16.7ms frame. Fast up... */
 const ATTACK = 0.55
@@ -133,7 +133,7 @@ export function useMicInput() {
       })
 
       const context = new AudioContext()
-      // Created inside a click, so a suspended context is the exception -- but
+      // Created inside a click, so a suspended context is the exception — but
       // a resumed one is one `await` cheaper to guarantee than an assumption.
       if (context.state === 'suspended') await context.resume()
 
@@ -198,7 +198,7 @@ export function useMicInput() {
     } catch (error) {
       // `NotAllowedError` is the user (or the platform) saying no;
       // `SecurityError` is the browser having already decided. Everything
-      // else -- no device, OS privacy switch off, the WebView refusing -- is
+      // else — no device, OS privacy switch off, the WebView refusing — is
       // reported as unavailable, because from this side they all look the
       // same: the call failed for a reason the app cannot argue with.
       setStatus(error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError') ? 'denied' : 'unavailable')
@@ -208,7 +208,7 @@ export function useMicInput() {
 
   /**
    * Stops measuring. If this run was recording, the captured audio is
-   * assembled here -- once, on stop -- and `takeNote` hands it over.
+   * assembled here — once, on stop — and `takeNote` hands it over.
    */
   const stop = useCallback(() => {
     const active = nodes.current

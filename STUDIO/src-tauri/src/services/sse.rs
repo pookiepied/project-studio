@@ -4,8 +4,8 @@
 //! is small and the edge cases are the whole difficulty: where a chunk
 //! boundary falls is arbitrary, and the bugs live at the boundaries rather
 //! than in the field grammar. This project already paid for that knowledge
-//! once -- the TypeScript parser deleted with the cloud gateway (commit
-//! `45233d5`) carried eleven tests for exactly these cases -- and the list
+//! once — the TypeScript parser deleted with the cloud gateway (commit
+//! `45233d5`) carried eleven tests for exactly these cases — and the list
 //! below is that list, transferred rather than re-derived.
 //!
 //! Bytes are buffered, not text: a multi-byte UTF-8 character can straddle a
@@ -32,8 +32,8 @@ pub(crate) struct SseFrame {
 pub(crate) struct SseParser {
     /// Bytes not yet resolved into a complete line.
     buffer: Vec<u8>,
-    /// The block under construction. Dispatched -- or dropped, if it never
-    /// gained a `data:` line -- by the next blank line.
+    /// The block under construction. Dispatched — or dropped, if it never
+    /// gained a `data:` line — by the next blank line.
     event: Option<String>,
     data: Option<String>,
 }
@@ -49,8 +49,8 @@ impl SseParser {
         self.drain_completed_lines(false)
     }
 
-    /// Ends the stream: a trailing lone `\r` is resolved as a line break --
-    /// which can complete a block -- and whatever then remains has no
+    /// Ends the stream: a trailing lone `\r` is resolved as a line break —
+    /// which can complete a block — and whatever then remains has no
     /// terminator, so it is a truncated frame and is discarded rather than
     /// half-emitted.
     pub(crate) fn finish(&mut self) -> Result<Vec<SseFrame>, Utf8Error> {
@@ -76,7 +76,7 @@ impl SseParser {
     /// `None` when the buffer holds no decidable line end. The one undecided
     /// case is a `\r` as the very last byte: it is either half of a CRLF or
     /// a lone-carriage-return line break, and those are one line break and
-    /// not two -- deciding early was the bug the old parser's CRLF tests
+    /// not two — deciding early was the bug the old parser's CRLF tests
     /// existed for, where one break became two and split a frame in half.
     /// More bytes decide it; only the end of the stream may decide it as
     /// lone.
@@ -229,7 +229,7 @@ mod tests {
     fn keeps_a_crlf_frame_whole_when_the_chunk_ends_on_the_carriage_return() {
         // The failure this exists for: a lone trailing `\r` decided
         // prematurely becomes two line breaks, one block splits in half, and
-        // the half without a `data:` line is dropped -- taking the event name
+        // the half without a `data:` line is dropped — taking the event name
         // with it.
         let frames = frames_of(&["event: a\r\ndata: 1\r", "\n\r\n"]).expect("valid");
         assert_eq!(
@@ -270,7 +270,7 @@ mod tests {
     fn reads_a_stream_that_uses_lone_carriage_returns_as_line_breaks() {
         // Legal per the spec, rare in practice. The trailing `\r` is
         // undecided until the stream ends, so this only completes in
-        // `finish` -- which is the honest reading: mid-stream, that byte
+        // `finish` — which is the honest reading: mid-stream, that byte
         // could still be half of a CRLF.
         let frames = frames_of(&["event: a\rdata: 1\r\r"]).expect("valid");
         assert_eq!(

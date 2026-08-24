@@ -9,12 +9,12 @@
  * this file a hand-maintained mirror: when the harness contract changes, this
  * file does not notice, and nothing in either build will tell you. Update it
  * in the same change, or the parsers below will start rejecting responses that
- * are perfectly valid -- which is the failure mode this design chooses, since
+ * are perfectly valid — which is the failure mode this design chooses, since
  * a rejection is visible and a silent misread is not.
  *
  * These are WIRE types. They are not view types. `src/domain/models/types.ts`
  * keeps its own `Provider` and `Model` for the offline catalog, and the two
- * deliberately disagree -- `Provider` is `{id, name, compatibility, custom}`,
+ * deliberately disagree — `Provider` is `{id, name, compatibility, custom}`,
  * a `ProviderConnection` is a different thing with a different lifecycle.
  * Do not merge them and do not import this file into `domain/`. Mapping
  * happens once, at the UI boundary, in whichever component renders both.
@@ -46,7 +46,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Membership as a narrowing, without a cast.
  *
  * Comparing each allowed member against the value means the returned item is
- * already typed as the member -- the alternative, `allowed.includes(value)`
+ * already typed as the member — the alternative, `allowed.includes(value)`
  * followed by `value as T`, is the cast this codebase does not take.
  */
 function oneOf<T extends string>(allowed: readonly T[], value: unknown): T | null {
@@ -179,7 +179,7 @@ interface ProviderConnectionBase {
    * The vendor whose built-in model list applies, if the catalog knows it.
    * Deliberately not the same field as `id`: `id` is the user's name for this
    * connection, so two OpenAI accounts can coexist. Absent means a vendor the
-   * catalog has never heard of -- the normal case for a self-hosted endpoint.
+   * catalog has never heard of — the normal case for a self-hosted endpoint.
    */
   readonly catalogProvider?: string
   /** Whether a key exists. Never the key. */
@@ -202,7 +202,7 @@ export interface RetrievalConnection extends ProviderConnectionBase {
 }
 
 /**
- * `providerConnectionSchema` -- a variant discriminated on `kind`, so the type
+ * `providerConnectionSchema` — a variant discriminated on `kind`, so the type
  * system refuses a retrieval protocol on a language connection.
  */
 export type ProviderConnection = LanguageConnection | MediaConnection | RetrievalConnection
@@ -228,7 +228,7 @@ export type ProviderConnectionDraft = (
  * credentials still point at the old one.
  *
  * `baseUrl: null` clears the override; `baseUrl` absent leaves it alone. The
- * distinction is load-bearing -- without the explicit clear, a base URL once
+ * distinction is load-bearing — without the explicit clear, a base URL once
  * set could only be reassigned, never returned to the protocol default.
  */
 export interface ProviderConnectionPatch {
@@ -245,7 +245,7 @@ export interface ProviderConnectionPatch {
 
 /**
  * `ModelCapability`. "unknown" is an undescribed dimension, distinct from a
- * confirmed "unsupported" -- and distinct from 0 for the two numbers.
+ * confirmed "unsupported" — and distinct from 0 for the two numbers.
  */
 export interface ModelCapability {
   readonly textGeneration: CapabilityState
@@ -289,7 +289,7 @@ export interface ModelPricing {
   readonly cacheWrite: number | 'unknown'
 }
 
-/** `providerModelSchema` -- one element of what `GET /models` returns. */
+/** `providerModelSchema` — one element of what `GET /models` returns. */
 export interface ProviderModel {
   readonly connectionId: string
   /** Exactly as the provider names it, so a call needs no translation. */
@@ -311,7 +311,7 @@ export interface ProviderModel {
  * `probeResultSchema`. `ok` is the bit the UI branches on.
  *
  * `modelCount` is present only when the probe could enumerate and `failure`
- * only when it could not -- never both as a substitute, so an unreachable
+ * only when it could not — never both as a substitute, so an unreachable
  * provider is never misread as "zero models". `status` is absent when the
  * attempt never produced an HTTP response (DNS refusal, timeout) and
  * `latencyMs` is absent when it never left the process.
@@ -573,12 +573,12 @@ export function parseHarnessErrorBody(value: unknown): HarnessErrorBody | null {
  * - Rust's `StreamEvent` (`src-tauri/src/services/stream.rs`), which is what
  *   actually arrives over a Tauri channel: a kind-tagged kebab-case union in
  *   which every variant carries the offset to resume from. The offset is
- *   opaque -- `-1`, or `seq_batch` pairs -- and is carried, parsed never.
+ *   opaque — `-1`, or `seq_batch` pairs — and is carried, parsed never.
  * - Flue's conversation content: the updates view's chunks and the history
  *   view's snapshot. That mirror grew past facts into content when rendering
  *   arrived, and now lives in `conversation-chunks.ts`, re-exported here so
  *   the boundary stays "import from index, not from the files". When a
- *   component needs to read what a chunk SAYS, extend that module -- not this
+ *   component needs to read what a chunk SAYS, extend that module — not this
  *   one.
  */
 

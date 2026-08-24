@@ -20,7 +20,7 @@ import type { LanguageProtocol } from '@/platform/harness'
  * No translation table is written here, and that is deliberate. A mapping
  * between them would be a fifth thing to keep in step, and it would imply the
  * two lists are allowed to keep diverging. What gets SENT is the harness
- * union, full stop -- this file names it directly and `COMPATIBILITIES` is not
+ * union, full stop — this file names it directly and `COMPATIBILITIES` is not
  * imported. The offline catalog keeps its own spelling because it describes
  * fixture rows that never reach the wire.
  *
@@ -28,8 +28,8 @@ import type { LanguageProtocol } from '@/platform/harness'
  *
  * The harness discriminates connections on `kind`: language, media, retrieval.
  * This dialog creates language connections and nothing else. Media has its own
- * protocols, its own probe shape and its own model semantics -- the harness's
- * own model catalog returns no rows for a media connection yet -- so a media
+ * protocols, its own probe shape and its own model semantics — the harness's
+ * own model catalog returns no rows for a media connection yet — so a media
  * creation flow would be a form that produces a record nothing can use. That
  * is Task 17's business, not a `kind` dropdown bolted on here.
  */
@@ -65,8 +65,8 @@ void _everyProtocolIsOffered
 /**
  * The id the connection will be filed under, derived from its display name.
  *
- * The harness requires a slug -- lowercase, digits, single hyphens, starting
- * and ending alphanumeric -- because the id names a keychain entry of its own
+ * The harness requires a slug — lowercase, digits, single hyphens, starting
+ * and ending alphanumeric — because the id names a keychain entry of its own
  * and has to survive the credential store's validation unchanged. So it cannot
  * simply be the display name.
  *
@@ -75,7 +75,7 @@ void _everyProtocolIsOffered
  * dialog rather than hidden, because it is what a duplicate-id failure will
  * name back at you.
  *
- * Returns the empty string when nothing survives -- a name of only punctuation
+ * Returns the empty string when nothing survives — a name of only punctuation
  * or only non-Latin characters. The caller treats that as "not valid yet"; it
  * is not a case to paper over with a random id, because an id nobody chose is
  * an id nobody can recognise in an error message.

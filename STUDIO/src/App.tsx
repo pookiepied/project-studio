@@ -17,7 +17,7 @@ import { WorkspaceProvider } from '@/stores/workspace'
  * with `?conversation=<id>`; the main window opens it with no query at all.
  *
  * The provider stack is shared rather than given a detached copy, because the
- * detached shell renders the *real* `ChatPage` -- and its transcript reaches
+ * detached shell renders the *real* `ChatPage` — and its transcript reaches
  * the rail (artifacts), the turn menu reaches the workspace, the identity line
  * reaches navigation. A slimmer stack would work until the first artifact
  * opened, then throw.
@@ -44,7 +44,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
       strips transforms and layout animations app-wide while keeping opacity,
       which is the correct fallback for every animation in `design/tokens`. CSS
       transitions are covered by the matching media query in `index.css`. Never
-      branch on the preference inside a component -- one switch, here.
+      branch on the preference inside a component — one switch, here.
     */
     <MotionConfig reducedMotion="user">
       <AppearanceProvider initial={initialAppearance}>
@@ -69,7 +69,7 @@ function StudioApp() {
   const [showSplash, setShowSplash] = useState(true)
 
   useEffect(() => {
-    // The splash stays for its full entrance even on an instant boot -- the
+    // The splash stays for its full entrance even on an instant boot — the
     // mark is interrupted mid-arrival otherwise. Elapsed time is subtracted so
     // a slow mount shortens the wait rather than stacking on top of it.
     const elapsed = performance.now() - startedAt.current
@@ -82,7 +82,7 @@ function StudioApp() {
     <>
       {/* The app is fully painted the whole time; only the splash moves.
 
-          It used to cross-fade -- the shell animating 0 -> 1 while the
+          It used to cross-fade — the shell animating 0 -> 1 while the
           splash animated 1 -> 0 over a similar duration. Two opacities
           passing through each other is what read as a flash: at the
           midpoint both layers are half-transparent, so for a few frames
@@ -91,7 +91,7 @@ function StudioApp() {
           dissolving at once and no moment that belonged to either.
 
           Fading one layer away from a finished one underneath is a
-          reveal, and it only has to be paced once -- see `SplashScreen`.
+          reveal, and it only has to be paced once — see `SplashScreen`.
           The shell keeps a slight scale so the arrival still has
           movement, but it starts as soon as the splash begins to leave
           rather than waiting for it to finish. */}

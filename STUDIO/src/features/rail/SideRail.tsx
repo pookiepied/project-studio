@@ -10,7 +10,7 @@ import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail } from '@/stores/rail'
 /**
  * The narrowest the conversation may become.
  *
- * Below this the top strip's centred identity line -- project, title, branch --
+ * Below this the top strip's centred identity line — project, title, branch —
  * runs out of room before its own truncation can save it, and the composer's
  * controls start colliding. It is a floor for the page, expressed as the rail's
  * ceiling.
@@ -22,7 +22,7 @@ const MIN_PAGE_WIDTH = 520
  * The side rail.
  *
  * A column beside the conversation holding artifacts opened out of it. The
- * transcript is a reading measure -- deliberately narrow -- and some things the
+ * transcript is a reading measure — deliberately narrow — and some things the
  * model produces are simply the wrong shape for it: a table with fifteen
  * columns, a long list of sources, an image worth looking at. Rather than
  * widen the column for everyone, those move here.
@@ -30,7 +30,7 @@ const MIN_PAGE_WIDTH = 520
  * ---- The two placements ---------------------------------------------------
  *
  * `inset` floats the rail as its own rounded panel with the window's ground
- * visible above and below, which is the same language the page uses -- a panel
+ * visible above and below, which is the same language the page uses — a panel
  * resting on the sidebar rather than a region of one sheet. It is the default
  * because it keeps the window reading as a set of objects.
  *
@@ -52,7 +52,7 @@ export function SideRail() {
    * The rail may not starve the page.
    *
    * Dragging it wide enough squeezed the conversation until the top strip broke
-   * -- the project, the title and the branch are one centred line, and there is
+   * — the project, the title and the branch are one centred line, and there is
    * a width below which they simply cannot all be there. The honest fix is to
    * refuse the drag rather than to let the layout fail: the page keeps a floor,
    * and the rail's ceiling is whatever is left over.
@@ -88,14 +88,14 @@ export function SideRail() {
           animate={{ width: effective, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={SPRING_PANEL}
-          // Square, flush, and sunken -- the mirror of the sidebar, for the
+          // Square, flush, and sunken — the mirror of the sidebar, for the
           // reason spelled out in `AppShell`: the radius belongs to the centre,
           // not to the column beside it.
           //
           // This was `my-2 mr-2 border` with its own `RADIUS.xl`, which made it
           // a rounded card floating in a gutter while the left column was the
           // ground the page rests on. Two columns either side of the same page,
-          // built on opposite principles -- and the page was already rounding
+          // built on opposite principles — and the page was already rounding
           // its right corners against this edge (`railOpen` in `AppShell`), so
           // there were two arcs a few pixels apart curving away from each
           // other. That gap is what read as "the rail became a rounded object".
@@ -147,7 +147,7 @@ export function SideRail() {
  * target nobody hits on the first try. Pointer capture rather than
  * document-level listeners: capture keeps the drag alive when the pointer
  * outruns the handle, which it always does, and it releases cleanly if the
- * window loses focus mid-drag -- the case that leaves a document listener
+ * window loses focus mid-drag — the case that leaves a document listener
  * attached forever.
  */
 function ResizeHandle({
@@ -186,7 +186,7 @@ function ResizeHandle({
   }, [])
 
   // The cursor belongs to the whole document while dragging, not just to the
-  // handle -- otherwise it flickers back to an arrow the moment the pointer
+  // handle — otherwise it flickers back to an arrow the moment the pointer
   // leaves the 4px strip, which is immediately.
   useEffect(() => {
     return () => {
@@ -215,8 +215,8 @@ function ResizeHandle({
       className="group/resize absolute inset-y-0 left-0 z-10 w-3 cursor-col-resize touch-none"
     >
       {/* A grip at the middle of the edge, not a rule down the whole of it.
-          The reach stays full height -- you can still grab the seam anywhere
-          along it -- but the *mark* is a short centred line, because a hairline
+          The reach stays full height — you can still grab the seam anywhere
+          along it — but the *mark* is a short centred line, because a hairline
           running floor to ceiling is a wall between two panels rather than a
           handle on one. It also duplicated the seam the sunken surface already
           draws, so the edge carried two lines saying the same thing.

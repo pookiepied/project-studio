@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn'
 /**
  * Archived chats.
  *
- * Archiving keeps a conversation indefinitely -- there is no thirty-day sweep,
+ * Archiving keeps a conversation indefinitely — there is no thirty-day sweep,
  * and the copy says so, because an archive that quietly deletes is the one
  * feature nobody forgives. Deleting is a separate, explicit act, available one
  * at a time or over a selection.

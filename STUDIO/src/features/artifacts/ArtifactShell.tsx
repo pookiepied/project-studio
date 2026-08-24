@@ -15,14 +15,14 @@ import { cn } from '@/lib/cn'
  *
  * In the design this grew out of, each artifact drew its own header: its own
  * icon bubble, its own title truncation, its own status line, its own footer
- * caption. Nine files, nine copies, and they had already drifted -- different
+ * caption. Nine files, nine copies, and they had already drifted — different
  * gaps, different type sizes, two different ideas of where the summary goes.
  * That is the failure mode of an artifact system, and it is worth being blunt
  * about: if adding a kind means writing chrome, every kind's chrome is
  * slightly different and the transcript stops looking designed.
  *
- * So a kind supplies a mark, a status line and a body. Everything else --
- * layout, spacing, the working state, the rail button, the provenance footer --
+ * So a kind supplies a mark, a status line and a body. Everything else —
+ * layout, spacing, the working state, the rail button, the provenance footer —
  * is here and is not negotiable per kind.
  *
  * ---- Why it is not a card ------------------------------------------------
@@ -87,7 +87,7 @@ export function ArtifactShell({
           </p>
         </div>
 
-        {/* Reserved space, revealed on hover -- the same rule the code block's
+        {/* Reserved space, revealed on hover — the same rule the code block's
             controls follow, so a reply full of blocks does not twitch as the
             pointer crosses it. */}
         {conversation && !working ? (

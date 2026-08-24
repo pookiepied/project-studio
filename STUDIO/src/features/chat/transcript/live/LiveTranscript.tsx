@@ -16,7 +16,7 @@ import {
  * item gets and where the working indicator goes, and nothing else. Every
  * behaviour lives in the component that owns it.
  *
- * The one judgement this list makes is which assistant message is LIVE --
+ * The one judgement this list makes is which assistant message is LIVE —
  * the newest one while a turn has not settled. That bit drives the caret and
  * the thinking ripple and nothing else; whether any message reads as
  * finished was decided by the projection from settlement facts, never here,
@@ -66,7 +66,7 @@ export function LiveTranscript({
       )}
 
       {/* The gap between sending and the first token: the mark's own ripple
-          and nothing else -- no "Thinking..." label, because the glyph
+          and nothing else — no "Thinking..." label, because the glyph
           already animates. Shown when a turn is producing but nothing has
           been written into the transcript yet. */}
       {phase.status === 'streaming' && (visible[visible.length - 1]?.kind ?? null) !== 'assistant' ? (

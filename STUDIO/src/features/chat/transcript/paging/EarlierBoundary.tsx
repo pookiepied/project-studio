@@ -11,8 +11,8 @@ import { StudioMark } from '@/components/brand'
  * the scroll compensation in `useTranscriptWindow` would be correcting for two
  * things at once and get neither right.
  *
- * The mark is the app's own, busy. Anything else here -- a spinner, a
- * "loading…" label, a skeleton row -- would be a second vocabulary for the one
+ * The mark is the app's own, busy. Anything else here — a spinner, a
+ * "loading…" label, a skeleton row — would be a second vocabulary for the one
  * idea the brand already expresses, and a skeleton in particular pretends to be
  * content, which at the top of a history is a lie about what you are about to
  * read.

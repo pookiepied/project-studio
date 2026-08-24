@@ -9,7 +9,7 @@ import { useEffect } from 'react'
  * It exists so the composer does not need autofocus. Autofocusing on mount
  * would apply the field's focus styling before anyone had touched it, and the
  * empty state is the whole first impression. This gives back the only thing
- * that costs -- you can still type the moment the window opens.
+ * that costs — you can still type the moment the window opens.
  *
  * Anything that is not plainly typing is left alone: modifier chords, so Cmd+K
  * still reaches the palette, and keystrokes already aimed at a field.
@@ -30,7 +30,7 @@ export function useTypeToFocus(enabled: boolean, focus: () => void) {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
       }
 
-      // Focus only. The keystroke is not replayed and does not need to be --
+      // Focus only. The keystroke is not replayed and does not need to be —
       // the event has not been consumed, so it lands in the field on its own.
       focus()
     }

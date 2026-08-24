@@ -5,7 +5,7 @@
  * by fetching a picture from the internet, and shipping binaries in the repo to
  * fake it is worse. These are SVGs encoded as data URIs: no network, no assets
  * directory, a few hundred bytes each, and they exercise exactly the code path
- * a real result would -- `<img src>` with an intrinsic aspect ratio.
+ * a real result would — `<img src>` with an intrinsic aspect ratio.
  *
  * They are abstract on purpose. A photograph would set an expectation about
  * output quality that a demo has no business making.
@@ -64,7 +64,7 @@ export const GENERATED_VIDEO_POSTER = dataUri(`
  * A file in `public/` rather than a data URI, unlike the stills above. The
  * stills are a few hundred bytes and belong inline; a video is tens of
  * kilobytes, and base64 in a TypeScript module is 33% larger again, parsed on
- * every startup, and unreadable in a diff. It is also the honest shape -- a
+ * every startup, and unreadable in a diff. It is also the honest shape — a
  * real result arrives as a URL, so the demo exercises the same path.
  *
  * Generated, not sourced: a synthetic gradient drift, so there is nothing to

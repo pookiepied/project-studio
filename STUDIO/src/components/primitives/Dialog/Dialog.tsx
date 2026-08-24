@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
  * A modal sheet.
  *
  * Escape is bound to the document rather than to the panel, because bound to
- * the panel it works only while focus is inside it -- which is every time
+ * the panel it works only while focus is inside it — which is every time
  * except the one that matters, after focus has drifted to a menu the sheet
  * opened.
  */

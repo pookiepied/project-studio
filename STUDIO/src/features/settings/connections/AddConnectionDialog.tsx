@@ -26,19 +26,19 @@ import { LANGUAGE_PROTOCOL_CHOICES, connectionIdFrom } from './draft'
  * back is already a record that cannot carry it.
  *
  * `close()` clears every field, including the key, before telling the parent.
- * The parent unmounts nothing -- the dialog stays mounted and hidden -- so the
+ * The parent unmounts nothing — the dialog stays mounted and hidden — so the
  * clear is what actually forgets, and it must stay in front of `onClose`.
  *
  * There is no "show key" toggle. The argument for one is that people mistype
  * long secrets; the argument against is that this field is filled once, from a
  * clipboard, in a window that may be screen-shared, and the recovery from a
- * typo is cheap and immediate -- the probe says the key was refused. An eye
+ * typo is cheap and immediate — the probe says the key was refused. An eye
  * icon would trade a permanent exposure risk for a one-off convenience.
  *
  * ---- Why the base URL is required -----------------------------------------
  *
  * The harness treats `baseUrl` as optional because a connection can inherit
- * its address from `catalogProvider` -- the vendor whose built-in model list
+ * its address from `catalogProvider` — the vendor whose built-in model list
  * applies. This dialog does not send a `catalogProvider`: the set of vendor
  * names the harness's built-in catalog knows is not exposed over HTTP, so
  * there is nothing to populate a vendor picker from, and guessing one would

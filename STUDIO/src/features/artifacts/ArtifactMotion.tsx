@@ -6,8 +6,8 @@ import { cn } from '@/lib/cn'
 /**
  * The motion every artifact shares.
  *
- * Artifacts fill in over time -- results arrive one at a time, a timeline grows
- * a step, an image resolves -- and if each kind animates that differently the
+ * Artifacts fill in over time — results arrive one at a time, a timeline grows
+ * a step, an image resolves — and if each kind animates that differently the
  * transcript stops feeling like one app. So the arrival of a row is defined
  * once, here, and every artifact uses it.
  *

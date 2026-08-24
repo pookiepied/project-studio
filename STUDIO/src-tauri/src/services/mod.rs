@@ -1,6 +1,6 @@
 //! The one seam through which the webview reaches a side system.
 //!
-//! There is exactly one side system today -- the Harness -- and that is why
+//! There is exactly one side system today — the Harness — and that is why
 //! this is an enum with one variant and a match with one arm, not a registry,
 //! a trait-object table, or anything config-driven. The second side system
 //! (an account backend) is v2 and a different shape entirely: no process, no
@@ -13,7 +13,7 @@
 //! The credential rule this module exists to enforce: a credential never
 //! crosses a boundary it does not have to. The webview does not know the
 //! Harness bearer, cannot learn it (no command returns it), and no longer
-//! needs it -- `service_fetch` reads it from the supervisor at call time,
+//! needs it — `service_fetch` reads it from the supervisor at call time,
 //! attaches it, and scrubs it from anything that could echo it.
 //!
 //! A directory rather than one file, mirroring `harness/`: `error.rs` holds
@@ -42,8 +42,8 @@ use crate::harness::endpoint::HarnessEndpoint;
 /// The side systems the webview may ask Rust to call on its behalf.
 ///
 /// An enum rather than a string so that an unknown service is a
-/// deserialization failure at the invoke boundary -- the request never runs,
-/// and the error says what was not recognised -- rather than a runtime string
+/// deserialization failure at the invoke boundary — the request never runs,
+/// and the error says what was not recognised — rather than a runtime string
 /// comparison that fails somewhere deeper with a worse message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -71,13 +71,13 @@ pub struct ServiceRequestInit {
 ///
 /// - it must start with `/`, because the authority of a URL ends at its
 ///   first `/`. A path like `@example.com/x` concatenated onto the base
-///   re-parses with `example.com` as the host and the base as userinfo --
+///   re-parses with `example.com` as the host and the base as userinfo —
 ///   which is a credentialed request to somebody else's server;
 /// - it must not start with `//`, which is how a protocol-relative URL names
 ///   an authority;
 /// - it must not contain `://`, the scheme separator.
 ///
-/// Everything else -- `?`, `#`, percents, non-ASCII -- is inert once the
+/// Everything else — `?`, `#`, percents, non-ASCII — is inert once the
 /// first character is `/`: the authority has already ended, and nothing that
 /// follows it can reopen one.
 pub(crate) fn validate_path(path: &str) -> Result<(), ServiceError> {
@@ -93,13 +93,13 @@ pub(crate) fn validate_path(path: &str) -> Result<(), ServiceError> {
         // The one route in the denylist and why it is this one: `/api/shutdown`
         // ends the harness process. The harness's own guard for that route is
         // the client type, and production mints exactly ONE credential, typed
-        // `studio-host` (`app.ts` in STUDIO HARNESS) -- precisely the client
+        // `studio-host` (`app.ts` in STUDIO HARNESS) — precisely the client
         // type the route demands. So from inside the harness process, the
         // desktop UI and the Host are indistinguishable, and the route's own
         // check cannot keep the webview out; only this seam knows that a
         // request came from the webview rather than from Rust itself. Every
         // other `/api` route manages state the UI legitimately reads and
-        // changes -- connections, models, approvals -- so there is nothing to
+        // changes — connections, models, approvals — so there is nothing to
         // list beyond the path that stops the process other windows use.
         return Err(ServiceError::InvalidPath {
             message: "the service seam does not carry shutdown: stopping the harness is the host's decision, made on the process's own channels".to_owned(),
@@ -134,8 +134,8 @@ fn refused_routes() -> &'static [&'static str] {
 ///
 /// Both were verified against the real crate and the real router, not assumed.
 /// So the comparison runs on a canonical form: decode per segment, then
-/// resolve. Anything this refuses that the router would have missed --
-/// `/api//shutdown`, say -- is a path nothing legitimate sends, and refusing a
+/// resolve. Anything this refuses that the router would have missed —
+/// `/api//shutdown`, say — is a path nothing legitimate sends, and refusing a
 /// superset is the safe direction for a denylist.
 fn is_refused_route(path: &str) -> bool {
     refused_routes().contains(&canonical_route(path).as_str())

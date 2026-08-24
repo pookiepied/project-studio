@@ -4,7 +4,7 @@ import type { ProviderId } from '@/components/icons'
  * What a model can be asked to do.
  *
  * Capabilities are declared rather than inferred from the slug, because the
- * composer disables controls from them -- a picker that offers vision to a
+ * composer disables controls from them — a picker that offers vision to a
  * text-only model is a failure the user only discovers after sending.
  */
 type Capability = 'text' | 'vision' | 'tools' | 'reasoning'

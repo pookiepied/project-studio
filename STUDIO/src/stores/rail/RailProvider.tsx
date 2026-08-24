@@ -5,7 +5,7 @@ import type { Artifact } from '@/domain/artifacts/types'
  * The side rail's state.
  *
  * The rail holds artifacts opened out of the transcript so they can be read at
- * a size the message column cannot give them -- a long search, a table with
+ * a size the message column cannot give them — a long search, a table with
  * fifteen columns, a generated image you want to look at properly.
  *
  * ---- Two things done differently from the version this follows -----------
@@ -19,7 +19,7 @@ import type { Artifact } from '@/domain/artifacts/types'
  * artifacts gave fifteen tabs, at which point the strip is scrolling
  * horizontally and finding anything means reading tiny labels one at a time.
  * Entries carry the conversation they came from and the rail groups by it, so
- * the list stays navigable at any size -- and a cap drops the oldest, because a
+ * the list stays navigable at any size — and a cap drops the oldest, because a
  * rail is a workbench, not an archive.
  */
 
@@ -44,7 +44,7 @@ export interface RailEntry {
  * should not exist.
  *
  * The rail floats, inset, because that is the language the rest of the window
- * already speaks -- the page is a rounded panel resting on the sidebar, and the
+ * already speaks — the page is a rounded panel resting on the sidebar, and the
  * rail is another panel beside it.
  */
 
@@ -62,8 +62,8 @@ interface RailValue {
    *
    * The distinction between this and `open` is the whole point. Closing the
    * rail throws its contents away; collapsing it does not. The sidebar and the
-   * rail cannot both have the window -- at any width where both fit, the
-   * conversation between them is narrower than either -- so opening one folds
+   * rail cannot both have the window — at any width where both fit, the
+   * conversation between them is narrower than either — so opening one folds
    * the other. Folding must be recoverable without the user having to find the
    * artifact in the transcript again, which is why this is a separate flag
    * rather than a call to `closeAll`.
@@ -98,7 +98,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
         const existing = current.find((entry) => entry.id === artifact.id)
 
         // Already here: replace it in place rather than appending. Replacing
-        // matters as much as not duplicating -- an artifact still streaming
+        // matters as much as not duplicating — an artifact still streaming
         // will be opened again with more of itself, and the rail should show
         // the newer one without moving it in the strip.
         if (existing) {
@@ -132,7 +132,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
       const index = current.findIndex((entry) => entry.id === id)
       const next = current.filter((entry) => entry.id !== id)
 
-      // Focus the neighbour, preferring the one before -- closing a tab should
+      // Focus the neighbour, preferring the one before — closing a tab should
       // leave you where you were in the list, not jump you to the end of it.
       setActiveId((active) => {
         if (active !== id) return active

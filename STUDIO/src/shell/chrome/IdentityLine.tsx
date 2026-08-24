@@ -9,7 +9,7 @@ import { useDetachConversation, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
 
 /**
- * Project, conversation, branch -- one line, centred in the strip.
+ * Project, conversation, branch — one line, centred in the strip.
  *
  * The order is the sentence: which project, which conversation in it, which
  * branch it is working against. Set as three separate pieces of chrome they
@@ -158,7 +158,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
 
         {/* No project list here.
             This menu hangs off the conversation's own title, opened from
-            inside that conversation -- which means the project is already
+            inside that conversation — which means the project is already
             answered by where you are standing. Listing every project as a
             selectable row made the most common case (looking at a title you
             are already in) carry the entire filing system, and grew the menu

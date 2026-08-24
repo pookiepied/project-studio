@@ -13,12 +13,12 @@ import { cn } from '@/lib/cn'
  * happens when I press send". True, and it hid the difference that matters:
  * they are touched at completely different rates. The model is a per-
  * conversation choice, reasoning is a per-question dial, and permission is a
- * per-*situation* consent -- the only one of the three whose consequence lands
+ * per-*situation* consent — the only one of the three whose consequence lands
  * on the user's files. It is also the one you reconsider while looking at the
  * thing you are about to send, which is not where the window chrome is.
  *
  * So it sits by the send button. That leaves the pill in the strip meaning one
- * coherent thing -- who you are talking to and how hard it is thinking -- and
+ * coherent thing — who you are talking to and how hard it is thinking — and
  * puts the consent where the consequence happens.
  *
  * ---- Why it is a mark and not a label -------------------------------------
@@ -26,7 +26,7 @@ import { cn } from '@/lib/cn'
  * The brief is fewer things to look at by default, and a permanent word in the
  * composer is a word to read every time the eye passes the field. Three modes
  * reuse three glyphs, so the mark becomes recognisable the way a transport
- * control is -- and unlike a label, it costs no width that the text should be
+ * control is — and unlike a label, it costs no width that the text should be
  * spending. The name is one hover away, and the full sentence is one click.
  *
  * The exception is the mode that changes what "send" means most: `auto` also
@@ -61,11 +61,11 @@ export function PermissionControl() {
               // height and pulling the row's centre off.
               // The control step, not `h-8`. This sits in the composer's row
               // beside three icon buttons, and as a rem class it was the one
-              // that did not move with them -- 32 against their 28, which set
+              // that did not move with them — 32 against their 28, which set
               // the whole field's height and made the capsule 4px taller than
               // its own tokens said it was.
               'h-[var(--control-md)] transition-colors duration-fast',
-              // Every mode is now a mark and nothing else -- the three used to
+              // Every mode is now a mark and nothing else — the three used to
               // disagree, with `auto` alone also spelling its name, so the
               // control changed width when you changed mode and the row
               // reflowed around it.
@@ -73,7 +73,7 @@ export function PermissionControl() {
               // The reason `auto` spelled itself is still real: it is the one
               // mode where sending means the app proceeds without asking, and
               // a glyph can be glanced past. So the signal stays and only the
-              // text goes -- unattended is the one state that paints itself,
+              // text goes — unattended is the one state that paints itself,
               // which reads at the edge of vision the way a word never did,
               // and costs no width.
               loud ? 'text-foreground' : 'text-muted-foreground',

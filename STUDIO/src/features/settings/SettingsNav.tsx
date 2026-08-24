@@ -21,7 +21,7 @@ import { cn } from '@/lib/cn'
  * and none of them are confusing, because the two columns are not peers.
  *
  * What makes them not peers is stated visually rather than argued about. The
- * rail paints no fill and no border -- it is text on the page's own surface,
+ * rail paints no fill and no border — it is text on the page's own surface,
  * where the app sidebar is a distinct sunken column with a background. One is
  * furniture; the other is a list inside a document. And it is scoped: it
  * appears only within Settings and lists only settings, so at no point are
@@ -29,7 +29,7 @@ import { cn } from '@/lib/cn'
  *
  * The selection is a moving chip rather than a restyled row. A `layoutId`
  * animates the *same* element between positions, so the selection reads as one
- * object sliding down the list -- which is a statement that these are views of
+ * object sliding down the list — which is a statement that these are views of
  * one page, not four pages that happen to be adjacent.
  */
 export function SettingsNav({

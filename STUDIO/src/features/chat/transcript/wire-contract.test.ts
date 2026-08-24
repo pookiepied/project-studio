@@ -67,7 +67,7 @@ describe('the real wire payload', () => {
  *    first message and the answer starts a second, both carrying the same
  *    submissionId. "Turn", for grouping, therefore means assistant MESSAGE.
  *  - The tool answer arrives AFTER the message that issued it has already
- *    completed, and carries no message id -- only a toolCallId. Correlation
+ *    completed, and carries no message id — only a toolCallId. Correlation
  *    has to be global; anything positional would drop it.
  */
 const TOOL_TURN = [{"type": "conversation-reset", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "snapshot": {"v": 1, "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "offset": "0000000000000000_0000000000000000", "messages": [], "settlements": []}, "position": {"batch": 0, "index": 0}}, {"type": "message-appended", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "message": {"id": "entry_direct_MzIwYzY4M2EtODJlMi00ZTg0LWE4MGEtMzgwYmNiMjY2YTRi", "role": "user", "submissionId": "320c683a-82e2-4e84-a80a-380bcb266a4b", "metadata": {"timestamp": "2026-08-24T19:06:11.167Z"}, "parts": [{"type": "text", "text": "Summarize the workspace please.", "state": "done"}]}, "position": {"batch": 1, "index": 0}}, {"type": "message-started", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6483ba40-1605-418c-a347-7c7c329fa6ea", "timestamp": "2026-08-24T19:06:11.176Z", "submissionId": "320c683a-82e2-4e84-a80a-380bcb266a4b", "model": {"provider": "project-studio-test", "id": "default"}, "position": {"batch": 2, "index": 0}}, {"type": "tool-input", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6483ba40-1605-418c-a347-7c7c329fa6ea", "toolCallId": "workspace-summary-1", "toolName": "workspace_summary", "input": {"workspace": "Project Studio V2"}, "position": {"batch": 3, "index": 0}}, {"type": "message-completed", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6483ba40-1605-418c-a347-7c7c329fa6ea", "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}}, "position": {"batch": 4, "index": 0}}, {"type": "tool-output", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "toolCallId": "workspace-summary-1", "output": "{\"workspace\":\"Project Studio V2\",\"status\":\"ready\"}", "position": {"batch": 6, "index": 0}}, {"type": "message-started", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6661d15b-7f21-4d3d-9717-ae31957de1f7", "timestamp": "2026-08-24T19:06:11.200Z", "submissionId": "320c683a-82e2-4e84-a80a-380bcb266a4b", "model": {"provider": "project-studio-test", "id": "default"}, "position": {"batch": 7, "index": 0}}, {"type": "message-delta", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6661d15b-7f21-4d3d-9717-ae31957de1f7", "kind": "text", "delta": "Project ", "position": {"batch": 9, "index": 0}}, {"type": "message-delta", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6661d15b-7f21-4d3d-9717-ae31957de1f7", "kind": "text", "delta": "Studio V2 workspace is ready.", "position": {"batch": 9, "index": 1}}, {"type": "message-completed", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "messageId": "entry_6661d15b-7f21-4d3d-9717-ae31957de1f7", "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}}, "position": {"batch": 11, "index": 0}}, {"type": "submission-settled", "conversationId": "conv_01M0TJMYAC698CQ3PDCVP0ZRW5", "submissionId": "320c683a-82e2-4e84-a80a-380bcb266a4b", "outcome": "completed", "result": {"text": "Project Studio V2 workspace is ready.", "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}}, "model": {"provider": "project-studio", "id": "default"}}, "position": {"batch": 12, "index": 0}}]
@@ -153,8 +153,8 @@ describe('a real tool-calling turn', () => {
  * exhausted at their real ~14s pace).
  *
  * This is the payload Task 26 exists for, so its shape is worth stating
- * exactly. Four `message-started`/`message-completed` pairs -- one per retry
- * attempt, each closing its own record cleanly with zero usage -- arrive
+ * exactly. Four `message-started`/`message-completed` pairs — one per retry
+ * attempt, each closing its own record cleanly with zero usage — arrive
  * BEFORE the settlement, and none of them says anything went wrong. The only
  * honest fact about the failure is the settlement's `error` object: Flue's
  * own sentence for why the provider refused four times.
@@ -237,13 +237,13 @@ describe('a real rate-limited turn', () => {
  * the same moment as the updates above.
  *
  * Two facts make this pin load-bearing for cold starts. The four attempts
- * materialize as assistant messages with `parts: []` -- so "an attempt that
+ * materialize as assistant messages with `parts: []` — so "an attempt that
  * never spoke" has the same shape in history as live, and one rule can serve
  * both. And those assistant messages carry NO `submissionId` (the field the
  * SDK calls optional on tracked messages), which is how a cold start came to
  * render them as complete bubbles: matching settlements by message id alone
- * found nothing to mark. Position -- between this settlement's user message
- * and the next user message -- is the only association history offers.
+ * found nothing to mark. Position — between this settlement's user message
+ * and the next user message — is the only association history offers.
  */
 const FAILED_HISTORY = { v: 1, conversationId: 'conv_01M0TNYP1A7FVY39X70CRV91Y2', offset: '0000000000000000_0000000000000010', messages: [ { id: 'entry_direct_NTBiN2E0ZTUtMGRiMC00YzM0LWE5YmMtNDUxMDc3MjA0NDA0', role: 'user', submissionId: '50b7a4e5-0db0-4c34-a9bc-451077204404', parts: [{ type: 'text', text: '[fail] please answer.', state: 'done' }], metadata: { timestamp: '2026-08-24T20:03:56.097Z' } }, { id: 'entry_1dbfb415-4840-4238-a49f-3587cf16d20f', role: 'assistant', parts: [], metadata: { timestamp: '2026-08-24T20:03:56.108Z', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, model: { provider: 'project-studio-test', id: 'default' } } }, { id: 'entry_8c257a3c-1452-45bd-a5aa-f25c1ce10a6f', role: 'assistant', parts: [], metadata: { timestamp: '2026-08-24T20:03:57.937Z', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, model: { provider: 'project-studio-test', id: 'default' } } }, { id: 'entry_d873b3ed-2f58-45c2-9627-946899139e6d', role: 'assistant', parts: [], metadata: { timestamp: '2026-08-24T20:04:01.496Z', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, model: { provider: 'project-studio-test', id: 'default' } } }, { id: 'entry_39090cc2-7820-4a79-8f08-dd005aaa82c4', role: 'assistant', parts: [], metadata: { timestamp: '2026-08-24T20:04:09.089Z', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, model: { provider: 'project-studio-test', id: 'default' } } } ], settlements: [ { submissionId: '50b7a4e5-0db0-4c34-a9bc-451077204404', outcome: 'failed', error: { name: 'FlueError', message: 'direct(50b7a4e5-0db0-4c34-a9bc-451077204404) failed: 429 rate limit exceeded: temporarily rate-limited upstream', type: 'operation_failed', details: '' } } ] }
 
@@ -269,7 +269,7 @@ describe('a cold start reading the same failed conversation as history', () => {
  * Captured from a live harness: one ordinary turn, then a `[fail]` turn that
  * burned its three retries. This is the stress case for the positional
  * association a cold start is forced into, because assistant messages in a
- * snapshot carry no submissionId -- only user messages do (verified on the
+ * snapshot carry no submissionId — only user messages do (verified on the
  * wire; every assistant here reads `undefined`).
  *
  * If the adjacency rule were even slightly loose, the earlier successful

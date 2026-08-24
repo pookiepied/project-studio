@@ -23,7 +23,7 @@ import { cn } from '@/lib/cn'
  * The window.
  *
  * One rounded panel filling the transparent OS window. There is no tray and no
- * inset, so there is exactly one radius in the shell -- this one, matched by
+ * inset, so there is exactly one radius in the shell — this one, matched by
  * the DWM corner preference in `src-tauri/src/window.rs`. Two radii is how a
  * frameless window ends up with arcs that cross.
  *
@@ -58,7 +58,7 @@ export function AppShell() {
    * space, so the reading column was covered on one side and squeezed on the
    * other, by two panels neither of which you were reading.
    *
-   * The sidebar wins the gesture, because opening it is always deliberate --
+   * The sidebar wins the gesture, because opening it is always deliberate —
    * you clicked the toggle. The rail is folded rather than closed, so its
    * contents survive, and it says so with the pill below.
    */
@@ -109,7 +109,7 @@ export function AppShell() {
     <div
       // Sunken, not `surface`. The page's rounded corner cuts away to whatever
       // is behind it, and behind it was the same white the page is painted in
-      // -- so the radius existed and was invisible. The window's own ground is
+      // — so the radius existed and was invisible. The window's own ground is
       // the sunken tone the sidebar uses, which is what makes the corner read
       // as the page lifting off it. With the sidebar closed the page covers
       // this completely, so nothing shows through.
@@ -130,7 +130,7 @@ export function AppShell() {
           the sidebar's edge made it a floating object with the page poured
           around it, which reads as two panels arguing about which one is the
           background. Rounding the page instead states the hierarchy: the
-          sidebar is the ground -- flush to the window on all four sides -- and
+          sidebar is the ground — flush to the window on all four sides — and
           the conversation is the thing sitting on it. It is also what makes the
           sunken surface behind visible as a seam rather than as a border.
 
@@ -139,7 +139,7 @@ export function AppShell() {
           arc a pixel inside the first is the thing that looks unfinished.
 
           And it goes away when the sidebar does. With no column beside it the
-          page is not resting on anything -- a rounded corner against the bare
+          page is not resting on anything — a rounded corner against the bare
           window edge would be a panel floating over nothing, which is exactly
           the "why is this cut off" look. Closed, the page is simply the window
           again. */}
@@ -152,7 +152,7 @@ export function AppShell() {
           borderTopLeftRadius: rounded ? RADIUS.xl : 0,
           borderBottomLeftRadius: rounded ? RADIUS.xl : 0,
           // The same rule, mirrored: the page's right edge rests on the rail
-          // whenever the rail is open, so it rounds against it -- and squares
+          // whenever the rail is open, so it rounds against it — and squares
           // off against the window when the rail is gone, exactly as the left
           // edge does when the sidebar is gone. One rule for both edges: round
           // where something is being rested on, square where the window is.
@@ -168,7 +168,7 @@ export function AppShell() {
           The obvious construction here is `<AnimatePresence mode="wait">`, so
           the outgoing surface finishes leaving before the next arrives. It is
           the wrong trade twice over. It puts a full exit *and* a full enter --
-          360ms -- between clicking a conversation and seeing it, which makes
+          360ms — between clicking a conversation and seeing it, which makes
           switching conversations feel slow in a way no amount of easing fixes.
           And it makes navigation depend on an animation completing: anything
           that stalls the frame loop leaves the old surface mounted and the new
@@ -198,7 +198,7 @@ export function AppShell() {
       {/* The rail, folded, saying so.
           Only this side gets a prompt. The sidebar is summoned by a control
           that is always visible in the strip, so a second reminder of where it
-          went would be noise -- but the rail has no permanent handle, and
+          went would be noise — but the rail has no permanent handle, and
           something you opened vanishing with no trace is indistinguishable
           from having been closed. A tab on the edge it went behind is the
           smallest thing that says "still here, this way". */}
@@ -230,7 +230,7 @@ export function AppShell() {
       <ActionsMenu />
       {/* The same actions, offered the moment text is selected rather than
           after a right-click. Mounted beside `ActionsMenu` because the two
-          share their verbs (`ActionItems`) and hand off to each other -- a
+          share their verbs (`ActionItems`) and hand off to each other — a
           right-click closes this one; this one never opens over that one. */}
       <SelectionMenu />
       </VoiceModeProvider>
@@ -252,7 +252,7 @@ export function AppShell() {
  * object on every render, and React identifies component types by reference.
  * So on each render of `AppShell` the element type changed, React concluded the
  * old subtree was a different component entirely, and it unmounted the whole
- * page and mounted a fresh one -- the transcript, every message, the composer,
+ * page and mounted a fresh one — the transcript, every message, the composer,
  * all of it.
  *
  * That is exactly the reported symptom, including the part that made no sense
@@ -261,7 +261,7 @@ export function AppShell() {
  * Framer entry animation in the list at once.
  *
  * And it happened precisely while a reply streamed, because that is when
- * `AppShell` re-renders -- `useWorkspace()` publishes a new conversation object
+ * `AppShell` re-renders — `useWorkspace()` publishes a new conversation object
  * on every chunk, roughly every 28ms. Some thirty-five remounts of the entire
  * page per second, which no amount of tuning masks, fades or measurement
  * timing could ever have fixed.

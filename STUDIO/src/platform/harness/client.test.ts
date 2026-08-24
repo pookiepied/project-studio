@@ -9,7 +9,7 @@ import type { ProviderConnection } from './contracts'
  * Nothing here needs a running harness. What is being tested is the part
  * STUDIO owns: that the credential goes out on every call, that a body which
  * does not match the contract is refused instead of returned, that the three
- * failure kinds land on the right cases, and -- the one that matters most --
+ * failure kinds land on the right cases, and — the one that matters most —
  * that a key-shaped field in a response cannot survive into a parsed record.
  */
 
@@ -424,7 +424,7 @@ describe('the api key', () => {
       apiKey: CANARY,
     })
 
-    // It was sent, once, in the request body -- that is the whole point of it.
+    // It was sent, once, in the request body — that is the whole point of it.
     expect(stub.calls[0]?.body).toContain(CANARY)
 
     expect(result.ok).toBe(true)

@@ -10,8 +10,8 @@ import type { Message } from '@/domain/session/types'
  * The ordinary demo turn types out a fixed reply, which shows what streaming
  * text looks like and nothing about what an *artifact* looks like while it is
  * still working. That state is most of an artifact's visible life and it is
- * the state with all the moving parts -- the halo, the dots, the timeline
- * resolving a step at a time -- so it needs to be reachable on demand rather
+ * the state with all the moving parts — the halo, the dots, the timeline
+ * resolving a step at a time — so it needs to be reachable on demand rather
  * than only when a real tool happens to be slow.
  *
  * Each step rewrites the message with the scene at its new state. That is a
@@ -75,7 +75,7 @@ export function useGalleryTurn() {
 
         // The state is accumulated rather than recomputed from the script each
         // time, so a step only has to say what changed. Written as a local
-        // rather than a ref because a run owns its own timeline -- two runs
+        // rather than a ref because a run owns its own timeline — two runs
         // overlapping would be a bug, and `cancel` prevents it.
         let state: SceneState = SCENE_START
 

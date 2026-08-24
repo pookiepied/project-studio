@@ -9,7 +9,7 @@ import { isWorking, type Artifact } from '@/domain/artifacts/types'
 import { cn } from '@/lib/cn'
 
 /**
- * Generated media -- an image or a video.
+ * Generated media — an image or a video.
  *
  * One component for both, because the difference is the element in the frame
  * and nothing else: identical status vocabulary, identical prompt, identical
@@ -118,7 +118,7 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
  * The play triangle.
  *
  * Drawn rather than taken from the icon set: every mark in the registry is a
- * 1.2px stroke at 14px, and a play button is a solid shape at 20 -- borrowing
+ * 1.2px stroke at 14px, and a play button is a solid shape at 20 — borrowing
  * an outline glyph and filling it would put a shape in the app that answers to
  * neither rule.
  */

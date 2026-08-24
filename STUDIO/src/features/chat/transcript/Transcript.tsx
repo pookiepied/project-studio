@@ -8,8 +8,8 @@ import type { Conversation, SessionStatus } from '@/domain/session/types'
  * The list of turns.
  *
  * Deliberately thin: it decides which component a message gets and nothing
- * else. Every behaviour that used to accumulate in a transcript component --
- * collapsing, editing, hover actions, code, math, the reasoning trace -- lives
+ * else. Every behaviour that used to accumulate in a transcript component —
+ * collapsing, editing, hover actions, code, math, the reasoning trace — lives
  * in the component that owns it, so this file stays readable as those grow.
  */
 export function Transcript({
@@ -60,7 +60,7 @@ export function Transcript({
       )}
 
       {/* The gap between sending and the first token. The mark's own ripple and
-          nothing else -- no "Thinking..." label, because the glyph already
+          nothing else — no "Thinking..." label, because the glyph already
           animates and a word beside it is the interface narrating something the
           user can see. */}
       {status === 'thinking' && visible[visible.length - 1]?.role === 'user' ? (

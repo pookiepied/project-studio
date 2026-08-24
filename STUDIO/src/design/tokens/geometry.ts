@@ -19,7 +19,7 @@ import { DEFAULT_UI_SIZE } from './typography'
  * The steps were drawn tight enough that a row, a menu and a chip all read as
  * rectangles with the corners taken off rather than as soft objects, and at
  * this size that is the difference between an interface that feels calm and one
- * that feels administrative. The window's own 20 is unchanged -- it was already
+ * that feels administrative. The window's own 20 is unchanged — it was already
  * the softest thing on screen, and everything else was failing to agree with
  * it.
  */
@@ -41,7 +41,7 @@ export const RADIUS = {
  * The ratios are `--control-*` in `index.css`, and this is the numeric mirror
  * of them: Framer cannot spring a `calc()`, so the handful of controls that
  * animate a height or a radius need real numbers. Derived rather than restated,
- * so the two cannot drift the way the type scale and the geometry did -- which
+ * so the two cannot drift the way the type scale and the geometry did — which
  * is the whole reason this block exists.
  *
  * The multiplication comes before the division on both sides, so the steps are
@@ -91,7 +91,7 @@ export const SHELL = {
     paddingInline: SPACE.lg,
   },
 
-  /** Window controls. Monochrome -- see `TrafficLights`. */
+  /** Window controls. Monochrome — see `TrafficLights`. */
   trafficLight: { size: 11, gap: SPACE.md },
 
   sidebar: {
@@ -104,7 +104,7 @@ export const SHELL = {
   /**
    * Reading measure for the transcript and the composer.
    *
-   * 46 em of body text, which is about 76 characters -- the upper end of
+   * 46 em of body text, which is about 76 characters — the upper end of
    * comfortable prose. Stated against `--text-body` because the measure has to
    * track the text it is measuring; the root font-size is the layout grid now,
    * not the text size. The composer shares it so a reply lands exactly as wide
@@ -121,14 +121,14 @@ export const SHELL = {
    * The transcript fades into the surface at the top and bottom, and a thumb
    * that runs the full height slides underneath those fades and half
    * disappears. Insetting the track keeps the thumb inside the legible band
-   * without taking away any scroll range -- the content still reaches both
+   * without taking away any scroll range — the content still reaches both
    * ends, only the indicator is shorter.
    *
    * Two values, because the ends are not symmetrical, and each is the sum of
    * what is actually painted over the scroller there rather than a number
    * picked to look about right. A single 44 cleared the strip and then stopped
    * one pixel inside the gradient beneath it, so the thumb still faded out at
-   * the top -- the bug that outlived several attempts to tune the one number.
+   * the top — the bug that outlived several attempts to tune the one number.
    *
    *   top     `topStrip.height` (solid) + 20 (the gradient below it)
    *   bottom  40 (the composer's gradient; the composer itself paints no fill)
@@ -142,14 +142,14 @@ export const SHELL = {
 /*
  * The composer's height, and why it is no longer a number of its own.
  *
- * It used to be 52, and 52 was never chosen for the text -- it was 32px round
+ * It used to be 52, and 52 was never chosen for the text — it was 32px round
  * controls plus 10px of padding, twice. The field was sized by its buttons, and
  * the text inside it had no say at all: setting the composer to 8px or 16px
  * left the capsule exactly 52 tall either way. That is why every attempt to fix
  * "the field is huge and the text is tiny" by changing a font size failed. The
  * font was never in the equation.
  *
- * Measured, the field held 11px text in a 52px box -- 4.7x. Every other control
+ * Measured, the field held 11px text in a 52px box — 4.7x. Every other control
  * in the app sat between 2.2x and 2.4x. It was not that the composer looked
  * wrong next to the text; it was the one control in the interface not drawn to
  * the same proportion as the rest of it.
@@ -157,7 +157,7 @@ export const SHELL = {
  * Both inputs are tokens now, so the height is an outcome rather than a
  * constant: the control row is `CONTROL.md`, the same step every other icon
  * button uses, and the padding is one step of the spacing grid. At the default
- * that lands on 40 -- which is also `SHELL.topStrip.height`, so the field and
+ * that lands on 40 — which is also `SHELL.topStrip.height`, so the field and
  * the window's chrome finally agree without either being told to.
  */
 const COMPOSER_PADDING_BLOCK = SPACE.sm
@@ -177,7 +177,7 @@ export const COMPOSER = {
    *
    * `pill` is 9999. Animating 9999 -> 18 is a linear interpolation through
    * absurd values, and border-radius is clamped to half the box at paint time,
-   * so nothing visible happens for most of the transition -- the field sits as
+   * so nothing visible happens for most of the transition — the field sits as
    * a capsule through ~99% of the duration and then collapses to a box in the
    * last few frames. That late collapse, arriving after the height had already
    * changed, is exactly the "it changes shape and then reverts" the user kept
@@ -185,12 +185,12 @@ export const COMPOSER = {
    *
    * From 26 to 18 the transition is short, monotonic and visible the whole way,
    * which is what makes it read as one object relaxing rather than two shapes
-   * swapping. (Half of 52 exactly -- it only adds up now that the rem grid
+   * swapping. (Half of 52 exactly — it only adds up now that the rem grid
    * paints at nominal; for as long as the root carried the text size, the
    * field's real height was ~42px and this number described a box it never
    * sat on.)
    *
-   * Half of the height rather than a hand-written copy of half the height --
+   * Half of the height rather than a hand-written copy of half the height —
    * the capsule stays a capsule when the height moves, instead of the two
    * needing to be remembered together.
    */
@@ -201,6 +201,6 @@ export const COMPOSER = {
   /** Grow to about eight lines, then scroll inside. */
   maxHeight: 184,
   paddingInline: SPACE.sm,
-  /** Every round control inside the field -- the same step as the chrome's. */
+  /** Every round control inside the field — the same step as the chrome's. */
   controlSize: CONTROL.md,
 } as const

@@ -14,7 +14,7 @@ import { useDetachConversation, useWorkspace } from '@/stores/workspace'
  *
  * Not a second app, and not a stripped copy of the shell. It is the same
  * `ChatPage`, the same composer, the same transcript and the same window
- * treatment -- one rounded frame with the DWM corner, the traffic lights, the
+ * treatment — one rounded frame with the DWM corner, the traffic lights, the
  * drag region. A detached window that rendered its own lighter transcript
  * would drift from the real one within a week, and the first thing anyone
  * would notice is that a feature works in one window and not the other.
@@ -27,7 +27,7 @@ import { useDetachConversation, useWorkspace } from '@/stores/workspace'
  * The identity line stays, because it names what you are looking at and a
  * window with no title is one you cannot pick out of a task switcher. The turn
  * settings stay, because the composer is here and they belong to the next
- * message -- which is the same rule the main window follows.
+ * message — which is the same rule the main window follows.
  */
 export function DetachedShell({ conversationId }: { conversationId: string }) {
   const { conversations } = useWorkspace()
@@ -36,8 +36,8 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
 
   if (!conversation) return <Missing />
 
-  // A fork is a new conversation, and this window is about one. The default --
-  // navigating in place -- is invisible here, because this shell renders the
+  // A fork is a new conversation, and this window is about one. The default —
+  // navigating in place — is invisible here, because this shell renders the
   // conversation it was opened for and no route. So a fork gets what any new
   // conversation deserves: a window of its own.
   const openFork = (forkId: string) => {
@@ -59,7 +59,7 @@ export function DetachedShell({ conversationId }: { conversationId: string }) {
             // Same contract as the sidebar's brand band: dragging goes through
             // `startWindowDrag` rather than `data-tauri-drag-region`, whose
             // double-click maximize squares the DWM corner. The target guard
-            // keeps the strip's controls clickable -- the drag belongs to the
+            // keeps the strip's controls clickable — the drag belongs to the
             // empty header, never to a child of it.
             if (event.button !== 0 || event.target !== event.currentTarget) return
             void startWindowDrag()

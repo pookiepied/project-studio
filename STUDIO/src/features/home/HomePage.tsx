@@ -6,7 +6,7 @@ import { useNavigation } from '@/stores/navigation'
 /**
  * The home surface.
  *
- * A line and a field. Nothing else -- no recents, no project grid, no cards.
+ * A line and a field. Nothing else — no recents, no project grid, no cards.
  * Recents used to sit under the composer and they are gone on purpose: the
  * sidebar is where conversations live, and listing them here too meant the
  * first thing on the calmest screen in the app was a duplicate of the column

@@ -352,7 +352,7 @@ describe('readChunkFacts', () => {
       outcome: 'failed',
     })
     // An error this side cannot read means "reason present but unknown",
-    // never a fabricated cause -- and never dropped either.
+    // never a fabricated cause — and never dropped either.
     const unreadable = readChunkFacts({ type: 'submission-settled', outcome: 'aborted', error: 42 })
     expect(unreadable).toMatchObject({
       type: 'submission-settled',

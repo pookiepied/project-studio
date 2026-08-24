@@ -88,7 +88,7 @@ describe('the field holds its words until the harness takes them', () => {
   it('is busy from send to receipt, so one message cannot be POSTed twice', async () => {
     // Held in a property, not a bare `let`: the assignment happens inside the
     // promise executor's callback, and control-flow narrowing would call the
-    // variable `never` here -- the same pattern useConversation.test.tsx uses.
+    // variable `never` here — the same pattern useConversation.test.tsx uses.
     const holder: { settle: ((receipt: Receipt) => void) | null } = { settle: null }
     const onSend = vi.fn(
       () =>
@@ -103,7 +103,7 @@ describe('the field holds its words until the harness takes them', () => {
     await waitFor(() => expect(onSend).toHaveBeenCalled())
 
     // Still in flight: the control reads Stop, and clicking it cannot start
-    // a second POST -- a duplicate turn is the one thing a retry here would
+    // a second POST — a duplicate turn is the one thing a retry here would
     // manufacture.
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(onSend).toHaveBeenCalledTimes(1)
@@ -113,13 +113,13 @@ describe('the field holds its words until the harness takes them', () => {
     await waitFor(() => expect(field()).toBe(''))
   })
   it('stays busy from send to receipt even when the page passes a busy of its own', () => {
-    // ChatPage passes `busy={phase.status === 'streaming'}` -- a BOOLEAN, and
+    // ChatPage passes `busy={phase.status === 'streaming'}` — a BOOLEAN, and
     // `false` for the whole POST round trip, because the turn has not started
     // streaming yet. A guard written as `busyOverride ?? sending` never
     // reaches `sending` when the caller always supplies a boolean, so the
     // in-flight lock existed only in tests that omitted the prop. Two clicks
     // then mean two POSTs, and an identical resend is a SECOND TURN by
-    // design -- the harness pins that and deduplicates nothing.
+    // design — the harness pins that and deduplicates nothing.
     const holder: { settle: ((receipt: Receipt) => void) | null } = { settle: null }
     const onSend = vi.fn(
       () =>

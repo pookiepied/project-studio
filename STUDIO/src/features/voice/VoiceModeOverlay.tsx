@@ -17,8 +17,8 @@ import { useVoiceSession } from '@/features/voice/useVoiceMode'
  * The voice stage.
  *
  * A different stage in the plain sense: the whole window is given over to one
- * conversation held out loud, and everything else -- sidebar, transcript,
- * composer -- waits underneath, untouched, for the mode to end.
+ * conversation held out loud, and everything else — sidebar, transcript,
+ * composer — waits underneath, untouched, for the mode to end.
  *
  * ---- The layout ------------------------------------------------------------
  *
@@ -29,7 +29,7 @@ import { useVoiceSession } from '@/features/voice/useVoiceMode'
  * ---- Motion ----------------------------------------------------------------
  *
  * Entrance and exit are a whole surface changing, so they take `DURATION.slow`
- * -- the palette's clock, not the composer's. Everything inside is
+ * — the palette's clock, not the composer's. Everything inside is
  * crossfades on the state of the session; the one continuous animation is the
  * orb, which is the state made visible rather than choreography (see
  * `VoiceOrb`).
@@ -39,7 +39,7 @@ import { useVoiceSession } from '@/features/voice/useVoiceMode'
  * One transport, one meaning: the floor. Tapped while listening, it takes the
  * turn by hand; tapped while the stage speaks or thinks, it interrupts and
  * gives the floor back. Escape leaves the mode entirely. The close control is
- * a quiet round button in the corner -- never the primary, because leaving is
+ * a quiet round button in the corner — never the primary, because leaving is
  * not the thing this screen is for.
  */
 
@@ -62,7 +62,7 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
   const session = useVoiceSession(open)
 
   // Escape leaves the mode from anywhere, including while the transport is
-  // disabled -- a mode you could not keyboard out of would be a trap with a
+  // disabled — a mode you could not keyboard out of would be a trap with a
   // waveform in it. Bound to the document for the same reason the Dialog's
   // is: focus may be nowhere useful inside the stage.
   useEffect(() => {
@@ -120,7 +120,7 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 px-6">
               {/* One line of state. The label swaps on a fast crossfade; the
                   dot under "Listening" pulses for exactly as long as the
-                  microphone is actually open -- the same licence the thinking
+                  microphone is actually open — the same licence the thinking
                   sparkle runs on. */}
               <div className="flex h-4 items-center">
                 <AnimatePresence initial={false} mode="popLayout">
@@ -221,15 +221,15 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
                     icon-only control in the app.
 
                     `xl` rather than `size="lg"` plus a `size-11` override. The
-                    two contradicted each other -- `size-11` won through
-                    tailwind-merge, so the `lg` was dead prop -- and 44px as a
+                    two contradicted each other — `size-11` won through
+                    tailwind-merge, so the `lg` was dead prop — and 44px as a
                     rem utility was the last control in the app that could not
                     follow `--ui-size`. It is a step now, and the only thing
                     that uses it.
 
                     The mark scales with it. A `md` glyph is 15px, which inside
                     a 44px circle is 2.9x air where every other control in the
-                    app sits near 1.9x -- a small square adrift in a large
+                    app sits near 1.9x — a small square adrift in a large
                     disc, which is what read as "not centred" even though the
                     flex centring was exact. `lg` puts it back in proportion. */}
                 <IconButton
@@ -254,18 +254,18 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
 /**
  * The ridge: the stage's continuous line, drawn from the level history.
  *
- * One frame loop, one buffer, one path -- and the source of the signal
+ * One frame loop, one buffer, one path — and the source of the signal
  * changes with the session while all three persist:
  *
  *   listening   the microphone's measured level. Real, always; silence draws
  *               a hairline, because that is what silence is.
  *   thinking    the pulse from `waveform.ts`. Barely above the hairline: the
  *               one state with nothing to measure gets the quietest shape.
- *   speaking    the envelope. Synthesised, and contained -- see its note in
+ *   speaking    the envelope. Synthesised, and contained — see its note in
  *               `waveform.ts`; a real voice swaps the source and nothing else.
  *
  * Because the buffer survives the transitions, the line morphs from one
- * source into the next instead of being redrawn -- the collapse from speech
+ * source into the next instead of being redrawn — the collapse from speech
  * to thought reads as settling, not switching.
  *
  * Like the composer's bars, this writes the path directly from the frame
@@ -277,7 +277,7 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
  *
  * ---- Why this replaced the ridge ------------------------------------------
  *
- * The ridge was an honest instrument -- a real waveform of real audio -- and
+ * The ridge was an honest instrument — a real waveform of real audio — and
  * it had one flaw that no amount of tuning fixed: a horizontal line renders
  * every state as the same gesture at a different amplitude. Listening and
  * speaking both look like a moving line. Thinking looks like a flat one, which
@@ -291,7 +291,7 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
  * listening from speaking. Together each state is identifiable from across a
  * room and without reading the label under it.
  *
- *   connecting  grey, a slow shallow breath -- waiting, not dead
+ *   connecting  grey, a slow shallow breath — waiting, not dead
  *   listening   blue, driven by the microphone; this one is the real signal,
  *               so a silent room shows a still orb and only speech moves it
  *   thinking    amber, a slow pulse with nothing measured, because there is

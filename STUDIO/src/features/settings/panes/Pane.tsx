@@ -21,8 +21,8 @@ export function Pane({
     <div className="mx-auto w-full max-w-[36rem]">
       <header className="mb-5">
         {/* The editorial serif, because this is a page title and that is the
-            serif's one job (ADR 0043). It was set in `text-title` -- Inter,
-            semibold -- which made Settings the only page in the app whose
+            serif's one job (ADR 0043). It was set in `text-title` — Inter,
+            semibold — which made Settings the only page in the app whose
             heading answered to a different voice than the home greeting and the
             dialog headers. One page disagreeing is what reads as the app using
             several fonts at random rather than two with a rule. */}

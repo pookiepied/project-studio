@@ -2,9 +2,9 @@
  * The conversation surface of the harness, one client per conversation.
  *
  * This is the client ADR 0045 exists for. `client.ts` is request and
- * response: ask, wait, parse, done. A conversation is a different shape --
+ * response: ask, wait, parse, done. A conversation is a different shape —
  * a turn is submitted and the answer is a durable run that is READ,
- * possibly from before it started, possibly after an interruption -- so it
+ * possibly from before it started, possibly after an interruption — so it
  * belongs beside the administration client rather than inside it.
  *
  * ---- The offset is the whole point ----------------------------------------
@@ -23,13 +23,13 @@
  * snapshot of the materialized conversation and refuses `offset` and `live`;
  * `?view=updates` emits the chunk protocol as SSE and requires an offset to
  * resume strictly after. A plain GET defaults to history, which is why the
- * bare path this client once sent -- to which Rust appended
- * `offset=...&live=sse` -- was refused on every single attach.
+ * bare path this client once sent — to which Rust appended
+ * `offset=...&live=sse` — was refused on every single attach.
  *
  * The protocol is also explicit that an updates connection must not be
  * resumed without the projection state its offset presupposes ("request
- * fresh history when local state is unavailable"). So a cold start here --
- * no retained offset -- is always: read history first, hand its snapshot to
+ * fresh history when local state is unavailable"). So a cold start here —
+ * no retained offset — is always: read history first, hand its snapshot to
  * the consumer, then open updates strictly after the snapshot's offset. A
  * 404 from history is not a failure: the harness creates the stream when the
  * agent instance receives its first prompt, so a conversation nobody has
@@ -43,7 +43,7 @@
  * body, and forwards classified events over a Tauri channel. Cancelling a
  * read is `service_stream_cancel`, and the distinction it rests on is ADR
  * 0045 section 5: cancelling a stream stops READING a run; aborting stops
- * the RUN. Closing a pane does the first and must never do the second --
+ * the RUN. Closing a pane does the first and must never do the second —
  * which is why `attach()`'s handle exposes cancel and nothing else touches
  * the abort route except an explicit caller decision.
  *
@@ -103,10 +103,10 @@ function defaultChannelFactory(onMessage: (message: WireStreamEvent) => void): S
  * - `no-harness`: the supervisor has no endpoint. Remedy: start it.
  * - `refused`: the harness answered, with a refusal; status travels with
  *   its own sentence.
- * - `rejected`: OUR seam refused the call -- a bad path or init is this
+ * - `rejected`: OUR seam refused the call — a bad path or init is this
  *   file's bug, not something to show a user as a harness problem.
  * - `broken`: the read began and then failed mid-flight. Recoverable by
- *   reattaching at the retained offset -- that is its whole design.
+ *   reattaching at the retained offset — that is its whole design.
  * - `unreachable`: the exchange never completed; a lost submission
  *   acknowledgement lands here and stays unknown, never retried (Flue
  *   deduplicates nothing).
@@ -137,7 +137,7 @@ function nonEmpty(value: unknown): string | null {
 /**
  * Reads a rejection from any service-seam command into the failure union.
  * An unclassifiable rejection stays `unreachable` with whatever sentence
- * travelled with it -- never swallowed.
+ * travelled with it — never swallowed.
  */
 export function seamFailure(value: unknown): SeamFailure {
   if (!isRecord(value) || typeof value['kind'] !== 'string') {
@@ -204,7 +204,7 @@ export interface SubmittedTurn {
  * content. `replaying` distinguishes history being replayed from history
  * being made; it flips when `up-to-date` arrives and stays flipped.
  * `absent` means the harness answered that no stream exists for this
- * conversation yet -- a fresh conversation, not a failure.
+ * conversation yet — a fresh conversation, not a failure.
  */
 export type ConversationDelivery =
   | {
@@ -236,7 +236,7 @@ export interface AttachHandlers {
 /**
  * How an attached read finished. `ended` is the harness saying the stream
  * closed behind an `Ended` delivery; `cancelled` covers everything where
- * nobody was left reading -- an explicit cancel, a superseded attach, or a
+ * nobody was left reading — an explicit cancel, a superseded attach, or a
  * webview that went away mid-read. `absent` is how a cold start ends when
  * the harness has no stream for this conversation at all: there was
  * nothing to read, nothing broke, and submitting the first turn will
@@ -262,8 +262,8 @@ export interface AttachHandle {
 
 export interface ConversationClientOptions {
   /**
-   * Caller-chosen conversation id. ADR 0045: the id is ours -- the UI
-   * already stores conversation ids because it lists them -- so there is
+   * Caller-chosen conversation id. ADR 0045: the id is ours — the UI
+   * already stores conversation ids because it lists them — so there is
    * nothing to discover and nothing here asks the harness what is in flight.
    */
   readonly conversationId: string
@@ -278,7 +278,7 @@ export interface ConversationClient {
   /**
    * The last offset any delivered event reported across attachments; null
    * until a first delivery. This is everything durably known about where
-   * this webview has read to -- ADR 0045: "everything else is re-derivable
+   * this webview has read to — ADR 0045: "everything else is re-derivable
    * from the id and that number".
    */
   lastOffset(): string | null
@@ -290,7 +290,7 @@ export interface ConversationClient {
    * Attaches a reader.
    *
    * With a retained offset (or one named explicitly) the read opens the
-   * updates view strictly after that offset. Without one -- a cold start --
+   * updates view strictly after that offset. Without one — a cold start —
    * the history view is read first and its snapshot delivered, because an
    * updates connection resumed without the projection state behind its
    * offset would render deltas whose messages never began. Attaching while
@@ -422,18 +422,18 @@ export function createConversationClient(options: ConversationClientOptions): Co
 
       // One settle, whichever fact arrives first: the `Ended` delivery, the
       // command resolving, or the command rejecting. Everything later is
-      // ignored, including a resolve with no prior `Ended` -- Rust returns
+      // ignored, including a resolve with no prior `Ended` — Rust returns
       // `Ok(())` for a reader gone or cancelled too, and with nobody left
       // reading, "cancelled" is the honest word for it.
       let done = false
       // Set by cancel() directly, because a cold start spends time in its
       // history fetch before any registered stream exists for the registry
-      // to stop -- and a superseded read must deliver nothing once told.
+      // to stop — and a superseded read must deliver nothing once told.
       let stopped = false
       // Whether a stream was ever registered. Cancelling a read that opened
       // one settles through the registry: Rust stops the reader and resolves
       // `service_stream`. A cold start cancelled BEFORE that has no reader to
-      // stop, so nothing downstream would ever settle it -- see cancel().
+      // stop, so nothing downstream would ever settle it — see cancel().
       let opened = false
       let upToDate = false
       let resolveSettled!: (settlement: StreamSettlement) => void
@@ -466,8 +466,8 @@ export function createConversationClient(options: ConversationClientOptions): Co
             // The try covers the PARSE and nothing else. Reading the data
             // is a judgement about the frame; what the consumer then does
             // with it is not, and folding a consumer's exception into this
-            // fallback would deliver the same bytes twice -- once as chunks
-            // and once as raw -- while hiding the real failure.
+            // fallback would deliver the same bytes twice — once as chunks
+            // and once as raw — while hiding the real failure.
             let chunks: readonly ChunkFacts[] | null = null
             try {
               const value: unknown = JSON.parse(event.data)
@@ -538,8 +538,8 @@ export function createConversationClient(options: ConversationClientOptions): Co
       /**
        * The cold-start sequence: history first, then updates from wherever
        * the snapshot ended. A conversation the harness has never heard of
-       * has no stream to attach to -- that is `absent`, a normal state a
-       * first submission leaves, not an error -- and everything else that
+       * has no stream to attach to — that is `absent`, a normal state a
+       * first submission leaves, not an error — and everything else that
        * can go wrong lands in the same settlements a broken read uses.
        */
       const openFromHistory = () => {
@@ -604,7 +604,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
           // A cold start still inside its history read has no registered
           // stream, so the registry has nothing to stop and nothing else
           // will ever settle this handle. Say so here rather than leaving a
-          // promise pending for the lifetime of the page -- and leave the
+          // promise pending for the lifetime of the page — and leave the
           // opened case to the registry, whose Ok is the honest signal that
           // the reader really has gone.
           if (!opened) resolveSettled({ outcome: 'cancelled' })
@@ -624,7 +624,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
 
       active = registration
       // Supersede, don't stack: two live readers would deliver everything
-      // twice. Fire-and-forget is enough -- the old read settles `cancelled`
+      // twice. Fire-and-forget is enough — the old read settles `cancelled`
       // into whoever still awaits it.
       void previous?.cancel()
       return registration

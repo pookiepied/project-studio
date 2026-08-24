@@ -7,7 +7,7 @@ import { ActionItems } from '@/shell/ActionItems'
  * The right-click menu.
  *
  * It replaces the webview's own, which offers Back, Reload, View Source and
- * Inspect -- commands from a document viewer, in an app with no address bar,
+ * Inspect — commands from a document viewer, in an app with no address bar,
  * several of which do visible damage. `suppressWebviewChrome` blocks that menu
  * in every environment; this is what appears instead, styled like the rest of
  * the app and carrying app-native verbs.
@@ -18,7 +18,7 @@ import { ActionItems } from '@/shell/ActionItems'
  * interface, search, and settings.
  *
  * The verbs themselves are shared with the selection menu through
- * `ActionItems`, so the two cannot drift apart -- they are the same list of
+ * `ActionItems`, so the two cannot drift apart — they are the same list of
  * actions, summoned two ways, and the duplication that preceded the shared
  * component was how one would eventually change without the other.
  *

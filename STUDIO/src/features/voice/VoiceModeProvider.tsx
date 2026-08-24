@@ -5,12 +5,12 @@ import { VoiceModeOverlay } from '@/features/voice/VoiceModeOverlay'
  * Who may open the voice stage, and where it renders.
  *
  * The composer starts voice mode; the stage itself is not part of the page
- * the composer sits in -- it takes the whole window, sidebar and all, so it
+ * the composer sits in — it takes the whole window, sidebar and all, so it
  * is mounted as a sibling of the shell's contents rather than inside any
  * page. A context is the seam between those two positions: the composer does
  * not know where the stage lives, and the stage does not know what opened it.
  *
- * Both shells mount one -- the studio and a detached conversation window each
+ * Both shells mount one — the studio and a detached conversation window each
  * get their own stage over their own contents, because a voice mode that
  * worked in one window and not the other is exactly the drift `DetachedShell`
  * exists to prevent.

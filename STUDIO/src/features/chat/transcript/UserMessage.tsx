@@ -110,7 +110,7 @@ export function UserMessage({
           //
           // Branching lived here too and did not belong. A branch is a fork of
           // the *conversation* from a point in it, and the point is always the
-          // reply you want to redo -- offering it on your own message asks the
+          // reply you want to redo — offering it on your own message asks the
           // reader to work out what "from here" means when "here" is something
           // they wrote. It is still on every assistant message, where the
           // question it answers is the one people actually have.

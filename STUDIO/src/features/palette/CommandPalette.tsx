@@ -45,7 +45,7 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
 
   // Escape is bound to the document rather than to the input: bound to the
   // input it works only while the input has focus, which is every time except
-  // the one that matters -- after focus has drifted to a row.
+  // the one that matters — after focus has drifted to a row.
   useEffect(() => {
     if (!paletteOpen) return
     const onKeyDown = (event: KeyboardEvent) => {

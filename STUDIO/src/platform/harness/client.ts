@@ -16,7 +16,7 @@
  *    goes through a parser from `contracts.ts`, and a body that does not match
  *    is a `malformed-response` failure rather than a value.
  * 3. No retries. A local process that does not answer is a fact to show the
- *    user, not a thing to hammer -- a retry loop against a dead loopback port
+ *    user, not a thing to hammer — a retry loop against a dead loopback port
  *    only delays the truth.
  *
  * The credential is held in this object and sent as a header. It is never
@@ -81,7 +81,7 @@ export interface HarnessClientOptions extends HarnessAddress {
  *
  * `not-reachable` is nothing at the other end: the harness is not running, the
  * port moved, or it did not answer inside the timeout. The remedy is to start
- * it. `unauthorized` is a live harness refusing this credential -- 401 when it
+ * it. `unauthorized` is a live harness refusing this credential — 401 when it
  * does not recognise it, 403 when it does but the session lacks
  * PROVIDER_MANAGEMENT. Both are the same remedy, a fresh launch, so they are
  * one case with different words. `harness-error` is the harness working
@@ -196,7 +196,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
   // headers and the webview's origin is cross-origin to a loopback port, so a
   // browser fetch never gets past the preflight; a request issued from Rust has
   // no origin to preflight. `transport.ts` says why at length, and the
-  // capability -- not this module -- is what limits where it may go.
+  // capability — not this module — is what limits where it may go.
   //
   // Still just a `typeof globalThis.fetch`, so the injection seam above is
   // unchanged and every test that supplies its own transport is unaffected.
@@ -305,7 +305,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     createConnection(draft) {
       // The draft may carry `apiKey`. It goes out in this body and is gone the
-      // moment the request is serialized -- the 201 that comes back is a
+      // moment the request is serialized — the 201 that comes back is a
       // ProviderConnection, which by contract has no key on it.
       return json(
         'POST',
@@ -324,7 +324,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     },
 
     probeConnection(id) {
-      // A refused key or a dead endpoint is a 200 with `ok: false` -- the probe
+      // A refused key or a dead endpoint is a 200 with `ok: false` — the probe
       // succeeded as a probe. Only a missing connection is a 404 here.
       return json('POST', connectionPath(id, '/probe'), undefined, parseProbeResult)
     },

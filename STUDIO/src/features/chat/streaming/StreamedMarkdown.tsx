@@ -12,7 +12,7 @@ import { segment } from '@/features/chat/streaming/segment'
  *
  * What it does is render blocks instead of one document. `segment` decides
  * where the finished text ends, each block is memoised on its own text, and the
- * blocks are keyed by position -- so the block being written keeps its identity
+ * blocks are keyed by position — so the block being written keeps its identity
  * when it finishes and the next one starts, rather than unmounting and being
  * replaced by an identical copy.
  *

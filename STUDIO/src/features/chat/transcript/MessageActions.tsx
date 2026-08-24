@@ -20,7 +20,7 @@ export interface MessageAction {
  * permanently under every turn is a transcript you read past rather than read.
  *
  * Two details that are not incidental. It keeps its height while hidden, so
- * revealing it does not shove the next message down -- opacity only, never
+ * revealing it does not shove the next message down — opacity only, never
  * mount and unmount. And it stays visible while any of its own buttons has
  * focus, so tabbing through the row does not make it disappear under the
  * keyboard user.
@@ -38,7 +38,7 @@ export function MessageActions({
   align?: 'start' | 'end'
   visible: boolean
   /**
-   * Sits at the end of the same row -- the model's name, today.
+   * Sits at the end of the same row — the model's name, today.
    *
    * A slot rather than a sibling, and that is the fix rather than a
    * convenience. As a sibling in a wrapper it did not share this row's top
@@ -72,7 +72,7 @@ export function MessageActions({
         // Space above *and* below.
         //
         // Above, so the row separates from the last line of the reply rather
-        // than reading as its final paragraph -- the gap has to beat the
+        // than reading as its final paragraph — the gap has to beat the
         // prose's own line spacing to do that. Below, because the row is the
         // end of one turn and the next message begins immediately after it; at
         // rest the row is invisible, so without the trailing space two turns

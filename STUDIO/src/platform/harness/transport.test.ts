@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 /**
  * Which way a harness request goes out, and when that is decided.
  *
- * The command itself is not under test -- it is ours but it lives in Rust,
+ * The command itself is not under test — it is ours but it lives in Rust,
  * with its own tests there (`src-tauri/src/services.rs`). The invoke is
  * replaced with a spy so the only thing these assertions can be about is the
  * dispatch: did we pick the right destination, did we send it a path and a
@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
  * "Late enough" is the point of the per-call tests. A module-scope
  * `const transport = isTauri() ? a : b` would evaluate once, at import, and
  * `window.__TAURI_INTERNALS__` is injected by the webview on its own schedule
- * -- so the wrong answer would be cached forever. The harness shipped this
+ * — so the wrong answer would be cached forever. The harness shipped this
  * exact bug in `net/own-ports.ts`; the fix there and here is to read on every
  * call. These tests are what stop it coming back.
  */
@@ -113,7 +113,7 @@ describe('inside Tauri', () => {
     const [command, payload] = invoke.mock.calls[0]
     expect(command).toBe('service_fetch')
     expect(payload.service).toBe('harness')
-    // A path, query included -- not the URL. Rust re-addresses it.
+    // A path, query included — not the URL. Rust re-addresses it.
     expect(payload.path).toBe('/api/providers/models?kind=anthropic')
     expect(payload.init.method).toBe('GET')
     // Lowercased by the Headers normalisation; replaced by Rust before it

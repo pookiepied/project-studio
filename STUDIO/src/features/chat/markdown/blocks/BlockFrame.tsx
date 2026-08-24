@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn'
 /**
  * The preview frame: a thing the reader takes away, shown inside a reply.
  *
- * Code and writing-as-an-object live here -- tier three of the content
+ * Code and writing-as-an-object live here — tier three of the content
  * hierarchy (see `RULES.md`). Their shared contract is *preview*: the content
  * is shown to be recognised and copied, not to be worked in, so past
  * `previewHeight` it is held at the cap behind a fade and that is the whole of
@@ -15,7 +15,7 @@ import { cn } from '@/lib/cn'
  * Two boxes, not one. An outer card carries the shadow and the padding, and an
  * inner panel carries the content on a surface of its own. The caption sits
  * between the inner panel's bottom edge and the card's, on the card's
- * background, with no rule between them -- the gap is the separation.
+ * background, with no rule between them — the gap is the separation.
  *
  * ---- Why the nesting is the whole design ---------------------------------
  *
@@ -32,11 +32,11 @@ import { cn } from '@/lib/cn'
  *
  * And it fixes the corners. A single box has to clip its content to keep its
  * radius, and `overflow: hidden` against a rounded corner is where the harsh,
- * chewed edge comes from -- the browser clips on a pixel grid while the border
+ * chewed edge comes from — the browser clips on a pixel grid while the border
  * radius is antialiased, so the fill ends a fraction inside the curve and the
  * corner reads as cut rather than turned. With two boxes the inner panel's
  * *background* is the rounded shape, and its padding means text never reaches
- * the corner in the first place. Nothing is clipped, so nothing is chewed --
+ * the corner in the first place. Nothing is clipped, so nothing is chewed —
  * which is also why the clip only switches on while the preview cap is holding.
  */
 export function BlockFrame({
@@ -49,7 +49,7 @@ export function BlockFrame({
 }: {
   /** What this block is: a path for code, a name for prose. Left of the caption. */
   label: ReactNode
-  /** Secondary detail -- a line range, a word count. Right of the caption. */
+  /** Secondary detail — a line range, a word count. Right of the caption. */
   meta?: ReactNode
   /**
    * Controls. Always visible.
@@ -69,7 +69,7 @@ export function BlockFrame({
   /**
    * The child paints to the panel's edges and supplies its own padding.
    *
-   * Needed by anything that fills the panel -- the highlighter pads itself, and
+   * Needed by anything that fills the panel — the highlighter pads itself, and
    * a padded child inside the frame's padding is twice the gutter.
    */
   flush?: boolean
