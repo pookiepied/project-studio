@@ -24,6 +24,23 @@ export { resolveHarnessAddress } from './connection'
 export { harnessTransport } from './transport'
 
 export {
+  createConversationClient,
+  seamFailure,
+  type AttachHandle,
+  type AttachHandlers,
+  type ChannelFactory,
+  type ConversationClient,
+  type ConversationClientOptions,
+  type ConversationDelivery,
+  type ServiceInvoke,
+  type SeamFailure,
+  type StreamChannel,
+  type StreamSettlement,
+  type SubmittedTurn,
+  type TurnResult,
+} from './conversation'
+
+export {
   CAPABILITY_SLOTS,
   CAPABILITY_STATES,
   CREDENTIAL_STATUSES,
@@ -42,8 +59,12 @@ export {
   parseProviderConnections,
   parseProviderModel,
   parseProviderModels,
+  parseWireStreamEvent,
+  readChunkFacts,
   type CapabilitySlot,
   type CapabilityState,
+  type ChunkFacts,
+  type ChunkPosition,
   type CredentialStatus,
   type HarnessErrorBody,
   type InvocationShape,
@@ -64,4 +85,5 @@ export {
   type ProviderSource,
   type RetrievalConnection,
   type RetrievalProtocol,
+  type WireStreamEvent,
 } from './contracts'

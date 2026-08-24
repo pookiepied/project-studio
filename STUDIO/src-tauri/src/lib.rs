@@ -147,21 +147,61 @@ async fn service_fetch(
 /// carrying the offset to resume from, so any interruption is answered by
 /// re-invoking this rather than by losing the run (ADR 0045). The
 /// credential stays in Rust exactly as `service_fetch` holds it.
+///
+/// `stream_id` is chosen by the webview and is what makes the stream
+/// cancellable within the session: switching conversations or closing a pane
+/// must stop the old read promptly, not when a heartbeat happens to notice.
+/// See `services::stream_control` for the registry behind it.
+// Same reason as the function it wraps: each argument is one name the
+// webview sends, and folding them would move the contract out of the
+// invoke boundary that matches on it.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn service_stream(
-  supervisor: tauri::State<'_, HarnessSupervisor>,
-  service: services::ServiceId,
-  path: String,
-  init: services::ServiceRequestInit,
-  offset: String,
-  channel: tauri::ipc::Channel<services::StreamEvent>,
+    supervisor: tauri::State<'_, HarnessSupervisor>,
+    streams: tauri::State<'_, std::sync::Arc<services::StreamRegistry>>,
+    service: services::ServiceId,
+    path: String,
+    init: services::ServiceRequestInit,
+    offset: String,
+    stream_id: String,
+    channel: tauri::ipc::Channel<services::StreamEvent>,
 ) -> Result<(), services::ServiceError> {
-  services::service_stream(&supervisor, service, path, init, offset, channel).await
+    services::service_stream(
+        &supervisor,
+        &streams,
+        service,
+        path,
+        init,
+        offset,
+        &stream_id,
+        channel,
+    )
+    .await
+}
+
+/// Cancels one live stream by the id its reader chose. Idempotent by
+/// construction: an unknown id, a stream that already finished, and a cancel
+/// sent twice all find nothing to do and succeed quietly (ADR 0045's rule is
+/// untouched here -- this stops READING a run, never the run itself; aborting
+/// work is Flue's `POST /agents/:name/:id/abort`, and only ever called on
+/// purpose).
+#[tauri::command]
+fn service_stream_cancel(
+    streams: tauri::State<'_, std::sync::Arc<services::StreamRegistry>>,
+    stream_id: String,
+) -> Result<(), String> {
+    streams.cancel(&stream_id);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let supervisor = HarnessSupervisor::new();
+  // The registry behind `service_stream_cancel`: which live streams the
+  // webviews may ask Rust to stop reading. Shared by every window, since a
+  // detached conversation window owns streams exactly as the main one does.
+  let stream_registry = std::sync::Arc::new(services::StreamRegistry::default());
 
   // Eager, and off Tauri's setup thread, so the Harness is starting while the
   // window is still being built rather than after the first request for it.
@@ -191,6 +231,7 @@ pub fn run() {
 
   tauri::Builder::default()
     .manage(supervisor)
+    .manage(stream_registry)
     // Remembers size and position across launches. A desktop app that reopens
     // at a fixed size every time is one the user has to re-arrange every time,
     // and on a second monitor that is the difference between usable and not.
@@ -234,7 +275,8 @@ pub fn run() {
       restart_harness,
       get_harness_status,
       service_fetch,
-      service_stream
+      service_stream,
+      service_stream_cancel
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")

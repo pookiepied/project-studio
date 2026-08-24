@@ -30,8 +30,14 @@ export interface LifecycleRoutesOptions {
  * Restricted to the `studio-host` client type rather than an admission scope:
  * the scope list is ADR 0028's to change, and the distinction this route needs
  * -- "the process that owns this process" versus "a UI consuming it" -- is
- * exactly what the client-type model already says. The desktop UI has no
- * business stopping the process other windows are using.
+ * exactly what the client-type model already says. Note what this check can
+ * and cannot do: production mints exactly one credential, typed
+ * `studio-host` and shared by the Host and its webview, so from in here they
+ * are indistinguishable. Keeping the desktop UI off this route is enforced
+ * one hop earlier, at the Studio's own service seam
+ * (`STUDIO/src-tauri/src/services/mod.rs`), which refuses the path for the
+ * webview; this check distinguishes among HTTP clients a Host does not
+ * control, and costs nothing.
  */
 export function createLifecycleRoutes(
   options: LifecycleRoutesOptions,

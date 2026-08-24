@@ -29,18 +29,26 @@
 //!   carry no notification from the webview to Rust; the only signal is a
 //!   send failing, which it does once the webview was destroyed. Sending
 //!   [`CHANNEL_HEARTBEAT`] regularly bounds how long an unread stream keeps
-//!   its connection open to that discovery.
+//!   its connection open to that discovery -- the backstop, bounded by
+//!   idleness. The prompt path is deliberate: the webview names the stream
+//!   when it starts it and cancels it through [`StreamRegistry`]
+//!   (`stream_control.rs`) while the session is still alive, which is the
+//!   routine case -- switching conversations, closing a pane -- and cannot
+//!   wait fifteen seconds for a heartbeat to notice anything.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
+use tokio::sync::watch;
 
 use crate::harness::endpoint::HarnessEndpoint;
 use crate::harness::supervisor::{redact, HarnessSupervisor};
 
 use super::error::request_failure;
 use super::sse::{SseFrame, SseParser};
+use super::stream_control::StreamRegistry;
 use super::{
     apply_init, method_from_init, seam_client, validate_path, ServiceError, ServiceId,
     ServiceRequestInit,
@@ -130,6 +138,9 @@ enum Outcome {
     BodyEnded,
     /// A send into the channel failed: the webview is gone.
     ReaderGone,
+    /// The webview cancelled this stream id. Nothing is wrong with the
+    /// harness, and there is nobody left to tell.
+    Cancelled,
     Broken(String),
 }
 
@@ -151,27 +162,71 @@ enum Delivery {
 ///
 /// Split from the `#[tauri::command]` wrapper in `lib.rs` for the same
 /// reason as `service_fetch`: testability without a Tauri app.
+///
+/// The `stream_id` is the webview's handle for cancelling this read
+/// (`service_stream_cancel`); it must be non-empty, because an unnamed
+/// stream is one nobody can ever stop. The registration guards the whole
+/// request, so a stream that ends on its own releases its entry whatever
+/// the exit.
+///
+/// The argument count is deliberate: every parameter after the supervisor is
+/// one name the webview sends, and the invoke boundary matches those names.
+/// A struct would hide the contract, not shrink it.
+#[allow(clippy::too_many_arguments)]
 pub async fn service_stream(
     supervisor: &HarnessSupervisor,
+    registry: &Arc<StreamRegistry>,
     service: ServiceId,
     path: String,
     init: ServiceRequestInit,
     offset: String,
+    stream_id: &str,
     channel: Channel<StreamEvent>,
 ) -> Result<(), ServiceError> {
-    match service {
+    if stream_id.is_empty() {
+        return Err(ServiceError::InvalidRequest {
+            message:
+                "the stream id is empty; a stream that cannot be named cannot be cancelled"
+                    .to_owned(),
+        });
+    }
+    let (registration, cancel) = registry.register(stream_id);
+    let result = match service {
         ServiceId::Harness => {
             let endpoint = supervisor.get_endpoint().ok_or(ServiceError::NotRunning)?;
-            harness_stream(&endpoint, &path, init, offset, channel, CHANNEL_HEARTBEAT).await
+            harness_stream(
+                &endpoint,
+                &path,
+                init,
+                offset,
+                channel,
+                CHANNEL_HEARTBEAT,
+                cancel,
+            )
+            .await
         }
-    }
+    };
+    drop(registration);
+    result
+}
+
+/// Waits for the cancellation signal.
+///
+/// A closed signal source counts as cancelled too: the registry drops a
+/// sender when its entry is released or overwritten, and a stream whose
+/// registration is gone has no business still reading. Used in both selects
+/// -- the connect and the consume loop -- so there is no phase of a stream
+/// where cancellation waits on the harness instead of the user.
+async fn cancelled(cancel: &mut watch::Receiver<bool>) {
+    let _ = cancel.changed().await;
 }
 
 /// The one arm, against a resolved endpoint.
 ///
 /// `heartbeat_every` is a parameter rather than the constant so tests can
 /// observe cancellation in milliseconds; the command passes
-/// [`CHANNEL_HEARTBEAT`].
+/// [`CHANNEL_HEARTBEAT`]. `cancel` is the registry's half of the same story:
+/// the webview's prompt stop, watched in both selects below.
 pub(crate) async fn harness_stream(
     endpoint: &HarnessEndpoint,
     path: &str,
@@ -179,6 +234,7 @@ pub(crate) async fn harness_stream(
     offset: String,
     channel: Channel<StreamEvent>,
     heartbeat_every: Duration,
+    mut cancel: watch::Receiver<bool>,
 ) -> Result<(), ServiceError> {
     let url = compose_stream_url(endpoint, path, &offset)?;
     let method = method_from_init(&init)?;
@@ -204,10 +260,17 @@ pub(crate) async fn harness_stream(
         message: error.to_string(),
     })?;
 
-    let response = client
-        .execute(request)
-        .await
-        .map_err(|error| request_failure(&endpoint.token, error))?;
+    let response = tokio::select! {
+        result = client.execute(request) => result
+            .map_err(|error| request_failure(&endpoint.token, error))?,
+        _ = cancelled(&mut cancel) => {
+            // The webview stopped caring before the harness answered. There
+            // is no reader task yet and nothing to tear down; dropping this
+            // future drops the request, which closes the connection.
+            log::debug!("service_stream: cancelled while connecting");
+            return Ok(());
+        }
+    };
 
     let status = response.status();
     if !status.is_success() {
@@ -329,6 +392,9 @@ pub(crate) async fn harness_stream(
                     break 'consume Outcome::ReaderGone;
                 }
             }
+            _ = cancelled(&mut cancel) => {
+                break 'consume Outcome::Cancelled;
+            }
             _ = tokio::time::sleep_until(last_byte + READ_IDLE_TIMEOUT) => {
                 break 'consume Outcome::Broken(format!(
                     "no bytes for {}s; the harness heartbeats every 15s, so the server is dead or frozen",
@@ -352,6 +418,16 @@ pub(crate) async fn harness_stream(
             // not a silent `Ok(())` either, which would be indistinguishable
             // from a finished run in any future diagnostic that counted them.
             log::debug!("service_stream: the channel stopped accepting; request cancelled");
+            Ok(())
+        }
+        Outcome::Cancelled => {
+            // Same audience problem as `ReaderGone` -- the canceller asked
+            // for exactly this -- but a different fact worth being able to
+            // tell apart in the logs: this session ended its own stream,
+            // which is routine (a conversation switch), not a death.
+            // Reattaching is the caller's business; the offset it needs was
+            // on every event already delivered.
+            log::debug!("service_stream: cancelled through its stream id");
             Ok(())
         }
         Outcome::BodyEnded => {
@@ -557,6 +633,13 @@ mod tests {
     /// the tests that want one pass their own interval.
     const NO_HEARTBEAT: Duration = Duration::from_secs(600);
 
+    /// A cancellation receiver nobody will ever fire, for the tests that are
+    /// about some other outcome. The sender comes back too so the scope --
+    /// not the registry -- decides how long the stream can be cancelled.
+    fn uncancelled() -> (watch::Sender<bool>, watch::Receiver<bool>) {
+        watch::channel(false)
+    }
+
     const SSE_HEAD: &str =
         "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncache-control: no-cache\r\n\r\n";
 
@@ -728,13 +811,16 @@ mod tests {
         });
 
         let (channel, events) = recording_channel();
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "4_0".to_owned(),
             channel,
             NO_HEARTBEAT,
+            cancel,
         )
         .await;
 
@@ -768,13 +854,16 @@ mod tests {
     async fn an_absolute_url_in_path_is_refused_before_any_request_is_made() {
         let (addr, captured, _disconnected) = spawn_stub(|_request, _stream| {});
 
+        let (_never, cancel) = uncancelled();
         let error = harness_stream(
+
             &endpoint_for(addr),
             "http://127.0.0.1:9/x",
             ServiceRequestInit::default(),
             "4_0".to_owned(),
             recording_channel().0,
             NO_HEARTBEAT,
+            cancel,
         )
         .await
         .expect_err("an absolute URL is not a path");
@@ -811,13 +900,16 @@ mod tests {
         });
 
         let (channel, events) = recording_channel();
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "0_0".to_owned(),
             channel,
             NO_HEARTBEAT,
+            cancel,
         )
         .await;
         assert!(result.is_ok(), "{result:?}");
@@ -860,13 +952,16 @@ mod tests {
         });
 
         let (channel, events) = recording_channel();
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "4_0".to_owned(),
             channel,
             NO_HEARTBEAT,
+            cancel,
         )
         .await;
         assert!(result.is_ok(), "{result:?}");
@@ -920,13 +1015,16 @@ mod tests {
             std::thread::sleep(Duration::from_millis(300));
         });
 
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "0_0".to_owned(),
             failing_channel(),
             NO_HEARTBEAT,
+            cancel,
         )
         .await;
 
@@ -949,6 +1047,7 @@ mod tests {
             stream.write_all(SSE_HEAD.as_bytes()).expect("head");
         });
 
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
             &endpoint_for(addr),
             "/agents/claude/42",
@@ -956,6 +1055,7 @@ mod tests {
             "0_0".to_owned(),
             failing_channel(),
             Duration::from_millis(100),
+            cancel,
         )
         .await;
 
@@ -984,6 +1084,7 @@ mod tests {
         });
 
         let (channel, events) = recording_channel();
+        let (_never, cancel) = uncancelled();
         let error = harness_stream(
             &endpoint_for(addr),
             "/agents/claude/42",
@@ -991,6 +1092,7 @@ mod tests {
             "0_0".to_owned(),
             channel,
             NO_HEARTBEAT,
+            cancel,
         )
         .await
         .expect_err("a stream that ends without a close frame is broken");
@@ -1024,13 +1126,16 @@ mod tests {
                 .expect("refusal");
         });
 
+        let (_never, cancel) = uncancelled();
         let error = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "0_0".to_owned(),
             recording_channel().0,
             NO_HEARTBEAT,
+            cancel,
         )
         .await
         .expect_err("a refusal is not a stream");
@@ -1055,13 +1160,16 @@ mod tests {
             let _ = stream.shutdown(Shutdown::Both);
         });
 
+        let (_never, cancel) = uncancelled();
         let error = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "0_0".to_owned(),
             recording_channel().0,
             NO_HEARTBEAT,
+            cancel,
         )
         .await
         .expect_err("a control frame must carry the next offset");
@@ -1089,13 +1197,16 @@ mod tests {
         });
 
         let (channel, events) = recording_channel();
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42",
             ServiceRequestInit::default(),
             "0_0".to_owned(),
             channel,
             NO_HEARTBEAT,
+            cancel,
         )
         .await;
         assert!(result.is_ok(), "{result:?}");
@@ -1125,13 +1236,16 @@ mod tests {
                 .expect("close frame");
         });
 
+        let (_never, cancel) = uncancelled();
         let result = harness_stream(
+
             &endpoint_for(addr),
             "/agents/claude/42?live=long-poll",
             ServiceRequestInit::default(),
             "0_0".to_owned(),
             recording_channel().0,
             NO_HEARTBEAT,
+            cancel,
         )
         .await;
         assert!(result.is_ok(), "{result:?}");
@@ -1153,40 +1267,46 @@ mod tests {
                 .expect("refusal");
         });
 
-        let errors = vec![
-            harness_stream(
-                &endpoint_for(addr),
-                "/agents/claude/42",
-                ServiceRequestInit::default(),
-                "0_0".to_owned(),
-                recording_channel().0,
-                NO_HEARTBEAT,
-            )
-            .await
-            .expect_err("the stub refuses everything"),
-            harness_stream(
-                &endpoint_for(addr),
-                "http://127.0.0.1:9/x",
-                ServiceRequestInit::default(),
-                "0_0".to_owned(),
-                recording_channel().0,
-                NO_HEARTBEAT,
-            )
-            .await
-            .expect_err("an absolute URL is not a path"),
-            service_stream(
-                &HarnessSupervisor::new(),
-                ServiceId::Harness,
-                "/agents/claude/42".to_owned(),
-                ServiceRequestInit::default(),
-                "0_0".to_owned(),
-                recording_channel().0,
-            )
-            .await
-            .expect_err("a supervisor that never started is not running"),
-        ];
+        let (_never, cancel) = uncancelled();
+        let refused = harness_stream(
+            &endpoint_for(addr),
+            "/agents/claude/42",
+            ServiceRequestInit::default(),
+            "0_0".to_owned(),
+            recording_channel().0,
+            NO_HEARTBEAT,
+            cancel,
+        )
+        .await
+        .expect_err("the stub refuses everything");
 
-        for error in errors {
+        let (_never_either, cancel) = uncancelled();
+        let absolute = harness_stream(
+            &endpoint_for(addr),
+            "http://127.0.0.1:9/x",
+            ServiceRequestInit::default(),
+            "0_0".to_owned(),
+            recording_channel().0,
+            NO_HEARTBEAT,
+            cancel,
+        )
+        .await
+        .expect_err("an absolute URL is not a path");
+
+        let never_started = service_stream(
+            &HarnessSupervisor::new(),
+            &Arc::new(StreamRegistry::default()),
+            ServiceId::Harness,
+            "/agents/claude/42".to_owned(),
+            ServiceRequestInit::default(),
+            "0_0".to_owned(),
+            "test-stream",
+            recording_channel().0,
+        )
+        .await
+        .expect_err("a supervisor that never started is not running");
+
+        for error in [refused, absolute, never_started] {
             let text = serde_json::to_string(&error).expect("errors serialize");
             assert!(
                 !text.contains("stub-bearer-value"),
@@ -1226,5 +1346,133 @@ mod tests {
         // Anything that is not an unreserved character stays inside the one
         // parameter rather than becoming query structure.
         assert_eq!(encode_query_component("a b&c=d"), "a%20b%26c%3Dd");
+    }
+
+    /// How long a cancel gets to stop a live read before the test calls it
+    /// unprompt. The whole point of the registry is that this is comfortably
+    /// below any heartbeat or idle deadline.
+    const CANCEL_BUDGET: Duration = Duration::from_secs(2);
+
+    #[tokio::test]
+    async fn a_named_stream_can_be_cancelled_promptly_mid_read() {
+        // Head and one frame, then nothing but the stub's comment probes. The
+        // old backstop would have kept this connection until a heartbeat's
+        // failing send noticed the reader was gone; the registry must end it
+        // when the webview says so.
+        let (addr, _captured, disconnected) = spawn_stub(|_request, stream| {
+            stream.write_all(SSE_HEAD.as_bytes()).expect("head");
+            stream
+                .write_all(frame("data", r#"{"a":1}"#).as_bytes())
+                .expect("frame");
+            std::thread::sleep(Duration::from_millis(1_500));
+        });
+
+        let registry = Arc::new(StreamRegistry::default());
+        let (_registration, cancel) = registry.register("pane-1");
+        let (channel, events) = recording_channel();
+        let endpoint = endpoint_for(addr);
+        let task = tokio::spawn(async move {
+            harness_stream(
+                &endpoint,
+                "/agents/claude/42",
+                ServiceRequestInit::default(),
+                "0_0".to_owned(),
+                channel,
+                NO_HEARTBEAT,
+                cancel,
+            )
+            .await
+        });
+
+        // Wait for proof the read is live before cancelling: one delivered
+        // frame means the request reached the harness and came back.
+        let started = Instant::now();
+        loop {
+            let delivered = events.lock().expect("events").iter().any(|(_, event)| {
+                matches!(event, StreamEvent::Frame { .. })
+            });
+            if delivered || started.elapsed() > CANCEL_BUDGET {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+
+        assert!(registry.cancel("pane-1"), "the registration was live");
+        let result = tokio::time::timeout(CANCEL_BUDGET, task)
+            .await
+            .expect("cancellation is prompt; it does not wait for a heartbeat")
+            .expect("the read task did not panic");
+        assert!(result.is_ok(), "a cancelled stream is not an error: {result:?}");
+        assert!(
+            eventually(&disconnected, Duration::from_secs(5)),
+            "the server never observed the cancelled connection"
+        );
+        // And the entry went with it: cancelling again finds nothing.
+        assert!(!registry.cancel("pane-1"));
+    }
+
+    #[tokio::test]
+    async fn a_cancel_that_arrives_while_connecting_does_not_wait_for_the_harness() {
+        // Accepts and then says nothing -- no response head at all -- so the
+        // connect phase itself hangs until the cancel lands. A stub framework
+        // is not used here because the probe comments it writes before any
+        // head would themselves be a malformed HTTP answer.
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a loopback listener");
+        let addr = listener.local_addr().expect("a local address");
+        std::thread::spawn(move || {
+            let (_held, _) = listener.accept().expect("one connection");
+            std::thread::sleep(Duration::from_secs(5));
+        });
+
+        let registry = Arc::new(StreamRegistry::default());
+        let (_registration, cancel) = registry.register("pane-2");
+        let endpoint = endpoint_for(addr);
+        let task = tokio::spawn(async move {
+            harness_stream(
+                &endpoint,
+                "/agents/claude/42",
+                ServiceRequestInit::default(),
+                "0_0".to_owned(),
+                recording_channel().0,
+                NO_HEARTBEAT,
+                cancel,
+            )
+            .await
+        });
+
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let started = Instant::now();
+        assert!(registry.cancel("pane-2"));
+        let result = tokio::time::timeout(CANCEL_BUDGET, task)
+            .await
+            .expect("cancellation during connect is prompt")
+            .expect("the connecting task did not panic");
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "the cancel waited {:?} for a harness that never answered",
+            started.elapsed()
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn an_unnamed_stream_is_refused_before_anything_starts() {
+        // An id the webview cannot later cancel is a stream nobody can ever
+        // prompt-stop; the empty name is refused rather than registered under
+        // some invented key.
+        let error = service_stream(
+            &HarnessSupervisor::new(),
+            &Arc::new(StreamRegistry::default()),
+            ServiceId::Harness,
+            "/agents/claude/42".to_owned(),
+            ServiceRequestInit::default(),
+            "0_0".to_owned(),
+            "",
+            recording_channel().0,
+        )
+        .await
+        .expect_err("an unnamed stream cannot be cancelled");
+
+        assert!(matches!(error, ServiceError::InvalidRequest { .. }), "{error:?}");
     }
 }

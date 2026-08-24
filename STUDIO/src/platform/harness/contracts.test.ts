@@ -6,6 +6,8 @@ import {
   parseProbeResult,
   parseProviderConnection,
   parseProviderModels,
+  parseWireStreamEvent,
+  readChunkFacts,
 } from './contracts'
 
 /**
@@ -229,5 +231,83 @@ describe('parseHarnessErrorBody', () => {
   it('returns null when there is no sentence to show', () => {
     expect(parseHarnessErrorBody({ code: 'models.configuration' })).toBeNull()
     expect(parseHarnessErrorBody('gateway exploded')).toBeNull()
+  })
+})
+
+describe('parseWireStreamEvent', () => {
+  it('reads every variant Rust can deliver, with its resume offset', () => {
+    expect(parseWireStreamEvent({ kind: 'up-to-date', offset: '4_1' })).toEqual({
+      kind: 'up-to-date',
+      offset: '4_1',
+    })
+    expect(parseWireStreamEvent({ kind: 'keep-alive', offset: '-1' })).toEqual({
+      kind: 'keep-alive',
+      offset: '-1',
+    })
+    expect(parseWireStreamEvent({ kind: 'ended', offset: '9_0' })).toEqual({
+      kind: 'ended',
+      offset: '9_0',
+    })
+    expect(
+      parseWireStreamEvent({ kind: 'frame', offset: '5_0', event: null, data: '[1]' }),
+    ).toEqual({ kind: 'frame', offset: '5_0', data: '[1]' })
+    expect(
+      parseWireStreamEvent({ kind: 'frame', offset: '5_0', event: 'presence', data: '{}' }),
+    ).toEqual({ kind: 'frame', offset: '5_0', event: 'presence', data: '{}' })
+  })
+
+  it('refuses anything without the one fact every variant must carry', () => {
+    // The offset is the resume contract; an event without one cannot exist.
+    expect(parseWireStreamEvent({ kind: 'up-to-date' })).toBeNull()
+    expect(parseWireStreamEvent({ kind: 'frame', data: 'x' })).toBeNull()
+    expect(parseWireStreamEvent({ kind: 'mystery', offset: '1_0' })).toBeNull()
+    expect(parseWireStreamEvent('a frame from somewhere else')).toBeNull()
+  })
+})
+
+describe('readChunkFacts', () => {
+  it('reads the facts state depends on and leaves content unread', () => {
+    expect(
+      readChunkFacts({
+        type: 'message-started',
+        messageId: 'm1',
+        submissionId: 'sub_2',
+        position: { batch: 7, index: 3 },
+        model: { provider: 'anthropic', id: 'claude-opus-5' },
+      }),
+    ).toEqual({
+      type: 'message-started',
+      messageId: 'm1',
+      submissionId: 'sub_2',
+      position: { batch: 7, index: 3 },
+      outcome: null,
+    })
+    expect(readChunkFacts({ type: 'submission-settled', outcome: 'aborted' })).toEqual({
+      type: 'submission-settled',
+      messageId: null,
+      submissionId: null,
+      position: null,
+      outcome: 'aborted',
+    })
+  })
+
+  it('keeps unknown chunk types as facts rather than dropping the batch entry', () => {
+    // A projection this side has not heard of is still a real chunk with a
+    // real position; dropping it would desynchronise dedupe.
+    expect(readChunkFacts({ type: 'compaction-started-v9' })).toMatchObject({
+      type: 'compaction-started-v9',
+      position: null,
+    })
+  })
+
+  it('refuses entries with no type at all', () => {
+    expect(readChunkFacts({ position: { batch: 1, index: 1 } })).toBeNull()
+    expect(readChunkFacts('text')).toBeNull()
+  })
+
+  it('refuses a position that is only half a pair', () => {
+    const half = readChunkFacts({ type: 'message-delta', position: { batch: 2 } })
+    expect(half).not.toBeNull()
+    expect(half?.position).toBeNull()
   })
 })

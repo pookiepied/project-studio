@@ -18,18 +18,22 @@
 //!
 //! A directory rather than one file, mirroring `harness/`: `error.rs` holds
 //! the failure shapes, `fetch.rs` the request-and-response command,
-//! `stream.rs` the streaming command, `sse.rs` the framing underneath it.
-//! The enum, the shared `init` type and the path rule live here because every
-//! command through the seam uses all three.
+//! `stream.rs` the streaming command, `stream_control.rs` its in-session
+//! cancellation, `sse.rs` the framing underneath it. The enum, the shared
+//! `init` type and the path rule live here because every command through the
+//! seam uses all three.
 
 mod error;
 mod fetch;
 mod sse;
 mod stream;
+mod stream_control;
 
 pub use error::ServiceError;
 pub use fetch::{service_fetch, SerializedResponse};
-pub use stream::{service_stream, StreamEvent};
+pub use stream::service_stream;
+pub use stream::StreamEvent;
+pub(crate) use stream_control::StreamRegistry;
 
 use serde::Deserialize;
 
@@ -85,12 +89,111 @@ pub(crate) fn validate_path(path: &str) -> Result<(), ServiceError> {
         "a path starting '//' names an authority"
     } else if path.contains("://") {
         "it contains a scheme"
+    } else if is_refused_route(path) {
+        // The one route in the denylist and why it is this one: `/api/shutdown`
+        // ends the harness process. The harness's own guard for that route is
+        // the client type, and production mints exactly ONE credential, typed
+        // `studio-host` (`app.ts` in STUDIO HARNESS) -- precisely the client
+        // type the route demands. So from inside the harness process, the
+        // desktop UI and the Host are indistinguishable, and the route's own
+        // check cannot keep the webview out; only this seam knows that a
+        // request came from the webview rather than from Rust itself. Every
+        // other `/api` route manages state the UI legitimately reads and
+        // changes -- connections, models, approvals -- so there is nothing to
+        // list beyond the path that stops the process other windows use.
+        return Err(ServiceError::InvalidPath {
+            message: "the service seam does not carry shutdown: stopping the harness is the host's decision, made on the process's own channels".to_owned(),
+        });
     } else {
         return Ok(());
     };
     Err(ServiceError::InvalidPath {
         message: format!("the service seam takes a path, not a URL: {reason}"),
     })
+}
+
+/// Routes the webview may not reach through the seam, however validly formed
+/// its path. Kept a function so the match site above stays readable and the
+/// test below has one thing to enumerate.
+fn refused_routes() -> &'static [&'static str] {
+    &["/api/shutdown"]
+}
+
+/// Whether `path` reaches a refused route once everything between here and
+/// the router has had its say.
+///
+/// A denylist has to compare what the ROUTER will match, not what the caller
+/// typed, and two layers rewrite the path in between:
+///
+/// - the `url` crate, which reqwest parses the composed address with, removes
+///   `.` and `..` segments per RFC 3986, so `/api/x/../shutdown` leaves this
+///   process as `/api/shutdown`;
+/// - Hono, on the harness side, percent-decodes each segment before matching
+///   and resolves dot segments of its own, so `/api/%73hutdown` and
+///   `/api/x/%2E%2E/shutdown` both reach the shutdown handler.
+///
+/// Both were verified against the real crate and the real router, not assumed.
+/// So the comparison runs on a canonical form: decode per segment, then
+/// resolve. Anything this refuses that the router would have missed --
+/// `/api//shutdown`, say -- is a path nothing legitimate sends, and refusing a
+/// superset is the safe direction for a denylist.
+fn is_refused_route(path: &str) -> bool {
+    refused_routes().contains(&canonical_route(path).as_str())
+}
+
+/// The path as the harness's router will read it.
+///
+/// Decoding happens per segment, after the split on `/`, because that is what
+/// Hono does: an encoded `%2F` inside a segment stays content and never
+/// becomes a separator. Decoding the whole path first would invent separators
+/// the router never sees, and could refuse a legitimate id that carries one.
+fn canonical_route(path: &str) -> String {
+    let addressed = path.split(['?', '#']).next().unwrap_or("");
+    let mut resolved: Vec<String> = Vec::new();
+    for segment in addressed.split('/') {
+        let decoded = percent_decode_segment(segment);
+        match decoded.as_str() {
+            // An empty segment is a doubled slash, and `.` is here-ish:
+            // neither addresses anything.
+            "" | "." => {}
+            ".." => {
+                resolved.pop();
+            }
+            _ => resolved.push(decoded),
+        }
+    }
+    format!("/{}", resolved.join("/"))
+}
+
+/// Percent-decodes one path segment, once.
+///
+/// Once, not to a fixed point: the router decodes a single pass, so `%2525`
+/// is the literal `%25` to it and must be to us. A `%` that does not begin a
+/// valid escape is content, which is also how every router treats it.
+fn percent_decode_segment(segment: &str) -> String {
+    let bytes = segment.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        let escape = (bytes[index] == b'%' && index + 2 < bytes.len())
+            .then(|| {
+                let high = (bytes[index + 1] as char).to_digit(16)?;
+                let low = (bytes[index + 2] as char).to_digit(16)?;
+                u8::try_from(high * 16 + low).ok()
+            })
+            .flatten();
+        match escape {
+            Some(byte) => {
+                out.push(byte);
+                index += 3;
+            }
+            None => {
+                out.push(bytes[index]);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The client shape every command through the seam uses.
@@ -172,6 +275,72 @@ mod tests {
     fn an_honest_path_is_accepted() {
         assert!(validate_path("/api/providers/connections").is_ok());
         assert!(validate_path("/api/providers/models?kind=anthropic").is_ok());
+    }
+
+    #[test]
+    fn the_shutdown_route_is_refused_at_the_seam() {
+        // Production has exactly one credential and it is typed studio-host,
+        // so the harness's own client-type check on this route cannot tell
+        // the webview from the Host. The seam can, and must.
+        assert!(matches!(
+            validate_path("/api/shutdown"),
+            Err(ServiceError::InvalidPath { .. })
+        ));
+        assert!(matches!(
+            validate_path("/api/shutdown?confirm=true"),
+            Err(ServiceError::InvalidPath { .. })
+        ));
+        // Neighbours that only look like it stay open.
+        assert!(validate_path("/api/shutdowns").is_ok());
+        assert!(validate_path("/api/shutdown/status").is_ok());
+    }
+
+    #[test]
+    fn a_path_that_only_becomes_the_shutdown_route_later_is_refused_too() {
+        // An exact-string denylist does not hold, because the path is
+        // rewritten twice after it leaves here. Each of these was confirmed
+        // to reach the shutdown handler: the first two because the `url`
+        // crate removes dot segments while reqwest parses the composed
+        // address, the rest because Hono percent-decodes every segment and
+        // resolves dot segments before it matches a route.
+        for disguise in [
+            "/api/x/../shutdown",
+            "/api/./shutdown",
+            "/api/%73hutdown",
+            "/api/sh%75tdown",
+            "/%61pi/shutdown",
+            "/api/x/%2E%2E/shutdown",
+            "/api//shutdown",
+            "/api/x/../shutdown?confirm=true",
+        ] {
+            assert!(
+                matches!(
+                    validate_path(disguise),
+                    Err(ServiceError::InvalidPath { .. })
+                ),
+                "the seam let a disguised shutdown through: {disguise}"
+            );
+        }
+    }
+
+    #[test]
+    fn canonicalising_does_not_close_paths_the_app_legitimately_uses() {
+        // The denylist refuses a superset on purpose, so the cost of that
+        // choice is worth pinning: an encoded separator inside one segment is
+        // content, not a path boundary, and a model id is exactly where that
+        // shows up.
+        for honest in [
+            "/api/providers/connections",
+            "/api/providers/models?kind=anthropic",
+            "/api/providers/connections/abc/models/anthropic%2Fclaude-opus-4",
+            "/agents/main/01H%2FX",
+            "/api/shutdown-report",
+        ] {
+            assert!(
+                validate_path(honest).is_ok(),
+                "the seam refused an honest path: {honest}"
+            );
+        }
     }
 
     #[test]
