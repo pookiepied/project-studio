@@ -14,9 +14,14 @@ import {
  * Both seams are injected -- the invoke and the channel constructor -- so
  * nothing here touches Tauri or a harness. What is asserted is the wire
  * behaviour the app depends on: where requests go, what a receipt must look
- * like, and above all that the tracked offset survives an interruption and
- * seeds the next attach. A test that fails without the offset tracking is
- * the one this file exists to keep.
+ * like, that a cold start is history FIRST and updates AFTER it, and above
+ * all that the tracked offset survives an interruption and seeds the next
+ * attach. A test that fails without the offset tracking is the one this file
+ * exists to keep.
+ *
+ * The request shapes here were confirmed against a live harness: history
+ * refuses `offset`/`live` outright, and a conversation with no stream yet
+ * answers 404 -- both are pinned below so neither can quietly regress.
  */
 
 interface RecordedCall {
@@ -67,6 +72,17 @@ function serviceResponse(status: number, body: string): unknown {
   return { status, headers: [['content-type', 'application/json']], body }
 }
 
+/** One snapshot body the way the harness writes it, at a given tail offset. */
+function snapshotBody(offset: string): string {
+  return JSON.stringify({
+    v: 1,
+    conversationId: 'conv_1',
+    offset,
+    messages: [],
+    settlements: [],
+  })
+}
+
 /**
  * A stream script that behaves like the real seam on cancellation: Rust
  * resolves `service_stream` with Ok once the registry stops the read, so a
@@ -90,6 +106,7 @@ function cancellableStreams(): { invoke: ServiceInvoke; calls: RecordedCall[] } 
 }
 
 const CONVERSATION = 'cnv_test_01'
+const UPDATES_PATH = `/agents/studio/${CONVERSATION}?view=updates`
 
 describe('submitting a turn', () => {
   it('posts to the agent route with the caller-chosen conversation id and parses the receipt', async () => {
@@ -152,37 +169,127 @@ describe('submitting a turn', () => {
 })
 
 describe('attaching to a run', () => {
-  it('reads from -1 when nothing has been seen yet, over the streaming seam', async () => {
-    const { invoke, calls } = scriptedInvoke({ service_stream: () => undefined })
-    const { factory } = recordingChannels()
-    const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
-
-    client.attach({ onEvent: () => {} })
-
-    expect(client.attached()).toBe(true)
-    expect(calls[0].command).toBe('service_stream')
-    expect(calls[0].args['service']).toBe('harness')
-    expect(calls[0].args['path']).toBe(`/agents/studio/${CONVERSATION}`)
-    expect(calls[0].args['offset']).toBe('-1')
-    expect(typeof calls[0].args['streamId']).toBe('string')
-  })
-
-  it('resumes from the last delivered offset on the next attach', async () => {
-    // THE test of this task: events advance the tracked offset; a fresh
-    // attach after the interruption reads FROM there.
-    const { invoke, calls } = scriptedInvoke({ service_stream: () => undefined })
+  it('cold starts with history first, then opens updates strictly after the snapshot offset', async () => {
+    // THE sequence the protocol prescribes when local state is unavailable:
+    // an updates connection resumed without its projection state would
+    // render deltas whose messages never began. The live harness refuses a
+    // bare path too -- Rust appends offset/live, which history rejects --
+    // so the old bare-path request was refused on EVERY attach.
+    let streamOpened = false
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: (args) => {
+        // History must be asked for before any stream exists, by path, with
+        // no offset or live parameter -- those are exactly what it refuses.
+        if (streamOpened) throw new Error('history read after the stream opened')
+        const init = args['init'] as { method: string }
+        expect(init.method).toBe('GET')
+        return serviceResponse(200, snapshotBody('0000000000000000_0000000000000007'))
+      },
+      service_stream: (args) => {
+        streamOpened = true
+        expect(args['offset']).toBe('0000000000000000_0000000000000007')
+        return new Promise<void>(() => {})
+      },
+    })
     const { factory, feeds } = recordingChannels()
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
-    const first = client.attach({ onEvent: () => {} })
+    const deliveries: ConversationDelivery[] = []
+    client.attach({ onEvent: (delivery) => deliveries.push(delivery) })
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const fetches = calls.filter((call) => call.command === 'service_fetch')
+    expect(fetches).toHaveLength(1)
+    expect(fetches[0].args['path']).toBe(`/agents/studio/${CONVERSATION}?view=history`)
+    expect(calls.filter((call) => call.command === 'service_stream')).toHaveLength(1)
+    expect(calls.find((call) => call.command === 'service_stream')?.args['path']).toBe(UPDATES_PATH)
+
+    expect(deliveries.map((delivery) => delivery.kind)).toEqual(['snapshot'])
+    const snapshot = deliveries[0]
+    if (snapshot.kind !== 'snapshot') throw new Error('expected the snapshot first')
+    expect(snapshot.offset).toBe('0000000000000000_0000000000000007')
+    expect(client.lastOffset()).toBe('0000000000000000_0000000000000007')
+
+    // And what arrives on the updates connection is still classified as before.
+    feeds[0]({ kind: 'up-to-date', offset: '0000000000000000_0000000000000008' })
+    expect(deliveries.map((delivery) => delivery.kind)).toEqual(['snapshot', 'up-to-date'])
+  })
+
+  it('reports a fresh conversation as absent instead of dressing a 404 up as a break', async () => {
+    // The harness creates the stream when the agent instance receives its
+    // first prompt. A conversation nobody has spoken into has none, the
+    // history view says 404, and there is nothing to attach to -- a normal
+    // state a first submission leaves, never a broken read.
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () =>
+        serviceResponse(
+          404,
+          JSON.stringify({
+            error: { type: 'stream_not_found', message: 'was not found' },
+          }),
+        ),
+    })
+    const { factory } = recordingChannels()
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
+
+    const deliveries: ConversationDelivery[] = []
+    const handle = client.attach({ onEvent: (delivery) => deliveries.push(delivery) })
+    await handle.settled
+
+    expect(deliveries).toEqual([{ kind: 'absent', offset: '-1' }])
+    await expect(handle.settled).resolves.toEqual({ outcome: 'absent' })
+    expect(calls.some((call) => call.command === 'service_stream')).toBe(false)
+  })
+
+  it('carries a history refusal into the settlement with its status', async () => {
+    const { invoke } = scriptedInvoke({
+      service_fetch: () => serviceResponse(403, JSON.stringify({ error: 'admission denied' })),
+    })
+    const { factory } = recordingChannels()
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
+
+    const handle = client.attach({ onEvent: () => {} })
+    await expect(handle.settled).resolves.toEqual({
+      outcome: 'refused',
+      failure: { kind: 'refused', status: 403, message: 'admission denied' },
+    })
+  })
+
+  it('settles broken when the history answer breaks the mirror', async () => {
+    for (const body of ['not json', JSON.stringify({ v: 'one' })]) {
+      const { invoke } = scriptedInvoke({
+        service_fetch: () => serviceResponse(200, body),
+      })
+      const { factory } = recordingChannels()
+      const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
+      const handle = client.attach({ onEvent: () => {} })
+      const settlement = await handle.settled
+      expect(settlement.outcome).toBe('broken')
+      if (settlement.outcome !== 'broken') continue
+      expect(settlement.failure.kind).toBe('malformed')
+    }
+  })
+
+  it('resumes from the last delivered offset on the next attach, over the updates view', async () => {
+    // THE test of this task: events advance the tracked offset; a fresh
+    // attach after the interruption reads FROM there.
+    const { invoke, calls } = cancellableStreams()
+    const { factory, feeds } = recordingChannels()
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
+
+    const first = client.attach({ onEvent: () => {} }, { from: '-1' })
     feeds[0]({ kind: 'frame', offset: '4_0', event: 'data', data: '[{"type":"log"}]' })
     feeds[0]({ kind: 'up-to-date', offset: '5_1' })
     expect(client.lastOffset()).toBe('5_1')
 
     await first.cancel()
     client.attach({ onEvent: () => {} })
-    expect(calls.filter((call) => call.command === 'service_stream')).toHaveLength(2)
-    expect(calls.at(-1)?.args['offset']).toBe('5_1')
+    const reads = calls.filter((call) => call.command === 'service_stream')
+    expect(reads).toHaveLength(2)
+    expect(reads[1].args['offset']).toBe('5_1')
+    expect(reads[1].args['path']).toBe(UPDATES_PATH)
   })
 
   it('honours an explicit starting offset, including -1 for the beginning', async () => {
@@ -206,14 +313,14 @@ describe('attaching to a run', () => {
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
     const deliveries: ConversationDelivery[] = []
-    client.attach({ onEvent: (delivery) => deliveries.push(delivery) })
+    client.attach({ onEvent: (delivery) => deliveries.push(delivery) }, { from: '-1' })
 
     feeds[0]({
       kind: 'frame',
       offset: '6_0',
       event: 'data',
       data: JSON.stringify([
-        { type: 'message-started', messageId: 'm1', submissionId: 'sub_9', position: { batch: 6, index: 0 } },
+        { type: 'message-started', messageId: 'm1', submissionId: 'sub_9', timestamp: '2026-08-24T00:00:00Z', position: { batch: 6, index: 0 } },
         { noTypeHere: true },
         { type: 'submission-settled', outcome: 'failed', submissionId: 'sub_9' },
       ]),
@@ -230,17 +337,43 @@ describe('attaching to a run', () => {
     expect(batch.chunks).toEqual([
       {
         type: 'message-started',
+        position: { batch: 6, index: 0 },
         messageId: 'm1',
         submissionId: 'sub_9',
-        position: { batch: 6, index: 0 },
         outcome: null,
+        snapshot: null,
+        message: null,
+        model: null,
+        timestamp: '2026-08-24T00:00:00Z',
+        deltaKind: null,
+        delta: null,
+        toolCallId: null,
+        toolName: null,
+        input: null,
+        output: null,
+        errorText: null,
+        usage: null,
       },
+      // An unrecognised type survives as a fact carrying only its position,
+      // because dropping it would desync position dedupe.
       {
         type: 'submission-settled',
+        position: null,
         messageId: null,
         submissionId: 'sub_9',
-        position: null,
         outcome: 'failed',
+        snapshot: null,
+        message: null,
+        model: null,
+        timestamp: null,
+        deltaKind: null,
+        delta: null,
+        toolCallId: null,
+        toolName: null,
+        input: null,
+        output: null,
+        errorText: null,
+        usage: null,
       },
     ])
     const foreign = deliveries[1]
@@ -255,7 +388,7 @@ describe('attaching to a run', () => {
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
     const deliveries: ConversationDelivery[] = []
-    client.attach({ onEvent: (delivery) => deliveries.push(delivery) })
+    client.attach({ onEvent: (delivery) => deliveries.push(delivery) }, { from: '-1' })
 
     feeds[0]({
       kind: 'frame',
@@ -291,7 +424,7 @@ describe('attaching to a run', () => {
     const { factory, feeds } = recordingChannels()
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
-    const handle = client.attach({ onEvent: () => {} })
+    const handle = client.attach({ onEvent: () => {} }, { from: '-1' })
     feeds[0]({ kind: 'ended', offset: '9_0' })
     await expect(handle.settled).resolves.toEqual({ outcome: 'ended' })
 
@@ -310,7 +443,7 @@ describe('attaching to a run', () => {
     const { factory, feeds } = recordingChannels()
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
-    const handle = client.attach({ onEvent: () => {} })
+    const handle = client.attach({ onEvent: () => {} }, { from: '-1' })
     feeds[0]({ kind: 'up-to-date', offset: '8_8' })
 
     await expect(handle.settled).resolves.toEqual({
@@ -321,12 +454,40 @@ describe('attaching to a run', () => {
     expect(client.lastOffset()).toBe('8_8')
   })
 
+  it('delivers nothing from a superseded cold start whose history landed late', async () => {
+    // Held in a property, not a bare `let`: the assignment happens inside a
+    // callback, and control-flow narrowing would call it `never` here.
+    const release: { history: ((value: unknown) => void) | null } = { history: null }
+    const { invoke } = scriptedInvoke({
+      service_fetch: () =>
+        new Promise((resolve) => {
+          release.history = resolve
+        }),
+    })
+    const streams = cancellableStreams()
+    const invokeBoth: ServiceInvoke = async (command, args) =>
+      command === 'service_fetch' ? invoke(command, args) : streams.invoke(command, args)
+    const { factory } = recordingChannels()
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke: invokeBoth, createChannel: factory })
+
+    const deliveries: ConversationDelivery[] = []
+    const first = client.attach({ onEvent: (delivery) => deliveries.push(delivery) })
+    await first.cancel()
+    client.attach({ onEvent: () => {} }, { from: '-1' })
+
+    release.history?.(serviceResponse(200, snapshotBody('9_9')))
+    for (let index = 0; index < 5; index += 1) await Promise.resolve()
+
+    expect(deliveries).toEqual([])
+    expect(streams.calls.filter((call) => call.command === 'service_stream')).toHaveLength(1)
+  })
+
   it('cancels its read through the registry without touching the run', async () => {
     const { invoke, calls } = scriptedInvoke({ service_stream: () => new Promise(() => {}) })
     const { factory } = recordingChannels()
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
-    const handle = client.attach({ onEvent: () => {} })
+    const handle = client.attach({ onEvent: () => {} }, { from: '-1' })
     await handle.cancel()
     await handle.cancel()
 
@@ -349,7 +510,7 @@ describe('attaching to a run', () => {
       invoke: failing.invoke,
       createChannel: otherFeeds.factory,
     })
-    await expect(other.attach({ onEvent: () => {} }).cancel()).resolves.toBeUndefined()
+    await expect(other.attach({ onEvent: () => {} }, { from: '-1' }).cancel()).resolves.toBeUndefined()
   })
 
   it('supersedes the previous read instead of stacking a second one', async () => {
@@ -357,8 +518,8 @@ describe('attaching to a run', () => {
     const { factory } = recordingChannels()
     const client = createConversationClient({ conversationId: CONVERSATION, invoke, createChannel: factory })
 
-    const first = client.attach({ onEvent: () => {} })
-    client.attach({ onEvent: () => {} })
+    const first = client.attach({ onEvent: () => {} }, { from: '-1' })
+    client.attach({ onEvent: () => {} }, { from: '-1' })
 
     const cancelIds = calls
       .filter((call) => call.command === 'service_stream_cancel')
@@ -406,5 +567,116 @@ describe('aborting a run', () => {
       ok: false,
       error: { kind: 'refused', status: 404, message: 'no such agent instance' },
     })
+  })
+})
+
+/**
+ * What a cancelled read must stop doing.
+ *
+ * `cancel()` is asynchronous by nature: the registry stops the reader in
+ * Rust, but frames already in the channel's queue still arrive afterwards.
+ * A superseded read that keeps delivering is not merely untidy -- it writes
+ * the client's tracked offset, and an older read's late frame can drag that
+ * offset BACKWARDS past what the newer read has already seen.
+ */
+describe('a read that has been cancelled', () => {
+  it('delivers nothing once cancelled, and never moves the tracked offset backwards', async () => {
+    const { invoke } = cancellableStreams()
+    const channels = recordingChannels()
+    const client = createConversationClient({
+      conversationId: CONVERSATION,
+      invoke,
+      createChannel: channels.factory,
+    })
+
+    const deliveries: ConversationDelivery[] = []
+    const handle = client.attach(
+      { onEvent: (delivery) => deliveries.push(delivery) },
+      { from: '4_0' },
+    )
+    const feed = channels.feeds[0]
+    if (feed === undefined) throw new Error('no channel')
+
+    feed({ kind: 'keep-alive', offset: '9_9' })
+    expect(client.lastOffset()).toBe('9_9')
+    const delivered = deliveries.length
+
+    await handle.cancel()
+
+    // A frame that was already in flight when the cancel landed.
+    feed({ kind: 'keep-alive', offset: '2_0' })
+
+    expect(deliveries).toHaveLength(delivered)
+    expect(client.lastOffset()).toBe('9_9')
+  })
+
+  it('settles a cold start cancelled while its history read is still in flight', async () => {
+    let releaseHistory!: (answer: unknown) => void
+    const { invoke } = scriptedInvoke({
+      service_fetch: () => new Promise((resolve) => { releaseHistory = resolve }),
+      service_stream: () => new Promise<void>(() => {}),
+      service_stream_cancel: async () => undefined,
+    })
+    const channels = recordingChannels()
+    const client = createConversationClient({
+      conversationId: CONVERSATION,
+      invoke,
+      createChannel: channels.factory,
+    })
+
+    // No retained offset: this is the history-first cold start.
+    const handle = client.attach({ onEvent: () => {} })
+    await handle.cancel()
+    releaseHistory(serviceResponse(200, snapshotBody('3_0')))
+
+    // Nothing else will ever settle this read; if cancel does not, the
+    // promise hangs for the lifetime of the page.
+    const settlement = await Promise.race([
+      handle.settled,
+      new Promise((resolve) => setTimeout(() => resolve('hung'), 50)),
+    ])
+    expect(settlement).toEqual({ outcome: 'cancelled' })
+    expect(client.attached()).toBe(false)
+  })
+})
+
+/**
+ * The parse guard must guard the PARSE.
+ *
+ * A frame that is not a chunk batch is delivered raw, and deciding that
+ * requires a try. But the decision is about the DATA, not about what the
+ * consumer then does with it: a reducer that throws must not be told the
+ * same bytes twice in a second shape, and its failure must not be swallowed
+ * into a fallback that looks like a protocol judgement.
+ */
+describe('a consumer that throws on a chunk batch', () => {
+  it('is not handed the same frame again as raw data', () => {
+    const { invoke } = cancellableStreams()
+    const channels = recordingChannels()
+    const client = createConversationClient({
+      conversationId: CONVERSATION,
+      invoke,
+      createChannel: channels.factory,
+    })
+
+    const kinds: string[] = []
+    client.attach(
+      {
+        onEvent: (delivery) => {
+          kinds.push(delivery.kind)
+          if (delivery.kind === 'chunks') throw new Error('reducer blew up')
+        },
+      },
+      { from: '-1' },
+    )
+    const feed = channels.feeds[0]
+    if (feed === undefined) throw new Error('no channel')
+
+    const batch = JSON.stringify([{ type: 'message-delta', position: { batch: 1, index: 0 } }])
+    expect(() => feed({ kind: 'frame', offset: '1_0', event: 'data', data: batch })).toThrow(
+      'reducer blew up',
+    )
+
+    expect(kinds).toEqual(['chunks'])
   })
 })

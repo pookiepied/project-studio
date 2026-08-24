@@ -8,6 +8,8 @@ import {
   type ChunkPosition,
   type ConversationClient,
   type ConversationDelivery,
+  type ConversationSnapshotFacts,
+  type TurnResult,
 } from '@/platform/harness'
 import { isTauri } from '@/platform/tauri/window'
 
@@ -25,7 +27,8 @@ import { isTauri } from '@/platform/tauri/window'
  *   what follows is history being made.
  * - `streaming`: a turn is being produced, carrying the submission it
  *   belongs to when one has been seen.
- * - `idle`: the last turn settled completed; connected and quiet.
+ * - `idle`: the last turn settled completed -- or the harness has no stream
+ *   for this conversation yet, which is how every fresh conversation starts.
  * - `interrupted`: the read broke -- transport failure, harness crash,
  *   harness stop. The offset is retained, so this is resumable, not lost.
  * - `run-failed`: a settlement said `failed` or `aborted`. Sticky until the
@@ -45,6 +48,16 @@ export type ConversationPhase =
       readonly message: string
     }
 
+/**
+ * The content half of a delivery: everything rendering reduces into the
+ * transcript. Connection-only deliveries (liveness, foreign frames) stop at
+ * this hook and never reach the projection -- heartbeats are not content,
+ * and the boundary between the two lives here rather than in every consumer.
+ */
+export type ConversationContent =
+  | { readonly kind: 'snapshot'; readonly snapshot: ConversationSnapshotFacts }
+  | { readonly kind: 'chunks'; readonly replaying: boolean; readonly chunks: readonly ChunkFacts[] }
+
 export interface ConversationView {
   readonly phase: ConversationPhase
   /**
@@ -59,6 +72,16 @@ export interface ConversationView {
    * is live rather than stacking on it.
    */
   resume: () => void
+  /**
+   * Submits one user turn through the harness. Never retried here: an
+   * identical resend would be a SECOND turn, so a failed submission is
+   * surfaced, not repeated. On success, makes sure a read is attached --
+   * a conversation's very first turn creates the stream this page has
+   * been unable to find since it mounted.
+   */
+  submit: (message: string) => Promise<TurnResult<{ readonly submissionId: string }>>
+  /** Aborts the RUN, and says so; reading on is how the UI learns the outcome. */
+  abort: () => Promise<TurnResult<boolean>>
 }
 
 /* -------------------------------------------------------------------------- */
@@ -156,18 +179,20 @@ function atOrBefore(a: ChunkPosition, b: ChunkPosition): boolean {
 }
 
 /**
- * What one batch of chunk facts does to the turn state.
+ * What one batch of chunk facts does to the TURN state.
  *
  * Redelivered batches are dropped by position, not by faith: a reconnect
  * after an interruption replays the batch that was in flight, and the
  * projection's own ordering token is what makes that at-least-once delivery
- * safe to apply twice.
+ * safe to apply twice. Content goes through the transcript projection, which
+ * keeps the same discipline over the same positions -- this function reads
+ * only what connection phases need, so the two concerns stay out of each
+ * other's way.
  *
  * `message-started` opens a stream and names its submission;
  * `message-delta` proves generation is running even when the start scrolled
- * past the resume point; `submission-settled` closes it. Anything else --
- * appended history, tool traffic, compaction -- moves neither needle yet,
- * because rendering them is Task 25's business.
+ * past the resume point; `submission-settled` closes it. Anything else moves
+ * neither needle.
  */
 function reduceChunks(
   chunks: readonly ChunkFacts[],
@@ -186,8 +211,8 @@ function reduceChunks(
     if (chunk.position !== null) applied = chunk.position
     if (chunk.type === 'message-started') {
       streaming = chunk.submissionId ?? streaming ?? ''
-    } else if (chunk.type === 'message-delta' && streaming === null) {
-      streaming = ''
+    } else if (chunk.type === 'message-delta') {
+      if (streaming === null) streaming = ''
     } else if (chunk.type === 'submission-settled' && chunk.outcome !== null) {
       settled = chunk.outcome
     }
@@ -209,6 +234,12 @@ export interface UseConversationOptions {
   readonly contact?: ContactHarness
   /** Defaults to the real lifecycle events; must be stable across renders. */
   readonly listen?: LifecycleListen
+  /**
+   * Receives everything rendering is allowed to see: snapshots and chunk
+   * batches, in arrival order, from the current read only. Must be stable
+   * across renders -- it rides beside `contact` as an effect dependency.
+   */
+  readonly onContent?: (content: ConversationContent) => void
 }
 
 export function useConversation(
@@ -216,6 +247,7 @@ export function useConversation(
   options: UseConversationOptions = {},
 ): ConversationView {
   const subscribe = options.listen ?? defaultListen
+  const onContent = options.onContent
   // Memoised so the mount effect does not churn when a parent re-renders.
   const fallbackContact = useMemo(() => defaultContactFor(conversationId), [conversationId])
   const contact = options.contact ?? fallbackContact
@@ -262,6 +294,12 @@ export function useConversation(
             // moves this state machine. This is what keeps heartbeats out
             // of the transcript's way forever.
             return
+          case 'snapshot':
+            // History's whole answer: content to seed the projection with.
+            // The phase stays `attaching` -- the updates connection that
+            // follows still has to catch up before anything is live.
+            onContent?.({ kind: 'snapshot', snapshot: delivery.snapshot })
+            return
           case 'up-to-date':
             upToDateRef.current = true
             setPhase((current) =>
@@ -269,6 +307,11 @@ export function useConversation(
             )
             return
           case 'chunks': {
+            onContent?.({
+              kind: 'chunks',
+              replaying: delivery.replaying,
+              chunks: delivery.chunks,
+            })
             const result = reduceChunks(delivery.chunks, appliedRef.current)
             appliedRef.current = result.applied
             if (result.settled !== null) {
@@ -299,6 +342,12 @@ export function useConversation(
             }
             return
           }
+          case 'absent':
+            // The harness creates the stream at a conversation's first
+            // prompt. Until then there is nothing to replay and nothing to
+            // watch: connected, quiet, ready for the composer.
+            setPhase({ status: 'idle' })
+            return
           case 'ended':
             setPhase({ status: 'idle' })
             return
@@ -317,11 +366,11 @@ export function useConversation(
             : failure.message
         setPhase({ status: 'interrupted', reason })
       }
-      // `ended` already arrived as a delivery; `cancelled` means this read
-      // was superseded or the hook went away -- both handled where that
-      // happens, not here.
+      // `ended` and `absent` already arrived as deliveries; `cancelled`
+      // means this read was superseded or the hook went away -- both
+      // handled where that happens, not here.
     })
-  }, [])
+  }, [onContent])
 
   useEffect(() => {
     liveRef.current = true
@@ -394,5 +443,42 @@ export function useConversation(
     attach()
   }, [attach])
 
-  return { phase, offset, resume }
+  const submit = useCallback(
+    async (message: string) => {
+      const client = clientRef.current
+      if (client === null) {
+        return {
+          ok: false as const,
+          error: {
+            kind: 'no-harness' as const,
+            message: 'There is no harness to send this to yet.',
+          },
+        }
+      }
+      const sent = await client.submitTurn(message)
+      // A fresh conversation had no stream to attach to at mount; its first
+      // admitted turn creates one, and this is where the read begins.
+      if (sent.ok && !client.attached()) attach()
+      return sent.ok
+        ? { ok: true as const, value: { submissionId: sent.value.submissionId } }
+        : sent
+    },
+    [attach],
+  )
+
+  const abort = useCallback(async () => {
+    const client = clientRef.current
+    if (client === null) {
+      return {
+        ok: false as const,
+        error: {
+          kind: 'no-harness' as const,
+          message: 'There is no harness to abort work in.',
+        },
+      }
+    }
+    return client.abortRun()
+  }, [])
+
+  return { phase, offset, resume, submit, abort }
 }

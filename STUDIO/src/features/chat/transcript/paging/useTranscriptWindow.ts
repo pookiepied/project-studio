@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Message } from '@/domain/session/types'
 
 /**
  * How much of a long conversation is actually in the document.
@@ -42,9 +41,18 @@ const INITIAL = 40
  */
 const TRIGGER_MARGIN = 600
 
-export interface TranscriptWindow {
-  /** The messages to render, oldest first. */
-  readonly visible: readonly Message[]
+/**
+ * The one thing windowing needs of an item: a stable identity for the
+ * anchor. Demo messages and live transcript items both qualify; this module
+ * is content-blind by design.
+ */
+interface WindowedItem {
+  readonly id: string
+}
+
+export interface TranscriptWindow<T extends WindowedItem> {
+  /** The items to render, oldest first. */
+  readonly visible: readonly T[]
   /** Older turns exist behind the top of the list. */
   readonly hasOlder: boolean
   /** A batch is being brought in. Drives the mark at the top of the list. */
@@ -53,14 +61,14 @@ export interface TranscriptWindow {
   readonly sentinel: (node: HTMLElement | null) => void
 }
 
-export function useTranscriptWindow(
-  messages: readonly Message[],
+export function useTranscriptWindow<T extends WindowedItem>(
+  items: readonly T[],
   viewport: React.RefObject<HTMLElement | null>,
-): TranscriptWindow {
+): TranscriptWindow<T> {
   const [count, setCount] = useState(INITIAL)
   const [loading, setLoading] = useState(false)
 
-  const total = messages.length
+  const total = items.length
   const shown = Math.min(count, total)
   const hasOlder = shown < total
 
@@ -71,7 +79,7 @@ export function useTranscriptWindow(
    * every streamed reply, and resetting there would throw away everything the
    * reader had paged in each time the model spoke.
    */
-  const anchorId = messages[0]?.id
+  const anchorId = items[0]?.id
   useEffect(() => {
     setCount(INITIAL)
   }, [anchorId])
@@ -173,7 +181,7 @@ export function useTranscriptWindow(
   return {
     // Sliced from the end: the newest turns are the ones always present, and
     // paging extends backwards into the history.
-    visible: shown >= total ? messages : messages.slice(total - shown),
+    visible: shown >= total ? items : items.slice(total - shown),
     hasOlder,
     loading,
     sentinel,

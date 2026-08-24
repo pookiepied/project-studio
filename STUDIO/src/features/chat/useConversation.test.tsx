@@ -51,10 +51,31 @@ function scriptedInvoke(script: {
 /**
  * Streams whose command resolves when cancelled, exactly as Rust does:
  * `service_stream` answers Ok once the registry stops the read.
+ *
+ * The same script answers a cold start's history read, because every attach
+ * without a retained offset is history FIRST and updates after it. Tests
+ * that need a different history answer script `service_fetch` themselves.
  */
 function cancellableStreams(): { invoke: ServiceInvoke; calls: RecordedCall[] } {
   const resolvers = new Map<string, () => void>()
   return scriptedInvoke({
+    service_fetch: (args) => {
+      const path = String(args['path'])
+      if (!path.endsWith('?view=history')) {
+        throw new Error(`unexpected fetch in this script: ${path}`)
+      }
+      return {
+        status: 200,
+        headers: [],
+        body: JSON.stringify({
+          v: 1,
+          conversationId: 'conv_1',
+          offset: '-1',
+          messages: [],
+          settlements: [],
+        }),
+      }
+    },
     service_stream: (args) =>
       new Promise<void>((resolve) => {
         resolvers.set(String(args['streamId']), () => resolve())
@@ -426,7 +447,7 @@ describe('what a conversation switch and a closed pane must do', () => {
     // not -- ADR 0045 section 5, held where it is easiest to break.
     expect(streams.calls.some((call) => String(call.args['path']).endsWith('/abort'))).toBe(false)
     const secondRead = streams.calls.filter((call) => call.command === 'service_stream')[1]
-    expect(secondRead.args['path']).toBe('/agents/studio/cnv_2')
+    expect(secondRead.args['path']).toBe('/agents/studio/cnv_2?view=updates')
     expect(secondRead.args['offset']).toBe('-1')
   })
 

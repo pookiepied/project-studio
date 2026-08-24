@@ -574,12 +574,12 @@ export function parseHarnessErrorBody(value: unknown): HarnessErrorBody | null {
  *   actually arrives over a Tauri channel: a kind-tagged kebab-case union in
  *   which every variant carries the offset to resume from. The offset is
  *   opaque -- `-1`, or `seq_batch` pairs -- and is carried, parsed never.
- * - Flue's conversation updates projection, whose `data` frames carry a JSON
- *   array of chunks. What is mirrored below is deliberately chunk FACTS --
- *   type, position, the ids and outcome that drive conversation state --
- *   not the full chunk protocol. Content (deltas, tool input and output,
- *   usage) belongs to rendering; when a component renders transcripts it
- *   extends these parsers rather than reading raw frames beside them.
+ * - Flue's conversation content: the updates view's chunks and the history
+ *   view's snapshot. That mirror grew past facts into content when rendering
+ *   arrived, and now lives in `conversation-chunks.ts`, re-exported here so
+ *   the boundary stays "import from index, not from the files". When a
+ *   component needs to read what a chunk SAYS, extend that module -- not this
+ *   one.
  */
 
 /** The mirror of Rust's `StreamEvent`, exactly as it serializes. */
@@ -621,53 +621,22 @@ export function parseWireStreamEvent(value: unknown): WireStreamEvent | null {
   }
 }
 
-/**
- * The monotonic ordering token stamped on every projected chunk,
- * lexicographic by batch then index. It exists so a redelivered batch -- an
- * SSE reconnect replays the batch that was in flight -- can be dropped
- * instead of double-applied. Like offsets: opaque, never interpreted.
- */
-export interface ChunkPosition {
-  readonly batch: number
-  readonly index: number
-}
-
-/**
- * What the conversation layer reads out of one projected chunk. See the
- * section docblock above for why this is facts and not the whole protocol.
- */
-export interface ChunkFacts {
-  readonly type: string
-  readonly position: ChunkPosition | null
-  /** Present on `message-started`; ties the open message to its submission. */
-  readonly messageId: string | null
-  /** Present on `submission-settled`; how a run says it finished. */
-  readonly submissionId: string | null
-  /** How a settled turn ended; absent on everything else. */
-  readonly outcome: 'completed' | 'failed' | 'aborted' | null
-}
-
-function readChunkPosition(value: unknown): ChunkPosition | null {
-  if (!isRecord(value)) return null
-  const batch = finiteNumber(value['batch'])
-  const index = finiteNumber(value['index'])
-  return batch === null || index === null ? null : { batch, index }
-}
-
-export function readChunkFacts(value: unknown): ChunkFacts | null {
-  if (!isRecord(value)) return null
-  const type = text(value['type'])
-  if (type === null) return null
-  const rawOutcome = value['outcome']
-  const outcome =
-    rawOutcome === 'completed' || rawOutcome === 'failed' || rawOutcome === 'aborted'
-      ? rawOutcome
-      : null
-  return {
-    type,
-    position: readChunkPosition(value['position']),
-    messageId: text(value['messageId']),
-    submissionId: text(value['submissionId']),
-    outcome,
-  }
-}
+export {
+  absent,
+  present,
+  readChunkFacts,
+  readChunkPosition,
+  readConversationMessage,
+  readConversationSnapshot,
+  type ChunkFacts,
+  type ChunkPosition,
+  type ConversationMessageFacts,
+  type ConversationSnapshotFacts,
+  type MessagePartFacts,
+  type MessageRole,
+  type ModelRefFacts,
+  type Present,
+  type SettlementFacts,
+  type TurnOutcome,
+  type UsageFacts,
+} from './conversation-chunks'

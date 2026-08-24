@@ -8,6 +8,7 @@ import {
   parseProviderModels,
   parseWireStreamEvent,
   readChunkFacts,
+  readConversationSnapshot,
 } from './contracts'
 
 /**
@@ -266,38 +267,118 @@ describe('parseWireStreamEvent', () => {
 })
 
 describe('readChunkFacts', () => {
-  it('reads the facts state depends on and leaves content unread', () => {
+  // The whole flat shape, written out once: every field the wire omits is
+  // null, never invented, and a consumer can rely on that for all of them.
+  const EMPTY = {
+    position: null,
+    messageId: null,
+    submissionId: null,
+    outcome: null,
+    snapshot: null,
+    message: null,
+    model: null,
+    timestamp: null,
+    deltaKind: null,
+    delta: null,
+    toolCallId: null,
+    toolName: null,
+    input: null,
+    output: null,
+    errorText: null,
+    usage: null,
+  }
+
+  it('reads identity and content fields, leaving everything else null', () => {
     expect(
       readChunkFacts({
         type: 'message-started',
         messageId: 'm1',
         submissionId: 'sub_2',
         position: { batch: 7, index: 3 },
+        timestamp: '2026-08-24T00:00:00Z',
         model: { provider: 'anthropic', id: 'claude-opus-5' },
       }),
     ).toEqual({
+      ...EMPTY,
       type: 'message-started',
+      position: { batch: 7, index: 3 },
       messageId: 'm1',
       submissionId: 'sub_2',
-      position: { batch: 7, index: 3 },
-      outcome: null,
+      timestamp: '2026-08-24T00:00:00Z',
+      model: { provider: 'anthropic', id: 'claude-opus-5' },
     })
     expect(readChunkFacts({ type: 'submission-settled', outcome: 'aborted' })).toEqual({
+      ...EMPTY,
       type: 'submission-settled',
-      messageId: null,
-      submissionId: null,
-      position: null,
       outcome: 'aborted',
+    })
+  })
+
+  it('carries delta content and keeps an unread kind as null rather than dropping the chunk', () => {
+    expect(
+      readChunkFacts({
+        type: 'message-delta',
+        messageId: 'm1',
+        kind: 'reasoning',
+        delta: 'The',
+        position: { batch: 5, index: 0 },
+      }),
+    ).toEqual({
+      ...EMPTY,
+      type: 'message-delta',
+      position: { batch: 5, index: 0 },
+      messageId: 'm1',
+      deltaKind: 'reasoning',
+      delta: 'The',
+    })
+    const foreign = readChunkFacts({ type: 'message-delta', kind: 'citations', delta: 'x' })
+    expect(foreign).toMatchObject({ type: 'message-delta', deltaKind: null, delta: 'x' })
+  })
+
+  it('keeps tool calls and their answers apart, because the wire does', () => {
+    expect(
+      readChunkFacts({
+        type: 'tool-input',
+        messageId: 'm1',
+        toolCallId: 't1',
+        toolName: 'read',
+        input: { path: 'package.json' },
+      }),
+    ).toEqual({
+      ...EMPTY,
+      type: 'tool-input',
+      messageId: 'm1',
+      toolCallId: 't1',
+      toolName: 'read',
+      input: { present: true, value: { path: 'package.json' } },
+    })
+    // The output carries no message id on the wire; correlation is by call id.
+    expect(readChunkFacts({ type: 'tool-output', toolCallId: 't1', output: 'contents' })).toEqual({
+      ...EMPTY,
+      type: 'tool-output',
+      toolCallId: 't1',
+      output: { present: true, value: 'contents' },
+    })
+    expect(
+      readChunkFacts({ type: 'tool-output-error', toolCallId: 't1', errorText: 'boom' }),
+    ).toEqual({
+      ...EMPTY,
+      type: 'tool-output-error',
+      toolCallId: 't1',
+      errorText: 'boom',
     })
   })
 
   it('keeps unknown chunk types as facts rather than dropping the batch entry', () => {
     // A projection this side has not heard of is still a real chunk with a
     // real position; dropping it would desynchronise dedupe.
-    expect(readChunkFacts({ type: 'compaction-started-v9' })).toMatchObject({
+    expect(readChunkFacts({ type: 'compaction-started-v9' })).toEqual({
+      ...EMPTY,
       type: 'compaction-started-v9',
-      position: null,
     })
+    expect(
+      readChunkFacts({ type: 'compaction-started-v9', position: { batch: 9, index: 1 } }),
+    ).toEqual({ ...EMPTY, type: 'compaction-started-v9', position: { batch: 9, index: 1 } })
   })
 
   it('refuses entries with no type at all', () => {
@@ -309,5 +390,113 @@ describe('readChunkFacts', () => {
     const half = readChunkFacts({ type: 'message-delta', position: { batch: 2 } })
     expect(half).not.toBeNull()
     expect(half?.position).toBeNull()
+  })
+})
+
+describe('readConversationSnapshot', () => {
+  const SNAPSHOT = {
+    v: 1,
+    conversationId: 'conv_1',
+    offset: '0000000000000000_0000000000000012',
+    messages: [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello', state: 'done' }],
+        metadata: { timestamp: '2026-08-24T00:00:00Z' },
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          { type: 'reasoning', text: 'thinking', state: 'done' },
+          { type: 'text', text: 'hi', state: 'done' },
+          {
+            type: 'dynamic-tool',
+            toolCallId: 't1',
+            toolName: 'read',
+            state: 'output-available',
+            input: { path: 'p' },
+            output: 'body',
+          },
+        ],
+        metadata: {
+          usage: { input: 10, output: 4, totalTokens: 14 },
+          model: { provider: 'openrouter-test', id: 'stealth/ox-alpha' },
+        },
+      },
+    ],
+    settlements: [{ submissionId: 's1', outcome: 'completed', result: { text: 'hi' } }],
+  }
+
+  it('reads the whole snapshot, including tool parts and absent optional fields', () => {
+    expect(readConversationSnapshot(SNAPSHOT)).toEqual({
+      version: 1,
+      conversationId: 'conv_1',
+      offset: '0000000000000000_0000000000000012',
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          submissionId: null,
+          parts: [{ kind: 'text', text: 'hello', state: 'done' }],
+          timestamp: '2026-08-24T00:00:00Z',
+          model: null,
+          usage: null,
+        },
+        {
+          id: 'a1',
+          role: 'assistant',
+          submissionId: null,
+          parts: [
+            { kind: 'reasoning', text: 'thinking', state: 'done' },
+            { kind: 'text', text: 'hi', state: 'done' },
+            {
+              kind: 'tool',
+              toolCallId: 't1',
+              toolName: 'read',
+              state: 'output-available',
+              input: { present: true, value: { path: 'p' } },
+              output: { present: true, value: 'body' },
+              errorText: null,
+            },
+          ],
+          timestamp: null,
+          model: { provider: 'openrouter-test', id: 'stealth/ox-alpha' },
+          usage: {
+            input: 10,
+            output: 4,
+            cacheRead: null,
+            cacheWrite: null,
+            reasoning: null,
+            totalTokens: 14,
+          },
+        },
+      ],
+      settlements: [
+        {
+          submissionId: 's1',
+          outcome: 'completed',
+          result: { present: true, value: { text: 'hi' } },
+          error: { present: false, value: undefined },
+        },
+      ],
+    })
+  })
+
+  it('refuses a snapshot it cannot fully trust, because history is the cold-start source of truth', () => {
+    expect(readConversationSnapshot({ v: 1, messages: 'no' })).toBeNull()
+    expect(
+      readConversationSnapshot({ ...SNAPSHOT, messages: [...SNAPSHOT.messages, { id: 'broken' }] }),
+    ).toBeNull()
+    expect(readConversationSnapshot(null)).toBeNull()
+  })
+
+  it('reads a reset chunk through the same reader as history', () => {
+    const chunk = readChunkFacts({ type: 'conversation-reset', snapshot: SNAPSHOT })
+    expect(chunk).not.toBeNull()
+    if (chunk?.type !== 'conversation-reset') throw new Error('expected a reset chunk')
+    expect(chunk.snapshot?.messages).toHaveLength(2)
+    expect(chunk.position).toBeNull()
   })
 })

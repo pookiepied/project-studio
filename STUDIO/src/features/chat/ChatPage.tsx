@@ -3,6 +3,10 @@ import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { Composer } from '@/features/chat/composer'
 import { Transcript, useAutoScroll } from '@/features/chat/transcript'
+import { ConnectionNotice } from '@/features/chat/transcript/live/ConnectionNotice'
+import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
+import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
+import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
@@ -20,6 +24,18 @@ import type { Conversation } from '@/domain/session/types'
  * the composer below paint no fill, so a gradient is what separates them from
  * the text scrolling past, and `studio-scroll-inset` keeps the scroll thumb out
  * from under those gradients.
+ *
+ * ---- Where the words come from --------------------------------------------
+ *
+ * Every ordinary conversation renders LIVE: the transcript is a projection of
+ * the harness's event stream (`useConversationTranscript`), and the composer
+ * submits to the harness. What the UI shows and what the model receives are
+ * two projections of one log here, never derived from each other -- nothing
+ * in the live path reads rendered state to build a request.
+ *
+ * The artifact gallery is the one exception: its replies are a local demo of
+ * stages no harness produces, so it keeps the seeded transcript it has always
+ * had. That is a display of artifacts, not a conversation with an agent.
  */
 export function ChatPage({
   conversation,
@@ -35,9 +51,11 @@ export function ChatPage({
 }) {
   const { status, retry, editMessage, fork } = useWorkspace()
   const { openChat } = useNavigation()
-  const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } = useAutoScroll(
-    conversation.messages,
-  )
+  const gallery = conversation.id === GALLERY_CONVERSATION_ID
+
+  const live = useConversationTranscript(conversation.id)
+  const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
+    useAutoScroll(gallery ? conversation.messages : live.items)
 
   const forkFrom = (messageId: string) => {
     const created = fork(conversation.id, messageId)
@@ -65,14 +83,18 @@ export function ChatPage({
             paddingBottom: 20,
           }}
         >
-          <Transcript
-            conversation={conversation}
-            status={status}
-            viewport={viewport}
-            onRetry={() => retry(conversation.id)}
-            onEdit={(messageId, text) => editMessage(conversation.id, messageId, text)}
-            onFork={forkFrom}
-          />
+          {gallery ? (
+            <Transcript
+              conversation={conversation}
+              status={status}
+              viewport={viewport}
+              onRetry={() => retry(conversation.id)}
+              onEdit={(messageId, text) => editMessage(conversation.id, messageId, text)}
+              onFork={forkFrom}
+            />
+          ) : (
+            <LiveTranscript items={live.items} phase={live.phase} viewport={viewport} />
+          )}
         </div>
       </div>
 
@@ -139,10 +161,21 @@ export function ChatPage({
           className="relative z-10 mx-auto w-full bg-surface pb-4"
           style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
         >
+          {!gallery ? (
+            <ConnectionNotice phase={live.phase} onResume={live.resume} />
+          ) : null}
+
           <Composer
             conversationId={conversation.id}
             projectId={conversation.projectId}
             placeholder="Reply"
+            {...(gallery
+              ? {}
+              : {
+                  onSend: (text: string) => void live.submit(text),
+                  busy: live.phase.status === 'streaming',
+                  onStop: () => void live.abort(),
+                })}
           />
         </div>
       </div>

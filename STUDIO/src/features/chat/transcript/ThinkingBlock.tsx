@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { COLLAPSE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { StudioMark } from '@/components/brand'
-import type { Thinking } from '@/domain/session/types'
 import { cn } from '@/lib/cn'
 
 /**
@@ -17,13 +16,20 @@ import { cn } from '@/lib/cn'
  *
  * The header still earns its place while collapsed by carrying the duration:
  * "Thought for 4s" is the one fact about the trace that is worth a glance
- * without opening it.
+ * without opening it. A segment whose span nobody recorded -- the live wire
+ * carries no per-segment timing -- says only "Thought", which is honest.
  *
  * The mark is the brand mark, not a glyph: the same StudioMark that assembles
  * on the splash ripples here while the model works. "Studio is thinking" is
  * said by Studio itself, which no generic spinner can say.
  */
-export function ThinkingBlock({ thinking, live }: { thinking: Thinking; live: boolean }) {
+export function ThinkingBlock({
+  thinking,
+  live,
+}: {
+  thinking: { text: string; seconds: number | null }
+  live: boolean
+}) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -39,7 +45,9 @@ export function ThinkingBlock({ thinking, live }: { thinking: Thinking; live: bo
       >
         <StudioMark busy={live} size={12} className="text-current" />
 
-        <span>{live ? 'Thinking' : `Thought for ${formatSeconds(thinking.seconds)}`}</span>
+        <span>
+          {live ? 'Thinking' : thinking.seconds === null ? 'Thought' : `Thought for ${formatSeconds(thinking.seconds)}`}
+        </span>
 
         <Icons.disclosure state={open ? 'on' : 'rest'} />
       </button>

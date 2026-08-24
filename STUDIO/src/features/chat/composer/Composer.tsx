@@ -54,6 +54,15 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  * What is left is what genuinely belongs to this message: what to add to it,
  * and whether to send it.
  *
+ * ---- Where a send goes -----------------------------------------------------
+ *
+ * By default it goes through the workspace store, which plays a local demo
+ * turn -- that is the home page's new-conversation flow and the gallery.
+ * A conversation backed by the harness passes `onSend`/`busy`/`onStop`, and
+ * those take over completely: the text leaves for the harness, stop aborts
+ * the RUN (the only thing that means abort), and this component never
+ * learns more about either than that. Two transports, one control.
+ *
  * ---- The shape ------------------------------------------------------------
  *
  * A capsule while it holds one line, a rounded box once it holds more. Both are
@@ -71,11 +80,20 @@ export function Composer({
   projectId,
   placeholder,
   onSent,
+  onSend,
+  busy: busyOverride,
+  onStop,
 }: {
   conversationId: string | null
   projectId: string | null
   placeholder: string
   onSent?: (conversationId: string) => void
+  /** When present, sends go here instead of the demo turn runner. */
+  onSend?: (text: string) => void
+  /** Overrides the demo busy state while `onSend` owns sending. */
+  busy?: boolean
+  /** Aborts the harness run; only meaningful with `onSend`. */
+  onStop?: () => void
 }) {
   const { status, send, stop } = useWorkspace()
   const [text, setText] = useState('')
@@ -103,16 +121,31 @@ export function Composer({
   const focus = useCallback(() => field.current?.focus(), [])
   useTypeToFocus(true, focus)
 
-  const busy = status !== 'idle'
+  const live = onSend !== undefined
+  const busy = live ? (busyOverride ?? false) : status !== 'idle'
   const canSend = text.trim().length > 0 && !busy
   const dictating = dictation.stage !== 'idle'
 
   const submit = () => {
     if (!canSend) return
+    if (live) {
+      onSend(text)
+      setText('')
+      setMultiline(false)
+      return
+    }
     const id = send(conversationId, text, projectId)
     setText('')
     setMultiline(false)
     if (conversationId === null && id) onSent?.(id)
+  }
+
+  const halt = () => {
+    if (live) {
+      onStop?.()
+      return
+    }
+    stop()
   }
 
   return (
@@ -336,7 +369,7 @@ export function Composer({
                   label={busy ? 'Stop' : 'Send'}
                   size="md"
                   tone="solid"
-                  onClick={busy ? stop : submit}
+                  onClick={busy ? halt : submit}
                 >
                   {busy ? <Icons.stop /> : <Icons.send size="md" />}
                 </IconButton>

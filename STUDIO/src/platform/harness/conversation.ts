@@ -17,6 +17,25 @@
  * offset as deliveries arrive and resumes from it on any later attach.
  * Offsets are never parsed, compared or incremented here either.
  *
+ * ---- Two views, and the order a cold start reads them in ------------------
+ *
+ * The agent stream answers in two views. `?view=history` returns ONE JSON
+ * snapshot of the materialized conversation and refuses `offset` and `live`;
+ * `?view=updates` emits the chunk protocol as SSE and requires an offset to
+ * resume strictly after. A plain GET defaults to history, which is why the
+ * bare path this client once sent -- to which Rust appended
+ * `offset=...&live=sse` -- was refused on every single attach.
+ *
+ * The protocol is also explicit that an updates connection must not be
+ * resumed without the projection state its offset presupposes ("request
+ * fresh history when local state is unavailable"). So a cold start here --
+ * no retained offset -- is always: read history first, hand its snapshot to
+ * the consumer, then open updates strictly after the snapshot's offset. A
+ * 404 from history is not a failure: the harness creates the stream when the
+ * agent instance receives its first prompt, so a conversation nobody has
+ * spoken into yet simply does not exist, and that fact is delivered as
+ * `absent` rather than dressed up as a broken read.
+ *
  * ---- What crosses which seam ----------------------------------------------
  *
  * Submitting and aborting are ordinary requests through `service_fetch`.
@@ -48,7 +67,9 @@ import {
   parseHarnessErrorBody,
   parseWireStreamEvent,
   readChunkFacts,
+  readConversationSnapshot,
   type ChunkFacts,
+  type ConversationSnapshotFacts,
   type WireStreamEvent,
 } from './contracts'
 
@@ -171,15 +192,27 @@ export interface SubmittedTurn {
 
 /**
  * One delivery on an attached stream, already classified by Rust and parsed
- * where the contract allows it. `chunks` replaces the raw `data` frame when
- * the payload parses as the chunk array the updates view promises; anything
- * else arrives as `frame` untouched, because a frame this layer cannot read
- * is still real bytes somebody may yet want. `keep-alive` is liveness only;
- * it reaches handlers so a UI can show quietness, but must never become
+ * where the contract allows it.
+ *
+ * `snapshot` is the history view's answer at a cold start: the whole
+ * materialized conversation, from which content is seeded before the
+ * updates connection opens. `chunks` replaces the raw `data` frame when the
+ * payload parses as the chunk array the updates view promises; anything else
+ * arrives as `frame` untouched, because a frame this layer cannot read is
+ * still real bytes somebody may yet want. `keep-alive` is liveness only; it
+ * reaches handlers so a UI can show quietness, but must never become
  * content. `replaying` distinguishes history being replayed from history
  * being made; it flips when `up-to-date` arrives and stays flipped.
+ * `absent` means the harness answered that no stream exists for this
+ * conversation yet -- a fresh conversation, not a failure.
  */
 export type ConversationDelivery =
+  | {
+      readonly kind: 'snapshot'
+      readonly offset: string
+      readonly snapshot: ConversationSnapshotFacts
+    }
+  | { readonly kind: 'absent'; readonly offset: string }
   | {
       readonly kind: 'chunks'
       readonly offset: string
@@ -204,10 +237,14 @@ export interface AttachHandlers {
  * How an attached read finished. `ended` is the harness saying the stream
  * closed behind an `Ended` delivery; `cancelled` covers everything where
  * nobody was left reading -- an explicit cancel, a superseded attach, or a
- * webview that went away mid-read.
+ * webview that went away mid-read. `absent` is how a cold start ends when
+ * the harness has no stream for this conversation at all: there was
+ * nothing to read, nothing broke, and submitting the first turn will
+ * create what this read could not find.
  */
 export type StreamSettlement =
   | { readonly outcome: 'ended' }
+  | { readonly outcome: 'absent' }
   | { readonly outcome: 'cancelled' }
   | { readonly outcome: 'broken'; readonly failure: SeamFailure }
   | { readonly outcome: 'refused'; readonly failure: SeamFailure }
@@ -250,9 +287,14 @@ export interface ConversationClient {
   /** Submits one user turn and resolves with where its events begin. */
   submitTurn(message: string): Promise<TurnResult<SubmittedTurn>>
   /**
-   * Attaches a reader, resuming from the tracked offset unless the caller
-   * names one explicitly (`-1` reads the whole durable history). Attaching
-   * while attached supersedes the older read first.
+   * Attaches a reader.
+   *
+   * With a retained offset (or one named explicitly) the read opens the
+   * updates view strictly after that offset. Without one -- a cold start --
+   * the history view is read first and its snapshot delivered, because an
+   * updates connection resumed without the projection state behind its
+   * offset would render deltas whose messages never began. Attaching while
+   * attached supersedes the older read first.
    */
   attach(handlers: AttachHandlers, options?: { readonly from?: string }): AttachHandle
   /** Aborts the RUN: Flue's abort route, and the only thing that means abort. */
@@ -270,6 +312,8 @@ export function createConversationClient(options: ConversationClientOptions): Co
 
   const agentsPath = (): string =>
     `/agents/${encodeURIComponent(agentName)}/${encodeURIComponent(conversationId)}`
+  const historyPath = (): string => `${agentsPath()}?view=history`
+  const updatesPath = (): string => `${agentsPath()}?view=updates`
 
   /**
    * One round trip through `service_fetch`, judged the way `client.ts`
@@ -382,6 +426,15 @@ export function createConversationClient(options: ConversationClientOptions): Co
       // `Ok(())` for a reader gone or cancelled too, and with nobody left
       // reading, "cancelled" is the honest word for it.
       let done = false
+      // Set by cancel() directly, because a cold start spends time in its
+      // history fetch before any registered stream exists for the registry
+      // to stop -- and a superseded read must deliver nothing once told.
+      let stopped = false
+      // Whether a stream was ever registered. Cancelling a read that opened
+      // one settles through the registry: Rust stops the reader and resolves
+      // `service_stream`. A cold start cancelled BEFORE that has no reader to
+      // stop, so nothing downstream would ever settle it -- see cancel().
+      let opened = false
       let upToDate = false
       let resolveSettled!: (settlement: StreamSettlement) => void
       const settled = new Promise<StreamSettlement>((resolve) => {
@@ -410,6 +463,11 @@ export function createConversationClient(options: ConversationClientOptions): Co
               })
               return
             }
+            // The try covers the PARSE and nothing else. Reading the data
+            // is a judgement about the frame; what the consumer then does
+            // with it is not, and folding a consumer's exception into this
+            // fallback would deliver the same bytes twice -- once as chunks
+            // and once as raw -- while hiding the real failure.
             let chunks: readonly ChunkFacts[] | null = null
             try {
               const value: unknown = JSON.parse(event.data)
@@ -417,12 +475,6 @@ export function createConversationClient(options: ConversationClientOptions): Co
                 chunks = value
                   .map(readChunkFacts)
                   .filter((chunk): chunk is ChunkFacts => chunk !== null)
-                handlers.onEvent({
-                  kind: 'chunks',
-                  offset: event.offset,
-                  replaying: !upToDate,
-                  chunks,
-                })
               }
             } catch {
               chunks = null
@@ -434,7 +486,14 @@ export function createConversationClient(options: ConversationClientOptions): Co
                 event: event.event ?? null,
                 data: event.data,
               })
+              return
             }
+            handlers.onEvent({
+              kind: 'chunks',
+              offset: event.offset,
+              replaying: !upToDate,
+              chunks,
+            })
             return
           }
           case 'up-to-date':
@@ -449,11 +508,106 @@ export function createConversationClient(options: ConversationClientOptions): Co
         }
       })
 
+      /**
+       * Opens the updates view strictly after `from`. Rust appends the
+       * offset and the live mode itself, so the path names only the view.
+       */
+      const openUpdates = (from: string) => {
+        opened = true
+        const pending = invoke('service_stream', {
+          service: 'harness',
+          path: updatesPath(),
+          init: {},
+          offset: from,
+          streamId,
+          channel,
+        })
+        pending.then(
+          () => resolveSettled({ outcome: 'cancelled' }),
+          (error: unknown) => {
+            const failure = seamFailure(error)
+            resolveSettled(
+              failure.kind === 'broken'
+                ? { outcome: 'broken', failure }
+                : { outcome: 'refused', failure },
+            )
+          },
+        )
+      }
+
+      /**
+       * The cold-start sequence: history first, then updates from wherever
+       * the snapshot ended. A conversation the harness has never heard of
+       * has no stream to attach to -- that is `absent`, a normal state a
+       * first submission leaves, not an error -- and everything else that
+       * can go wrong lands in the same settlements a broken read uses.
+       */
+      const openFromHistory = () => {
+        void (async () => {
+          const answer = await request('GET', historyPath(), undefined)
+          if (done || stopped) return
+          if ('failure' in answer) {
+            resolveSettled(
+              answer.failure.kind === 'broken'
+                ? { outcome: 'broken', failure: answer.failure }
+                : { outcome: 'refused', failure: answer.failure },
+            )
+            return
+          }
+          if (answer.status === 404) {
+            // Streams are created when their agent instance receives its
+            // first prompt. There is nothing to replay and nothing live.
+            handlers.onEvent({ kind: 'absent', offset: '-1' })
+            resolveSettled({ outcome: 'absent' })
+            return
+          }
+          if (answer.status < 200 || answer.status >= 300) {
+            resolveSettled({ outcome: 'refused', failure: refusalOf(answer.status, answer.bodyText) })
+            return
+          }
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(answer.bodyText)
+          } catch {
+            resolveSettled({
+              outcome: 'broken',
+              failure: {
+                kind: 'malformed',
+                message: 'The harness answered a history read with something that is not JSON.',
+              },
+            })
+            return
+          }
+          const snapshot = readConversationSnapshot(parsed)
+          if (snapshot === null || snapshot.offset === null) {
+            resolveSettled({
+              outcome: 'broken',
+              failure: {
+                kind: 'malformed',
+                message: 'The history snapshot did not match the contract this client mirrors.',
+              },
+            })
+            return
+          }
+          trackedOffset = snapshot.offset
+          handlers.onEvent({ kind: 'snapshot', offset: snapshot.offset, snapshot })
+          openUpdates(snapshot.offset)
+        })()
+      }
+
       const registration: AttachHandle = {
         settled,
         cancel() {
           // Prompt stop of THIS READ, by name, through Part 1's registry.
           // It never touches the run: a window going away cancels nothing.
+          stopped = true
+          // A cold start still inside its history read has no registered
+          // stream, so the registry has nothing to stop and nothing else
+          // will ever settle this handle. Say so here rather than leaving a
+          // promise pending for the lifetime of the page -- and leave the
+          // opened case to the registry, whose Ok is the honest signal that
+          // the reader really has gone.
+          if (!opened) resolveSettled({ outcome: 'cancelled' })
           return invoke('service_stream_cancel', { streamId }).then(
             () => undefined,
             () => undefined,
@@ -461,27 +615,12 @@ export function createConversationClient(options: ConversationClientOptions): Co
         },
       }
 
-      const pending = invoke('service_stream', {
-        service: 'harness',
-        path: agentsPath(),
-        init: {},
-        // Resume from wherever this conversation got to; `-1` only when
-        // nothing has been seen, which replays the durable history.
-        offset: attachOptions?.from ?? trackedOffset ?? '-1',
-        streamId,
-        channel,
-      })
-      pending.then(
-        () => resolveSettled({ outcome: 'cancelled' }),
-        (error: unknown) => {
-          const failure = seamFailure(error)
-          resolveSettled(
-            failure.kind === 'broken'
-              ? { outcome: 'broken', failure }
-              : { outcome: 'refused', failure },
-          )
-        },
-      )
+      const from = attachOptions?.from ?? trackedOffset
+      // An explicitly named `-1` still goes straight to updates: the server
+      // projects a full reset plus every chunk from scratch at that offset,
+      // which is exactly what a caller asking for the beginning asked for.
+      if (from !== null) openUpdates(from)
+      else openFromHistory()
 
       active = registration
       // Supersede, don't stack: two live readers would deliver everything
