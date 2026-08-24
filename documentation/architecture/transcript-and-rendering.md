@@ -103,6 +103,26 @@ Storing it means it can disagree with the record; computing it means it cannot. 
 then works for a run someone reattaches to hours later, which a stored-on-completion
 summary would miss.
 
+**It is a display artefact and never enters the model's context.** On the next turn the
+model sees the events, not the summary card. Two consequences follow, and both are the
+point of §1: the summary can be redesigned or its arithmetic fixed without changing
+model behaviour, and it can never hide anything from the model — collapsing is not
+truncating, and a group collapsed on screen is still fully present in what gets sent.
+
+Do not confuse this with **context compaction**, which is a different mechanism wearing
+the same word. Compaction summarises older turns *for the model* when the window fills,
+and that summary replaces them in what is sent (ADR 0003; Flue owns it).
+
+| | Display summary | Compaction summary |
+|---|---|---|
+| Who reads it | The person | The model |
+| When | A run finishes | Context fills |
+| Effect on the model | None | Replaces older turns |
+| Recomputable | Freely | No — it becomes the record |
+
+Merging the two would mean the model forgetting whatever the UI chose not to show, which
+is the precise failure §1 exists to prevent.
+
 It is a real feature and it is downstream: it needs tools that report line deltas and
 timing, which is partly Phase 10's business. Not now.
 
