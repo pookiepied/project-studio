@@ -162,7 +162,12 @@ export function ChatPage({
           style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
         >
           {!gallery ? (
-            <ConnectionNotice phase={live.phase} onResume={live.resume} />
+            <ConnectionNotice
+              phase={live.phase}
+              onResume={live.resume}
+              refused={live.refused}
+              onDismissRefusal={live.dismissRefusal}
+            />
           ) : null}
 
           <Composer
@@ -172,7 +177,7 @@ export function ChatPage({
             {...(gallery
               ? {}
               : {
-                  onSend: (text: string) => void live.submit(text),
+                  onSend: (text: string) => live.submit(text),
                   busy: live.phase.status === 'streaming',
                   onStop: () => void live.abort(),
                 })}

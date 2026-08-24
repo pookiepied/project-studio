@@ -4,6 +4,7 @@ import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import { ToolGroups } from '@/features/chat/transcript/live/ToolGroups'
 import type {
   AssistantSegment,
+  MessageEnd,
   TranscriptItem,
 } from '@/features/chat/transcript/projection'
 
@@ -44,7 +45,7 @@ export function AssistantTurn({
           live={live}
         />
       ))}
-      <EndLine state={item.end.state} />
+      <EndLine end={item.end} />
     </div>
   )
 }
@@ -105,23 +106,34 @@ function TextSegment({
 /**
  * The honest ending. Complete says nothing at all -- a finished reply needs
  * no footnote about having finished. Everything else names what happened,
- * because a turn that died must never be mistaken for one that landed.
+ * because a turn that died must never be mistaken for one that landed. The
+ * settlement's own sentence rides under a failed or aborted line when the
+ * wire carried one; when it did not, nothing is invented -- the outcome
+ * alone is the fact.
  */
-function EndLine({ state }: { state: 'complete' | 'stopped' | 'failed' | 'aborted' }) {
-  if (state === 'complete') return null
+function EndLine({ end }: { end: MessageEnd }) {
+  if (end.state === 'complete') return null
   const copy = {
     stopped: { text: 'Stopped before finishing', icon: Icons.stop },
     failed: { text: 'This turn failed', icon: Icons.failed },
     aborted: { text: 'Aborted', icon: Icons.stop },
-  }[state]
+  }[end.state]
+  const reason = end.state === 'stopped' ? null : end.reason
   return (
-    <div className="mt-1 inline-flex items-center gap-1.5 text-caption text-muted-foreground">
-      {state === 'failed' ? (
-        <copy.icon size="sm" className="text-destructive" />
-      ) : (
-        <copy.icon size="sm" />
-      )}
-      <span>{copy.text}</span>
+    <div className="mt-1 flex flex-col items-start gap-0.5">
+      <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+        {end.state === 'failed' ? (
+          <copy.icon size="sm" className="text-destructive" />
+        ) : (
+          <copy.icon size="sm" />
+        )}
+        <span>{copy.text}</span>
+      </div>
+      {reason !== null ? (
+        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+          {reason}
+        </p>
+      ) : null}
     </div>
   )
 }

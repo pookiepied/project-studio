@@ -285,6 +285,9 @@ describe('readChunkFacts', () => {
     input: null,
     output: null,
     errorText: null,
+    errorName: null,
+    errorType: null,
+    errorMessage: null,
     usage: null,
   }
 
@@ -311,6 +314,52 @@ describe('readChunkFacts', () => {
       ...EMPTY,
       type: 'submission-settled',
       outcome: 'aborted',
+    })
+  })
+
+  it('carries a settlement error field by field, inventing nothing it omits', () => {
+    // Verbatim from a live harness: Flue serializes name, message, type and
+    // an empty details. The sentence is the part worth keeping; an empty
+    // string is no more a reason than an absent object is.
+    expect(
+      readChunkFacts({
+        type: 'submission-settled',
+        submissionId: 'sub_9',
+        outcome: 'failed',
+        error: {
+          name: 'FlueError',
+          message: 'direct(sub_9) failed: 429 rate limit exceeded',
+          type: 'operation_failed',
+          details: '',
+        },
+      }),
+    ).toEqual({
+      ...EMPTY,
+      type: 'submission-settled',
+      submissionId: 'sub_9',
+      outcome: 'failed',
+      errorName: 'FlueError',
+      errorType: 'operation_failed',
+      errorMessage: 'direct(sub_9) failed: 429 rate limit exceeded',
+    })
+    // No error object at all is still a failed settlement, with no reason.
+    expect(
+      readChunkFacts({ type: 'submission-settled', submissionId: 'sub_8', outcome: 'failed' }),
+    ).toEqual({
+      ...EMPTY,
+      type: 'submission-settled',
+      submissionId: 'sub_8',
+      outcome: 'failed',
+    })
+    // An error this side cannot read means "reason present but unknown",
+    // never a fabricated cause -- and never dropped either.
+    const unreadable = readChunkFacts({ type: 'submission-settled', outcome: 'aborted', error: 42 })
+    expect(unreadable).toMatchObject({
+      type: 'submission-settled',
+      outcome: 'aborted',
+      errorName: null,
+      errorType: null,
+      errorMessage: null,
     })
   })
 
@@ -478,7 +527,7 @@ describe('readConversationSnapshot', () => {
           submissionId: 's1',
           outcome: 'completed',
           result: { present: true, value: { text: 'hi' } },
-          error: { present: false, value: undefined },
+          error: { present: false, name: null, type: null, message: null },
         },
       ],
     })

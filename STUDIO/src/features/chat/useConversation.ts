@@ -9,6 +9,7 @@ import {
   type ConversationClient,
   type ConversationDelivery,
   type ConversationSnapshotFacts,
+  type SeamFailure,
   type TurnResult,
 } from '@/platform/harness'
 import { isTauri } from '@/platform/tauri/window'
@@ -45,7 +46,14 @@ export type ConversationPhase =
   | {
       readonly status: 'run-failed'
       readonly outcome: 'failed' | 'aborted'
+      /** What the settlement means, in this file's own words. */
       readonly message: string
+      /**
+       * The provider's own sentence for the failure, when the wire carried
+       * one -- the part that names the cause. Null when it did not; nothing
+       * invents a reason the harness never gave.
+       */
+      readonly detail: string | null
     }
 
 /**
@@ -77,11 +85,23 @@ export interface ConversationView {
    * identical resend would be a SECOND turn, so a failed submission is
    * surfaced, not repeated. On success, makes sure a read is attached --
    * a conversation's very first turn creates the stream this page has
-   * been unable to find since it mounted.
+   * been unable to find since it mounts.
    */
   submit: (message: string) => Promise<TurnResult<{ readonly submissionId: string }>>
   /** Aborts the RUN, and says so; reading on is how the UI learns the outcome. */
   abort: () => Promise<TurnResult<boolean>>
+  /**
+   * The last submission this connection refused to carry, held where the
+   * other connection states render until the person dismisses it or the
+   * next send succeeds. A refused POST used to change nothing at all --
+   * the person typed, pressed send, and watched the app do exactly
+   * nothing, which reads as a broken key rather than a broken connection.
+   * The one exception is `no-harness`: while the phase machine is already
+   * saying that permanently, a second notice would say it twice.
+   */
+  readonly refused: SeamFailure | null
+  /** Puts the refusal away without sending anything. */
+  dismissRefusal: () => void
 }
 
 /* -------------------------------------------------------------------------- */
@@ -201,9 +221,11 @@ function reduceChunks(
   applied: ChunkPosition | null
   streaming: string | null
   settled: 'completed' | 'failed' | 'aborted' | null
+  settledReason: string | null
 } {
   let streaming: string | null = null
   let settled: 'completed' | 'failed' | 'aborted' | null = null
+  let settledReason: string | null = null
   for (const chunk of chunks) {
     if (applied !== null && chunk.position !== null && atOrBefore(chunk.position, applied)) {
       continue
@@ -215,9 +237,13 @@ function reduceChunks(
       if (streaming === null) streaming = ''
     } else if (chunk.type === 'submission-settled' && chunk.outcome !== null) {
       settled = chunk.outcome
+      // The provider's sentence, parsed since Task 26 put it on the facts.
+      // A later settlement in the same batch replaces an earlier one; a
+      // settlement without a sentence leaves the reason null.
+      settledReason = chunk.errorMessage
     }
   }
-  return { applied, streaming, settled }
+  return { applied, streaming, settled, settledReason }
 }
 
 const SETTLEMENT_MESSAGES: Record<'failed' | 'aborted', string> = {
@@ -256,6 +282,16 @@ export function useConversation(
   // to reach a run, and knows nothing else yet.
   const [phase, setPhase] = useState<ConversationPhase>({ status: 'attaching' })
   const [offset, setOffset] = useState<string | null>(null)
+  // A refused submission. Deliberately NOT a phase: a send can be refused
+  // while an earlier turn is still streaming, and the state machine has no
+  // status that means "streaming AND refused" -- booleans are how the
+  // combinations start lying (see ConversationPhase above). The refusal
+  // renders beside whatever phase is real.
+  const [refused, setRefused] = useState<SeamFailure | null>(null)
+  // Mirror for callbacks that must judge the CURRENT phase -- a closure over
+  // `phase` would see the render the callback was created in.
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
 
   // Client and live handle are not render state: nothing displays them and
   // changing them must not paint.
@@ -322,6 +358,7 @@ export function useConversation(
                       status: 'run-failed',
                       outcome: result.settled,
                       message: SETTLEMENT_MESSAGES[result.settled],
+                      detail: result.settledReason,
                     },
               )
               return
@@ -381,6 +418,8 @@ export function useConversation(
     clientRef.current = createConversationClient({ conversationId })
     setOffset(null)
     setPhase({ status: 'attaching' })
+    // A refusal belongs to the conversation it happened in.
+    setRefused(null)
 
     void contact().then((found) => {
       if (disposed || !liveRef.current) return
@@ -456,15 +495,28 @@ export function useConversation(
         }
       }
       const sent = await client.submitTurn(message)
+      if (!sent.ok) {
+        // The no-harness diagnosis belongs to the phase machine, which says
+        // it permanently; stacking the same sentence in a second notice
+        // teaches people to stop reading them. Every other refusal lands.
+        if (liveRef.current && phaseRef.current.status !== 'no-harness') {
+          setRefused(sent.error)
+        }
+        return sent
+      }
+      // A send that got through retires whatever the last refusal said.
+      if (liveRef.current) setRefused(null)
       // A fresh conversation had no stream to attach to at mount; its first
       // admitted turn creates one, and this is where the read begins.
-      if (sent.ok && !client.attached()) attach()
-      return sent.ok
-        ? { ok: true as const, value: { submissionId: sent.value.submissionId } }
-        : sent
+      if (!client.attached()) attach()
+      return { ok: true as const, value: { submissionId: sent.value.submissionId } }
     },
     [attach],
   )
+
+  const dismissRefusal = useCallback(() => {
+    if (liveRef.current) setRefused(null)
+  }, [])
 
   const abort = useCallback(async () => {
     const client = clientRef.current
@@ -480,5 +532,5 @@ export function useConversation(
     return client.abortRun()
   }, [])
 
-  return { phase, offset, resume, submit, abort }
+  return { phase, offset, resume, submit, abort, refused, dismissRefusal }
 }

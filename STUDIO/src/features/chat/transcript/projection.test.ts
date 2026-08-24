@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { readChunkFacts, type ChunkFacts } from '@/platform/harness'
+import {
+  readChunkFacts,
+  type ChunkFacts,
+  type ConversationSnapshotFacts,
+} from '@/platform/harness'
 import {
   applyChunks,
   emptyProjection,
@@ -424,7 +428,7 @@ describe('an interrupted turn is never a finished one', () => {
       throw new Error('expected two assistant items')
     }
     expect(finished.end).toEqual({ state: 'complete' })
-    expect(interrupted.end).toEqual({ state: 'aborted' })
+    expect(interrupted.end).toEqual({ state: 'aborted', reason: null })
   })
 
   it('lets a resumed stream finish what interruption interrupted', () => {
@@ -536,12 +540,12 @@ describe('seeded turns honour what their submission settled as', () => {
         },
       ],
       settlements: [
-        { submissionId: SUBMISSION, outcome: 'failed', result: { present: false, value: undefined }, error: { present: false, value: undefined } },
+        { submissionId: SUBMISSION, outcome: 'failed', result: { present: false, value: undefined }, error: { present: false, name: null, type: null, message: null } },
       ],
     })
     const reply = items[0]
     if (reply.kind !== 'assistant') throw new Error('expected an assistant item')
-    expect(reply.end).toEqual({ state: 'failed' })
+    expect(reply.end).toEqual({ state: 'failed', reason: null })
   })
 
   it('leaves genuinely finished messages of a failed submission finished', () => {
@@ -561,7 +565,7 @@ describe('seeded turns honour what their submission settled as', () => {
         },
       ],
       settlements: [
-        { submissionId: SUBMISSION, outcome: 'aborted', result: { present: false, value: undefined }, error: { present: false, value: undefined } },
+        { submissionId: SUBMISSION, outcome: 'aborted', result: { present: false, value: undefined }, error: { present: false, name: null, type: null, message: null } },
       ],
     })
     const reply = items[0]
@@ -584,7 +588,13 @@ describe('which message is being written right now', () => {
   } as const
 
   function withEnd(state: 'complete' | 'failed' | 'aborted') {
-    return { ...stoppedItem, end: { state } }
+    return {
+      ...stoppedItem,
+      end:
+        state === 'complete'
+          ? { state }
+          : { state, reason: state === 'failed' ? 'boom' : null },
+    }
   }
 
   it('is only true while the turn runs, for the newest, unfinished message', () => {
@@ -608,6 +618,7 @@ describe('which message is being written right now', () => {
         {
           kind: 'user',
           id: 'u1',
+          submissionId: null,
           text: 'hi',
           attachments: [],
           timestamp: null,
@@ -615,5 +626,301 @@ describe('which message is being written right now', () => {
         { newest: true, turnRunning: true },
       ),
     ).toBe(false)
+  })
+})
+
+/**
+ * Task 26's adversarial cases, live side. The rule under test: a message
+ * that closed without ever producing content is a retry attempt that never
+ * spoke and is withdrawn into one visible failure; open messages take the
+ * outcome; closed-with-content messages are never falsified by a later
+ * failure. Content means a delta or tool input arrived -- nothing else.
+ */
+describe('a failed submission must not look like a completed one', () => {
+  const SENTENCE = 'direct(sub_1) failed: 429 rate limit exceeded'
+
+  function rateLimitedTurn() {
+    // Four retry attempts, each closing cleanly with nothing in them --
+    // the shape the real captured wire has (wire-contract.test.ts pins it).
+    let projection = applyChunks(
+      emptyProjection(),
+      chunksOf(resetChunk(), {
+        type: 'message-appended',
+        message: {
+          id: 'u1',
+          role: 'user',
+          submissionId: SUBMISSION,
+          metadata: { timestamp: '2026-08-24T00:00:00Z' },
+          parts: [{ type: 'text', text: '[fail] please answer.', state: 'done' }],
+        },
+        position: at(1),
+      }),
+    )
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      projection = applyChunks(
+        projection,
+        chunksOf(
+          { type: 'message-started', messageId: `m${attempt}`, submissionId: SUBMISSION, position: at(2 + attempt * 2) },
+          { type: 'message-completed', messageId: `m${attempt}`, position: at(3 + attempt * 2) },
+        ),
+      )
+    }
+    return projection
+  }
+
+  it('withdraws four silent attempts into one failure carrying the sentence', () => {
+    const settled = applyChunks(
+      rateLimitedTurn(),
+      chunksOf({
+        type: 'submission-settled',
+        submissionId: SUBMISSION,
+        outcome: 'failed',
+        error: { name: 'FlueError', type: 'operation_failed', message: SENTENCE },
+        position: at(10),
+      }),
+    )
+    expect(settled.items).toHaveLength(2)
+    const [, failure] = settled.items
+    expect(failure).toMatchObject({
+      kind: 'submission-failed',
+      id: `${SUBMISSION}#settled`,
+      submissionId: SUBMISSION,
+      outcome: 'failed',
+      reason: SENTENCE,
+    })
+    expect(settled.items.some((item) => item.kind === 'assistant')).toBe(false)
+  })
+
+  it('keeps content that streamed before the failure and marks its record failed', () => {
+    let projection = applyChunks(
+      emptyProjection(),
+      chunksOf(
+        resetChunk(),
+        { type: 'message-started', messageId: 'm1', submissionId: SUBMISSION, position: at(1) },
+        { type: 'message-delta', messageId: 'm1', kind: 'text', delta: 'half an answer', position: at(2) },
+      ),
+    )
+    projection = applyChunks(
+      projection,
+      chunksOf({
+        type: 'submission-settled',
+        submissionId: SUBMISSION,
+        outcome: 'failed',
+        error: { message: SENTENCE },
+        position: at(3),
+      }),
+    )
+    // Content survives, now honestly labelled with the reason beside it.
+    expect(projection.items).toHaveLength(1)
+    const reply = projection.items[0]
+    if (reply.kind !== 'assistant') throw new Error('expected an assistant item')
+    expect(reply.end).toEqual({ state: 'failed', reason: SENTENCE })
+    // A survivor stands, so there is nothing to replace with a card.
+    expect(projection.items.some((item) => item.kind === 'submission-failed')).toBe(false)
+  })
+
+  it('never falsifies work a submission genuinely completed before failing late', () => {
+    let projection = applyChunks(
+      emptyProjection(),
+      chunksOf(
+        resetChunk(),
+        { type: 'message-started', messageId: 'worker', submissionId: SUBMISSION, position: at(1) },
+        { type: 'tool-input', messageId: 'worker', toolCallId: 't1', toolName: 'read', input: { p: 1 }, position: at(2) },
+        { type: 'tool-output', toolCallId: 't1', output: 'contents', position: at(3) },
+        { type: 'message-completed', messageId: 'worker', position: at(4) },
+      ),
+    )
+    // Two more attempts of the same submission fail silently, then the turn.
+    projection = applyChunks(
+      projection,
+      chunksOf(
+        { type: 'message-started', messageId: 'retry', submissionId: SUBMISSION, position: at(5) },
+        { type: 'message-completed', messageId: 'retry', position: at(6) },
+        {
+          type: 'submission-settled',
+          submissionId: SUBMISSION,
+          outcome: 'failed',
+          error: { message: SENTENCE },
+          position: at(7),
+        },
+      ),
+    )
+    expect(projection.items).toHaveLength(1)
+    const worker = projection.items[0]
+    if (worker?.kind !== 'assistant') throw new Error('the working message vanished')
+    // Real work keeps its real completion. A tool input is content too:
+    // "content" was never a test over text.
+    expect(worker.end).toEqual({ state: 'complete' })
+    expect(worker.segments).toHaveLength(1)
+  })
+
+  it('renders a failure with no error object as a failure with an unknown reason', () => {
+    const settled = applyChunks(
+      rateLimitedTurn(),
+      chunksOf({
+        type: 'submission-settled',
+        submissionId: SUBMISSION,
+        outcome: 'failed',
+        position: at(10),
+      }),
+    )
+    expect(settled.items).toHaveLength(2)
+    const [, failure] = settled.items
+    if (failure?.kind !== 'submission-failed') throw new Error('no failure item')
+    // The outcome is stated; no cause is invented.
+    expect(failure.outcome).toBe('failed')
+    expect(failure.reason).toBeNull()
+  })
+
+  it('applies a redelivered batch containing the failed settlement exactly once', () => {
+    const settled = applyChunks(
+      rateLimitedTurn(),
+      chunksOf({
+        type: 'submission-settled',
+        submissionId: SUBMISSION,
+        outcome: 'failed',
+        error: { message: SENTENCE },
+        position: at(10),
+      }),
+    )
+    expect(applyChunks(settled, chunksOf({
+      type: 'submission-settled',
+      submissionId: SUBMISSION,
+      outcome: 'failed',
+      error: { message: SENTENCE },
+      position: at(10),
+    }))).toBe(settled)
+  })
+
+  it('leaves a legitimately silent model alone when the turn actually completed', () => {
+    // The emptiness rule must never trip on the honest case: a model that
+    // answers with nothing, successfully. Under a COMPLETED settlement
+    // nothing is withdrawn and nothing is marked.
+    let projection = applyChunks(
+      emptyProjection(),
+      chunksOf(
+        resetChunk(),
+        { type: 'message-started', messageId: 'quiet', submissionId: SUBMISSION, position: at(1) },
+        { type: 'message-completed', messageId: 'quiet', position: at(2) },
+        {
+          type: 'submission-settled',
+          submissionId: SUBMISSION,
+          outcome: 'completed',
+          position: at(3),
+        },
+      ),
+    )
+    expect(projection.items).toHaveLength(1)
+    const quiet = projection.items[0]
+    if (quiet?.kind !== 'assistant') throw new Error('expected an assistant item')
+    expect(quiet.end).toEqual({ state: 'complete' })
+  })
+})
+
+describe('a cold start applies the same failure rule to history-shaped snapshots', () => {
+  const SENTENCE = 'direct(sub_1) failed: 429 rate limit exceeded'
+
+  function failedHistory(): ConversationSnapshotFacts {
+    return {
+      version: 1,
+      conversationId: CONVERSATION,
+      offset: '9_9',
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          submissionId: SUBMISSION,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [{ kind: 'text', text: '[fail] please answer.', state: 'done' }],
+        },
+        // History's own shape for the attempts: assistant messages with NO
+        // submissionId and empty parts, exactly as a real harness returns
+        // them (pinned verbatim in wire-contract.test.ts).
+        ...[0, 1, 2].map((attempt) => ({
+          id: `a${attempt}`,
+          role: 'assistant' as const,
+          submissionId: null,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [],
+        })),
+      ],
+      settlements: [
+        {
+          submissionId: SUBMISSION,
+          outcome: 'failed' as const,
+          result: { present: false, value: undefined },
+          error: { present: true, name: 'FlueError', type: 'operation_failed', message: SENTENCE },
+        },
+      ],
+    }
+  }
+
+  it('associates unmarked attempts by position and collapses them into the failure', () => {
+    const items = seededFrom(failedHistory())
+    expect(items).toHaveLength(2)
+    const [, failure] = items
+    expect(failure).toMatchObject({
+      kind: 'submission-failed',
+      submissionId: SUBMISSION,
+      reason: SENTENCE,
+    })
+    expect(items.some((item) => item.kind === 'assistant')).toBe(false)
+  })
+
+  it('still honours an explicit submissionId when a snapshot carries one', () => {
+    const snapshot = failedHistory()
+    const items = seededFrom({
+      ...snapshot,
+      messages: [
+        ...snapshot.messages.slice(0, 1),
+        ...snapshot.messages.slice(1).map((message) => ({ ...message, submissionId: SUBMISSION })),
+      ],
+    })
+    expect(items).toHaveLength(2)
+    expect(items[1]).toMatchObject({ kind: 'submission-failed', reason: SENTENCE })
+  })
+
+  it('leaves another turn between the two user messages entirely alone', () => {
+    const base = failedHistory()
+    const snapshot: ConversationSnapshotFacts = {
+      ...base,
+      messages: [
+        ...base.messages,
+        {
+          id: 'u2',
+          role: 'user' as const,
+          submissionId: null,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [{ kind: 'text' as const, text: 'next question', state: 'done' as const }],
+        },
+        {
+          id: 'later',
+          role: 'assistant' as const,
+          submissionId: null,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [{ kind: 'text' as const, text: 'a good answer', state: 'done' as const }],
+        },
+      ],
+    }
+    const items = seededFrom(snapshot)
+    // The failed turn collapsed; the LATER answer, which sits beyond the
+    // next user message, is nobody's retry attempt and stays complete.
+    expect(items.map((item) => item.kind)).toEqual([
+      'user',
+      'submission-failed',
+      'user',
+      'assistant',
+    ])
+    const last = items.at(-1)
+    if (last?.kind !== 'assistant') throw new Error('expected the later answer')
+    expect(last.end).toEqual({ state: 'complete' })
   })
 })

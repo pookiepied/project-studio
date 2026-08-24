@@ -636,6 +636,7 @@ export {
   type MessageRole,
   type ModelRefFacts,
   type Present,
+  type SettlementErrorFacts,
   type SettlementFacts,
   type TurnOutcome,
   type UsageFacts,

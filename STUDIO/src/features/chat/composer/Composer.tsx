@@ -63,6 +63,13 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  * the RUN (the only thing that means abort), and this component never
  * learns more about either than that. Two transports, one control.
  *
+ * A live send answers with a receipt, and the field holds the words until
+ * the receipt says the harness took them. Clearing optimistically turned a
+ * refused POST into a silent swallow -- the message vanished, nothing
+ * anywhere said why, and the person retyped it into a connection that would
+ * refuse it again. Now a refusal leaves the text exactly where it was, with
+ * the notice explaining itself above this component.
+ *
  * ---- The shape ------------------------------------------------------------
  *
  * A capsule while it holds one line, a rounded box once it holds more. Both are
@@ -88,8 +95,12 @@ export function Composer({
   projectId: string | null
   placeholder: string
   onSent?: (conversationId: string) => void
-  /** When present, sends go here instead of the demo turn runner. */
-  onSend?: (text: string) => void
+  /**
+   * When present, sends go here instead of the demo turn runner. The answer
+   * is a receipt, not a fire-and-forget: the field clears only when `ok`
+   * says the harness took the message.
+   */
+  onSend?: (text: string) => Promise<{ readonly ok: boolean }>
   /** Overrides the demo busy state while `onSend` owns sending. */
   busy?: boolean
   /** Aborts the harness run; only meaningful with `onSend`. */
@@ -97,8 +108,17 @@ export function Composer({
 }) {
   const { status, send, stop } = useWorkspace()
   const [text, setText] = useState('')
+  // Mirror of `text` for callbacks that must judge the CURRENT field against
+  // what was sent -- the closure below would otherwise see the render in
+  // which the send began.
+  const textRef = useRef('')
+  textRef.current = text
   const [focused, setFocused] = useState(false)
   const [multiline, setMultiline] = useState(false)
+  // True from send to receipt. Without it a refused send left `busy` false
+  // for the whole round trip, so a second click could start a second POST
+  // while the first was still being judged.
+  const [sending, setSending] = useState(false)
   const field = useRef<ComposerFieldHandle>(null)
   const voice = useVoiceModeContext()
 
@@ -122,16 +142,35 @@ export function Composer({
   useTypeToFocus(true, focus)
 
   const live = onSend !== undefined
-  const busy = live ? (busyOverride ?? false) : status !== 'idle'
+  // OR, never a fallback. The page passes a boolean for the whole POST round
+  // trip -- `false`, because the turn has not started streaming yet -- so
+  // `busyOverride ?? sending` would never reach `sending` where it is wired,
+  // and the in-flight lock would exist only for callers that omit the prop.
+  const busy = live ? (busyOverride ?? false) || sending : status !== 'idle'
   const canSend = text.trim().length > 0 && !busy
   const dictating = dictation.stage !== 'idle'
 
   const submit = () => {
     if (!canSend) return
-    if (live) {
-      onSend(text)
-      setText('')
-      setMultiline(false)
+    if (live && onSend !== undefined) {
+      const outgoing = text
+      setSending(true)
+      void onSend(outgoing).then(
+        (receipt) => {
+          setSending(false)
+          // Clear only what the harness actually took, and only if the
+          // field still holds exactly that -- words typed during the round
+          // trip belong to the next message, not this receipt.
+          if (!receipt.ok || textRef.current !== outgoing) return
+          setText('')
+          setMultiline(false)
+        },
+        () => {
+          // A send that threw instead of answering is not an acceptance
+          // either. The words stay, exactly as for an explicit refusal.
+          setSending(false)
+        },
+      )
       return
     }
     const id = send(conversationId, text, projectId)

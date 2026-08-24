@@ -2,6 +2,7 @@ import { StudioMark } from '@/components/brand'
 import { EarlierBoundary, useTranscriptWindow } from '@/features/chat/transcript/paging'
 import { AssistantTurn } from '@/features/chat/transcript/live/AssistantTurn'
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
+import { SubmissionFailed } from '@/features/chat/transcript/live/SubmissionFailed'
 import type { ConversationPhase } from '@/features/chat/useConversation'
 import {
   isMessageBeingWritten,
@@ -47,6 +48,8 @@ export function LiveTranscript({
       {visible.map((item) =>
         item.kind === 'user' ? (
           <LiveUserMessage key={item.id} item={item} />
+        ) : item.kind === 'submission-failed' ? (
+          <SubmissionFailed key={item.id} item={item} />
         ) : (
           <AssistantTurn
             key={item.id}

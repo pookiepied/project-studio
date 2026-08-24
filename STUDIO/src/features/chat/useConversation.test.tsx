@@ -408,8 +408,7 @@ describe('interruption and its answer', () => {
   })
 })
 
-describe('what a conversation switch and a closed pane must do', () => {
-  it('cancels the old read promptly on a switch, and never aborts the run', async () => {
+describe('what a conversation switch and a closed pane must do', () => {  it('cancels the old read promptly on a switch, and never aborts the run', async () => {
     const streams = cancellableStreams()
     const channels = recordingChannels()
     const lifecycle = manualLifecycle()
@@ -467,6 +466,198 @@ describe('what a conversation switch and a closed pane must do', () => {
 
     await waitFor(() =>
       expect(streams.calls.some((call) => call.command === 'service_stream_cancel')).toBe(true),
+    )
+  })
+})
+
+/**
+ * Task 26, Part C: a refused submission must change something on screen.
+ * The refusal lands beside the phases (not as one) because a send can be
+ * refused while an earlier turn is still streaming -- and the state machine
+ * has no status that means both at once.
+ */
+describe('a refused submission has somewhere to land', () => {
+  const REFUSAL = { kind: 'stream-refused', status: 403, message: 'admission denied for this session' }
+
+  /** Streams held open; submissions answered per `mode`. */
+  function submitScripting(mode: { reject: boolean }): { invoke: ServiceInvoke; calls: RecordedCall[] } {
+    const resolvers = new Map<string, () => void>()
+    return scriptedInvoke({
+      service_fetch: (args) => {
+        const path = String(args['path'])
+        if (path.endsWith('?view=history')) {
+          return {
+            status: 200,
+            headers: [],
+            body: JSON.stringify({ v: 1, conversationId: 'conv_1', offset: '-1', messages: [], settlements: [] }),
+          }
+        }
+        if (!path.includes('?view=')) {
+          if (mode.reject) throw REFUSAL
+          return { status: 202, headers: [], body: JSON.stringify({ submissionId: 'sub_new', offset: '0_0' }) }
+        }
+        throw new Error(`unexpected fetch in this script: ${path}`)
+      },
+      service_stream: (args) =>
+        new Promise<void>((resolve) => {
+          resolvers.set(String(args['streamId']), () => resolve())
+        }),
+      service_stream_cancel: (args) => {
+        const resolve = resolvers.get(String(args['streamId']))
+        if (resolve !== undefined) {
+          resolve()
+          resolvers.delete(String(args['streamId']))
+        }
+        return undefined
+      },
+    })
+  }
+
+  it('lands a refused POST in refused, with its status and its own sentence', async () => {
+    const streams = submitScripting({ reject: true })
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    const receipt = await rendered.result.current.submit('please answer')
+    expect(receipt.ok).toBe(false)
+    if (receipt.ok) throw new Error('unreachable')
+    expect(receipt.error).toEqual({
+      kind: 'refused',
+      status: 403,
+      message: 'admission denied for this session',
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.refused).toEqual({
+        kind: 'refused',
+        status: 403,
+        message: 'admission denied for this session',
+      }),
+    )
+
+    act(() => rendered.result.current.dismissRefusal())
+    expect(rendered.result.current.refused).toBeNull()
+  })
+
+  it('refuses a send while an earlier turn is still streaming, and keeps streaming', async () => {
+    // The adversarial case: the state machine must not be hijacked by the
+    // refusal -- the earlier run is still producing, and the caret must not
+    // blink out because a second POST bounced.
+    const streams = submitScripting({ reject: true })
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    act(() => {
+      channels.feeds[0](
+        dataFrame('3_0', [
+          { type: 'message-started', messageId: 'm2', submissionId: 'sub_live', position: { batch: 3, index: 0 } },
+        ]),
+      )
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.phase).toEqual({ status: 'streaming', submissionId: 'sub_live' }),
+    )
+
+    await rendered.result.current.submit('a second message')
+    expect(rendered.result.current.phase.status).toBe('streaming')
+    await waitFor(() => expect(rendered.result.current.refused?.kind).toBe('refused'))
+  })
+
+  it('retires the refusal once a later send gets through', async () => {
+    // The script reads this each call, so the same harness can refuse the
+    // first send and accept the second -- which is the point: the refusal
+    // must survive until something actually got through.
+    const mode = { reject: true }
+    const streams = submitScripting(mode)
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const { contact } = contactFor(() =>
+      createConversationClient({ conversationId: 'cnv_1', invoke: streams.invoke, createChannel: channels.factory }),
+    )
+    const rendered = renderHook((id: string) => useConversation(id, { contact, listen: lifecycle.listen }), {
+      initialProps: 'cnv_1',
+    })
+    await waitFor(() => expect(streamCount(streams)).toBeGreaterThan(0))
+
+    await rendered.result.current.submit('first try')
+    await waitFor(() => expect(rendered.result.current.refused?.kind).toBe('refused'))
+
+    mode.reject = false
+    await rendered.result.current.submit('second try')
+    await waitFor(() => expect(rendered.result.current.refused).toBeNull())
+  })
+
+  it('never stacks a refusal under the permanent no-harness notice', async () => {
+    // The pre-contact path already explains itself on screen forever;
+    // landing the same diagnosis twice teaches people to ignore notices.
+    const lifecycle = manualLifecycle()
+    const rendered = renderHook(
+      (id: string) => useConversation(id, { contact: ABSENT, listen: lifecycle.listen }),
+      { initialProps: 'cnv_1' },
+    )
+    await waitFor(() => expect(rendered.result.current.phase).toEqual({ status: 'no-harness' }))
+
+    const receipt = await rendered.result.current.submit('anyone there?')
+    expect(receipt.ok).toBe(false)
+    // Whatever sentence the seam produced, the phase already owns this
+    // diagnosis permanently -- so nothing may land beside it.
+    await waitFor(() => expect(rendered.result.current.refused).toBeNull())
+  })
+
+  it('carries the provider sentence into the run-failed phase as its detail', async () => {
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    act(() => {
+      channels.feeds[0](
+        dataFrame('5_0', [
+          {
+            type: 'submission-settled',
+            submissionId: 'sub_9',
+            outcome: 'failed',
+            error: {
+              name: 'FlueError',
+              type: 'operation_failed',
+              message: 'direct(sub_9) failed: 429 rate limit exceeded: temporarily rate-limited upstream',
+            },
+            position: { batch: 5, index: 0 },
+          },
+        ]),
+      )
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.phase).toEqual({
+        status: 'run-failed',
+        outcome: 'failed',
+        message: 'The turn failed while it was running.',
+        detail: 'direct(sub_9) failed: 429 rate limit exceeded: temporarily rate-limited upstream',
+      }),
+    )
+  })
+
+  it('says nothing invented when the settlement carried no error object', async () => {
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    act(() => {
+      channels.feeds[0](
+        dataFrame('5_0', [
+          { type: 'submission-settled', submissionId: 'sub_9', outcome: 'aborted', position: { batch: 5, index: 0 } },
+        ]),
+      )
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.phase).toEqual({
+        status: 'run-failed',
+        outcome: 'aborted',
+        message: 'The turn was aborted before it finished.',
+        detail: null,
+      }),
     )
   })
 })

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { useConversation } from '@/features/chat/useConversation'
 import type { ConversationContent } from '@/features/chat/useConversation'
+import type { SeamFailure } from '@/platform/harness'
 import {
   applyChunks,
   emptyProjection,
@@ -31,6 +32,8 @@ export function useConversationTranscript(conversationId: string): {
   resume: () => void
   submit: (message: string) => Promise<{ ok: boolean }>
   abort: () => Promise<{ ok: boolean }>
+  refused: SeamFailure | null
+  dismissRefusal: () => void
 } {
   const [projection, setProjection] = useState(emptyProjection)
 
@@ -64,5 +67,7 @@ export function useConversationTranscript(conversationId: string): {
       const aborted = await conversation.abort()
       return { ok: aborted.ok }
     },
+    refused: conversation.refused,
+    dismissRefusal: conversation.dismissRefusal,
   }
 }

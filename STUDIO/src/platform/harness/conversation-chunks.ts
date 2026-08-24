@@ -142,7 +142,57 @@ export interface SettlementFacts {
   readonly submissionId: string
   readonly outcome: 'completed' | 'failed' | 'aborted'
   readonly result: { readonly present: boolean; readonly value: unknown }
-  readonly error: { readonly present: boolean; readonly value: unknown }
+  /**
+   * What the harness said went wrong, parsed. A failure the wire carried no
+   * error object for reads as `present: false` -- still a failure, just one
+   * with no sentence to show. An error object this side cannot read (not a
+   * record) is `present: true` with every field null, for the same reason:
+   * "there was a reason, and it is unknown" is a different fact from "there
+   * was no reason".
+   */
+  readonly error: SettlementErrorFacts
+}
+
+/**
+ * The error object of a failed or aborted settlement, mirrored field by
+ * field from what Flue actually serializes (`serializeError` in
+ * `@flue/runtime`, observed on a live harness):
+ *
+ * `{"name":"FlueError","type":"operation_failed","message":"direct(...)
+ * failed: 429 rate limit exceeded: ...","details":""}`
+ *
+ * The provider's own sentence lives in `message`; that is the part a person
+ * can act on, and dropping it is how Task 25 turned a faithful log into a
+ * fabricated success. `details` also exists on the wire but was empty in
+ * every capture; it stays unmirrored until something needs it.
+ */
+export interface SettlementErrorFacts {
+  /** Whether the wire carried an error object at all. */
+  readonly present: boolean
+  /** The error class name -- "FlueError", "FlueHttpError". */
+  readonly name: string | null
+  /** Flue's stable error type -- "operation_failed", not the message. */
+  readonly type: string | null
+  /** The sentence a person could act on. Never synthesised when absent. */
+  readonly message: string | null
+}
+
+const NO_SETTLEMENT_ERROR: SettlementErrorFacts = {
+  present: false,
+  name: null,
+  type: null,
+  message: null,
+}
+
+function readSettlementError(value: unknown): SettlementErrorFacts {
+  if (value === undefined) return NO_SETTLEMENT_ERROR
+  if (!isRecord(value)) return { present: true, name: null, type: null, message: null }
+  return {
+    present: true,
+    name: text(value['name']),
+    type: text(value['type']),
+    message: text(value['message']),
+  }
 }
 
 /**
@@ -311,7 +361,7 @@ function readSettlement(value: unknown): SettlementFacts | null {
     submissionId,
     outcome,
     result: readPresentJson(value['result']),
-    error: readPresentJson(value['error']),
+    error: readSettlementError(value['error']),
   }
 }
 
@@ -398,6 +448,14 @@ export interface ChunkFacts {
   /** `tool-output` and `tool-output-error`: the answer, keyed by call id alone. */
   readonly output: Present<unknown> | null
   readonly errorText: string | null
+  /**
+   * `submission-settled`: who signed the failure, and what it said. Null
+   * whenever the wire omitted the error or the field -- never invented, so a
+   * renderer can show "reason unknown" without lying.
+   */
+  readonly errorName: string | null
+  readonly errorType: string | null
+  readonly errorMessage: string | null
   /** `message-completed`: what the message cost. */
   readonly usage: UsageFacts | null
 }
@@ -432,6 +490,9 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
     input: value['input'] === undefined ? null : readPresentJson(value['input']),
     output: value['output'] === undefined ? null : readPresentJson(value['output']),
     errorText: text(value['errorText']),
+    errorName: null,
+    errorType: null,
+    errorMessage: null,
     usage: null,
   }
 
@@ -528,6 +589,10 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
         rawOutcome === 'completed' || rawOutcome === 'failed' || rawOutcome === 'aborted'
           ? rawOutcome
           : null
+      // The one sentence a person could act on travels here. Task 25 dropped
+      // it at exactly this line; the failure rendered as four empty completed
+      // bubbles and nothing else.
+      const error = readSettlementError(value['error'])
       return {
         ...base,
         messageId: null,
@@ -538,6 +603,9 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
         output: null,
         errorText: null,
         outcome,
+        errorName: error.name,
+        errorType: error.type,
+        errorMessage: error.message,
       }
     }
     default:
@@ -559,6 +627,9 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
         input: null,
         output: null,
         errorText: null,
+        errorName: null,
+        errorType: null,
+        errorMessage: null,
         usage: null,
       }
   }

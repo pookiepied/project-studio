@@ -38,6 +38,29 @@
  * settlement says so. Silence proves nothing -- a stream that stops
  * mid-sentence leaves a visibly unfinished message behind, whatever the
  * connection does afterwards.
+ *
+ * ---- A failed submission must not look like a completed one ---------------
+ *
+ * `message-completed` means "this attempt's record is closed", not "this
+ * turn succeeded". Each retry attempt of a failing turn closes its own
+ * record cleanly -- so by the time the settlement arrives, four empty
+ * attempts all read complete, and a rule that only touches still-open
+ * messages correctly changes nothing. The rule here:
+ *
+ *  - an OPEN message of the failed submission takes the outcome, with the
+ *    settlement's sentence beside it when the wire carried one;
+ *  - a message that closed WITHOUT EVER PRODUCING CONTENT is withdrawn --
+ *    it was a retry attempt that never got to speak, and four empty bubbles
+ *    are a fabricated success however they are labelled;
+ *  - a message that closed WITH content keeps its completion -- a late
+ *    failure never retroactively falsifies real work;
+ *  - if withdrawal leaves nothing of the submission standing, one failure
+ *    item takes the attempts' place, carrying the provider's sentence.
+ *
+ * Everything here is derivable from wire facts alone: content means a delta
+ * or a tool input arrived for that message id. No counting, no emptiness
+ * test over text -- and a legitimately silent model is never misrepresented,
+ * because silence under a COMPLETED settlement touches nothing at all.
  */
 
 import type {
@@ -83,8 +106,13 @@ export type AssistantSegment =
 export type MessageEnd =
   | { readonly state: 'complete' }
   | { readonly state: 'stopped' }
-  | { readonly state: 'failed' }
-  | { readonly state: 'aborted' }
+  /**
+   * The submission settled failed/aborted over this record. `reason` is the
+   * settlement's own sentence -- the provider's words, or null when the wire
+   * carried none. Never invented here; "unknown" renders as unknown.
+   */
+  | { readonly state: 'failed'; readonly reason: string | null }
+  | { readonly state: 'aborted'; readonly reason: string | null }
 
 export interface UserAttachmentView {
   readonly mediaType: string
@@ -96,6 +124,8 @@ export type TranscriptItem =
   | {
       readonly kind: 'user'
       readonly id: string
+      /** The submission these words opened, when one carried them. */
+      readonly submissionId: string | null
       readonly text: string
       readonly attachments: readonly UserAttachmentView[]
       readonly timestamp: string | null
@@ -109,6 +139,23 @@ export type TranscriptItem =
       /** How this message ended. Never inferred from silence. */
       readonly end: MessageEnd
       readonly usage: UsageFacts | null
+    }
+  | {
+      /**
+       * A failed or aborted submission standing where its contentless retry
+       * attempts stood. Exists so a rate-limited turn reads as ONE visible
+       * failure instead of four empty bubbles -- the display projection
+       * collapsing records that carry nothing of their own. What the
+       * attempts said (nothing) and what the settlement said (the failure)
+       * are both still in the log; this is the honest rendering of them.
+       */
+      readonly kind: 'submission-failed'
+      /** Stable per submission, so identity survives a replay. */
+      readonly id: string
+      readonly submissionId: string
+      readonly outcome: 'failed' | 'aborted'
+      /** The settlement's own sentence; null when none arrived. */
+      readonly reason: string | null
     }
 
 /**
@@ -323,18 +370,74 @@ function answerToolCall(
   draft.items[site.itemIndex] = { ...item, segments }
 }
 
-/** Marks every unfinished message of a submission with how its turn ended. */
-function markSubmissionEnded(
-  draft: Draft,
+type AssistantItem = Extract<TranscriptItem, { kind: 'assistant' }>
+
+/** Which items a failed or aborted submission owns, position included. */
+type BelongsTo = (item: AssistantItem, index: number) => boolean
+
+/**
+ * Applies one failed or aborted settlement to a list of items, in place.
+ * The rule is the module docblock's: open messages take the outcome (with
+ * the sentence beside it), closed-without-content attempts are withdrawn,
+ * closed-with-content messages keep their completion, and a submission left
+ * with nothing standing gets one failure item where its attempts were.
+ *
+ * Returns whether anything changed. `items` is mutated; callers that keep
+ * id-indexed maps rebuild them when this returns true -- withdrawal and
+ * insertion shift every index after the first one touched.
+ */
+function settleSubmissionFailure(
+  items: TranscriptItem[],
   submissionId: string,
-  end: MessageEnd,
-): void {
-  for (let index = 0; index < draft.items.length; index += 1) {
-    const item = draft.items[index]
-    if (item.kind !== 'assistant' || item.submissionId !== submissionId) continue
-    if (item.end.state === 'complete') continue
-    draft.items[index] = { ...item, end }
+  belongsTo: BelongsTo,
+  outcome: 'failed' | 'aborted',
+  reason: string | null,
+): boolean {
+  const withdrawn = new Set<number>()
+  let survivors = 0
+  // The first withdrawn attempt's index. Nothing before it is removed, so
+  // this is also where a replacement failure item goes if nothing survives.
+  let firstWithdrawn = -1
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index]
+    if (item === undefined || item.kind !== 'assistant' || !belongsTo(item, index)) continue
+    if (item.end.state === 'complete') {
+      if (item.segments.length === 0) {
+        if (firstWithdrawn === -1) firstWithdrawn = index
+        withdrawn.add(index)
+        continue
+      }
+      survivors += 1
+      continue
+    }
+    // An open record takes the outcome: interrupted means interrupted, at
+    // the transcript layer too. A crash-recovered stopped message under an
+    // abort or failure must not read as an ordinary pause.
+    items[index] = { ...item, end: { state: outcome, reason } }
+    survivors += 1
   }
+
+  if (withdrawn.size === 0) return false
+
+  const kept: TranscriptItem[] = []
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index]
+    if (item !== undefined && !withdrawn.has(index)) kept.push(item)
+  }
+  if (survivors === 0 && firstWithdrawn >= 0) {
+    const card: TranscriptItem = {
+      kind: 'submission-failed',
+      id: `${submissionId}#settled`,
+      submissionId,
+      outcome,
+      reason,
+    }
+    kept.splice(firstWithdrawn, 0, card)
+  }
+  items.length = 0
+  for (const item of kept) items.push(item)
+  return true
 }
 
 /* -------------------------------------------------------------------------- */
@@ -399,6 +502,7 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
       items.push({
         kind: 'user',
         id: message.id,
+        submissionId: message.submissionId,
         text: texts.join('\n\n'),
         attachments,
         timestamp: message.timestamp,
@@ -474,18 +578,48 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
   }
 
   // Settlements are facts about how submissions ended, and history carries
-  // them precisely so a cold start knows what a crash knew. A message still
-  // unfinished under a failed/aborted submission takes that outcome -- the
-  // same rule the live path applies -- while genuinely finished messages of
-  // the same submission stay finished.
+  // them precisely so a cold start knows what a crash knew. The live rule --
+  // open tail takes the outcome, finished work stays finished, empty retry
+  // attempts withdraw -- applies here through the same function.
+  //
+  // One thing history forces on top: ASSISTANT messages in a snapshot carry
+  // no submissionId (observed on a live harness; the SDK type calls the
+  // field optional and the projection omits it), so matching by id alone
+  // finds nothing -- that is how a cold start came to render four empty
+  // complete bubbles. A submission's records are therefore also recognised
+  // by position: in a linear append-only log, the assistant messages between
+  // ITS user message and the next one are its attempts, and nothing else.
   for (const settlement of snapshot.settlements) {
     if (settlement.outcome === 'completed') continue
+
+    let turnStart = -1
+    let turnEnd = items.length
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index]
-      if (item.kind !== 'assistant' || item.submissionId !== settlement.submissionId) continue
-      if (item.end.state === 'complete') continue
-      items[index] = { ...item, end: { state: settlement.outcome } }
+      if (item === undefined) continue
+      if (turnStart === -1) {
+        if (item.kind === 'user' && item.submissionId === settlement.submissionId) {
+          turnStart = index
+        }
+        continue
+      }
+      if (item.kind === 'user') {
+        turnEnd = index
+        break
+      }
     }
+
+    const submissionId = settlement.submissionId
+    const outcome = settlement.outcome
+    settleSubmissionFailure(
+      items,
+      submissionId,
+      (item, index) =>
+        item.submissionId === submissionId ||
+        (turnStart !== -1 && index > turnStart && index < turnEnd),
+      outcome,
+      settlement.error.message,
+    )
   }
 
   return items
@@ -670,10 +804,25 @@ function applyChunk(draft: Draft, chunk: ChunkFacts): void {
       return
     }
     case 'submission-settled': {
-      if (chunk.submissionId === null || chunk.outcome === null) return
-      if (chunk.outcome !== 'completed') {
-        markSubmissionEnded(draft, chunk.submissionId, { state: chunk.outcome })
-      }
+      const submissionId = chunk.submissionId
+      const outcome = chunk.outcome
+      if (submissionId === null || outcome === null || outcome === 'completed') return
+      // The settlement's sentence rides along: it lands on whatever open
+      // messages take the outcome, and on the failure item if the attempts
+      // are withdrawn wholesale.
+      const changed = settleSubmissionFailure(
+        draft.items,
+        submissionId,
+        (item) => item.submissionId === submissionId,
+        outcome,
+        chunk.errorMessage,
+      )
+      if (!changed) return
+      // Withdrawal and insertion shift item indexes; every id-indexed map is
+      // rebuilt rather than patched, because a stale index silently routes
+      // later content to the wrong item.
+      draft.assistants = assistantsOf(draft.items)
+      draft.callSites = callSitesOf(draft.items)
       return
     }
     default:
