@@ -232,8 +232,14 @@ warning that is expected and not your problem.
 - **No batch files, PowerShell scripts, or shell scripts that edit source.** No
   scripted search-and-replace across files. Edit every file by hand, one edit at
   a time. Scripted edits have corrupted this codebase before.
-- **ASCII only in source files.** No emoji. No smart quotes, no curly
-  apostrophes, no en-dashes. Plain `'`, `"`, `-`. UTF-8, no BOM, LF endings.
+- **ASCII in source files, with one exception.** No emoji. No smart quotes, no
+  curly apostrophes, no en-dashes. Plain `'`, `"`, `-`. UTF-8, no BOM, LF in
+  the repository. The exception is the em dash in comments, which §7 requires
+  and which this bullet used to contradict — a task brief written from this
+  bullet alone put roughly 885 ASCII double dashes into code that had used em
+  dashes since its first commit, and the sweep that undid them followed §7. If
+  the two ever disagree again, §7 governs comment prose and this bullet governs
+  everything else.
 - **Do not reformat code you are not changing.** No import reordering, no
   whitespace tidying, no unrelated fixes. The diff contains only your task.
 - **Do not edit anything in `docs/`, `documentation/`, or `tasks/`.** The
