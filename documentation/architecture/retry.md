@@ -1,9 +1,10 @@
 # Retry: the map, and the rule
 
-**Written:** 2026-08-25, from Task 29. This file is the map the rule needs: a
+**Written:** 2026-08-25, from Task 29; row 1 revised when Task 30 split its
+budget per class. This file is the map the rule needs: a
 contributor asking "does this retry, and how many times?" reads one table
 instead of grepping nine files. It is corrected against the code as it stands
-after Task 29 landed; where the working table this document was written from
+after Task 30 landed; where the working table this document was written from
 was wrong, the correction is recorded here rather than quietly absorbed.
 
 ## The rule
@@ -36,7 +37,7 @@ number.
 
 | # | Axis and owner | Budget and shape | Mechanism | Visible to the person waiting? |
 |---|---|---|---|---|
-| 1 | Transient model errors — Flue runtime (patched) | 3 retries, base 2s doubling, jittered ×(0.75–1.0) | private to `@flue/runtime` bundle | **Yes, since Task 29**: each scheduled retry appends a `submission_retry_scheduled` record, projected as a `submission-retrying` chunk; Studio renders the wait with the provider's sentence. Before that it was a log line only |
+| 1 | Transient model errors — loop in Flue runtime (patched); budget in `STUDIO HARNESS/src/reliability/model-retry-policy.ts` | per class: rate-limit 8 retries; connection/transport 2; everything else pi-ai calls retryable 3. Base 2s doubling, jittered ×(0.75–1.0) of each attempt's ceiling, any single wait capped at 30s | the bundle asks an injected policy at each decision (`globalThis.__projectStudioTransientModelRetryPolicy`, installed by `src/app.ts`); absent or malformed policy falls back to the shipped constants of three | **Yes, since Task 29**: each scheduled retry appends a `submission_retry_scheduled` record, projected as a `submission-retrying` chunk carrying attempt, budget and delay; Studio renders the wait with the provider's sentence |
 | 2 | Context overflow — Flue runtime | compact once, then retry the turn once | private (`runModelTurnWithRecovery`'s `overflowRecoveryAttempted`) | No — the compaction emits an internal run event, nothing on the conversation wire; the person sees a pause |
 | 3 | Submission durability — `src/agents/studio.ts` | `durability.maxAttempts: 3`, `timeoutMs: 300_000`; attempts across process resets | Flue's submission machinery | Partly: a lost or crashed attempt settles visibly (failed/aborted with a sentence) on recovery; the counting itself is invisible |
 | 4 | MCP server start — `extend/mcp/supervisor.ts` | 5 attempts, 1s ×2 capped at 30s, full jitter, then give up | `getBackoffDelay` (shared module since Task 29) | Give-up yes (server reads not-connected); the five waits in between are log lines |
@@ -48,10 +49,24 @@ number.
 
 Corrections the code forced on the working version of this table:
 
-- Row 1 says **three retries**, which is four model calls in total;
+- Row 1 stopped being one number in Task 30, and the split of labour is the
+  point to keep: pi-ai's `isRetryableAssistantError` still decides
+  **retryable at all** — which is where quota and billing exhaustion get their
+  budget of zero, by exclusion, before any budget table runs — while
+  `model-retry-policy.ts` splits only the survivors into how patient to be.
+  The policy lives outside the patched bundle because the bundle cannot import
+  our source (it executes from pnpm's virtual store; an injected relative
+  import fails with `ERR_MODULE_NOT_FOUND` inside `.pnpm/`), so the bundle
+  consults instead of importing, and degrades to its own constants rather than
+  breaking the turn loop if the injection is missing. A class may change
+  between attempts: each decision reads only the failure in front of it, so
+  the attempt count stays one derived number and the budget follows the newest
+  failure.
+- Row 1 used to say **three retries**, which is four model calls in total;
   `MAX_TRANSIENT_MODEL_RETRIES = 3` counts retries, while row 3's
   `maxAttempts: 3` counts total attempts. That asymmetry is exactly why a
-  contributor cannot carry a number between axes.
+  contributor cannot carry a number between axes, and why row 1's per-class
+  budgets are stated as retries too.
 - Row 8 was listed as having no retryable notion at all; in fact `http.ts`
   classifies its errors with a `retryable` flag even though nothing consumes
   it as a loop. The classification is fine — the flag is a fact about the
@@ -71,9 +86,12 @@ The coupling this whole file exists to serve:
 
 Row 1 is the worked example. Three retries and roughly fourteen seconds were
 defensible *because they were silent*; making them visible (Task 29) is what
-earns the right to revisit the budget, and not before. Rows 5 and 9 are the
-shape to copy when generosity is warranted: bounded, announced, and ending
-in something a person can act on.
+earns the right to revisit the budget, and not before. Task 30 spent that
+permission for row 1 and nothing else: only the rate-limit class grew (to
+eight), transport shrank to two, and every wait stays capped at thirty seconds
+and abortable at every attempt. Rows 5 and 9 are the shape to copy when
+generosity is warranted: bounded, announced, and ending in something a person
+can act on.
 
 Full reasoning lives in `reliability-and-the-silent-stop.md`; this file is
 the map, not the argument.

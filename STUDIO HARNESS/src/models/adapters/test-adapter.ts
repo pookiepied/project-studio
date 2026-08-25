@@ -143,6 +143,46 @@ function shouldRefuse(failure: FailureRequest): boolean {
   return refused === 0;
 }
 
+/** A `[fail-seq: ...]` directive: its identity and the refusals it owes. */
+interface FailureSequence {
+  /** The whole bracket token, lowercased — the state key, warts and all. */
+  readonly key: string;
+  readonly refusals: readonly string[];
+}
+
+/**
+ * Parses the first `[fail-seq: first | second | ...]` in the user text.
+ * Empty entries are dropped; a directive with none of them is no directive.
+ */
+function failureSequence(userText: string): FailureSequence | undefined {
+  const match = /\[fail-seq:\s*([^\]]*)\]/i.exec(userText);
+  if (match === null) return undefined;
+  const refusals = (match[1] ?? "")
+    .split("|")
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== "");
+  if (refusals.length === 0) return undefined;
+  return { key: match[0].toLowerCase(), refusals };
+}
+
+/**
+ * Consumes and returns this attempt's refusal from the sequence, or undefined
+ * once every listed sentence has been spent, after which attempts answer
+ * normally. Keyed like `onceFailureCounts`, with the same lifetime wart: the
+ * count lives for the process lifetime, so a restart starts a sequence over,
+ * and two scenarios sharing one bracket token share one state. Give each
+ * scenario its own entries.
+ */
+const sequenceCounts = new Map<string, number>();
+
+function nextSequenceRefusal(sequence: FailureSequence): string | undefined {
+  const refused = sequenceCounts.get(sequence.key) ?? 0;
+  const sentence = sequence.refusals[refused];
+  if (sentence === undefined) return undefined;
+  sequenceCounts.set(sequence.key, refused + 1);
+  return sentence;
+}
+
 async function waitForDelay(
   milliseconds: number,
   signal: AbortSignal | undefined,
@@ -180,8 +220,23 @@ function stream(
       // so a retry that recovers can be told apart from one that merely fails
       // faster, and `[fail: <text>]` names any other provider sentence, so a
       // non-retryable failure can be exercised through the same door.
+      // `[fail-seq: first | second | ...]` refuses once with each listed
+      // sentence in order and answers after the list is spent — the only way
+      // to drive a turn whose error class changes between attempts, which a
+      // per-class budget makes a case worth testing rather than assuming.
       // Without a seam like this the only way to reach the failure paths is
       // to wait for a real provider to have a bad day.
+      const sequence = failureSequence(userText);
+      if (sequence !== undefined) {
+        const refusal = nextSequenceRefusal(sequence);
+        if (refusal !== undefined) {
+          const message = createMessage(model);
+          message.stopReason = "error";
+          message.errorMessage = refusal;
+          events.push({ type: "error", reason: "error", error: message });
+          return;
+        }
+      }
       const failure = failureRequest(userText);
       if (failure !== undefined && shouldRefuse(failure)) {
         const message = createMessage(model);

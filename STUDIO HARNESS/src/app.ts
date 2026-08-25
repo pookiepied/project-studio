@@ -16,6 +16,10 @@ import {
   type ObservabilityHandle,
 } from "./observability/index.js";
 import { reportNodeRuntime } from "./platform/runtime.js";
+import {
+  createStudioTransientModelRetryPolicy,
+  installTransientModelRetryPolicy,
+} from "./reliability/model-retry-policy.js";
 import { createHttpApp } from "./transport/http/create-app.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
@@ -47,6 +51,15 @@ function createHarnessApplication(): HarnessApplication {
     // leaving a partially initialized SDK behind.
     const providerConfig = resolveProviderConfig();
     bootstrapModelProviders(providerConfig, { database });
+
+    // The patched runtime owns the transient-retry loop but not its budget:
+    // the per-class table lives in src/reliability/model-retry-policy.ts, and
+    // this publication is how the bundle reaches it — it cannot import our
+    // modules (it executes from pnpm's virtual store), so it reads the policy
+    // off globalThis at each retry decision. Installed here because this is
+    // the composition root, before any session or MCP server can run; until
+    // it fires the bundle keeps its own shipped constants.
+    installTransientModelRetryPolicy(createStudioTransientModelRetryPolicy());
 
     observability = initializeObservability();
 

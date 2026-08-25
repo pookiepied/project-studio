@@ -28,17 +28,23 @@ allowBuilds:
 #      saw the one sentence that could help.
 #
 #   2. conversation-stream-store-*.mjs + flue-app-*.mjs — makes each scheduled
-#      transient retry VISIBLE. waitForTransientModelRetry used to write only
-#      an internal log line; now it also appends a submission_retry_scheduled
-#      record carrying wire facts only (attempt, maxRetries, delayMs, the
-#      failed attempt's error sentence), which encodeRecord projects into a
-#      `submission-retrying` chunk. No policy was added or changed: same
-#      budget, same delays, same classifier. The exhausted branch emits
-#      nothing — there is no wait to announce, and the settlement carries the
-#      failure. The bundle filenames carry content hashes, so an upgrade fails
-#      this patch loudly rather than silently; the patch file itself says how
-#      to re-derive each hunk, and documentation/architecture/retry.md holds
-#      the map this belongs to.
+#      transient retry VISIBLE and its budget PER-CLASS. waitForTransientModelRetry
+#      used to write only an internal log line under one shipped budget; since
+#      Task 29 it also appends a submission_retry_scheduled record carrying wire
+#      facts only (attempt, maxRetries, delayMs, the failed attempt's error
+#      sentence), which encodeRecord projects into a `submission-retrying`
+#      chunk. Since Task 30 the budget and wait for each attempt come from
+#      src/reliability/model-retry-policy.ts — rate-limit 8 retries, transport
+#      2, everything else 3 — consulted on
+#      globalThis.__projectStudioTransientModelRetryPolicy, because this bundle
+#      cannot import our source from pnpm's virtual store. An absent,
+#      malformed or throwing policy falls back to the shipped constants, so
+#      the fallback path is exactly the pre-Task-30 behaviour. The exhausted
+#      branch still emits nothing — there is no wait to announce, and the
+#      settlement carries the failure. The bundle filenames carry content
+#      hashes, so an upgrade fails this patch loudly rather than silently;
+#      the patch file itself says how to re-derive each hunk, and
+#      documentation/architecture/retry.md holds the map this belongs to.
 patchedDependencies:
   '@flue/cli@1.0.0-beta.9': patches/@flue__cli@1.0.0-beta.9.patch
   '@flue/runtime@1.0.0-beta.9': patches/@flue__runtime@1.0.0-beta.9.patch

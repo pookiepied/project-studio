@@ -514,18 +514,25 @@ describe.sequential("Flue harness vertical slice", () => {
       const running = await startHarness(await createDatabasePath());
       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
-      // The test provider answers `[fail]` with a transient 429, every time.
-      // Flue retries it a bounded number of times and then gives up, and what
-      // it records must be a FAILURE carrying the reason — not a completed
-      // turn that happens to be empty. A rate-limited turn rendering as a
-      // silent success is the one failure mode reliability-and-the-silent-
-      // stop.md calls unacceptable, so this pins the harness side of it.
+      // The test provider answers this sentence with a transient 503 every
+      // time. Flue retries it a bounded number of times and then gives up,
+      // and what it records must be a FAILURE carrying the reason — not a
+      // completed turn that happens to be empty. A throttled or failing turn
+      // rendering as a silent success is the one failure mode reliability-
+      // and-the-silent-stop.md calls unacceptable, so this pins the harness
+      // side of it. The sentence names the 503 rather than using bare `[fail]`
+      // because Task 30 gave the 429 class a generous budget of its own;
+      // exhausting that budget here would spend minutes proving what the
+      // dedicated per-class tests below measure directly.
       //
       // Settlement is awaited on the raw wire rather than through the SDK's
       // `wait`: its chunk validator refuses unknown types by design, and this
       // turn now emits the `submission-retrying` signal. Everything asserted
       // afterwards is unchanged, read back from history as before.
-      const run = await client.send("provider-failure", "[fail] please answer.");
+      const run = await client.send(
+        "provider-failure",
+        "[fail: 503 service unavailable] please answer.",
+      );
       const settled = await waitForSettledChunk(running, run, 60_000);
       expect(settled?.["outcome"]).toBe("failed");
 
@@ -534,7 +541,7 @@ describe.sequential("Flue harness vertical slice", () => {
         (candidate) => candidate.submissionId === run.submissionId,
       );
       expect(settlement?.outcome).toBe("failed");
-      expect(JSON.stringify(settlement)).toContain("rate limit");
+      expect(JSON.stringify(settlement)).toContain("503");
     },
     90_000,
   );
@@ -562,6 +569,12 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(settlement?.outcome).toBe("failed");
       expect(JSON.stringify(settlement)).toContain("insufficient_quota");
       expect(attemptCount(history, "[fail: You exceeded your current quota")).toBe(1);
+
+      // The table's zero row is enforced by pi-ai's classifier, which refuses
+      // these sentences before the retry site is ever reached — so the wire
+      // must carry not one retry signal: no scheduled wait, no budget spent.
+      const chunks = await readUpdateChunks(running, run);
+      expect(chunks.filter(isRetryWaitChunk)).toHaveLength(0);
     },
     30_000,
   );
@@ -652,12 +665,18 @@ describe.sequential("Flue harness vertical slice", () => {
       const running = await startHarness(await createDatabasePath());
       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
 
-      // Three throttled attempts used to spend about fourteen seconds emitting
+      // Three server failures used to spend about fourteen seconds emitting
       // repeated empty message pairs, with the retries known only to the
       // server log. Now each scheduled retry is a record, so the wire carries
       // exactly one signal per retry and none for the exhausted branch —
-      // giving up must never read as another wait about to happen.
-      const run = await client.send("retry-visible", "[fail] please answer.");
+      // giving up must never read as another wait about to happen. The 503
+      // wording pins the generic-transient budget of three; bare `[fail]`
+      // would now name the rate-limit class, whose generous budget has its
+      // own tests below.
+      const run = await client.send(
+        "retry-visible",
+        "[fail: 503 service unavailable] please answer.",
+      );
       await waitForSettledChunk(running, run, 60_000);
 
       const chunks = await readUpdateChunks(running, run);
@@ -679,7 +698,7 @@ describe.sequential("Flue harness vertical slice", () => {
         // The provider's sentence for the attempt that failed, and the
         // association with the submission the retry serves.
         expect(typeof chunk.error).toBe("string");
-        expect(chunk.error).toContain("rate limit");
+        expect(chunk.error).toContain("503");
         expect(chunk.submissionId).toBe(run.submissionId);
       }
 
@@ -746,8 +765,17 @@ describe.sequential("Flue harness vertical slice", () => {
 
       const run = await client.send("cancel-retry", "[fail] please answer.");
       // Cancel DURING a retry wait: the sleep is abortable, and the person
-      // cancelling mid-wait must get a visible ending, not silence.
-      await collectUntil(running, run, (chunks) => chunks.some(isRetryWaitChunk));
+      // cancelling mid-wait must get a visible ending, not silence. Bare
+      // `[fail]` names the rate-limit class under the per-class budgets, so
+      // the first signal doubles as the cheapest look at its generous budget
+      // on the wire — eight retries where three shipped, read off the chunk
+      // instead of waiting the run out.
+      const firstSignal = await collectUntil(
+        running,
+        run,
+        (chunks) => chunks.some(isRetryWaitChunk),
+      ).then((chunks) => chunks.find(isRetryWaitChunk));
+      expect(firstSignal?.maxRetries).toBe(8);
       await client.cancel("cancel-retry");
       const settlement = await waitForSettledChunk(running, run, 30_000);
       expect(settlement?.["outcome"]).toBe("aborted");
@@ -777,6 +805,224 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(retriesAfterAbort).toHaveLength(0);
     },
     60_000,
+  );
+
+  it(
+    "follows the class when the failure changes between attempts",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // The adversarial shape for a per-class budget: attempt one fails with
+      // a 503 (generic-transient, budget three), attempt two with a 429
+      // (rate-limit, budget eight). Each decision reads the failure actually
+      // in front of the loop — no memory, no averaging across classes — so
+      // the second signal must carry the generous budget even though the run
+      // began as server trouble.
+      const run = await client.send(
+        "class-change",
+        "[fail-seq: 503 service unavailable | 429 too many requests] please answer.",
+      );
+      const settlement = await waitForSettledChunk(running, run, 30_000);
+      expect(settlement?.["outcome"]).toBe("completed");
+
+      const chunks = await readUpdateChunks(running, run);
+      const retries = chunks.filter(isRetryWaitChunk);
+      expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2]);
+      expect(retries.map((chunk) => chunk.maxRetries)).toEqual([3, 8]);
+      // Each signal carries the sentence of the failure that earned it.
+      expect(String(retries[0]?.error ?? "")).toContain("503");
+      expect(String(retries[1]?.error ?? "")).toContain("429");
+    },
+    30_000,
+  );
+
+  it(
+    "spends a transport failure's short budget and gives up announcing nothing further",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // A dead connection gets two retries, not three: if the network is
+      // gone, waiting does not help. Three refusals drive one attempt past
+      // that budget — the third must schedule nothing and settle failed,
+      // proving the exhausted branch still emits nothing under per-class
+      // budgets.
+      const run = await client.send(
+        "transport-exhausted",
+        "[fail-seq: socket hang up | socket hang up | socket hang up] please answer.",
+      );
+      const settled = await waitForSettledChunk(running, run, 30_000);
+      expect(settled?.["outcome"]).toBe("failed");
+
+      const history = await client.history("transport-exhausted");
+      const settlement = history.settlements.find(
+        (candidate) => candidate.submissionId === run.submissionId,
+      );
+      expect(settlement?.outcome).toBe("failed");
+      expect(JSON.stringify(settlement)).toContain("socket hang up");
+      expect(attemptCount(history, "[fail-seq: socket hang up")).toBe(3);
+
+      const chunks = await readUpdateChunks(running, run);
+      const retries = chunks.filter(isRetryWaitChunk);
+      expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2]);
+      expect(retries.map((chunk) => chunk.maxRetries)).toEqual([2, 2]);
+    },
+    30_000,
+  );
+
+  it(
+    "grants the final retry at exactly the transport budget boundary",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // Two failures against a budget of two: the second decision sits ON
+      // the boundary and must still be granted — give-up begins only once
+      // the count EXCEEDS the budget, the same asymmetry the single number
+      // always had.
+      const run = await client.send(
+        "transport-boundary",
+        "[fail-seq: socket hang up | socket hang up] please answer.",
+      );
+      const settlement = await waitForSettledChunk(running, run, 30_000);
+      expect(settlement?.["outcome"]).toBe("completed");
+
+      const history = await client.history("transport-boundary");
+      expect(attemptCount(history, "[fail-seq: socket hang up")).toBe(3);
+
+      const chunks = await readUpdateChunks(running, run);
+      const retries = chunks.filter(isRetryWaitChunk);
+      expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2]);
+      expect(retries.map((chunk) => chunk.maxRetries)).toEqual([2, 2]);
+    },
+    30_000,
+  );
+
+  it(
+    "keeps a rate-limited turn going past the old budget and cancels a long wait cleanly",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // The permission Task 29 bought, spent: eight retries of doubling from
+      // two seconds is minutes of waiting, defensible only because every
+      // second of it is announced and cancellable. Six signals in — past
+      // anything the old single budget allowed — the person cancels: the
+      // wait ends visibly, nothing retry-shaped follows, and every signal
+      // carried the generous budget rather than a silent fallback to three.
+      const run = await client.send("generous-cancel", "[fail] please answer.");
+      const collected = await collectUntil(
+        running,
+        run,
+        (chunks) => chunks.filter(isRetryWaitChunk).length >= 6,
+        130_000,
+      );
+      const retries = collected.filter(isRetryWaitChunk);
+      expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2, 3, 4, 5, 6]);
+      for (const chunk of retries) {
+        expect(chunk.maxRetries).toBe(8);
+      }
+
+      await client.cancel("generous-cancel");
+      const settlement = await waitForSettledChunk(running, run, 30_000);
+      expect(settlement?.["outcome"]).toBe("aborted");
+
+      const chunks = await readUpdateChunks(running, run);
+      let lastRetryIndex = -1;
+      let abortedIndex = -1;
+      chunks.forEach((chunk, index) => {
+        if (isRetryWaitChunk(chunk)) lastRetryIndex = index;
+        if (
+          abortedIndex === -1 &&
+          isSettledChunk(chunk) &&
+          chunk["submissionId"] === run.submissionId &&
+          chunk["outcome"] === "aborted"
+        ) {
+          abortedIndex = index;
+        }
+      });
+      expect(abortedIndex).toBeGreaterThan(-1);
+      expect(lastRetryIndex).toBeLessThan(abortedIndex);
+      const retriesAfterAbort = chunks.filter(
+        (chunk, index) => isRetryWaitChunk(chunk) && index > abortedIndex,
+      );
+      expect(retriesAfterAbort).toHaveLength(0);
+    },
+    170_000,
+  );
+
+  it(
+    "re-derives the attempt count across a restart instead of starting over",
+    async () => {
+      const databasePath = await createDatabasePath();
+      const firstServer = await startHarness(databasePath);
+      const firstClient = new FlueHarnessClient({
+        baseUrl: firstServer.baseUrl,
+        token: firstServer.token,
+      });
+
+      // Two server failures are announced, and the turn is killed inside the
+      // SECOND wait. The replacement server resumes the same submission by
+      // re-entering the retry decision, counting the two errored records it
+      // finds persisted, and announcing attempt 2 again — the duplicate is
+      // not a reset counter losing its place, it is the same number derived
+      // twice from records, which is the whole property. The generic budget
+      // is three, so the resumed turn holds ONE grant left, not three: the
+      // fourth refusal exhausts it into a visible failure. A counter that
+      // had restarted would have completed the turn instead — a fresh budget
+      // wearing resume's clothes is exactly the fabrication class this rule
+      // exists to prevent.
+      const accepted = await firstClient.send(
+        "resume-retry-count",
+        "[fail-seq: 503 service unavailable | 503 service unavailable | 503 service unavailable | 503 service unavailable] survive this.",
+      );
+      await collectUntil(firstServer, accepted, (chunks) => {
+        return chunks.filter(isRetryWaitChunk).length >= 2;
+      });
+
+      await killHarness(firstServer.process);
+
+      const replacement = await startHarness(databasePath);
+      const resumedRun = {
+        ...accepted,
+        streamUrl: `${replacement.baseUrl}/agents/studio/resume-retry-count`,
+      };
+      const replacementClient = new FlueHarnessClient({
+        baseUrl: replacement.baseUrl,
+        token: replacement.token,
+      });
+      const settled = await waitForSettledChunk(replacement, resumedRun, 90_000);
+      expect(settled?.["outcome"]).toBe("failed");
+
+      // [1, 2] came from the first process; [2, 3] from the replacement. No
+      // signal follows attempt 3: the exhausted branch announces nothing.
+      const chunks = await readUpdateChunks(replacement, resumedRun);
+      const retries = chunks.filter(isRetryWaitChunk);
+      expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2, 2, 3]);
+      expect(retries.map((chunk) => chunk.maxRetries)).toEqual([3, 3, 3, 3]);
+
+      let lastRetryIndex = -1;
+      let failedIndex = -1;
+      chunks.forEach((chunk, index) => {
+        if (isRetryWaitChunk(chunk)) lastRetryIndex = index;
+        if (
+          failedIndex === -1 &&
+          isSettledChunk(chunk) &&
+          chunk["submissionId"] === accepted.submissionId &&
+          chunk["outcome"] === "failed"
+        ) {
+          failedIndex = index;
+        }
+      });
+      expect(failedIndex).toBeGreaterThan(-1);
+      expect(lastRetryIndex).toBeLessThan(failedIndex);
+
+      // Four refused attempts on the wire, and nothing beyond them.
+      const history = await replacementClient.history("resume-retry-count");
+      expect(attemptCount(history, "[fail-seq: 503")).toBe(4);
+    },
+    120_000,
   );
 
   it(

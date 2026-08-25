@@ -194,11 +194,13 @@ routes exist, and they are not equally good:
 
 ### Why the ordering is forced
 
-**Flue's retry is a log line, not a record.** `waitForTransientModelRetry` calls
+**Flue's retry was a log line until Task 29 made it a record.**
+`waitForTransientModelRetry` used to call only
 `internalLog("warn", "[flue:model-retry] ...")` with the attempt, the max, the delay and
-the error — and writes no event. Nothing reaches the chunk stream. From the client, a
-retrying turn is indistinguishable from a stalled one: repeated empty
-`message-started`/`message-completed` pairs, and then a settlement.
+the error — no event, nothing on the chunk stream — so from the client a retrying turn
+was indistinguishable from a stalled one: repeated empty
+`message-started`/`message-completed` pairs, and then a settlement. Each scheduled retry
+now also appends a canonical record, projected as a visible chunk.
 
 Inferring "it is retrying" from those repeated empties is exactly the kind of guess this
 codebase refuses elsewhere, and it would be wrong in the one case that matters — a model
