@@ -91,6 +91,18 @@ user reads when a state occurs, that state should not exist.
 **Symmetry.** If two things are alike, they are handled alike. If you handle one
 differently, say why in a comment, or make them the same.
 
+**One retry authority per axis.** At most one layer owns any given retry
+decision, and a layer that does not own the axis surfaces the failure instead
+of inventing its own loop. Two comments reasoned this out independently before
+it was a rule: `platform/harness/client.ts` ("a retry loop against a dead
+loopback port only delays the truth") and `platform/harness/conversation.ts`
+("a retry loop would be duplication wearing a retry's clothes"). The arithmetic
+is shared — `STUDIO HARNESS/src/reliability/backoff.ts`, one pure function from
+attempt to delay — while each owner passes its own budget, because one global
+retry count is wrong: billing exhaustion deserves zero attempts and a throttled
+429 deserves several. The map of every retry authority lives in
+`documentation/architecture/retry.md`; if you add one, add its row.
+
 **Delete rather than deprecate.** This codebase is young. There is no
 compatibility burden.
 

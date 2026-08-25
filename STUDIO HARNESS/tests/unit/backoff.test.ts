@@ -6,7 +6,7 @@ import {
   DEFAULT_MAX_DELAY_MS,
   DEFAULT_MULTIPLIER,
   getBackoffDelay,
-} from "../../src/extend/mcp/wire/backoff.js";
+} from "../../src/reliability/backoff.js";
 
 describe("retry backoff", () => {
   describe("defaults", () => {

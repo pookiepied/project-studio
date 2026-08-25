@@ -451,13 +451,24 @@ export interface ChunkFacts {
   /**
    * `submission-settled`: who signed the failure, and what it said. Null
    * whenever the wire omitted the error or the field — never invented, so a
-   * renderer can show "reason unknown" without lying.
+   * renderer can show "reason unknown" without lying. The provider's sentence
+   * for the attempt a retry follows travels in the same field on
+   * `submission-retrying`, read from the chunk's flat `error` string.
    */
   readonly errorName: string | null
   readonly errorType: string | null
   readonly errorMessage: string | null
   /** `message-completed`: what the message cost. */
   readonly usage: UsageFacts | null
+  /**
+   * `submission-retrying`: which retry the harness scheduled, out of what
+   * budget, and how long the wait before the next attempt is. Wire facts
+   * only — the count is the harness's own derived number, not one this side
+   * keeps; null on every other chunk type.
+   */
+  readonly attempt: number | null
+  readonly maxRetries: number | null
+  readonly delayMs: number | null
 }
 
 /**
@@ -494,6 +505,9 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
     errorType: null,
     errorMessage: null,
     usage: null,
+    attempt: null,
+    maxRetries: null,
+    delayMs: null,
   }
 
   switch (type) {
@@ -583,6 +597,32 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
         errorText: null,
         usage: value['usage'] === undefined ? null : readUsage(value['usage']),
       }
+    case 'submission-retrying':
+      // The harness's own announcement that a transient model failure is
+      // being retried. Everything except the association fields and the
+      // facts themselves is unread, mirroring how every other chunk type
+      // narrows; a field that fails to read stays null rather than
+      // inventing a number.
+      return {
+        ...base,
+        messageId: null,
+        snapshot: null,
+        message: null,
+        model: null,
+        deltaKind: null,
+        delta: null,
+        toolCallId: null,
+        toolName: null,
+        input: null,
+        output: null,
+        errorText: null,
+        errorName: null,
+        errorType: null,
+        errorMessage: text(value['error']),
+        attempt: finiteNumber(value['attempt']),
+        maxRetries: finiteNumber(value['maxRetries']),
+        delayMs: finiteNumber(value['delayMs']),
+      }
     case 'submission-settled': {
       const rawOutcome = value['outcome']
       const outcome =
@@ -631,6 +671,9 @@ export function readChunkFacts(value: unknown): ChunkFacts | null {
         errorType: null,
         errorMessage: null,
         usage: null,
+        attempt: null,
+        maxRetries: null,
+        delayMs: null,
       }
   }
 }

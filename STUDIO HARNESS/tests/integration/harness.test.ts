@@ -309,6 +309,121 @@ function attemptCount(history: FlueConversationSnapshot, userTextIncludes: strin
   return attempts;
 }
 
+/* ---- Reading the updates view over plain HTTP ---------------------------- */
+
+/**
+ * The retry signal the patched runtime appends, read structurally rather than
+ * through `@flue/sdk`: its chunk validator refuses unknown types by design (a
+ * protocol mismatch should fail loudly), which is exactly the behaviour these
+ * tests must observe from the outside. Narrowing by hand keeps that honest.
+ */
+interface RetryWaitChunk {
+  readonly type: unknown;
+  readonly submissionId: unknown;
+  // The predicate only accepts the chunk when all three read as numbers,
+  // so carrying them as numbers is the check's verdict, not an assumption.
+  readonly attempt: number;
+  readonly maxRetries: number;
+  readonly delayMs: number;
+  readonly error: unknown;
+}
+
+function isRecordValue(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isRetryWaitChunk(value: unknown): value is RetryWaitChunk {
+  return (
+    isRecordValue(value) &&
+    value["type"] === "submission-retrying" &&
+    typeof value["attempt"] === "number" &&
+    typeof value["maxRetries"] === "number" &&
+    typeof value["delayMs"] === "number"
+  );
+}
+
+function isSettledChunk(value: unknown): value is Record<string, unknown> {
+  return isRecordValue(value) && value["type"] === "submission-settled";
+}
+
+function updatesUrl(run: AcceptedRun, offset: string): URL {
+  const url = new URL(run.streamUrl);
+  url.searchParams.set("view", "updates");
+  url.searchParams.set("offset", offset);
+  return url;
+}
+
+/** One ordered read of every chunk the conversation ever projected. */
+async function readUpdateChunks(running: RunningHarness, run: AcceptedRun): Promise<unknown[]> {
+  const response = await fetch(updatesUrl(run, "-1"), {
+    headers: { authorization: `Bearer ${running.token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`The updates view answered ${String(response.status)}.`);
+  }
+  const body: unknown = await response.json();
+  if (!Array.isArray(body)) {
+    throw new Error("The updates view did not answer an array of chunks.");
+  }
+  return body;
+}
+
+/**
+ * Long-polls the updates view until the predicate holds — how a client waits
+ * during a live run without the SDK's typed stream in the way.
+ */
+async function collectUntil(
+  running: RunningHarness,
+  run: AcceptedRun,
+  predicate: (chunks: readonly unknown[]) => boolean,
+  timeoutMs = 20_000,
+): Promise<readonly unknown[]> {
+  const collected: unknown[] = [];
+  let offset = "-1";
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const url = updatesUrl(run, offset);
+    url.searchParams.set("live", "long-poll");
+    const response = await fetch(url, {
+      headers: { authorization: `Bearer ${running.token}` },
+    });
+    if (!response.ok) {
+      throw new Error(`The live updates view answered ${String(response.status)}.`);
+    }
+    const body: unknown = await response.json();
+    if (Array.isArray(body)) collected.push(...body);
+    const nextOffset = response.headers.get("Stream-Next-Offset");
+    if (nextOffset !== null && nextOffset !== "") offset = nextOffset;
+    if (predicate(collected)) return collected;
+  }
+  throw new Error(`No batch satisfied the collector within ${String(timeoutMs)}ms.`);
+}
+
+/**
+ * Waits for the submission's settlement on the updates view. `@flue/sdk`'s
+ * `wait` cannot be used here: its chunk validator refuses unknown types by
+ * design, so a client built before the retry signal existed fails loudly
+ * mid-turn — which is exactly the compatibility fact these tests exist to
+ * observe from the outside.
+ */
+async function waitForSettledChunk(
+  running: RunningHarness,
+  run: AcceptedRun,
+  timeoutMs: number,
+): Promise<Record<string, unknown> | null> {
+  const chunks = await collectUntil(
+    running,
+    run,
+    (items) =>
+      items.some((item) => isSettledChunk(item) && item["submissionId"] === run.submissionId),
+    timeoutMs,
+  );
+  const settled = chunks
+    .filter(isSettledChunk)
+    .find((chunk) => chunk["submissionId"] === run.submissionId);
+  return settled ?? null;
+}
+
 afterEach(async () => {
   await Promise.all([...processes].map(stopHarness));
   await Promise.all(
@@ -405,8 +520,14 @@ describe.sequential("Flue harness vertical slice", () => {
       // turn that happens to be empty. A rate-limited turn rendering as a
       // silent success is the one failure mode reliability-and-the-silent-
       // stop.md calls unacceptable, so this pins the harness side of it.
+      //
+      // Settlement is awaited on the raw wire rather than through the SDK's
+      // `wait`: its chunk validator refuses unknown types by design, and this
+      // turn now emits the `submission-retrying` signal. Everything asserted
+      // afterwards is unchanged, read back from history as before.
       const run = await client.send("provider-failure", "[fail] please answer.");
-      await expect(client.wait(run)).rejects.toThrow();
+      const settled = await waitForSettledChunk(running, run, 60_000);
+      expect(settled?.["outcome"]).toBe("failed");
 
       const history = await client.history("provider-failure");
       const settlement = history.settlements.find(
@@ -479,9 +600,11 @@ describe.sequential("Flue harness vertical slice", () => {
       // OpenRouter's wrapper sentence matched nothing in the old inline regex,
       // so this failure was never retried and lost its work on the first try.
       // The patched policy recognizes it; four assistant records on the wire
-      // are the proof — first attempt plus the full retry budget.
+      // are the proof — first attempt plus the full retry budget. Awaited on
+      // the raw wire for the same reason as `provider-failure` above.
       const run = await client.send("openrouter", "[fail: Provider returned error] please answer.");
-      await expect(client.wait(run)).rejects.toThrow();
+      const settled = await waitForSettledChunk(running, run, 60_000);
+      expect(settled?.["outcome"]).toBe("failed");
 
       const history = await client.history("openrouter");
       const settlement = history.settlements.find(
@@ -501,12 +624,19 @@ describe.sequential("Flue harness vertical slice", () => {
 
       // Retry must still WORK, not merely fail with better manners: one
       // refused attempt, then a normal answer on the retry, settling complete
-      // — two attempts on the wire, exactly.
+      // — two attempts on the wire, exactly. The completed settlement is
+      // awaited on the raw wire (the SDK's validator refuses the retry
+      // signal), and the answer itself is read back from history below.
       const run = await client.send("retry-recovers", "[fail-once] please answer.");
-      const result = await client.wait(run);
-      expect(result.text).toContain("Echo:");
+      const settled = await waitForSettledChunk(running, run, 30_000);
+      expect(settled?.["outcome"]).toBe("completed");
 
       const history = await client.history("retry-recovers");
+      expect(
+        history.messages.some(
+          (message) => message.role === "assistant" && textFromMessage(message).includes("Echo:"),
+        ),
+      ).toBe(true);
       const settlement = history.settlements.find(
         (candidate) => candidate.submissionId === run.submissionId,
       );
@@ -514,6 +644,139 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(attemptCount(history, "[fail-once]")).toBe(2);
     },
     30_000,
+  );
+
+  it(
+    "announces every scheduled retry on the wire while the provider keeps refusing",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // Three throttled attempts used to spend about fourteen seconds emitting
+      // repeated empty message pairs, with the retries known only to the
+      // server log. Now each scheduled retry is a record, so the wire carries
+      // exactly one signal per retry and none for the exhausted branch —
+      // giving up must never read as another wait about to happen.
+      const run = await client.send("retry-visible", "[fail] please answer.");
+      await waitForSettledChunk(running, run, 60_000);
+
+      const chunks = await readUpdateChunks(running, run);
+      const retries = chunks.filter(isRetryWaitChunk);
+      // Count what you assert: one signal per scheduled retry, not "some".
+      expect(retries).toHaveLength(3);
+      expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2, 3]);
+      expect(retries.map((chunk) => chunk.maxRetries)).toEqual([3, 3, 3]);
+      // The wait grows with the attempt — the existing exponential shape,
+      // visible as facts rather than inferred from silence.
+      const [first, second, third] = retries;
+      if (first === undefined || second === undefined || third === undefined) {
+        throw new Error("Three retry signals were counted but not delivered.");
+      }
+      expect(first.delayMs).toBeGreaterThan(0);
+      expect(second.delayMs).toBeGreaterThan(first.delayMs);
+      expect(third.delayMs).toBeGreaterThan(second.delayMs);
+      for (const chunk of retries) {
+        // The provider's sentence for the attempt that failed, and the
+        // association with the submission the retry serves.
+        expect(typeof chunk.error).toBe("string");
+        expect(chunk.error).toContain("rate limit");
+        expect(chunk.submissionId).toBe(run.submissionId);
+      }
+
+      let lastRetryIndex = -1;
+      let settledIndex = -1;
+      chunks.forEach((chunk, index) => {
+        if (isRetryWaitChunk(chunk)) lastRetryIndex = index;
+        if (settledIndex === -1 && isSettledChunk(chunk)) settledIndex = index;
+      });
+      expect(settledIndex).toBeGreaterThan(-1);
+      expect(lastRetryIndex).toBeLessThan(settledIndex);
+      const settlement = chunks.filter(isSettledChunk)[0];
+      if (settlement === undefined) throw new Error("No settled chunk followed the retries.");
+      expect(settlement["outcome"]).toBe("failed");
+    },
+    90_000,
+  );
+
+  it(
+    "announces exactly one retry when the refusal clears, then completes cleanly",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // The case that must show a retry AND a recovery: one refused attempt,
+      // one signal, then an ordinary answer. A finished turn carrying a stale
+      // "retrying" state would be the same fabrication class as a fabricated
+      // success, so the completed settlement has to come after the signal.
+      const run = await client.send("recover-visible", "[fail-once] please answer.");
+      const settlement = await waitForSettledChunk(running, run, 30_000);
+      expect(settlement?.["outcome"]).toBe("completed");
+
+      const chunks = await readUpdateChunks(running, run);
+      const retries = chunks.filter(isRetryWaitChunk);
+      expect(retries).toHaveLength(1);
+      const [only] = retries;
+      if (only === undefined) throw new Error("The retry signal vanished between filter and read.");
+      expect(only.attempt).toBe(1);
+      expect(only.submissionId).toBe(run.submissionId);
+
+      let lastRetryIndex = -1;
+      let completedIndex = -1;
+      chunks.forEach((chunk, index) => {
+        if (isRetryWaitChunk(chunk)) lastRetryIndex = index;
+        if (
+          completedIndex === -1 &&
+          isSettledChunk(chunk) &&
+          chunk["submissionId"] === run.submissionId &&
+          chunk["outcome"] === "completed"
+        ) {
+          completedIndex = index;
+        }
+      });
+      expect(completedIndex).toBeGreaterThan(lastRetryIndex);
+    },
+    30_000,
+  );
+
+  it(
+    "ends a cancelled retry visibly rather than letting it simply stop",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      const run = await client.send("cancel-retry", "[fail] please answer.");
+      // Cancel DURING a retry wait: the sleep is abortable, and the person
+      // cancelling mid-wait must get a visible ending, not silence.
+      await collectUntil(running, run, (chunks) => chunks.some(isRetryWaitChunk));
+      await client.cancel("cancel-retry");
+      const settlement = await waitForSettledChunk(running, run, 30_000);
+      expect(settlement?.["outcome"]).toBe("aborted");
+
+      // Whichever point the cancellation reached — inside the sleep, or an
+      // attempt after it — the aborted settlement follows every retry signal
+      // and nothing retry-shaped comes after it.
+      const chunks = await readUpdateChunks(running, run);
+      let lastRetryIndex = -1;
+      let abortedIndex = -1;
+      chunks.forEach((chunk, index) => {
+        if (isRetryWaitChunk(chunk)) lastRetryIndex = index;
+        if (
+          abortedIndex === -1 &&
+          isSettledChunk(chunk) &&
+          chunk["submissionId"] === run.submissionId &&
+          chunk["outcome"] === "aborted"
+        ) {
+          abortedIndex = index;
+        }
+      });
+      expect(abortedIndex).toBeGreaterThan(-1);
+      expect(lastRetryIndex).toBeLessThan(abortedIndex);
+      const retriesAfterAbort = chunks.filter(
+        (chunk, index) => isRetryWaitChunk(chunk) && index > abortedIndex,
+      );
+      expect(retriesAfterAbort).toHaveLength(0);
+    },
+    60_000,
   );
 
   it(

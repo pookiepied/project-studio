@@ -2,6 +2,7 @@ import { StudioMark } from '@/components/brand'
 import { EarlierBoundary, useTranscriptWindow } from '@/features/chat/transcript/paging'
 import { AssistantTurn } from '@/features/chat/transcript/live/AssistantTurn'
 import { LiveUserMessage } from '@/features/chat/transcript/live/LiveUserMessage'
+import { RetryWait } from '@/features/chat/transcript/live/RetryWait'
 import { SubmissionFailed } from '@/features/chat/transcript/live/SubmissionFailed'
 import type { ConversationPhase } from '@/features/chat/useConversation'
 import {
@@ -21,6 +22,10 @@ import {
  * the thinking ripple and nothing else; whether any message reads as
  * finished was decided by the projection from settlement facts, never here,
  * never from silence.
+ *
+ * A scheduled retry is the one state where a running turn produces nothing:
+ * the harness said so on the wire, and while its wait lasts the caret would
+ * be a lie, so the turn reads as paused and the wait line speaks instead.
  */
 export function LiveTranscript({
   items,
@@ -38,6 +43,7 @@ export function LiveTranscript({
   // message being unfinished (a crash left it stopped) is not the same as a
   // turn running right now, and only the phase knows which it is.
   const turnRunning = phase.status === 'streaming'
+  const retrying = phase.status === 'streaming' ? phase.retrying : null
 
   const { visible, hasOlder, loading, sentinel } = useTranscriptWindow(items, viewport)
 
@@ -56,6 +62,7 @@ export function LiveTranscript({
             item={item}
             live={
               turnRunning &&
+              retrying === null &&
               isMessageBeingWritten(item, {
                 newest: item.id === lastAssistantId,
                 turnRunning,
@@ -65,11 +72,16 @@ export function LiveTranscript({
         ),
       )}
 
-      {/* The gap between sending and the first token: the mark's own ripple
-          and nothing else — no "Thinking..." label, because the glyph
-          already animates. Shown when a turn is producing but nothing has
-          been written into the transcript yet. */}
-      {phase.status === 'streaming' && (visible[visible.length - 1]?.kind ?? null) !== 'assistant' ? (
+      {/* The two live indicators at the tail of the list. A retry wait is
+          named in words because "nothing is moving" and "the provider said
+          no" look identical without them — that was the defect this signal
+          exists to end. Otherwise the gap between sending and the first
+          token gets the mark's own ripple and nothing else: no "Thinking..."
+          label, because the glyph already animates. */}
+      {turnRunning && retrying !== null ? (
+        <RetryWait retrying={retrying} />
+      ) : phase.status === 'streaming' &&
+        (visible[visible.length - 1]?.kind ?? null) !== 'assistant' ? (
         <StudioMark busy size={16} className="text-foreground/45" />
       ) : null}
     </div>

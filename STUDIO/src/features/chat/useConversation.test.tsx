@@ -280,6 +280,7 @@ describe('the phases the run itself puts a conversation in', () => {
       expect(rendered.result.current.phase).toEqual({
         status: 'streaming',
         submissionId: 'sub_live',
+        retrying: null,
       }),
     )
     expect(rendered.result.current.offset).toBe('4_0')
@@ -341,6 +342,158 @@ describe('the phases the run itself puts a conversation in', () => {
       )
     })
     expect(rendered.result.current.phase).toEqual({ status: 'idle' })
+  })
+})
+
+describe('the retry a turn announces while it is running', () => {
+  const retryChunk = (attempt: number, position: { batch: number; index: number }) => ({
+    type: 'submission-retrying',
+    submissionId: 'sub_live',
+    attempt,
+    maxRetries: 3,
+    delayMs: 1500 * attempt,
+    error: '429 rate limit exceeded: temporarily rate-limited upstream',
+    position,
+  })
+
+  it('carries the harness retry signal while it waits, and drops it when generation resumes', async () => {
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    act(() => {
+      channels.feeds[0](
+        dataFrame('3_0', [
+          { type: 'message-started', messageId: 'm2', submissionId: 'sub_live', position: { batch: 3, index: 0 } },
+        ]),
+      )
+      channels.feeds[0](dataFrame('4_0', [retryChunk(1, { batch: 4, index: 0 })]))
+      channels.feeds[0](dataFrame('5_0', [retryChunk(2, { batch: 5, index: 0 })]))
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.phase).toEqual({
+        status: 'streaming',
+        submissionId: 'sub_live',
+        retrying: {
+          attempt: 2,
+          maxRetries: 3,
+          delayMs: 3000,
+          detail: '429 rate limit exceeded: temporarily rate-limited upstream',
+        },
+      }),
+    )
+
+    // The next attempt starts producing again: whatever was being waited on
+    // is over, and nothing stale may survive into the resumed turn.
+    act(() => {
+      channels.feeds[0](
+        dataFrame('6_0', [
+          { type: 'message-started', messageId: 'm3', submissionId: 'sub_live', position: { batch: 6, index: 0 } },
+        ]),
+      )
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.phase).toEqual({
+        status: 'streaming',
+        submissionId: 'sub_live',
+        retrying: null,
+      }),
+    )
+  })
+
+  it('never carries a stale retry past its settlement', async () => {
+    for (const outcome of ['completed', 'failed'] as const) {
+      const streams = cancellableStreams()
+      const channels = recordingChannels()
+      const lifecycle = manualLifecycle()
+      const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+      act(() => {
+        channels.feeds[0](
+          dataFrame('3_0', [
+            { type: 'message-started', messageId: 'm2', submissionId: 'sub_9', position: { batch: 3, index: 0 } },
+          ]),
+        )
+        channels.feeds[0](
+          dataFrame('4_0', [
+            { ...retryChunk(1, { batch: 4, index: 0 }), submissionId: 'sub_9' },
+          ]),
+        )
+        channels.feeds[0](
+          dataFrame('5_0', [
+            { type: 'submission-settled', submissionId: 'sub_9', outcome, error: { message: 'the end' }, position: { batch: 5, index: 0 } },
+          ]),
+        )
+      })
+      await waitFor(() =>
+        expect(
+          outcome === 'completed'
+            ? rendered.result.current.phase.status === 'idle'
+            : rendered.result.current.phase.status === 'run-failed',
+        ).toBe(true),
+      )
+      // Neither idle nor run-failed has anywhere to put a retry — the shape
+      // itself is the guarantee that one cannot leak past its settlement.
+      expect(rendered.result.current.phase.status).not.toBe('streaming')
+    }
+  })
+
+  it('ignores a redelivered retry batch instead of rewinding the wait', async () => {
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    act(() => {
+      channels.feeds[0](
+        dataFrame('3_0', [
+          { type: 'message-started', messageId: 'm2', submissionId: 'sub_live', position: { batch: 3, index: 0 } },
+        ]),
+      )
+      channels.feeds[0](dataFrame('4_0', [retryChunk(1, { batch: 4, index: 0 })]))
+      channels.feeds[0](dataFrame('5_0', [retryChunk(2, { batch: 5, index: 0 })]))
+    })
+    await waitFor(() => expect(rendered.result.current.phase.status).toBe('streaming'))
+    if (rendered.result.current.phase.status !== 'streaming') throw new Error('unreachable')
+    expect(rendered.result.current.phase.retrying?.attempt).toBe(2)
+
+    // The reconnect replays the batch that was in flight (and an older one
+    // besides); dedupe by position must leave the newest wait standing.
+    act(() => {
+      channels.feeds[0](dataFrame('4_0', [retryChunk(1, { batch: 4, index: 0 })]))
+      channels.feeds[0](dataFrame('5_0', [retryChunk(2, { batch: 5, index: 0 })]))
+    })
+    if (rendered.result.current.phase.status !== 'streaming') throw new Error('unreachable')
+    expect(rendered.result.current.phase.retrying?.attempt).toBe(2)
+  })
+
+  it('refuses to wait on a retry signal that arrived half-read', async () => {
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
+
+    act(() => {
+      channels.feeds[0](
+        dataFrame('3_0', [
+          { type: 'message-started', messageId: 'm2', submissionId: 'sub_live', position: { batch: 3, index: 0 } },
+        ]),
+      )
+      channels.feeds[0](
+        dataFrame('4_0', [
+          // No delay on the wire: a wait nobody can name is not a state.
+          { type: 'submission-retrying', submissionId: 'sub_live', attempt: 1, maxRetries: 3, position: { batch: 4, index: 0 } },
+        ]),
+      )
+    })
+    await waitFor(() =>
+      expect(rendered.result.current.phase).toEqual({
+        status: 'streaming',
+        submissionId: 'sub_live',
+        retrying: null,
+      }),
+    )
   })
 })
 
@@ -556,7 +709,11 @@ describe('a refused submission has somewhere to land', () => {
       )
     })
     await waitFor(() =>
-      expect(rendered.result.current.phase).toEqual({ status: 'streaming', submissionId: 'sub_live' }),
+      expect(rendered.result.current.phase).toEqual({
+        status: 'streaming',
+        submissionId: 'sub_live',
+        retrying: null,
+      }),
     )
 
     await rendered.result.current.submit('a second message')

@@ -2,7 +2,7 @@ import { ExtendError } from "../errors.js";
 import { McpConnection, type McpChannel, type McpConnectionOptions } from "./connection.js";
 import { handshake, type McpSession } from "./handshake.js";
 import type { McpServerRecord } from "./registry.js";
-import { getBackoffDelay, type BackoffOptions } from "./wire/backoff.js";
+import { getBackoffDelay, type BackoffOptions } from "../../reliability/backoff.js";
 import { transition, type LifecycleEvent, type LifecycleState } from "./wire/lifecycle.js";
 
 /**

@@ -356,6 +356,9 @@ describe('attaching to a run', () => {
         errorType: null,
         errorMessage: null,
         usage: null,
+        attempt: null,
+        maxRetries: null,
+        delayMs: null,
       },
       // An unrecognised type survives as a fact carrying only its position,
       // because dropping it would desync position dedupe.
@@ -380,6 +383,9 @@ describe('attaching to a run', () => {
         errorType: null,
         errorMessage: null,
         usage: null,
+        attempt: null,
+        maxRetries: null,
+        delayMs: null,
       },
     ])
     const foreign = deliveries[1]

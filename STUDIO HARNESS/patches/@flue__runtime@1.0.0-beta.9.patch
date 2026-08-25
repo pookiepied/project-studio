@@ -1,7 +1,7 @@
 diff --git a/dist/conversation-projections-XMug3C6A.mjs b/dist/conversation-projections-XMug3C6A.mjs
 index d05220033fe9d56662329e478c7ebc7db283f3ba..ded0dabe1facf4499af534b271431f534a2d6947 100644
 --- a/dist/conversation-projections-XMug3C6A.mjs
-+++ b/dist/conversation-projections-XMug3C6A.mjs	
++++ b/dist/conversation-projections-XMug3C6A.mjs
 @@ -4,6 +4,7 @@ import { C as DirectAgentPayloadSchema, a as isBufferedRunEvent, b as isUuid, f
  import * as v from "valibot";
  import { ulid } from "ulidx";
@@ -32,3 +32,60 @@ index d05220033fe9d56662329e478c7ebc7db283f3ba..ded0dabe1facf4499af534b271431f53
  }
  function isCompletedAssistantResponse(message) {
  	return message.stopReason === "stop" || message.stopReason === "length";
+diff --git a/dist/conversation-stream-store-Bitz7UoW.mjs b/dist/conversation-stream-store-Bitz7UoW.mjs
+index 94032552cc83d3596ae6e53bd46ec6c9c9749b01..efe7bb82b458d23884d1aca4282c11f3424d07d7 100644
+--- a/dist/conversation-stream-store-Bitz7UoW.mjs
++++ b/dist/conversation-stream-store-Bitz7UoW.mjs
+@@ -2396,6 +2396,27 @@ var Session = class {
+ 		const delayMs = modelRetryDelayMs(attempt);
+ 		await this.rebuildCanonicalContext();
+ 		this.modelRetryAbortController = new AbortController();
++		// [project-studio patch] A retry the person cannot see is
++		// indistinguishable from a hang, so each scheduled retry is appended as
++		// a canonical record beside the log line that was its only witness.
++		// The record carries wire facts only — which attempt, out of what
++		// budget, the delay, and the failed attempt's own error sentence — and
++		// no policy; flue-app's encodeRecord projects it into a
++		// `submission-retrying` chunk for clients. The attempt number is the
++		// same derived count this method was called with, read back from the
++		// persisted path, so a resume re-derives it instead of remembering it.
++		// The exhausted branch deliberately emits nothing: there is no wait to
++		// announce, and the settlement already carries the failure. If an
++		// upgrade reshapes this method, re-derive this hunk from
++		// documentation/architecture/retry.md.
++		await this.appendCanonical([{
++			...this.canonicalEnvelope("submission_retry_scheduled"),
++			type: "submission_retry_scheduled",
++			attempt,
++			maxRetries: MAX_TRANSIENT_MODEL_RETRIES,
++			delayMs,
++			...(assistant.errorMessage ? { error: assistant.errorMessage } : {})
++		}]);
+ 		this.internalLog("warn", "[flue:model-retry] Retrying transient model error", {
+ 			attempt,
+ 			maxRetries: MAX_TRANSIENT_MODEL_RETRIES,
+diff --git a/dist/flue-app-DweeRG3g.mjs b/dist/flue-app-DweeRG3g.mjs
+index c0cd7c7542ba19ee11b50a9cb5319eb519341288..9b5207abcc319a39ca73b24510c49a3987a71e4d 100644
+--- a/dist/flue-app-DweeRG3g.mjs
++++ b/dist/flue-app-DweeRG3g.mjs
+@@ -157,6 +157,20 @@ function encodeRecord(record, conversationId, state) {
+ 			...record.usage ? { usage: record.usage } : {}
+ 		}];
+ 		case "tool_results_committed": return record.outcomeIds.flatMap((outcomeId) => encodeToolOutcome(outcomeId, conversationId, record, state));
++		// [project-studio patch] Project the record the transient-retry site
++		// appends (submission_retry_scheduled in the stream-store bundle) into
++		// a chunk. Unknown record types project to nothing by design — this
++		// case exists so the one record Studio itself adds is not dropped
++		// along with them.
++		case "submission_retry_scheduled": return [{
++			type: "submission-retrying",
++			conversationId,
++			...record.submissionId ? { submissionId: record.submissionId } : {},
++			attempt: record.attempt,
++			maxRetries: record.maxRetries,
++			delayMs: record.delayMs,
++			...record.error === void 0 ? {} : { error: record.error }
++		}];
+ 		case "submission_settled": return record.submissionId ? [{
+ 			type: "submission-settled",
+ 			conversationId,

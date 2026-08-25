@@ -15,6 +15,20 @@ import {
 import { isTauri } from '@/platform/tauri/window'
 
 /**
+ * The facts a retry signal carries, verbatim from the wire. Which attempt
+ * failed, out of what budget, how long the next wait is, and what the
+ * provider said about the attempt that failed — nothing derived here, and
+ * nothing fed back into requests.
+ */
+export interface RetryWaitFacts {
+  readonly attempt: number
+  readonly maxRetries: number
+  readonly delayMs: number
+  /** The provider's sentence for the failed attempt; null when none came. */
+  readonly detail: string | null
+}
+
+/**
  * The states a conversation's connection to its run can be in.
  *
  * One tagged union, because each of these renders as a different thing, and
@@ -27,7 +41,11 @@ import { isTauri } from '@/platform/tauri/window'
  * - `live`: the `up-to-date` transition happened — the replay is over and
  *   what follows is history being made.
  * - `streaming`: a turn is being produced, carrying the submission it
- *   belongs to when one has been seen.
+ *   belongs to when one has been seen. `retrying` carries the harness's own
+ *   announcement that a transient model failure is being retried inside that
+ *   turn — a fact the wire did not have before Task 29, so a waiting retry
+ *   is no longer indistinguishable from a stall. It clears the moment
+ *   generation resumes or the turn settles, never by timing out locally.
  * - `idle`: the last turn settled completed — or the harness has no stream
  *   for this conversation yet, which is how every fresh conversation starts.
  * - `interrupted`: the read broke — transport failure, harness crash,
@@ -40,7 +58,12 @@ export type ConversationPhase =
   | { readonly status: 'harness-starting' }
   | { readonly status: 'attaching' }
   | { readonly status: 'live' }
-  | { readonly status: 'streaming'; readonly submissionId: string | null }
+  | {
+      readonly status: 'streaming'
+      readonly submissionId: string | null
+      /** The scheduled retry being waited on, when the harness said so. */
+      readonly retrying: RetryWaitFacts | null
+    }
   | { readonly status: 'idle' }
   | { readonly status: 'interrupted'; readonly reason: string }
   | {
@@ -211,8 +234,10 @@ function atOrBefore(a: ChunkPosition, b: ChunkPosition): boolean {
  *
  * `message-started` opens a stream and names its submission;
  * `message-delta` proves generation is running even when the start scrolled
- * past the resume point; `submission-settled` closes it. Anything else moves
- * neither needle.
+ * past the resume point; `submission-retrying` says the turn is paused on a
+ * scheduled retry — it can only be believed while no later chunk shows
+ * generation resumed, so any start, delta, or settlement after it clears it;
+ * `submission-settled` closes the stream. Anything else moves neither needle.
  */
 function reduceChunks(
   chunks: readonly ChunkFacts[],
@@ -220,10 +245,12 @@ function reduceChunks(
 ): {
   applied: ChunkPosition | null
   streaming: string | null
+  retrying: RetryWaitFacts | null
   settled: 'completed' | 'failed' | 'aborted' | null
   settledReason: string | null
 } {
   let streaming: string | null = null
+  let retrying: RetryWaitFacts | null = null
   let settled: 'completed' | 'failed' | 'aborted' | null = null
   let settledReason: string | null = null
   for (const chunk of chunks) {
@@ -231,19 +258,32 @@ function reduceChunks(
       continue
     }
     if (chunk.position !== null) applied = chunk.position
-    if (chunk.type === 'message-started') {
+    if (chunk.type === 'submission-retrying') {
+      // A half-read signal is not a state: all three numbers must have come
+      // off the wire before anything waits on them.
+      if (chunk.attempt === null || chunk.maxRetries === null || chunk.delayMs === null) continue
+      retrying = {
+        attempt: chunk.attempt,
+        maxRetries: chunk.maxRetries,
+        delayMs: chunk.delayMs,
+        detail: chunk.errorMessage,
+      }
+    } else if (chunk.type === 'message-started') {
       streaming = chunk.submissionId ?? streaming ?? ''
+      retrying = null
     } else if (chunk.type === 'message-delta') {
       if (streaming === null) streaming = ''
+      retrying = null
     } else if (chunk.type === 'submission-settled' && chunk.outcome !== null) {
       settled = chunk.outcome
+      retrying = null
       // The provider's sentence, parsed since Task 26 put it on the facts.
       // A later settlement in the same batch replaces an earlier one; a
       // settlement without a sentence leaves the reason null.
       settledReason = chunk.errorMessage
     }
   }
-  return { applied, streaming, settled, settledReason }
+  return { applied, streaming, retrying, settled, settledReason }
 }
 
 const SETTLEMENT_MESSAGES: Record<'failed' | 'aborted', string> = {
@@ -363,19 +403,18 @@ export function useConversation(
               )
               return
             }
-            if (result.streaming !== null) {
-              setPhase((current) =>
-                current.status === 'streaming'
-                  ? {
-                      status: 'streaming',
-                      submissionId:
-                        result.streaming === '' ? current.submissionId : result.streaming,
-                    }
-                  : {
-                      status: 'streaming',
-                      submissionId: result.streaming === '' ? null : result.streaming,
-                    },
-              )
+            if (result.streaming !== null || result.retrying !== null) {
+              setPhase((current) => {
+                // A start names the submission outright; an empty name (a
+                // delta with no seen start) and a bare retry both keep
+                // whatever association the stream already carried.
+                const previous = current.status === 'streaming' ? current.submissionId : null
+                const submissionId =
+                  result.streaming === null || result.streaming === ''
+                    ? previous
+                    : result.streaming
+                return { status: 'streaming', submissionId, retrying: result.retrying }
+              })
             }
             return
           }

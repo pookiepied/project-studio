@@ -289,6 +289,9 @@ describe('readChunkFacts', () => {
     errorType: null,
     errorMessage: null,
     usage: null,
+    attempt: null,
+    maxRetries: null,
+    delayMs: null,
   }
 
   it('reads identity and content fields, leaving everything else null', () => {
@@ -428,6 +431,43 @@ describe('readChunkFacts', () => {
     expect(
       readChunkFacts({ type: 'compaction-started-v9', position: { batch: 9, index: 1 } }),
     ).toEqual({ ...EMPTY, type: 'compaction-started-v9', position: { batch: 9, index: 1 } })
+  })
+
+  it('reads a retry signal with its attempt, budget, wait, and the failed attempt sentence', () => {
+    // The harness's own announcement that a transient failure is being
+    // retried. Nothing here is derived on this side — every field is read
+    // off the wire or left null.
+    expect(
+      readChunkFacts({
+        type: 'submission-retrying',
+        conversationId: 'conv_1',
+        submissionId: 'sub_1',
+        attempt: 2,
+        maxRetries: 3,
+        delayMs: 4100,
+        error: '429 rate limit exceeded: temporarily rate-limited upstream',
+        position: { batch: 7, index: 0 },
+      }),
+    ).toEqual({
+      ...EMPTY,
+      type: 'submission-retrying',
+      submissionId: 'sub_1',
+      errorMessage: '429 rate limit exceeded: temporarily rate-limited upstream',
+      attempt: 2,
+      maxRetries: 3,
+      delayMs: 4100,
+      position: { batch: 7, index: 0 },
+    })
+  })
+
+  it('keeps a retry signal it cannot fully read as positioned identity', () => {
+    // A client that has never heard of this chunk — which is every client
+    // built before it existed — keeps its type and position and loses
+    // nothing it could not render anyway. That is the contract this very
+    // chunk relied on while landing.
+    expect(
+      readChunkFacts({ type: 'submission-retrying', attempt: 'two', position: { batch: 8, index: 1 } }),
+    ).toEqual({ ...EMPTY, type: 'submission-retrying', position: { batch: 8, index: 1 } })
   })
 
   it('refuses entries with no type at all', () => {
