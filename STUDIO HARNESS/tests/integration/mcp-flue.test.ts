@@ -4,7 +4,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { itContained } from "../contained.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
@@ -68,59 +68,206 @@ async function port(): Promise<number> {
   });
 }
 
-async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 20_000): Promise<void> {
+/** Same envelope as `harness.test.ts`: see the reasoning on its constants. */
+const STARTUP_BUDGET_MS = 20_000;
+
+/**
+ * A start attempt that has produced not one byte on either pipe after this
+ * long is wedged, not slow. The window exists because the failure this suite
+ * kept hitting was exactly that shape — alive, unexited, silent for the whole
+ * budget — while every healthy boot, however loaded the machine, has spoken
+ * within a few seconds of starting.
+ */
+const STARTUP_SILENCE_MS = 10_000;
+
+/**
+ * Thrown when an attempt crosses the silence window. Consumed by the
+ * replacement logic below; reaches a test only as text folded into the final
+ * failure.
+ */
+class StartupSilent extends Error {}
+
+interface HarnessStartOptions {
+  readonly entry?: string;
+  readonly startupBudgetMs?: number;
+  readonly startupSilenceMs?: number;
+}
+
+async function waitUntil(
+  predicate: () => Promise<boolean>,
+  timeoutMs = 20_000,
+  describeFailure?: () => string,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error(`Condition was not met within ${timeoutMs}ms.`);
+  const suffix = describeFailure === undefined ? "" : describeFailure();
+  throw new Error(`Condition was not met within ${timeoutMs}ms.${suffix}`);
 }
 
-async function startHarness(databasePath: string): Promise<RunningHarness> {
-  const portNumber = await port();
-  const admission = createAdmissionSession({ clientType: "test" });
-  const child = spawn(process.execPath, ["dist/server.mjs"], {
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      PORT: String(portNumber),
-      PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
-      PROJECT_STUDIO_DB_PATH: join(databasePath, "flue.db"),
-      PROJECT_STUDIO_STORE_PATH: join(databasePath, "studio.db"),
-      PROJECT_STUDIO_MODEL_SOURCE: "test",
-    },
-    stdio: "pipe",
-  });
-  let output = "";
-  child.stdout?.on("data", (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  child.stderr?.on("data", (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  const baseUrl = `http://127.0.0.1:${portNumber}`;
-  await waitUntil(async () => {
-    if (child.exitCode !== null) return false;
+/**
+ * Starts a harness with the same instrumentation `harness.test.ts` uses:
+ * named pids, stream tails, a silence window with one same-budget
+ * replacement, and a child exit treated as a reason rather than as more
+ * waiting. It is a copy rather than a shared import because extracting the
+ * five integration helpers is deliberately queued elsewhere; until then this
+ * file carries its own, and the weakest instrument on the most contended path
+ * was the one that had none of it.
+ *
+ * The history this replaces: no pid in failures, tails only via one opaque
+ * `output()` blob, a child that exited mid-startup treated as retryable-false
+ * (so a harness that died immediately cost the full timeout instead of naming
+ * itself), and silence waited out to the very end.
+ */
+async function startHarness(
+  databasePath: string,
+  options: HarnessStartOptions = {},
+): Promise<RunningHarness> {
+  const budgetMs = options.startupBudgetMs ?? STARTUP_BUDGET_MS;
+  const silenceMs = options.startupSilenceMs ?? STARTUP_SILENCE_MS;
+  const startedAt = Date.now();
+  /** Attempts replaced for silence, named in any later failure. */
+  const replaced: string[] = [];
+
+  const withReplacedAttempts = (message: string): string =>
+    replaced.length === 0
+      ? message
+      : `${message}\n  An earlier attempt was replaced for staying silent: ${replaced.join("; ")}.`;
+
+  for (;;) {
+    const portNumber = await port();
+    const admission = createAdmissionSession({ clientType: "test" });
+    const attemptStartedAt = Date.now();
+    const child = spawn(process.execPath, [options.entry ?? "dist/server.mjs"], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        PORT: String(portNumber),
+        PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
+        PROJECT_STUDIO_DB_PATH: join(databasePath, "flue.db"),
+        PROJECT_STUDIO_STORE_PATH: join(databasePath, "studio.db"),
+        PROJECT_STUDIO_MODEL_SOURCE: "test",
+      },
+      // An IPC channel alongside the pipes, so shutdown can be *requested* on
+      // Windows, where SIGTERM maps to TerminateProcess and never reaches a
+      // handler. The harness listens for the message as well.
+      stdio: ["pipe", "pipe", "pipe", "ipc"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    /** The last of a stream, which is where the reason for a bad start is. */
+    const tail = (text: string): string =>
+      text.length > 2_000 ? `...${text.slice(-2_000)}` : text;
+
+    const baseUrl = `http://127.0.0.1:${portNumber}`;
+    /** Kept so the failure can say what the last probe actually objected to. */
+    let lastProbeError: unknown;
+    // Undici's top-level sentence is "fetch failed" for a refused connection
+    // and for a timed-out one alike; the difference is carried up from cause.
+    const probeSentence = (error: unknown): string => {
+      if (!(error instanceof Error)) return String(error);
+      const cause = error.cause;
+      return cause instanceof Error
+        ? `${error.message} (${cause.message})`
+        : error.message;
+    };
+    const describeFailure = (): string =>
+      [
+        ` The harness on ${baseUrl} never accepted a connection.`,
+        `pid=${String(child.pid)}`,
+        `exitCode=${String(child.exitCode)}`,
+        `signal=${String(child.signalCode)}`,
+        // A port taken between allocation and use is the other way this fails,
+        // and it looks nothing like a slow boot once the message says so.
+        `lastProbe=${probeSentence(lastProbeError)}`,
+        `stdout=${tail(stdout) || "(nothing)"}`,
+        `stderr=${tail(stderr) || "(nothing)"}`,
+      ].join("\n  ");
+
     try {
-      await fetch(baseUrl);
-      return true;
-    } catch {
-      return false;
+      await waitUntil(
+        async () => {
+          if (child.exitCode !== null) {
+            throw new Error(`Harness exited during startup: ${stderr}`);
+          }
+
+          if (
+            stdout.length === 0 &&
+            stderr.length === 0 &&
+            Date.now() - attemptStartedAt >= silenceMs
+          ) {
+            throw new StartupSilent(describeFailure());
+          }
+
+          try {
+            await fetch(baseUrl);
+            return true;
+          } catch (error) {
+            lastProbeError = error;
+            return false;
+          }
+        },
+        Math.max(budgetMs - (Date.now() - startedAt), 1),
+        describeFailure,
+      );
+
+      return { baseUrl, process: child, token: admission.credential, output: () => stdout + stderr };
+    } catch (error) {
+      // One replacement, and only while enough of the budget remains for the
+      // next attempt to be fair; otherwise the failure carries everything known.
+      const replaceable =
+        error instanceof StartupSilent &&
+        replaced.length === 0 &&
+        budgetMs - (Date.now() - startedAt) >= Math.ceil(silenceMs / 2);
+      if (replaceable) {
+        replaced.push(
+          `pid=${String(child.pid)} on port ${String(portNumber)}, killed after ${String(Date.now() - attemptStartedAt)}ms with no output`,
+        );
+        await killHarness(child);
+        continue;
+      }
+      if (error instanceof Error) error.message = withReplacedAttempts(error.message);
+      throw error;
     }
-  });
-  return { baseUrl, process: child, token: admission.credential, output: () => output };
+  }
+}
+
+async function killHarness(child: ChildProcess): Promise<void> {
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill("SIGKILL");
+    await new Promise<void>((resolve) => {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        resolve();
+        return;
+      }
+      child.once("exit", () => resolve());
+    });
+  }
 }
 
 async function stopHarness(harness: RunningHarness): Promise<void> {
-  if (harness.process.exitCode !== null) return;
-  harness.process.kill("SIGTERM");
+  const child = harness.process;
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  // Ask over IPC when there is a channel, because a signal cannot carry this
+  // on Windows; SIGTERM remains the fallback for a child without one.
+  if (child.connected) child.send("shutdown");
+  else child.kill("SIGTERM");
   await new Promise<void>((resolve) => {
     const timer = setTimeout(() => {
-      harness.process.kill("SIGKILL");
+      child.kill("SIGKILL");
       resolve();
     }, 5_000);
-    harness.process.once("exit", () => {
+    child.once("exit", () => {
       clearTimeout(timer);
       resolve();
     });
@@ -225,4 +372,40 @@ describe("MCP through the Flue agent", () => {
     const next = await client.send("mcp-off", "use mcp again");
     expect((await client.wait(next)).text).toBe("Echo: use mcp again");
   }, 60_000);
+});
+
+describe("the startup silence window", () => {
+  it("replaces a harness that produces no output and names both attempts in the failure", async () => {
+    // A deterministic stand-in for a machine-stalled boot: alive, listening on
+    // nothing, writing not one byte to either pipe. This suite was the second
+    // sighting of that shape and had the least instrumentation for it; the
+    // stub drives the same kill-and-replace machinery `harness.test.ts` pins,
+    // so the helper here cannot quietly lose it again.
+    const directory = await mkdtemp(join(tmpdir(), "studio-mcp-flue-silent-"));
+    const entry = join(directory, "never-speaks.mjs");
+    await writeFile(entry, "setInterval(() => {}, 1000);\n", "utf8");
+
+    let failure: unknown;
+    try {
+      await startHarness(directory, {
+        entry,
+        startupBudgetMs: 3_000,
+        startupSilenceMs: 600,
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    if (!(failure instanceof Error)) {
+      throw new Error("startHarness resolved instead of failing.");
+    }
+    const pids = [...failure.message.matchAll(/pid=(\d+)/g)].map((match) => match[1]);
+    expect(new Set(pids).size).toBe(2);
+    expect(failure.message).toContain(
+      "An earlier attempt was replaced for staying silent",
+    );
+    expect(failure.message).toContain("never accepted a connection");
+
+    await rm(directory, { recursive: true, force: true });
+  });
 });

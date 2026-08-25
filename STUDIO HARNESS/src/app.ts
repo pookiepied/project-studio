@@ -15,6 +15,7 @@ import {
   registerFlueTurnBoundary,
   type ObservabilityHandle,
 } from "./observability/index.js";
+import { bootLog } from "./platform/boot-log.js";
 import { reportNodeRuntime } from "./platform/runtime.js";
 import {
   createStudioTransientModelRetryPolicy,
@@ -35,6 +36,7 @@ interface HarnessApplication {
 }
 
 function createHarnessApplication(): HarnessApplication {
+  bootLog("composition root entered");
   let observability: ObservabilityHandle | undefined;
   let admission: ReturnType<typeof createAdmissionSession> | undefined;
   let studioRuntime: StudioRuntime | undefined;
@@ -44,13 +46,17 @@ function createHarnessApplication(): HarnessApplication {
     // This function is the composition root: it opens the one connection the
     // server uses, hands it to everything that needs one, and is the only
     // thing that closes it.
+    bootLog("step 1: openDatabase() entering");
     database = openDatabase();
+    bootLog("step 1: openDatabase() completed");
 
     // Provider selection is validated and bootstrapped before OpenTelemetry
     // starts, so an unavailable/invalid model source rejects cleanly instead of
     // leaving a partially initialized SDK behind.
+    bootLog("step 2: resolveProviderConfig() and bootstrapModelProviders() entering");
     const providerConfig = resolveProviderConfig();
     bootstrapModelProviders(providerConfig, { database });
+    bootLog("step 2: resolveProviderConfig() and bootstrapModelProviders() completed");
 
     // The patched runtime owns the transient-retry loop but not its budget:
     // the per-class table lives in src/reliability/model-retry-policy.ts, and
@@ -59,17 +65,24 @@ function createHarnessApplication(): HarnessApplication {
     // off globalThis at each retry decision. Installed here because this is
     // the composition root, before any session or MCP server can run; until
     // it fires the bundle keeps its own shipped constants.
+    bootLog("step 3: installTransientModelRetryPolicy() entering");
     installTransientModelRetryPolicy(createStudioTransientModelRetryPolicy());
+    bootLog("step 3: installTransientModelRetryPolicy() completed");
 
+    bootLog("step 4: initializeObservability() entering");
     observability = initializeObservability();
+    bootLog("step 4: initializeObservability() completed");
 
     // Said out loud on every start, because the alternative was a number in a
     // file nobody reads. `.node-version` and `engines` were both unenforced —
     // no CI, no version manager — so the whole Stage 4 cycle was measured on a
     // runtime below the floor our dependencies declare, and nothing said so
     // (meta-task #79).
+    bootLog("step 5: reportNodeRuntime() entering");
     reportNodeRuntime(observability.logger);
+    bootLog("step 5: reportNodeRuntime() completed");
 
+    bootLog("step 6: admission session entering");
     const bootstrapCredential = admissionCredentialFromEnvironment(
       process.env.PROJECT_STUDIO_ADMISSION_CREDENTIAL,
     );
@@ -83,9 +96,11 @@ function createHarnessApplication(): HarnessApplication {
         ? {}
         : { sessionId: process.env.PROJECT_STUDIO_ADMISSION_SESSION_ID }),
     });
+    bootLog("step 6: admission session completed");
 
     // Durable: an unanswered question survives a restart and is asked again
     // rather than disappearing with the process (ADR 0036).
+    bootLog("step 7: PermissionApprovalBroker and StudioRuntime entering");
     const approvals = new PermissionApprovalBroker({
       store: new PendingApprovalStore(database),
     });
@@ -104,11 +119,13 @@ function createHarnessApplication(): HarnessApplication {
         "MCP startup reconciliation failed; inspect server status for details.",
       );
     });
+    bootLog("step 7: PermissionApprovalBroker and StudioRuntime completed");
 
     // Same database, same construction style as `servers`: the provider
     // surface is composed here so the connection it reads from is the one this
     // root owns and closes. Keys go to the OS credential store, never the
     // database, which is ConnectionStore's own rule to enforce.
+    bootLog("step 8: ConnectionStore, ProviderManagementService entering");
     const providerConnections = new ConnectionStore({
       db: database,
       credentials: new KeyringCredentialStore(),
@@ -120,14 +137,17 @@ function createHarnessApplication(): HarnessApplication {
         connections: providerConnections,
       }),
     });
+    bootLog("step 8: ConnectionStore, ProviderManagementService completed");
 
     // Reads and writes the same app_setting keys and keychain entries the
     // retrieval tool path uses; its own store instances over the same
     // database and OS keyring, the way every consumer here builds one.
+    bootLog("step 9: RetrievalManagementService entering");
     const retrieval = new RetrievalManagementService({
       settings: new RetrievalSettingsStore(database),
       credentials: new KeyringCredentialStore(),
     });
+    bootLog("step 9: RetrievalManagementService completed");
 
     let shutdownPromise: Promise<void> | undefined;
     const shutdown = (): Promise<void> => {
@@ -145,6 +165,7 @@ function createHarnessApplication(): HarnessApplication {
       return shutdownPromise;
     };
 
+    bootLog("step 10: createHttpApp entering");
     const app = createHttpApp({
       servers: runtime.servers,
       providers,
@@ -159,9 +180,16 @@ function createHarnessApplication(): HarnessApplication {
         void shutdown().finally(() => process.exit(0));
       },
     });
+    bootLog("step 10: createHttpApp completed");
 
     return { app, shutdown };
   } catch (error) {
+    // The stack, not just the sentence: this is the one path where a start
+    // fails after having spoken, and the phase names above it are only half
+    // the answer.
+    bootLog(
+      `composition root FAILED: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+    );
     // Startup is a transaction: anything opened before a later composition
     // failure is closed before the error escapes to the process supervisor.
     admission?.verifier.invalidate();

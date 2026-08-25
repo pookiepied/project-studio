@@ -63,6 +63,19 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
       streamSimple: this.stream,
     });
 
+    const { defaultProvider, defaultModel } = this.#config;
+
+    // An unconfigured source registers only what Flue structurally requires:
+    // the alias resolves to its unoperational descriptor, and no telemetry
+    // names a provider this harness has never been given.
+    if (defaultProvider === undefined || defaultModel === undefined) {
+      registerProvider(DEFAULT_MODEL_PROVIDER, {
+        api: LOCAL_ALIAS_API,
+        baseUrl: "http://127.0.0.1",
+      });
+      return;
+    }
+
     const target = this.#runtime.target();
 
     // Flue requires a baseUrl for a provider id its catalog does not know. The
@@ -74,26 +87,30 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
       ...(target?.contextWindow ? { contextWindow: target.contextWindow } : {}),
       ...(target?.maxTokens ? { maxTokens: target.maxTokens } : {}),
       telemetry: {
-        providerName: this.#config.defaultProvider,
+        providerName: defaultProvider,
         serverAddress: target?.baseUrl ?? "local",
       },
     });
   }
 
   /**
-   * Fails loudly when the configured model is not in the collection, rather
-   * than at the first user message. A typo in
-   * `PROJECT_STUDIO_LOCAL_DEFAULT_MODEL` is a configuration error and should
-   * read like one.
+   * Fails loudly when a turn cannot be routed, rather than at the first user
+   * message with nothing said. Two distinct refusals: no model has been chosen
+   * yet, which the settings UI exists to fix, or a chosen model that cannot be
+   * found, which is a configuration error naming what to check.
    */
   assertTargetResolvable(): Model<Api> {
     const target = this.#runtime.target();
-    if (!target) {
+    if (target) return target;
+
+    if (this.#config.defaultProvider === undefined || this.#config.defaultModel === undefined) {
       throw new ProviderConfigurationError(
-        `Local default model "${this.#config.defaultProvider}/${this.#config.defaultModel}" is not available. Check the provider id and model id, and declare the provider in PROJECT_STUDIO_LOCAL_PROVIDERS if it is not built in.`,
+        'No default model is selected. Choose one in provider settings, or set PROJECT_STUDIO_LOCAL_DEFAULT_MODEL to "<provider>/<model>".',
       );
     }
-    return target;
+    throw new ProviderConfigurationError(
+      `Local default model "${this.#config.defaultProvider}/${this.#config.defaultModel}" is not available. Check the provider id and model id, and declare the provider in PROJECT_STUDIO_LOCAL_PROVIDERS if it is not built in.`,
+    );
   }
 
   resolve(reference: ModelReference): ModelDescriptor {

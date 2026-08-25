@@ -172,11 +172,21 @@ async function startHarness(
 
     /** The last of a stream, which is where the reason for a bad start is. */
     const tail = (text: string): string =>
-      text.length > 2_000 ? `…${text.slice(-2_000)}` : text;
+      text.length > 2_000 ? `...${text.slice(-2_000)}` : text;
 
     const baseUrl = `http://127.0.0.1:${port}`;
     /** Kept so the failure can say what the last attempt actually objected to. */
     let lastProbeError: unknown;
+    // Undici's top-level sentence is "fetch failed" for a refused connection
+    // and for a timed-out one alike; the difference is exactly what separates
+    // a port race from a wedged child, so it is carried up from the cause.
+    const probeSentence = (error: unknown): string => {
+      if (!(error instanceof Error)) return String(error);
+      const cause = error.cause;
+      return cause instanceof Error
+        ? `${error.message} (${cause.message})`
+        : error.message;
+    };
     const describeFailure = (): string =>
       [
         ` The harness on ${baseUrl} never accepted a connection.`,
@@ -185,7 +195,7 @@ async function startHarness(
         `signal=${String(child.signalCode)}`,
         // A port taken between allocation and use is the other way this fails,
         // and it looks nothing like a slow boot once the message says so.
-        `lastProbe=${lastProbeError instanceof Error ? lastProbeError.message : String(lastProbeError)}`,
+        `lastProbe=${probeSentence(lastProbeError)}`,
         `stdout=${tail(stdout) || "(nothing)"}`,
         `stderr=${tail(stderr) || "(nothing)"}`,
       ].join("\n  ");

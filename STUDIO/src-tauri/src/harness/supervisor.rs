@@ -868,8 +868,7 @@ impl HarnessSupervisor {
         // these names cannot shadow what we set deliberately.
         apply_harness_environment(&mut cmd);
 
-        cmd.env("PORT", "0");
-        cmd.env("PROJECT_STUDIO_HARNESS_HOSTNAME", "127.0.0.1");
+        apply_deliberate_environment(&mut cmd);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
@@ -1391,6 +1390,30 @@ enum PoliteOutcome {
     DrainExceeded,
 }
 
+/// The variables the Host supplies deliberately, after the environment policy.
+///
+/// Deliberate means *not on the allowlist*: [`apply_harness_environment`]
+/// clears first, so anything set here cannot be shadowed by a host variable of
+/// the same name, and keeping the two apart is what makes that guarantee
+/// readable. `launch` applies the policy and then this, in that order.
+///
+/// - `PORT` 0 — the OS assigns; the readiness frame reports what was bound.
+/// - `PROJECT_STUDIO_HARNESS_HOSTNAME` — loopback only, enforced again by the
+///   readiness check.
+/// - `PROJECT_STUDIO_MODEL_SOURCE` — `local`, the BYOK provider source the
+///   desktop app exists to run. Set here rather than inherited for the same
+///   reason as `PORT`: the allowlist's whole point is that host variables
+///   cannot shadow deliberate ones, and this is a deliberate one. It selects
+///   the source at the spawn site because the alternative would be an
+///   environment variable the app depends on and no window of ours sets — a
+///   harness silently running its network-free `test` provider while a user
+///   wonders why their connected providers are never asked.
+fn apply_deliberate_environment(cmd: &mut Command) {
+    cmd.env("PORT", "0");
+    cmd.env("PROJECT_STUDIO_HARNESS_HOSTNAME", "127.0.0.1");
+    cmd.env("PROJECT_STUDIO_MODEL_SOURCE", "local");
+}
+
 #[cfg(test)]
 mod tests {
     use std::net::TcpListener;
@@ -1421,6 +1444,40 @@ mod tests {
         assert_eq!(redacted.matches("[redacted]").count(), 2);
         // An empty token is not a substring to replace; it is every position.
         assert_eq!(redact("anything", ""), "anything");
+    }
+
+    /// The deliberate variables survive the policy: set after it clears, so
+    /// they are exactly the names a host cannot shadow — and `local` is among
+    /// them, because the desktop app must reach the BYOK path the allowlist
+    /// knows nothing about.
+    #[test]
+    fn deliberate_environment_survives_the_policy() {
+        let mut cmd = Command::new("node");
+        apply_harness_environment(&mut cmd);
+        apply_deliberate_environment(&mut cmd);
+
+        let values: Vec<(String, String)> = cmd
+            .get_envs()
+            .filter_map(|(k, v)| {
+                v.map(|value| (k.to_string_lossy().into_owned(), value.to_string_lossy().into_owned()))
+            })
+            .collect();
+
+        let find = |name: &str| {
+            values
+                .iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value.clone())
+        };
+        assert_eq!(find("PORT").as_deref(), Some("0"));
+        assert_eq!(
+            find("PROJECT_STUDIO_HARNESS_HOSTNAME").as_deref(),
+            Some("127.0.0.1")
+        );
+        assert_eq!(
+            find("PROJECT_STUDIO_MODEL_SOURCE").as_deref(),
+            Some("local")
+        );
     }
 
     /// The path handed to Node is one Node can open.

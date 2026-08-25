@@ -24,10 +24,20 @@ export interface CustomProviderConfig {
 }
 
 export interface LocalModelConfig {
-  /** Provider id owning the model the stable alias routes to. */
-  readonly defaultProvider: string;
-  /** Model id within that provider. */
-  readonly defaultModel: string;
+  /**
+   * Provider id owning the model the stable alias routes to, or `undefined`
+   * when the user has connected nothing yet.
+   *
+   * Undefined is a state, not an error, on the app path: a harness somebody
+   * just installed starts, serves the provider-management routes that let the
+   * settings UI fix the omission, and refuses individual turns until a model
+   * is chosen. The env-driven path (`PROJECT_STUDIO_LOCAL_DEFAULT_MODEL`)
+   * treats absence as an error instead, because a headless caller that asked
+   * for `local` by name has nothing to configure through a UI.
+   */
+  readonly defaultProvider: string | undefined;
+  /** Model id within that provider. `undefined` under the same rule. */
+  readonly defaultModel: string | undefined;
   readonly customProviders: readonly CustomProviderConfig[];
 }
 
@@ -81,6 +91,12 @@ export function parseModelSpecifier(raw: string): {
  * from the provider settings store. The environment variables remain as an
  * override for development and for headless runs that have no settings
  * database, and they are only consulted when settings supply nothing.
+ *
+ * This is the strict entry point: a caller that reaches for it without any
+ * selection gets an error, because headless callers cannot fix the omission
+ * themselves. The composition path that starts a desktop app uses
+ * [`tolerantLocalModelConfig`], where an unselected default is a state the
+ * settings UI exists to resolve.
  */
 export function resolveLocalModelConfig(
   input: {
@@ -102,6 +118,40 @@ export function resolveLocalModelConfig(
     defaultProvider: selection.provider,
     defaultModel: selection.model,
     customProviders: input.customProviders ?? readCustomProviders(),
+  };
+}
+
+/**
+ * The default selection carried by `PROJECT_STUDIO_LOCAL_DEFAULT_MODEL`, or
+ * `undefined` when it says nothing.
+ *
+ * Exported so the composition root can apply the same settings-first,
+ * environment-second order the strict resolver uses, without that resolver's
+ * throw on total absence.
+ */
+export function defaultSelectionFromEnvironment():
+  | { readonly provider: string; readonly model: string }
+  | undefined {
+  return resolveDefaultSelection(undefined);
+}
+
+/**
+ * The tolerant counterpart, for paths where a first launch is normal.
+ *
+ * Same fields, same validation of whatever selection exists — an env override
+ * is still parsed and a malformed specifier still fails here. What differs is
+ * only absence: no selection yields `undefined`, not a startup failure.
+ */
+export function tolerantLocalModelConfig(input: {
+  readonly defaultSelection?:
+    | { readonly provider: string; readonly model: string }
+    | undefined;
+  readonly customProviders: readonly CustomProviderConfig[];
+}): LocalModelConfig {
+  return {
+    defaultProvider: input.defaultSelection?.provider,
+    defaultModel: input.defaultSelection?.model,
+    customProviders: input.customProviders,
   };
 }
 

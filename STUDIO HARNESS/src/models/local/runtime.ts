@@ -132,11 +132,17 @@ export function createLocalRuntime(
 
   return {
     models,
+    // An unselected default is a state, not a fault: `undefined` here is what
+    // makes the alias descriptor report unconfigured and the settings UI's
+    // fix-it path reachable, instead of the harness refusing to start.
     target: () =>
-      models.getModel(
-        options.config.defaultProvider,
-        options.config.defaultModel,
-      ),
+      options.config.defaultProvider === undefined ||
+      options.config.defaultModel === undefined
+        ? undefined
+        : models.getModel(
+            options.config.defaultProvider,
+            options.config.defaultModel,
+          ),
     listModels: () => models.getModels(),
   };
 }

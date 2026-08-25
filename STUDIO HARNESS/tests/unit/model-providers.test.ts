@@ -144,17 +144,32 @@ describe("createModelProviderAdapter", () => {
     );
   });
 
-  it("fails clearly for local when no default model is configured", () => {
-    // `local` is operational now; what it refuses is starting without knowing
-    // which model the stable alias should route to.
+  it("starts unconfigured rather than dead when no default model is chosen", () => {
+    // A first launch has connected nothing. That is a state for the settings
+    // UI to fix, not a startup failure: the harness must come up so provider
+    // management can reach it, and refuse individual turns instead.
     delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
     const opened = openDatabase();
     database = opened;
-    expect(() => createModelProviderAdapter("local", { database: opened })).toThrow(
+
+    const adapter = createModelProviderAdapter("local", { database: opened });
+    expect(adapter.source).toBe("local");
+
+    const descriptor = adapter.resolve(defaultModelReference("local"));
+    expect(descriptor.operational).toBe(false);
+  });
+
+  it("refuses an unconfigured turn with directions, not a crash", () => {
+    delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
+    const opened = openDatabase();
+    database = opened;
+    const adapter = createModelProviderAdapter("local", { database: opened });
+
+    expect(() => adapter.assertTargetResolvable()).toThrow(
       ProviderConfigurationError,
     );
-    expect(() => createModelProviderAdapter("local", { database: opened })).toThrow(
-      /PROJECT_STUDIO_LOCAL_DEFAULT_MODEL/,
+    expect(() => adapter.assertTargetResolvable()).toThrow(
+      /No default model is selected/,
     );
   });
 

@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 
 import { sqlite } from "@flue/runtime/node";
 
+import { bootLog } from "./platform/boot-log.js";
 import {
   ensureDirectory,
   flueDatabasePath,
@@ -21,7 +22,15 @@ import {
  * `PROJECT_STUDIO_DB_PATH` still overrides it, and now goes through
  * `resolveConfigured`, so a relative override means "inside the Studio home"
  * rather than "wherever this process started".
+ *
+ * Of our own modules this is the first to execute in the built bundle — the
+ * Flue loader imports `app.ts` only later, and dynamically. The journal open
+ * below therefore announces itself: a start that stops between "dependencies
+ * loaded" and "composition root entered" has landed here before, where a hot
+ * WAL left by a hard-killed predecessor has to be recovered under a lock.
  */
+bootLog("journal module evaluating");
+
 const path = process.env.PROJECT_STUDIO_DB_PATH
   ? resolveConfigured(process.env.PROJECT_STUDIO_DB_PATH)
   : flueDatabasePath();
@@ -30,4 +39,6 @@ const path = process.env.PROJECT_STUDIO_DB_PATH
 // directory does not exist yet.
 ensureDirectory(dirname(path));
 
+bootLog(`journal opening at ${path}`);
 export default sqlite(path);
+bootLog("journal open");

@@ -13,8 +13,9 @@ import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import { LocalModelProviderAdapter } from "./adapters/local-adapter.js";
 import type { StudioDatabase } from "../storage/database.js";
 import {
+  defaultSelectionFromEnvironment,
   mergeCustomProviders,
-  resolveLocalModelConfig,
+  tolerantLocalModelConfig,
   type LocalModelConfig,
 } from "./local/config.js";
 import { ProviderSettingsStore } from "./local/settings-store.js";
@@ -67,10 +68,13 @@ export function createModelProviderAdapter(
  * Builds the local BYOK source.
  *
  * The user's provider credentials stay in the OS keychain and are read by Pi
- * during auth resolution; nothing here holds a key. Configuration is validated
- * eagerly so a bad default model or an unusable custom provider fails at
- * startup, but the credential store is not consulted, because a user may
- * legitimately start the harness before connecting any provider.
+ * during auth resolution; nothing here holds a key. A *broken* configuration
+ * still fails eagerly at startup — a malformed default model or an unusable
+ * custom provider is an error worth refusing to start on. A *missing* one is
+ * not: a harness somebody just installed has connected nothing yet, so an
+ * unselected default builds an adapter whose turns refuse with directions to
+ * the settings UI, while provider management itself starts and works. The
+ * credential store is not consulted on either path.
  */
 function createLocalAdapter(
   overrides: LocalBootstrapOverrides,
@@ -98,16 +102,20 @@ function createLocalAdapter(
 /**
  * Reads the local configuration the user actually chose.
  *
- * Provider settings are the source of truth; the environment variables are the
- * override for development and for runs with no settings database. An
- * unreadable settings database is not swallowed — a user who configured
- * providers in the UI must not silently start on stale environment values.
+ * Provider settings are the source of truth; the environment variable is the
+ * fallback for development runs with no settings database, in the same order
+ * the strict resolver uses. Absence from both is tolerated here rather than
+ * thrown: this is the desktop composition path, where a first launch before
+ * any provider was connected is normal, and the state is one the settings UI
+ * can fix. An unreadable settings database is still not swallowed — a user who
+ * configured providers in the UI must not silently start on stale values.
  */
 function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalModelConfig {
   const settings = new ProviderSettingsStore(database);
-  const selection = settings.getDefaultModel();
+  const selection =
+    settings.getDefaultModel() ?? defaultSelectionFromEnvironment();
 
-  return resolveLocalModelConfig({
+  return tolerantLocalModelConfig({
     ...(selection ? { defaultSelection: selection } : {}),
     customProviders: mergeCustomProviders(settings.listCustomProviders()),
   });
