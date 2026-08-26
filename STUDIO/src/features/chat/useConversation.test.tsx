@@ -3,7 +3,7 @@
  */
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { RenderHookResult } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type {
   ContactHarness,
@@ -816,5 +816,295 @@ describe('a refused submission has somewhere to land', () => {
         detail: null,
       }),
     )
+  })
+})
+
+/**
+ * Mounts against a scripted harness whose contact is built ONCE. A contact
+ * recreated inside the render prop would re-run the mount effect on every
+ * render, because the effect correctly treats an unstable contact as a
+ * changed dependency - and attaching is a render.
+ */
+async function mountScripted(options: {
+  invoke: ServiceInvoke
+  factory: (onMessage: (message: WireStreamEvent) => void) => StreamChannel
+  listen: LifecycleListen
+  livenessBudgetMs?: number
+}): Promise<RenderHookResult<ReturnType<typeof useConversation>, string>> {
+  const { contact } = contactFor(() =>
+    createConversationClient({
+      conversationId: 'cnv_1',
+      invoke: options.invoke,
+      createChannel: options.factory,
+    }),
+  )
+  return renderHook(
+    (id: string) =>
+      useConversation(id, {
+        contact,
+        listen: options.listen,
+        ...(options.livenessBudgetMs === undefined
+          ? {}
+          : { livenessBudgetMs: options.livenessBudgetMs }),
+      }),
+    { initialProps: 'cnv_1' },
+  )
+}
+
+describe('the delivery a submission owes its turn', () => {
+  /** History refused for a conversation the harness has no stream for yet. */
+  const NO_STREAM = { status: 404, headers: [], body: '' }
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+  }
+
+  interface TurnScript {
+    readonly invoke: ServiceInvoke
+    readonly calls: RecordedCall[]
+    readonly historyReads: () => number
+    readonly streamOffsets: () => string[]
+    readonly streamIds: () => string[]
+    readonly cancelledStreams: () => string[]
+  }
+
+  /**
+   * A conversation whose submission POST admits with the receipt's own
+   * offset, and whose history view answers per `historyAtMount`: `absent`
+   * is the every-fresh-conversation state (the stream does not exist until
+   * the first admission creates it), `live` is a conversation the harness
+   * already knows. Any history read AFTER the first answers 404 - with the
+   * fix, the submission never makes one, so a regression to the cold-start
+   * shape lands in `absent` and opens no stream, which the offsets record
+   * makes unmissable.
+   */
+  function turnScript(admittedOffset: string, historyAtMount: 'absent' | 'live'): TurnScript {
+    const resolvers = new Map<string, () => void>()
+    let historyReads = 0
+    const streamOffsets: string[] = []
+    const streamIds: string[] = []
+    const cancelled: string[] = []
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: (args) => {
+        const path = String(args['path'])
+        const init = args['init']
+        const method = isRecord(init) ? init['method'] : undefined
+        if (path.endsWith('?view=history')) {
+          historyReads += 1
+          if (historyReads === 1 && historyAtMount === 'live') {
+            return {
+              status: 200,
+              headers: [],
+              body: JSON.stringify({
+                v: 1,
+                conversationId: 'conv_1',
+                offset: '4_2',
+                messages: [],
+                settlements: [],
+              }),
+            }
+          }
+          return NO_STREAM
+        }
+        if (method === 'POST' && !path.includes('?view=') && !path.endsWith('/abort')) {
+          return {
+            status: 200,
+            headers: [],
+            body: JSON.stringify({ submissionId: 'sub_turn', offset: admittedOffset }),
+          }
+        }
+        throw new Error(`unexpected fetch in this script: ${String(method)} ${path}`)
+      },
+      service_stream: (args) => {
+        streamOffsets.push(String(args['offset']))
+        streamIds.push(String(args['streamId']))
+        return new Promise<void>((resolve) => {
+          resolvers.set(String(args['streamId']), () => resolve())
+        })
+      },
+      service_stream_cancel: (args) => {
+        cancelled.push(String(args['streamId']))
+        const resolve = resolvers.get(String(args['streamId']))
+        if (resolve !== undefined) {
+          resolve()
+          resolvers.delete(String(args['streamId']))
+        }
+        return undefined
+      },
+    })
+    return {
+      invoke,
+      calls,
+      historyReads: () => historyReads,
+      streamOffsets: () => streamOffsets,
+      streamIds: () => streamIds,
+      cancelledStreams: () => cancelled,
+    }
+  }
+
+  it('starts the turn read at the admission receipt offset, never by re-reading history', async () => {
+    // A fresh conversation's mount attach settled `absent` - the stream did
+    // not exist until this admission created it. The old shape attached with
+    // a second cold start: a history read whose answer the submission had
+    // just made stale, and - in the race where the 404 won - no read at all,
+    // with the whole turn running unwitnessed. The receipt names where the
+    // turn begins; the read must open THERE.
+    const script = turnScript('9_4', 'absent')
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountScripted({
+      invoke: script.invoke,
+      factory: channels.factory,
+      listen: lifecycle.listen,
+    })
+    // The mount attach finds no stream: connected, quiet, ready.
+    await waitFor(() => expect(rendered.result.current.phase).toEqual({ status: 'idle' }))
+
+    const receipt = await rendered.result.current.submit('watch this one')
+    expect(receipt.ok).toBe(true)
+
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['9_4']))
+    expect(script.historyReads()).toBe(1)
+  })
+
+  it('replaces a read that is already attached with one starting at the receipt offset', async () => {
+    // The other half of the same defect: an attached read that went deaf
+    // without Rust noticing is still `attached()`, and a submission that
+    // trusted it streamed the whole turn into a void. Every submission now
+    // opens its own read at its own admission offset; the superseded one is
+    // cancelled, and the position discipline makes any overlap harmless.
+    const script = turnScript('9_4', 'live')
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    const rendered = await mountScripted({
+      invoke: script.invoke,
+      factory: channels.factory,
+      listen: lifecycle.listen,
+    })
+    // The mount attach reads history and opens the updates stream.
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
+    act(() => {
+      channels.feeds[0]({ kind: 'up-to-date', offset: '4_2' })
+    })
+    await waitFor(() => expect(rendered.result.current.phase.status).toBe('live'))
+
+    const receipt = await rendered.result.current.submit('watch this one')
+    expect(receipt.ok).toBe(true)
+    await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2', '9_4']))
+
+    // The turn's first replay lands on the transcript through the new read.
+    act(() => {
+      channels.feeds[1](
+        dataFrame('9_4', [
+          {
+            type: 'message-started',
+            messageId: 'entry_turn',
+            submissionId: 'sub_turn',
+            position: { batch: 9, index: 0 },
+          },
+        ]),
+      )
+    })
+    await waitFor(() => expect(rendered.result.current.phase.status).toBe('streaming'))
+    // The mount read was stopped - once by the hook's supersede and once by
+    // the client's own, which is why the same id can appear twice.
+    const mountStream = script.streamIds()[0]
+    if (mountStream === undefined) {
+      throw new Error('the mount stream was asserted opened above')
+    }
+    expect(script.cancelledStreams()).toContain(mountStream)
+  })
+})
+
+describe('the silence a read may not outlast', () => {
+  /**
+   * Drains the contact-attach-invoke chain without `waitFor`: the budget
+   * runs on the fake clock from before the mount, so no real-timer wait can
+   * race the very watchdog under test.
+   */
+  async function flushAttach(): Promise<void> {
+    for (let round = 0; round < 8; round += 1) {
+      await Promise.resolve()
+    }
+  }
+
+  it('stops trusting a read that delivers nothing for a whole budget', async () => {
+    // Rust cannot see this failure: a channel whose webview side vanished
+    // keeps accepting sends, so the harness streams into a void while the
+    // UI sits attached and deaf. The webview is the only place the silence
+    // can be named, and the phase must say interrupted rather than leave a
+    // dead read wearing a live one's state.
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    vi.useFakeTimers()
+    try {
+      const rendered = await mountScripted({
+        invoke: streams.invoke,
+        factory: channels.factory,
+        listen: lifecycle.listen,
+        livenessBudgetMs: 50,
+      }).then(async (hook) => {
+        await act(async () => {
+          await flushAttach()
+        })
+        return hook
+      })
+      expect(streamCount({ calls: streams.calls })).toBe(1)
+      act(() => {
+        channels.feeds[0]({ kind: 'up-to-date', offset: '-1' })
+      })
+      expect(rendered.result.current.phase.status).toBe('live')
+
+      // The budget elapses with nothing further from the read.
+      act(() => {
+        vi.advanceTimersByTime(60)
+      })
+      expect(rendered.result.current.phase.status).toBe('interrupted')
+      // The dead read was stopped by name, not left running in Rust.
+      expect(
+        streams.calls.filter((call) => call.command === 'service_stream_cancel'),
+      ).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps trusting a read that keeps speaking, however quiet the turn itself is', async () => {
+    // The false-positive guard: a healthy read is heard from at least twice
+    // inside the budget (Rust forwards a keep-alive every 15s), so a long
+    // provider silence before the first token must never read as a break.
+    const streams = cancellableStreams()
+    const channels = recordingChannels()
+    const lifecycle = manualLifecycle()
+    vi.useFakeTimers()
+    try {
+      const rendered = await mountScripted({
+        invoke: streams.invoke,
+        factory: channels.factory,
+        listen: lifecycle.listen,
+        livenessBudgetMs: 50,
+      }).then(async (hook) => {
+        await act(async () => {
+          await flushAttach()
+        })
+        return hook
+      })
+      expect(streamCount({ calls: streams.calls })).toBe(1)
+      act(() => {
+        channels.feeds[0]({ kind: 'up-to-date', offset: '-1' })
+      })
+      expect(rendered.result.current.phase.status).toBe('live')
+
+      for (let round = 0; round < 5; round += 1) {
+        act(() => {
+          vi.advanceTimersByTime(30)
+          channels.feeds[0]({ kind: 'keep-alive', offset: '3_0' })
+        })
+      }
+      expect(rendered.result.current.phase.status).toBe('live')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

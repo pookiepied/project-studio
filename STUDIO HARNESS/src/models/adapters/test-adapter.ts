@@ -200,6 +200,24 @@ async function waitForDelay(
   });
 }
 
+/**
+ * `[pace]`: how far apart the answer's deltas are emitted, so a client can be
+ * observed receiving them WHILE the turn runs rather than afterwards. Without
+ * spacing the whole event stream finishes inside one tick and no reader, ours
+ * or a test's, can tell a live delivery from a replayed one.
+ */
+const PACE_DELTA_MS = 300;
+/** Delta size under `[pace]`, small enough that an ordinary sentence makes several. */
+const PACE_SLICE_CHARS = 4;
+
+function pacedSlices(text: string): string[] {
+  const slices: string[] = [];
+  for (let index = 0; index < text.length; index += PACE_SLICE_CHARS) {
+    slices.push(text.slice(index, index + PACE_SLICE_CHARS));
+  }
+  return slices.length > 0 ? slices : [text];
+}
+
 function stream(
   model: Model<Api>,
   context: Context,
@@ -297,12 +315,17 @@ function stream(
         ? "Project Studio V2 workspace is ready."
         : hasAnyToolResult(context)
           ? "MCP tool completed."
-        : `Echo: ${userText.replace("[slow]", "").trim()}`;
+        : `Echo: ${userText.replace("[slow]", "").replace("[pace]", "").trim()}`;
       const partial = createMessage(model, [{ type: "text", text: "" }]);
       let streamedText = "";
       events.push({ type: "text_start", contentIndex: 0, partial });
 
-      for (const chunk of [text.slice(0, 8), text.slice(8)]) {
+      // `[pace]` spreads the deltas over wall-clock time; the default keeps
+      // the historical two-delta shape so existing scenarios are untouched.
+      const paced = /\[pace\]/i.test(userText);
+      const slices = paced ? pacedSlices(text) : [text.slice(0, 8), text.slice(8)];
+      for (const [index, chunk] of slices.entries()) {
+        if (paced && index > 0) await waitForDelay(PACE_DELTA_MS, options?.signal);
         streamedText += chunk;
         partial.content = [{ type: "text", text: streamedText }];
         events.push({

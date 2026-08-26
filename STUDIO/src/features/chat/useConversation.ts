@@ -291,6 +291,22 @@ const SETTLEMENT_MESSAGES: Record<'failed' | 'aborted', string> = {
   aborted: 'The turn was aborted before it finished.',
 }
 
+/**
+ * How long an attached read may deliver nothing at all - no chunk, no
+ * keep-alive, nothing - before this hook stops trusting it.
+ *
+ * Rust forwards a KeepAlive every 15s while a read is healthy, so a live
+ * read is heard from at least twice inside this budget; the budget is
+ * Rust's own READ_IDLE_TIMEOUT, one layer up. What it closes is the failure
+ * Rust cannot see: a channel whose webview side went away keeps accepting
+ * sends successfully forever, so the run streams into a void while the UI
+ * sits attached and deaf - and a turn submitted into that state runs
+ * entirely unwitnessed, which is the silent stop wearing a connection's
+ * clothes. On expiry the read is cancelled and the phase says interrupted:
+ * visible, holding its retained offset, never silently reattached.
+ */
+const READ_LIVENESS_BUDGET_MS = 45_000
+
 /* -------------------------------------------------------------------------- */
 /* The hook                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -306,6 +322,11 @@ export interface UseConversationOptions {
    * across renders — it rides beside `contact` as an effect dependency.
    */
   readonly onContent?: (content: ConversationContent) => void
+  /**
+   * How long an attached read may deliver nothing at all before this hook
+   * stops trusting it. Tests shorten it; production never names it.
+   */
+  readonly livenessBudgetMs?: number
 }
 
 export function useConversation(
@@ -345,108 +366,159 @@ export function useConversation(
   const upToDateRef = useRef(false)
   const appliedRef = useRef<ChunkPosition | null>(null)
 
-  const attach = useCallback(() => {
-    const client = clientRef.current
-    if (client === null || !liveRef.current) return
-    // Never two live readers: the client supersedes its own previous attach,
-    // and this covers the rarer case where the client itself was replaced
-    // along the way (a contact resolving after an earlier attach).
-    void handleRef.current?.cancel()
-    generationRef.current += 1
-    const generation = generationRef.current
-    upToDateRef.current = false
-    appliedRef.current = null
-    setPhase({ status: 'attaching' })
+  // Liveness of the current read: one timer, re-armed by every attach and
+  // every delivery. A firing timer is the whole test - no delivery of any
+  // kind arrived for a whole budget - so no clock comparison is kept.
+  const livenessBudgetRef = useRef(options.livenessBudgetMs ?? READ_LIVENESS_BUDGET_MS)
+  livenessBudgetRef.current = options.livenessBudgetMs ?? READ_LIVENESS_BUDGET_MS
+  const livenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    const handle = client.attach({
-      onEvent: (delivery: ConversationDelivery) => {
-        if (generationRef.current !== generation) return
-        // Every variant carries the resume point; none is exempt.
-        setOffset(delivery.offset)
-        switch (delivery.kind) {
-          case 'keep-alive':
-          case 'frame':
-            // Liveness and unread bytes: neither is content, and neither
-            // moves this state machine. This is what keeps heartbeats out
-            // of the transcript's way forever.
-            return
-          case 'snapshot':
-            // History's whole answer: content to seed the projection with.
-            // The phase stays `attaching` — the updates connection that
-            // follows still has to catch up before anything is live.
-            onContent?.({ kind: 'snapshot', snapshot: delivery.snapshot })
-            return
-          case 'up-to-date':
-            upToDateRef.current = true
-            setPhase((current) =>
-              current.status === 'streaming' ? current : { status: 'live' },
-            )
-            return
-          case 'chunks': {
-            onContent?.({
-              kind: 'chunks',
-              replaying: delivery.replaying,
-              chunks: delivery.chunks,
-            })
-            const result = reduceChunks(delivery.chunks, appliedRef.current)
-            appliedRef.current = result.applied
-            if (result.settled !== null) {
-              setPhase(
-                result.settled === 'completed'
-                  ? { status: 'idle' }
-                  : {
-                      status: 'run-failed',
-                      outcome: result.settled,
-                      message: SETTLEMENT_MESSAGES[result.settled],
-                      detail: result.settledReason,
-                    },
-              )
-              return
+  const disarmLiveness = useCallback(() => {
+    if (livenessTimerRef.current !== null) {
+      clearTimeout(livenessTimerRef.current)
+      livenessTimerRef.current = null
+    }
+  }, [])
+
+  const refreshLiveness = useCallback(() => {
+    disarmLiveness()
+    livenessTimerRef.current = setTimeout(() => {
+      livenessTimerRef.current = null
+      const handle = handleRef.current
+      if (handle === null || !liveRef.current) return
+      handleRef.current = null
+      void handle.cancel()
+      setPhase({
+        status: 'interrupted',
+        reason:
+          'The connection to this run went quiet, so Studio stopped reading it. Reattach to continue from where it stopped.',
+      })
+    }, livenessBudgetRef.current)
+  }, [disarmLiveness])
+
+  const attach = useCallback(
+    (reattach?: { readonly from?: string; readonly announce?: boolean }) => {
+      const client = clientRef.current
+      if (client === null || !liveRef.current) return
+      // Never two live readers: the client supersedes its own previous attach,
+      // and this covers the rarer case where the client itself was replaced
+      // along the way (a contact resolving after an earlier attach).
+      void handleRef.current?.cancel()
+      generationRef.current += 1
+      const generation = generationRef.current
+      upToDateRef.current = false
+      appliedRef.current = null
+      // A submission-driven attach names its own starting offset (the
+      // admission receipt's) and stays quiet: the turn's own replay arrives
+      // within milliseconds and drives the phase from there, so the
+      // reaching-the-conversation sentence would only flash over it. The
+      // stale notice a reattach replaces - interrupted, run-failed - is
+      // cleared by the same replay the moment it lands.
+      if (reattach?.announce !== false) setPhase({ status: 'attaching' })
+
+      const handle = client.attach(
+        {
+          onEvent: (delivery: ConversationDelivery) => {
+            if (generationRef.current !== generation) return
+            // A delivery of any kind - chunk, frame, keep-alive - is this
+            // read proving it is still being heard.
+            refreshLiveness()
+            // Every variant carries the resume point; none is exempt.
+            setOffset(delivery.offset)
+            switch (delivery.kind) {
+              case 'keep-alive':
+              case 'frame':
+                // Liveness and unread bytes: neither is content, and neither
+                // moves this state machine. This is what keeps heartbeats out
+                // of the transcript's way forever.
+                return
+              case 'snapshot':
+                // History's whole answer: content to seed the projection with.
+                // The phase stays `attaching` — the updates connection that
+                // follows still has to catch up before anything is live.
+                onContent?.({ kind: 'snapshot', snapshot: delivery.snapshot })
+                return
+              case 'up-to-date':
+                upToDateRef.current = true
+                setPhase((current) =>
+                  current.status === 'streaming' ? current : { status: 'live' },
+                )
+                return
+              case 'chunks': {
+                onContent?.({
+                  kind: 'chunks',
+                  replaying: delivery.replaying,
+                  chunks: delivery.chunks,
+                })
+                const result = reduceChunks(delivery.chunks, appliedRef.current)
+                appliedRef.current = result.applied
+                if (result.settled !== null) {
+                  setPhase(
+                    result.settled === 'completed'
+                      ? { status: 'idle' }
+                      : {
+                          status: 'run-failed',
+                          outcome: result.settled,
+                          message: SETTLEMENT_MESSAGES[result.settled],
+                          detail: result.settledReason,
+                        },
+                  )
+                  return
+                }
+                if (result.streaming !== null || result.retrying !== null) {
+                  setPhase((current) => {
+                    // A start names the submission outright; an empty name (a
+                    // delta with no seen start) and a bare retry both keep
+                    // whatever association the stream already carried.
+                    const previous = current.status === 'streaming' ? current.submissionId : null
+                    const submissionId =
+                      result.streaming === null || result.streaming === ''
+                        ? previous
+                        : result.streaming
+                    return { status: 'streaming', submissionId, retrying: result.retrying }
+                  })
+                }
+                return
+              }
+              case 'absent':
+                // The harness creates the stream at a conversation's first
+                // prompt. Until then there is nothing to replay and nothing to
+                // watch: connected, quiet, ready for the composer.
+                setPhase({ status: 'idle' })
+                return
+              case 'ended':
+                setPhase({ status: 'idle' })
+                return
             }
-            if (result.streaming !== null || result.retrying !== null) {
-              setPhase((current) => {
-                // A start names the submission outright; an empty name (a
-                // delta with no seen start) and a bare retry both keep
-                // whatever association the stream already carried.
-                const previous = current.status === 'streaming' ? current.submissionId : null
-                const submissionId =
-                  result.streaming === null || result.streaming === ''
-                    ? previous
-                    : result.streaming
-                return { status: 'streaming', submissionId, retrying: result.retrying }
-              })
-            }
-            return
-          }
-          case 'absent':
-            // The harness creates the stream at a conversation's first
-            // prompt. Until then there is nothing to replay and nothing to
-            // watch: connected, quiet, ready for the composer.
-            setPhase({ status: 'idle' })
-            return
-          case 'ended':
-            setPhase({ status: 'idle' })
-            return
+          },
+        },
+        reattach?.from === undefined ? undefined : { from: reattach.from },
+      )
+      handleRef.current = handle
+      // The read has its whole budget from now to prove it is alive; the
+      // first delivery re-arms this.
+      refreshLiveness()
+
+      void handle.settled.then((settlement) => {
+        if (!liveRef.current || generationRef.current !== generation) return
+        // The read is over, whatever the outcome: liveness is moot until a
+        // next attach arms it again.
+        disarmLiveness()
+        if (settlement.outcome === 'broken' || settlement.outcome === 'refused') {
+          const failure = settlement.failure
+          const reason =
+            failure.kind === 'refused'
+              ? `The harness refused the read (${failure.status}).`
+              : failure.message
+          setPhase({ status: 'interrupted', reason })
         }
-      },
-    })
-    handleRef.current = handle
-
-    void handle.settled.then((settlement) => {
-      if (!liveRef.current || generationRef.current !== generation) return
-      if (settlement.outcome === 'broken' || settlement.outcome === 'refused') {
-        const failure = settlement.failure
-        const reason =
-          failure.kind === 'refused'
-            ? `The harness refused the read (${failure.status}).`
-            : failure.message
-        setPhase({ status: 'interrupted', reason })
-      }
-      // `ended` and `absent` already arrived as deliveries; `cancelled`
-      // means this read was superseded or the hook went away — both
-      // handled where that happens, not here.
-    })
-  }, [onContent])
+        // `ended` and `absent` already arrived as deliveries; `cancelled`
+        // means this read was superseded or the hook went away — both
+        // handled where that happens, not here.
+      })
+    },
+    [onContent, refreshLiveness, disarmLiveness],
+  )
 
   useEffect(() => {
     liveRef.current = true
@@ -511,11 +583,12 @@ export function useConversation(
       // The prompt half of cancellation: switching conversations or leaving
       // stops THIS READ immediately. It never touches the run — a dead
       // window cancels nothing (ADR 0045 section 5).
+      disarmLiveness()
       void handleRef.current?.cancel()
       handleRef.current = null
       unsubscribe?.()
     }
-  }, [conversationId, contact, subscribe, attach])
+  }, [conversationId, contact, subscribe, attach, disarmLiveness])
 
   const resume = useCallback(() => {
     attach()
@@ -545,9 +618,17 @@ export function useConversation(
       }
       // A send that got through retires whatever the last refusal said.
       if (liveRef.current) setRefused(null)
-      // A fresh conversation had no stream to attach to at mount; its first
-      // admitted turn creates one, and this is where the read begins.
-      if (!client.attached()) attach()
+      // The receipt names where this turn's events begin, so the read starts
+      // THERE - never by re-reading history, and never by trusting whatever
+      // read happens to be attached. Two states make the old shape miss the
+      // turn entirely: a fresh conversation's mount attach settled `absent`
+      // (the stream did not exist until this admission created it), and a
+      // long-lived read can go deaf without Rust noticing, because a channel
+      // whose webview side vanished keeps accepting sends. Attaching from the
+      // receipt's offset replaces either with a read that begins exactly at
+      // this turn, and the position discipline downstream makes any overlap
+      // with what an older read already delivered safe to apply twice.
+      attach({ from: sent.value.offset, announce: false })
       return { ok: true as const, value: { submissionId: sent.value.submissionId } }
     },
     [attach],

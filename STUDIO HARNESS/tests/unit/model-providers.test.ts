@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { getApiProvider } from "@earendil-works/pi-ai/compat";
+import type { Context, Model } from "@earendil-works/pi-ai";
 
 import {
   defaultModelReference,
@@ -134,6 +136,51 @@ describe("test adapter", () => {
     adapter.register();
     const descriptor = adapter.resolve(defaultModelReference("test"));
     expect(descriptor.source).toBe("test");
+  });
+
+  it("spreads a [pace] answer's deltas over wall-clock time", async () => {
+    // A seam whose deltas all land inside one tick cannot exercise live
+    // streaming: no reader, ours or a test's, can tell a delivery made
+    // during the turn from a replay made after it. `[pace]` is the seam's
+    // answer, and this test is its contract: more than two deltas, and a
+    // first-to-last span that no synchronous emission could produce.
+    const adapter = new TestModelProviderAdapter();
+    adapter.register();
+    const provider = getApiProvider("project-studio-test");
+    if (provider === undefined) {
+      throw new Error("the test adapter registered no api provider");
+    }
+
+    const model: Model<"project-studio-test"> = {
+      id: "default",
+      name: "default",
+      api: "project-studio-test",
+      provider: "project-studio",
+      baseUrl: "in-process://project-studio-test",
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 32_000,
+      maxTokens: 4_096,
+    };
+    const context: Context = {
+      messages: [
+        { role: "user", content: "[pace] a short answer", timestamp: Date.now() },
+      ],
+    };
+
+    const deltaArrivals: number[] = [];
+    for await (const event of provider.streamSimple(model, context)) {
+      if (event.type === "text_delta") deltaArrivals.push(Date.now());
+    }
+
+    expect(deltaArrivals.length).toBeGreaterThan(2);
+    const first = deltaArrivals.at(0);
+    const last = deltaArrivals.at(-1);
+    if (first === undefined || last === undefined) {
+      throw new Error("the delta arrivals above were asserted non-empty");
+    }
+    expect(last - first).toBeGreaterThanOrEqual(900);
   });
 });
 
