@@ -103,17 +103,18 @@ function fillDialog({ name, url, key }: { name: string; url: string; key?: strin
 }
 
 describe('with no harness', () => {
-  it('renders the built-in catalog and no error', async () => {
+  it('says so plainly instead of showing a fixture catalog', async () => {
     harnessAbsent()
     stubFetch()
     render(<ProvidersPane />)
 
-    await screen.findByText('Anthropic')
-    expect(screen.getByText('OpenAI')).toBeTruthy()
-    expect(screen.getByText('Mistral')).toBeTruthy()
+    await screen.findByText(/No harness is connected/)
+    expect(screen.getByText(/Start Studio's harness/)).toBeTruthy()
 
-    // Quiet, and phrased as a fact rather than a problem.
-    expect(screen.getByText(/These are the built-in defaults/)).toBeTruthy()
+    // Quiet, and phrased as a fact rather than a problem. No fixture rows
+    // that look like connections but hold no key and answer no probe.
+    expect(screen.queryByText('Anthropic')).toBeNull()
+    expect(screen.queryByText('Mistral')).toBeNull()
 
     // Nothing that reads as a failure, and nothing that offers a mutation
     // there is no harness to accept.
@@ -127,7 +128,7 @@ describe('with no harness', () => {
     const calls = stubFetch()
     render(<ProvidersPane />)
 
-    await screen.findByText('Anthropic')
+    await screen.findByText(/No harness is connected/)
     expect(calls).toHaveLength(0)
   })
 })
@@ -143,9 +144,9 @@ describe('when the load fails', () => {
     await screen.findByText('Could not read connections.')
     expect(screen.getByText(new RegExp(BASE_URL.replace(/[.]/g, '\\.')))).toBeTruthy()
 
-    // Critically, it does not silently fall through to the built-in catalog:
+    // Critically, it does not silently fall through to a fixture list:
     // that would present fixture rows as though they were the user's own.
-    expect(screen.queryByText('Mistral')).toBeNull()
+    expect(screen.queryByText('The box next door')).toBeNull()
     expect(screen.getByText('Try again')).toBeTruthy()
   })
 

@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { rememberFirstAdmission } from '@/features/chat/first-attach'
 import { defaultContactFor, type ContactHarness } from '@/features/chat/useConversation'
 import { newId } from '@/lib/id'
-import type { SeamFailure } from '@/platform/harness'
+import type { SeamFailure, TurnSettingsWire } from '@/platform/harness'
 
 /**
  * The first turn of a conversation, sent from a page that has no conversation.
@@ -61,9 +61,14 @@ const NOT_RUNNING: SeamFailure = {
  * the view that is about to mount. Pure of React on purpose: everything worth
  * testing about a first send is here, and the hook below only holds what the
  * refusal notice renders.
+ *
+ * The turn's settings travel in the submission, so the harness's admission
+ * path settles them into the index BEFORE the run's initializer reads them -
+ * the first turn's own answer names the model that was picked.
  */
 export async function startConversation(request: {
   readonly text: string
+  readonly settings: TurnSettingsWire
   /** Defaults to asking the supervisor, exactly as a conversation view does. */
   readonly contactFor?: (conversationId: string) => ContactHarness
   /**
@@ -77,7 +82,7 @@ export async function startConversation(request: {
   const found = await contact()
   if (found.kind !== 'ready') return { ok: false, error: NOT_RUNNING }
 
-  const sent = await found.client.submitTurn(request.text)
+  const sent = await found.client.submitTurn(request.text, request.settings)
   if (!sent.ok) return { ok: false, error: sent.error }
 
   rememberFirstAdmission(conversationId, {
@@ -105,15 +110,22 @@ export interface FirstTurnView {
 export function useFirstTurn(options: {
   readonly onStarted: (conversationId: string, text: string) => void
   readonly contactFor?: (conversationId: string) => ContactHarness
+  /**
+   * The settings the first turn is sent with, read at send time - the picker's
+   * current choice, not a captured one.
+   */
+  readonly settings: () => TurnSettingsWire
 }): FirstTurnView {
   const [refused, setRefused] = useState<SeamFailure | null>(null)
-  const { onStarted, contactFor } = options
+  const { onStarted, contactFor, settings } = options
 
   const start = useCallback(
     async (text: string) => {
-      const outcome = await startConversation(
-        contactFor === undefined ? { text } : { text, contactFor },
-      )
+      const outcome = await startConversation({
+        text,
+        settings: settings(),
+        ...(contactFor === undefined ? {} : { contactFor }),
+      })
       if (!outcome.ok) {
         setRefused(outcome.error)
         return { ok: false }
@@ -122,7 +134,7 @@ export function useFirstTurn(options: {
       onStarted(outcome.conversationId, text)
       return { ok: true }
     },
-    [contactFor, onStarted],
+    [contactFor, onStarted, settings],
   )
 
   const dismissRefusal = useCallback(() => setRefused(null), [])

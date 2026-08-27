@@ -1,5 +1,8 @@
+import * as v from "valibot";
+
 import type { ConversationCreateInput } from "../contracts/conversations.js";
 import type { ConversationRecord } from "../contracts/conversations.js";
+import { reasoningChoiceSchema, type ReasoningChoice } from "../contracts/models.js";
 import { StorageError, storageErrorFrom } from "../storage/errors.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { deriveTitle } from "./title.js";
@@ -33,8 +36,21 @@ interface Row {
   pinned: number;
   archived: number;
   model_id: string | null;
+  reasoning_level: string | null;
   created_at: number;
   last_turn_at: number;
+}
+
+/**
+ * A stored reasoning choice, read back through the schema it was written
+ * through. Null is the row's own "never settled" and a value that does not
+ * parse reads the same way - an unreadable level must not become a level the
+ * run asks for.
+ */
+function toReasoningChoice(value: string | null): ReasoningChoice | null {
+  if (value === null) return null;
+  const parsed = v.safeParse(reasoningChoiceSchema, value);
+  return parsed.success ? parsed.output : null;
 }
 
 function toRecord(row: Row): ConversationRecord {
@@ -46,6 +62,7 @@ function toRecord(row: Row): ConversationRecord {
     pinned: row.pinned === 1,
     archived: row.archived === 1,
     modelId: row.model_id,
+    reasoningLevel: toReasoningChoice(row.reasoning_level),
     createdAt: row.created_at,
     lastTurnAt: row.last_turn_at,
   };
@@ -119,7 +136,13 @@ export class ConversationStore {
   record(input: ConversationCreateInput): ConversationRecord {
     const existing = this.get(input.id);
     if (existing !== undefined) {
-      return this.touch(input.id, input.createdAt ?? Date.now());
+      // A repeat receipt touches recency and settles the settings the turn
+      // named, so a record written by the admission path and the same receipt
+      // arriving again converge on one row rather than fighting.
+      const settled = this.#settledSettings(input);
+      return settled === undefined
+        ? this.touch(input.id, input.createdAt ?? Date.now())
+        : this.patch(input.id, { ...settled, lastTurnAt: input.createdAt ?? Date.now() });
     }
 
     const row: Row = {
@@ -132,7 +155,8 @@ export class ConversationStore {
       project_id: input.projectId ?? null,
       pinned: 0,
       archived: 0,
-      model_id: null,
+      model_id: input.modelId ?? null,
+      reasoning_level: input.reasoningLevel ?? null,
       created_at: input.createdAt ?? Date.now(),
       last_turn_at: input.createdAt ?? Date.now(),
     };
@@ -143,9 +167,9 @@ export class ConversationStore {
           .prepare(
             `INSERT INTO conversation (
                id, title, title_manual, project_id, pinned, archived,
-               model_id, created_at, last_turn_at
+               model_id, reasoning_level, created_at, last_turn_at
              )
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             row.id,
@@ -155,6 +179,7 @@ export class ConversationStore {
             row.pinned,
             row.archived,
             row.model_id,
+            row.reasoning_level,
             row.created_at,
             row.last_turn_at,
           );
@@ -165,6 +190,24 @@ export class ConversationStore {
       throw storageErrorFrom(error, "conflict");
     }
     return this.get(input.id) as ConversationRecord;
+  }
+
+  /**
+   * The settings half of a create input, when it carries one.
+   *
+   * Undefined means the caller sent no settings at all, which must patch
+   * nothing - a receipt without a model cannot clear one that admission
+   * already wrote. An explicit null (clear to the default) is a value and
+   * passes through.
+   */
+  #settledSettings(
+    input: ConversationCreateInput,
+  ): { modelId?: string | null; reasoningLevel?: string | null } | undefined {
+    if (input.modelId === undefined && input.reasoningLevel === undefined) return undefined;
+    return {
+      ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
+      ...(input.reasoningLevel === undefined ? {} : { reasoningLevel: input.reasoningLevel }),
+    };
   }
 
   /**
@@ -209,6 +252,8 @@ export class ConversationStore {
       pinned?: boolean | undefined;
       archived?: boolean | undefined;
       projectId?: string | null | undefined;
+      modelId?: string | null | undefined;
+      reasoningLevel?: string | null | undefined;
       lastTurnAt?: number | undefined;
     },
   ): ConversationRecord {
@@ -235,6 +280,18 @@ export class ConversationStore {
     if (change.projectId !== undefined) {
       assignments.push("project_id = ?");
       values.push(change.projectId);
+    }
+    // The model and the reasoning level are what a turn was sent with. Each
+    // is cleared by null back to the default, and neither is touched by an
+    // absent key - a receipt that carries only a model cannot reset a level
+    // somebody chose earlier.
+    if (change.modelId !== undefined) {
+      assignments.push("model_id = ?");
+      values.push(change.modelId);
+    }
+    if (change.reasoningLevel !== undefined) {
+      assignments.push("reasoning_level = ?");
+      values.push(change.reasoningLevel);
     }
     // Recency is a patch like any other, because the only caller that has it
     // is the one sending the receipt of a later turn. Applied with MAX for the
@@ -264,10 +321,12 @@ export class ConversationStore {
   /**
    * Removes rows outright.
    *
-   * Called only by emptying the archive over an explicit selection or all of
-   * it, which is the one destructive path in the product and is always a
-   * person choosing it. There is no sweep and nothing expires: an archive
-   * that quietly deletes is the one feature nobody forgives.
+   * Called by emptying the archive over an explicit selection or all of it -
+   * the one destructive path in the product, always a person choosing it -
+   * and by the turn-settings middleware, which rolls back a row it created
+   * for a first send the harness went on to refuse. There is no sweep and
+   * nothing expires: an archive that quietly deletes is the one feature
+   * nobody forgives.
    *
    * What removal destroys is answered by `conversations/purge.ts`, which owns
    * everything on disk besides these rows.

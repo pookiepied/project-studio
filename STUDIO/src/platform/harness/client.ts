@@ -33,12 +33,14 @@ import {
   parseProjectRecords,
   parseProviderConnection,
   parseProviderConnections,
+  parseProviderDefaults,
   parseProviderModels,
   parsePurgeOutcome,
   type CapabilitySlot,
   type ConversationCreateDraft,
   type ConversationPatch,
   type ConversationRecord,
+  type DefaultSelection,
   type ProbeResult,
   type ProjectCreateDraft,
   type ProjectPatch,
@@ -135,6 +137,8 @@ export interface HarnessClient {
   deleteConnection(id: string): Promise<HarnessResult<void>>
   probeConnection(id: string): Promise<HarnessResult<ProbeResult>>
   listModels(filter?: ModelFilter): Promise<HarnessResult<readonly ProviderModel[]>>
+  /** The user's chosen default models, per capability slot; absent slots are unset. */
+  getDefaults(): Promise<HarnessResult<DefaultSelection>>
 
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
@@ -394,13 +398,19 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       )
     },
 
+    getDefaults() {
+      return json('GET', `${PROVIDERS_PATH}/defaults`, undefined, parseProviderDefaults)
+    },
+
     listConversations() {
       return json('GET', `${CONVERSATIONS_PATH}`, undefined, parseConversationRecords)
     },
 
     createConversation(draft) {
       // Sent on the admission receipt, never before it. An id the harness
-      // refused to admit never becomes a row here.
+      // refused to admit never becomes a row here. The settings ride along
+      // when the turn carried them; the admission path has usually written
+      // them already, and a repeat receipt is the same write.
       return json(
         'POST',
         CONVERSATIONS_PATH,
@@ -408,6 +418,8 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
           id: draft.id,
           firstMessage: draft.firstMessage,
           ...(draft.projectId === undefined ? {} : { projectId: draft.projectId }),
+          ...(draft.modelId === undefined ? {} : { modelId: draft.modelId }),
+          ...(draft.reasoningLevel === undefined ? {} : { reasoningLevel: draft.reasoningLevel }),
           ...(draft.createdAt === undefined ? {} : { createdAt: draft.createdAt }),
         },
         parseConversationRecord,
@@ -420,6 +432,8 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       if (patch.pinned !== undefined) body.pinned = patch.pinned
       if (patch.archived !== undefined) body.archived = patch.archived
       if (patch.projectId !== undefined) body.projectId = patch.projectId
+      if (patch.modelId !== undefined) body.modelId = patch.modelId
+      if (patch.reasoningLevel !== undefined) body.reasoningLevel = patch.reasoningLevel
       if (patch.lastTurnAt !== undefined) body.lastTurnAt = patch.lastTurnAt
       return json('PATCH', conversationIndexPath(id), body, parseConversationRecord)
     },

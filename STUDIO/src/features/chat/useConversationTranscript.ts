@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useConversation } from '@/features/chat/useConversation'
 import type { ConversationContent } from '@/features/chat/useConversation'
-import type { SeamFailure } from '@/platform/harness'
+import type { SeamFailure, TurnSettingsWire } from '@/platform/harness'
 import { firstAdmission } from '@/features/chat/first-attach'
 import {
   applyChunks,
@@ -77,7 +77,7 @@ export function useConversationTranscript(conversationId: string): {
   phase: ReturnType<typeof useConversation>['phase']
   offset: string | null
   resume: () => void
-  submit: (message: string) => Promise<{ ok: boolean }>
+  submit: (message: string, settings: TurnSettingsWire) => Promise<{ ok: boolean }>
   abort: () => Promise<{ ok: boolean }>
   refused: SeamFailure | null
   dismissRefusal: () => void
@@ -115,8 +115,8 @@ export function useConversationTranscript(conversationId: string): {
     phase: conversation.phase,
     offset: conversation.offset,
     resume: conversation.resume,
-    submit: async (message) => {
-      const sent = await conversation.submit(message)
+    submit: async (message, settings) => {
+      const sent = await conversation.submit(message, settings)
       // Held only once the harness says it has the words. A submission that
       // was refused leaves the composer holding them (Task 32), and drawing
       // them in the transcript as well would show the same message in two

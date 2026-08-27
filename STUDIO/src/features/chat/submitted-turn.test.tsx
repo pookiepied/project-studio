@@ -127,6 +127,13 @@ function recordingChannels(): {
 
 const SILENT_LIFECYCLE: LifecycleListen = async () => () => {}
 
+/**
+ * What a send carries beside its words. Every test here passes settings the
+ * way the page does, and the first one asserts they reached the wire - the
+ * whole point of the turn settings is what the harness receives.
+ */
+const SETTINGS = { modelId: 'google/gemini-3.5-flash', reasoningLevel: 'high' } as const
+
 function dataFrame(offset: string, chunks: unknown[]): WireStreamEvent {
   return { kind: 'frame', offset, event: 'data', data: JSON.stringify(chunks) }
 }
@@ -178,12 +185,26 @@ describe('what the receipt licenses the page to say', () => {
     // nothing else would.
     let receipt: { ok: boolean } = { ok: false }
     await act(async () => {
-      receipt = await rendered.result.current.submit('watch this one')
+      receipt = await rendered.result.current.submit('watch this one', SETTINGS)
     })
     expect(receipt.ok).toBe(true)
     expect(rendered.result.current.phase).toEqual({
       status: 'submitted',
       submissionId: 'sub_turn',
+    })
+    // And the body the harness received carried what the picker chose - the
+    // assertion Task 36's wire tests are shaped on, one layer up.
+    const submission = script.calls.find(
+      (call) =>
+        call.command === 'service_fetch' &&
+        String(call.args['path']).endsWith('/agents/studio/cnv_1'),
+    )
+    const init = submission?.args['init']
+    const body = isRecord(init) && typeof init['body'] === 'string' ? init['body'] : ''
+    expect(JSON.parse(body)).toEqual({
+      message: 'watch this one',
+      modelId: SETTINGS.modelId,
+      reasoningLevel: SETTINGS.reasoningLevel,
     })
   })
 
@@ -196,7 +217,7 @@ describe('what the receipt licenses the page to say', () => {
     const rendered = mount({ script, channels })
     await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
 
-    await rendered.result.current.submit('watch this one')
+    await rendered.result.current.submit('watch this one', SETTINGS)
     await waitFor(() => expect(channels.feeds.length).toBe(2))
     act(() => {
       channels.feeds[1]({ kind: 'up-to-date', offset: '9_4' })
@@ -216,7 +237,7 @@ describe('what the receipt licenses the page to say', () => {
     const rendered = mount({ script, channels })
     await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
 
-    await rendered.result.current.submit('watch this one')
+    await rendered.result.current.submit('watch this one', SETTINGS)
     await waitFor(() => expect(channels.feeds.length).toBe(2))
     act(() => {
       channels.feeds[1](
@@ -241,7 +262,7 @@ describe('what the receipt licenses the page to say', () => {
     const rendered = mount({ script, channels })
     await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2']))
 
-    await rendered.result.current.submit('never mind')
+    await rendered.result.current.submit('never mind', SETTINGS)
     await waitFor(() => expect(channels.feeds.length).toBe(2))
     act(() => {
       channels.feeds[1](
@@ -268,7 +289,7 @@ describe('what the receipt licenses the page to say', () => {
       })
       let receipt: { ok: boolean } = { ok: false }
       await act(async () => {
-        receipt = await rendered.result.current.submit('watch this one')
+        receipt = await rendered.result.current.submit('watch this one', SETTINGS)
       })
       expect(receipt.ok).toBe(true)
       expect(rendered.result.current.phase.status).toBe('submitted')

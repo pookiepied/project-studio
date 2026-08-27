@@ -51,6 +51,9 @@ function composeApp(clientType: "studio-host" | "studio-client") {
       list: () => [],
     } as unknown as ProjectStore,
     admission: session.verifier,
+    // No submission in this suite carries turn settings; "nothing is served"
+    // is the honest answer for the one check the middleware makes.
+    isModelServed: async () => false,
     // A stand-in for "the process began its drain": the real one never returns
     // before exit, and a test that called it would end the test runner.
     requestShutdown: () => {

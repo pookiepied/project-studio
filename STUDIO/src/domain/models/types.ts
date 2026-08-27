@@ -1,68 +1,34 @@
-import type { ProviderId } from '@/components/icons'
-
 /**
- * What a model can be asked to do.
+ * The reasoning vocabulary - the one place it is declared.
  *
- * Capabilities are declared rather than inferred from the slug, because the
- * composer disables controls from them — a picker that offers vision to a
- * text-only model is a failure the user only discovers after sending.
- */
-type Capability = 'text' | 'vision' | 'tools' | 'reasoning'
-
-export interface Model {
-  readonly id: string
-  readonly providerId: ProviderId
-  /** What the user sees. */
-  readonly name: string
-  /** What the API is called, and what a custom provider asks for. */
-  readonly slug: string
-  readonly capabilities: readonly Capability[]
-  /** One line, shown under the name. Says what it is for, not what it is. */
-  readonly note: string
-  /**
-   * Tokens the model can hold. Declared per model rather than assumed, because
-   * the meter is meaningless if every model is measured against one number.
-   */
-  readonly contextWindow: number
-}
-
-export interface Provider {
-  readonly id: ProviderId
-  readonly name: string
-  /** Which wire format the endpoint speaks. */
-  readonly compatibility: Compatibility
-  /** Absent for the built-ins, set when someone adds their own endpoint. */
-  readonly baseUrl?: string
-  readonly custom: boolean
-}
-
-/**
- * The wire formats a custom provider may declare.
+ * `REASONING_LEVELS` mirrors Pi's `ThinkingLevel` union (which the harness
+ * contract re-exports), so what the composer shows is what the runtime can
+ * ask for: six levels, of which `xhigh` and `max` only ever reach a request
+ * for models whose provider names them. The old webview list had five values
+ * and no `xhigh`; two spellings of one concept is how "the UI said max, the
+ * wire said something else" starts, so the reconciliation lives here.
  *
- * Four, because these are the four the harness can actually speak. Offering a
- * fifth in the UI would be offering a choice that fails at the first request.
+ * `default` is a real value beside the levels, not one of them and not their
+ * absence: it means the provider's own behaviour. A model with no reasoning
+ * support offers no levels at all, and the control is absent rather than
+ * present and inert - so "off" is not a choice either; it is what the run
+ * does for an unasked level, and no control offers it.
  */
-export const COMPATIBILITIES = [
-  { id: 'openai-chat', name: 'OpenAI (chat completions)' },
-  { id: 'openai-responses', name: 'OpenAI (responses)' },
-  { id: 'anthropic', name: 'Anthropic (messages)' },
-  { id: 'google', name: 'Google (generateContent)' },
-] as const
+export const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 
-export type Compatibility = (typeof COMPATIBILITIES)[number]['id']
+export type ReasoningLevel = (typeof REASONING_LEVELS)[number]
 
-/**
- * Reasoning effort.
- *
- * Steps, not a slider. A continuous control implies a precision the underlying
- * setting does not have and invites fiddling with a number nobody can evaluate.
- */
-export type Effort = 'minimal' | 'low' | 'medium' | 'high' | 'max'
+export const REASONING_CHOICES = ['default', ...REASONING_LEVELS] as const
 
-export const EFFORTS: readonly { id: Effort; name: string; note: string }[] = [
-  { id: 'minimal', name: 'Minimal', note: 'Answer straight away.' },
-  { id: 'low', name: 'Low', note: 'A moment of thought.' },
-  { id: 'medium', name: 'Medium', note: 'The everyday balance.' },
-  { id: 'high', name: 'High', note: 'Work the problem through.' },
-  { id: 'max', name: 'Max', note: 'Take as long as it needs.' },
-]
+export type ReasoningChoice = 'default' | ReasoningLevel
+
+/** Display copy for a level, shown in the reasoning control. */
+export const REASONING_LEVEL_NOTES: readonly { id: ReasoningLevel; name: string; note: string }[] =
+  [
+    { id: 'minimal', name: 'Minimal', note: 'Answer straight away.' },
+    { id: 'low', name: 'Low', note: 'A moment of thought.' },
+    { id: 'medium', name: 'Medium', note: 'The everyday balance.' },
+    { id: 'high', name: 'High', note: 'Work the problem through.' },
+    { id: 'xhigh', name: 'X-high', note: 'Think harder than high.' },
+    { id: 'max', name: 'Max', note: 'Take as long as it needs.' },
+  ]

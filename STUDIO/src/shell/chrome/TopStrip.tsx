@@ -7,6 +7,8 @@ import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useNavigation } from '@/stores/navigation'
 import { contextUsage } from '@/domain/session/context'
+import { effectiveTurnSettings } from '@/domain/session/settings'
+import { findCatalogModel } from '@/domain/models/catalog'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
@@ -26,7 +28,7 @@ import { useWorkspace } from '@/stores/workspace'
  */
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations, settings } = useWorkspace()
+  const { conversations, settings, catalog } = useWorkspace()
 
   const conversation =
     route.kind === 'chat'
@@ -35,6 +37,12 @@ export function TopStrip() {
 
   /** Every surface that carries a composer, which is every surface but one. */
   const turnSettings = route.kind !== 'settings'
+
+  // The meter is measured against the model the conversation is actually held
+  // with - the same derivation the picker shows and the send uses - so a
+  // model with a small window does not borrow a big one's scale.
+  const effective = effectiveTurnSettings(conversation, settings)
+  const model = findCatalogModel(catalog.models, effective.modelId)
 
   return (
     <header
@@ -54,7 +62,9 @@ export function TopStrip() {
           <Icons.sidebar size="md" />
         </IconButton>
 
-        {conversation ? <ContextMeter used={contextUsage(conversation, settings.modelId)} /> : null}
+        {conversation ? (
+          <ContextMeter used={contextUsage(conversation, model?.contextWindow ?? null)} />
+        ) : null}
       </div>
 
       {/* Centred on the page, not on the window. The identity names the

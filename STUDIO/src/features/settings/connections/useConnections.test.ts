@@ -60,7 +60,8 @@ function refuse(): Promise<{ ok: false; error: HarnessFailure }> {
 /**
  * Every conversation/project method of `HarnessClient`, stubbed to fail. This
  * pane does not touch the index surface; if one ever fires here the suite is
- * testing more than it says.
+ * testing more than it says. `getDefaults` rides the provider surface but this
+ * pane does not read it either, so it refuses the same way.
  */
 function unreachableIndexStubs() {
   return {
@@ -76,6 +77,7 @@ function unreachableIndexStubs() {
     addProjectFolder: () => refuse(),
     updateProjectFolder: () => refuse(),
     removeProjectFolder: () => refuse(),
+    getDefaults: () => refuse(),
   }
 }
 

@@ -1,3 +1,7 @@
+import * as v from "valibot";
+
+import { modelIdSchema, reasoningChoiceSchema } from "./models.js";
+
 /**
  * Agent identity.
  *
@@ -17,3 +21,27 @@
  * identical behaviour, so nothing would catch the confusion returning.
  */
 export const STUDIO_AGENT_ID = "studio";
+
+/**
+ * The turn settings a submission may carry beside its message.
+ *
+ * A submission body cannot carry these through to the run: Flue parses every
+ * direct payload through `DirectAgentPayloadSchema` (`message` and `images`,
+ * unknown keys stripped), and the agent initializer receives only `{ id, env }`.
+ * These two fields are therefore consumed at our own admission boundary - the
+ * middleware in `transport/http/middleware/turn-settings.ts` reads them, writes
+ * them to the conversation index, and lets Flue strip them - so the durable
+ * row is settled BEFORE the run's initializer reads it. Neither field is
+ * required: absent means the conversation's stored settings stand.
+ *
+ * `modelId` is the local runtime's `<provider>/<model>` reference, the same
+ * vocabulary the conversation index stores and the run initializer resolves.
+ * `reasoningLevel` is a level or "default"; "default" means the provider's own
+ * behaviour and is stored verbatim rather than folded into a synonym.
+ */
+export const submissionTurnSettingsSchema = v.object({
+  modelId: v.optional(v.nullable(modelIdSchema)),
+  reasoningLevel: v.optional(v.nullable(reasoningChoiceSchema)),
+});
+
+export type SubmissionTurnSettings = v.InferOutput<typeof submissionTurnSettingsSchema>;

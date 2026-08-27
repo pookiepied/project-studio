@@ -1,4 +1,4 @@
-import type { Effort } from '@/domain/models/types'
+import type { ReasoningChoice } from '@/domain/models/types'
 import type { PermissionMode } from '@/domain/permissions/modes'
 
 type Role = 'user' | 'assistant'
@@ -41,13 +41,30 @@ export interface Conversation {
   readonly updatedAt: number
   readonly pinned: boolean
   readonly archived: boolean
+  /**
+   * The model this conversation is held with, in the runtime's own
+   * `<provider>/<model>` vocabulary; null for the stable default. Mapped from
+   * the index so the picker restores the choice on reopening instead of
+   * resetting to the default.
+   */
+  readonly modelId: string | null
+  /** The reasoning choice it is held with; null is the same state as "default". */
+  readonly reasoningLevel: ReasoningChoice | null
 }
 
 /** What the session is doing. Drives the mark, the send button, and the composer. */
 export type SessionStatus = 'idle' | 'thinking' | 'streaming'
 
+/**
+ * What a turn is sent with.
+ *
+ * `modelId` is the runtime reference or null for the stable default; the
+ * conversation index settles it at admission, and the harness refuses a model
+ * nothing serves before creating anything. `reasoningLevel` carries "default"
+ * or one of the model's levels. Permission modes are Task 40's.
+ */
 export interface TurnSettings {
-  readonly modelId: string
-  readonly effort: Effort
+  readonly modelId: string | null
+  readonly reasoningLevel: ReasoningChoice
   readonly permission: PermissionMode
 }

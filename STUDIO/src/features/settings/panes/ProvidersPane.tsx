@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Icons, ProviderMark } from '@/components/icons'
 import { Button, MenuItem, MenuSeparator, Popover } from '@/components/primitives'
-import { MODELS, PROVIDERS } from '@/domain/models/catalog'
 import type { HarnessFailure, ProviderConnection, ProviderModel } from '@/platform/harness'
 import { Pane } from '@/features/settings/panes/Pane'
 import {
@@ -68,7 +67,7 @@ function PaneBody({ connections }: { connections: Connections }) {
     return <p className="py-4 text-ui text-muted-foreground">Reading connections...</p>
   }
 
-  if (view.status === 'no-harness') return <BuiltInCatalog />
+  if (view.status === 'no-harness') return <NoHarness />
 
   if (view.status === 'failed') {
     return <LoadFailure error={view.error} onRetry={() => void connections.refresh()} />
@@ -84,37 +83,22 @@ function PaneBody({ connections }: { connections: Connections }) {
 }
 
 /**
- * The offline catalog: six vendors and their model counts, from fixtures.
+ * No harness, and no pretence of a catalog.
  *
- * Kept because it is the honest answer to "what can this app talk to" when
- * nothing is running behind it, and because it is what every other part of the
- * app is still driven by. It gains no controls — there is nothing to enable,
- * nothing to probe, and no credential to report — and that inertness is the
- * visual difference from a real connection.
+ * The pane used to fall back to a fixture list of six vendors and their model
+ * counts. Rows that look like connections but hold no key, serve no models,
+ * and answer no probe are a fixture wearing the product's clothes; a person
+ * meeting them on a fresh install would have to work out that none of it was
+ * real. What is true is one line: nothing is running yet.
  */
-function BuiltInCatalog() {
+function NoHarness() {
   return (
     <>
-      {PROVIDERS.map((provider) => {
-        const count = MODELS.filter((model) => model.providerId === provider.id).length
-        return (
-          <div key={provider.id} className="flex items-center gap-2.5 py-3">
-            <span className="flex size-7 items-center justify-center rounded-md bg-selected text-foreground">
-              <ProviderMark provider={provider.id} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-ui text-foreground">{provider.name}</p>
-              <p className="text-caption text-muted-foreground">
-                Built in - {count} {count === 1 ? 'model' : 'models'}
-              </p>
-            </div>
-          </div>
-        )
-      })}
-
-      <p className="py-3 text-caption text-muted-foreground">
-        These are the built-in defaults. No harness is connected, so there is nothing to add or
-        change here yet.
+      <p className="py-4 text-ui text-muted-foreground">
+        No harness is connected, so there are no connections or models to list yet.
+      </p>
+      <p className="py-1 text-caption text-muted-foreground">
+        Start Studio's harness to manage providers and pick models here.
       </p>
     </>
   )

@@ -521,6 +521,26 @@ export const MIGRATIONS: readonly Migration[] = [
           WHERE project_id IS NOT NULL;
       `);
     },
+  },
+  {
+    version: 15,
+    name: "conversation_reasoning_level",
+    up(db) {
+      // The level of reasoning a conversation is held with, beside the model
+      // column migration 14 added for exactly this moment. Migration 14 could
+      // not have carried this one: Task 36 had only just established that a
+      // reasoning request reached the request at all, and the choice - which
+      // of the levels, or the provider's own default - is a separate fact from
+      // which model answers, with a different lifecycle (it is per model, so
+      // the two are picked together but stored apart).
+      //
+      // Nullable on purpose: null and "default" both arrive, and both mean the
+      // same thing - no level asked for, the provider's own behaviour. Rows
+      // written before this column existed are null and are read as default;
+      // nothing is backfilled, because a backfill would rewrite a fact the
+      // user never stated.
+      db.exec("ALTER TABLE conversation ADD COLUMN reasoning_level TEXT");
+    },
   },];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

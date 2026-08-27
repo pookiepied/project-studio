@@ -61,6 +61,13 @@ export interface ProviderAdministration {
   probeConnection(id: string, auth: AuthContext): Promise<ProbeResult>;
 
   listModels(filter?: ProviderModelFilter): Promise<readonly ProviderModel[]>;
+  /**
+   * The model references the catalog currently serves, in the run's own
+   * `<provider>/<model>` vocabulary - the set a submission's chosen model is
+   * settled against at admission. Served by the catalog, which owns both the
+   * connection records and the model list this is derived from.
+   */
+  servedModelReferences(): Promise<ReadonlySet<string>>;
   addManualModel(
     connectionId: string,
     model: ManualModelInput,
@@ -170,6 +177,10 @@ export class ProviderManagementService implements ProviderAdministration {
     filter?: ProviderModelFilter,
   ): Promise<readonly ProviderModel[]> {
     return this.#catalog.listModels(filter);
+  }
+
+  servedModelReferences(): Promise<ReadonlySet<string>> {
+    return this.#catalog.servedModelReferences();
   }
 
   addManualModel(

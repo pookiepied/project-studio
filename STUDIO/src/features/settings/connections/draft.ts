@@ -5,24 +5,19 @@ import type { LanguageProtocol } from '@/platform/harness'
  *
  * ---- Two spellings of one list (FE-05) -------------------------------------
  *
- * `domain/models/types.ts` has `COMPATIBILITIES`, four wire formats written
- * for the offline catalog. `platform/harness/contracts.ts` has
- * `LANGUAGE_PROTOCOLS`, the four the harness actually branches on. They are
- * the same four things under different names, and only one of the four names
- * matches:
+ * `domain/models/types.ts` used to carry `COMPATIBILITIES`, four wire formats
+ * written for the offline catalog; that catalog is gone, and with it the
+ * second list. `platform/harness/contracts.ts` has `LANGUAGE_PROTOCOLS`, the
+ * four the harness actually branches on, and they are the only spelling left:
  *
- *   COMPATIBILITIES      LANGUAGE_PROTOCOLS
- *   openai-chat      ->  openai-completions
- *   openai-responses ->  openai-responses      (the only literal match)
- *   anthropic        ->  anthropic-messages
- *   google           ->  google-generative-ai
+ *   openai-completions
+ *   openai-responses
+ *   anthropic-messages
+ *   google-generative-ai
  *
  * No translation table is written here, and that is deliberate. A mapping
- * between them would be a fifth thing to keep in step, and it would imply the
- * two lists are allowed to keep diverging. What gets SENT is the harness
- * union, full stop — this file names it directly and `COMPATIBILITIES` is not
- * imported. The offline catalog keeps its own spelling because it describes
- * fixture rows that never reach the wire.
+ * between two lists would be a fifth thing to keep in step. What gets SENT is
+ * the harness union, full stop — this file names it directly.
  *
  * ---- Language only ---------------------------------------------------------
  *

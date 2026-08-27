@@ -186,6 +186,21 @@ export interface SubmittedTurn {
   readonly offset: string
 }
 
+/**
+ * The settings a turn is sent with, beside its words.
+ *
+ * A submission body cannot carry these through Flue - its payload schema is
+ * `message` and images, unknown keys stripped - so they are consumed at the
+ * harness's own admission boundary and settled into the conversation index
+ * before the run's initializer reads them. `modelId` is the runtime reference
+ * in `<provider>/<model>` form, or null for the stable default; the reasoning
+ * choice is "default" or a level, never folded into a synonym.
+ */
+export interface TurnSettingsWire {
+  readonly modelId: string | null
+  readonly reasoningLevel: string
+}
+
 /* -------------------------------------------------------------------------- */
 /* Deliveries                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -284,8 +299,12 @@ export interface ConversationClient {
   lastOffset(): string | null
   /** Whether a read is currently attached; at most one ever is. */
   attached(): boolean
-  /** Submits one user turn and resolves with where its events begin. */
-  submitTurn(message: string): Promise<TurnResult<SubmittedTurn>>
+  /**
+   * Submits one user turn and resolves with where its events begin. The
+   * settings travel in the body; a model the harness cannot serve is refused
+   * at admission, before anything is created.
+   */
+  submitTurn(message: string, settings?: TurnSettingsWire): Promise<TurnResult<SubmittedTurn>>
   /**
    * Attaches a reader.
    *
@@ -378,11 +397,20 @@ export function createConversationClient(options: ConversationClientOptions): Co
       return active !== null
     },
 
-    async submitTurn(message) {
+    async submitTurn(message, settings) {
       // Never retried, here or above: an identical resend is a SECOND TURN
       // (the harness pins this behaviour in its own test), so a retry loop
       // would be duplication wearing a retry's clothes.
-      const sent = await request('POST', agentsPath(), JSON.stringify({ message }))
+      //
+      // The settings keys are the harness contract's own (`modelId`,
+      // `reasoningLevel`), spelled once there. Null modelId is omitted: absent
+      // means the conversation's settled state stands.
+      const wire = settings ?? { modelId: null, reasoningLevel: 'default' }
+      const sent = await request('POST', agentsPath(), JSON.stringify({
+        message,
+        ...(wire.modelId === null ? {} : { modelId: wire.modelId }),
+        reasoningLevel: wire.reasoningLevel,
+      }))
       if ('failure' in sent) return { ok: false, error: sent.failure }
 
       if (sent.status < 200 || sent.status >= 300) {

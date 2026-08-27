@@ -163,6 +163,9 @@ describe("Harness HTTP admission", () => {
         },
       } as unknown as ProjectStore,
       admission: session.verifier,
+      // No submission in this suite carries turn settings; "nothing is
+      // served" is the honest answer for the one check the middleware makes.
+      isModelServed: async () => false,
       // Never exercised here; required so the route cannot be mounted without
       // a way to actually stop the process.
       requestShutdown: () => undefined,

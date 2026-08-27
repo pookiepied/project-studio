@@ -115,7 +115,10 @@ describe('submitting a turn', () => {
     })
     const client = createConversationClient({ conversationId: CONVERSATION, invoke })
 
-    const result = await client.submitTurn('hello')
+    const result = await client.submitTurn('hello', {
+      modelId: 'google/gemini-3.5-flash',
+      reasoningLevel: 'high',
+    })
 
     expect(result).toEqual({ ok: true, value: { submissionId: 'sub_1', offset: '7_2' } })
     expect(calls).toHaveLength(1)
@@ -124,7 +127,25 @@ describe('submitting a turn', () => {
     expect(calls[0].args['path']).toBe(`/agents/studio/${CONVERSATION}`)
     const init = calls[0].args['init'] as { method: string; body: string }
     expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body)).toEqual({ message: 'hello' })
+    // The settings ride the same body as the words, spelled exactly as the
+    // harness contract names them.
+    expect(JSON.parse(init.body)).toEqual({
+      message: 'hello',
+      modelId: 'google/gemini-3.5-flash',
+      reasoningLevel: 'high',
+    })
+  })
+
+  it('omits the model key when the turn rides the default, and never sends a null', async () => {
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' })
+
+    const init = calls[0]?.args['init'] as { body: string }
+    expect(JSON.parse(init.body)).toEqual({ message: 'hello', reasoningLevel: 'default' })
   })
 
   it('keeps the harness refusal together with its status and its own sentence', async () => {

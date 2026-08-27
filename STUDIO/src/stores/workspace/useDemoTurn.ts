@@ -27,7 +27,8 @@ const LEAD_IN = 380
 type TurnPatch = (change: (conversation: Conversation) => Conversation) => void
 
 export interface TurnRun {
-  readonly modelId: string
+  /** The reference a real turn would carry; null is the harness's default. */
+  readonly modelId: string | null
   readonly patch: TurnPatch
   readonly onThinking: () => void
   readonly onStreaming: () => void
@@ -61,7 +62,7 @@ export function useDemoTurn() {
           id: assistantId,
           role: 'assistant',
           text: '',
-          modelId,
+          ...(modelId === null ? {} : { modelId }),
           createdAt: Date.now(),
           thinking: { text: '', seconds: 0 },
         }

@@ -5,7 +5,7 @@ import {
   getBuiltinProviders,
   type BuiltinProvider,
 } from "@earendil-works/pi-ai/providers/all";
-import type { Api, Model } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, type Api, type Model } from "@earendil-works/pi-ai";
 
 import {
   capabilitySlotSchema,
@@ -20,7 +20,9 @@ import {
   type ProviderModel,
 } from "../contracts/providers.js";
 import {
+  REASONING_LEVELS,
   type ModelCapability,
+  type ReasoningLevel,
   ProviderConfigurationError,
 } from "../contracts/models.js";
 import {
@@ -269,8 +271,35 @@ export class ModelCatalog {
     this.#deleteManual(connectionId, modelId);
   }
 
-  async getDefaults(): Promise<DefaultSelection> {
-    const models = this.#modelIndex(await this.listModels());
+  /**
+   * The model references the catalog currently serves, as the run names them:
+   * `<catalogProvider ?? connectionId>/<modelId>` per row.
+   *
+   * This is the same derivation the webview's picker applies to decide what a
+   * choice is worth, kept beside the catalog so the admission path can check a
+   * submission's model against the list the picker was filled from. Hidden
+   * rows are included: hiding is a display fact, not an unprovisioning.
+   */
+  async servedModelReferences(): Promise<ReadonlySet<string>> {
+    const [connections, models] = await Promise.all([
+      this.#connections.list(),
+      this.listModels(),
+    ]);
+    const vendors = new Map(
+      connections.map((connection) => [
+        connection.id,
+        connection.catalogProvider ?? connection.id,
+      ]),
+    );
+    const served = new Set<string>();
+    for (const model of models) {
+      const vendor = vendors.get(model.connectionId) ?? model.connectionId;
+      served.add(`${vendor}/${model.modelId}`);
+    }
+    return served;
+  }
+
+  async getDefaults(): Promise<DefaultSelection> {    const models = this.#modelIndex(await this.listModels());
     const selections: Record<string, unknown> = {};
 
     for (const row of this.#defaultRows()) {
@@ -750,11 +779,29 @@ function providerModelFromPi(
     modelId: model.id,
     displayName: model.name.length > 0 ? model.name : model.id,
     capability: capabilityFromPiModel(model),
+    reasoningLevels: reasoningLevelsFromPiModel(model),
     shape: "stream",
     pricing: pricingFromPiModel(model),
     hidden: false,
     origin,
   });
+}
+
+/**
+ * The reasoning levels one Pi model actually supports.
+ *
+ * Pi answers this itself (`getSupportedThinkingLevels`): "off" for a model
+ * that cannot reason, and otherwise every level except one the model's own
+ * `thinkingLevelMap` marks null - with `xhigh` and `max` present only where
+ * the map names them. "off" is dropped here rather than offered: the composer
+ * adds its own "default" choice, and a control offering both Default and Off
+ * would be two words for the same absence of a request.
+ */
+function reasoningLevelsFromPiModel(model: Model<Api>): readonly ReasoningLevel[] {
+  const known = new Set<string>(REASONING_LEVELS);
+  return getSupportedThinkingLevels(model).filter(
+    (level): level is ReasoningLevel => level !== "off" && known.has(level),
+  );
 }
 
 function pricingFromPiModel(model: Model<Api>): ModelPricing {

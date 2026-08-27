@@ -34,6 +34,13 @@ interface RecordedCall {
   readonly args: Record<string, unknown>
 }
 
+/**
+ * What every submit in this file sends beside its words. The settings are part
+ * of the submission contract now; these tests exercise the connection and
+ * phase machinery, so the default-shaped settings are what they carry.
+ */
+const SETTINGS = { modelId: null, reasoningLevel: 'default' } as const
+
 function scriptedInvoke(script: {
   [command: string]: (args: Record<string, unknown>) => unknown
 }): { invoke: ServiceInvoke; calls: RecordedCall[] } {
@@ -672,7 +679,7 @@ describe('a refused submission has somewhere to land', () => {
     const lifecycle = manualLifecycle()
     const rendered = await mountReady(streams.invoke, streams.calls, channels.factory, lifecycle.listen)
 
-    const receipt = await rendered.result.current.submit('please answer')
+    const receipt = await rendered.result.current.submit('please answer', SETTINGS)
     expect(receipt.ok).toBe(false)
     if (receipt.ok) throw new Error('unreachable')
     expect(receipt.error).toEqual({
@@ -716,7 +723,7 @@ describe('a refused submission has somewhere to land', () => {
       }),
     )
 
-    await rendered.result.current.submit('a second message')
+    await rendered.result.current.submit('a second message', SETTINGS)
     expect(rendered.result.current.phase.status).toBe('streaming')
     await waitFor(() => expect(rendered.result.current.refused?.kind).toBe('refused'))
   })
@@ -737,11 +744,11 @@ describe('a refused submission has somewhere to land', () => {
     })
     await waitFor(() => expect(streamCount(streams)).toBeGreaterThan(0))
 
-    await rendered.result.current.submit('first try')
+    await rendered.result.current.submit('first try', SETTINGS)
     await waitFor(() => expect(rendered.result.current.refused?.kind).toBe('refused'))
 
     mode.reject = false
-    await rendered.result.current.submit('second try')
+    await rendered.result.current.submit('second try', SETTINGS)
     await waitFor(() => expect(rendered.result.current.refused).toBeNull())
   })
 
@@ -755,7 +762,7 @@ describe('a refused submission has somewhere to land', () => {
     )
     await waitFor(() => expect(rendered.result.current.phase).toEqual({ status: 'no-harness' }))
 
-    const receipt = await rendered.result.current.submit('anyone there?')
+    const receipt = await rendered.result.current.submit('anyone there?', SETTINGS)
     expect(receipt.ok).toBe(false)
     // Whatever sentence the seam produced, the phase already owns this
     // diagnosis permanently — so nothing may land beside it.
@@ -960,7 +967,7 @@ describe('the delivery a submission owes its turn', () => {
     // The mount attach finds no stream: connected, quiet, ready.
     await waitFor(() => expect(rendered.result.current.phase).toEqual({ status: 'idle' }))
 
-    const receipt = await rendered.result.current.submit('watch this one')
+    const receipt = await rendered.result.current.submit('watch this one', SETTINGS)
     expect(receipt.ok).toBe(true)
 
     await waitFor(() => expect(script.streamOffsets()).toEqual(['9_4']))
@@ -988,7 +995,7 @@ describe('the delivery a submission owes its turn', () => {
     })
     await waitFor(() => expect(rendered.result.current.phase.status).toBe('live'))
 
-    const receipt = await rendered.result.current.submit('watch this one')
+    const receipt = await rendered.result.current.submit('watch this one', SETTINGS)
     expect(receipt.ok).toBe(true)
     await waitFor(() => expect(script.streamOffsets()).toEqual(['4_2', '9_4']))
 

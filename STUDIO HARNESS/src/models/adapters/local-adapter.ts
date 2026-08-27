@@ -171,13 +171,16 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
   }
 
   readonly stream = (
-    _model: Model<Api>,
+    alias: Model<Api>,
     context: Context,
     options?: SimpleStreamOptions,
   ): AssistantMessageEventStream => {
     // The incoming model is the alias placeholder; the real one comes from
-    // configuration. Delegation hands Pi both the model and the auth for it.
-    const target = this.assertTargetResolvable();
+    // configuration, or - when the conversation's run named one - from the
+    // alias's own id, which carries the `<provider>/<model>` reference the
+    // conversation index stores. Delegation hands Pi the model and the auth
+    // for it.
+    const target = this.#resolveTarget(alias);
     // `streamSimple`, not `stream`: the options crossing this boundary are
     // protocol-independent, because the alias is not a real wire protocol and
     // nothing upstream knows which one the target speaks. Only `streamSimple`
@@ -187,4 +190,36 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     // model reasoned invisibly: the request never asked for the trace.
     return this.#runtime.models.streamSimple(target, context, options);
   };
+
+  /**
+   * The model a request actually goes to.
+   *
+   * The alias's `default` id is the stable route to the configured default.
+   * Anything else is a reference a conversation settled on, and it is honoured
+   * exactly or not at all: falling back to the default here would be the
+   * picker changing nothing about the request, wearing a quieter shape. An
+   * unresolvable reference is a configuration error naming what to check.
+   */
+  #resolveTarget(alias: Model<Api>): Model<Api> {
+    if (alias.id === DEFAULT_MODEL_NAME) {
+      return this.assertTargetResolvable();
+    }
+
+    const separator = alias.id.indexOf("/");
+    if (separator <= 0) {
+      throw new ProviderConfigurationError(
+        `The conversation's model "${alias.id}" is not a "<provider>/<model>" reference.`,
+      );
+    }
+    const target = this.#runtime.models.getModel(
+      alias.id.slice(0, separator),
+      alias.id.slice(separator + 1),
+    );
+    if (!target) {
+      throw new ProviderConfigurationError(
+        `The conversation's model "${alias.id}" is not available. Connect its provider or pick another model.`,
+      );
+    }
+    return target;
+  }
 }

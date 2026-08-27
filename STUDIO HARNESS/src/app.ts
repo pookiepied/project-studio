@@ -185,6 +185,12 @@ function createHarnessApplication(): HarnessApplication {
       conversations,
       projects,
       admission: admission.verifier,
+      // The same list the model picker is filled from: a submission's model
+      // reference is settled against it at admission, so a choice the catalog
+      // no longer serves is refused with a reason instead of dying later
+      // inside the run.
+      isModelServed: async (modelId) =>
+        (await providers.servedModelReferences()).has(modelId),
       // The same drain the signal handlers run, reached over HTTP because the
       // Host has no deliverable signal on Windows (see the route module). The
       // response goes out first: `requestShutdown` only starts the async drain,

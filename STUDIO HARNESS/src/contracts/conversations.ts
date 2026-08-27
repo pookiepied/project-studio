@@ -1,5 +1,7 @@
 import * as v from "valibot";
 
+import { reasoningChoiceSchema } from "./models.js";
+
 /**
  * The conversation index contract.
  *
@@ -10,10 +12,14 @@ import * as v from "valibot";
  * a stream disagreeing about text is not a state this schema can even
  * represent.
  *
- * `modelId` names the model the last turn was taken with, or null while
- * nothing has recorded one. No submission carries a model today; the column
- * exists because a conversation that cannot remember which model it was
- * talking to would otherwise demand a migration the moment one could.
+ * `modelId` names the model the conversation is held with, in the local
+ * runtime's own `<provider>/<model>` vocabulary, or null for the stable
+ * default alias. It is written when a turn carrying a model is admitted, and
+ * read when a conversation is reopened, so the picker restores the choice
+ * rather than resetting to the default. `reasoningLevel` is the same fact for
+ * the reasoning effort: a level, "default", or null - null and "default" are
+ * the same state, kept distinct on the wire only so a choice is never turned
+ * into an absence by a parser.
  */
 
 export const conversationIdSchema = v.pipe(v.string(), v.minLength(1));
@@ -41,6 +47,7 @@ export const conversationRecordSchema = v.object({
   pinned: v.boolean(),
   archived: v.boolean(),
   modelId: v.nullable(v.pipe(v.string(), v.minLength(1))),
+  reasoningLevel: v.nullable(reasoningChoiceSchema),
   createdAt: v.number(),
   lastTurnAt: v.number(),
 });
@@ -55,26 +62,40 @@ export type ConversationRecord = v.InferOutput<typeof conversationRecordSchema>;
  * before a harness has taken the turn, so a refused first send creates no row,
  * no sidebar entry, and no navigation. `firstMessage` is what the title is
  * derived from once, unless the caller says the title is already named.
+ *
+ * `modelId` and `reasoningLevel` record the settings the first turn was sent
+ * with. They are normally written by the turn-settings middleware at
+ * admission, before the run's initializer reads them; a create call carrying
+ * them lands on an existing row through this schema and is the same write.
  */
 export const conversationCreateSchema = v.object({
   id: conversationIdSchema,
   firstMessage: v.pipe(v.string(), v.minLength(1)),
   projectId: v.optional(v.nullable(conversationIdSchema)),
+  modelId: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
+  reasoningLevel: v.optional(v.nullable(reasoningChoiceSchema)),
   createdAt: v.optional(v.number()),
 });
 
 export type ConversationCreateInput = v.InferInput<typeof conversationCreateSchema>;
 
 /**
- * Everything a rename, pin, archive, or filing change means. Absent keys are
- * left alone; `projectId` distinguishes absence from clearing with null, the
+ * Everything a rename, pin, archive, filing change, or later-turn stamp changes.
+ * Absent keys are left alone; `projectId` distinguishes absence from clearing with null, the
  * same convention the provider connection patch uses.
+ *
+ * `modelId` and `reasoningLevel` settle the conversation's settings before any
+ * turn runs. null clears the model back to the stable default alias - the
+ * picker's "Studio default" row is that write - and a level choice replaces
+ * whatever was stored, "default" included.
  */
 export const conversationPatchSchema = v.object({
   title: v.optional(v.pipe(v.string(), v.minLength(1))),
   pinned: v.optional(v.boolean()),
   archived: v.optional(v.boolean()),
   projectId: v.optional(v.nullable(conversationIdSchema)),
+  modelId: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
+  reasoningLevel: v.optional(v.nullable(reasoningChoiceSchema)),
   lastTurnAt: v.optional(v.number()),
 });
 

@@ -69,6 +69,9 @@ const { useConversationTranscript } = await import('@/features/chat/useConversat
 
 const WORDS = 'what did you make of it?'
 
+/** What every send here carries: the default-shaped settings. */
+const SETTINGS = { modelId: null, reasoningLevel: 'default' } as const
+
 function admits(submissionId: string) {
   return async () => ({ ok: true as const, value: { submissionId } })
 }
@@ -107,7 +110,7 @@ describe('a message between the composer and the log', () => {
     const view = renderHook(() => useConversationTranscript('cnv_1'))
 
     await act(async () => {
-      await view.result.current.submit(WORDS)
+      await view.result.current.submit(WORDS, SETTINGS)
     })
 
     expect(view.result.current.pending).toEqual({
@@ -126,7 +129,7 @@ describe('a message between the composer and the log', () => {
     const view = renderHook(() => useConversationTranscript('cnv_1'))
 
     await act(async () => {
-      await view.result.current.submit(WORDS)
+      await view.result.current.submit(WORDS, SETTINGS)
     })
 
     expect(view.result.current.pending).toBeNull()
@@ -137,7 +140,7 @@ describe('a message between the composer and the log', () => {
     const view = renderHook(() => useConversationTranscript('cnv_1'))
 
     await act(async () => {
-      await view.result.current.submit(WORDS)
+      await view.result.current.submit(WORDS, SETTINGS)
     })
     act(() => {
       connection.deliver({ kind: 'chunks', replaying: false, chunks: echo('sub_1', WORDS) })
@@ -189,7 +192,7 @@ describe('a conversation opened by its own first turn', () => {
       initialProps: 'cnv_1',
     })
     await act(async () => {
-      await view.result.current.submit(WORDS)
+      await view.result.current.submit(WORDS, SETTINGS)
     })
     act(() => {
       connection.deliver({ kind: 'chunks', replaying: false, chunks: echo('sub_1', WORDS) })

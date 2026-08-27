@@ -8,7 +8,12 @@ import {
   ensureDirectory,
 } from "../platform/paths.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
-import { STUDIO_MODEL_ID } from "../contracts/models.js";
+import {
+  DEFAULT_MODEL_PROVIDER,
+  reasoningChoiceOr,
+  runThinkingLevelForChoice,
+  STUDIO_MODEL_ID,
+} from "../contracts/models.js";
 
 export const route: AgentRouteHandler = async (_context, next) => next();
 
@@ -38,6 +43,21 @@ export const route: AgentRouteHandler = async (_context, next) => next();
  * A conversation belonging to a project will resolve its roots from the project
  * store here rather than take this tree. The shape is ready for that:
  * `createAgentSandbox` already accepts both arguments per call.
+ *
+ * ---- Where the model comes from -------------------------------------------
+ *
+ * The model and reasoning level a person picked are read from the conversation
+ * index, once per run, right here. A submission cannot carry them: Flue parses
+ * the payload down to `message` and images, and this initializer receives only
+ * `{ id }` - so the durable row, settled by the turn-settings middleware before
+ * the run was admitted, is the only channel that exists. The reference is in
+ * the local runtime's own `<provider>/<model>` vocabulary; prefixed with the
+ * studio provider it becomes the specifier Flue resolves, whose id the local
+ * adapter parses back out to route the request at the named model.
+ *
+ * An unset model stays the stable alias, which routes to the harness's own
+ * default. A run already in flight keeps the model its initializer resolved;
+ * a change takes effect from the next run.
  */
 export default defineAgent(async ({ id }) => {
   const runtime = getStudioRuntime();
@@ -49,9 +69,22 @@ export default defineAgent(async ({ id }) => {
   ensureDirectory(conversationArtifactsDirectory(id));
   const workspace = conversationWorkspaceDirectory(id);
 
+  const settings = runtime.conversationTurnSettings(id);
+  const model =
+    settings.modelId === null
+      ? STUDIO_MODEL_ID
+      : `${DEFAULT_MODEL_PROVIDER}/${settings.modelId}`;
+  // "default" and an unset level both mean the provider's own behaviour; the
+  // mapping turns them into the run's "no explicit effort" rather than letting
+  // a substitute decide the level for the person who did not choose one.
+  const thinkingLevel = runThinkingLevelForChoice(
+    reasoningChoiceOr(settings.reasoningLevel),
+  );
+
   return {
     description: "Project Studio's local-first general agent.",
-    model: STUDIO_MODEL_ID,
+    model,
+    thinkingLevel,
     cwd: workspace,
     instructions: "Help the user complete work accurately.",
     // `id` is the agent *instance* — one per conversation thread, measured

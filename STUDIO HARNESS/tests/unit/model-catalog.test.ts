@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+
 import {
   type ProviderConnectionDraft,
 } from "../../src/contracts/providers.js";
@@ -369,5 +372,52 @@ describe("provider model catalog", () => {
     await connections.add(MEDIA);
 
     expect(await catalog.listModels({ connectionId: "images" })).toEqual([]);
+  });
+
+  // Task 38: the reasoning levels a composer may offer are the model's own
+  // answer, not a fixed list. Pi derives them from `reasoning` and
+  // `thinkingLevelMap`; "off" is the composer's "default" and is never
+  // returned as a level.
+  it("derives reasoning levels from the model's own record", async () => {
+    await connections.add(OPENAI);
+    const models = await catalog.listModels({ connectionId: "work-openai" });
+    const reasoning = models.filter((model) => model.capability.reasoning === "supported");
+    const mute = models.filter((model) => model.capability.reasoning === "unsupported");
+
+    expect(reasoning.length).toBeGreaterThan(0);
+    expect(mute.length).toBeGreaterThan(0);
+
+    // A model that cannot reason offers no levels at all, so the control can
+    // be absent rather than present and inert.
+    expect(mute.every((model) => model.reasoningLevels.length === 0)).toBe(true);
+
+    // Every reasoning model's levels agree with Pi's own supported list for
+    // that model, minus "off" - including which models carry xhigh or max.
+    const piById = new Map(
+      getBuiltinModels("openai").map((model) => [model.id, model]),
+    );
+    for (const model of reasoning) {
+      const pi = piById.get(model.modelId);
+      if (pi === undefined) continue;
+      const expected = getSupportedThinkingLevels(pi).filter((level) => level !== "off");
+      expect(model.reasoningLevels).toEqual(expected);
+    }
+    expect(reasoning.some((model) => model.reasoningLevels.includes("max"))).toBe(true);
+  });
+
+  it("answers the served references a submission's model is settled against", async () => {
+    await connections.add(OPENAI);
+    const models = await catalog.listModels({ connectionId: "work-openai" });
+    const first = models[0];
+    if (first === undefined) {
+      throw new ProviderConfigurationError("The builtin test catalog is empty.");
+    }
+
+    const served = await catalog.servedModelReferences();
+
+    // The reference is the vendor the catalog draws from, not the user's own
+    // connection name - the same vocabulary the run resolves.
+    expect(served.has(`openai/${first.modelId}`)).toBe(true);
+    expect(served.has(`work-openai/${first.modelId}`)).toBe(false);
   });
 });

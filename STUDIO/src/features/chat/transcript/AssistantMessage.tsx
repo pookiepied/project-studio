@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
-import { findModel } from '@/domain/models/catalog'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
@@ -30,7 +29,6 @@ export function AssistantMessage({
   onFork: () => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const model = message.modelId ? findModel(message.modelId) : undefined
   const shown = useSmoothText(message.text, streaming)
   const revealing = shown.length < message.text.length
 
@@ -88,11 +86,10 @@ export function AssistantMessage({
             { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: onFork },
             { id: 'read', label: 'Read aloud', icon: Icons.readAloud, run: () => undefined },
           ]}
-          // Inside the row, not beside it. As a sibling it missed the row's top
-          // margin and floated 12px above the buttons it names.
-          trailing={
-            model ? <span className="text-caption text-muted-foreground">{model.name}</span> : null
-          }
+          // No model name: this component now renders only the gallery's
+          // scripted replies, whose staged messages name no model, and the
+          // live transcript names its model nowhere by design.
+          trailing={null}
         />
     </div>
   )

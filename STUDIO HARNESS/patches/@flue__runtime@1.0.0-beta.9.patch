@@ -1,7 +1,7 @@
 diff --git a/dist/conversation-projections-XMug3C6A.mjs b/dist/conversation-projections-XMug3C6A.mjs
-index d05220033fe9d56662329e478c7ebc7db283f3ba..ded0dabe1facf4499af534b271431f534a2d6947 100644
+index d05220033fe9d56662329e478c7ebc7db283f3ba..a7abc2ad2aecff98ef8a3aa60a0a094be640cbcd 100644
 --- a/dist/conversation-projections-XMug3C6A.mjs
-+++ b/dist/conversation-projections-XMug3C6A.mjs
++++ b/dist/conversation-projections-XMug3C6A.mjs	
 @@ -4,6 +4,7 @@ import { C as DirectAgentPayloadSchema, a as isBufferedRunEvent, b as isUuid, f
  import * as v from "valibot";
  import { ulid } from "ulidx";
@@ -10,7 +10,30 @@ index d05220033fe9d56662329e478c7ebc7db283f3ba..ded0dabe1facf4499af534b271431f53
  //#region src/action.ts
  const definedActions = /* @__PURE__ */ new WeakSet();
  function defineAction(options) {
-@@ -2437,8 +2438,19 @@ function findTrailingPartialToolBatch(following) {
+@@ -81,12 +82,21 @@ function assertNonEmptyString$1(value, label) {
+ //#region src/agent-definition.ts
+ const agentDefinitions = /* @__PURE__ */ new WeakSet();
+ const VALID_THINKING_LEVELS = {
++	// [project-studio patch] "max" is a member of the ThinkingLevel union this
++	// bundle re-exports from pi-agent-core, and pi-ai honours it for models
++	// whose thinkingLevelMap names it (16 OpenRouter models and 6 Anthropic
++	// ones at beta.9's catalog). The runtime validation here predates it, so a
++	// level the type system allows and the provider supports was refused with
++	// "[flue] defineAgent() thinkingLevel must be one of..." at run start. If
++	// an upgrade renames this hash and the patch fails to apply, re-derive it
++	// from this comment -- do not drop "max" to make the check quiet.
+ 	off: true,
+ 	minimal: true,
+ 	low: true,
+ 	medium: true,
+ 	high: true,
+-	xhigh: true
++	xhigh: true,
++	max: true
+ };
+ const AgentProfileSchema = v.strictObject({
+ 	name: v.optional(v.string()),
+@@ -2437,8 +2447,19 @@ function findTrailingPartialToolBatch(following) {
  	};
  }
  function isRetryableModelError(message) {
@@ -35,7 +58,7 @@ index d05220033fe9d56662329e478c7ebc7db283f3ba..ded0dabe1facf4499af534b271431f53
 diff --git a/dist/conversation-stream-store-Bitz7UoW.mjs b/dist/conversation-stream-store-Bitz7UoW.mjs
 index 94032552cc83d3596ae6e53bd46ec6c9c9749b01..55f6bc09dac7afb55fb26394bb1c208761858281 100644
 --- a/dist/conversation-stream-store-Bitz7UoW.mjs
-+++ b/dist/conversation-stream-store-Bitz7UoW.mjs
++++ b/dist/conversation-stream-store-Bitz7UoW.mjs	
 @@ -2385,20 +2385,77 @@ var Session = class {
  		}
  	}
@@ -120,7 +143,7 @@ index 94032552cc83d3596ae6e53bd46ec6c9c9749b01..55f6bc09dac7afb55fb26394bb1c2087
 diff --git a/dist/flue-app-DweeRG3g.mjs b/dist/flue-app-DweeRG3g.mjs
 index c0cd7c7542ba19ee11b50a9cb5319eb519341288..9b5207abcc319a39ca73b24510c49a3987a71e4d 100644
 --- a/dist/flue-app-DweeRG3g.mjs
-+++ b/dist/flue-app-DweeRG3g.mjs
++++ b/dist/flue-app-DweeRG3g.mjs	
 @@ -157,6 +157,20 @@ function encodeRecord(record, conversationId, state) {
  			...record.usage ? { usage: record.usage } : {}
  		}];

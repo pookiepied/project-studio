@@ -30,8 +30,8 @@ export interface LegacyTurns {
 
 export function useDemoTurns(options: {
   readonly status: React.Dispatch<React.SetStateAction<SessionStatus>>
-  /** The model the turn is sent with, as of when it starts. */
-  readonly modelId: () => string
+  /** The model the turn is sent with, as of when it starts; null is the default. */
+  readonly modelId: () => string | null
   readonly markRunning: (conversationId: string, active: boolean) => void
   /** Finds a conversation as of this render; null when it does not exist. */
   readonly findConversation: (conversationId: string) => Conversation | undefined

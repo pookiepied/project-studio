@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { DEFAULT_MODEL_ID } from '@/domain/models/catalog'
+import type { CatalogModel } from '@/domain/models/catalog'
+import { catalogFrom } from '@/domain/models/catalog'
+import type { ReasoningChoice } from '@/domain/models/types'
 import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
 import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/session/gallery'
 import type { Conversation, SessionStatus, TurnSettings } from '@/domain/session/types'
@@ -18,8 +20,10 @@ import {
   createHarnessClient,
   resolveHarnessAddress,
   startHarness,
+  type DefaultSelection,
   type HarnessClient,
   type HarnessFailure,
+  type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
 import { useDemoTurns } from '@/stores/workspace/demo-turns'
@@ -50,9 +54,16 @@ import { newId } from '@/lib/id'
  *   so it never becomes a row in the harness's store either.
  * - The demo turn path (`demo-turns.ts`) keeps answering only for the gallery.
  */
+/**
+ * The resting turn settings. Null modelId is the harness's own default - the
+ * stable alias - which is why there is no model id here to invent, and
+ * "default" is the reasoning state of somebody who has not chosen a level.
+ * A second notion of "the default model" living in the webview is the same
+ * duplication Task 37 removed from titles.
+ */
 const DEFAULT_TURN_SETTINGS: TurnSettings = {
-  modelId: DEFAULT_MODEL_ID,
-  effort: 'medium',
+  modelId: null,
+  reasoningLevel: 'default',
   permission: DEFAULT_PERMISSION_MODE,
 }
 
@@ -70,6 +81,32 @@ export interface StorePhase {
   readonly error: HarnessFailure | null
 }
 
+/**
+ * The model catalog, loaded beside the index and failing beside itself: a
+ * catalog the harness will not serve must not blank the sidebar, and an index
+ * that failed must not hide the picker's state behind the sidebar's error.
+ */
+export interface CatalogPhase {
+  readonly status: 'loading' | 'ready' | 'no-harness' | 'failed'
+  readonly error: HarnessFailure | null
+}
+
+export interface ModelCatalogState {
+  readonly phase: CatalogPhase
+  readonly connections: readonly ProviderConnection[]
+  /** The picker's rows, mapped from the wire at the domain boundary. */
+  readonly models: readonly CatalogModel[]
+  /** The user's chosen defaults per slot; what the picker marks as default. */
+  readonly defaults: DefaultSelection
+}
+
+const EMPTY_CATALOG: ModelCatalogState = {
+  phase: { status: 'loading', error: null },
+  connections: [],
+  models: [],
+  defaults: {},
+}
+
 function mapRecord(record: ConversationRecordLike): Conversation {
   return {
     id: record.id,
@@ -80,6 +117,8 @@ function mapRecord(record: ConversationRecordLike): Conversation {
     updatedAt: record.lastTurnAt,
     pinned: record.pinned,
     archived: record.archived,
+    modelId: record.modelId,
+    reasoningLevel: record.reasoningLevel,
   }
 }
 
@@ -91,6 +130,8 @@ interface ConversationRecordLike {
   readonly pinned: boolean
   readonly archived: boolean
   readonly lastTurnAt: number
+  readonly modelId: string | null
+  readonly reasoningLevel: ReasoningChoice | null
 }
 
 function findIn(
@@ -108,6 +149,8 @@ interface WorkspaceValue {
   readonly projects: readonly Project[]
   readonly conversations: readonly Conversation[]
   readonly storePhase: StorePhase
+  /** The model catalog the picker reads: harness-served rows, or a named state. */
+  readonly catalog: ModelCatalogState
   readonly status: SessionStatus
   /**
    * Which conversations are working right now.
@@ -119,6 +162,15 @@ interface WorkspaceValue {
   readonly settings: TurnSettings
 
   setSettings: (settings: TurnSettings) => void
+  /**
+   * Settles the model and reasoning a conversation is held with, in the
+   * index - so reopening restores the choice, and the admission path's own
+   * write agrees with it.
+   */
+  setConversationSettings: (
+    conversationId: string,
+    settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice },
+  ) => void
 
   createProject: (input: NewProjectInput) => Project
   removeProject: (projectId: string) => void
@@ -136,6 +188,7 @@ interface WorkspaceValue {
     readonly id: string
     readonly firstMessage: string
     readonly projectId: string | null
+    readonly settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice }
   }) => void
   /** Stamps recency after an admitted later turn. */
   touch: (conversationId: string) => void
@@ -183,6 +236,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     ...((seed?.conversations ?? []).filter((item) => item.messages.length > 0)),
   ])
   const [storePhase, setStorePhase] = useState<StorePhase>({ status: 'loading', error: null })
+  const [catalog, setCatalog] = useState<ModelCatalogState>(EMPTY_CATALOG)
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [running, setRunning] = useState<ReadonlySet<string>>(() => new Set())
 
@@ -196,7 +250,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const [settings, setSettings] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
+  const [settings, setSettingsState] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
 
   /* ------------------------------ the index ------------------------------- */
 
@@ -213,17 +267,57 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setStorePhase((current) =>
           current.status === 'loading' ? { status: 'no-harness', error: null } : current,
         )
+        setCatalog((current) =>
+          current.phase.status === 'loading'
+            ? { ...current, phase: { status: 'no-harness', error: null } }
+            : current,
+        )
         return
       }
       client = createHarnessClient(address)
       clientRef.current = client
     }
 
-    const [conversations, projects] = await Promise.all([
+    // The catalog rides the same client and the same restart events as the
+    // index, but answers for itself: a picker that cannot be read is the
+    // picker's failure to show, not the sidebar's.
+    const [conversations, projects, connections, models, defaults] = await Promise.all([
       client.listConversations(),
       client.listProjects(),
+      client.listConnections(),
+      client.listModels(),
+      client.getDefaults(),
     ])
     if (!liveRef.current) return
+
+    if (!connections.ok) {
+      setCatalog({
+        phase: { status: 'failed', error: connections.error },
+        connections: [],
+        models: [],
+        defaults: {},
+      })
+    } else if (!models.ok) {
+      setCatalog((current) => ({
+        ...current,
+        phase: { status: 'failed', error: models.error },
+        connections: connections.value,
+      }))
+    } else if (!defaults.ok) {
+      setCatalog({
+        phase: { status: 'failed', error: defaults.error },
+        connections: connections.value,
+        models: catalogFrom(connections.value, models.value),
+        defaults: {},
+      })
+    } else {
+      setCatalog({
+        phase: { status: 'ready', error: null },
+        connections: connections.value,
+        models: catalogFrom(connections.value, models.value),
+        defaults: defaults.value,
+      })
+    }
 
     if (!conversations.ok) {
       setStorePhase({ status: 'failed', error: conversations.error })
@@ -294,10 +388,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (signal.name === 'harness-starting' || signal.name === 'harness-started') {
         restartLoad()
       }
-    }).then((off) => {
-      if (disposed) off()
-      else unlisten = off
     })
+      .then((off) => {
+        if (disposed) off()
+        else unlisten = off
+      })
+      // Subscribing is best effort. Outside the desktop shell there is no
+      // event bridge to subscribe to, and the rejection has to be swallowed
+      // here rather than left to the platform: unhandled, it is six noisy
+      // failures under the test runner and a console error in a browser, for
+      // an absence the store already handles as `no-harness`.
+      .catch(() => undefined)
     return () => {
       disposed = true
       unlisten?.()
@@ -314,6 +415,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     return cameUp
   }, [load])
+
+  const setSettings = useCallback((next: TurnSettings) => {
+    setSettingsState(next)
+  }, [])
 
   /* --------------------------- optimistic writes -------------------------- */
 
@@ -348,8 +453,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [load, patchAnyConversation],
   )
 
+  /**
+   * Settles the model and reasoning a conversation is held with, in the
+   * index - so reopening restores the choice, and the admission path's own
+   * write agrees with it. The window's settings follow the choice too, so the
+   * composer's view and the row agree the moment the pick lands.
+   */
+  const setConversationSettings = useCallback(
+    (
+      conversationId: string,
+      choice: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice },
+    ) => {
+      setSettingsState((current) => ({ ...current, ...choice }))
+      void mutateIndex(
+        conversationId,
+        { modelId: choice.modelId, reasoningLevel: choice.reasoningLevel },
+        (conversation) => ({ ...conversation, ...choice }),
+      )
+    },
+    [mutateIndex],
+  )
+
   const beginConversation = useCallback(
-    (input: { id: string; firstMessage: string; projectId: string | null }) => {
+    (input: {
+      id: string
+      firstMessage: string
+      projectId: string | null
+      settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice }
+    }) => {
       setRemoteConversations((current) => {
         // A second record under one receipt would be two sidebar rows pointing
         // at the same stream.
@@ -363,6 +494,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             updatedAt: Date.now(),
             pinned: false,
             archived: false,
+            modelId: input.settings.modelId,
+            reasoningLevel: input.settings.reasoningLevel,
           },
           ...current,
         ]
@@ -375,6 +508,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           id: input.id,
           firstMessage: input.firstMessage,
           ...(input.projectId === null ? {} : { projectId: input.projectId }),
+          modelId: input.settings.modelId,
+          reasoningLevel: input.settings.reasoningLevel,
           createdAt: Date.now(),
         })
         .then(async (result) => {
@@ -583,7 +718,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     findConversation,
     upsertLocal: setLocalConversations,
   })
-
   const cancel = useCallback(() => {
     turns.cancel()
   }, [turns.cancel])
@@ -605,10 +739,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       projects: remoteProjects,
       conversations,
       storePhase,
+      catalog,
       status,
       running,
       settings,
       setSettings,
+      setConversationSettings,
       createProject,
       removeProject,
       setBranch,
@@ -629,6 +765,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }),
     [
       beginConversation,
+      catalog,
       conversations,
       createProject,
       ensureStore,
@@ -640,7 +777,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       running,
       setArchived,
       setBranch,
+      setConversationSettings,
       setProject,
+      setSettings,
       status,
       stop,
       storePhase,

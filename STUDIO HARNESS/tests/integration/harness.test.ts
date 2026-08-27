@@ -1288,6 +1288,156 @@ describe.sequential("Flue harness vertical slice", () => {
     },
     30_000,
   );
+
+  /* ---------------------------------------------------------------------- */
+  /* The model the user actually picked (Task 38)                            */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Submits with a turn's settings, the way the webview does: the settings
+   * ride the submission body, which Flue itself strips down to `message` and
+   * images. Everything the settings then do happens at our admission
+   * boundary, so the receipt alone tells whether the write landed first.
+   */
+  async function submitWithSettings(
+    running: RunningHarness,
+    conversationId: string,
+    body: Record<string, unknown>,
+  ): Promise<Response> {
+    return fetch(`${running.baseUrl}/agents/studio/${conversationId}`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${running.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  interface IndexRecord {
+    readonly id: unknown;
+    readonly modelId: unknown;
+    readonly reasoningLevel: unknown;
+  }
+
+  async function conversationIndex(running: RunningHarness): Promise<IndexRecord[]> {
+    const response = await fetch(`${running.baseUrl}/api/conversations`, {
+      headers: { authorization: `Bearer ${running.token}` },
+    });
+    if (!response.ok) {
+      throw new Error(`The conversation index answered ${String(response.status)}.`);
+    }
+    return (await response.json()) as IndexRecord[];
+  }
+
+  /**
+   * The model info the assistant history records carry, read narrowly. The
+   * wire puts it at `metadata.model` - the same place the webview's chunk
+   * reader reads it from.
+   */
+  function modelRefs(history: unknown): string[] {
+    if (!isRecordValue(history) || !Array.isArray(history["messages"])) return [];
+    const names: string[] = [];
+    for (const message of history["messages"]) {
+      if (!isRecordValue(message) || message["role"] !== "assistant") continue;
+      const metadata = message["metadata"];
+      if (!isRecordValue(metadata)) continue;
+      const model = metadata["model"];
+      if (!isRecordValue(model)) continue;
+      if (typeof model["id"] === "string") names.push(model["id"]);
+    }
+    return names;
+  }
+
+  it(
+    "settles a submission's model and reasoning before the run reads them",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+
+      // One connection, so the served-reference check has a real list to
+      // answer from - the same list a picker is filled from.
+      const openrouter = {
+        id: "openrouter",
+        displayName: "OpenRouter",
+        kind: "language",
+        source: "local",
+        enabled: true,
+        catalogProvider: "openrouter",
+        protocol: "openai-completions",
+      };
+      const created = await fetch(`${running.baseUrl}/api/providers/connections`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${running.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(openrouter),
+      });
+      if (!created.ok) {
+        throw new Error(`The connection create answered ${String(created.status)}.`);
+      }
+
+      const models = (await (
+        await fetch(`${running.baseUrl}/api/providers/models`, {
+          headers: { authorization: `Bearer ${running.token}` },
+        })
+      ).json()) as Array<{ modelId: string; capability: { reasoning: string } }>;
+      const reasoningModel = models.find((model) => model.capability.reasoning === "supported");
+      if (reasoningModel === undefined) {
+        throw new Error("The live catalog answered no reasoning model.");
+      }
+
+      const conversationId = "picked-model";
+      // A FIRST turn: the index row does not exist yet, so the only way the
+      // run can take the chosen model is for admission to settle it first.
+      const submission = await submitWithSettings(running, conversationId, {
+        message: "please answer",
+        modelId: `openrouter/${reasoningModel.modelId}`,
+        reasoningLevel: "high",
+      });
+      expect(submission.status).toBe(202);
+
+      const rows = await conversationIndex(running);
+      const row = rows.find((entry) => entry.id === conversationId);
+      expect(row?.modelId).toBe(`openrouter/${reasoningModel.modelId}`);
+      expect(row?.reasoningLevel).toBe("high");
+
+      // And the turn that was admitted answers as a turn of a conversation
+      // whose history names the model it ran on.
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+      const run: AcceptedRun = {
+        threadId: conversationId,
+        submissionId: String((await submission.json())["submissionId"]),
+        streamUrl: `${running.baseUrl}/agents/studio/${conversationId}`,
+        offset: "-1",
+      };
+      await client.wait(run);
+      const history: unknown = await client.history(conversationId);
+      expect(modelRefs(history)).toContain(`openrouter/${reasoningModel.modelId}`);
+    },
+    30_000,
+  );
+
+  it(
+    "refuses a submission whose model nothing serves, creating nothing",
+    async () => {
+      const running = await startHarness(await createDatabasePath());
+
+      const submission = await submitWithSettings(running, "cnv_refused", {
+        message: "no provider serves this",
+        modelId: "openrouter/definitely/not-a-model",
+      });
+
+      expect(submission.status).toBe(400);
+      const body: unknown = await submission.json();
+      expect(
+        isRecordValue(body) && typeof body["error"] === "string" ? body["error"] : "",
+      ).toContain("No connected provider currently serves");
+      // A send the harness refuses creates no row, no sidebar entry.
+      expect(await conversationIndex(running)).toEqual([]);
+    },
+    30_000,
+  );
 });
 
 describe("the startup silence window", () => {

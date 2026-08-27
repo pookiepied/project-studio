@@ -26,6 +26,8 @@ export function galleryConversation(): Conversation {
     pinned: true,
     archived: false,
     updatedAt: Date.now() - 5 * 60 * 1000,
+    modelId: null,
+    reasoningLevel: null,
     messages: [
       {
         id: 'msg_gallery_user',
@@ -37,7 +39,6 @@ export function galleryConversation(): Conversation {
         id: 'msg_gallery_assistant',
         role: 'assistant',
         text: renderScene(SCENE_DONE),
-        modelId: 'sonnet-5',
         createdAt: Date.now() - 5 * 60 * 1000,
         thinking: {
           text: 'Six kinds, three with dedicated renderers and three without, so the fallback is on show too. Overlap a couple of them so the working states are visible together.',

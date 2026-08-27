@@ -160,6 +160,78 @@ describe("the conversation index", () => {
     expect(() => store.touch("ghost", Date.now())).toThrow(/No conversation/);
     expect(() => store.patch("ghost", { pinned: true })).toThrow(/No conversation/);
   });
+
+  // The settings a turn was sent with are the row's to remember, so reopening
+  // a conversation restores the model it was held with rather than resetting
+  // to the default (Task 38). They arrive two ways - creation and patch - and
+  // both must land on the same columns.
+  describe("the model and reasoning a conversation is held with", () => {
+    it("records the settings a first turn was sent with", () => {
+      const store = new ConversationStore(db);
+      const record = store.record({
+        id: "cnv_1",
+        firstMessage: "Hello",
+        modelId: "openrouter/anthropic/claude-sonnet-4.5",
+        reasoningLevel: "high",
+      });
+
+      expect(record.modelId).toBe("openrouter/anthropic/claude-sonnet-4.5");
+      expect(record.reasoningLevel).toBe("high");
+    });
+
+    it("leaves the settings null when creation carries none", () => {
+      const store = new ConversationStore(db);
+      const record = store.record({ id: "cnv_1", firstMessage: "Hello" });
+
+      expect(record.modelId).toBeNull();
+      expect(record.reasoningLevel).toBeNull();
+    });
+
+    it("settles and clears the settings through a patch", () => {
+      const store = new ConversationStore(db);
+      store.record({ id: "cnv_1", firstMessage: "Hello" });
+
+      const settled = store.patch("cnv_1", {
+        modelId: "google/gemini-3.5-flash",
+        reasoningLevel: "default",
+      });
+      expect(settled.modelId).toBe("google/gemini-3.5-flash");
+      expect(settled.reasoningLevel).toBe("default");
+
+      const cleared = store.patch("cnv_1", { modelId: null, reasoningLevel: null });
+      expect(cleared.modelId).toBeNull();
+      expect(cleared.reasoningLevel).toBeNull();
+    });
+
+    it("converges a repeated receipt that carries settings on one row", () => {
+      const store = new ConversationStore(db);
+      store.record({ id: "cnv_1", firstMessage: "First words" });
+      const again = store.record({
+        id: "cnv_1",
+        firstMessage: "Words again",
+        modelId: "openrouter/anthropic/claude-sonnet-4.5",
+        reasoningLevel: "medium",
+      });
+
+      expect(store.count()).toBe(1);
+      // The receipt does not re-derive the title, and it does not reset a
+      // level somebody chose.
+      expect(again.title).toBe("First words");
+      expect(again.modelId).toBe("openrouter/anthropic/claude-sonnet-4.5");
+      expect(again.reasoningLevel).toBe("medium");
+    });
+
+    it("reads a stored value the contract does not describe as null", () => {
+      const store = new ConversationStore(db);
+      store.record({ id: "cnv_1", firstMessage: "Hello", reasoningLevel: "high" });
+      db.prepare("UPDATE conversation SET reasoning_level = ? WHERE id = ?").run(
+        "utterly-bogus",
+        "cnv_1",
+      );
+
+      expect(store.get("cnv_1")?.reasoningLevel).toBeNull();
+    });
+  });
 });
 
 describe("emptying the archive", () => {

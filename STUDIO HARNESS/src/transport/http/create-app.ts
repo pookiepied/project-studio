@@ -10,6 +10,7 @@ import type { RetrievalAdministration } from "../../application/retrieval-manage
 import type { ConversationStore } from "../../conversations/store.js";
 import type { ProjectStore } from "../../projects/store.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
+import { createTurnSettingsMiddleware } from "./middleware/turn-settings.js";
 import { createConversationRoutes } from "./routes/conversations.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMcpRoutes } from "./routes/mcp.js";
@@ -34,6 +35,12 @@ export interface CreateHttpAppOptions {
   /** Projects and their folders over the same database. */
   readonly projects: ProjectStore;
   readonly admission: AdmissionVerifier;
+  /**
+   * Answers whether the catalog currently serves a model reference. Settling a
+   * submission's turn settings against the list its picker was filled from is
+   * the admission path's one outward fact; the wiring lives at composition.
+   */
+  readonly isModelServed: (modelId: string) => Promise<boolean>;
   /**
    * Begins this process's graceful shutdown when the Studio Host asks over
    * `POST /api/shutdown`. Required rather than optional so a composition
@@ -63,6 +70,16 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
 
   const agentRoutes = new Hono<AdmissionEnv>();
   agentRoutes.use("*", requireAdmissionScope(ADMISSION_SCOPES.AGENT_RUN));
+  // Before the Flue app: a submission's model and reasoning level are settled
+  // into the conversation index on the way in, so the run's initializer reads
+  // a row that already holds what this turn was sent with. See the middleware.
+  agentRoutes.use(
+    "*",
+    createTurnSettingsMiddleware({
+      conversations: options.conversations,
+      isModelServed: options.isModelServed,
+    }),
+  );
   agentRoutes.route("/", options.flueApp ?? flue());
   app.route("/", agentRoutes);
 

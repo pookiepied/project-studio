@@ -37,6 +37,7 @@ import type { StudioDatabase } from "../storage/database.js";
 import { CallGate } from "../tools/gate.js";
 import { ToolError } from "../tools/errors.js";
 import { registerNativeTools } from "../tools/native/index.js";
+import { ConversationStore } from "../conversations/store.js";
 
 export interface StudioRuntimeOptions {
   /**
@@ -200,7 +201,7 @@ function sessionEnvironment(sandbox: LocalSandbox): SessionEnv {
  * `agents/studio.ts` is default-exported to Flue's `defineAgent` and loaded by
  * Flue's own module resolution, so there is no point at which anything can be
  * injected into it — which is why a service locator exists there at all. This
- * is the narrowest type that locator can return: four members, not the class
+ * is the narrowest type that locator can return: five members, not the class
  * (ADR 0035 §6).
  */
 export interface AgentHost {
@@ -208,6 +209,21 @@ export interface AgentHost {
   start(): Promise<void>;
   reconcile(): Promise<void>;
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory;
+  /**
+   * The model and reasoning level a conversation is held with, as the run
+   * initializer needs them: the model reference in the local runtime's own
+   * `<provider>/<model>` vocabulary, or null for the stable default alias,
+   * and the stored reasoning choice or null for the provider's own default.
+   *
+   * Read once per run, inside the initializer. Flue re-runs it for every run,
+   * so a conversation whose model changed between turns takes the new one on
+   * the next run, and a run already in flight keeps the model its own
+   * initializer resolved - that is the behaviour, not an accident to fix.
+   */
+  conversationTurnSettings(conversationId: string): {
+    readonly modelId: string | null;
+    readonly reasoningLevel: string | null;
+  };
 }
 
 /**
@@ -221,6 +237,7 @@ export interface AgentHost {
  */
 export class StudioRuntime implements AgentHost {
   readonly #db: StudioDatabase;
+  readonly #conversations: ConversationStore;
   readonly #grants: PermissionGrantStore;
   readonly #trust: WorkspaceTrustStore;
   readonly #selection: ExtensionSelectionStore;
@@ -291,6 +308,7 @@ export class StudioRuntime implements AgentHost {
     this.#sessionId = options.sessionId ?? "standalone";
 
     this.#db = options.database;
+    this.#conversations = new ConversationStore(this.#db);
     this.#grants = new PermissionGrantStore(this.#db);
     this.#trust = new WorkspaceTrustStore(this.#db);
     this.#selection = new ExtensionSelectionStore(this.#db);
@@ -353,6 +371,17 @@ export class StudioRuntime implements AgentHost {
 
   get projectRoot(): string {
     return this.#projectRoot;
+  }
+
+  conversationTurnSettings(conversationId: string): {
+    readonly modelId: string | null;
+    readonly reasoningLevel: string | null;
+  } {
+    const record = this.#conversations.get(conversationId);
+    return {
+      modelId: record?.modelId ?? null,
+      reasoningLevel: record?.reasoningLevel ?? null,
+    };
   }
 
   start(): Promise<void> {

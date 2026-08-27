@@ -1,5 +1,4 @@
 import type { ModelCapability, ProviderConnection, ProviderModel } from '@/platform/harness'
-
 /**
  * Well-formed harness payloads, for tests.
  *
@@ -61,12 +60,17 @@ export const UNKNOWN_VENDOR: ProviderConnection = {
   protocol: 'openai-completions',
 }
 
-export function modelFor(connectionId: string, modelId: string): ProviderModel {
+export function modelFor(
+  connectionId: string,
+  modelId: string,
+  reasoningLevels: ProviderModel['reasoningLevels'] = [],
+): ProviderModel {
   return {
     connectionId,
     modelId,
     displayName: modelId,
     capability: CAPABILITY,
+    reasoningLevels,
     shape: 'stream',
     pricing: { input: 'unknown', output: 'unknown', cacheRead: 'unknown', cacheWrite: 'unknown' },
     hidden: false,

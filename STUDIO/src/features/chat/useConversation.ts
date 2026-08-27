@@ -11,6 +11,7 @@ import {
   type ConversationSnapshotFacts,
   type SeamFailure,
   type TurnResult,
+  type TurnSettingsWire,
 } from '@/platform/harness'
 import { isTauri } from '@/platform/tauri/window'
 import { firstAdmission, forgetFirstAdmission } from '@/features/chat/first-attach'
@@ -135,13 +136,18 @@ export interface ConversationView {
    */
   resume: () => void
   /**
-   * Submits one user turn through the harness. Never retried here: an
-   * identical resend would be a SECOND turn, so a failed submission is
-   * surfaced, not repeated. On success, makes sure a read is attached —
-   * a conversation's very first turn creates the stream this page has
-   * been unable to find since it mounts.
+   * Submits one user turn through the harness, carrying the turn's settings.
+   * Never retried here: an identical resend would be a SECOND turn, so a
+   * failed submission is surfaced, not repeated. On success, makes sure a read
+   * is attached - a conversation's very first turn creates the stream this
+   * page has been unable to find since it mounts. The settings travel in the
+   * submission body; the harness settles them into the index before the run
+   * starts, and refuses a model nothing serves before creating anything.
    */
-  submit: (message: string) => Promise<TurnResult<{ readonly submissionId: string }>>
+  submit: (
+    message: string,
+    settings: TurnSettingsWire,
+  ) => Promise<TurnResult<{ readonly submissionId: string }>>
   /** Aborts the RUN, and says so; reading on is how the UI learns the outcome. */
   abort: () => Promise<TurnResult<boolean>>
   /**
@@ -663,7 +669,7 @@ export function useConversation(
   }, [attach])
 
   const submit = useCallback(
-    async (message: string) => {
+    async (message: string, settings: TurnSettingsWire) => {
       const client = clientRef.current
       if (client === null) {
         return {
@@ -674,7 +680,7 @@ export function useConversation(
           },
         }
       }
-      const sent = await client.submitTurn(message)
+      const sent = await client.submitTurn(message, settings)
       if (!sent.ok) {
         // The no-harness diagnosis belongs to the phase machine, which says
         // it permanently; stacking the same sentence in a second notice

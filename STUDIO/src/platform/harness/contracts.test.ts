@@ -5,6 +5,7 @@ import {
   parseModelCapability,
   parseProbeResult,
   parseProviderConnection,
+  parseProviderModel,
   parseProviderModels,
   parseWireStreamEvent,
   readChunkFacts,
@@ -162,6 +163,7 @@ describe('parseProviderModels', () => {
     modelId: 'gpt-5',
     displayName: 'GPT-5',
     capability: CAPABILITY,
+    reasoningLevels: ['minimal', 'low', 'medium', 'high'],
     shape: 'stream',
     pricing: { input: 1.25, output: 10, cacheRead: 'unknown', cacheWrite: 'unknown' },
     hidden: false,
@@ -174,6 +176,14 @@ describe('parseProviderModels', () => {
 
   it('accepts a well-formed list', () => {
     expect(parseProviderModels([MODEL])).toEqual([MODEL])
+  })
+
+  it('reads absent reasoning levels as a model with none, and refuses a bad one', () => {
+    // The field arrived after the catalog did: rows written before it are
+    // models the harness knew no levels for, which is what empty says.
+    const { reasoningLevels: _levels, ...without } = MODEL
+    expect(parseProviderModel(without)?.reasoningLevels).toEqual([])
+    expect(parseProviderModel({ ...MODEL, reasoningLevels: ['colossal'] })).toBeNull()
   })
 
   it('fails the whole list when one element is wrong', () => {

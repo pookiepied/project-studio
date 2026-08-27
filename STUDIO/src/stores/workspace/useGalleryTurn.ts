@@ -64,7 +64,7 @@ export function useGalleryTurn() {
           id: assistantId,
           role: 'assistant',
           text: renderScene(SCENE_START),
-          modelId,
+          ...(modelId === null ? {} : { modelId }),
           createdAt: Date.now(),
         }
         patch((conversation) => ({

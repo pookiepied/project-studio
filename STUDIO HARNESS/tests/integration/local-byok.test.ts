@@ -269,6 +269,103 @@ describe("local BYOK source", () => {
     expect(mock.requests[0]?.body?.reasoning_effort).toBe("medium");
   });
 
+  /**
+   * Task 38's seam: the alias's id names the model a conversation settled on,
+   * and the request must go to THAT model - falling back to the configured
+   * default here would be the picker changing nothing about the request,
+   * wearing a quieter shape.
+   */
+  it("routes a request at the model the alias names", async () => {
+    const { adapter } = buildAdapter();
+    const named: Model<Api> = { ...aliasPlaceholder(), id: "my-llm/local-model" };
+
+    const text = await collectText(
+      adapter.stream(
+        named,
+        { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] },
+      ),
+    );
+
+    expect(text).toBe("Local model works.");
+    expect(mock.requests[0]?.body?.model).toBe("local-model");
+  });
+
+  it("refuses an alias naming a model that does not exist, rather than substituting one", async () => {
+    const { adapter } = buildAdapter();
+    const named: Model<Api> = { ...aliasPlaceholder(), id: "my-llm/missing-model" };
+
+    expect(() =>
+      adapter.stream(named, {
+        messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+      }),
+    ).toThrow(/is not available/);
+    expect(mock.requests).toHaveLength(0);
+  });
+
+  /**
+   * "default" is the provider's own behaviour, not medium. The run expresses
+   * it as Pi's "no explicit effort", which OpenAI-style endpoints render as an
+   * ABSENT reasoning_effort - so the absence itself is what the wire must
+   * show. Flue substitutes "medium" for an unset level, which is exactly the
+   * synonym this guards against.
+   */
+  it("sends no reasoning_effort at all when no level is asked for", async () => {
+    const { adapter, runtime } = buildAdapter();
+    const target = { ...adapter.assertTargetResolvable(), reasoning: true };
+    const reasoning: LocalRuntime = {
+      models: runtime.models,
+      target: () => target,
+      listModels: runtime.listModels,
+    };
+    const reasoningAdapter = new LocalModelProviderAdapter({
+      config: buildAdapter().config,
+      runtime: reasoning,
+    });
+
+    await collectText(
+      reasoningAdapter.stream(
+        aliasPlaceholder(),
+        { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] },
+      ),
+    );
+
+    expect(mock.requests[0]?.body?.reasoning_effort).toBeUndefined();
+  });
+
+  /**
+   * `xhigh` and `max` only exist for models whose thinkingLevelMap names them;
+   * this one does, so the level a conversation chose must arrive verbatim.
+   * Pi clamps a level a model cannot honour, which is its answer to a stored
+   * choice whose model changed - never a reason to pre-empt it here.
+   */
+  it("carries max on the wire when the model maps it", async () => {
+    const { adapter, runtime } = buildAdapter();
+    const target = {
+      ...adapter.assertTargetResolvable(),
+      reasoning: true,
+      thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+    };
+    const reasoning: LocalRuntime = {
+      models: runtime.models,
+      target: () => target,
+      listModels: runtime.listModels,
+    };
+    const reasoningAdapter = new LocalModelProviderAdapter({
+      config: buildAdapter().config,
+      runtime: reasoning,
+    });
+
+    await collectText(
+      reasoningAdapter.stream(
+        aliasPlaceholder(),
+        { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] },
+        { reasoning: "max" },
+      ),
+    );
+
+    expect(mock.requests[0]?.body?.reasoning_effort).toBe("max");
+  });
+
   it("treats a provider with a stored key as available", async () => {
     const { adapter } = buildAdapter();
     await new PiCredentialStore(secrets).modify("my-llm", async () => ({

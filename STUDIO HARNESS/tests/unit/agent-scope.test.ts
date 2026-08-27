@@ -34,6 +34,9 @@ function hostRecording(calls: StudioAgentSandboxOptions[]): AgentHost {
       calls.push(options);
       return sandbox;
     },
+    // No index exists in this test's process, so the agent reads the default
+    // settings: the stable alias at the provider's own reasoning behaviour.
+    conversationTurnSettings: () => ({ modelId: null, reasoningLevel: null }),
   };
 }
 

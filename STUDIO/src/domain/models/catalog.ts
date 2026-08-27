@@ -1,125 +1,150 @@
-import type { Model, Provider } from '@/domain/models/types'
+import type { ProviderConnection, ProviderModel } from '@/platform/harness'
+import { REASONING_LEVEL_NOTES, type ReasoningChoice, type ReasoningLevel } from './types'
 
 /**
- * The built-in catalog.
+ * The model catalog as the picker sees it: the harness's own list, mapped once
+ * at this boundary from the wire records.
  *
- * Demo data with a real shape: this is what a gateway will return, so the
- * picker is already written against the structure it will receive. Replacing
- * this file with a fetch is the whole migration.
+ * ---- What this file is now -------------------------------------------------
+ *
+ * It was ten demo models whose own docblock said "replacing this file with a
+ * fetch is the whole migration". The fetch happened; what remains is the
+ * mapping, not data. Nothing here invents a model, a capability, or a price:
+ * every field is read off the wire records, and a model the harness does not
+ * list does not exist.
+ *
+ * ---- Two vendor facts, kept apart -----------------------------------------
+ *
+ * A model reached through OpenRouter answers two different "who" questions,
+ * and the user asks for both: OpenRouter on the connection in Settings, and
+ * Anthropic's mark on the model itself. So each catalog row carries
+ * `connectionVendor` - the vendor whose list the connection draws from, which
+ * is what a Settings row shows - and `author`, the mark the model itself
+ * wears. OpenRouter names the author in its own model ids (`anthropic/...`),
+ * so the author is the id's first segment there; a direct vendor connection
+ * is its own author; anything else wears the custom mark.
+ *
+ * `id` is the runtime reference - `<vendor>/<model>` - the one string the
+ * conversation index stores, the submission carries, and the run resolves.
  */
 
-export const PROVIDERS: readonly Provider[] = [
-  { id: 'anthropic', name: 'Anthropic', compatibility: 'anthropic', custom: false },
-  { id: 'openai', name: 'OpenAI', compatibility: 'openai-responses', custom: false },
-  { id: 'google', name: 'Google', compatibility: 'google', custom: false },
-  { id: 'meta', name: 'Meta', compatibility: 'openai-chat', custom: false },
-  { id: 'deepseek', name: 'DeepSeek', compatibility: 'openai-chat', custom: false },
-  { id: 'mistral', name: 'Mistral', compatibility: 'openai-chat', custom: false },
-]
-
-export const MODELS: readonly Model[] = [
-  {
-    id: 'opus-5',
-    providerId: 'anthropic',
-    name: 'Opus 5',
-    slug: 'claude-opus-5',
-    capabilities: ['text', 'vision', 'tools', 'reasoning'],
-    note: 'The most capable. Slower, and worth it on hard problems.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'sonnet-5',
-    providerId: 'anthropic',
-    name: 'Sonnet 5',
-    slug: 'claude-sonnet-5',
-    capabilities: ['text', 'vision', 'tools', 'reasoning'],
-    note: 'Balanced. The everyday default.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'haiku-4-5',
-    providerId: 'anthropic',
-    name: 'Haiku 4.5',
-    slug: 'claude-haiku-4-5',
-    capabilities: ['text', 'vision', 'tools'],
-    note: 'Fast and light.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'gpt-5-6',
-    providerId: 'openai',
-    name: 'GPT-5.6',
-    slug: 'gpt-5.6',
-    capabilities: ['text', 'vision', 'tools', 'reasoning'],
-    note: 'Strong general reasoning.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'gpt-5-6-mini',
-    providerId: 'openai',
-    name: 'GPT-5.6 mini',
-    slug: 'gpt-5.6-mini',
-    capabilities: ['text', 'vision', 'tools'],
-    note: 'Cheaper, and quick.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'gemini-3-flash',
-    providerId: 'google',
-    name: 'Gemini 3 Flash',
-    slug: 'gemini-3-flash',
-    capabilities: ['text', 'vision', 'tools'],
-    note: 'Very fast, very long context.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'gemini-3-pro',
-    providerId: 'google',
-    name: 'Gemini 3 Pro',
-    slug: 'gemini-3-pro',
-    capabilities: ['text', 'vision', 'tools', 'reasoning'],
-    note: 'Google at full strength.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'llama-4-maverick',
-    providerId: 'meta',
-    name: 'Llama 4 Maverick',
-    slug: 'llama-4-maverick',
-    capabilities: ['text', 'tools'],
-    note: 'Open weights, run anywhere.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'deepseek-v4',
-    providerId: 'deepseek',
-    name: 'DeepSeek V4',
-    slug: 'deepseek-v4',
-    capabilities: ['text', 'tools', 'reasoning'],
-    note: 'Reasoning at a low price.',
-    contextWindow: 200_000,
-  },
-  {
-    id: 'mistral-large-3',
-    providerId: 'mistral',
-    name: 'Mistral Large 3',
-    slug: 'mistral-large-3',
-    capabilities: ['text', 'tools'],
-    note: 'European hosting, solid all-rounder.',
-    contextWindow: 200_000,
-  },
-]
-
-export const DEFAULT_MODEL_ID = 'sonnet-5'
-
-export function findModel(id: string): Model | undefined {
-  return MODELS.find((model) => model.id === id)
+/** One model the picker can offer. Mapped from the wire, never invented. */
+export interface CatalogModel {
+  /** The runtime reference: `<provider>/<model>`. What a turn is stored and sent as. */
+  readonly id: string
+  /** The connection that serves it, as the user named it. */
+  readonly connectionId: string
+  /** The model id exactly as the provider names it. */
+  readonly modelId: string
+  readonly name: string
+  /** The vendor whose mark the MODEL wears - Anthropic on a model reached through OpenRouter. */
+  readonly author: string
+  /** The vendor whose mark the CONNECTION wears - OpenRouter on that same model's connection. */
+  readonly connectionVendor: string
+  readonly connectionName: string
+  readonly reasoningLevels: readonly ReasoningLevel[]
+  readonly contextWindow: number | 'unknown'
 }
 
-/** Models grouped under their provider, in catalog order. */
-export function modelsByProvider(): { provider: Provider; models: Model[] }[] {
-  return PROVIDERS.map((provider) => ({
-    provider,
-    models: MODELS.filter((model) => model.providerId === provider.id),
-  })).filter((group) => group.models.length > 0)
+/** A catalog grouped the way the picker reads it: one group per connection. */
+export interface CatalogGroup {
+  readonly connectionId: string
+  readonly connectionName: string
+  readonly connectionVendor: string
+  readonly models: readonly CatalogModel[]
+}
+
+/**
+ * The vendor a connection's model list belongs to: the catalog's own vendor
+ * when it names one, otherwise the connection itself - the normal case for a
+ * self-hosted endpoint, whose models are keyed by their own id.
+ */
+export function connectionVendorOf(connection: ProviderConnection): string {
+  return connection.catalogProvider ?? connection.id
+}
+
+/**
+ * Whose mark a model wears. OpenRouter's ids carry the author (`anthropic/...`);
+ * a direct vendor connection is its own author; a self-hosted model id with a
+ * slash in it claims the prefix, and unknown authors fall back to the custom
+ * mark at the component.
+ */
+export function authorOf(modelId: string, vendor: string): string {
+  const separator = modelId.indexOf('/')
+  return separator > 0 ? modelId.slice(0, separator) : vendor
+}
+
+/** Maps one wire model onto the picker's row, against its connection. */
+export function catalogModelOf(
+  model: ProviderModel,
+  connection: ProviderConnection | undefined,
+): CatalogModel {
+  const vendor = connection === undefined ? model.connectionId : connectionVendorOf(connection)
+  return {
+    id: `${vendor}/${model.modelId}`,
+    connectionId: model.connectionId,
+    modelId: model.modelId,
+    name: model.displayName,
+    author: authorOf(model.modelId, vendor),
+    connectionVendor: vendor,
+    connectionName: connection?.displayName ?? model.connectionId,
+    reasoningLevels: model.reasoningLevels,
+    contextWindow: model.capability.contextWindow,
+  }
+}
+
+/**
+ * The whole catalog: wire rows plus the connections that name them, in the
+ * order the harness listed them.
+ */
+export function catalogFrom(
+  connections: readonly ProviderConnection[],
+  models: readonly ProviderModel[],
+): CatalogModel[] {
+  const byId = new Map(connections.map((connection) => [connection.id, connection]))
+  return models.map((model) => catalogModelOf(model, byId.get(model.connectionId)))
+}
+
+/** Groups a catalog under its connections, in connection order. */
+export function groupCatalog(models: readonly CatalogModel[]): CatalogGroup[] {
+  // Built mutable, exposed readonly: the groups handed on are frozen shapes,
+  // while this one construction site needs to append.
+  const drafts: {
+    connectionId: string
+    connectionName: string
+    connectionVendor: string
+    models: CatalogModel[]
+  }[] = []
+  const index = new Map<string, number>()
+  for (const model of models) {
+    let at = index.get(model.connectionId)
+    if (at === undefined) {
+      drafts.push({
+        connectionId: model.connectionId,
+        connectionName: model.connectionName,
+        connectionVendor: model.connectionVendor,
+        models: [],
+      })
+      at = drafts.length - 1
+      index.set(model.connectionId, at)
+    }
+    const draft = drafts[at]
+    if (draft !== undefined) draft.models.push(model)
+  }
+  return drafts.map((draft) => ({ ...draft }))
+}
+
+/** Finds a catalog row by its runtime reference. */
+export function findCatalogModel(
+  models: readonly CatalogModel[],
+  id: string | null,
+): CatalogModel | undefined {
+  if (id === null) return undefined
+  return models.find((model) => model.id === id)
+}
+
+/** Display copy for a reasoning choice, "default" included. */
+export function reasoningChoiceNote(choice: ReasoningChoice): string {
+  if (choice === 'default') return "The provider's own default"
+  return REASONING_LEVEL_NOTES.find((level) => level.id === choice)?.note ?? choice
 }

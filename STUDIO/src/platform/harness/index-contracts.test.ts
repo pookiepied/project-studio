@@ -25,6 +25,7 @@ const CONVERSATION = {
   pinned: false,
   archived: false,
   modelId: null,
+  reasoningLevel: null,
   createdAt: 1_000,
   lastTurnAt: 2_000,
 } as const
@@ -58,6 +59,21 @@ describe('parseConversationRecord', () => {
   it('keeps null fields null instead of inventing defaults', () => {
     expect(parseConversationRecord({ ...CONVERSATION, title: null })?.title).toBeNull()
     expect(parseConversationRecord({ ...CONVERSATION, modelId: null })?.modelId).toBeNull()
+    expect(
+      parseConversationRecord({ ...CONVERSATION, reasoningLevel: null })?.reasoningLevel,
+    ).toBeNull()
+  })
+
+  it('accepts a settled reasoning choice and refuses a level it does not know', () => {
+    expect(
+      parseConversationRecord({ ...CONVERSATION, reasoningLevel: 'default' })?.reasoningLevel,
+    ).toBe('default')
+    expect(
+      parseConversationRecord({ ...CONVERSATION, reasoningLevel: 'xhigh' })?.reasoningLevel,
+    ).toBe('xhigh')
+    expect(
+      parseConversationRecord({ ...CONVERSATION, reasoningLevel: 'colossal' }),
+    ).toBeNull()
   })
 
   it('fails the whole list when one element does not match', () => {

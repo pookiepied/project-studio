@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { Composer } from '@/features/chat/composer/Composer'
 import { useFirstTurn } from '@/features/chat/first-turn'
 import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
+import { effectiveTurnSettings } from '@/domain/session/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 
@@ -30,17 +31,29 @@ export function StartConversation({
   projectId: string | null
   placeholder: string
 }) {
-  const { beginConversation } = useWorkspace()
+  const { beginConversation, settings } = useWorkspace()
   const { openChat } = useNavigation()
 
   const onStarted = useCallback(
     (conversationId: string, text: string) => {
-      beginConversation({ id: conversationId, firstMessage: text, projectId })
+      beginConversation({
+        id: conversationId,
+        firstMessage: text,
+        projectId,
+        // The settings the turn went out with, so the record and the
+        // admission path's own write describe the same conversation.
+        settings: effectiveTurnSettings(null, settings),
+      })
       openChat(conversationId)
     },
-    [beginConversation, openChat, projectId],
+    [beginConversation, openChat, projectId, settings],
   )
-  const firstTurn = useFirstTurn({ onStarted })
+  // Read at send time, not captured: a model picked between mounting and
+  // sending is the one the turn should use.
+  const firstTurn = useFirstTurn({
+    onStarted,
+    settings: () => effectiveTurnSettings(null, settings),
+  })
 
   return (
     <>

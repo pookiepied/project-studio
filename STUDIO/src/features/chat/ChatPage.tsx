@@ -9,6 +9,7 @@ import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/useConversation'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
+import { effectiveTurnSettings } from '@/domain/session/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
@@ -51,7 +52,7 @@ export function ChatPage({
    */
   onForked?: (conversationId: string) => void
 }) {
-  const { status, retry, editMessage, fork, touch } = useWorkspace()
+  const { status, retry, editMessage, fork, touch, settings } = useWorkspace()
   const { openChat } = useNavigation()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
@@ -67,14 +68,17 @@ export function ChatPage({
   /**
    * A receipt is also a recency fact: the index stamps the conversation the
    * moment the harness admits a later turn, so sorting survives a reload.
+   * The turn goes out with this conversation's settled settings - the row's
+   * choice when it has one, the window's otherwise - the same derivation the
+   * picker displays, so what is on screen is what is sent.
    */
   const sendTurn = useCallback(
     async (text: string) => {
-      const sent = await live.submit(text)
+      const sent = await live.submit(text, effectiveTurnSettings(conversation, settings))
       if (sent.ok) touch(conversation.id)
       return sent
     },
-    [conversation.id, live.submit, touch],
+    [conversation, live.submit, settings, touch],
   )
 
   return (

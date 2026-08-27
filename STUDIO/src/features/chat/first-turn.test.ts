@@ -20,7 +20,12 @@ import { startConversation } from './first-turn'
  * attached to nothing. The order these tests pin is the whole fix — the
  * harness takes the message FIRST, and only an admitted send produces an id,
  * a receipt to hand across, and a page to open.
+ *
+ * The turn's settings ride the same submission body, so what the picker had
+ * chosen reaches the harness in the same request that admits the words.
  */
+
+const SETTINGS = { modelId: 'openrouter/anthropic/claude-sonnet-4.5', reasoningLevel: 'high' }
 
 interface Attempt {
   readonly bodies: string[]
@@ -65,13 +70,16 @@ describe('starting a conversation with a live first turn', () => {
     const attempt = harness('admits')
     const outcome = await startConversation({
       text: 'the first thing anyone types',
+      settings: SETTINGS,
       contactFor: attempt.contactFor,
       now: () => 1_700_000_000_000,
     })
 
     expect(outcome.ok).toBe(true)
     if (!outcome.ok) throw new Error('unreachable')
-    expect(attempt.bodies).toEqual([JSON.stringify({ message: 'the first thing anyone types' })])
+    expect(attempt.bodies).toEqual([
+      JSON.stringify({ message: 'the first thing anyone types', modelId: SETTINGS.modelId, reasoningLevel: SETTINGS.reasoningLevel }),
+    ])
     // The handoff: where this turn's events begin, what to call it while it
     // has produced nothing, and the words themselves. Without the first the
     // view that mounts next asks history about a stream that is milliseconds
@@ -89,6 +97,24 @@ describe('starting a conversation with a live first turn', () => {
     forgetFirstAdmission(outcome.conversationId)
   })
 
+  it('sends no model key at all when the turn rides the default', async () => {
+    // Absent, not null: the harness contract treats an absent modelId as "the
+    // conversation's settled state stands", and null is not a reference.
+    const attempt = harness('admits')
+    const outcome = await startConversation({
+      text: 'on the default',
+      settings: { modelId: null, reasoningLevel: 'default' },
+      contactFor: attempt.contactFor,
+    })
+
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) throw new Error('unreachable')
+    expect(attempt.bodies).toEqual([
+      JSON.stringify({ message: 'on the default', reasoningLevel: 'default' }),
+    ])
+    forgetFirstAdmission(outcome.conversationId)
+  })
+
   it('creates nothing at all when the harness refuses the send', async () => {
     // The reason the submission happens before any navigation: the words are
     // still in the field the person typed them into, there is no conversation
@@ -96,6 +122,7 @@ describe('starting a conversation with a live first turn', () => {
     const attempt = harness('refuses')
     const outcome = await startConversation({
       text: 'this one bounces',
+      settings: SETTINGS,
       contactFor: attempt.contactFor,
     })
 
@@ -112,6 +139,7 @@ describe('starting a conversation with a live first turn', () => {
     const attempt = harness('absent')
     const outcome = await startConversation({
       text: 'anyone there?',
+      settings: SETTINGS,
       contactFor: attempt.contactFor,
     })
 
@@ -123,8 +151,16 @@ describe('starting a conversation with a live first turn', () => {
 
   it('gives every send its own conversation, so two sends are two conversations', async () => {
     const attempt = harness('admits')
-    const one = await startConversation({ text: 'first', contactFor: attempt.contactFor })
-    const two = await startConversation({ text: 'second', contactFor: attempt.contactFor })
+    const one = await startConversation({
+      text: 'first',
+      settings: SETTINGS,
+      contactFor: attempt.contactFor,
+    })
+    const two = await startConversation({
+      text: 'second',
+      settings: SETTINGS,
+      contactFor: attempt.contactFor,
+    })
 
     expect(one.ok && two.ok).toBe(true)
     if (!one.ok || !two.ok) throw new Error('unreachable')

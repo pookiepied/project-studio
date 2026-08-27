@@ -1,4 +1,3 @@
-import { findModel } from '@/domain/models/catalog'
 import type { Conversation } from '@/domain/session/types'
 
 /**
@@ -38,11 +37,15 @@ const CHARS_PER_TOKEN = 4
 /** Every turn costs a little beyond its text: role, delimiters, tool framing. */
 const PER_MESSAGE_OVERHEAD = 8
 
-/** Used when a model has no declared window, or none is selected yet. */
+/** Used when no model is selected, or the selected one declares no window. */
 const FALLBACK_WINDOW = 200_000
 
-export function contextUsage(conversation: Conversation, modelId?: string): number {
-  const window = (modelId ? findModel(modelId)?.contextWindow : undefined) ?? FALLBACK_WINDOW
+/**
+ * The selected model's own window, from the catalog the harness served; null
+ * when nothing is selected or the model does not declare one.
+ */
+export function contextUsage(conversation: Conversation, contextWindow: number | 'unknown' | null): number {
+  const window = typeof contextWindow === 'number' && contextWindow > 0 ? contextWindow : FALLBACK_WINDOW
 
   const tokens = conversation.messages.reduce((total, message) => {
     // The reasoning trace occupies the window too, and on a long chain of

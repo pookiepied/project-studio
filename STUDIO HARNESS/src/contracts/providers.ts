@@ -1,6 +1,6 @@
 import * as v from "valibot";
 
-import { modelCapabilitySchema, type ModelCapability } from "./models.js";
+import { modelCapabilitySchema, reasoningLevelSchema, type ModelCapability } from "./models.js";
 
 /**
  * Which family of work a provider handles.
@@ -243,12 +243,23 @@ export type ModelPricing = v.InferOutput<typeof modelPricingSchema>;
  * and `origin` remembers whether it came from the built-in catalog, the user
  * typing it in, or a live fetch, so the UI can explain why it is there and
  * whether it will refresh.
+ *
+ * `reasoningLevels` is the per-model answer to "how hard can this one think":
+ * the levels Pi's own model record supports, in Pi's order, empty for a model
+ * that cannot reason. It exists beside `capability.reasoning` because the
+ * boolean says WHETHER and this says WHICH - a fixed list of levels offered to
+ * every model is how a composer ends up offering Max to a model with no
+ * reasoning at all. The value comes from Pi's `getSupportedThinkingLevels`
+ * with "off" removed; the composer supplies "default" itself.
  */
 export const providerModelSchema = v.object({
   connectionId: v.pipe(v.string(), v.minLength(1)),
   modelId: v.pipe(v.string(), v.minLength(1)),
   displayName: v.pipe(v.string(), v.minLength(1)),
   capability: modelCapabilitySchema,
+  // Optional with an empty default so records stored before this field
+  // existed still parse; every freshly built row carries it explicitly.
+  reasoningLevels: v.optional(v.array(reasoningLevelSchema), []),
   shape: invocationShapeSchema,
   pricing: modelPricingSchema,
   hidden: v.boolean(),

@@ -75,6 +75,9 @@ beforeEach(() => {
     conversations: new ConversationStore(db),
     projects: new ProjectStore(db),
     admission: session.verifier,
+    // No submission in this suite carries turn settings; "nothing is served"
+    // is the honest answer for the one check the middleware makes.
+    isModelServed: async () => false,
     // This suite never posts to the shutdown route; the no-op keeps the
     // process out of a composition that would otherwise be able to end it.
     requestShutdown: () => undefined,

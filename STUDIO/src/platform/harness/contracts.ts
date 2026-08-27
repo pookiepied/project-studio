@@ -140,6 +140,23 @@ export type CapabilityState = (typeof CAPABILITY_STATES)[number]
 export const MODEL_ORIGINS = ['catalog', 'manual', 'fetched'] as const
 export type ModelOrigin = (typeof MODEL_ORIGINS)[number]
 
+/**
+ * The reasoning levels a model may support, mirrored from
+ * `REASONING_LEVELS` in `STUDIO HARNESS/src/contracts/models.ts` - which is
+ * itself Pi's ThinkingLevel union. "default" is deliberately not a member: it
+ * is a choice the composer offers beside the levels, meaning the provider's
+ * own behaviour, and it never arrives as a level.
+ */
+export const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
+export type ReasoningLevel = (typeof REASONING_LEVELS)[number]
+
+/**
+ * A reasoning choice as the index stores it: a level, or "default" - the
+ * provider's own behaviour. Mirrored from `reasoningChoiceSchema`.
+ */
+export const REASONING_CHOICES = ['default', ...REASONING_LEVELS] as const
+export type ReasoningChoice = (typeof REASONING_CHOICES)[number]
+
 /** `CAPABILITY_SLOTS`. The `capability` filter `GET /models` accepts. */
 export const CAPABILITY_SLOTS = [
   'textGeneration',
@@ -296,6 +313,13 @@ export interface ProviderModel {
   readonly modelId: string
   readonly displayName: string
   readonly capability: ModelCapability
+  /**
+   * The levels this one model can be asked for, from Pi's own record. Empty
+   * for a model that cannot reason, which is what makes the composer's
+   * reasoning control absent rather than inert. "default" is never here; the
+   * composer offers it itself.
+   */
+  readonly reasoningLevels: readonly ReasoningLevel[]
   readonly shape: InvocationShape
   readonly pricing: ModelPricing
   /** Hidden from pickers without being deleted. */
@@ -323,6 +347,38 @@ export interface ProbeResult {
   readonly failure?: string
   readonly status?: number
   readonly latencyMs?: number
+}
+
+/* -------------------------------------------------------------------------- */
+/* Defaults                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** `modelReferenceSlotSchema` - one default, naming a model by its connection. */
+export interface ModelReferenceSlot {
+  readonly connectionId: string
+  readonly modelId: string
+}
+
+/**
+ * `defaultSelectionSchema` - the user's chosen defaults, per capability slot.
+ * Only the slots actually set appear, which is the contract's own partialness:
+ * most users set one or two and leave the rest to the harness.
+ */
+export type DefaultSelection = Partial<Record<CapabilitySlot, ModelReferenceSlot>>
+
+export function parseProviderDefaults(value: unknown): DefaultSelection | null {
+  if (!isRecord(value)) return null
+  const selection: DefaultSelection = {}
+  for (const slot of CAPABILITY_SLOTS) {
+    const raw = value[slot]
+    if (raw === undefined) continue
+    if (!isRecord(raw)) return null
+    const connectionId = text(raw['connectionId'])
+    const modelId = text(raw['modelId'])
+    if (connectionId === null || modelId === null) return null
+    selection[slot] = { connectionId, modelId }
+  }
+  return selection
 }
 
 /* -------------------------------------------------------------------------- */
@@ -485,6 +541,20 @@ export function parseModelPricing(value: unknown): ModelPricing | null {
   return { input, output, cacheRead, cacheWrite }
 }
 
+export function parseReasoningLevels(value: unknown): readonly ReasoningLevel[] | null {
+  // Absent parses as empty: records written before this field existed are
+  // models the harness knew no levels for, which is what empty says.
+  if (value === undefined) return []
+  if (!Array.isArray(value)) return null
+  const levels: ReasoningLevel[] = []
+  for (const item of value) {
+    const level = oneOf(REASONING_LEVELS, item)
+    if (level === null) return null
+    levels.push(level)
+  }
+  return levels
+}
+
 export function parseProviderModel(value: unknown): ProviderModel | null {
   if (!isRecord(value)) return null
 
@@ -492,6 +562,7 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
   const modelId = text(value['modelId'])
   const displayName = text(value['displayName'])
   const capability = parseModelCapability(value['capability'])
+  const reasoningLevels = parseReasoningLevels(value['reasoningLevels'])
   const shape = oneOf(INVOCATION_SHAPES, value['shape'])
   const pricing = parseModelPricing(value['pricing'])
   const hidden = flag(value['hidden'])
@@ -502,6 +573,7 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
     modelId === null ||
     displayName === null ||
     capability === null ||
+    reasoningLevels === null ||
     shape === null ||
     pricing === null ||
     hidden === null ||
@@ -510,7 +582,17 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
     return null
   }
 
-  return { connectionId, modelId, displayName, capability, shape, pricing, hidden, origin }
+  return {
+    connectionId,
+    modelId,
+    displayName,
+    capability,
+    reasoningLevels,
+    shape,
+    pricing,
+    hidden,
+    origin,
+  }
 }
 
 export function parseProviderModels(value: unknown): readonly ProviderModel[] | null {
@@ -584,8 +666,10 @@ export interface ConversationRecord {
   readonly titleManual: boolean
   readonly pinned: boolean
   readonly archived: boolean
-  /** Which model the last turn spoke to; null until turns carry models. */
+  /** Which model the conversation is held with, in the runtime's own vocabulary; null for the default alias. */
   readonly modelId: string | null
+  /** The reasoning choice it is held with; null is the same state as "default". */
+  readonly reasoningLevel: ReasoningChoice | null
   readonly createdAt: number
   readonly lastTurnAt: number
 }
@@ -626,6 +710,14 @@ function nullableText(value: unknown): { ok: true; value: string | null } | { ok
   return parsed === null ? { ok: false } : { ok: true, value: parsed }
 }
 
+function nullableChoice(
+  value: unknown,
+): { ok: true; value: ReasoningChoice | null } | { ok: false } {
+  if (value === null) return { ok: true, value: null }
+  const parsed = oneOf(REASONING_CHOICES, value)
+  return parsed === null ? { ok: false } : { ok: true, value: parsed }
+}
+
 export function parseConversationRecord(value: unknown): ConversationRecord | null {
   if (!isRecord(value)) return null
 
@@ -636,6 +728,7 @@ export function parseConversationRecord(value: unknown): ConversationRecord | nu
   const pinned = flag(value['pinned'])
   const archived = flag(value['archived'])
   const modelId = nullableText(value['modelId'])
+  const reasoningLevel = nullableChoice(value['reasoningLevel'])
   const createdAt = finiteNumber(value['createdAt'])
   const lastTurnAt = finiteNumber(value['lastTurnAt'])
 
@@ -647,6 +740,7 @@ export function parseConversationRecord(value: unknown): ConversationRecord | nu
     pinned === null ||
     archived === null ||
     !modelId.ok ||
+    !reasoningLevel.ok ||
     createdAt === null ||
     lastTurnAt === null
   ) {
@@ -663,6 +757,7 @@ export function parseConversationRecord(value: unknown): ConversationRecord | nu
     pinned,
     archived,
     modelId: modelId.value,
+    reasoningLevel: reasoningLevel.value,
     createdAt,
     lastTurnAt,
   }
@@ -729,19 +824,25 @@ export interface ConversationCreateDraft {
   readonly id: string
   readonly firstMessage: string
   readonly projectId?: string | null
+  /** The settings the first turn is being sent with, when one is settled. */
+  readonly modelId?: string | null
+  readonly reasoningLevel?: ReasoningChoice | null
   /** The moment the admission receipt arrived; defaults to the harness's clock. */
   readonly createdAt?: number
 }
 
 /**
  * What a rename, pin, archive, filing change, or later-turn stamp changes.
- * Absent keys are left alone; `projectId: null` clears the filing.
+ * Absent keys are left alone; `projectId: null` clears the filing, and
+ * `modelId: null` clears the model back to the default alias.
  */
 export interface ConversationPatch {
   readonly title?: string
   readonly pinned?: boolean
   readonly archived?: boolean
   readonly projectId?: string | null
+  readonly modelId?: string | null
+  readonly reasoningLevel?: ReasoningChoice | null
   readonly lastTurnAt?: number
 }
 
