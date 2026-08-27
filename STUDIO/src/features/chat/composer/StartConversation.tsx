@@ -50,7 +50,6 @@ export function StartConversation({
 
       <Composer
         conversationId={null}
-        projectId={projectId}
         placeholder={placeholder}
         onSend={firstTurn.start}
       />

@@ -4,6 +4,8 @@ import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
 import type { ProviderAdministration } from "../../src/application/provider-management.js";
+import type { ConversationStore } from "../../src/conversations/store.js";
+import type { ProjectStore } from "../../src/projects/store.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 
 /**
@@ -42,6 +44,12 @@ function composeApp(clientType: "studio-host" | "studio-client") {
       setRetrievalSlot: () => Promise.resolve(undefined),
     },
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
+    conversations: {
+      list: () => [],
+    } as unknown as ConversationStore,
+    projects: {
+      list: () => [],
+    } as unknown as ProjectStore,
     admission: session.verifier,
     // A stand-in for "the process began its drain": the real one never returns
     // before exit, and a test that called it would end the test runner.

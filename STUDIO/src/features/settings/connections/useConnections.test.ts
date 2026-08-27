@@ -46,6 +46,39 @@ interface Stub {
   readonly connect: HarnessConnect
 }
 
+/** The refusal every unused conversation/project method answers with. */
+const NOT_USED_HERE: HarnessFailure = {
+  kind: 'not-reachable',
+  timedOut: false,
+  message: 'The Connections pane does not use the conversation index.',
+}
+
+function refuse(): Promise<{ ok: false; error: HarnessFailure }> {
+  return Promise.resolve({ ok: false as const, error: NOT_USED_HERE })
+}
+
+/**
+ * Every conversation/project method of `HarnessClient`, stubbed to fail. This
+ * pane does not touch the index surface; if one ever fires here the suite is
+ * testing more than it says.
+ */
+function unreachableIndexStubs() {
+  return {
+    listConversations: () => refuse(),
+    createConversation: () => refuse(),
+    updateConversation: () => refuse(),
+    deleteConversation: () => refuse(),
+    purgeConversations: () => refuse(),
+    listProjects: () => refuse(),
+    createProject: () => refuse(),
+    updateProject: () => refuse(),
+    deleteProject: () => Promise.resolve({ ok: true as const, value: undefined }),
+    addProjectFolder: () => refuse(),
+    updateProjectFolder: () => refuse(),
+    removeProjectFolder: () => refuse(),
+  }
+}
+
 function stubClient(
   overrides: {
     connections?: readonly ProviderConnection[]
@@ -72,6 +105,10 @@ function stubClient(
     updateConnection,
     deleteConnection,
     probeConnection,
+    // The provider pane never calls the index surface; the stubs only
+    // satisfy the interface. If one of these ever fires here, this suite is
+    // testing more than it says.
+    ...unreachableIndexStubs(),
   }
 
   return {

@@ -15,6 +15,16 @@ import { cn } from '@/lib/cn'
  *
  * Selection is here rather than a per-row delete because the reason to visit
  * this pane at all is usually to clear several things at once.
+ *
+ * ---- What the buttons actually destroy -------------------------------------
+ *
+ * `removeMany` asks the harness to purge: the index row and that
+ * conversation's own tree under `~/.studio/data/conversations/` go; the
+ * canonical transcript inside Flue's journal has no supported deletion
+ * surface, so nothing pretends otherwise — see
+ * `STUDIO HARNESS/src/conversations/purge.ts`. The rows are removed first,
+ * which means there is no half-deleted state in the sidebar afterwards even
+ * when files were locked mid-turn and reported back as unremovable.
  */
 export function ArchivePane() {
   const { conversations, setArchived, removeMany } = useWorkspace()

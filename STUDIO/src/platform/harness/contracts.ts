@@ -563,6 +563,236 @@ export function parseHarnessErrorBody(value: unknown): HarnessErrorBody | null {
 }
 
 /* -------------------------------------------------------------------------- */
+/* The conversation index                                                      */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Mirrored from `STUDIO HARNESS/src/contracts/conversations.ts`. This is the
+ * INDEX, not a transcript: identity, title, filing and flags, and never one
+ * word of what was said. Flue's stream at `agents/studio/<id>` owns the words,
+ * and reading them back is `useConversation`'s job above.
+ *
+ * Like every contract here these are wire types; the sidebar's `Conversation`
+ * lives in `domain/session/types.ts` and mapping happens once at the store.
+ */
+
+export interface ConversationRecord {
+  readonly id: string
+  readonly title: string | null
+  readonly projectId: string | null
+  /** A person named this; automatic titling has stopped for it. */
+  readonly titleManual: boolean
+  readonly pinned: boolean
+  readonly archived: boolean
+  /** Which model the last turn spoke to; null until turns carry models. */
+  readonly modelId: string | null
+  readonly createdAt: number
+  readonly lastTurnAt: number
+}
+
+/** The marks a project may wear; mirrored from `projectIconSchema`. */
+export const PROJECT_ICON_KEYS = [
+  'arc',
+  'stack',
+  'grid',
+  'ring',
+  'wave',
+  'burst',
+  'prism',
+  'diamond',
+] as const
+
+export type ProjectIconKey = (typeof PROJECT_ICON_KEYS)[number]
+
+export interface ProjectFolderRecord {
+  readonly id: string
+  readonly name: string
+  readonly path: string
+}
+
+export interface ProjectRecord {
+  readonly id: string
+  readonly name: string
+  /** Membership, not free text: oneOf(PROJECT_ICON_KEYS) proved it below. */
+  readonly icon: ProjectIconKey
+  readonly description: string
+  readonly folders: readonly ProjectFolderRecord[]
+  readonly createdAt: number
+}
+
+function nullableText(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === null) return { ok: true, value: null }
+  const parsed = text(value)
+  return parsed === null ? { ok: false } : { ok: true, value: parsed }
+}
+
+export function parseConversationRecord(value: unknown): ConversationRecord | null {
+  if (!isRecord(value)) return null
+
+  const id = text(value['id'])
+  const title = nullableText(value['title'])
+  const projectId = nullableText(value['projectId'])
+  const titleManual = flag(value['titleManual'])
+  const pinned = flag(value['pinned'])
+  const archived = flag(value['archived'])
+  const modelId = nullableText(value['modelId'])
+  const createdAt = finiteNumber(value['createdAt'])
+  const lastTurnAt = finiteNumber(value['lastTurnAt'])
+
+  if (
+    id === null ||
+    !title.ok ||
+    !projectId.ok ||
+    titleManual === null ||
+    pinned === null ||
+    archived === null ||
+    !modelId.ok ||
+    createdAt === null ||
+    lastTurnAt === null
+  ) {
+    return null
+  }
+
+  // Field by field, like every other record here: nothing un-named in a
+  // response body can reach the sidebar through this parser.
+  return {
+    id,
+    title: title.value,
+    projectId: projectId.value,
+    titleManual,
+    pinned,
+    archived,
+    modelId: modelId.value,
+    createdAt,
+    lastTurnAt,
+  }
+}
+
+export function parseConversationRecords(value: unknown): readonly ConversationRecord[] | null {
+  return listOf(parseConversationRecord, value)
+}
+
+export function parseProjectFolder(value: unknown): ProjectFolderRecord | null {
+  if (!isRecord(value)) return null
+  const id = text(value['id'])
+  const name = text(value['name'])
+  const path = text(value['path'])
+  if (id === null || name === null || path === null) return null
+  return { id, name, path }
+}
+
+export function parseProjectRecord(value: unknown): ProjectRecord | null {
+  if (!isRecord(value)) return null
+
+  const id = text(value['id'])
+  const name = text(value['name'])
+  const icon = oneOf(PROJECT_ICON_KEYS, value['icon'])
+  const folders = listOf(parseProjectFolder, value['folders'])
+  const createdAt = finiteNumber(value['createdAt'])
+
+  // A description differs from every other text field here: empty is a real
+  // stored value ("a project with no description yet"), and the column is NOT
+  // NULL at the other end, so a plain string is required - null is a drift.
+  const rawDescription = value['description']
+  if (typeof rawDescription !== 'string') return null
+
+  if (
+    id === null ||
+    name === null ||
+    icon === null ||
+    folders === null ||
+    createdAt === null
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    name,
+    icon,
+    description: rawDescription,
+    folders,
+    createdAt,
+  }
+}
+
+export function parseProjectRecords(value: unknown): readonly ProjectRecord[] | null {
+  return listOf(parseProjectRecord, value)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Index mutations                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** What creating an index row sends: identity plus the words the title comes from. */
+export interface ConversationCreateDraft {
+  readonly id: string
+  readonly firstMessage: string
+  readonly projectId?: string | null
+  /** The moment the admission receipt arrived; defaults to the harness's clock. */
+  readonly createdAt?: number
+}
+
+/**
+ * What a rename, pin, archive, filing change, or later-turn stamp changes.
+ * Absent keys are left alone; `projectId: null` clears the filing.
+ */
+export interface ConversationPatch {
+  readonly title?: string
+  readonly pinned?: boolean
+  readonly archived?: boolean
+  readonly projectId?: string | null
+  readonly lastTurnAt?: number
+}
+
+/**
+ * The answer to permanent destruction over one id or many. `cleanupFailures`
+ * is present precisely so a tree that could not be fully removed is said out
+ * loud rather than silently absorbed.
+ */
+export interface PurgeOutcome {
+  readonly removed: readonly string[]
+  readonly cleanupFailures: Readonly<Record<string, string>>
+}
+
+export function parsePurgeOutcome(value: unknown): PurgeOutcome | null {
+  if (!isRecord(value)) return null
+  const removed = listOf(parseId, value['removed'])
+  if (!isRecord(value['cleanupFailures']) || removed === null) return null
+
+  const failures: Record<string, string> = {}
+  for (const [key, message] of Object.entries(value['cleanupFailures'])) {
+    if (typeof message !== 'string') return null
+    failures[key] = message
+  }
+  return { removed, cleanupFailures: failures }
+}
+
+function parseId(value: unknown): string | null {
+  return text(value)
+}
+
+export interface ProjectFolderSpec {
+  readonly name: string
+  readonly path: string
+}
+
+/** Everything creating a project means; the id is caller-chosen like the rest. */
+export interface ProjectCreateDraft {
+  readonly id?: string
+  readonly name: string
+  readonly icon: string
+  readonly description?: string
+  readonly folders?: readonly ProjectFolderSpec[]
+}
+
+export interface ProjectPatch {
+  readonly name?: string
+  readonly icon?: string
+  readonly description?: string
+}
+
+/* -------------------------------------------------------------------------- */
 /* Conversation streams                                                        */
 /* -------------------------------------------------------------------------- */
 

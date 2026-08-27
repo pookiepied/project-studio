@@ -7,10 +7,14 @@ import type { PermissionApprovalBroker } from "../../application/approval-broker
 import type { McpAdministration } from "../../application/mcp-management.js";
 import type { ProviderAdministration } from "../../application/provider-management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
+import type { ConversationStore } from "../../conversations/store.js";
+import type { ProjectStore } from "../../projects/store.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
+import { createConversationRoutes } from "./routes/conversations.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
+import { createProjectRoutes } from "./routes/projects.js";
 import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
 
@@ -25,6 +29,10 @@ export interface CreateHttpAppOptions {
    */
   readonly retrieval: RetrievalAdministration;
   readonly approvals: PermissionApprovalBroker;
+  /** The conversation index: rows, never transcript content. */
+  readonly conversations: ConversationStore;
+  /** Projects and their folders over the same database. */
+  readonly projects: ProjectStore;
   readonly admission: AdmissionVerifier;
   /**
    * Begins this process's graceful shutdown when the Studio Host asks over
@@ -49,6 +57,8 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
+  app.route("/api/conversations", createConversationRoutes(options));
+  app.route("/api/projects", createProjectRoutes(options));
   app.route("/api", createLifecycleRoutes({ requestShutdown: options.requestShutdown }));
 
   const agentRoutes = new Hono<AdmissionEnv>();

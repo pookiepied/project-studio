@@ -149,6 +149,10 @@ async function startHarness(
         PROJECT_STUDIO_DB_PATH: join(databasePath, "flue.db"),
         PROJECT_STUDIO_STORE_PATH: join(databasePath, "studio.db"),
         PROJECT_STUDIO_MODEL_SOURCE: "test",
+        // The whole Studio home travels with the database: an agent turn now
+        // creates its conversation tree under it, and a test must not write
+        // there under the developer's real home.
+        PROJECT_STUDIO_HOME: databasePath,
       },
       // An IPC channel alongside the pipes, so shutdown can be *requested* on
       // Windows, where SIGTERM maps to TerminateProcess and never reaches a

@@ -2,38 +2,54 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { DEFAULT_MODEL_ID } from '@/domain/models/catalog'
 import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
-import { DEMO_CONVERSATIONS, DEMO_PROJECTS } from '@/domain/session/demo'
-import type { Conversation, Message, SessionStatus, TurnSettings } from '@/domain/session/types'
+import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/session/gallery'
+import type { Conversation, SessionStatus, TurnSettings } from '@/domain/session/types'
 import type { Project } from '@/domain/projects/types'
 import { detachedConversationId } from '@/platform/tauri'
-import { deriveTitle } from '@/stores/workspace/deriveTitle'
+import {
+  createHarnessClient,
+  resolveHarnessAddress,
+  startHarness,
+  type HarnessClient,
+  type HarnessFailure,
+} from '@/platform/harness'
+import { defaultListen } from '@/features/chat/useConversation'
+import { useDemoTurns } from '@/stores/workspace/demo-turns'
 import { readHandoff } from '@/stores/workspace/handoff'
-import { useDemoTurn } from '@/stores/workspace/useDemoTurn'
-import type { TurnRun } from '@/stores/workspace/useDemoTurn'
-import { useGalleryTurn } from '@/stores/workspace/useGalleryTurn'
-import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { newId } from '@/lib/id'
 
 /**
- * Projects, conversations, messages, and the settings a turn is sent with.
+ * Projects, conversations, and the settings a turn is sent with.
  *
- * One store, because they are one graph: a conversation belongs to a project, a
- * message belongs to a conversation, and the turn settings decide what the next
- * message does. Splitting them into a provider each is the shape that made the
- * previous shell hard to follow — four contexts describing one surface means
- * four places to look when the surface is wrong.
+ * ---- Where conversations live now ------------------------------------------
  *
- * Navigation is deliberately *not* here. Where the user is looking is a
- * different question from what exists, and keeping them apart is what lets the
- * sidebar re-render on a route change without touching the conversation list.
+ * In the harness. The store used to seed every conversation and project from
+ * `DEMO_CONVERSATIONS` and `DEMO_PROJECTS`, which meant a reload lost the
+ * whole sidebar. It reads the index (`GET /api/conversations`,
+ * `/api/projects`) on mount and whenever the harness comes up, and writes
+ * every change through it. Transcripts were never here - the conversation view
+ * projects Flue's stream directly - so what crosses the seam is exactly what
+ * an index holds: existence, title, filing, flags, recency.
+ *
+ * The load phases answer the two questions a real network asks - not loaded
+ * YET, and could not be loaded - as different states, mirroring
+ * `useConversation`'s phase machine rather than inventing a third shape.
+ *
+ * Two things stay local on purpose:
+ *
+ * - The artifact gallery is a display of renderers, not a conversation.
+ *   `ChatPage` withholds sending for it already; it has no stream to index,
+ *   so it never becomes a row in the harness's store either.
+ * - The demo turn path (`demo-turns.ts`) keeps answering only for the gallery.
  */
-
 const DEFAULT_TURN_SETTINGS: TurnSettings = {
   modelId: DEFAULT_MODEL_ID,
   effort: 'medium',
@@ -47,17 +63,57 @@ interface NewProjectInput {
   readonly folders: readonly { name: string; path: string }[]
 }
 
+/** How loading the index itself went. Distinct from any single record. */
+export interface StorePhase {
+  readonly status: 'loading' | 'ready' | 'no-harness' | 'failed'
+  /** The refusal behind a failure, verbatim from the wire. */
+  readonly error: HarnessFailure | null
+}
+
+function mapRecord(record: ConversationRecordLike): Conversation {
+  return {
+    id: record.id,
+    title: record.title,
+    projectId: record.projectId,
+    // The stream owns what was said. This list carries identity only.
+    messages: [],
+    updatedAt: record.lastTurnAt,
+    pinned: record.pinned,
+    archived: record.archived,
+  }
+}
+
+/** Exactly the fields this module maps, so no wire type leaks into context. */
+interface ConversationRecordLike {
+  readonly id: string
+  readonly title: string | null
+  readonly projectId: string | null
+  readonly pinned: boolean
+  readonly archived: boolean
+  readonly lastTurnAt: number
+}
+
+function findIn(
+  lists: readonly (readonly Conversation[])[],
+  id: string,
+): Conversation | undefined {
+  for (const list of lists) {
+    const found = list.find((conversation) => conversation.id === id)
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+
 interface WorkspaceValue {
   readonly projects: readonly Project[]
   readonly conversations: readonly Conversation[]
+  readonly storePhase: StorePhase
   readonly status: SessionStatus
   /**
    * Which conversations are working right now.
    *
-   * `status` is a single value describing *the one you are looking at*, which
-   * was fine while a turn could only run in the foreground. It cannot answer
-   * "is anything happening in the other three", and that is the question the
-   * sidebar has to answer — so this is a set rather than another flag.
+   * A set rather than a flag: the sidebar answers "is anything happening in
+   * the other three" without being one of them.
    */
   readonly running: ReadonlySet<string>
   readonly settings: TurnSettings
@@ -69,54 +125,64 @@ interface WorkspaceValue {
   setBranch: (projectId: string, branch: string) => void
 
   /**
-   * Records a conversation whose first turn the harness has already taken.
+   * Records a conversation whose first turn the harness admitted.
    *
-   * Distinct from `send` because nothing about it is a turn: the words are
-   * already gone, the reply is the harness's to produce, and the transcript
-   * is a projection of its log rather than of this list. What is left for
-   * this store is the part the harness has no opinion about — that the
-   * conversation exists, what it is called in the sidebar, and which project
-   * it belongs to. It carries no messages for exactly that reason; a copy
-   * kept here would be a second source of truth for text the log already
-   * owns.
+   * Runs after the receipt - creation is admission, so a refused first send
+   * reaches nothing here. The local copy appears at once without a title and
+   * is replaced by the stored record when the write lands; titling happens
+   * once, in the harness, from the words actually sent.
    */
   beginConversation: (input: {
     readonly id: string
     readonly firstMessage: string
     readonly projectId: string | null
   }) => void
-  /** Creates the conversation if `conversationId` is null, and returns its id. */
-  send: (conversationId: string | null, text: string, projectId: string | null) => string
+  /** Stamps recency after an admitted later turn. */
+  touch: (conversationId: string) => void
+  send: (conversationId: string | null, text: string) => string
   stop: () => void
-  /** Drops the last reply and asks again from the same prompt. */
   retry: (conversationId: string) => void
-  /** Replaces a user message and discards everything after it. */
   editMessage: (conversationId: string, messageId: string, text: string) => void
-  /** Copies the conversation up to a message into a new one. */
   fork: (conversationId: string, messageId: string) => string | null
 
   rename: (conversationId: string, title: string) => void
   setProject: (conversationId: string, projectId: string | null) => void
   togglePin: (conversationId: string) => void
   setArchived: (conversationId: string, archived: boolean) => void
+  /** Deletes by archiving; the archive pane owns destruction. */
   remove: (conversationId: string) => void
+  /** Permanent destruction over a selection or all of the archive. */
   removeMany: (conversationIds: readonly string[]) => void
+  /**
+   * Asks the supervisor to start the harness and re-reads when it does. The
+   * remedy Task 34's notice names, reachable from anywhere that can see this
+   * store's absence.
+   */
+  ensureStore: () => Promise<boolean>
 }
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  // A detached window opens with the workspace as its opening window saw it,
-  // not with the demo seed — the conversation it was opened for may be one
-  // the seed has never heard of. Read once for the life of the window: the
-  // snapshot was written at the moment of opening (see `useDetachConversation`)
-  // and is a birth certificate, not a subscription.
+  // A detached window opens with the workspace its opening window saw, not
+  // with an empty column while the harness answers. Read once for the life of
+  // the window: it is a birth certificate, not a subscription.
   const [seed] = useState(() => (detachedConversationId() ? readHandoff() : null))
 
-  const [projects, setProjects] = useState<readonly Project[]>(seed?.projects ?? DEMO_PROJECTS)
-  const [conversations, setConversations] = useState<readonly Conversation[]>(
-    seed?.conversations ?? DEMO_CONVERSATIONS,
+  const [remoteConversations, setRemoteConversations] = useState<readonly Conversation[]>(
+    () =>
+      (seed?.conversations ?? []).filter(
+        (item) => item.id !== GALLERY_CONVERSATION_ID && item.messages.length === 0,
+      ),
   )
+  const [remoteProjects, setRemoteProjects] = useState<readonly Project[]>(
+    () => seed?.projects ?? [],
+  )
+  const [localConversations, setLocalConversations] = useState<readonly Conversation[]>(() => [
+    galleryConversation(),
+    ...((seed?.conversations ?? []).filter((item) => item.messages.length > 0)),
+  ])
+  const [storePhase, setStorePhase] = useState<StorePhase>({ status: 'loading', error: null })
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [running, setRunning] = useState<ReadonlySet<string>>(() => new Set())
 
@@ -129,304 +195,416 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return next
     })
   }, [])
+
   const [settings, setSettings] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
-  const demo = useDemoTurn()
-  const gallery = useGalleryTurn()
 
-  /**
-   * Which turn runner answers, and why the choice lives here.
-   *
-   * One conversation in the demo set is the artifact gallery, and replying in
-   * it plays every artifact through its stages instead of typing a canned
-   * paragraph. Deciding that here rather than inside the runner keeps both
-   * runners ignorant of each other and of conversation ids — and it is the
-   * single seam a real transport replaces, since `run` is the only thing the
-   * four call sites below know about.
-   */
-  const run = useCallback(
-    (conversationId: string, options: TurnRun) =>
-      (conversationId === GALLERY_CONVERSATION_ID ? gallery.run : demo.run)(options),
-    [demo.run, gallery.run],
-  )
+  /* ------------------------------ the index ------------------------------- */
 
-  const cancel = useCallback(() => {
-    demo.cancel()
-    gallery.cancel()
-  }, [demo.cancel, gallery.cancel])
+  const clientRef = useRef<HarnessClient | null>(null)
+  const liveRef = useRef(true)
 
-  const patchConversation = useCallback(
-    (id: string, change: (conversation: Conversation) => Conversation) => {
-      setConversations((current) =>
-        current.map((conversation) => (conversation.id === id ? change(conversation) : conversation)),
+  const load = useCallback(async () => {
+    let client = clientRef.current
+    if (client === null) {
+      const address = await resolveHarnessAddress()
+      if (!liveRef.current) return
+      if (address === null) {
+        // Said differently from a failure: nothing is wrong except absence.
+        setStorePhase((current) =>
+          current.status === 'loading' ? { status: 'no-harness', error: null } : current,
+        )
+        return
+      }
+      client = createHarnessClient(address)
+      clientRef.current = client
+    }
+
+    const [conversations, projects] = await Promise.all([
+      client.listConversations(),
+      client.listProjects(),
+    ])
+    if (!liveRef.current) return
+
+    if (!conversations.ok) {
+      setStorePhase({ status: 'failed', error: conversations.error })
+      return
+    }
+    if (!projects.ok) {
+      setStorePhase({ status: 'failed', error: projects.error })
+      return
+    }
+
+    // Local copies under ids the store holds are dropped: the row is the
+    // truth. Local-only records survive; they exist because their writes
+    // have not landed yet or belong to something the store will never hold.
+    const storedIds = new Set(conversations.value.map((record) => record.id))
+    setLocalConversations((current) =>
+      current.filter(
+        (item) => item.id === GALLERY_CONVERSATION_ID || !storedIds.has(item.id),
+      ),
+    )
+
+    setRemoteConversations(conversations.value.map(mapRecord))
+    setRemoteProjects(
+      projects.value.map((project) => ({
+        id: project.id,
+        name: project.name,
+        icon: project.icon,
+        description: project.description,
+        folders: project.folders.map((folder) => ({
+          id: folder.id,
+          name: folder.name,
+          path: folder.path,
+        })),
+        // A checked-out branch is git's fact to report. Until some surface
+        // reports it, there is none to show - which IdentityLine already
+        // renders as "no branch control".
+        branch: null,
+        branches: [],
+        createdAt: project.createdAt,
+      })),
+    )
+    setStorePhase({ status: 'ready', error: null })
+  }, [])
+
+  useEffect(() => {
+    liveRef.current = true
+    void load()
+    return () => {
+      liveRef.current = false
+    }
+  }, [load])
+
+  // When the harness comes back - first start, crash restart, or someone
+  // pressing start on Task 34's notice - the index re-reads itself. What is
+  // on screen while it is down stays: losing connection to the store does not
+  // mean forgetting what it had.
+  useEffect(() => {
+    const restartLoad = (): void => {
+      // The endpoint may have moved with the restart.
+      clientRef.current = null
+      setStorePhase((current) =>
+        current.status === 'ready' ? { status: 'loading', error: null } : current,
       )
+      void load().then(() => undefined)
+    }
+    let unlisten: (() => void) | null = null
+    let disposed = false
+    void defaultListen((signal) => {
+      if (signal.name === 'harness-starting' || signal.name === 'harness-started') {
+        restartLoad()
+      }
+    }).then((off) => {
+      if (disposed) off()
+      else unlisten = off
+    })
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [load])
+
+  /** Offers to start the harness, and re-reads when it comes up. */
+  const ensureStore = useCallback(async (): Promise<boolean> => {
+    const cameUp = await startHarness()
+    if (cameUp && liveRef.current) {
+      clientRef.current = null
+      setStorePhase({ status: 'loading', error: null })
+      await load()
+    }
+    return cameUp
+  }, [load])
+
+  /* --------------------------- optimistic writes -------------------------- */
+
+  const patchAnyConversation = useCallback(
+    (id: string, change: (conversation: Conversation) => Conversation) => {
+      const apply = (
+        current: readonly Conversation[],
+      ): readonly Conversation[] =>
+        current.map((conversation) =>
+          conversation.id === id ? change(conversation) : conversation,
+        )
+      setRemoteConversations(apply)
+      setLocalConversations(apply)
     },
     [],
   )
 
-  const stop = useCallback(() => {
-    cancel()
-    setStatus('idle')
-  }, [cancel])
-
-  // — Projects ----------------------------------------------------------
-
-  const createProject = useCallback((input: NewProjectInput): Project => {
-    const project: Project = {
-      id: newId('prj'),
-      name: input.name.trim(),
-      icon: input.icon,
-      description: input.description.trim(),
-      folders: input.folders.map((folder) => ({ id: newId('src'), ...folder })),
-      branch: input.folders.length > 0 ? 'main' : null,
-      branches: input.folders.length > 0 ? ['main'] : [],
-      createdAt: Date.now(),
-    }
-    setProjects((current) => [...current, project])
-    return project
-  }, [])
-
-  const removeProject = useCallback((projectId: string) => {
-    // Removing a project detaches its conversations rather than deleting them.
-    // The folder on disk is untouched and so is the work: this is a list the
-    // user curates, not a destructive action, and the confirmation copy says so.
-    setProjects((current) => current.filter((project) => project.id !== projectId))
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.projectId === projectId ? { ...conversation, projectId: null } : conversation,
-      ),
-    )
-  }, [])
-
-  const setBranch = useCallback((projectId: string, branch: string) => {
-    setProjects((current) =>
-      current.map((project) => (project.id === projectId ? { ...project, branch } : project)),
-    )
-  }, [])
-
-  // — Turns -------------------------------------------------------------
+  const mutateIndex = useCallback(
+    async (
+      id: string,
+      patch: Parameters<HarnessClient['updateConversation']>[1],
+      localChange?: (conversation: Conversation) => Conversation,
+    ) => {
+      if (localChange !== undefined) patchAnyConversation(id, localChange)
+      const client = clientRef.current
+      if (client === null) return
+      const result = await client.updateConversation(id, patch)
+      // On any refusal the truth is re-read instead of locally reverted -
+      // "what did not happen" has more cases than one revert can enumerate.
+      if (!result.ok && liveRef.current) void load()
+    },
+    [load, patchAnyConversation],
+  )
 
   const beginConversation = useCallback(
     (input: { id: string; firstMessage: string; projectId: string | null }) => {
-      setConversations((current) => {
-        // The id is the harness's now, and a second record under it would be
-        // a duplicate in the sidebar pointing at the same log.
+      setRemoteConversations((current) => {
+        // A second record under one receipt would be two sidebar rows pointing
+        // at the same stream.
         if (current.some((conversation) => conversation.id === input.id)) return current
-        const created: Conversation = {
+        return [
+          {
+            id: input.id,
+            title: null,
+            projectId: input.projectId,
+            messages: [],
+            updatedAt: Date.now(),
+            pinned: false,
+            archived: false,
+          },
+          ...current,
+        ]
+      })
+
+      const client = clientRef.current
+      if (client === null) return
+      void client
+        .createConversation({
           id: input.id,
-          title: deriveTitle(input.firstMessage),
-          projectId: input.projectId,
-          messages: [],
-          updatedAt: Date.now(),
-          pinned: false,
-          archived: false,
-        }
-        return [created, ...current]
-      })
+          firstMessage: input.firstMessage,
+          ...(input.projectId === null ? {} : { projectId: input.projectId }),
+          createdAt: Date.now(),
+        })
+        .then(async (result) => {
+          if (!liveRef.current) return
+          if (!result.ok) {
+            await load()
+            return
+          }
+          const stored = mapRecord(result.value)
+          setRemoteConversations((current) =>
+            current.map((conversation) =>
+              conversation.id === stored.id ? stored : conversation,
+            ),
+          )
+        })
     },
-    [],
+    [load],
   )
 
-  const send = useCallback(
-    (conversationId: string | null, text: string, projectId: string | null): string => {
-      const body = text.trim()
-      if (!body) return conversationId ?? ''
-
-      const userMessage: Message = {
-        id: newId('msg'),
-        role: 'user',
-        text: body,
-        createdAt: Date.now(),
-      }
-
-      let targetId = conversationId
-      if (targetId === null) {
-        // Sending is what creates a conversation. There is no separate "new
-        // conversation" step to forget, and no empty shell left in the list if
-        // someone opens one and walks away.
-        const created: Conversation = {
-          id: newId('cnv'),
-          title: deriveTitle(body),
-          projectId,
-          messages: [userMessage],
-          updatedAt: Date.now(),
-          pinned: false,
-          archived: false,
-        }
-        targetId = created.id
-        setConversations((current) => [created, ...current])
-      } else {
-        patchConversation(targetId, (conversation) => ({
-          ...conversation,
-          title: conversation.title ?? deriveTitle(body),
-          messages: [...conversation.messages, userMessage],
-          updatedAt: Date.now(),
-        }))
-      }
-
-      const id = targetId
-      run(id, {
-        modelId: settings.modelId,
-        patch: (change) => patchConversation(id, change),
-        onThinking: () => {
-          setStatus('thinking')
-          markRunning(id, true)
-        },
-        onStreaming: () => setStatus('streaming'),
-        onDone: () => {
-          setStatus('idle')
-          markRunning(id, false)
-        },
-      })
-
-      return targetId
-    },
-    [patchConversation, run, settings.modelId],
-  )
-
-  const retry = useCallback(
+  const touch = useCallback(
     (conversationId: string) => {
-      cancel()
-      const conversation = conversations.find((item) => item.id === conversationId)
-      if (!conversation) return
-
-      // Drop trailing assistant turns so retry replaces the answer rather than
-      // appending a second one under the same question.
-      const kept = [...conversation.messages]
-      while (kept.length > 0 && kept[kept.length - 1]?.role === 'assistant') kept.pop()
-      if (kept.length === 0) return
-
-      patchConversation(conversationId, (current) => ({ ...current, messages: kept }))
-      run(conversationId, {
-        modelId: settings.modelId,
-        patch: (change) => patchConversation(conversationId, change),
-        onThinking: () => {
-          setStatus('thinking')
-          markRunning(conversationId, true)
-        },
-        onStreaming: () => setStatus('streaming'),
-        onDone: () => {
-          setStatus('idle')
-          markRunning(conversationId, false)
-        },
-      })
+      void mutateIndex(
+        conversationId,
+        { lastTurnAt: Date.now() },
+        (conversation) => ({ ...conversation, updatedAt: Date.now() }),
+      )
     },
-    [cancel, conversations, patchConversation, run, settings.modelId],
+    [mutateIndex],
   )
-
-  const editMessage = useCallback(
-    (conversationId: string, messageId: string, text: string) => {
-      const body = text.trim()
-      if (!body) return
-      cancel()
-
-      const conversation = conversations.find((item) => item.id === conversationId)
-      if (!conversation) return
-      const index = conversation.messages.findIndex((message) => message.id === messageId)
-      if (index < 0) return
-
-      // Everything after an edited message described a different question, so
-      // it is discarded rather than left dangling under a prompt that no longer
-      // produced it.
-      const kept = conversation.messages
-        .slice(0, index + 1)
-        .map((message) => (message.id === messageId ? { ...message, text: body } : message))
-
-      patchConversation(conversationId, (current) => ({
-        ...current,
-        messages: kept,
-        updatedAt: Date.now(),
-      }))
-
-      run(conversationId, {
-        modelId: settings.modelId,
-        patch: (change) => patchConversation(conversationId, change),
-        onThinking: () => {
-          setStatus('thinking')
-          markRunning(conversationId, true)
-        },
-        onStreaming: () => setStatus('streaming'),
-        onDone: () => {
-          setStatus('idle')
-          markRunning(conversationId, false)
-        },
-      })
-    },
-    [cancel, conversations, patchConversation, run, settings.modelId],
-  )
-
-  const fork = useCallback(
-    (conversationId: string, messageId: string): string | null => {
-      const conversation = conversations.find((item) => item.id === conversationId)
-      if (!conversation) return null
-      const index = conversation.messages.findIndex((message) => message.id === messageId)
-      if (index < 0) return null
-
-      const copy: Conversation = {
-        ...conversation,
-        id: newId('cnv'),
-        title: conversation.title ? `${conversation.title} (fork)` : null,
-        messages: conversation.messages.slice(0, index + 1).map((message) => ({
-          ...message,
-          id: newId('msg'),
-        })),
-        updatedAt: Date.now(),
-        pinned: false,
-      }
-      setConversations((current) => [copy, ...current])
-      return copy.id
-    },
-    [conversations],
-  )
-
-  // — Conversation records ---------------------------------------------
 
   const rename = useCallback(
     (conversationId: string, title: string) => {
       const trimmed = title.trim()
       // An empty rename is a cancelled rename, not a request for a blank title.
       if (!trimmed) return
-      patchConversation(conversationId, (conversation) => ({ ...conversation, title: trimmed }))
+      void mutateIndex(
+        conversationId,
+        { title: trimmed },
+        (conversation) => ({ ...conversation, title: trimmed }),
+      )
     },
-    [patchConversation],
+    [mutateIndex],
   )
 
   const setProject = useCallback(
     (conversationId: string, projectId: string | null) => {
-      patchConversation(conversationId, (conversation) => ({ ...conversation, projectId }))
+      void mutateIndex(
+        conversationId,
+        { projectId },
+        (conversation) => ({ ...conversation, projectId }),
+      )
     },
-    [patchConversation],
+    [mutateIndex],
   )
 
   const togglePin = useCallback(
     (conversationId: string) => {
-      patchConversation(conversationId, (conversation) => ({
-        ...conversation,
-        pinned: !conversation.pinned,
-      }))
+      const current = findIn([remoteConversations, localConversations], conversationId)
+      const pinned = !(current?.pinned ?? false)
+      void mutateIndex(
+        conversationId,
+        { pinned },
+        (conversation) => ({ ...conversation, pinned }),
+      )
     },
-    [patchConversation],
+    [localConversations, mutateIndex, remoteConversations],
   )
 
   const setArchived = useCallback(
     (conversationId: string, archived: boolean) => {
-      patchConversation(conversationId, (conversation) => ({ ...conversation, archived }))
+      void mutateIndex(
+        conversationId,
+        { archived },
+        (conversation) => ({ ...conversation, archived }),
+      )
     },
-    [patchConversation],
+    [mutateIndex],
   )
 
-  const remove = useCallback((conversationId: string) => {
-    setConversations((current) => current.filter((item) => item.id !== conversationId))
+  // Deleting archives: the archive is the recovery window, so removing a
+  // conversation from anywhere except Settings lands it there.
+  const remove = useCallback(
+    (conversationId: string) => {
+      setArchived(conversationId, true)
+    },
+    [setArchived],
+  )
+
+  const removeMany = useCallback(
+    (conversationIds: readonly string[]) => {
+      const doomed = new Set(conversationIds)
+      setRemoteConversations((current) =>
+        current.filter((item) => !doomed.has(item.id)),
+      )
+      const client = clientRef.current
+      if (client === null || doomed.size === 0) return
+      void client.purgeConversations([...doomed]).then(async (result) => {
+        if (liveRef.current && !result.ok) await load()
+      })
+    },
+    [load],
+  )
+
+  /* ------------------------------ projects -------------------------------- */
+
+  const createProject = useCallback(
+    (input: NewProjectInput): Project => {
+      const created: Project = {
+        id: newId('prj'),
+        name: input.name.trim(),
+        icon: input.icon,
+        description: input.description.trim(),
+        folders: input.folders.map((folder) => ({ id: newId('src'), ...folder })),
+        branch: input.folders.length > 0 ? 'main' : null,
+        branches: input.folders.length > 0 ? ['main'] : [],
+        createdAt: Date.now(),
+      }
+      setRemoteProjects((current) => [...current, created])
+
+      const client = clientRef.current
+      if (client !== null) {
+        void client
+          .createProject({
+            id: created.id,
+            name: created.name,
+            icon: created.icon,
+            ...(created.description === '' ? {} : { description: created.description }),
+            folders: created.folders.map((folder) => ({
+              name: folder.name,
+              path: folder.path,
+            })),
+          })
+          .then(async (result) => {
+            if (!liveRef.current) return
+            if (!result.ok) {
+              await load()
+              return
+            }
+            // Folder ids come back server-minted; adopt them so later calls
+            // (relocate, remove) address real rows.
+            const stored = result.value
+            setRemoteProjects((current) =>
+              current.map((project) =>
+                project.id === stored.id
+                  ? {
+                      ...project,
+                      folders: stored.folders.map((folder) => ({
+                        id: folder.id,
+                        name: folder.name,
+                        path: folder.path,
+                      })),
+                    }
+                  : project,
+              ),
+            )
+          })
+      }
+      return created
+    },
+    [load],
+  )
+
+  const removeProject = useCallback(
+    (projectId: string) => {
+      // Detaches its conversations rather than deleting them - SET NULL at
+      // the schema, the same meaning everywhere above it.
+      setRemoteProjects((current) =>
+        current.filter((project) => project.id !== projectId),
+      )
+      setRemoteConversations((current) =>
+        current.map((conversation) =>
+          conversation.projectId === projectId
+            ? { ...conversation, projectId: null }
+            : conversation,
+        ),
+      )
+      const client = clientRef.current
+      if (client === null) return
+      void client.deleteProject(projectId).then(async (result) => {
+        if (liveRef.current && !result.ok) await load()
+      })
+    },
+    [load],
+  )
+
+  const setBranch = useCallback((projectId: string, branch: string) => {
+    // Memory only: branches are git's fact to report, and nothing here stores
+    // them.
+    setRemoteProjects((current) =>
+      current.map((project) => (project.id === projectId ? { ...project, branch } : project)),
+    )
   }, [])
 
-  const removeMany = useCallback((conversationIds: readonly string[]) => {
-    const doomed = new Set(conversationIds)
-    setConversations((current) => current.filter((item) => !doomed.has(item.id)))
-  }, [])
+  /* --------------------- the demo path (gallery only) --------------------- */
+
+  const findConversation = useCallback(
+    (conversationId: string): Conversation | undefined =>
+      findIn([remoteConversations, localConversations], conversationId),
+    [localConversations, remoteConversations],
+  )
+
+  const turns = useDemoTurns({
+    status: setStatus,
+    modelId: useCallback(() => settings.modelId, [settings.modelId]),
+    markRunning,
+    findConversation,
+    upsertLocal: setLocalConversations,
+  })
+
+  const cancel = useCallback(() => {
+    turns.cancel()
+  }, [turns.cancel])
+
+  const stop = useCallback(() => {
+    cancel()
+    setStatus('idle')
+  }, [cancel])
+
+  /* -------------------------------- value --------------------------------- */
+
+  const conversations = useMemo(
+    () => [...localConversations, ...remoteConversations],
+    [localConversations, remoteConversations],
+  )
 
   const value = useMemo<WorkspaceValue>(
     () => ({
-      projects,
+      projects: remoteProjects,
       conversations,
+      storePhase,
       status,
       running,
       settings,
@@ -435,39 +613,44 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       removeProject,
       setBranch,
       beginConversation,
-      send,
+      touch,
+      send: turns.send,
       stop,
-      retry,
-      editMessage,
-      fork,
+      retry: turns.retry,
+      editMessage: turns.editMessage,
+      fork: turns.fork,
       rename,
       setProject,
       togglePin,
       setArchived,
       remove,
       removeMany,
+      ensureStore,
     }),
     [
-      projects,
-      conversations,
-      status,
-      running,
-      settings,
-      createProject,
-      removeProject,
-      setBranch,
       beginConversation,
-      send,
-      stop,
-      retry,
-      editMessage,
-      fork,
-      rename,
-      setProject,
-      togglePin,
-      setArchived,
+      conversations,
+      createProject,
+      ensureStore,
+      remoteProjects,
       remove,
       removeMany,
+      removeProject,
+      rename,
+      running,
+      setArchived,
+      setBranch,
+      setProject,
+      status,
+      stop,
+      storePhase,
+      settings,
+      touch,
+      togglePin,
+      turns.editMessage,
+      turns.fork,
+      turns.retry,
+      turns.send,
     ],
   )
 

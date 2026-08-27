@@ -29,6 +29,8 @@ import { ModelCatalog } from "./providers/model-catalog.js";
 import { ProviderManagementService } from "./application/provider-management.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
 import { RetrievalSettingsStore } from "./retrieval/settings.js";
+import { ConversationStore } from "./conversations/store.js";
+import { ProjectStore } from "./projects/store.js";
 
 interface HarnessApplication {
   readonly app: ReturnType<typeof createHttpApp>;
@@ -149,6 +151,15 @@ function createHarnessApplication(): HarnessApplication {
     });
     bootLog("step 9: RetrievalManagementService completed");
 
+    // The conversation index and the project tables: the product's own record
+    // of what exists, over the same database and behind the same admission
+    // middleware as everything else. The transcript stays in Flue's journal;
+    // nothing here reads or writes it.
+    bootLog("step 10: conversation and project stores entering");
+    const conversations = new ConversationStore(database);
+    const projects = new ProjectStore(database);
+    bootLog("step 10: conversation and project stores completed");
+
     let shutdownPromise: Promise<void> | undefined;
     const shutdown = (): Promise<void> => {
       shutdownPromise ??= (async () => {
@@ -165,12 +176,14 @@ function createHarnessApplication(): HarnessApplication {
       return shutdownPromise;
     };
 
-    bootLog("step 10: createHttpApp entering");
+    bootLog("step 11: createHttpApp entering");
     const app = createHttpApp({
       servers: runtime.servers,
       providers,
       retrieval,
       approvals,
+      conversations,
+      projects,
       admission: admission.verifier,
       // The same drain the signal handlers run, reached over HTTP because the
       // Host has no deliverable signal on Windows (see the route module). The
@@ -180,7 +193,7 @@ function createHarnessApplication(): HarnessApplication {
         void shutdown().finally(() => process.exit(0));
       },
     });
-    bootLog("step 10: createHttpApp completed");
+    bootLog("step 11: createHttpApp completed");
 
     return { app, shutdown };
   } catch (error) {

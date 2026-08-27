@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   cacheDirectory,
+  conversationArtifactsDirectory,
+  conversationAttachmentsDirectory,
+  conversationDirectory,
+  conversationWorkspaceDirectory,
+  conversationsDirectory,
   databasePath,
   flueDatabasePath,
   durableDirectories,
@@ -99,6 +104,41 @@ describe("the Studio home", () => {
       join(workspace, "data"),
     ]);
     expect(durableDirectories()).not.toContain(cacheDirectory());
+  });
+});
+
+describe("a conversation's own directory", () => {
+  it("lives under data, because what the model wrote there is the user's", () => {
+    process.env.PROJECT_STUDIO_HOME = workspace;
+
+    expect(conversationsDirectory()).toBe(join(workspace, "data", "conversations"));
+    expect(conversationDirectory("cnv_x")).toBe(
+      join(workspace, "data", "conversations", "cnv_x"),
+    );
+    expect(conversationWorkspaceDirectory("cnv_x")).toBe(
+      join(workspace, "data", "conversations", "cnv_x", "workspace"),
+    );
+  });
+
+  it("keeps attachments and artifacts siblings of the workspace, not inside it", () => {
+    process.env.PROJECT_STUDIO_HOME = workspace;
+
+    const root = conversationDirectory("cnv_x");
+    for (const child of [
+      conversationAttachmentsDirectory("cnv_x"),
+      conversationArtifactsDirectory("cnv_x"),
+    ]) {
+      expect(child?.startsWith(root)).toBe(true);
+      expect(child?.startsWith(conversationWorkspaceDirectory("cnv_x"))).toBe(false);
+    }
+  });
+
+  it("refuses an id that is not a plain path segment", () => {
+    // Ids are caller-chosen, so a traversal must not be a directory change.
+    for (const hostile of ["..", "../elsewhere", "a/b", "", "a\\b"]) {
+      expect(() => conversationDirectory(hostile)).toThrow(/conversation id/);
+    }
+    expect(conversationDirectory("cnv_ok.id-1")).toContain("cnv_ok.id-1");
   });
 });
 

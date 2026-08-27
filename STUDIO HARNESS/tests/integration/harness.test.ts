@@ -149,6 +149,10 @@ async function startHarness(
         PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
         PROJECT_STUDIO_DB_PATH: databasePath,
         PROJECT_STUDIO_STORE_PATH: join(dirname(databasePath), "studio.db"),
+        // The whole Studio home travels with the database: an agent turn now
+        // creates its conversation tree under it, and a test must not write
+        // there under the developer's real home.
+        PROJECT_STUDIO_HOME: dirname(databasePath),
       },
       // An IPC channel alongside the pipes, so shutdown can be *requested* on
       // Windows. `SIGTERM` there maps to TerminateProcess and never reaches a

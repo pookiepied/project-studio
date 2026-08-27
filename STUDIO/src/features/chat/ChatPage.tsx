@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { useCallback } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { Composer } from '@/features/chat/composer'
@@ -50,7 +51,7 @@ export function ChatPage({
    */
   onForked?: (conversationId: string) => void
 }) {
-  const { status, retry, editMessage, fork } = useWorkspace()
+  const { status, retry, editMessage, fork, touch } = useWorkspace()
   const { openChat } = useNavigation()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
@@ -62,6 +63,19 @@ export function ChatPage({
     const created = fork(conversation.id, messageId)
     if (created) (onForked ?? openChat)(created)
   }
+
+  /**
+   * A receipt is also a recency fact: the index stamps the conversation the
+   * moment the harness admits a later turn, so sorting survives a reload.
+   */
+  const sendTurn = useCallback(
+    async (text: string) => {
+      const sent = await live.submit(text)
+      if (sent.ok) touch(conversation.id)
+      return sent
+    },
+    [conversation.id, live.submit, touch],
+  )
 
   return (
     <div className="relative flex h-full flex-col">
@@ -178,12 +192,11 @@ export function ChatPage({
 
           <Composer
             conversationId={conversation.id}
-            projectId={conversation.projectId}
             placeholder="Reply"
             {...(gallery
               ? {}
               : {
-                  onSend: (text: string) => live.submit(text),
+                  onSend: (text: string) => sendTurn(text),
                   // Admitted counts. A turn the harness has taken but not yet
                   // started producing is still a turn: the words are gone,
                   // the stop control is the only thing that can call it back,

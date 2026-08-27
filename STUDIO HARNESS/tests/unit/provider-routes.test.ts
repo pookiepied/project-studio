@@ -9,6 +9,8 @@ import type { McpAdministration } from "../../src/application/mcp-management.js"
 import { ProviderManagementService } from "../../src/application/provider-management.js";
 import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
 import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
+import { ConversationStore } from "../../src/conversations/store.js";
+import { ProjectStore } from "../../src/projects/store.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ConnectionStore } from "../../src/providers/connection-store.js";
 import { ModelCatalog } from "../../src/providers/model-catalog.js";
@@ -70,6 +72,8 @@ beforeEach(() => {
       credentials,
     }),
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
+    conversations: new ConversationStore(db),
+    projects: new ProjectStore(db),
     admission: session.verifier,
     // This suite never posts to the shutdown route; the no-op keeps the
     // process out of a composition that would otherwise be able to end it.

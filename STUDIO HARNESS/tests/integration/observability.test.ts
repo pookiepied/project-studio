@@ -98,6 +98,10 @@ async function startHarness(options: {
       PROJECT_STUDIO_ADMISSION_CREDENTIAL: admission.credential,
       PROJECT_STUDIO_DB_PATH: databasePath,
       PROJECT_STUDIO_STORE_PATH: join(directory, "studio.db"),
+      // The whole Studio home travels with the database: an agent turn now
+      // creates its conversation tree under it, and a test must not write
+      // there under the developer's real home.
+      PROJECT_STUDIO_HOME: directory,
       PROJECT_STUDIO_OTEL_EXPORTER: "memory",
       PROJECT_STUDIO_OTEL_MEMORY_DUMP_PATH: dumpPath,
       PROJECT_STUDIO_DEPLOYMENT_ENVIRONMENT: "test",

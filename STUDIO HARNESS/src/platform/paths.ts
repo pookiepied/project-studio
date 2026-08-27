@@ -154,6 +154,79 @@ export function sessionsDirectory(): string {
 }
 
 /**
+ * The per-conversation tree: what a conversation owns when it owns nothing
+ * else.
+ *
+ * A conversation with no project still needs somewhere to stand. Its own
+ * directory under `data/` is that place, and the three children answer three
+ * different questions with different lifetimes:
+ *
+ * - `workspace/` — the sandbox root for a conversation without a project.
+ *   Empty at first; a file the model writes here stays with the conversation.
+ *   Granted by default, because nothing else is inside it.
+ * - `attachments/` and `artifacts/` are **siblings**, not children of
+ *   `workspace/`: an attachment is something the user contributed, an artifact
+ *   is something the app produced, and either nested inside the sandbox root
+ *   would put them within the model's reach by construction.
+ *
+ * Under `data/` rather than `tmp/` on purpose — these files are the user's,
+ * and losing them because they were filed as scratch would be a bug. Created
+ * by callers when a conversation is created (`paths.ts`'s own rule), never at
+ * startup for conversations that merely exist in the index.
+ */
+export function conversationsDirectory(): string {
+  return studioPath("data", "conversations");
+}
+
+/**
+ * A conversation id as a path segment.
+ *
+ * Ids are caller-chosen (ADR 0045) and arrive here from a route parameter, so
+ * this refuses to guess: an id carrying a separator or a traversal is not a
+ * conversation directory anybody meant, and joining it unchecked would let one
+ * escape `data/conversations`. Legitimate ids are simple segments — `cnv_*` in
+ * practice — and anything else has no business reaching this tree.
+ */
+function conversationSegment(conversationId: string): string {
+  // Alphanumeric start, so nothing begins with a dot, and plain segment
+  // characters after: no separator of either platform's kind can appear, which
+  // is what makes traversal unrepresentable. `a..b` passes and is harmless —
+  // dots only traverse when they are the whole segment, and a whole segment of
+  // dots cannot start with a letter or a digit.
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(conversationId)) {
+    // Classified rather than a raw error, like every configured location that
+    // cannot be used: a name this module cannot turn into a directory of its
+    // own is a storage problem whatever the caller intended to keep there.
+    throw new StorageError("invalid", {
+      message:
+        `"${conversationId}" is not a conversation id this install can address. ` +
+        "A conversation directory must come from a plain identifier.",
+    });
+  }
+  return conversationId;
+}
+
+/** One conversation's directory. */
+export function conversationDirectory(conversationId: string): string {
+  return join(conversationsDirectory(), conversationSegment(conversationId));
+}
+
+/** The sandbox root of a conversation without a project. */
+export function conversationWorkspaceDirectory(conversationId: string): string {
+  return join(conversationDirectory(conversationId), "workspace");
+}
+
+/** Where files the user contributes to a conversation land. */
+export function conversationAttachmentsDirectory(conversationId: string): string {
+  return join(conversationDirectory(conversationId), "attachments");
+}
+
+/** Where artifacts this app produced for a conversation land. */
+export function conversationArtifactsDirectory(conversationId: string): string {
+  return join(conversationDirectory(conversationId), "artifacts");
+}
+
+/**
  * Everything that must survive, for a backup or export to enumerate.
  *
  * Derived from the same accessors the rest of the application uses, so a new

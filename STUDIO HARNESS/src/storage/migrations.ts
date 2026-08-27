@@ -435,6 +435,92 @@ export const MIGRATIONS: readonly Migration[] = [
           RENAME TO provider_default;
       `);
     },
+  },
+  {
+    version: 14,
+    name: "conversations_and_projects",
+    up(db) {
+      // Studio owns the index; Flue owns the transcript. Every message, tool
+      // call and attachment of a conversation lives in Flue's own journal,
+      // addressed by a stream path (`agents/studio/<id>`) whose id the caller
+      // chose (ADR 0045). That journal cannot be enumerated through any
+      // supported surface — `listAgents()` names agents, not conversations —
+      // so these rows are not a cache that could be rebuilt from somewhere:
+      // they are the only record that a conversation exists at all.
+      //
+      // Nothing here stores text. A second transcript, even a summary one, is
+      // exactly what the adapter contract refuses ("adapters must not model a
+      // second authoritative transcript"), and one that drifts from the real
+      // log is worse than none.
+      //
+      // `model_id` is written by nothing today and deliberately exists anyway:
+      // the next task sends a model with every submission, and a conversation
+      // that cannot say which model it was talking to would need this column
+      // the moment it could. An empty nullable column now costs nothing; a
+      // migration on release day would cost a rewrite of applied history.
+      db.exec(`
+        CREATE TABLE project (
+          id          TEXT PRIMARY KEY,
+          name        TEXT NOT NULL,
+          icon        TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          created_at  INTEGER NOT NULL
+        ) STRICT;
+
+        CREATE TABLE project_folder (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          path       TEXT NOT NULL,
+          name       TEXT NOT NULL,
+          position   INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES project(id) ON DELETE CASCADE
+        ) STRICT;
+
+        CREATE UNIQUE INDEX project_folder_path_per_project
+          ON project_folder (project_id, path);
+
+        CREATE INDEX project_folder_by_project
+          ON project_folder (project_id, position);
+      `);
+
+      // A folder is a row, not a grant. It decides what a project *offers* its
+      // sandboxes as roots when a turn binds them; everything that authorizes
+      // an actual call keeps flowing through `permission_grant` alone, which
+      // already carries `project_id`, `resource_pattern`, and per-conversation
+      // scoping (migrations 2, 3 and 5). Two places able to authorize a read
+      // is the failure `PermissionKernel`'s docblock opens with.
+      //
+      // The join columns below are ordinary configuration state:
+      //
+      // - `archived` is the failsafe the Archive pane promises: set, never
+      //   swept, expired by nothing.
+      // - `title_manual` records that a person named the conversation, so no
+      //   later derivation ever overwrites their words again.
+      // - deleting a project detaches its conversations rather than destroying
+      //   them — ON DELETE SET NULL, mirroring what removing a project already
+      //   means in the product.
+      db.exec(`
+        CREATE TABLE conversation (
+          id           TEXT PRIMARY KEY,
+          title        TEXT,
+          title_manual INTEGER NOT NULL DEFAULT 0,
+          project_id   TEXT REFERENCES project(id) ON DELETE SET NULL,
+          pinned       INTEGER NOT NULL DEFAULT 0,
+          archived     INTEGER NOT NULL DEFAULT 0,
+          model_id     TEXT,
+          created_at   INTEGER NOT NULL,
+          last_turn_at INTEGER NOT NULL
+        ) STRICT;
+
+        CREATE INDEX conversation_recent
+          ON conversation (archived, last_turn_at DESC);
+
+        CREATE INDEX conversation_by_project
+          ON conversation (project_id, last_turn_at DESC)
+          WHERE project_id IS NOT NULL;
+      `);
+    },
   },];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

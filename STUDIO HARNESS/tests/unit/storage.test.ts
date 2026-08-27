@@ -59,6 +59,67 @@ describe("migrations", () => {
     expect(rows.map((row) => row.name)).toEqual(MIGRATIONS.map((entry) => entry.name));
   });
 
+  it("migrates the conversation and project tables with their own foreign keys", () => {
+    // Asserted against the database, not the stores: these are properties of
+    // schema 14 itself, and the stores are one reader among many.
+    const handle = new DatabaseSync(":memory:");
+    migrate(handle);
+    handle.exec("PRAGMA foreign_keys = ON");
+
+    const now = Date.now();
+    handle
+      .prepare(
+        "INSERT INTO project (id, name, icon, description, created_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run("prj_x", "X", "arc", "", now);
+    handle
+      .prepare(
+        "INSERT INTO project_folder (id, project_id, path, name, position, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run("fold_1", "prj_x", "D:/Work/x", "x", 0, now);
+
+    handle
+      .prepare(
+        `INSERT INTO conversation (
+           id, title, title_manual, project_id, pinned, archived,
+           model_id, created_at, last_turn_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run("cnv_1", null, 0, "prj_x", 0, 0, null, now, now);
+
+    // Filing under a project that does not exist is refused by SQLite.
+    expect(() =>
+      handle
+        .prepare(
+          `INSERT INTO conversation (
+             id, title, title_manual, project_id, pinned, archived,
+             model_id, created_at, last_turn_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run("cnv_bad", null, 0, "ghost", 0, 0, null, now, now),
+    ).toThrow();
+
+    // The same folder path twice within one project is refused.
+    expect(() =>
+      handle
+        .prepare(
+          "INSERT INTO project_folder (id, project_id, path, name, position, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run("fold_2", "prj_x", "D:/Work/x", "alias", 1, now),
+    ).toThrow();
+
+    // Deleting a project cascades its folders and detaches its conversations.
+    handle.prepare("DELETE FROM project WHERE id = ?").run("prj_x");
+    expect(
+      (handle.prepare("SELECT COUNT(*) AS n FROM project_folder").get() as { n: number }).n,
+    ).toBe(0);
+    const remaining = handle
+      .prepare("SELECT project_id FROM conversation WHERE id = 'cnv_1'")
+      .get() as { project_id: string | null };
+    expect(remaining.project_id).toBeNull();
+    handle.close();
+  });
+
   it("adds the definition hash when an existing grant schema is upgraded", () => {
     const handle = new DatabaseSync(":memory:");
     migrate(handle, MIGRATIONS.slice(0, 7));

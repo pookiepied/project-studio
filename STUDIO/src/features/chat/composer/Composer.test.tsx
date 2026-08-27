@@ -39,7 +39,6 @@ function renderComposer(onSend: (text: string) => Promise<Receipt>, busy?: boole
     <VoiceModeProvider>
       <Composer
         conversationId="cnv_1"
-        projectId={null}
         placeholder="Reply"
         onSend={onSend}
         {...(busy === undefined ? {} : { busy })}

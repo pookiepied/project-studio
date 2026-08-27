@@ -26,17 +26,30 @@
 
 import {
   parseHarnessErrorBody,
+  parseConversationRecord,
+  parseConversationRecords,
   parseProbeResult,
+  parseProjectRecord,
+  parseProjectRecords,
   parseProviderConnection,
   parseProviderConnections,
   parseProviderModels,
+  parsePurgeOutcome,
   type CapabilitySlot,
+  type ConversationCreateDraft,
+  type ConversationPatch,
+  type ConversationRecord,
   type ProbeResult,
+  type ProjectCreateDraft,
+  type ProjectPatch,
+  type ProjectRecord,
+  type ProjectFolderSpec,
   type ProviderConnection,
   type ProviderConnectionDraft,
   type ProviderConnectionPatch,
   type ProviderKind,
   type ProviderModel,
+  type PurgeOutcome,
 } from './contracts'
 import { harnessTransport } from './transport'
 
@@ -122,9 +135,36 @@ export interface HarnessClient {
   deleteConnection(id: string): Promise<HarnessResult<void>>
   probeConnection(id: string): Promise<HarnessResult<ProbeResult>>
   listModels(filter?: ModelFilter): Promise<HarnessResult<readonly ProviderModel[]>>
+
+  listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
+  createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
+  updateConversation(
+    id: string,
+    patch: ConversationPatch,
+  ): Promise<HarnessResult<ConversationRecord>>
+  /** Permanent destruction of one conversation: index row plus its own tree. */
+  deleteConversation(id: string): Promise<HarnessResult<PurgeOutcome>>
+  purgeConversations(ids: readonly string[]): Promise<HarnessResult<PurgeOutcome>>
+
+  listProjects(): Promise<HarnessResult<readonly ProjectRecord[]>>
+  createProject(draft: ProjectCreateDraft): Promise<HarnessResult<ProjectRecord>>
+  updateProject(id: string, patch: ProjectPatch): Promise<HarnessResult<ProjectRecord>>
+  deleteProject(id: string): Promise<HarnessResult<void>>
+  addProjectFolder(
+    projectId: string,
+    folder: ProjectFolderSpec,
+  ): Promise<HarnessResult<ProjectRecord>>
+  updateProjectFolder(
+    projectId: string,
+    folderId: string,
+    change: { name?: string; path?: string },
+  ): Promise<HarnessResult<ProjectRecord>>
+  removeProjectFolder(projectId: string, folderId: string): Promise<HarnessResult<ProjectRecord>>
 }
 
 const PROVIDERS_PATH = '/api/providers'
+const CONVERSATIONS_PATH = '/api/conversations'
+const PROJECTS_PATH = '/api/projects'
 
 function failed(error: HarnessFailure): { ok: false; error: HarnessFailure } {
   return { ok: false, error }
@@ -298,6 +338,22 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     return `${PROVIDERS_PATH}/connections/${encodeURIComponent(id)}${suffix}`
   }
 
+  function conversationIndexPath(id: string): string {
+    return `${CONVERSATIONS_PATH}/${encodeURIComponent(id)}`
+  }
+
+  function projectPath(id: string, suffix = ''): string {
+    return `${PROJECTS_PATH}/${encodeURIComponent(id)}${suffix}`
+  }
+
+  function foldersPath(projectId: string): string {
+    return projectPath(projectId, '/folders')
+  }
+
+  function folderPath(projectId: string, folderId: string): string {
+    return `${foldersPath(projectId)}/${encodeURIComponent(folderId)}`
+  }
+
   return {
     listConnections() {
       return json('GET', `${PROVIDERS_PATH}/connections`, undefined, parseProviderConnections)
@@ -336,6 +392,88 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
         undefined,
         parseProviderModels,
       )
+    },
+
+    listConversations() {
+      return json('GET', `${CONVERSATIONS_PATH}`, undefined, parseConversationRecords)
+    },
+
+    createConversation(draft) {
+      // Sent on the admission receipt, never before it. An id the harness
+      // refused to admit never becomes a row here.
+      return json(
+        'POST',
+        CONVERSATIONS_PATH,
+        {
+          id: draft.id,
+          firstMessage: draft.firstMessage,
+          ...(draft.projectId === undefined ? {} : { projectId: draft.projectId }),
+          ...(draft.createdAt === undefined ? {} : { createdAt: draft.createdAt }),
+        },
+        parseConversationRecord,
+      )
+    },
+
+    updateConversation(id, patch) {
+      const body: Record<string, unknown> = {}
+      if (patch.title !== undefined) body.title = patch.title
+      if (patch.pinned !== undefined) body.pinned = patch.pinned
+      if (patch.archived !== undefined) body.archived = patch.archived
+      if (patch.projectId !== undefined) body.projectId = patch.projectId
+      if (patch.lastTurnAt !== undefined) body.lastTurnAt = patch.lastTurnAt
+      return json('PATCH', conversationIndexPath(id), body, parseConversationRecord)
+    },
+
+    deleteConversation(id) {
+      return json('DELETE', conversationIndexPath(id), undefined, parsePurgeOutcome)
+    },
+
+    purgeConversations(ids) {
+      return json('POST', `${CONVERSATIONS_PATH}/purge`, { ids: [...ids] }, parsePurgeOutcome)
+    },
+
+    listProjects() {
+      return json('GET', PROJECTS_PATH, undefined, parseProjectRecords)
+    },
+
+    createProject(draft) {
+      return json(
+        'POST',
+        PROJECTS_PATH,
+        {
+          ...(draft.id === undefined ? {} : { id: draft.id }),
+          name: draft.name,
+          icon: draft.icon,
+          ...(draft.description === undefined ? {} : { description: draft.description }),
+          ...(draft.folders === undefined
+            ? {}
+            : { folders: draft.folders.map((folder) => ({ ...folder })) }),
+        },
+        parseProjectRecord,
+      )
+    },
+
+    updateProject(id, patch) {
+      return json('PATCH', projectPath(id), { ...patch }, parseProjectRecord)
+    },
+
+    deleteProject(id) {
+      return empty('DELETE', projectPath(id))
+    },
+
+    addProjectFolder(projectId, folder) {
+      return json('POST', foldersPath(projectId), { ...folder }, parseProjectRecord)
+    },
+
+    updateProjectFolder(projectId, folderId, change) {
+      const body: Record<string, unknown> = {}
+      if (change.name !== undefined) body.name = change.name
+      if (change.path !== undefined) body.path = change.path
+      return json('PATCH', folderPath(projectId, folderId), body, parseProjectRecord)
+    },
+
+    removeProjectFolder(projectId, folderId) {
+      return json('DELETE', folderPath(projectId, folderId), undefined, parseProjectRecord)
     },
   }
 }

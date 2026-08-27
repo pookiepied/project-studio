@@ -48,6 +48,10 @@ async function startHarness(dbPath: string): Promise<Running> {
       PROJECT_STUDIO_ADMISSION_CREDENTIAL: adm.credential,
       PROJECT_STUDIO_DB_PATH: dbPath,
       PROJECT_STUDIO_STORE_PATH: join(dirname(dbPath), "studio.db"),
+      // The whole Studio home travels with the database: an agent turn now
+      // creates its conversation tree under it, and a test must not write
+      // there under the developer's real home.
+      PROJECT_STUDIO_HOME: dirname(dbPath),
     },
     stdio: "pipe",
   });

@@ -90,7 +90,6 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  */
 export function Composer({
   conversationId,
-  projectId,
   placeholder,
   onSent,
   onSend,
@@ -98,7 +97,6 @@ export function Composer({
   onStop,
 }: {
   conversationId: string | null
-  projectId: string | null
   placeholder: string
   onSent?: (conversationId: string) => void
   /**
@@ -179,7 +177,7 @@ export function Composer({
       )
       return
     }
-    const id = send(conversationId, text, projectId)
+    const id = send(conversationId, text)
     setText('')
     setMultiline(false)
     if (conversationId === null && id) onSent?.(id)

@@ -194,7 +194,13 @@ const LIFECYCLE_EVENTS = [
   'harness-restarting',
 ] as const
 
-const defaultListen: LifecycleListen = (handler) => {
+/**
+ * The real lifecycle subscription, exported rather than private: the workspace
+ * store re-reads the index on the same events (a restart may have moved the
+ * endpoint), and re-declaring the list a second time is how the two copies
+ * start disagreeing.
+ */
+export const defaultListen: LifecycleListen = (handler) => {
   const subscriptions = LIFECYCLE_EVENTS.map((name) =>
     listen<unknown>(name, (event) => handler({ name, payload: event.payload })),
   )

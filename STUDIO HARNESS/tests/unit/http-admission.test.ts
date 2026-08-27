@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-
 import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
 import type { ProviderAdministration } from "../../src/application/provider-management.js";
+import type { ConversationStore } from "../../src/conversations/store.js";
+import type { ProjectStore } from "../../src/projects/store.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 import {
   authContext,
@@ -96,6 +97,8 @@ describe("Harness HTTP admission", () => {
     let permissionEntered = 0;
     let providerEntered = 0;
     let retrievalEntered = 0;
+    let conversationEntered = 0;
+    let projectEntered = 0;
     flueApp.get("/probe", () => {
       flueEntered += 1;
       return new Response("entered");
@@ -147,6 +150,18 @@ describe("Harness HTTP admission", () => {
           return [];
         },
       } as unknown as PermissionApprovalBroker,
+      conversations: {
+        list: () => {
+          conversationEntered += 1;
+          return [];
+        },
+      } as unknown as ConversationStore,
+      projects: {
+        list: () => {
+          projectEntered += 1;
+          return [];
+        },
+      } as unknown as ProjectStore,
       admission: session.verifier,
       // Never exercised here; required so the route cannot be mounted without
       // a way to actually stop the process.
@@ -160,6 +175,8 @@ describe("Harness HTTP admission", () => {
       "/api/permissions/pending",
       "/api/providers/connections",
       "/api/providers/retrieval",
+      "/api/conversations",
+      "/api/projects",
     ]) {
       const response = await app.request(`http://harness.test${path}`);
       expect(response.status, path).toBe(401);
@@ -174,6 +191,8 @@ describe("Harness HTTP admission", () => {
     expect(permissionEntered).toBe(0);
     expect(providerEntered).toBe(0);
     expect(retrievalEntered).toBe(0);
+    expect(conversationEntered).toBe(0);
+    expect(projectEntered).toBe(0);
 
     const admittedProbe = await app.request("http://harness.test/probe", {
       headers: { authorization: `Bearer ${session.credential}` },
