@@ -99,7 +99,32 @@ export interface ToolGroupView {
 
 export type AssistantSegment =
   | { readonly kind: 'text'; readonly id: string; readonly text: string }
-  | { readonly kind: 'thinking'; readonly id: string; readonly text: string }
+  | {
+      readonly kind: 'thinking'
+      readonly id: string
+      readonly text: string
+      /**
+       * When this run's first delta ARRIVED HERE, and when its most recent one
+       * did. Both null for anything replayed.
+       *
+       * The wire carries no per-segment duration — Flue's chunk protocol has
+       * one timestamp, on `message-started` — so the only honest number
+       * available is the span over which this run's deltas actually landed.
+       * That is a measurement of something that happened, not an inference
+       * about the model, and it is the difference between saying "these words
+       * arrived over four seconds" and inventing a thinking time nobody
+       * reported.
+       *
+       * It is null on a replay because a replay's arrival times are the
+       * REPLAY's, not the turn's: a reattach that redelivers a two-minute
+       * trace in fifty milliseconds would otherwise claim the model thought
+       * for fifty milliseconds. `useConversationTranscript` gates it on the
+       * delivery's own `replaying` flag, and a segment with no span says only
+       * "Thought", which is what we actually know.
+       */
+      readonly startedAt: number | null
+      readonly updatedAt: number | null
+    }
   | { readonly kind: 'tools'; readonly id: string; readonly groups: readonly ToolGroupView[] }
 
 /** How a message ended, as far as the log can prove. */
@@ -176,12 +201,47 @@ interface CallSite {
   readonly callIndex: number
 }
 
+/**
+ * Words this window sent, which the log has not echoed back yet.
+ *
+ * A user's own message reaches the transcript the same way everything else
+ * does: the harness durably records it and a `message-appended` chunk brings
+ * it back. That round trip is a real interval — measured at roughly a second
+ * on this machine — and for its whole length the page showed no sign of the
+ * message that had just been typed into it. The words vanished from the
+ * composer and appeared nowhere, and the working mark sat alone against an
+ * empty page and then JUMPED down when the echo finally landed above it.
+ *
+ * This is not an invented log entry and it is not held in `items`, which are
+ * facts the harness reported. It is the receipt rendered: we hold a
+ * submission id the harness answered with, and until its own message comes
+ * back, the words that id stands for are shown where they will land. The id
+ * is what retires it — not a timer, and not the arrival of any other message.
+ */
+export interface PendingSubmission {
+  /** The submission the harness admitted. Its echo is what clears this. */
+  readonly submissionId: string
+  readonly text: string
+  /**
+   * When this window was handed the receipt — the earliest moment anything on
+   * this side knew a turn existed, earlier than any chunk about it can
+   * arrive. Nothing measures a duration from it, and nothing orders by it
+   * either — a held submission is always the newest thing there is, which is
+   * why it draws below every item without consulting a clock. What the screen
+   * reports about time is the reasoning run's own span, and the wait in front
+   * of that is drawn by nothing. See `first-attach.ts` for why it is kept.
+   */
+  readonly at: number
+}
+
 export interface TranscriptProjection {
   readonly items: readonly TranscriptItem[]
   /** The ordering token everything above was built from. */
   readonly applied: ChunkPosition | null
   readonly openRuns: ReadonlyMap<string, OpenRun>
   readonly callSites: ReadonlyMap<string, CallSite>
+  /** Sent, not yet echoed. Always newer than every item; see the type. */
+  readonly pending: PendingSubmission | null
 }
 
 /* -------------------------------------------------------------------------- */
@@ -201,6 +261,7 @@ interface Draft {
   assistants: Map<string, number>
   openRuns: Map<string, OpenRun>
   callSites: Map<string, CallSite>
+  pending: PendingSubmission | null
 }
 
 function draftOf(projection: TranscriptProjection): Draft {
@@ -210,15 +271,41 @@ function draftOf(projection: TranscriptProjection): Draft {
     assistants: assistantsOf(projection.items),
     openRuns: new Map(projection.openRuns),
     callSites: new Map(projection.callSites),
+    pending: projection.pending,
   }
 }
 
+/**
+ * Whether the log now carries the message a pending submission stands for.
+ *
+ * Backwards, because an echo lands at the end and this only ever runs while
+ * something is in flight — a window of about a second, during which the
+ * answer is almost always the last item. The scan is bounded by the array
+ * only in the case where the echo never comes, and then the projection is
+ * right to keep looking: the alternative is retiring the words on a guess.
+ */
+function echoed(items: readonly TranscriptItem[], pending: PendingSubmission): boolean {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index]
+    if (item === undefined) continue
+    if (item.kind === 'user' && item.submissionId === pending.submissionId) return true
+  }
+  return false
+}
+
 function settle(draft: Draft): TranscriptProjection {
+  // The one place a pending submission is retired. Every path that changes
+  // items comes through here, including a snapshot that replaced them all,
+  // so there is no arrangement of deliveries that leaves the words on screen
+  // twice or drops them before the log has them.
+  const pending =
+    draft.pending !== null && echoed(draft.items, draft.pending) ? null : draft.pending
   return {
     items: draft.items,
     applied: draft.applied,
     openRuns: draft.openRuns,
     callSites: draft.callSites,
+    pending,
   }
 }
 
@@ -256,12 +343,22 @@ function assistantAt(draft: Draft, messageId: string): Extract<
   return item !== undefined && item.kind === 'assistant' ? item : null
 }
 
-/** Appends one delta to the message's open run of that kind, opening a new run if needed. */
+/**
+ * Appends one delta to the message's open run of that kind, opening a new run
+ * if needed.
+ *
+ * `arrivedAt` is when this batch reached the webview, or null when it was
+ * replayed. It is stamped on thinking runs only, and only here: the span a
+ * run's deltas landed over needs no close hook anywhere, because the last
+ * delta to arrive is the last one that will, and the reader wants the number
+ * while it is still growing rather than after it stops.
+ */
 function appendDelta(
   draft: Draft,
   messageId: string,
   kind: 'text' | 'thinking',
   text: string,
+  arrivedAt: number | null,
 ): void {
   const item = assistantAt(draft, messageId)
   if (item === null) return
@@ -271,7 +368,16 @@ function appendDelta(
   if (open !== undefined && open.kind === kind) {
     const segment = segments[open.index]
     if (segment !== undefined && segment.kind === kind) {
-      segments[open.index] = { ...segment, text: segment.text + text }
+      segments[open.index] =
+        segment.kind === 'thinking'
+          ? // A replayed delta landing on a live run leaves the span alone
+            // rather than overwriting it with a replay's clock.
+            {
+              ...segment,
+              text: segment.text + text,
+              updatedAt: arrivedAt ?? segment.updatedAt,
+            }
+          : { ...segment, text: segment.text + text }
       draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
       return
     }
@@ -283,7 +389,13 @@ function appendDelta(
   segments.push(
     kind === 'text'
       ? { kind: 'text', id: `${messageId}#text-${ordinal}`, text }
-      : { kind: 'thinking', id: `${messageId}#think-${ordinal}`, text },
+      : {
+          kind: 'thinking',
+          id: `${messageId}#think-${ordinal}`,
+          text,
+          startedAt: arrivedAt,
+          updatedAt: arrivedAt,
+        },
   )
   draft.openRuns.set(messageId, { kind, index: segments.length - 1 })
   draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
@@ -528,6 +640,10 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
           kind: 'thinking',
           id: `${message.id}#think-${thinkingRuns}`,
           text: part.text,
+          // A snapshot is history. Nobody here watched these words arrive,
+          // and the wire stores no span for them, so none is claimed.
+          startedAt: null,
+          updatedAt: null,
         })
         thinkingRuns += 1
       } else if (part.kind === 'tool') {
@@ -630,7 +746,53 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
 /* -------------------------------------------------------------------------- */
 
 export function emptyProjection(): TranscriptProjection {
-  return { items: [], applied: null, openRuns: new Map(), callSites: new Map() }
+  return {
+    items: [],
+    applied: null,
+    openRuns: new Map(),
+    callSites: new Map(),
+    pending: null,
+  }
+}
+
+/**
+ * Holds the words of a submission the harness has admitted, until its own
+ * message comes back.
+ *
+ * Takes the receipt's id rather than minting one, because the id is the whole
+ * mechanism: it is what the echo will be recognised by. A submission whose
+ * message is already in the log is not held at all — a reattach can deliver
+ * the echo before this is ever called, and showing the words twice for a
+ * frame is the failure this guard exists to prevent.
+ */
+export function withPendingSubmission(
+  projection: TranscriptProjection,
+  pending: PendingSubmission,
+): TranscriptProjection {
+  if (echoed(projection.items, pending)) return projection
+  return { ...projection, pending }
+}
+
+/**
+ * The pending submission drawn as the message it will become.
+ *
+ * Shaped here rather than at the component, so the one place that knows what
+ * a user item is also decides what a not-yet-echoed one looks like. `id` is
+ * the submission's, which is stable for as long as this is on screen and
+ * belongs to nothing else; the timestamp is null because the log has not
+ * stamped one yet and this must not invent it.
+ */
+export function pendingUserItem(
+  pending: PendingSubmission,
+): Extract<TranscriptItem, { kind: 'user' }> {
+  return {
+    kind: 'user',
+    id: pending.submissionId,
+    submissionId: pending.submissionId,
+    text: pending.text,
+    attachments: [],
+    timestamp: null,
+  }
 }
 
 /**
@@ -675,6 +837,21 @@ export function isMessageBeingWritten(
   )
 }
 
+/**
+ * Whether this item has anything on screen for a reader to look at.
+ *
+ * An assistant message exists from `message-started`, which is a fact about
+ * the LOG, not about the page: until its first delta lands it has no segments
+ * and renders as an empty box. Anything deciding what the tail of a
+ * transcript should look like has to ask this rather than "is there an
+ * assistant message", or it hands the screen over to a record with nothing in
+ * it — which is exactly the second or more of blankness between the working
+ * mark disappearing and the first reasoning arriving.
+ */
+export function hasVisibleContent(item: TranscriptItem): boolean {
+  return item.kind === 'assistant' ? item.segments.length > 0 : true
+}
+
 /** A projection built from nothing but a snapshot — the cold start's opening state. */
 export function seededProjection(snapshot: ConversationSnapshotFacts): TranscriptProjection {
   const items = seededFrom(snapshot)
@@ -683,7 +860,27 @@ export function seededProjection(snapshot: ConversationSnapshotFacts): Transcrip
     applied: null,
     openRuns: openRunsOf(items),
     callSites: callSitesOf(items),
+    pending: null,
   }
+}
+
+/**
+ * A snapshot replaces the log. It does not replace the receipt.
+ *
+ * `seededProjection` alone was wrong for a live conversation: a snapshot is
+ * the whole state of the log as the harness knows it, and a message admitted
+ * a moment ago may not be in the one that is already in flight towards us. A
+ * reattach landing in that window would take the words off the screen and put
+ * them back when the next delivery arrived. Carrying the pending submission
+ * through, and letting `withPendingSubmission` drop it if the snapshot turns
+ * out to contain its echo, makes a re-seed neutral either way.
+ */
+export function reseeded(
+  current: TranscriptProjection,
+  snapshot: ConversationSnapshotFacts,
+): TranscriptProjection {
+  const seeded = seededProjection(snapshot)
+  return current.pending === null ? seeded : withPendingSubmission(seeded, current.pending)
 }
 
 /**
@@ -695,6 +892,14 @@ export function seededProjection(snapshot: ConversationSnapshotFacts): Transcrip
 export function applyChunks(
   projection: TranscriptProjection,
   chunks: readonly ChunkFacts[],
+  /**
+   * When this batch arrived here, or null when it was replayed rather than
+   * lived through. Only thinking runs read it, and only to record the span
+   * their deltas landed over; a replay's clock is the replay's, so it is
+   * refused rather than believed. Defaults to null, which is the answer for
+   * every caller that has no arrival time to offer.
+   */
+  arrivedAt: number | null = null,
 ): TranscriptProjection {
   const draft = draftOf(projection)
   let changed = false
@@ -704,7 +909,7 @@ export function applyChunks(
       if (draft.applied !== null && atOrBefore(chunk.position, draft.applied)) continue
       draft.applied = chunk.position
     }
-    applyChunk(draft, chunk)
+    applyChunk(draft, chunk, arrivedAt)
     changed = true
   }
 
@@ -713,7 +918,7 @@ export function applyChunks(
   return changed ? settle(draft) : projection
 }
 
-function applyChunk(draft: Draft, chunk: ChunkFacts): void {
+function applyChunk(draft: Draft, chunk: ChunkFacts, arrivedAt: number | null): void {
   switch (chunk.type) {
     case 'conversation-reset': {
       if (chunk.snapshot === null) return
@@ -772,6 +977,7 @@ function applyChunk(draft: Draft, chunk: ChunkFacts): void {
         chunk.messageId,
         chunk.deltaKind === 'text' ? 'text' : 'thinking',
         chunk.delta,
+        arrivedAt,
       )
       return
     }

@@ -41,7 +41,14 @@ export function AssistantMessage({
       className="flex min-w-0 flex-col"
     >
       {message.thinking ? (
-        <ThinkingBlock thinking={message.thinking} live={streaming && shown.length === 0} />
+        <ThinkingBlock
+          text={message.thinking.text}
+          // Stated, not measured: the gallery is a scripted display of
+          // artifact stages, and its number was written down rather than
+          // observed. Saying so keeps the live path's clock out of it.
+          span={{ kind: 'stated', seconds: message.thinking.seconds }}
+          live={streaming && shown.length === 0}
+        />
       ) : null}
 
       {/* The text on screen is not `message.text`. It is a prefix of it, paced

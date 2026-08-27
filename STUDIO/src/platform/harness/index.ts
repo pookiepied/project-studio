@@ -19,7 +19,7 @@ export {
   type ModelFilter,
 } from './client'
 
-export { resolveHarnessAddress } from './connection'
+export { resolveHarnessAddress, startHarness } from './connection'
 
 export { harnessTransport } from './transport'
 

@@ -66,7 +66,7 @@ export function TextBlock({ text, fence }: { text: string; fence: string }) {
               transition={{ duration: DURATION.fast }}
               className="flex items-center"
             >
-              {copied ? <Icons.check /> : <Icons.copy />}
+              {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
             </motion.span>
           </AnimatePresence>
         </IconButton>

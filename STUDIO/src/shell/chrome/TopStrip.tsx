@@ -51,7 +51,7 @@ export function TopStrip() {
           onClick={toggleSidebar}
           active={sidebarOpen}
         >
-          <Icons.sidebar />
+          <Icons.sidebar size="md" />
         </IconButton>
 
         {conversation ? <ContextMeter used={contextUsage(conversation, settings.modelId)} /> : null}

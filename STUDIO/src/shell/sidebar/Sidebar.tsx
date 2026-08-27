@@ -345,7 +345,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
           </button>
 
           <IconButton label="Settings" onClick={() => openSettings()}>
-            <Icons.settings />
+            <Icons.settings size="md" />
           </IconButton>
         </div>
         </div>

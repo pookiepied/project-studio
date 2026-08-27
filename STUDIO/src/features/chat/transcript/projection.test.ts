@@ -585,6 +585,7 @@ describe('which message is being written right now', () => {
     segments: [],
     end: { state: 'stopped' },
     usage: null,
+    startedAt: null,
   } as const
 
   function withEnd(state: 'complete' | 'failed' | 'aborted') {
@@ -922,5 +923,103 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
     const last = items.at(-1)
     if (last?.kind !== 'assistant') throw new Error('expected the later answer')
     expect(last.end).toEqual({ state: 'complete' })
+  })
+})
+
+/**
+ * How long a reasoning run took, from the only clock that exists here.
+ *
+ * The wire carries no per-segment duration — Flue's chunk protocol has one
+ * timestamp, on `message-started` — so the only honest number is the span
+ * this run's own deltas landed over. That is a measurement of delivery, and
+ * the whole discipline is refusing to make one when delivery was a replay.
+ */
+describe('the span a reasoning run is measured over', () => {
+  function startedThinking(): ChunkFacts[] {
+    return chunksOf(
+      resetChunk(),
+      { type: 'message-started', messageId: 'm1', submissionId: SUBMISSION, position: at(1) },
+    )
+  }
+
+  function reasoning(batch: number, delta: string): ChunkFacts[] {
+    return chunksOf({
+      type: 'message-delta',
+      messageId: 'm1',
+      kind: 'reasoning',
+      delta,
+      position: at(batch),
+    })
+  }
+
+  function thinkingOf(projection: ReturnType<typeof applyChunks>) {
+    const reply = projection.items.at(-1)
+    if (reply?.kind !== 'assistant') throw new Error('expected an assistant item')
+    const segment = reply.segments[0]
+    if (segment?.kind !== 'thinking') throw new Error('expected a thinking segment')
+    return segment
+  }
+
+  it('grows as the run keeps arriving, so the header counts up without a timer', () => {
+    let projection = applyChunks(emptyProjection(), startedThinking(), 1000)
+    projection = applyChunks(projection, reasoning(2, 'wei'), 1000)
+    expect(thinkingOf(projection).startedAt).toBe(1000)
+    expect(thinkingOf(projection).updatedAt).toBe(1000)
+
+    projection = applyChunks(projection, reasoning(3, 'ghing'), 4200)
+    expect(thinkingOf(projection).startedAt).toBe(1000)
+    // Three point two seconds, and it moved because a delta really landed —
+    // no clock is read anywhere, which is why no timer has to tick.
+    expect(thinkingOf(projection).updatedAt).toBe(4200)
+  })
+
+  it('claims no span at all for a run that was replayed rather than lived through', () => {
+    // A reattach hands back a two-minute trace in milliseconds. Timing that
+    // by arrival would report the reattach's speed as the model's.
+    let projection = applyChunks(emptyProjection(), startedThinking(), null)
+    projection = applyChunks(projection, reasoning(2, 'wei'), null)
+    projection = applyChunks(projection, reasoning(3, 'ghing'), null)
+
+    expect(thinkingOf(projection).startedAt).toBeNull()
+    expect(thinkingOf(projection).updatedAt).toBeNull()
+  })
+
+  it('leaves a lived run alone when a replay redelivers part of it', () => {
+    // The overlap a reattach always produces: the batch in flight arrives
+    // twice, once live and once replayed. Position dedupe drops the second,
+    // and even if it did not, a replay may not overwrite a measured span.
+    let projection = applyChunks(emptyProjection(), startedThinking(), 1000)
+    projection = applyChunks(projection, reasoning(2, 'wei'), 1000)
+    projection = applyChunks(projection, reasoning(3, 'ghing'), 4200)
+    projection = applyChunks(projection, reasoning(3, 'ghing'), null)
+
+    expect(thinkingOf(projection).startedAt).toBe(1000)
+    expect(thinkingOf(projection).updatedAt).toBe(4200)
+  })
+
+  it('says nothing about the span of a run seeded from a snapshot', () => {
+    const items = seededFrom({
+      version: 1,
+      conversationId: CONVERSATION,
+      offset: '4_0',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          submissionId: SUBMISSION,
+          model: null,
+          timestamp: null,
+          usage: null,
+          parts: [{ kind: 'reasoning', text: 'thought about it', state: 'done' }],
+        },
+      ],
+      settlements: [],
+    })
+    const reply = items.at(-1)
+    if (reply?.kind !== 'assistant') throw new Error('expected an assistant item')
+    const segment = reply.segments[0]
+    if (segment?.kind !== 'thinking') throw new Error('expected a thinking segment')
+    expect(segment.startedAt).toBeNull()
+    expect(segment.updatedAt).toBeNull()
   })
 })

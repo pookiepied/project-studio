@@ -178,6 +178,13 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     // The incoming model is the alias placeholder; the real one comes from
     // configuration. Delegation hands Pi both the model and the auth for it.
     const target = this.assertTargetResolvable();
-    return this.#runtime.models.stream(target, context, options);
+    // `streamSimple`, not `stream`: the options crossing this boundary are
+    // protocol-independent, because the alias is not a real wire protocol and
+    // nothing upstream knows which one the target speaks. Only `streamSimple`
+    // translates them — `reasoning` becomes Google's `thinkingConfig` or
+    // OpenAI's `reasoning_effort` there. `stream` takes options already in the
+    // target's protocol and silently ignores anything else, which is how every
+    // model reasoned invisibly: the request never asked for the trace.
+    return this.#runtime.models.streamSimple(target, context, options);
   };
 }

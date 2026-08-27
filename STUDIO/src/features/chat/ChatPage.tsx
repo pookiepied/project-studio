@@ -6,6 +6,7 @@ import { Transcript, useAutoScroll } from '@/features/chat/transcript'
 import { ConnectionNotice } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
+import { isTurnRunning } from '@/features/chat/useConversation'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
@@ -93,7 +94,12 @@ export function ChatPage({
               onFork={forkFrom}
             />
           ) : (
-            <LiveTranscript items={live.items} phase={live.phase} viewport={viewport} />
+            <LiveTranscript
+              items={live.items}
+              pending={live.pending}
+              phase={live.phase}
+              viewport={viewport}
+            />
           )}
         </div>
       </div>
@@ -178,7 +184,13 @@ export function ChatPage({
               ? {}
               : {
                   onSend: (text: string) => live.submit(text),
-                  busy: live.phase.status === 'streaming',
+                  // Admitted counts. A turn the harness has taken but not yet
+                  // started producing is still a turn: the words are gone,
+                  // the stop control is the only thing that can call it back,
+                  // and on the real provider that window has been most of the
+                  // turn's length. Reading `streaming` alone is what left the
+                  // composer idle for six of a seven-second turn.
+                  busy: isTurnRunning(live.phase),
                   onStop: () => void live.abort(),
                 })}
           />

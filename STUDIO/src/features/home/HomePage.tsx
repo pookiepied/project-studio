@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
-import { Composer } from '@/features/chat/composer'
-import { useNavigation } from '@/stores/navigation'
+import { StartConversation } from '@/features/chat/composer'
 
 /**
  * The home surface.
@@ -19,10 +18,15 @@ import { useNavigation } from '@/stores/navigation'
  * voice the rest of the app is written in: plain, declarative, and about the
  * work rather than about the tool. It is the one display moment in the app, so
  * it carries the serif and the serif goes nowhere else.
+ *
+ * ---- Where the first message goes ------------------------------------------
+ *
+ * To the harness, like every message after it, through `StartConversation` —
+ * which owns what starting one means and is shared with the project page. All
+ * this surface decides is that a conversation started here belongs to no
+ * project.
  */
 export function HomePage() {
-  const { openChat } = useNavigation()
-
   return (
     <div
       className="flex h-full flex-col items-center justify-center"
@@ -46,12 +50,7 @@ export function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION.slow, ease: EASE_OUT, delay: 0.05 }}
         >
-          <Composer
-            conversationId={null}
-            projectId={null}
-            placeholder="Ask anything"
-            onSent={openChat}
-          />
+          <StartConversation projectId={null} placeholder="Ask anything" />
         </motion.div>
       </div>
     </div>

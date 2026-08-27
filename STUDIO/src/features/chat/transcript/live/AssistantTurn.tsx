@@ -20,7 +20,8 @@ import type {
  * unfinished — a quiet "stopped" line under it — whatever stopped it: an
  * abort, a crash, a provider that gave up mid-sentence. Only
  * `message-completed` (or a snapshot's own `done` states) lets it read as
- * finished.
+ * finished. The one message that line is withheld from is the one still
+ * being written, which has not reached an ending to report; see `live`.
  *
  * The text reveal is paced by `useSmoothText`, exactly as the demo surface
  * does it; only the last segment of the last unfinished message is live, so
@@ -31,7 +32,12 @@ export function AssistantTurn({
   live,
 }: {
   item: Extract<TranscriptItem, { kind: 'assistant' }>
-  /** This message is the newest one and its turn has not settled yet. */
+  /**
+   * This message is the one being written right now: the newest, unfinished,
+   * with its turn producing. Not merely "a turn is running" — a turn that has
+   * been admitted and has produced nothing is not writing this message, and
+   * the caret and the ending below both depend on the narrower reading.
+   */
   live: boolean
 }) {
   // Only the final text run may pace its reveal. Everything else — history
@@ -49,7 +55,19 @@ export function AssistantTurn({
           live={live}
         />
       ))}
-      <EndLine end={item.end} />
+      {/* An ending is reported once there is one to report.
+          `end` is `stopped` from `message-started` until `message-completed`
+          arrives, and that default is right: how a message ended comes from
+          the log, never from silence, and a message with no completion fact
+          has not completed. What was wrong was rendering the CONCLUSION while
+          the message has not reached its ending yet — every live reply
+          carried a stop icon and "Stopped before finishing" underneath the
+          text it was still writing. `live` is the seam because it is exactly
+          the parent's judgement that this message is the one being written
+          right now (phase `streaming`, newest, unfinished). `stopped` is
+          named rather than implied: a failed or an aborted ending is a fact
+          the log carried, and no reading of "live" may swallow one. */}
+      {live && item.end.state === 'stopped' ? null : <EndLine end={item.end} />}
     </div>
   )
 }
@@ -65,9 +83,20 @@ function Segment({
 }) {
   switch (segment.kind) {
     case 'thinking':
-      // Collapsed by default, positioned where it occurred. No duration is
-      // carried per segment on the wire, so none is claimed.
-      return <ThinkingBlock thinking={{ text: segment.text, seconds: null }} live={live} />
+      // Collapsed by default, positioned where it occurred. The duration is
+      // the REASONING's own span — first of this run's deltas to last — and
+      // not the wait in front of it. The silence before a model produces
+      // anything is partly the provider's latency and partly hidden thinking
+      // nobody here can see, and counting it as reasoning was what made the
+      // number mean nothing. Nothing owns that silence now: the transcript
+      // draws no row until this run exists.
+      return (
+        <ThinkingBlock
+          text={segment.text}
+          span={{ kind: 'measured', since: segment.startedAt, until: segment.updatedAt }}
+          live={live}
+        />
+      )
     case 'text':
       return <TextSegment segment={segment} growing={growing} />
     case 'tools':

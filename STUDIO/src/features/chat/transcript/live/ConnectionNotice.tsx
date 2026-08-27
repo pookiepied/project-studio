@@ -1,4 +1,7 @@
+import { useState } from 'react'
+
 import { Button } from '@/components/primitives'
+import { startHarness } from '@/platform/harness'
 import {
   classifyFailureKind,
   failureRemedy,
@@ -40,7 +43,7 @@ export function ConnectionNotice({
   return (
     <>
       {refused !== null && refused !== undefined ? (
-        <Refusal failure={refused} onDismiss={onDismissRefusal} />
+        <SendRefusal failure={refused} onDismiss={onDismissRefusal} />
       ) : null}
       <PhaseNotice phase={phase} onResume={onResume} />
     </>
@@ -52,8 +55,8 @@ function PhaseNotice({ phase, onResume }: { phase: ConversationPhase; onResume: 
     case 'no-harness':
       return (
         <Notice>
-          The harness is not running, so there is nothing to talk to yet. Start it from the
-          status bar and this conversation will attach on its own.
+          The harness is not running, so there is nothing to talk to yet.
+          <StartHarness onStarted={onResume} />
         </Notice>
       )
     case 'harness-starting':
@@ -109,7 +112,7 @@ function PhaseNotice({ phase, onResume }: { phase: ConversationPhase; onResume: 
 function refusalCopy(failure: SeamFailure): string {
   switch (failure.kind) {
     case 'no-harness':
-      return 'The message was not sent: there is no harness running to receive it. Start the harness from the status bar, then send again.'
+      return 'The message was not sent: there is no harness running to receive it. Start it below, then send again.'
     case 'refused':
       return `The harness refused this message (${failure.status}): ${failure.message} Fix what it names, then send again.`
     case 'unreachable':
@@ -123,7 +126,14 @@ function refusalCopy(failure: SeamFailure): string {
   }
 }
 
-function Refusal({
+/**
+ * A send the harness would not take, wherever it was sent from.
+ *
+ * Exported because home and a project page start conversations too, and a
+ * first send that was refused needs the same sentence there — with no phase
+ * beside it, because those pages have no connection of their own to narrate.
+ */
+export function SendRefusal({
   failure,
   onDismiss,
 }: {
@@ -141,6 +151,48 @@ function Refusal({
         </div>
       ) : null}
     </Notice>
+  )
+}
+
+/**
+ * The one control in the app that can start the harness.
+ *
+ * Here rather than in a status bar because this is where the absence is
+ * already being reported, and a remedy belongs beside the sentence that names
+ * the problem. The copy used to point at a status bar; there is no status bar,
+ * and `restart_harness` — a Tauri command since the supervisor landed — had
+ * never been called from the webview at all. So a harness that failed to come
+ * up left the app permanently unable to send, with instructions that could not
+ * be followed.
+ *
+ * A start it refuses says so and stays put, rather than clearing itself: the
+ * supervisor keeps the reason, `get_harness_status` reports it, and the phase
+ * this notice renders will carry it on the next look. Pressing again is safe —
+ * the supervisor is single-flight, so a second press joins the first start
+ * rather than launching a second harness.
+ */
+function StartHarness({ onStarted }: { onStarted: () => void }) {
+  const [starting, setStarting] = useState(false)
+
+  return (
+    <div className="mt-0.5">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={starting}
+        onClick={() => {
+          setStarting(true)
+          void startHarness().then((up) => {
+            setStarting(false)
+            // Only on success. Reattaching to a harness that did not come up
+            // would replace the reason with a generic reaching-out message.
+            if (up) onStarted()
+          })
+        }}
+      >
+        {starting ? 'Starting the harness…' : 'Start the harness'}
+      </Button>
+    </div>
   )
 }
 

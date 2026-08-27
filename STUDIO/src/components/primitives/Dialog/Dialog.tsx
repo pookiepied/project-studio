@@ -67,7 +67,7 @@ export function Dialog({
             <header className="flex shrink-0 items-center justify-between px-4 pt-3.5 pb-2">
               <h2 className="studio-heading text-foreground">{title}</h2>
               <IconButton label="Close" size="sm" onClick={onClose}>
-                <Icons.close />
+                <Icons.close size="sm" />
               </IconButton>
             </header>
 

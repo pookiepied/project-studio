@@ -56,12 +56,18 @@ const FOOTER_TRACK = 'auto calc(var(--control-md) + 0.5rem)'
  *
  * ---- Where a send goes -----------------------------------------------------
  *
- * By default it goes through the workspace store, which plays a local demo
- * turn — that is the home page's new-conversation flow and the gallery.
- * A conversation backed by the harness passes `onSend`/`busy`/`onStop`, and
- * those take over completely: the text leaves for the harness, stop aborts
- * the RUN (the only thing that means abort), and this component never
- * learns more about either than that. Two transports, one control.
+ * Anywhere a message can reach the harness, it does, and the caller says so
+ * by passing `onSend`/`busy`/`onStop`: the text leaves for the harness, stop
+ * aborts the RUN (the only thing that means abort), and this component never
+ * learns more about either than that. That is every conversation, and — since
+ * Task 33 — home and a project page too, where a send starts a conversation
+ * by admitting its first turn before anything is created or navigated to.
+ *
+ * The default path, the workspace store's local demo turn, has exactly one
+ * caller left: the artifact gallery, which is a display of stages no harness
+ * produces rather than a conversation with an agent. It was the default for
+ * the two entry points as well, which meant every conversation in the app
+ * began with a turn that never left the window. Two transports, one control.
  *
  * A live send answers with a receipt, and the field holds the words until
  * the receipt says the harness took them. Clearing optimistically turned a
@@ -410,7 +416,21 @@ export function Composer({
                   tone="solid"
                   onClick={busy ? halt : submit}
                 >
-                  {busy ? <Icons.stop /> : <Icons.send size="md" />}
+                  {busy ? (
+                    <>
+                      <WorkingRing />
+                      {/* `size="md"`, like every other mark in this row. It
+                          was written without one, so it fell back to the
+                          text-relative step and painted 10.4px inside a 22px
+                          circle while its own siblings painted 14.8px — the
+                          mark was centred to the pixel and still looked
+                          wrong, because it was two thirds the size of the
+                          arrow it replaced. */}
+                      <Icons.stop size="md" />
+                    </>
+                  ) : (
+                    <Icons.send size="md" />
+                  )}
                 </IconButton>
               </motion.div>
             ) : (
@@ -437,5 +457,87 @@ export function Composer({
         </motion.div>
       </div>
     </div>
+  )
+}
+
+/**
+ * The turn is in flight: a ring travelling around the stop control.
+ *
+ * The button stays the stop button — that is the one thing it must remain
+ * while a turn is running, and a spinner that replaced it would take away the
+ * only way to call the turn back. The ring is drawn around it instead, so the
+ * control's meaning is unchanged and the motion is the only thing added.
+ *
+ * It exists because the composer had no way of saying "sent, nothing back
+ * yet". Measured on the real provider, that window is 2.7s on a small model
+ * and 6 to 8s on a reasoning one, and for all of it the only sign anything
+ * was happening lived in the transcript. A person who has just pressed send
+ * is looking at the button they pressed.
+ *
+ * Indeterminate on purpose: nothing here knows how long the model will take,
+ * so the ring reports activity and never progress. A bar that filled would be
+ * inventing a fraction of a duration nobody has measured.
+ *
+ * ---- Why an arc rather than a bordered box ---------------------------------
+ *
+ * It was a `rounded-full` span with one lit border edge, hung on a wrapper
+ * around the mark. Two things were wrong with that and they compounded. It
+ * measured itself from the GLYPH — 10.4px of icon plus 5px of inset, landing
+ * at 18px inside a 22px control — so it traced neither the mark nor the
+ * button, and an arc that matches no edge on screen reads as a loose ring
+ * rather than as the control's outline. And a border arc on a rounded box is
+ * drawn by the box model: its ends are mitre cuts, and at this diameter the
+ * curve is visibly a rounded rectangle pretending to be a circle.
+ *
+ * A stroked circle fixes both. `pathLength` normalises the circumference to
+ * 100 so the dash is a plain percentage of the way round, round caps give the
+ * arc ends instead of mitres, and `non-scaling-stroke` holds the line at
+ * ~1.4px at every `--ui-size`, the way the icon set holds its own weight.
+ *
+ * ---- Outside the button, not inside it -------------------------------------
+ *
+ * It first went just INSIDE the rim, on the reasoning that a ring tracing the
+ * edge reads as the button's own outline. On screen it does not: inside the
+ * rim the arc shares its space with the mark, crowding a glyph that is
+ * centred to the pixel into looking off-centre, and the control ends up with
+ * something drawn on top of it rather than around it.
+ *
+ * Outside, it is unambiguously a halo: the button is untouched, the mark has
+ * its whole circle back, and the moving part is clearly separate from the
+ * thing you click. Nothing in the composer clips it — the frame, the grid and
+ * the cell are all `overflow: visible` — so the few pixels it needs are there.
+ */
+function WorkingRing() {
+  return (
+    <motion.svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      // Hung on the IconButton, which is positioned for exactly this, and
+      // grown past its edge. Not a flex item, so it cannot shift the mark it
+      // travels around.
+      className="pointer-events-none absolute -inset-[3px]"
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1.1, ease: 'linear', repeat: Infinity }}
+    >
+      <circle
+        cx="12"
+        cy="12"
+        // The box is the button plus 3px on every side, so the button's own
+        // rim sits at r=10.24 in these units. This clears it with a little
+        // air and still leaves room for the stroke inside the box.
+        r="10.9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.4}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+        pathLength={100}
+        // A quarter of the way round, with a gap for the rest. Long enough to
+        // read as travelling, short enough that the gap is what the eye
+        // follows.
+        strokeDasharray="25 75"
+        opacity={0.75}
+      />
+    </motion.svg>
   )
 }

@@ -143,3 +143,33 @@ export async function resolveHarnessAddress(): Promise<HarnessAddress | null> {
 
   return { baseUrl, credential }
 }
+
+/**
+ * Asks the supervisor to start the harness, and says whether it came up.
+ *
+ * This exists because the app had no way to say it. `restart_harness` has been
+ * a Tauri command since the supervisor landed, and nothing in the webview had
+ * ever called it — so a harness that failed to start, or died mid-session, was
+ * unrecoverable without quitting the app, while the refusal notice told people
+ * to start it "from the status bar", a control that was never built. A sentence
+ * naming a remedy the software does not offer is worse than no sentence.
+ *
+ * It belongs in this module for the same reason resolving the address does:
+ * this is the one place that talks to the supervisor. The credential is not
+ * involved and never crosses — the command answers with the endpoint view,
+ * which carries no bearer, and this reduces it to a yes or a no.
+ *
+ * Outside Tauri there is no supervisor and nothing to ask, so the answer is
+ * no: a browser's harness is started by hand and configured by env var.
+ */
+export async function startHarness(): Promise<boolean> {
+  if (!isTauri()) return false
+  try {
+    const report = await invoke<{ readonly url?: unknown }>('restart_harness')
+    return typeof report === 'object' && report !== null
+  } catch {
+    // The supervisor's own sentence is already on screen through
+    // `get_harness_status`; a second one invented here would compete with it.
+    return false
+  }
+}

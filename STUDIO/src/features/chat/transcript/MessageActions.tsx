@@ -92,7 +92,7 @@ export function MessageActions({
       )}
     >
       <IconButton label={copied ? 'Copied' : 'Copy'} size="sm" onClick={() => void copy()}>
-        {copied ? <Icons.check /> : <Icons.copy />}
+        {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
       </IconButton>
 
       {actions.map((action) => {

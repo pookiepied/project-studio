@@ -113,7 +113,7 @@ export function SideRail() {
             </span>
 
             <IconButton label="Close the rail" size="sm" onClick={closeAll}>
-              <Icons.close />
+              <Icons.close size="sm" />
             </IconButton>
           </header>
 

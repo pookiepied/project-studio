@@ -1,7 +1,7 @@
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
-import { Composer } from '@/features/chat/composer'
+import { StartConversation } from '@/features/chat/composer'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { Project } from '@/domain/projects/types'
@@ -14,6 +14,10 @@ import type { Project } from '@/domain/projects/types'
  * project page to do, and a button that reveals a field is a step that exists
  * only to be clicked past. Sending creates the conversation already attached to
  * the project.
+ *
+ * Sending goes to the harness through `StartConversation`, the same component
+ * home uses: this is the other entry point, and the only thing it decides
+ * differently is that a conversation started here belongs to this project.
  */
 export function ProjectPage({ project }: { project: Project }) {
   const { conversations } = useWorkspace()
@@ -47,11 +51,9 @@ export function ProjectPage({ project }: { project: Project }) {
         </header>
 
         <div className="mb-7">
-          <Composer
-            conversationId={null}
+          <StartConversation
             projectId={project.id}
             placeholder={`Ask about ${project.name}`}
-            onSent={openChat}
           />
         </div>
 

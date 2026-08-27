@@ -16,6 +16,7 @@ import {
   createProviderBootstrapCoordinator,
 } from "../../src/models/bootstrap.js";
 import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
+import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ProviderSettingsStore } from "../../src/models/local/settings-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -212,6 +213,14 @@ describe("createModelProviderAdapter", () => {
     database = opened;
     const adapter = createModelProviderAdapter("local", { database: opened });
 
+    // Narrowed rather than declared on `ModelProviderAdapter`: refusing an
+    // unroutable turn with directions is how the LOCAL BYOK adapter behaves,
+    // not part of what a provider adapter is. Putting it on the interface
+    // would also drag Pi's `Model<Api>` into `contracts/models.ts`, whose
+    // whole point is to describe adapters without naming a gateway.
+    if (!(adapter instanceof LocalModelProviderAdapter)) {
+      throw new Error("the local source must build the local adapter");
+    }
     expect(() => adapter.assertTargetResolvable()).toThrow(
       ProviderConfigurationError,
     );

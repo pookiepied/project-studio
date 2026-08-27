@@ -15,6 +15,51 @@ export interface ComposerFieldHandle {
 const HEIGHT_TRANSITION = `height ${DURATION.slow}s cubic-bezier(${EASE_OUT.join(', ')})`
 
 /**
+ * How tall this text would be at a given width, asked WITHOUT touching the
+ * field.
+ *
+ * The field is animating its own height almost whenever this is called, and
+ * the previous approach measured it in place: suspend the transition, set
+ * `height: auto`, read `scrollHeight`, put a height back, force a reflow,
+ * re-enable the transition. Every step of that is a write to the element the
+ * animation is running on, so every keystroke cancelled the run and started a
+ * new one from wherever it had reached. It also had to borrow the element's
+ * WIDTH to answer the wrap question, mutating the thing being animated a
+ * second time for a value that has nothing to do with what is on screen.
+ *
+ * A stand-in has neither problem. It is a shallow clone, so it carries the
+ * same classes and therefore the same font, padding and border box; it is laid
+ * out in the same parent, so it inherits the same everything; and it is
+ * removed before the frame ends. `scrollHeight` on a fresh element with
+ * `height: auto` is simply the content height — no reset needed, because there
+ * is no previous height for it to floor against.
+ */
+function measure(element: HTMLTextAreaElement, width: number): number {
+  const parent = element.parentElement
+  if (!parent) return element.scrollHeight
+
+  const stand = element.cloneNode(false)
+  if (!(stand instanceof HTMLTextAreaElement)) return element.scrollHeight
+
+  // `value` is a property, not an attribute, so a clone starts empty.
+  stand.value = element.value
+  stand.style.position = 'absolute'
+  stand.style.top = '0'
+  stand.style.left = '0'
+  stand.style.visibility = 'hidden'
+  stand.style.pointerEvents = 'none'
+  stand.style.transition = 'none'
+  stand.style.height = 'auto'
+  stand.style.overflowY = 'hidden'
+  stand.style.width = `${width}px`
+
+  parent.appendChild(stand)
+  const height = stand.scrollHeight
+  parent.removeChild(stand)
+  return height
+}
+
+/**
  * The text area.
  *
  * Starts exactly one line tall and grows with its content, animated to each
@@ -69,6 +114,18 @@ export function ComposerField({
   // footer leaves exactly when the line fits where the capsule will put it.
   const besideWidth = useRef<number | null>(null)
 
+  /**
+   * The height this element was last told to go to.
+   *
+   * The guard that stops a keystroke retargeting an animation at the height it
+   * is already animating to. Without it every keystroke restarted the run, so
+   * a field that had a 400ms move to make never got more than ~120ms of it
+   * before starting over: measured mid-sentence, the inline height read 56px
+   * while the element was still painting at 18. The text outran its own box
+   * and the whole composer stuttered, which is the "flashing" this fixes.
+   */
+  const committed = useRef<number | null>(null)
+
   // Layout, not effect. This measures the field and writes its height, and a
   // passive effect runs *after* the browser has painted — so a paste showed one
   // frame at the previous height and radius before snapping to the right ones.
@@ -77,42 +134,27 @@ export function ComposerField({
     const element = field.current
     if (!element) return
 
-    // The measurement runs with the height's transition suspended.
-    // `scrollHeight` never reports less than the height the element already
-    // has, so learning the content's real height means resetting to `auto`
-    // first — and a change made on a live transition would either swallow
-    // it outright (`auto` is not interpolable, so the reset is an instant
-    // jump that cancels the run) or animate the reset itself. Measuring is
-    // bookkeeping; only the final move to the new height should ever be
-    // seen.
-    element.style.transition = 'none'
-
-    // Reset before measuring: see above.
-    element.style.height = 'auto'
-
     // While the controls are beside the field, remember the width they leave
     // it. This is the width the capsule would give the text again if the
     // footer left, so it is the width the decision below must be made
     // against — recorded here because only this arrangement can measure it.
-    if (!multiline) besideWidth.current = element.clientWidth
+    //
+    // The border-box width, to match what `measure` sets on the stand-in.
+    // `clientWidth` excludes the reserved scrollbar gutter and includes the
+    // padding, so measuring against it asked the question at a width about
+    // 20px narrower than the capsule really offers — the two directions were
+    // being decided against different widths, which is the oscillation this
+    // whole mechanism exists to prevent.
+    if (!multiline) besideWidth.current = element.getBoundingClientRect().width
 
-    // How tall the text is at the width the decision cares about. In the
-    // footer arrangement that is not this element's width, so the remembered
-    // one is borrowed for the duration of a read. Synchronous and before
-    // paint, so the borrow is never seen. Until a width has been recorded
-    // (a field that mounted already multiline) the current width is the only
-    // honest answer, and the next measure in the capsule records the real
-    // one and settles it.
-    let decisive = element.scrollHeight
-    if (multiline && besideWidth.current !== null) {
-      const restored = element.style.width
-      element.style.width = `${besideWidth.current}px`
-      decisive = element.scrollHeight
-      element.style.width = restored
-    }
+    // How tall the text is at the width the decision cares about, and how
+    // tall it is here. In the footer arrangement those are different widths.
+    const here = element.getBoundingClientRect().width
+    const natural = measure(element, here)
+    const decisive = multiline && besideWidth.current !== null
+      ? measure(element, besideWidth.current)
+      : natural
 
-    // How tall the text actually is here, for the height itself.
-    const natural = element.scrollHeight
     const clamped = Math.min(natural, COMPOSER.maxHeight)
     element.style.overflowY = natural > COMPOSER.maxHeight ? 'auto' : 'hidden'
     // `stable` reserves the thumb gutter whether it is needed or not. Otherwise
@@ -120,15 +162,12 @@ export function ComposerField({
     // the text jitters left.
     element.style.scrollbarGutter = 'stable'
 
-    // Back to where the field *currently is*, not where the inline style
-    // last sent it: mid-animation the two differ, and restoring the target
-    // outright would skip the rest of the run — including the one this
-    // re-measure is about to retarget. Committed with the transition still
-    // off, so the only change that animates is the step below.
-    element.style.height = `${element.getBoundingClientRect().height}px`
-    void element.offsetHeight
-    element.style.transition = HEIGHT_TRANSITION
-    element.style.height = `${clamped}px`
+    // Only ever written when the target actually moves. A transition that is
+    // already heading for this height is left alone to finish.
+    if (committed.current !== clamped) {
+      committed.current = clamped
+      element.style.height = `${clamped}px`
+    }
 
     // One line plus a pixel of slack, rather than comparing to a hardcoded
     // height: the line box changes with the user's text-size preference.

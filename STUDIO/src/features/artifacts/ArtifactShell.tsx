@@ -99,7 +99,7 @@ export function ArtifactShell({
                 openArtifact(artifact, conversation.id, conversation.title ?? 'Conversation')
               }
             >
-              <Icons.openLarger />
+              <Icons.openLarger size="sm" />
             </IconButton>
           </span>
         ) : null}

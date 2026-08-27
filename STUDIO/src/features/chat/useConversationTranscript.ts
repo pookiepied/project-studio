@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useConversation } from '@/features/chat/useConversation'
 import type { ConversationContent } from '@/features/chat/useConversation'
 import type { SeamFailure } from '@/platform/harness'
+import { firstAdmission } from '@/features/chat/first-attach'
 import {
   applyChunks,
   emptyProjection,
-  seededProjection,
+  reseeded,
+  withPendingSubmission,
+  type PendingSubmission,
   type TranscriptItem,
+  type TranscriptProjection,
 } from '@/features/chat/transcript/projection'
 
 /**
@@ -25,8 +29,51 @@ import {
  * ordering is arrival order and replay safety lives in the reducer's
  * position discipline, not here.
  */
+/**
+ * When a delivery arrived here, or null when it did not happen here at all.
+ *
+ * `replaying` has been on every chunk delivery since Task 24 and nothing read
+ * it. It is exactly the distinction anything measuring durations needs: a
+ * reattach hands back a two-minute reasoning trace in fifty milliseconds, and
+ * a timer started on arrival would report the reattach's speed as the model's
+ * thinking time. Replayed batches and snapshots therefore carry no time, and
+ * a reasoning run built from them claims no duration.
+ *
+ * The clock is a parameter because a rule about time is exactly the kind that
+ * cannot be tested against `Date.now`.
+ */
+export function arrivalTimeOf(content: ConversationContent, now: () => number): number | null {
+  if (content.kind !== 'chunks') return null
+  return content.replaying ? null : now()
+}
+
+/**
+ * What a conversation shows before any delivery has reached it.
+ *
+ * Empty, unless this conversation was opened by its own first turn. Those
+ * words were typed on another page and admitted there, and the receipt carried
+ * across the navigation (`first-attach.ts`) names both the submission and the
+ * text — so the first thing this view can put on screen is the message it
+ * exists because of, rather than an empty column for the length of a round
+ * trip. Built during render rather than in an effect for the same reason the
+ * opening phase is: an effect is a frame late, and a frame of blankness at the
+ * exact moment someone is looking for their own message is the defect.
+ */
+function openingProjection(conversationId: string): TranscriptProjection {
+  const opening = firstAdmission(conversationId)
+  return opening === null
+    ? emptyProjection()
+    : withPendingSubmission(emptyProjection(), {
+        submissionId: opening.submissionId,
+        text: opening.text,
+        at: opening.at,
+      })
+}
+
 export function useConversationTranscript(conversationId: string): {
   items: readonly TranscriptItem[]
+  /** Words this window sent that the log has not echoed back yet. */
+  pending: PendingSubmission | null
   phase: ReturnType<typeof useConversation>['phase']
   offset: string | null
   resume: () => void
@@ -35,13 +82,19 @@ export function useConversationTranscript(conversationId: string): {
   refused: SeamFailure | null
   dismissRefusal: () => void
 } {
-  const [projection, setProjection] = useState(emptyProjection)
+  const [projection, setProjection] = useState(() => openingProjection(conversationId))
+  // Which id the state above currently describes. The effect below re-seeds on
+  // a change of conversation, and without this it would also re-seed on the
+  // mount that just built the same thing — a second render of identical
+  // content on every conversation opened.
+  const seededFor = useRef(conversationId)
 
   const onContent = useCallback((content: ConversationContent) => {
+    const arrivedAt = arrivalTimeOf(content, Date.now)
     setProjection((current) =>
       content.kind === 'snapshot'
-        ? seededProjection(content.snapshot)
-        : applyChunks(current, content.chunks),
+        ? reseeded(current, content.snapshot)
+        : applyChunks(current, content.chunks, arrivedAt),
     )
   }, [])
 
@@ -51,16 +104,33 @@ export function useConversationTranscript(conversationId: string): {
   // items belong to another id, and a delivery for the new one must never
   // land on top of them.
   useEffect(() => {
-    setProjection(emptyProjection())
+    if (seededFor.current === conversationId) return
+    seededFor.current = conversationId
+    setProjection(openingProjection(conversationId))
   }, [conversationId])
 
   return {
     items: projection.items,
+    pending: projection.pending,
     phase: conversation.phase,
     offset: conversation.offset,
     resume: conversation.resume,
     submit: async (message) => {
       const sent = await conversation.submit(message)
+      // Held only once the harness says it has the words. A submission that
+      // was refused leaves the composer holding them (Task 32), and drawing
+      // them in the transcript as well would show the same message in two
+      // places, one of which is a claim that it was sent.
+      if (sent.ok) {
+        const admitted = sent.value.submissionId
+        // Stamped where the receipt is read, which is the earliest this side
+        // knows the turn exists. Nothing measures a duration from it today;
+        // see `PendingSubmission`.
+        const at = Date.now()
+        setProjection((current) =>
+          withPendingSubmission(current, { submissionId: admitted, text: message, at }),
+        )
+      }
       return { ok: sent.ok }
     },
     abort: async () => {

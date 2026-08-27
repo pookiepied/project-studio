@@ -5,6 +5,7 @@ import {
   type ServerResponse,
 } from "node:http";
 
+import type { Api, Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
@@ -14,7 +15,9 @@ import { PiCredentialStore } from "../../src/models/local/credential-bridge.js";
 import {
   createLocalRuntime,
   LOCAL_PLACEHOLDER_KEY,
+  type LocalRuntime,
 } from "../../src/models/local/runtime.js";
+import { LOCAL_ALIAS_API } from "../../src/models/adapters/local-adapter.js";
 import { defaultModelReference } from "../../src/contracts/models.js";
 
 /**
@@ -113,6 +116,25 @@ function buildAdapter() {
   return { config, runtime, adapter: new LocalModelProviderAdapter({ config, runtime }) };
 }
 
+/**
+ * The model Flue hands the adapter: the alias, never the target. The adapter
+ * ignores it by design, and passing the real target here would hide that.
+ */
+function aliasPlaceholder(): Model<Api> {
+  return {
+    id: "default",
+    name: "default",
+    api: LOCAL_ALIAS_API,
+    provider: "project-studio",
+    baseUrl: "http://127.0.0.1",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 32_000,
+    maxTokens: 4_000,
+  };
+}
+
 async function collectText(stream: AsyncIterable<any>): Promise<string> {
   let text = "";
   for await (const event of stream) {
@@ -209,6 +231,42 @@ describe("local BYOK source", () => {
 
     expect(text).toBe("Local model works.");
     expect(mock.requests[0]?.authorization).toBe(`Bearer ${LOCAL_PLACEHOLDER_KEY}`);
+  });
+
+  /**
+   * The alias is not a wire protocol, so the options that reach the adapter are
+   * the protocol-independent ones: `reasoning`, not `reasoning_effort` and not
+   * `thinkingConfig`. Only Pi's `streamSimple` translates them for the target's
+   * actual protocol. Delegating to `stream` instead type-checks and streams a
+   * perfectly good answer with the reasoning request silently dropped, which is
+   * why this asserts on the wire rather than on the reply.
+   */
+  it("carries a reasoning request through the alias to the provider", async () => {
+    const { adapter, runtime } = buildAdapter();
+
+    // A custom provider's models are declared unable to reason, because the
+    // harness cannot verify the claim. This one can, so the protocol has
+    // something to ask for.
+    const target = { ...adapter.assertTargetResolvable(), reasoning: true };
+    const reasoning: LocalRuntime = {
+      models: runtime.models,
+      target: () => target,
+      listModels: runtime.listModels,
+    };
+    const reasoningAdapter = new LocalModelProviderAdapter({
+      config: buildAdapter().config,
+      runtime: reasoning,
+    });
+
+    await collectText(
+      reasoningAdapter.stream(
+        aliasPlaceholder(),
+        { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] },
+        { reasoning: "medium" },
+      ),
+    );
+
+    expect(mock.requests[0]?.body?.reasoning_effort).toBe("medium");
   });
 
   it("treats a provider with a stored key as available", async () => {

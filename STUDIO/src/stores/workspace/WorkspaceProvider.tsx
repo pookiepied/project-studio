@@ -68,6 +68,23 @@ interface WorkspaceValue {
   removeProject: (projectId: string) => void
   setBranch: (projectId: string, branch: string) => void
 
+  /**
+   * Records a conversation whose first turn the harness has already taken.
+   *
+   * Distinct from `send` because nothing about it is a turn: the words are
+   * already gone, the reply is the harness's to produce, and the transcript
+   * is a projection of its log rather than of this list. What is left for
+   * this store is the part the harness has no opinion about — that the
+   * conversation exists, what it is called in the sidebar, and which project
+   * it belongs to. It carries no messages for exactly that reason; a copy
+   * kept here would be a second source of truth for text the log already
+   * owns.
+   */
+  beginConversation: (input: {
+    readonly id: string
+    readonly firstMessage: string
+    readonly projectId: string | null
+  }) => void
   /** Creates the conversation if `conversationId` is null, and returns its id. */
   send: (conversationId: string | null, text: string, projectId: string | null) => string
   stop: () => void
@@ -187,6 +204,27 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // — Turns -------------------------------------------------------------
+
+  const beginConversation = useCallback(
+    (input: { id: string; firstMessage: string; projectId: string | null }) => {
+      setConversations((current) => {
+        // The id is the harness's now, and a second record under it would be
+        // a duplicate in the sidebar pointing at the same log.
+        if (current.some((conversation) => conversation.id === input.id)) return current
+        const created: Conversation = {
+          id: input.id,
+          title: deriveTitle(input.firstMessage),
+          projectId: input.projectId,
+          messages: [],
+          updatedAt: Date.now(),
+          pinned: false,
+          archived: false,
+        }
+        return [created, ...current]
+      })
+    },
+    [],
+  )
 
   const send = useCallback(
     (conversationId: string | null, text: string, projectId: string | null): string => {
@@ -396,6 +434,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       createProject,
       removeProject,
       setBranch,
+      beginConversation,
       send,
       stop,
       retry,
@@ -417,6 +456,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       createProject,
       removeProject,
       setBranch,
+      beginConversation,
       send,
       stop,
       retry,

@@ -130,7 +130,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
                   size="sm"
                   onClick={() => setFolders((current) => current.filter((_, i) => i !== index))}
                 >
-                  <Icons.close />
+                  <Icons.close size="sm" />
                 </IconButton>
               </div>
             ))}

@@ -128,6 +128,12 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         onPointerCancel={() => setPointer('rest')}
         className={cn(
           'inline-flex shrink-0 items-center justify-center',
+          // Positioned, so anything a caller overlays on the control traces
+          // the CONTROL. The composer's working ring is the case: hung off
+          // the mark instead, it sized itself from a 10px glyph inside a 22px
+          // circle and read as an arbitrary ring floating in the button
+          // rather than as the button's own outline.
+          'relative',
           // `leading-none` and the flex centring together are what actually keep
           // the glyph on the button's optical centre. Line-height alone leaves an
           // SVG sitting a pixel low, which is the misalignment that showed up

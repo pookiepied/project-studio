@@ -13,6 +13,7 @@ import {
   type TurnResult,
 } from '@/platform/harness'
 import { isTauri } from '@/platform/tauri/window'
+import { firstAdmission, forgetFirstAdmission } from '@/features/chat/first-attach'
 
 /**
  * The facts a retry signal carries, verbatim from the wire. Which attempt
@@ -40,6 +41,21 @@ export interface RetryWaitFacts {
  * - `attaching`: a read is in flight and history is being replayed into it.
  * - `live`: the `up-to-date` transition happened — the replay is over and
  *   what follows is history being made.
+ * - `submitted`: the harness admitted a turn and has produced nothing for it
+ *   yet. This is a REPORT, not a guess: the admission receipt named the
+ *   submission and the offset its events begin at, so saying "a turn is
+ *   running" here repeats what the harness said rather than what a clock
+ *   suspects. It is its own state rather than a `streaming` carrying nothing
+ *   because "a turn exists" and "a turn is producing" are different facts
+ *   that render differently — the working mark and the stop control belong
+ *   to the first, the caret and the paced reveal only to the second — and
+ *   folding them together would leave every consumer re-deriving the
+ *   difference from a boolean, which is the shape the top of this comment
+ *   refuses. Only the harness ends it: a start or a delta moves it on to
+ *   `streaming`, a settlement to `idle` or `run-failed`, and a read that
+ *   broke or went silent to `interrupted`. No timer here may end it, because
+ *   a busy composer that unsticks itself on a clock is the silent stop
+ *   wearing a spinner.
  * - `streaming`: a turn is being produced, carrying the submission it
  *   belongs to when one has been seen. `retrying` carries the harness's own
  *   announcement that a transient model failure is being retried inside that
@@ -58,6 +74,7 @@ export type ConversationPhase =
   | { readonly status: 'harness-starting' }
   | { readonly status: 'attaching' }
   | { readonly status: 'live' }
+  | { readonly status: 'submitted'; readonly submissionId: string }
   | {
       readonly status: 'streaming'
       readonly submissionId: string | null
@@ -78,6 +95,20 @@ export type ConversationPhase =
        */
       readonly detail: string | null
     }
+
+/**
+ * Whether a turn is under way at all, admitted or producing.
+ *
+ * The one question the composer and the working mark ask, in one place rather
+ * than in each of them: a person watching the window cannot tell admission
+ * from generation and should not have to, because what they need — their
+ * words are gone, something is happening, here is how to stop it — is true
+ * across both. Everything that distinguishes the two, the caret and the paced
+ * reveal, reads `streaming` directly and must keep doing so.
+ */
+export function isTurnRunning(phase: ConversationPhase): boolean {
+  return phase.status === 'submitted' || phase.status === 'streaming'
+}
 
 /**
  * The content half of a delivery: everything rendering reduces into the
@@ -195,7 +226,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Whatever comes back must be stable across renders — it is an effect
  * dependency, like the settings pane's connect seam.
  */
-function defaultContactFor(conversationId: string): ContactHarness {
+export function defaultContactFor(conversationId: string): ContactHarness {
   return async () => {
     if (!isTauri()) return { kind: 'absent' }
     let state: unknown
@@ -440,9 +471,17 @@ export function useConversation(
                 return
               case 'up-to-date':
                 upToDateRef.current = true
-                setPhase((current) =>
-                  current.status === 'streaming' ? current : { status: 'live' },
-                )
+                // A reader that has caught up no longer needs the receipt a
+                // first turn was started with; every later attach on this
+                // conversation is an ordinary cold start.
+                forgetFirstAdmission(conversationId)
+                // Catching up says where the read is, not what the run is
+                // doing. A turn already known to be under way — admitted, or
+                // producing — outranks it: this delivery arrives on the very
+                // read a submission just opened, and demoting `submitted` to
+                // `live` here is exactly how the stop control would blink
+                // out a frame after it appeared.
+                setPhase((current) => (isTurnRunning(current) ? current : { status: 'live' }))
                 return
               case 'chunks': {
                 onContent?.({
@@ -469,8 +508,13 @@ export function useConversation(
                   setPhase((current) => {
                     // A start names the submission outright; an empty name (a
                     // delta with no seen start) and a bare retry both keep
-                    // whatever association the stream already carried.
-                    const previous = current.status === 'streaming' ? current.submissionId : null
+                    // whatever association the stream already carried — which
+                    // now includes the receipt's own, since a submission is
+                    // named from the moment it was admitted.
+                    const previous =
+                      current.status === 'streaming' || current.status === 'submitted'
+                        ? current.submissionId
+                        : null
                     const submissionId =
                       result.streaming === null || result.streaming === ''
                         ? previous
@@ -517,7 +561,7 @@ export function useConversation(
         // handled where that happens, not here.
       })
     },
-    [onContent, refreshLiveness, disarmLiveness],
+    [conversationId, onContent, refreshLiveness, disarmLiveness],
   )
 
   useEffect(() => {
@@ -528,7 +572,18 @@ export function useConversation(
     // client is one per conversation by construction.
     clientRef.current = createConversationClient({ conversationId })
     setOffset(null)
-    setPhase({ status: 'attaching' })
+    // A conversation opened for a turn that was admitted elsewhere says so
+    // from its first render, not from whenever the supervisor answers. The
+    // receipt is in hand before this view exists, so waiting on `contact()`
+    // to repeat it would leave the composer idle for the length of one
+    // status invoke — measured at ~280ms on the desktop, which is a stop
+    // control blinking out of the home page and back into this one.
+    const opening = firstAdmission(conversationId)
+    setPhase(
+      opening === null
+        ? { status: 'attaching' }
+        : { status: 'submitted', submissionId: opening.submissionId },
+    )
     // A refusal belongs to the conversation it happened in.
     setRefused(null)
 
@@ -543,7 +598,14 @@ export function useConversation(
         return
       }
       clientRef.current = found.client
-      attach()
+      // A conversation whose first turn was submitted from another page
+      // reads from that turn's own offset rather than asking history about a
+      // stream that is milliseconds old — the 404 race Task 32 removed from
+      // `submit()`, which a first turn would otherwise walk straight back
+      // into. Quiet, because the phase this view opened in is already the
+      // right one and the turn's replay is a few milliseconds behind.
+      const first = firstAdmission(conversationId)
+      attach(first === null ? undefined : { from: first.offset, announce: false })
     })
 
     let unsubscribe: (() => void) | null = null
@@ -629,6 +691,15 @@ export function useConversation(
       // this turn, and the position discipline downstream makes any overlap
       // with what an older read already delivered safe to apply twice.
       attach({ from: sent.value.offset, announce: false })
+      // Said before this call answers, so the page is never between two
+      // truths: the composer drops its own in-flight lock the moment the
+      // receipt reaches it, and if nothing had taken the lock over by then
+      // the stop control would blink out and back when the first token
+      // finally arrived. Setting it here means the phase is already
+      // `submitted` in the render the composer's own release lands in.
+      if (liveRef.current) {
+        setPhase({ status: 'submitted', submissionId: sent.value.submissionId })
+      }
       return { ok: true as const, value: { submissionId: sent.value.submissionId } }
     },
     [attach],

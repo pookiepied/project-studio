@@ -103,7 +103,7 @@ export function MediaLightbox({
               </span>
               <span className="ml-auto shrink-0">
                 <IconButton label="Close" size="sm" onClick={onClose}>
-                  <Icons.close />
+                  <Icons.close size="sm" />
                 </IconButton>
               </span>
             </div>
