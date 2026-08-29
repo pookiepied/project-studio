@@ -3,13 +3,21 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { COMPOSER, DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
+import {
+  MAX_IMAGES_PER_TURN,
+  pickImageFiles,
+  readImageFile,
+  type ImageRejection,
+} from '@/domain/attachments/images'
 import { AddMenu } from '@/features/chat/composer/AddMenu'
+import { PendingImages } from '@/features/chat/composer/PendingImages'
 import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { DictationBar, useDictation } from '@/features/voice'
 import { useVoiceModeContext } from '@/features/voice'
 import { useWorkspace } from '@/stores/workspace'
+import type { TurnImageWire } from '@/platform/harness'
 import { cn } from '@/lib/cn'
 
 /*
@@ -104,7 +112,14 @@ export function Composer({
    * is a receipt, not a fire-and-forget: the field clears only when `ok`
    * says the harness took the message.
    */
-  onSend?: (text: string) => Promise<{ readonly ok: boolean }>
+  /**
+   * When present, sends go here instead of the demo turn runner. The answer
+   * is a receipt, not a fire-and-forget: the field clears only when `ok`
+   * says the harness took the message. The images beside the words clear
+   * with the same rule — they belong to this message, and stay when the
+   * field still holds words the receipt did not take.
+   */
+  onSend?: (text: string, images: readonly TurnImageWire[]) => Promise<{ readonly ok: boolean }>
   /** Overrides the demo busy state while `onSend` owns sending. */
   busy?: boolean
   /** Aborts the harness run; only meaningful with `onSend`. */
@@ -117,6 +132,18 @@ export function Composer({
   // which the send began.
   const textRef = useRef('')
   textRef.current = text
+  /**
+   * The images riding on this message, already read and encoded. The ref is
+   * the receipt check's twin of `textRef`: a send clears them only when the
+   * strip still holds exactly what that receipt took, so images picked
+   * during the round trip belong to the next message.
+   */
+  const [images, setImages] = useState<readonly TurnImageWire[]>([])
+  const imagesRef = useRef<readonly TurnImageWire[]>([])
+  imagesRef.current = images
+  /** Pick-time rejections, held until the next pick or a successful send. */
+  const [refusals, setRefusals] = useState<readonly ImageRejection[]>([])
+  const picker = useRef<HTMLInputElement>(null)
   const [focused, setFocused] = useState(false)
   const [multiline, setMultiline] = useState(false)
   // True from send to receipt. Without it a refused send left `busy` false
@@ -151,23 +178,53 @@ export function Composer({
   // `busyOverride ?? sending` would never reach `sending` where it is wired,
   // and the in-flight lock would exist only for callers that omit the prop.
   const busy = live ? (busyOverride ?? false) || sending : status !== 'idle'
-  const canSend = text.trim().length > 0 && !busy
+  const canSend = (text.trim().length > 0 || images.length > 0) && !busy
   const dictating = dictation.stage !== 'idle'
+
+  /**
+   * Reads the picker's haul into the strip: rules first, then bytes. The
+   * cap counts the turn, so a second pick that would overrun fills the
+   * rejections line instead of silently dropping.
+   */
+  const addImages = useCallback((picked: readonly File[]) => {
+    const { accepted, rejections: judged } = pickImageFiles(picked, imagesRef.current.length)
+    void Promise.all(accepted.map(readImageFile)).then((outcomes) => {
+      const read: TurnImageWire[] = []
+      const held: ImageRejection[] = [...judged]
+      for (const outcome of outcomes) {
+        if ('type' in outcome) read.push(outcome)
+        else held.push(outcome)
+      }
+      setRefusals(held)
+      if (read.length === 0) return
+      setImages((current) => [...current, ...read].slice(0, MAX_IMAGES_PER_TURN))
+    })
+  }, [])
+
+  const removeImage = useCallback((index: number) => {
+    setImages((current) => current.filter((_, at) => at !== index))
+  }, [])
 
   const submit = () => {
     if (!canSend) return
     if (live && onSend !== undefined) {
       const outgoing = text
+      const carried = images
       setSending(true)
-      void onSend(outgoing).then(
+      void onSend(outgoing, carried).then(
         (receipt) => {
           setSending(false)
           // Clear only what the harness actually took, and only if the
           // field still holds exactly that — words typed during the round
-          // trip belong to the next message, not this receipt.
-          if (!receipt.ok || textRef.current !== outgoing) return
+          // trip belong to the next message, not this receipt. Same for the
+          // strip: a different array is a different message being built.
+          if (!receipt.ok || textRef.current !== outgoing || imagesRef.current !== carried) {
+            return
+          }
           setText('')
           setMultiline(false)
+          setImages([])
+          setRefusals([])
         },
         () => {
           // A send that threw instead of answering is not an acceptance
@@ -179,6 +236,8 @@ export function Composer({
     }
     const id = send(conversationId, text)
     setText('')
+    setImages([])
+    setRefusals([])
     setMultiline(false)
     if (conversationId === null && id) onSent?.(id)
   }
@@ -261,6 +320,21 @@ export function Composer({
         focused ? 'shadow-lifted' : 'shadow-raised',
       )}
     >
+      {/* The images this message carries, above the words: content of the
+          message, in the message's frame. The rejections under them are the
+          pick's honest remainder — a file the rules refused, named where the
+          person can still do something about it. */}
+      <PendingImages images={images} onRemove={removeImage} />
+      {refusals.length > 0 ? (
+        <div className="mb-2" role="status">
+          {refusals.map((entry, at) => (
+            <p key={`${entry.filename}-${at}`} className="text-caption text-muted-foreground">
+              {entry.filename} — {entry.reason}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {/* One grid, two arrangements, the same three columns — and always two
           rows, so nothing has to appear or vanish. On one line the second
           track is zeroed and the clusters sit in the side columns with the
@@ -304,7 +378,11 @@ export function Composer({
             multiline ? 'row-start-2 self-end' : 'row-start-1',
           )}
         >
-          <AddMenu />
+          {/* The image picker is this menu's one live item: the dialog it
+              opens is the webview's own file input, no plugin. The demo
+              transport carries only words, so on the gallery there is no
+              handler to attach and the item closes as it always has. */}
+          <AddMenu onImage={live ? () => picker.current?.click() : undefined} />
 
           {/* What Studio may do, next to the thing that will make it do it.
               The mode is the one setting whose consequence lands on the user's
@@ -341,6 +419,7 @@ export function Composer({
                   stage={dictation.stage}
                   elapsedMs={dictation.elapsedMs}
                   denied={dictation.denied}
+                  note={dictation.note}
                   onFrame={dictation.mic.onFrame}
                 />
               </motion.div>
@@ -454,6 +533,23 @@ export function Composer({
           )}
         </motion.div>
       </div>
+
+      {/* Off-flow and invisible: only its click handler matters, opened by
+          the plus menu. `accept` narrows the dialog to the four formats the
+          rules admit, and `multiple` matches the strip's count; the value is
+          reset after each read so picking the same file twice still fires. */}
+      <input
+        ref={picker}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const picked = Array.from(event.target.files ?? [])
+          event.target.value = ''
+          if (picked.length > 0) addImages(picked)
+        }}
+      />
     </div>
   )
 }

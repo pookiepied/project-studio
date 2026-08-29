@@ -110,11 +110,13 @@ export const LANGUAGE_PROTOCOLS = [
   'openai-responses',
   'anthropic-messages',
   'google-generative-ai',
+  'mistral-conversations',
+  'azure-openai-responses',
 ] as const
 export type LanguageProtocol = (typeof LANGUAGE_PROTOCOLS)[number]
 
 /** `mediaProtocolSchema`. */
-export const MEDIA_PROTOCOLS = ['openai-images', 'openrouter-images'] as const
+export const MEDIA_PROTOCOLS = ['openai-images', 'openrouter-images', 'elevenlabs'] as const
 export type MediaProtocol = (typeof MEDIA_PROTOCOLS)[number]
 
 /** `retrievalProtocolSchema`. */
@@ -161,10 +163,13 @@ export type ReasoningChoice = (typeof REASONING_CHOICES)[number]
 export const CAPABILITY_SLOTS = [
   'textGeneration',
   'imageGeneration',
+  'imageEditing',
   'videoGeneration',
   'speechGeneration',
   'transcription',
   'embeddings',
+  'webSearch',
+  'webFetch',
 ] as const
 export type CapabilitySlot = (typeof CAPABILITY_SLOTS)[number]
 
@@ -173,6 +178,26 @@ export type CapabilitySlot = (typeof CAPABILITY_SLOTS)[number]
  * harness itself accepts the flat union and validates it against the kind.
  */
 export type ProviderProtocol = LanguageProtocol | MediaProtocol | RetrievalProtocol
+
+/**
+ * Narrowing guards from the flat union back to the per-kind unions.
+ *
+ * The library carries one flat protocol field; a connection draft needs the
+ * kind-tied one, and these are the checked way across - a value that is not
+ * of the kind's union simply fails the guard, which is the parse step the
+ * connection type demands.
+ */
+export function isLanguageProtocol(value: ProviderProtocol): value is LanguageProtocol {
+  return (LANGUAGE_PROTOCOLS as readonly string[]).includes(value)
+}
+
+export function isMediaProtocol(value: ProviderProtocol): value is MediaProtocol {
+  return (MEDIA_PROTOCOLS as readonly string[]).includes(value)
+}
+
+export function isRetrievalProtocol(value: ProviderProtocol): value is RetrievalProtocol {
+  return (RETRIEVAL_PROTOCOLS as readonly string[]).includes(value)
+}
 
 /* -------------------------------------------------------------------------- */
 /* Connections                                                                 */
@@ -273,15 +298,21 @@ export interface ModelCapability {
   readonly embeddings: CapabilityState
   readonly reranking: CapabilityState
   readonly imageGeneration: CapabilityState
+  /** Producing a new image guided by one the user supplies. */
+  readonly imageEditing: CapabilityState
   readonly videoGeneration: CapabilityState
   readonly speechGeneration: CapabilityState
   readonly transcription: CapabilityState
+  /** Retrieving web results for a query. */
+  readonly webSearch: CapabilityState
+  /** Retrieving one named page. */
+  readonly webFetch: CapabilityState
   readonly contextWindow: number | 'unknown'
   readonly maxOutputTokens: number | 'unknown'
 }
 
 /**
- * The eleven state-valued keys, listed once so the parser cannot drift from
+ * The fourteen state-valued keys, listed once so the parser cannot drift from
  * the interface: a name that is not a capability key fails to compile.
  */
 const CAPABILITY_STATE_KEYS = [
@@ -293,9 +324,12 @@ const CAPABILITY_STATE_KEYS = [
   'embeddings',
   'reranking',
   'imageGeneration',
+  'imageEditing',
   'videoGeneration',
   'speechGeneration',
   'transcription',
+  'webSearch',
+  'webFetch',
 ] as const satisfies readonly (keyof ModelCapability)[]
 
 /** `modelPricingSchema`. USD per million tokens; "unknown" is not zero. */
@@ -325,6 +359,26 @@ export interface ProviderModel {
   /** Hidden from pickers without being deleted. */
   readonly hidden: boolean
   readonly origin: ModelOrigin
+  /**
+   * Whether the provider itself still offers this model, as far as its last
+   * probe showed. Absent on old rows parses as true: nothing was known, and
+   * nothing should be marked.
+   */
+  readonly available: boolean
+}
+
+/**
+ * One entry of the provider library: a vendor any of the three catalogs can
+ * name, with the capability slots it actually serves.
+ */
+export interface LibraryProvider {
+  readonly id: string
+  readonly displayName: string
+  readonly kind: ProviderKind
+  readonly protocol: ProviderProtocol
+  readonly baseUrl?: string
+  readonly capabilities: readonly CapabilitySlot[]
+  readonly modelCount: number
 }
 
 /* -------------------------------------------------------------------------- */
@@ -492,9 +546,12 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
     embeddings,
     reranking,
     imageGeneration,
+    imageEditing,
     videoGeneration,
     speechGeneration,
     transcription,
+    webSearch,
+    webFetch,
   } = states
   if (
     textGeneration === undefined ||
@@ -505,9 +562,12 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
     embeddings === undefined ||
     reranking === undefined ||
     imageGeneration === undefined ||
+    imageEditing === undefined ||
     videoGeneration === undefined ||
     speechGeneration === undefined ||
-    transcription === undefined
+    transcription === undefined ||
+    webSearch === undefined ||
+    webFetch === undefined
   ) {
     return null
   }
@@ -521,9 +581,12 @@ export function parseModelCapability(value: unknown): ModelCapability | null {
     embeddings,
     reranking,
     imageGeneration,
+    imageEditing,
     videoGeneration,
     speechGeneration,
     transcription,
+    webSearch,
+    webFetch,
     contextWindow,
     maxOutputTokens,
   }
@@ -567,6 +630,9 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
   const pricing = parseModelPricing(value['pricing'])
   const hidden = flag(value['hidden'])
   const origin = oneOf(MODEL_ORIGINS, value['origin'])
+  // Absent parses as available: rows written before the field existed were
+  // never marked, and a missing mark must not read as a bad mark.
+  const available = value['available'] === undefined ? true : flag(value['available'])
 
   if (
     connectionId === null ||
@@ -577,7 +643,8 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
     shape === null ||
     pricing === null ||
     hidden === null ||
-    origin === null
+    origin === null ||
+    available === null
   ) {
     return null
   }
@@ -592,11 +659,68 @@ export function parseProviderModel(value: unknown): ProviderModel | null {
     pricing,
     hidden,
     origin,
+    available,
   }
 }
 
 export function parseProviderModels(value: unknown): readonly ProviderModel[] | null {
   return listOf(parseProviderModel, value)
+}
+
+export function parseLibraryProvider(value: unknown): LibraryProvider | null {
+  if (!isRecord(value)) return null
+
+  const id = text(value['id'])
+  const displayName = text(value['displayName'])
+  const kind = oneOf(PROVIDER_KINDS, value['kind'])
+  const protocol =
+    oneOf(LANGUAGE_PROTOCOLS, value['protocol']) ??
+    oneOf(MEDIA_PROTOCOLS, value['protocol']) ??
+    oneOf(RETRIEVAL_PROTOCOLS, value['protocol'])
+  const baseUrl = optionalText(value['baseUrl'])
+  const capabilities = listOf((slot: unknown) => oneOf(CAPABILITY_SLOTS, slot), value['capabilities'])
+  const modelCount = typeof value['modelCount'] === 'number' ? value['modelCount'] : null
+
+  if (
+    id === null ||
+    displayName === null ||
+    kind === null ||
+    protocol === null ||
+    capabilities === null ||
+    modelCount === null ||
+    !baseUrl.ok
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    displayName,
+    kind,
+    protocol,
+    capabilities,
+    modelCount,
+    ...(baseUrl.value === undefined ? {} : { baseUrl: baseUrl.value }),
+  }
+}
+
+export function parseLibraryProviders(value: unknown): readonly LibraryProvider[] | null {
+  return listOf(parseLibraryProvider, value)
+}
+
+/**
+ * `GET /api/providers/icons/:id` — one vendor's real logo as SVG text.
+ * Absence is the ordinary answer and travels as a 404, never as a guess.
+ */
+export interface ProviderIcon {
+  readonly svg: string
+}
+
+export function parseProviderIcon(value: unknown): ProviderIcon | null {
+  if (!isRecord(value)) return null
+  const svg = text(value['svg'])
+  if (svg === null || svg.length === 0) return null
+  return { svg }
 }
 
 export function parseProbeResult(value: unknown): ProbeResult | null {

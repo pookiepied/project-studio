@@ -12,10 +12,25 @@ import { cn } from '@/lib/cn'
  */
 
 const BASE = [
-  'w-full rounded-md border bg-surface px-2.5 py-1.5 text-ui text-foreground',
+  // `min-w-0` is load-bearing: a field is `w-full`, and inside a flex ROW a
+  // `w-full` item still refuses to shrink below its intrinsic width unless
+  // the minimum is released — so in any narrow row the field overflows its
+  // container and gets clipped at the edges rather than shrinking. Every
+  // field lives in a column or a row of some layout; none of them wants the
+  // default minimum.
+  'w-full min-w-0 rounded-md border bg-surface px-2.5 py-1.5 text-ui text-foreground',
   'placeholder:text-muted-foreground/70',
   'transition-[border-color,box-shadow] duration-fast outline-none',
   'focus:border-foreground/20 focus:shadow-[0_0_0_2px_var(--ring)]',
+  // The app's global `:focus-visible` outline would stack on top of this
+  // field's own ring — two rings, and the outer one floats 4px off the field,
+  // where its ends bulge past the field's own shape on a short control and it
+  // is the first thing an `overflow` ancestor clips at the left and right
+  // edges. The field's ring is the focus indicator, for mouse and keyboard
+  // alike, and it is drawn inside the field's own box so no container can cut
+  // it off. The bang is load-bearing: this sheet's own rules are unlayered,
+  // and unlayered styles beat every utility layer without it.
+  'focus-visible:outline-none!',
 ].join(' ')
 
 export const TextField = forwardRef<

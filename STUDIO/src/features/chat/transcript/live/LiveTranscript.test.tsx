@@ -127,21 +127,29 @@ afterEach(() => {
  * hand, from the instant they send. Saying it a second time in the transcript
  * put a claim where content goes.
  *
- * No mark is drawn here, so `svg` still identifies an indicator — a user
- * bubble carries none, which the second case pins.
+ * "Nothing" is about CLAIMS, not pixels: the words just sent stand there, with
+ * their hover action row (invisible until hovered, and not a claim), and the
+ * gap between them and the reply draws no caret, no working mark, and no word.
+ * The assertions below therefore ask for the absence of the specific lies this
+ * window once told rather than for an empty container.
  */
+function silence(container: HTMLElement): void {
+  expect(container.querySelector('span.animate-pulse')).toBeNull()
+  expect(container.textContent).not.toContain('Working')
+  expect(container.textContent).not.toContain('Thinking')
+}
+
 describe('the silence between sending and the first token', () => {
   it('draws nothing while the turn is only admitted', () => {
     // The measured gap on the real provider was six seconds of a
     // seven-second turn.
     const { container } = show([user('u1', 'please answer')], SUBMITTED)
-    expect(container.querySelector('svg')).toBeNull()
-    expect(container.querySelector('button')).toBeNull()
+    silence(container)
   })
 
   it('draws nothing when nothing has been submitted either', () => {
     const { container } = show([user('u1', 'please answer')], { status: 'live' })
-    expect(container.querySelector('svg')).toBeNull()
+    silence(container)
   })
 
   it('draws nothing while the reply exists in the log but not on the page', () => {
@@ -149,7 +157,7 @@ describe('the silence between sending and the first token', () => {
     // a fact about the log, not about the screen, and the screen says nothing
     // about it.
     const { container } = show([user('u1', 'please answer'), openedAssistant('a1')], STREAMING)
-    expect(container.querySelector('svg')).toBeNull()
+    silence(container)
   })
 
   it('never claims the model is thinking before a run exists', () => {
@@ -294,7 +302,7 @@ describe('the tail of a turn that has just been sent', () => {
     // Every turn after the first is sent into a transcript whose last item is
     // a finished reply full of text, and neither case adds a row.
     const first = show([], SUBMITTED, HELD)
-    expect(first.container.querySelector('svg')).toBeNull()
+    silence(first.container)
     cleanup()
 
     // The older reply carries its own "stopped" line, mark and all, so this

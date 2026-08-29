@@ -10,18 +10,20 @@ import {
 } from '@/components/primitives'
 import {
   findCatalogModel,
-  groupCatalog,
   reasoningChoiceNote,
   type CatalogModel,
 } from '@/domain/models/catalog'
 import { REASONING_LEVEL_NOTES, type ReasoningChoice } from '@/domain/models/types'
 import { effectiveTurnSettings } from '@/domain/session/settings'
+import { loadRecentModelIds, rememberRecentModel } from '@/domain/session/recents'
+import { ModelLibraryDialog } from '@/features/models/ModelLibraryDialog'
+import { CatalogStateNote } from '@/features/models/CatalogStateNote'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
 
 /**
- * The turn settings: one pill, one menu, two depths.
+ * The turn settings: one pill, one menu, and a library on its own page.
  *
  * ---- Why it is one control again -------------------------------------------
  *
@@ -36,13 +38,24 @@ import { cn } from '@/lib/cn'
  * has a second level for the setting that needs room. Nothing on the strip
  * changed shape; the depth is behind a click, which is where depth belongs.
  *
- * ---- Where the models come from --------------------------------------------
+ * ---- What the first level shows, and why not everything --------------------
  *
- * From the harness - the catalog `GET /api/providers/models` serves, which is
- * the same list the settings pages manage. The picker offers exactly what the
- * harness says it can serve: no harness, no connections, or a failed read are
- * named states, because six models that do not exist are worse than a sentence
- * that says why the list is empty.
+ * There was a time this menu listed every model of every connection, and then
+ * a time it opened a small library beside the strip. Against an aggregator
+ * connection neither works: hundreds of rows in a column that used to be a
+ * shortcut, and the facts that distinguish them - price, context, capability -
+ * with nowhere to appear. So the first level holds only what a decision
+ * actually needs: the harness's default, the models already picked recently,
+ * and the door to the library - which is a dialog of its own now, wide enough
+ * to show a list and a detail pane, where choosing is an explicit act with a
+ * button rather than a row click that might have been an accident.
+ *
+ * "Recent" is deliberately not an "auto" mode - Studio is nobody's first-party
+ * client and invents no model; the resting choice remains the harness's own
+ * default until the user names one, and the recents are only the names the
+ * user has already chosen, kept to three so the section stays a shortcut
+ * rather than growing a second library. Until a model is named, the pill says
+ * "Choose a model" rather than dressing the default up as a selection.
  *
  * ---- Why reasoning is a slider ---------------------------------------------
  *
@@ -55,12 +68,16 @@ import { cn } from '@/lib/cn'
  * reasoning support offers no control at all, rather than one that does
  * nothing.
  */
+
+type View = 'root' | 'reasoning'
+
 export function TurnMenu() {
   const { settings, setSettings, setConversationSettings, conversations, catalog } =
     useWorkspace()
   const { route, openSettings } = useNavigation()
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState<'root' | 'reasoning'>('root')
+  const [view, setView] = useState<View>('root')
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   // The choice a turn from THIS surface will carry: the conversation's own
   // settled model when it has one, the window's otherwise. The send paths use
@@ -78,14 +95,15 @@ export function TurnMenu() {
     if (!open) setView('root')
   }, [open])
 
-  const chooseModel = (modelId: string | null) => {
+  const chooseModel = (modelId: string | null, reasoningLevel: ReasoningChoice = effective.reasoningLevel) => {
+    // Only an explicit pick counts as recent - the harness's default is the
+    // resting state, not a choice the user made, and recording it would put a
+    // row that resolves to whatever the defaults name into a list of names.
+    if (modelId !== null) rememberRecentModel(modelId)
     if (active !== null) {
-      setConversationSettings(active.id, {
-        modelId,
-        reasoningLevel: effective.reasoningLevel,
-      })
+      setConversationSettings(active.id, { modelId, reasoningLevel })
     } else {
-      setSettings({ ...settings, modelId })
+      setSettings({ ...settings, modelId, reasoningLevel })
     }
     setOpen(false)
   }
@@ -101,67 +119,83 @@ export function TurnMenu() {
     }
   }
 
-  const label = model?.name ?? 'Studio default'
+  // Not "Studio default": until a model is named, nothing is selected, and a
+  // pill that reads as a selection is a pill that lies. This is the one place
+  // that says what to do about it.
+  const label = model?.name ?? 'Choose a model'
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-      side="bottom"
-      align="end"
-      className="studio-scroll-bounded max-h-[28rem] w-72 overflow-y-auto"
-      trigger={
-        <Tooltip
-          label={[label, reasoningLabel(model, effective.reasoningLevel)]
-            .filter(Boolean)
-            .join(' · ')}
-          side="bottom"
-        >
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            aria-label="Turn settings"
-            className={cn(
-              // No border, no dividers, no fill at rest. The strip holds the
-              // window's identity; this is a label that happens to be clickable.
-              'flex max-w-56 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui',
-              'text-muted-foreground transition-colors duration-fast',
-              open ? 'bg-selected text-foreground' : 'hover:bg-tint',
-            )}
+    <>
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        side="bottom"
+        align="end"
+        className="studio-scroll-bounded max-h-[28rem] w-80 overflow-y-auto"
+        trigger={
+          <Tooltip
+            label={[label, reasoningLabel(model, effective.reasoningLevel)]
+              .filter(Boolean)
+              .join(' · ')}
+            side="bottom"
           >
-            {/* The model's own mark, not the connection's: a model reached
-                through OpenRouter wears its author's mark here, and the
-                connection wears OpenRouter's in Settings. Two facts, two
-                places. */}
-            {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
-            <span className="min-w-0 truncate">{label}</span>
-            <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
-          </button>
-        </Tooltip>
-      }
-    >
-      {view === 'reasoning' ? (
-        <ReasoningPanel
-          model={model}
-          choice={effective.reasoningLevel}
-          onBack={() => setView('root')}
-          onChange={chooseReasoning}
-        />
-      ) : (
-        <ModelPanel
-          catalog={catalog}
-          selected={effective.modelId}
-          onChoose={chooseModel}
-          onOpenReasoning={() => setView('reasoning')}
-          onOpenLibrary={() => {
-            setOpen(false)
-            openSettings('providers')
-          }}
-          reasoningLabel={reasoningLabel(model, effective.reasoningLevel)}
-          hasReasoningControl={model !== undefined && model.reasoningLevels.length > 0}
-        />
-      )}
-    </Popover>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              aria-label="Turn settings"
+              className={cn(
+                // No border, no dividers, no fill at rest. The strip holds the
+                // window's identity; this is a label that happens to be clickable.
+                'flex max-w-56 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui',
+                'text-muted-foreground transition-colors duration-fast',
+                open ? 'bg-selected text-foreground' : 'hover:bg-tint',
+              )}
+            >
+              {/* The model's own mark, not the connection's: a model reached
+                  through OpenRouter wears its author's mark here, and the
+                  connection wears OpenRouter's in Settings. Two facts, two
+                  places. */}
+              {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
+              <span className="min-w-0 truncate">{label}</span>
+              <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
+            </button>
+          </Tooltip>
+        }
+      >
+        {view === 'reasoning' ? (
+          <ReasoningPanel
+            model={model}
+            choice={effective.reasoningLevel}
+            onBack={() => setView('root')}
+            onChange={chooseReasoning}
+          />
+        ) : (
+          <ModelPanel
+            catalog={catalog}
+            selected={effective.modelId}
+            onChoose={chooseModel}
+            onOpenReasoning={() => setView('reasoning')}
+            onOpenLibrary={() => {
+              setOpen(false)
+              setLibraryOpen(true)
+            }}
+            reasoningLabel={reasoningLabel(model, effective.reasoningLevel)}
+            hasReasoningControl={model !== undefined && model.reasoningLevels.length > 0}
+          />
+        )}
+      </Popover>
+
+      <ModelLibraryDialog
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        catalog={catalog}
+        onUse={(modelId, reasoningLevel) => chooseModel(modelId, reasoningLevel)}
+        onOpenSettings={() => {
+          setLibraryOpen(false)
+          openSettings('providers')
+        }}
+      />
+    </>
   )
 }
 
@@ -176,6 +210,23 @@ function reasoningLabel(model: CatalogModel | undefined, choice: ReasoningChoice
 
 function capital(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1)
+}
+
+/** The dial's steps for one model: the provider's own default, then the levels
+ * that model actually supports, in Pi's own order. Shared by the two places a
+ * reasoning dial appears, so they can never disagree about what it offers. */
+function reasoningSteps(model: CatalogModel | undefined) {
+  return [
+    { id: 'default' as const, name: 'Default', note: reasoningChoiceNote('default') },
+    ...(model?.reasoningLevels ?? []).map((level) => {
+      const note = REASONING_LEVEL_NOTES.find((entry) => entry.id === level)
+      return {
+        id: level,
+        name: note?.name ?? capital(level),
+        note: note?.note,
+      }
+    }),
+  ]
 }
 
 function ModelPanel({
@@ -195,20 +246,8 @@ function ModelPanel({
   onOpenReasoning: () => void
   onOpenLibrary: () => void
 }) {
-  if (catalog.phase.status === 'loading') {
-    return <MenuNote>Reading models...</MenuNote>
-  }
-  if (catalog.phase.status === 'no-harness') {
-    return (
-      <MenuNote>No harness is running, so there are no models to choose yet.</MenuNote>
-    )
-  }
-  if (catalog.phase.status === 'failed') {
-    return (
-      <MenuNote>
-        Could not read the model catalog. {catalog.phase.error?.message ?? ''}
-      </MenuNote>
-    )
+  if (catalog.phase.status !== 'ready') {
+    return <CatalogStateNote catalog={catalog} />
   }
   if (catalog.models.length === 0) {
     // The state a new install is in, said once, pointing at the one place
@@ -225,52 +264,44 @@ function ModelPanel({
     )
   }
 
-  const defaultsGroup = groupCatalog(catalog.models)
+  // Only picks that still resolve to a catalog row are offered. A model that
+  // was removed since it was last chosen simply stops appearing here; the
+  // remembered name is a shortcut, not a record the picker has to honour.
+  const recent = loadRecentModelIds()
+    .map((id) => findCatalogModel(catalog.models, id))
+    .filter((entry): entry is CatalogModel => entry !== undefined)
+
   return (
     <>
       <MenuItem selected={selected === null} onSelect={() => onChoose(null)}>
-        Studio default
+        Default model
       </MenuItem>
 
-      <MenuSeparator />
-
-      {defaultsGroup.map((group) => (
-        <div key={group.connectionId}>
-          {/* The connection's mark sits with its name, once, rather than on
-              every model beneath it. Repeating a logo down a group says the
-              rows differ by provider when what differs is the model. The
-              mark shown is the CONNECTION's vendor; each model under it
-              carries its own author's mark. */}
-          <MenuLabel>
-            <span className="flex items-center gap-1.5">
-              <ProviderMark provider={group.connectionVendor} />
-              {group.connectionName}
-            </span>
-          </MenuLabel>
-          {group.models.map((candidate) => (
+      {recent.length > 0 ? (
+        <>
+          <MenuSeparator />
+          <MenuLabel>Recent</MenuLabel>
+          {recent.map((candidate) => (
             <MenuItem
               key={candidate.id}
               selected={candidate.id === selected}
               onSelect={() => onChoose(candidate.id)}
             >
               <span className="flex min-w-0 items-center gap-1.5">
-                {/* The model's own author - Anthropic's mark on a model
-                    reached through OpenRouter. The distinction is the
-                    point: this row answers "whose model", the group header
-                    answers "through whom". */}
                 <ProviderMark provider={candidate.author} className="opacity-80" />
                 <span className="min-w-0 truncate">{candidate.name}</span>
               </span>
             </MenuItem>
           ))}
-        </div>
-      ))}
+        </>
+      ) : null}
 
-      {/* Where a user's own models arrive from, rather than letting them
-          swell this list. A picker is for choosing; adding is a different
-          activity and needs a page that can hold a key, a base URL and a wire
-          format without becoming a menu. */}
-      <MenuItem icon={<Icons.mcp />} onSelect={onOpenLibrary}>
+      {/* Where everything else lives: the full catalog, with search and the
+          facts about each model, one step away. A picker is for choosing;
+          browsing two hundred rows is a different activity and gets a page
+          that can hold it. */}
+      <MenuSeparator />
+      <MenuItem icon={<Icons.search />} onSelect={onOpenLibrary}>
         Model library…
       </MenuItem>
 
@@ -303,20 +334,7 @@ function ReasoningPanel({
   onBack: () => void
   onChange: (choice: ReasoningChoice) => void
 }) {
-  // "default" first - the provider's own behaviour, which is a real choice -
-  // then the levels this one model actually supports, in Pi's own order.
-  const steps = [
-    { id: 'default' as const, name: 'Default', note: reasoningChoiceNote('default') },
-    ...(model?.reasoningLevels ?? []).map((level) => {
-      const note = REASONING_LEVEL_NOTES.find((entry) => entry.id === level)
-      return {
-        id: level,
-        name: note?.name ?? capital(level),
-        note: note?.note,
-      }
-    }),
-  ]
-
+  const steps = reasoningSteps(model)
   return (
     <>
       <button

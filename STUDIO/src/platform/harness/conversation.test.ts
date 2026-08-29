@@ -148,6 +148,46 @@ describe('submitting a turn', () => {
     expect(JSON.parse(init.body)).toEqual({ message: 'hello', reasoningLevel: 'default' })
   })
 
+  it('carries images in the Flue submission shape, spelled exactly as the contract names them', async () => {
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    await client.submitTurn(
+      'look at this',
+      { modelId: 'openai/gpt-4o', reasoningLevel: 'default' },
+      [
+        { type: 'image', data: 'aGk=', mimeType: 'image/png', filename: 'shot.png' },
+        { type: 'image', data: 'aGk=', mimeType: 'image/jpeg' },
+      ],
+    )
+
+    const init = calls[0]?.args['init'] as { body: string }
+    expect(JSON.parse(init.body)).toEqual({
+      message: 'look at this',
+      modelId: 'openai/gpt-4o',
+      reasoningLevel: 'default',
+      images: [
+        { type: 'image', data: 'aGk=', mimeType: 'image/png', filename: 'shot.png' },
+        { type: 'image', data: 'aGk=', mimeType: 'image/jpeg' },
+      ],
+    })
+  })
+
+  it('sends a text-only turn with no images key at all, byte-for-byte what it always sent', async () => {
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' }, [])
+
+    const init = calls[0]?.args['init'] as { body: string }
+    expect(init.body).not.toContain('images')
+    expect(JSON.parse(init.body)).toEqual({ message: 'hello', reasoningLevel: 'default' })
+  })
+
   it('keeps the harness refusal together with its status and its own sentence', async () => {
     const { invoke } = scriptedInvoke({
       service_fetch: () => serviceResponse(403, JSON.stringify({ error: 'admission denied' })),

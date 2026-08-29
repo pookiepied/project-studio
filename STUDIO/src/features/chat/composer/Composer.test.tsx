@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { VoiceModeProvider } from '@/features/voice'
 import { Composer } from './Composer'
+import type { TurnImageWire } from '@/platform/harness'
 
 // The composer reads the workspace store for the demo transport's status and
 // send; a stub keeps this test about the live receipt mechanics alone. The
@@ -34,7 +35,10 @@ class ResizeObserverStub {
 }
 vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 
-function renderComposer(onSend: (text: string) => Promise<Receipt>, busy?: boolean) {
+function renderComposer(
+  onSend: (text: string, images: readonly TurnImageWire[]) => Promise<Receipt>,
+  busy?: boolean,
+) {
   return render(
     <VoiceModeProvider>
       <Composer
@@ -68,7 +72,7 @@ describe('the field holds its words until the harness takes them', () => {
     type('please answer this')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    await waitFor(() => expect(onSend).toHaveBeenCalledWith('please answer this'))
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('please answer this', []))
     expect(field()).toBe('please answer this')
   })
 
@@ -135,5 +139,70 @@ describe('the field holds its words until the harness takes them', () => {
     // The field still holds the words, so a second click is a live path.
     fireEvent.click(screen.getByRole('button', { name: /Send|Stop/ }))
     expect(onSend).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the images a turn carries', () => {
+  const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4])
+
+  /** Opens the plus menu's Image item, which wakes the hidden file input. */
+  function pickImages(): void {
+    fireEvent.click(screen.getByRole('button', { name: 'Add context' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Image/ }))
+  }
+
+  function pickerInput(): HTMLInputElement {
+    const input = document.querySelector('input[type="file"]')
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker in the composer')
+    return input
+  }
+
+  function changeFiles(input: HTMLInputElement, files: File[]): void {
+    Object.defineProperty(input, 'files', { value: files, configurable: true })
+    fireEvent.change(input)
+  }
+
+  it('carries a picked image with the words, and strips it once the receipt lands', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    pickImages()
+    changeFiles(pickerInput(), [
+      new File([pngBytes], 'photo.png', { type: 'image/png' }),
+      new File([new Uint8Array([0, 1, 2])], 'notes.txt', { type: 'text/plain' }),
+    ])
+
+    await waitFor(() => expect(screen.getByAltText('photo.png')).toBeTruthy())
+    // The picker's honest remainder: a file the rules refused, named.
+    expect(screen.getByText(/notes\.txt — Images only/)).toBeTruthy()
+
+    type('look at this')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() =>
+      expect(onSend).toHaveBeenCalledWith('look at this', [
+        {
+          type: 'image',
+          data: btoa(String.fromCharCode(...pngBytes)),
+          mimeType: 'image/png',
+          filename: 'photo.png',
+        },
+      ]),
+    )
+    await waitFor(() => expect(screen.queryByAltText('photo.png')).toBeNull())
+    expect(screen.queryByText(/notes\.txt/)).toBeNull()
+  })
+
+  it('keeps the strip when the harness refuses, exactly as it keeps the words', async () => {
+    const onSend = vi.fn(async () => ({ ok: false }))
+    renderComposer(onSend)
+
+    pickImages()
+    changeFiles(pickerInput(), [new File([pngBytes], 'photo.png', { type: 'image/png' })])
+    await waitFor(() => expect(screen.getByAltText('photo.png')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(onSend).toHaveBeenCalled())
+    expect(screen.getByAltText('photo.png')).toBeTruthy()
+    expect(field()).toBe('')
   })
 })

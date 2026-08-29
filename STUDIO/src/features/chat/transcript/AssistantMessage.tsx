@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
+import { ReadAloud } from '@/features/voice/ReadAloud'
 import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import type { Message } from '@/domain/session/types'
@@ -19,13 +20,11 @@ import type { Message } from '@/domain/session/types'
 export function AssistantMessage({
   message,
   streaming,
-  onRetry,
   onFork,
 }: {
   message: Message
   /** This is the message currently being written. */
   streaming: boolean
-  onRetry: () => void
   onFork: () => void
 }) {
   const [hovered, setHovered] = useState(false)
@@ -77,15 +76,19 @@ export function AssistantMessage({
           fade rather than mount — this component was the one place breaking
           that promise. Now the space is reserved from the first frame of the
           reply, so when the row appears nothing else moves. `visible` still
-          gates it, so a message being written offers no retry button. */}
+          gates it, so a message being written offers no controls.
+
+          The same three verbs the live row carries: copy, branch, read aloud.
+          Retry lived here once and was removed on purpose — redoing a turn
+          that touched a workspace is the person's call through their own
+          tooling, not a button. */}
       <MessageActions
           visible={hovered && !streaming && !revealing}
           copyPayload={message.text}
           actions={[
-            { id: 'retry', label: 'Try again', icon: Icons.retry, run: onRetry },
             { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: onFork },
-            { id: 'read', label: 'Read aloud', icon: Icons.readAloud, run: () => undefined },
           ]}
+          after={message.text.trim() === '' ? null : <ReadAloud text={message.text} />}
           // No model name: this component now renders only the gallery's
           // scripted replies, whose staged messages name no model, and the
           // live transcript names its model nowhere by design.

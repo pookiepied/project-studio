@@ -31,6 +31,7 @@ export function MessageActions({
   align = 'start',
   visible,
   trailing,
+  after,
 }: {
   actions: readonly MessageAction[]
   /** Text for the built-in copy button, which every message has. */
@@ -47,6 +48,12 @@ export function MessageActions({
    * margin and one fade, and they cannot come apart again.
    */
   trailing?: ReactNode
+  /**
+   * A control that belongs with the verbs but manages its own state — the
+   * read-aloud pill, which grows from a button into its own player. Rendered
+   * between the icon buttons and the trailing caption.
+   */
+  after?: ReactNode
 }) {
   const [copied, setCopied] = useState(false)
   const [focusWithin, setFocusWithin] = useState(false)
@@ -103,6 +110,8 @@ export function MessageActions({
           </IconButton>
         )
       })}
+
+      {after}
 
       {/* A little clear of the buttons, so the name reads as a caption on the
           row rather than as a fifth control. */}

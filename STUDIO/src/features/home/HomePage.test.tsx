@@ -30,6 +30,9 @@ const workspace = {
   beginConversation: vi.fn(),
   settings: { permission: 'manual' },
   setSettings: vi.fn(),
+  // The send path reads the catalog to judge whether the turn's model can
+  // see images; an empty catalog means "unknown", which passes.
+  catalog: { phase: { status: 'ready' as const, error: null }, models: [] },
 }
 const openChat = vi.fn()
 

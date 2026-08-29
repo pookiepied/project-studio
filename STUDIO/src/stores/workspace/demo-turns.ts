@@ -23,8 +23,6 @@ export interface LegacyTurns {
   cancel: () => void
   /** The gallery's own composer path; a project argument has nothing to mean. */
   send: (conversationId: string | null, text: string) => string
-  retry: (conversationId: string) => void
-  editMessage: (conversationId: string, messageId: string, text: string) => void
   fork: (conversationId: string, messageId: string) => string | null
 }
 
@@ -104,73 +102,6 @@ export function useDemoTurns(options: {
     [markRunning, modelId, patch, run, status],
   )
 
-  const retry = useCallback(
-    (conversationId: string) => {
-      if (conversationId !== GALLERY_CONVERSATION_ID) return
-      cancel()
-      const conversation = findConversation(conversationId)
-      if (!conversation) return
-
-      const kept = [...conversation.messages]
-      while (kept.length > 0 && kept[kept.length - 1]?.role === 'assistant') kept.pop()
-      if (kept.length === 0) return
-
-      patch(conversationId, (current) => ({ ...current, messages: kept }))
-      run(conversationId, {
-        modelId: modelId(),
-        patch: (change) => patch(conversationId, change),
-        onThinking: () => {
-          status('thinking')
-          markRunning(conversationId, true)
-        },
-        onStreaming: () => status('streaming'),
-        onDone: () => {
-          status('idle')
-          markRunning(conversationId, false)
-        },
-      })
-    },
-    [cancel, findConversation, markRunning, modelId, patch, run, status],
-  )
-
-  const editMessage = useCallback(
-    (conversationId: string, messageId: string, text: string) => {
-      if (conversationId !== GALLERY_CONVERSATION_ID) return
-      const body = text.trim()
-      if (!body) return
-      cancel()
-
-      const conversation = findConversation(conversationId)
-      if (!conversation) return
-      const index = conversation.messages.findIndex((message) => message.id === messageId)
-      if (index < 0) return
-
-      const kept = conversation.messages
-        .slice(0, index + 1)
-        .map((message) => (message.id === messageId ? { ...message, text: body } : message))
-
-      patch(conversationId, (current) => ({
-        ...current,
-        messages: kept,
-        updatedAt: Date.now(),
-      }))
-      run(conversationId, {
-        modelId: modelId(),
-        patch: (change) => patch(conversationId, change),
-        onThinking: () => {
-          status('thinking')
-          markRunning(conversationId, true)
-        },
-        onStreaming: () => status('streaming'),
-        onDone: () => {
-          status('idle')
-          markRunning(conversationId, false)
-        },
-      })
-    },
-    [cancel, findConversation, markRunning, modelId, patch, run, status],
-  )
-
   const fork = useCallback(
     (conversationId: string, messageId: string): string | null => {
       if (conversationId !== GALLERY_CONVERSATION_ID) return null
@@ -185,7 +116,7 @@ export function useDemoTurns(options: {
       const copy: Conversation = {
         ...conversation,
         id: copyId,
-        title: conversation.title ? `${conversation.title} (fork)` : null,
+        title: conversation.title ? `${conversation.title} (Fork)` : null,
         messages: conversation.messages.slice(0, index + 1).map((message) => ({
           ...message,
           id: newId('msg'),
@@ -199,5 +130,5 @@ export function useDemoTurns(options: {
     [findConversation, upsertLocal],
   )
 
-  return { run, cancel, send, retry, editMessage, fork }
+  return { run, cancel, send, fork }
 }

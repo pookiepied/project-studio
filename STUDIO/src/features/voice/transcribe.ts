@@ -1,27 +1,69 @@
+import { base64OfBytes } from '@/lib/base64'
+import { createHarnessClient, resolveHarnessAddress } from '@/platform/harness'
 import { formatClock } from '@/features/voice/waveform'
 import type { VoiceNote } from '@/features/voice/useMicInput'
 
 /**
- * Speech to text. This is the seam.
+ * Speech to text. The seam, filled.
  *
- * Everything around it is real: the microphone runs, the level is measured,
- * the audio is captured. This function is where a model plugs in — send
- * `note.blob` to an ASR endpoint (Whisper, the provider of your choice) and
- * return its text. The signature is deliberately the whole contract: audio
- * in, text out, asynchronous, no UI knowledge.
+ * Everything around it was already real: the microphone runs, the level is
+ * measured, the audio is captured. What changed is the middle - the blob now
+ * rides to the harness, which resolves the transcription slot (the model the
+ * Providers pane names) and speaks to that provider. This module never learns
+ * which one; it knows audio in, words out, and that is the whole contract.
  *
- * Until a model is connected, the demo below stands in. It keeps the honest
- * latency a round trip will really have (so the processing state is paced by
- * something other than a developer's patience) and returns a bracketed note
- * that says exactly what it is — a stand-in, marked in the text itself, so a
- * dictated placeholder can never be mistaken for a transcript.
+ * The address is resolved at call time, exactly as the workspace store does
+ * for its client: a harness that restarted between two dictations is the live
+ * one by the second call, not a stale endpoint. The answer is a result, not a
+ * bare string, because two very different non-answers exist - nothing
+ * listening, and a refusal that names its fix - and the composer shows the
+ * note on the strip, so a failure is never typed into the field pretending to
+ * be dictation.
  */
-export async function transcribeRecording(note: VoiceNote): Promise<string> {
-  // A plausible round trip: short for a short note, capped so a long
-  // recording never parks the composer.
-  const latency = 380 + Math.min(900, note.durationMs * 0.03)
-  await new Promise((resolve) => setTimeout(resolve, latency))
+export type TranscriptionOutcome =
+  | { readonly kind: 'ok'; readonly text: string }
+  | { readonly kind: 'note'; readonly note: string }
 
-  const length = note.blob ? `${(note.blob.size / 1024).toFixed(0)} kB` : formatClock(note.durationMs)
-  return `[Voice note · ${formatClock(note.durationMs)} · ${length} — transcript arrives when speech-to-text is connected]`
+export async function transcribeRecording(note: VoiceNote): Promise<TranscriptionOutcome> {
+  const blob = note.blob
+  if (blob === undefined || blob === null) {
+    return {
+      kind: 'note',
+      note: `Nothing was captured for that ${formatClock(note.durationMs)} take - try again`,
+    }
+  }
+
+  let bytes: Uint8Array
+  try {
+    bytes = new Uint8Array(await blob.arrayBuffer())
+  } catch {
+    return { kind: 'note', note: 'The recording could not be read - try again' }
+  }
+
+  const address = await resolveHarnessAddress()
+  if (address === null) {
+    return { kind: 'note', note: 'The harness is not running - start it below, then dictate again' }
+  }
+
+  const sent = await createHarnessClient(address).transcribe({
+    audio: base64OfBytes(bytes),
+    mimeType: blob.type === '' ? 'audio/webm' : blob.type,
+  })
+  if (!sent.ok) {
+    return { kind: 'note', note: sentenceFor(sent.error.message) }
+  }
+  if (sent.value.text.trim() === '') {
+    return {
+      kind: 'note',
+      note: 'Nothing intelligible came back - try again, a little closer to the mic',
+    }
+  }
+  return { kind: 'ok', text: sent.value.text.trim() }
+}
+
+function sentenceFor(message: string): string {
+  if (message.includes('No transcription model is connected')) {
+    return 'No transcription model is connected - pick one in Settings - Providers'
+  }
+  return `Dictation failed: ${message}`
 }

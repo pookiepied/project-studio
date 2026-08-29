@@ -6,6 +6,7 @@ import { StudioMark } from '@/components/brand'
 import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
+import { SettingsTree } from '@/shell/sidebar/SettingsTree'
 import { startWindowDrag } from '@/platform/tauri'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
@@ -15,7 +16,18 @@ import { cn } from '@/lib/cn'
 /**
  * The sidebar.
  *
- * ---- One state, not two --------------------------------------------------
+ * ---- What the column is ---------------------------------------------------
+ *
+ * The left column holds where you can go, one list at a time. On the app
+ * surfaces that list is conversations and projects. On the settings route the
+ * same column shows the settings tree instead -- same width, same ground, same
+ * brand band, same drag region -- because Settings' navigation lives there too,
+ * and a second list beside the first was the two-column mistake this app
+ * already tried and untried. The swap and its rules are recorded on
+ * `SettingsTree`; the open/close state that makes room for it is kept in the
+ * navigation store beside `sidebarOpen` itself.
+ *
+ * ---- One state, not two ---------------------------------------------------
  *
  * Open, or gone. There is no icon rail.
  *
@@ -35,8 +47,9 @@ import { cn } from '@/lib/cn'
  * Closing the sidebar takes Account and Settings off screen with it. That is
  * acceptable only because neither is lost: the toggle sits in the strip, Ctrl B
  * brings the column back, Ctrl K reaches every destination by name, and Ctrl ,
- * opens Settings directly. If any of those went away the rail would have to
- * come back.
+ * opens Settings directly -- which now opens the column with it, since the
+ * column is where Settings' own navigation lives. If any of those went away the
+ * rail would have to come back.
  *
  * ---- Why the inner column is a fixed width -------------------------------
  *
@@ -49,10 +62,12 @@ import { cn } from '@/lib/cn'
 export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
   const compact = useCompactLayout()
   const {
+    route,
     sidebarOpen,
     toggleSidebar,
     goHome,
     openSettings,
+    leaveSettings,
     setPaletteOpen,
     sidebarOrganize,
     sidebarSort,
@@ -62,6 +77,9 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
   const { projects, conversations } = useWorkspace()
   const [sectionOpen, setSectionOpen] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  const inSettings = route.kind === 'settings'
+  const activeSection = inSettings ? route.sectionId : ''
 
   const flat = sidebarOrganize === 'list'
   const live = conversations.filter((conversation) => !conversation.archived)
@@ -147,7 +165,14 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             brand sat below the window controls rather than beside them, and the
             first thing at the top of the window was nothing. Sharing the one
             number puts the wordmark, the traffic lights and the panel toggle on
-            a single line, and keeps them there if the strip is ever retuned. */}
+            a single line, and keeps them there if the strip is ever retuned.
+
+            While Settings is the route, the band's right end carries the way
+            back: one icon, on the same line as the brand and the window
+            controls, at the edge of the column it is about to leave. Back is a
+            window-level move, but it is made *from* this column — the tree it
+            leaves lives here — so the control sits on the band rather than in
+            the strip over the page, where it would read as page furniture. */}
         {/* This band is title bar: the window's top edge on the sidebar's side,
             and a frameless window whose most handle-shaped strip does not move
             it is one people try to drag and then give up on. Selection is off
@@ -160,194 +185,226 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             is a DWM attribute that Windows drops for any maximized window. One
             stray double-click on the logo turned the whole panel square, with
             nothing in the CSS to explain it. Maximizing lives in the traffic
-            lights, where it is deliberate. */}
+            lights, where it is deliberate. The target guard keeps that contract
+            intact now that the band holds a control: the drag belongs to the
+            empty band, never to a child of it. */}
         <div
           onPointerDown={(event) => {
-            if (event.button !== 0) return
+            if (event.button !== 0 || event.target !== event.currentTarget) return
             void startWindowDrag()
           }}
-          className="flex shrink-0 items-center gap-1.5 px-3.5 select-none"
+          className="flex shrink-0 items-center justify-between gap-1.5 px-3.5 select-none"
           style={{ height: SHELL.topStrip.height }}
         >
-          <StudioMark size={16} className="pointer-events-none text-foreground" />
-          <span className="studio-heading pointer-events-none text-foreground">Studio</span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <StudioMark size={16} className="pointer-events-none text-foreground" />
+            <span className="studio-heading pointer-events-none text-foreground">Studio</span>
+          </div>
+
+          {inSettings ? (
+            <IconButton label="Back" tooltipSide="bottom" onClick={leaveSettings}>
+              <Icons.back size="md" />
+            </IconButton>
+          ) : null}
         </div>
 
         {/* Spacing in this column separates things that are different in kind,
             not merely adjacent. The two standing actions sit closer to each
             other than to the list below them, and the list's groups sit further
             apart than the rows inside a group — so the eye gets the hierarchy
-            from the gaps before it reads a single title. */}
+            from the gaps before it reads a single title.
+
+            In Settings the slot is empty on purpose. The way back moved up into
+            the brand band; the slot itself stays so the tree begins at the same
+            height on every route, and a list that swaps in place never jumps
+            because of the swap. */}
         <div className="mt-1 flex shrink-0 flex-col gap-1 px-2 pb-5">
-          <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
-          <Action
-            label="Search"
-            hint="Ctrl K"
-            icon={<Icons.command />}
-            onClick={() => setPaletteOpen(true)}
-          />
+          {inSettings ? null : (
+            <>
+              <Action label="New conversation" icon={<Icons.newChat />} onClick={goHome} />
+              <Action
+                label="Search"
+                hint="Ctrl K"
+                icon={<Icons.command />}
+                onClick={() => setPaletteOpen(true)}
+              />
+            </>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          <div className="group/section flex items-center gap-0.5 px-1 pt-1.5 pb-1">
-            <button
-              type="button"
-              onClick={() => setSectionOpen((value) => !value)}
-              aria-expanded={sectionOpen}
-              className="flex min-w-0 flex-1 items-center gap-1 rounded text-micro uppercase text-muted-foreground/80 transition-colors duration-fast hover:text-muted-foreground"
-            >
-              {/* Sized `sm`, not from its own text. Marks size at 1.1em of the
-                  text beside them, and this header is `micro` while the project
-                  rows under it are `ui` — so the parent's arrow came out
-                  *smaller* than its children's, which inverts the hierarchy the
-                  arrows exist to express. A disclosure belongs to the tree, not
-                  to the label it happens to sit next to. */}
-              <Icons.disclosure state={sectionOpen ? 'on' : 'rest'} size="sm" className="shrink-0" />
-              {flat ? 'Conversations' : 'Projects'}
-            </button>
-
-            {flat ? null : (
-              <Tooltip label="New project">
+          {inSettings ? (
+            <SettingsTree active={activeSection} onSelect={(sectionId) => openSettings(sectionId)} />
+          ) : (
+            <>
+              <div className="group/section flex items-center gap-0.5 px-1 pt-1.5 pb-1">
                 <button
                   type="button"
-                  aria-label="New project"
-                  onClick={onNewProject}
-                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
+                  onClick={() => setSectionOpen((value) => !value)}
+                  aria-expanded={sectionOpen}
+                  className="flex min-w-0 flex-1 items-center gap-1 rounded text-micro uppercase text-muted-foreground/80 transition-colors duration-fast hover:text-muted-foreground"
                 >
-                  <Icons.projectNew />
+                  {/* Sized `sm`, not from its own text. Marks size at 1.1em of the
+                      text beside them, and this header is `micro` while the project
+                      rows under it are `ui` — so the parent's arrow came out
+                      *smaller* than its children's, which inverts the hierarchy the
+                      arrows exist to express. A disclosure belongs to the tree, not
+                      to the label it happens to sit next to. */}
+                  <Icons.disclosure state={sectionOpen ? 'on' : 'rest'} size="sm" className="shrink-0" />
+                  {flat ? 'Conversations' : 'Projects'}
                 </button>
-              </Tooltip>
-            )}
 
-            <Popover
-              open={menuOpen}
-              onOpenChange={setMenuOpen}
-              side="bottom"
-              align="end"
-              trigger={
-                <button
-                  type="button"
-                  aria-label="Sidebar options"
-                  onClick={() => setMenuOpen((value) => !value)}
-                  className={cn(
-                    'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint',
-                    menuOpen ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100',
-                  )}
+                {flat ? null : (
+                  <Tooltip label="New project">
+                    <button
+                      type="button"
+                      aria-label="New project"
+                      onClick={onNewProject}
+                      className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
+                    >
+                      <Icons.projectNew />
+                    </button>
+                  </Tooltip>
+                )}
+
+                <Popover
+                  open={menuOpen}
+                  onOpenChange={setMenuOpen}
+                  side="bottom"
+                  align="end"
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label="Sidebar options"
+                      onClick={() => setMenuOpen((value) => !value)}
+                      className={cn(
+                        'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint',
+                        menuOpen ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100',
+                      )}
+                    >
+                      <Icons.more />
+                    </button>
+                  }
                 >
-                  <Icons.more />
-                </button>
-              }
-            >
-              <MenuLabel>Organize sidebar by</MenuLabel>
-              <MenuItem
-                selected={sidebarOrganize === 'project'}
-                onSelect={() => {
-                  setSidebarOrganize('project')
-                  setMenuOpen(false)
-                }}
-              >
-                Project
-              </MenuItem>
-              <MenuItem
-                selected={sidebarOrganize === 'list'}
-                onSelect={() => {
-                  setSidebarOrganize('list')
-                  setMenuOpen(false)
-                }}
-              >
-                In a list
-              </MenuItem>
+                  <MenuLabel>Organize sidebar by</MenuLabel>
+                  <MenuItem
+                    selected={sidebarOrganize === 'project'}
+                    onSelect={() => {
+                      setSidebarOrganize('project')
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Project
+                  </MenuItem>
+                  <MenuItem
+                    selected={sidebarOrganize === 'list'}
+                    onSelect={() => {
+                      setSidebarOrganize('list')
+                      setMenuOpen(false)
+                    }}
+                  >
+                    In a list
+                  </MenuItem>
 
-              <MenuSeparator />
-              <MenuLabel>Sort chats by</MenuLabel>
-              <MenuItem
-                selected={sidebarSort === 'priority'}
-                onSelect={() => {
-                  setSidebarSort('priority')
-                  setMenuOpen(false)
-                }}
-              >
-                Priority
-              </MenuItem>
-              <MenuItem
-                selected={sidebarSort === 'updated'}
-                onSelect={() => {
-                  setSidebarSort('updated')
-                  setMenuOpen(false)
-                }}
-              >
-                Last updated
-              </MenuItem>
-              <MenuItem
-                selected={sidebarSort === 'manual'}
-                onSelect={() => {
-                  setSidebarSort('manual')
-                  setMenuOpen(false)
-                }}
-              >
-                Manual order
-              </MenuItem>
-            </Popover>
-          </div>
+                  <MenuSeparator />
+                  <MenuLabel>Sort chats by</MenuLabel>
+                  <MenuItem
+                    selected={sidebarSort === 'priority'}
+                    onSelect={() => {
+                      setSidebarSort('priority')
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Priority
+                  </MenuItem>
+                  <MenuItem
+                    selected={sidebarSort === 'updated'}
+                    onSelect={() => {
+                      setSidebarSort('updated')
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Last updated
+                  </MenuItem>
+                  <MenuItem
+                    selected={sidebarSort === 'manual'}
+                    onSelect={() => {
+                      setSidebarSort('manual')
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Manual order
+                  </MenuItem>
+                </Popover>
+              </div>
 
-          <AnimatePresence initial={false}>
-            {sectionOpen ? (
-              <motion.div {...COLLAPSE} className="overflow-hidden">
-                {flat ? (
+              <AnimatePresence initial={false}>
+                {sectionOpen ? (
+                  <motion.div {...COLLAPSE} className="overflow-hidden">
+                    {flat ? (
+                      <div className="flex flex-col gap-1">
+                        {sorted.map((conversation) => (
+                          <ConversationRow key={conversation.id} conversation={conversation} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {projects.map((project) => (
+                          <ProjectSection
+                            key={project.id}
+                            project={project}
+                            conversations={sorted.filter(
+                              (conversation) => conversation.projectId === project.id,
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              {!flat && loose.length > 0 ? (
+                <>
+                  <p className="px-1.5 pt-5 pb-1.5 text-micro text-muted-foreground/80 uppercase">
+                    Conversations
+                  </p>
                   <div className="flex flex-col gap-1">
-                    {sorted.map((conversation) => (
+                    {loose.map((conversation) => (
                       <ConversationRow key={conversation.id} conversation={conversation} />
                     ))}
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {projects.map((project) => (
-                      <ProjectSection
-                        key={project.id}
-                        project={project}
-                        conversations={sorted.filter(
-                          (conversation) => conversation.projectId === project.id,
-                        )}
-                      />
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-
-          {!flat && loose.length > 0 ? (
-            <>
-              <p className="px-1.5 pt-5 pb-1.5 text-micro text-muted-foreground/80 uppercase">
-                Conversations
-              </p>
-              <div className="flex flex-col gap-1">
-                {loose.map((conversation) => (
-                  <ConversationRow key={conversation.id} conversation={conversation} />
-                ))}
-              </div>
+                </>
+              ) : null}
             </>
-          ) : null}
+          )}
         </div>
 
         {/* No rule above it. The gap already separates this from the list --
             a footer pinned to the bottom of a column reads as a footer without
             being underlined, and the line was one more piece of furniture in a
-            panel whose whole job is to be quiet. Position does the work. */}
-        <div className="flex shrink-0 items-center justify-between px-2 pt-3 pb-2">
-          <button
-            type="button"
-            onClick={() => openSettings('account')}
-            className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
-          >
-            <Icons.account />
-            <span className="truncate">Account</span>
-          </button>
+            panel whose whole job is to be quiet. Position does the work.
 
-          <IconButton label="Settings" onClick={() => openSettings()}>
-            <Icons.settings size="md" />
-          </IconButton>
-        </div>
+            It is also conversation-column furniture: Account and the settings
+            shortcut are both rows in the settings tree already, so while the
+            tree is what this column holds, the footer would be a second copy
+            of destinations the column is showing. */}
+        {inSettings ? null : (
+          <div className="flex shrink-0 items-center justify-between px-2 pt-3 pb-2">
+            <button
+              type="button"
+              onClick={() => openSettings('account')}
+              className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
+            >
+              <Icons.account />
+              <span className="truncate">Account</span>
+            </button>
+
+            <IconButton label="Settings" onClick={() => openSettings()}>
+              <Icons.settings size="md" />
+            </IconButton>
+          </div>
+        )}
         </div>
       </motion.aside>
     </>

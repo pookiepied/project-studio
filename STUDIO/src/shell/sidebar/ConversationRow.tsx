@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
+import { useForkConversation } from '@/features/chat/fork'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
 import type { Conversation } from '@/domain/session/types'
@@ -11,14 +12,15 @@ import { cn } from '@/lib/cn'
  * One conversation in the sidebar.
  *
  * The overflow menu appears on hover or while it is open, and holds every verb
- * that is about the conversation as a record rather than as a place: pin,
- * rename, archive, delete, open elsewhere. Keeping them here rather than in a
- * toolbar is what lets the row be a plain title the rest of the time.
+ * that is about the conversation as a record rather than as a place: fork,
+ * pin, rename, archive, delete, open elsewhere. Keeping them here rather than
+ * in a toolbar is what lets the row be a plain title the rest of the time.
  */
 export function ConversationRow({ conversation }: { conversation: Conversation }) {
   const { route, openChat, goHome } = useNavigation()
   const { rename, togglePin, setArchived, remove, running } = useWorkspace()
   const detach = useDetachConversation()
+  const { forkWhole } = useForkConversation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(conversation.title ?? '')
@@ -105,6 +107,18 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
           </button>
         }
       >
+        <MenuItem
+          icon={<Icons.fork />}
+          note="A new conversation carrying everything said here."
+          onSelect={() => {
+            setMenuOpen(false)
+            // The fork opens its own conversation on success; a refusal is a
+            // menu that simply closed, with the source untouched.
+            void forkWhole(conversation)
+          }}
+        >
+          Fork
+        </MenuItem>
         <MenuItem
           icon={<Icons.pin />}
           onSelect={() => {

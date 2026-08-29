@@ -2,12 +2,12 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 
 import { NavigationProvider, useNavigation } from '@/stores/navigation'
 import { WorkspaceProvider } from '@/stores/workspace/WorkspaceProvider'
-import { KNOWN_VENDOR, modelFor } from '@/features/settings/connections/harness.fixtures'
+import { KNOWN_VENDOR, modelFor } from '@/features/settings/providers/harness.fixtures'
 import { TurnMenu } from './TurnMenu'
 
 /**
@@ -19,6 +19,11 @@ import { TurnMenu } from './TurnMenu'
  * the whole point of the task - the writes a pick makes: the index PATCH that
  * settles a conversation's model and reasoning, carrying exactly what the
  * harness contract names.
+ *
+ * The picker is deliberately two surfaces: a short first level (the default,
+ * the recents, the door) and the library dialog behind it, where every model
+ * lives with its facts and choosing is an explicit button rather than a row
+ * click. Most tests below therefore walk that path.
  */
 
 const BASE_URL = 'http://127.0.0.1:4319'
@@ -32,6 +37,9 @@ const REASONING_MODEL = modelFor(KNOWN_VENDOR.id, 'claude-sonnet-4.5', [
   'max',
 ])
 const FLAT_MODEL = modelFor(KNOWN_VENDOR.id, 'jamba-large-1.7')
+const ANOTHER_FLAT = modelFor(KNOWN_VENDOR.id, 'vox-small-1')
+const THIRD_FLAT = modelFor(KNOWN_VENDOR.id, 'kappa-mini')
+const FOURTH_FLAT = modelFor(KNOWN_VENDOR.id, 'delta-pro')
 
 const CONVERSATION = {
   id: 'cnv_1',
@@ -126,10 +134,20 @@ function mountPicker(options: { conversationId?: string } = {}) {
   )
 }
 
-/** The menu's panel exists only while open; everything below needs it open. */
+/** The menu's panel exists only while open; everything below needs it open.
+ * The wait is for the panel itself, not a row in it: the trigger's own label
+ * is often the same words, and the catalog may still be loading. */
 async function openModelPanel() {
   fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
-  await screen.findByText('Studio default')
+  await screen.findByRole('menu')
+}
+
+/** The library is a dialog of its own now; this walks to it. */
+async function openLibrary() {
+  await openModelPanel()
+  fireEvent.click(screen.getByText('Model library…'))
+  await screen.findByRole('dialog', { name: 'Model library' })
+  await screen.findByRole('textbox', { name: 'Search models' })
 }
 
 beforeEach(() => {
@@ -153,8 +171,8 @@ describe('the model picker', () => {
     await screen.findByText(/No connections yet/)
     expect(screen.getByText('Open Settings')).toBeTruthy()
     // The panel offers no invented rows beside the sentence. (The trigger's
-    // own label legitimately reads "Studio default" - it is the harness's
-    // default the conversation rides on until a connection exists.)
+    // own label legitimately reads "Choose a model" - nothing is selected,
+    // and the picker says so.)
     const menu = screen.getByRole('menu')
     expect(menu.textContent).not.toContain('claude-sonnet-4.5')
     expect(menu.textContent).not.toContain('Work Anthropic')
@@ -170,19 +188,89 @@ describe('the model picker', () => {
     await screen.findByText(/No harness is running/)
   })
 
-  it('groups models under their connection and marks each model with its author', async () => {
+  it('says "Choose a model" while nothing is picked, not a default dressed as a choice', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL]))
+    mountPicker()
+
+    const trigger = screen.getByRole('button', { name: 'Turn settings' })
+    expect(trigger.textContent).toContain('Choose a model')
+    expect(trigger.textContent).not.toContain('Default model')
+
+    // The resting choice is still offered - named for what it is.
+    await openModelPanel()
+    expect(within(screen.getByRole('menu')).getByText('Default model')).toBeTruthy()
+  })
+
+  it('keeps the first level short: default, the door, reasoning - not every model', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
+    mountPicker()
+
+    await openModelPanel()
+    const menu = screen.getByRole('menu')
+    // No connection groups, no model rows: choosing happens in the library.
+    expect(menu.textContent).not.toContain('claude-sonnet-4.5')
+    expect(menu.textContent).not.toContain('jamba-large-1.7')
+    expect(menu.textContent).not.toContain('Work Anthropic')
+    // The door is there, and so is the resting choice (queried inside the
+    // panel: the trigger's own label reads similar words).
+    expect(screen.getByText('Model library…')).toBeTruthy()
+    expect(within(menu).getByText('Default model')).toBeTruthy()
+  })
+
+  it('groups every model under its connection in the library and marks each with its author', async () => {
     harnessConfigured()
     mountPicker()
     stubFetch(defaultRoute([REASONING_MODEL]))
 
-    await openModelPanel()
+    await openLibrary()
     await screen.findByText('Work Anthropic')
-    // The panel renders in a portal, so the mark is queried on the document.
+    // The dialog renders in place, so the marks are queried on the document.
     // The row's mark is the model's own author, resolved from the vendor the
     // connection draws from - while the group header wears the connection's
     // own vendor.
-    expect(document.body.querySelector('[data-provider="anthropic"]')).not.toBeNull()
-    expect(screen.getByText('claude-sonnet-4.5')).toBeTruthy()
+    expect(document.querySelector('[data-provider="anthropic"]')).not.toBeNull()
+    expect(screen.getByRole('option', { name: /claude-sonnet-4\.5/ })).toBeTruthy()
+  })
+
+  it('narrows the library as the search is typed, and says so when nothing matches', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
+    mountPicker()
+
+    await openLibrary()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+      target: { value: 'jamba' },
+    })
+    // The needle matches by name; the other model's row is gone. The group
+    // header stays - the connection still serves the one model that matched.
+    expect(screen.getByRole('option', { name: /jamba-large-1\.7/ })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: /claude-sonnet/ })).toBeNull()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+      target: { value: 'nothing at all' },
+    })
+    await screen.findByText(/No models match "nothing at all"/)
+  })
+
+  it('shows the facts a choice deserves: price, context, and what the model can do', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL]))
+    mountPicker()
+
+    await openLibrary()
+    // Nothing is highlighted yet: the pane says what it is for.
+    await screen.findByText(/Select a model to see/)
+    fireEvent.click(screen.getByRole('option', { name: /claude-sonnet-4\.5/ }))
+
+    // The wire record's own facts, shown rather than buried: prices per
+    // million tokens, the context size, and the capability chips.
+    await screen.findByText('Input price')
+    expect(screen.getByText('Output price')).toBeTruthy()
+    expect(screen.getByText('Context window')).toBeTruthy()
+    expect(screen.getByText('Tool calling')).toBeTruthy()
+    expect(screen.getByText('Vision')).toBeTruthy()
   })
 
   it('hides the reasoning control entirely for a model that cannot reason', async () => {
@@ -190,13 +278,14 @@ describe('the model picker', () => {
     stubFetch(defaultRoute([FLAT_MODEL]))
     mountPicker()
 
-    await openModelPanel()
-    await screen.findByText('jamba-large-1.7')
+    await openLibrary()
+    fireEvent.click(screen.getByRole('option', { name: /jamba-large-1\.7/ }))
+    await screen.findByText('Capabilities')
     // Present and inert would be a control that lies; it is absent instead.
-    expect(screen.queryByText('Reasoning')).toBeNull()
+    expect(screen.queryByText('Reasoning effort')).toBeNull()
   })
 
-  it('settles a pick onto the conversation through an index PATCH', async () => {
+  it('settles a library pick through an index PATCH, applied only by the explicit button', async () => {
     harnessConfigured()
     const calls = stubFetch(defaultRoute([REASONING_MODEL]))
     mountPicker({ conversationId: 'cnv_1' })
@@ -204,9 +293,18 @@ describe('the model picker', () => {
     // Open the conversation first, so the picker is holding a record.
     fireEvent.click(screen.getByText('open chat'))
 
-    await openModelPanel()
-    fireEvent.click(await screen.findByText('claude-sonnet-4.5'))
+    await openLibrary()
+    // Highlighting a row writes nothing: the details appear, the dial rests
+    // on Default, and the index is untouched until the button.
+    fireEvent.click(screen.getByRole('option', { name: /claude-sonnet-4\.5/ }))
+    await screen.findByText('Reasoning effort')
+    expect(
+      calls.filter((call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1')),
+    ).toEqual([])
+    const slider = screen.getByRole('slider', { name: 'Reasoning effort' })
+    expect(slider.getAttribute('aria-valuetext')).toBe('Default')
 
+    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
     await waitFor(() => {
       const patch = calls.find(
         (call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1'),
@@ -226,21 +324,100 @@ describe('the model picker', () => {
     )
   })
 
+  it('offers the last three explicit picks before the library, most recent first', async () => {
+    harnessConfigured()
+    const calls = stubFetch(defaultRoute([FLAT_MODEL, ANOTHER_FLAT, THIRD_FLAT, FOURTH_FLAT]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+
+    // Four picks, three seats: the oldest falls off the list entirely.
+    for (const name of ['jamba-large-1\\.7', 'vox-small-1', 'kappa-mini', 'delta-pro']) {
+      await openLibrary()
+      fireEvent.click(await screen.findByRole('option', { name: new RegExp(name) }))
+      fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+      const plain = name.replace('\\.', '.')
+      await waitFor(() => {
+        expect(
+          calls.some(
+            (call) =>
+              call.method === 'PATCH' &&
+              JSON.parse(call.body ?? '{}').modelId === `anthropic/${plain}`,
+          ),
+        ).toBe(true)
+      })
+    }
+
+    await openModelPanel()
+    await screen.findByText('Recent')
+    const menu = screen.getByRole('menu')
+    expect(menu.textContent).toContain('delta-pro')
+    expect(menu.textContent).toContain('kappa-mini')
+    expect(menu.textContent).toContain('vox-small-1')
+    expect(menu.textContent).not.toContain('jamba-large-1.7')
+
+    // A recent is one click, not two: choosing it settles the same PATCH the
+    // library path would, with no trip through the dialog. The four picks'
+    // patches came before it; the last one is the recent's.
+    fireEvent.click(within(menu).getByText('kappa-mini'))
+    await waitFor(() => {
+      const patch = calls
+        .filter((call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1'))
+        .at(-1)
+      expect(JSON.parse(patch?.body ?? '{}')).toEqual({
+        modelId: 'anthropic/kappa-mini',
+        reasoningLevel: 'default',
+      })
+    })
+  })
+
+  it('keeps the recents honest: choosing the default records nothing', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+
+    // Choosing the harness's default is the resting state, not a pick; it
+    // must not enter a list of names.
+    await openModelPanel()
+    fireEvent.click(within(screen.getByRole('menu')).getByText('Default model'))
+    await openModelPanel()
+    expect(screen.queryByText('Recent')).toBeNull()
+  })
+
+  it('keeps the recents honest: a model the catalog no longer has stops appearing', async () => {
+    harnessConfigured()
+    const calls = stubFetch(defaultRoute([FLAT_MODEL]))
+    const view = mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+
+    await openLibrary()
+    fireEvent.click(await screen.findByRole('option', { name: /jamba-large-1\.7/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+    await waitFor(() => {
+      expect(calls.some((call) => call.method === 'PATCH')).toBe(true)
+    })
+
+    // A fresh surface, and a harness that no longer offers the model: the
+    // remembered name does not offer a row that cannot be sent to.
+    view.unmount()
+    stubFetch(defaultRoute([]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(screen.getByText('open chat'))
+
+    await openModelPanel()
+    expect(screen.queryByText('Recent')).toBeNull()
+  })
+
   it('offers Default first and the model levels as steps of one dial', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([REASONING_MODEL]))
     mountPicker()
 
-    await openModelPanel()
-    // The reasoning control belongs to a selected model: pick one first. The
-    // pick closes the menu, so it is reopened before reading its steps.
-    fireEvent.click(await screen.findByText('claude-sonnet-4.5'))
-    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
-    fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
-    fireEvent.click(await screen.findByText('Reasoning'))
+    await openLibrary()
+    fireEvent.click(screen.getByRole('option', { name: /claude-sonnet-4\.5/ }))
 
-    // One dial, whose steps are Default then the model's own levels: seven
-    // stops for this model, resting on Default.
+    // One dial in the details pane, whose steps are Default then the model's
+    // own levels: seven stops for this model, resting on Default.
     const slider = screen.getByRole('slider', { name: 'Reasoning effort' })
     expect(slider.getAttribute('max')).toBe('6')
     expect(slider.getAttribute('aria-valuetext')).toBe('Default')
@@ -252,5 +429,16 @@ describe('the model picker', () => {
     expect(screen.getByText('Max')).toBeTruthy()
     fireEvent.change(slider, { target: { value: '5' } })
     expect(screen.getByText('X-high')).toBeTruthy()
+
+    // The dial is part of the pick: applying carries the dragged level out.
+    // (No conversation is open here, so the choice settles on the window's
+    // settings; reopening the reasoning panel shows where it landed.)
+    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
+    // The menu item's accessible name carries its hint ("Reasoning X-high").
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Reasoning/ }))
+    // Scoped to the menu: the dialog's own dial may still be on its way out.
+    const settled = within(screen.getByRole('menu')).getByRole('slider', { name: 'Reasoning effort' })
+    expect(settled.getAttribute('aria-valuetext')).toBe('X-high')
   })
 })

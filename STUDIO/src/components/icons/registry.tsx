@@ -26,13 +26,13 @@
  * glyph inside it rather than the glyph having its own small hitbox.
  */
 import {
-  Archive, ArrowDown, ArrowUp, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
+  Archive, ArrowDown, ArrowLeft, ArrowUp, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
   CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
   MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
   RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
-  FastForward, Bot, CalendarDays, CircleAlert, CircleCheck, Clapperboard, FileText,
+  FastForward, Bot, CalendarDays, CircleAlert, CircleCheck, CirclePause, CirclePlay, Clapperboard, FileText,
   Link2, Mail, Maximize2, Sparkles, Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -108,6 +108,8 @@ const REGISTRY = {
   more: { mark: MoreHorizontal },
   openExternal: { mark: ExternalLink },
   jumpToLatest: { mark: ArrowDown, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
+  // Leaving the one surface whose navigation lives in the sidebar column.
+  back: { mark: ArrowLeft },
 
   // — Disclosure ----------------------------------------------------------
   expand: { mark: ChevronDown },
@@ -141,6 +143,12 @@ const REGISTRY = {
   edit: { mark: Pencil },
   fork: { mark: Split },
   readAloud: { mark: Volume2 },
+  // The player controls a spoken message earns. Circled, because the bare
+  // Pause is already the manual permission mode's mark — one mark means one
+  // concept — and a circle is what a media player puts around a transport
+  // control anyway.
+  play: { mark: CirclePlay },
+  pause: { mark: CirclePause },
 
   // — Composer ------------------------------------------------------------
   add: { mark: Plus, motion: CROSS },

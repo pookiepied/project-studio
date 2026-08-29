@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react'
 import { siAnthropic, siDeepseek, siGooglegemini, siMeta, siMistralai } from 'simple-icons'
 import { ICON_STEP, type IconSize } from '@/design/tokens'
+import { resolveProviderIcon } from '@/domain/providers/icons'
+import { brandColorFor } from '@/components/icons/brand-colors'
 import { cn } from '@/lib/cn'
 
 /**
- * Provider marks — the real brand logos, drawn in one colour.
+ * Provider marks — the real brand logos, in their real colours.
  *
  * ---- Why Simple Icons ------------------------------------------------------
  *
@@ -11,9 +14,29 @@ import { cn } from '@/lib/cn'
  * wrong one: a provider mark's whole job is to be recognised before it is read,
  * and an abstract figure standing in for Anthropic is recognisable to nobody.
  * Simple Icons ships each brand as a single path on a 24-unit grid with no
- * baked-in colour, which is exactly the shape this app can use — the mark
- * inherits `currentColor` like every other glyph, so a picker built from them
- * still reads as one list rather than a strip of brand assets.
+ * baked-in colour, which is exactly the shape this app can use.
+ *
+ * ---- Why marks wear colour, and where the colour comes from ----------------
+ *
+ * The marks used to inherit `currentColor` like every other glyph, which kept
+ * a picker reading as one list — and made thirty vendors visually identical.
+ * The user asked for the real colours, so the marks now wear Simple Icons'
+ * own single-colour rendition per brand: not a guess, and the same colour the
+ * rest of the industry renders these logos in. Vendors whose brand is
+ * effectively black (Anthropic, Moonshot, GitHub Copilot) and vendors with no
+ * known colour wear the theme's foreground instead — a near-black logo on a
+ * dark theme is a logo nobody can see, and lightening a brand into a colour
+ * it does not own is not the fix. See `brand-colors.ts`.
+ *
+ * ---- How the real logos are coloured ---------------------------------------
+ *
+ * The harness serves the vendors' actual logos (models.dev, cached on disk),
+ * but those SVGs are monochrome `currentColor` by design — drop one into an
+ * `<img>` and it renders black everywhere. So the logo is not an image here:
+ * it becomes a CSS mask on a span, and the brand colour is the span's
+ * background. The shape comes from the vendor, the colour from the same table
+ * every other mark uses. A mask image cannot execute anything, so the SVG
+ * needs no sanitising to be safe.
  *
  * Each icon is imported by name so the bundler drops the other three thousand.
  *
@@ -59,18 +82,19 @@ const PROVIDER_IDS = [
 export type ProviderId = (typeof PROVIDER_IDS)[number]
 
 /**
- * A brand path, or `null` for the marks we draw ourselves.
+ * A brand path and the colour it wears, or `null` for the marks we draw ourselves.
  *
  * Google resolves to the Gemini mark rather than the four-colour "G": the "G"
- * is the company, and what is being named here is the model family. Gemini is
- * also legible as one colour, which the multi-colour logo is not.
+ * is the company, and what is being named here is the model family. The star
+ * wears Gemini's own colour; a real "G" logo served for this vendor wears
+ * Google's instead, each according to what it depicts.
  */
-const BRAND: Record<ProviderId, string | null> = {
-  anthropic: siAnthropic.path,
-  google: siGooglegemini.path,
-  meta: siMeta.path,
-  deepseek: siDeepseek.path,
-  mistral: siMistralai.path,
+const BRAND: Record<ProviderId, { readonly path: string; readonly hex?: string } | null> = {
+  anthropic: { path: siAnthropic.path },
+  google: { path: siGooglegemini.path, hex: '#8E75B2' },
+  meta: { path: siMeta.path, hex: '#0467DF' },
+  deepseek: { path: siDeepseek.path, hex: '#5786FE' },
+  mistral: { path: siMistralai.path, hex: '#FA520F' },
   openai: null,
   custom: null,
 }
@@ -124,6 +148,32 @@ function markFor(provider: string): ProviderId {
   return 'custom'
 }
 
+/**
+ * The real logo for one vendor id, or null while unknown.
+ *
+ * The drawn marks are the floor and render immediately; this upgrades to the
+ * vendor's real logo when the harness has one (models.dev, cached on disk).
+ * Null is cached as firmly as a success - most of the two hundred OpenRouter
+ * authors have no logo anywhere, and a picker must not re-ask for them on
+ * every render.
+ */
+function useProviderIconDataUri(provider: string): string | null {
+  const [uri, setUri] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (provider === '') return undefined
+    let live = true
+    void resolveProviderIcon(provider).then((resolved) => {
+      if (live && resolved !== null) setUri(resolved)
+    })
+    return () => {
+      live = false
+    }
+  }, [provider])
+
+  return uri
+}
+
 export function ProviderMark({
   provider,
   size = 'text',
@@ -139,6 +189,38 @@ export function ProviderMark({
   const box = size === 'text' ? '1.1em' : ICON_STEP[size]
   const id = markFor(provider)
   const brand = BRAND[id]
+  const realIcon = useProviderIconDataUri(provider)
+
+  // The real logo, when one resolved, replaces the drawn mark outright - and
+  // keeps the same `data-provider` resolution, so nothing observing which
+  // vendor a row names can tell the difference between the two sources. It is
+  // a mask rather than an image because the source SVGs are monochrome
+  // `currentColor`; the fill is the vendor's brand colour, or the theme's own
+  // foreground when the brand is effectively black or simply unknown.
+  if (realIcon !== null) {
+    const colour = brandColorFor(provider)
+    return (
+      <span
+        aria-hidden
+        draggable={false}
+        style={{
+          width: box,
+          height: box,
+          backgroundColor: colour ?? 'currentColor',
+          maskImage: `url("${realIcon}")`,
+          WebkitMaskImage: `url("${realIcon}")`,
+          maskSize: 'contain',
+          WebkitMaskSize: 'contain',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+          maskPosition: 'center',
+          WebkitMaskPosition: 'center',
+        }}
+        data-provider={id}
+        className={cn('studio-icon shrink-0', className)}
+      />
+    )
+  }
 
   return (
     <svg
@@ -156,8 +238,9 @@ export function ProviderMark({
       {brand ? (
         // The brand paths are solid shapes, so they fill rather than stroke —
         // and they must not inherit the `non-scaling-stroke` treatment meant for
-        // outlined marks, which is why `stroke` is explicitly none.
-        <path d={brand} fill="currentColor" stroke="none" />
+        // outlined marks, which is why `stroke` is explicitly none. The fill is
+        // the brand's own colour where it has one it can wear on any theme.
+        <path d={brand.path} fill={brand.hex ?? 'currentColor'} stroke="none" />
       ) : (
         // A null brand means one of the two we draw ourselves. The fallback is
         // belt and braces rather than a real branch: `markFor` cannot return an

@@ -3,7 +3,7 @@ import type { ModelCapability, ProviderConnection, ProviderModel } from '@/platf
  * Well-formed harness payloads, for tests.
  *
  * Test-only, and it stays out of the app bundle by never being imported from
- * app code — there is no barrel entry for it and nothing under `features/`
+ * app code - there is no barrel entry for it and nothing under `features/`
  * reaches for it. It lives beside the code it describes rather than in a test
  * directory because these shapes have to move when the wire contract moves,
  * and a fixture two directories away is a fixture nobody updates.
@@ -21,9 +21,12 @@ export const CAPABILITY: ModelCapability = {
   embeddings: 'unsupported',
   reranking: 'unsupported',
   imageGeneration: 'unsupported',
+  imageEditing: 'unsupported',
   videoGeneration: 'unsupported',
   speechGeneration: 'unsupported',
   transcription: 'unsupported',
+  webSearch: 'unsupported',
+  webFetch: 'unsupported',
   contextWindow: 200_000,
   maxOutputTokens: 'unknown',
 }
@@ -44,9 +47,8 @@ export const KNOWN_VENDOR: ProviderConnection = {
 /**
  * A connection pointing at something the built-in catalog has never heard of.
  *
- * This is the normal case for anything created through the dialog, since it
- * sends no `catalogProvider` at all — and the reason `ProviderMark` had to
- * stop taking a closed union (FE-05).
+ * This is the normal case for anything created through the custom form - and
+ * the reason `ProviderMark` had to stop taking a closed union (FE-05).
  */
 export const UNKNOWN_VENDOR: ProviderConnection = {
   id: 'box-next-door',
@@ -75,5 +77,6 @@ export function modelFor(
     pricing: { input: 'unknown', output: 'unknown', cacheRead: 'unknown', cacheWrite: 'unknown' },
     hidden: false,
     origin: 'catalog',
+    available: true,
   }
 }

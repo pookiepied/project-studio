@@ -26,6 +26,12 @@ export function useDictation({ onText }: { onText: (text: string) => void }) {
   const [stage, setStage] = useState<DictationStage>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [denied, setDenied] = useState(false)
+  /**
+   * A sentence from the transcriber, held for the strip's blocked face: the
+   * mic worked, the words did not come back. Same self-clearing rhythm as
+   * `denied`, because both are one-line facts, not dialogs.
+   */
+  const [note, setNote] = useState<string | null>(null)
   const mic = useMicInput()
 
   const clock = useRef<number | null>(null)
@@ -41,6 +47,7 @@ export function useDictation({ onText }: { onText: (text: string) => void }) {
 
   const start = useCallback(async () => {
     if (stage !== 'idle' && stage !== 'blocked') return
+    setNote(null)
     setStage('requesting')
     const live = await mic.start({ record: true })
     if (!live) {
@@ -69,8 +76,15 @@ export function useDictation({ onText }: { onText: (text: string) => void }) {
     })
 
     setStage('processing')
-    const text = note ? await transcribeRecording(note) : ''
-    if (text) onText(text)
+    const outcome = note === null ? { kind: 'note' as const, note: '' } : await transcribeRecording(note)
+    if (outcome.kind === 'ok') {
+      if (outcome.text) onText(outcome.text)
+    } else {
+      setNote(outcome.note)
+      setStage('blocked')
+      dismissing.current = window.setTimeout(() => setStage('idle'), BLOCKED_DISMISS_MS)
+      return
+    }
     setStage('idle')
   }, [clearTimers, mic, onText, stage])
 
@@ -96,5 +110,5 @@ export function useDictation({ onText }: { onText: (text: string) => void }) {
 
   useEffect(() => clearTimers, [clearTimers])
 
-  return { stage, elapsedMs, denied, start, stop, cancel, mic }
+  return { stage, elapsedMs, denied, note, start, stop, cancel, mic }
 }

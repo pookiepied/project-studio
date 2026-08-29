@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { MessageEnd, TranscriptItem } from '@/features/chat/transcript/projection'
@@ -72,5 +72,52 @@ describe('what a message being written says about how it ended', () => {
     cleanup()
     render(<AssistantTurn item={assistant({ state: 'aborted', reason: null })} live />)
     expect(screen.getByText('Aborted')).toBeTruthy()
+  })
+})
+
+describe('the action row under a finished answer', () => {
+  const finished = (): Extract<TranscriptItem, { kind: 'assistant' }> => ({
+    kind: 'assistant',
+    id: 'msg_2',
+    submissionId: 'sub_2',
+    model: null,
+    segments: [
+      { kind: 'text', id: 'run_1', text: 'first paragraph' },
+      { kind: 'tools', id: 'tools_1', groups: [] },
+      { kind: 'text', id: 'run_2', text: 'second paragraph' },
+    ],
+    end: { state: 'complete' },
+    usage: null,
+  })
+
+  it('copies the written runs in order, skipping everything between them', async () => {
+    const writes: string[] = []
+    vi.stubGlobal('navigator', {
+      ...globalThis.navigator,
+      clipboard: { writeText: async (text: string) => void writes.push(text) },
+    })
+    render(<AssistantTurn item={finished()} live={false} onBranch={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    await waitFor(() => expect(writes).toEqual(['first paragraph\n\nsecond paragraph']))
+  })
+
+  it('carries the three verbs: copy, branch from here, read aloud', () => {
+    // The same row the gallery's replies carry. Retry is deliberately absent
+    // on both — redoing a turn that touched a workspace is the person's call
+    // through their own tooling, not a button.
+    const branch = vi.fn()
+    render(<AssistantTurn item={finished()} live={false} onBranch={branch} />)
+    expect(screen.getByRole('button', { name: 'Branch from here' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Read aloud' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Branch from here' }))
+    expect(branch).toHaveBeenCalledTimes(1)
+  })
+
+  it('withholds branch when no fork path was given, but copy stays', () => {
+    render(<AssistantTurn item={finished()} live={false} />)
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Branch from here' })).toBeNull()
   })
 })

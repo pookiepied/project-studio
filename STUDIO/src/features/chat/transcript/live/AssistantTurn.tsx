@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { Icons } from '@/components/icons'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
+import { ReadAloud } from '@/features/voice/ReadAloud'
 import {
   classifyFailureKind,
   failureRemedy,
 } from '@/features/chat/transcript/failure-kind'
+import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import { ThinkingBlock } from '@/features/chat/transcript/ThinkingBlock'
 import { ToolGroups } from '@/features/chat/transcript/live/ToolGroups'
 import type {
@@ -26,10 +29,21 @@ import type {
  * The text reveal is paced by `useSmoothText`, exactly as the demo surface
  * does it; only the last segment of the last unfinished message is live, so
  * nothing above the caret ever re-renders per frame.
+ *
+ * ---- The action row -------------------------------------------------------
+ *
+ * The one row the gallery's replies carry, and the same three verbs: copy,
+ * branch from here, read aloud — no retry, on purpose (redoing a turn that
+ * touched a workspace is the person's call through their own tooling, not a
+ * button), and no model name, because the transcript names its model nowhere
+ * by design. Revealed on hover, always mounted so nothing jumps when it fades
+ * in, and withheld from the message still being written — an unfinished
+ * answer is not yet a thing to act on.
  */
 export function AssistantTurn({
   item,
   live,
+  onBranch,
 }: {
   item: Extract<TranscriptItem, { kind: 'assistant' }>
   /**
@@ -39,14 +53,22 @@ export function AssistantTurn({
    * the caret and the ending below both depend on the narrower reading.
    */
   live: boolean
+  /** Forks the conversation with everything up to and including this answer. */
+  onBranch?: () => void
 }) {
+  const [hovered, setHovered] = useState(false)
+  const written = writtenRuns(item)
   // Only the final text run may pace its reveal. Everything else — history
   // replayed at a reattach, earlier runs of this same message — must be on
   // the page the moment it arrives; a transcript that retypes itself is
   // telling the reader a story about timing that never happened.
   const lastIndex = item.segments.length - 1
   return (
-    <div className="flex min-w-0 flex-col">
+    <div
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      className="flex min-w-0 flex-col"
+    >
       {item.segments.map((segment, index) => (
         <Segment
           key={segment.id}
@@ -68,8 +90,26 @@ export function AssistantTurn({
           named rather than implied: a failed or an aborted ending is a fact
           the log carried, and no reading of "live" may swallow one. */}
       {live && item.end.state === 'stopped' ? null : <EndLine end={item.end} />}
+      <MessageActions
+        visible={hovered && !live}
+        copyPayload={written}
+        actions={
+          onBranch === undefined
+            ? []
+            : [{ id: 'branch', label: 'Branch from here', icon: Icons.fork, run: onBranch }]
+        }
+        after={written.trim() === '' ? null : <ReadAloud text={written} />}
+      />
     </div>
   )
+}
+
+/** The turn's written runs in wire order — what copy and the voice both carry. */
+function writtenRuns(item: Extract<TranscriptItem, { kind: 'assistant' }>): string {
+  return item.segments
+    .filter((segment) => segment.kind === 'text')
+    .map((segment) => segment.text)
+    .join('\n\n')
 }
 
 function Segment({

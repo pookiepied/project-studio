@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
+import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer'
+import { useForkConversation } from '@/features/chat/fork'
 import { Transcript, useAutoScroll } from '@/features/chat/transcript'
-import { ConnectionNotice } from '@/features/chat/transcript/live/ConnectionNotice'
+import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/useConversation'
@@ -12,6 +14,7 @@ import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
+import type { SeamFailure, TurnImageWire } from '@/platform/harness'
 import type { Conversation } from '@/domain/session/types'
 
 /**
@@ -52,18 +55,46 @@ export function ChatPage({
    */
   onForked?: (conversationId: string) => void
 }) {
-  const { status, retry, editMessage, fork, touch, settings } = useWorkspace()
+  const { status, fork, touch, settings, catalog, markRunning } = useWorkspace()
   const { openChat } = useNavigation()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
+
+  // The sidebar's working mark is only as honest as its witness, and for a
+  // real turn this page is the only one there is: the phase machine here is
+  // what saw the admission (the receipt) and what sees the settlement (the
+  // wire). While it reports submitted or streaming, the conversation is
+  // working -- including when this page is not the one on screen, which is
+  // the only question the sidebar asks. Unmount clears nothing: a turn
+  // outlives the view that watches it (ADR 0045), so the mark persists until
+  // a witness -- this one on return, another window's -- sees it settle.
+  // `interrupted` clears it, though the run may technically live on: a mark
+  // with no witness behind it is the invented progress the mark exists to
+  // refuse, and resuming re-marks it within one replay.
+  useEffect(() => {
+    if (gallery) return
+    markRunning(conversation.id, isTurnRunning(live.phase))
+  }, [gallery, conversation.id, live.phase.status, markRunning])
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(gallery ? conversation.messages : live.items)
+
+  // Branch from one answer: everything up to and including it becomes the
+  // first message of a new conversation, named for its source.
+  const { branchFrom } = useForkConversation()
 
   const forkFrom = (messageId: string) => {
     const created = fork(conversation.id, messageId)
     if (created) (onForked ?? openChat)(created)
   }
+
+  /**
+   * A refusal the send path raises before the POST: the turn is addressed to
+   * a model that cannot see, and it is carrying images. Held here, beside the
+   * connection notices, because it is a send the composer kept — the words
+   * and the strip stay, and the sentence explains why nothing left.
+   */
+  const [attachRefusal, setAttachRefusal] = useState<SeamFailure | null>(null)
 
   /**
    * A receipt is also a recency fact: the index stamps the conversation the
@@ -73,12 +104,19 @@ export function ChatPage({
    * picker displays, so what is on screen is what is sent.
    */
   const sendTurn = useCallback(
-    async (text: string) => {
-      const sent = await live.submit(text, effectiveTurnSettings(conversation, settings))
+    async (text: string, images: readonly TurnImageWire[]) => {
+      const effective = effectiveTurnSettings(conversation, settings)
+      const refused = visionRefusal(effective.modelId, images.length, catalog.models)
+      if (refused !== null) {
+        setAttachRefusal(refused)
+        return { ok: false }
+      }
+      setAttachRefusal(null)
+      const sent = await live.submit(text, effective, images)
       if (sent.ok) touch(conversation.id)
       return sent
     },
-    [conversation, live.submit, settings, touch],
+    [conversation, catalog.models, live.submit, settings, touch],
   )
 
   return (
@@ -107,8 +145,6 @@ export function ChatPage({
               conversation={conversation}
               status={status}
               viewport={viewport}
-              onRetry={() => retry(conversation.id)}
-              onEdit={(messageId, text) => editMessage(conversation.id, messageId, text)}
               onFork={forkFrom}
             />
           ) : (
@@ -117,6 +153,7 @@ export function ChatPage({
               pending={live.pending}
               phase={live.phase}
               viewport={viewport}
+              onBranch={(messageId) => void branchFrom(conversation, live.items, messageId)}
             />
           )}
         </div>
@@ -186,12 +223,17 @@ export function ChatPage({
           style={{ maxWidth: SHELL.measure, paddingInline: SHELL.gutter }}
         >
           {!gallery ? (
-            <ConnectionNotice
-              phase={live.phase}
-              onResume={live.resume}
-              refused={live.refused}
-              onDismissRefusal={live.dismissRefusal}
-            />
+            <>
+              <ConnectionNotice
+                phase={live.phase}
+                onResume={live.resume}
+                refused={live.refused}
+                onDismissRefusal={live.dismissRefusal}
+              />
+              {attachRefusal !== null ? (
+                <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
+              ) : null}
+            </>
           ) : null}
 
           <Composer
@@ -200,7 +242,7 @@ export function ChatPage({
             {...(gallery
               ? {}
               : {
-                  onSend: (text: string) => sendTurn(text),
+                  onSend: sendTurn,
                   // Admitted counts. A turn the harness has taken but not yet
                   // started producing is still a turn: the words are gone,
                   // the stop control is the only thing that can call it back,

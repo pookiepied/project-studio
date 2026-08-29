@@ -3,7 +3,7 @@ import { AppearancePane } from '@/features/settings/panes/AppearancePane'
 import { ArchivePane } from '@/features/settings/panes/ArchivePane'
 import { GeneralPane } from '@/features/settings/panes/GeneralPane'
 import { PlaceholderPane } from '@/features/settings/panes/Pane'
-import { ProvidersPane } from '@/features/settings/panes/ProvidersPane'
+import { ProvidersPane } from '@/features/settings/providers/ProvidersPane'
 import { PLACEHOLDERS } from '@/features/settings/panes/placeholders'
 
 /**

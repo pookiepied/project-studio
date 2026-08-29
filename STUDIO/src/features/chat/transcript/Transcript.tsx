@@ -9,23 +9,19 @@ import type { Conversation, SessionStatus } from '@/domain/session/types'
  *
  * Deliberately thin: it decides which component a message gets and nothing
  * else. Every behaviour that used to accumulate in a transcript component —
- * collapsing, editing, hover actions, code, math, the reasoning trace — lives
- * in the component that owns it, so this file stays readable as those grow.
+ * collapsing, hover actions, code, math, the reasoning trace — lives in the
+ * component that owns it, so this file stays readable as those grow.
  */
 export function Transcript({
   conversation,
   status,
   viewport,
-  onRetry,
-  onEdit,
   onFork,
 }: {
   conversation: Conversation
   status: SessionStatus
   /** The scroll container, needed to hold position while paging older turns. */
   viewport: React.RefObject<HTMLElement | null>
-  onRetry: () => void
-  onEdit: (messageId: string, text: string) => void
   onFork: (messageId: string) => void
 }) {
   const lastId = conversation.messages[conversation.messages.length - 1]?.id
@@ -43,17 +39,12 @@ export function Transcript({
 
       {visible.map((message) =>
         message.role === 'user' ? (
-          <UserMessage
-            key={message.id}
-            message={message}
-            onEdit={(text) => onEdit(message.id, text)}
-          />
+          <UserMessage key={message.id} message={message} />
         ) : (
           <AssistantMessage
             key={message.id}
             message={message}
             streaming={status !== 'idle' && message.id === lastId}
-            onRetry={onRetry}
             onFork={() => onFork(message.id)}
           />
         ),

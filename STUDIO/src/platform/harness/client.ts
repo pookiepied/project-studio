@@ -28,12 +28,15 @@ import {
   parseHarnessErrorBody,
   parseConversationRecord,
   parseConversationRecords,
+  parseLibraryProviders,
+  parseProviderIcon,
   parseProbeResult,
   parseProjectRecord,
   parseProjectRecords,
   parseProviderConnection,
   parseProviderConnections,
   parseProviderDefaults,
+  parseProviderModel,
   parseProviderModels,
   parsePurgeOutcome,
   type CapabilitySlot,
@@ -41,6 +44,8 @@ import {
   type ConversationPatch,
   type ConversationRecord,
   type DefaultSelection,
+  type LibraryProvider,
+  type ModelCapability,
   type ProbeResult,
   type ProjectCreateDraft,
   type ProjectPatch,
@@ -50,8 +55,10 @@ import {
   type ProviderConnectionDraft,
   type ProviderConnectionPatch,
   type ProviderKind,
+  type ProviderIcon,
   type ProviderModel,
   type PurgeOutcome,
+  type ReasoningLevel,
 } from './contracts'
 import { harnessTransport } from './transport'
 
@@ -127,8 +134,26 @@ export interface ModelFilter {
   readonly capability?: CapabilitySlot
 }
 
+/**
+ * A model the user is adding by hand under an existing connection: what it is
+ * called, and what the user states it can do against the contract's real
+ * fields. Everything left unsaid stays unknown on the harness side.
+ */
+export interface ManualModelInput {
+  readonly modelId: string
+  readonly displayName: string
+  readonly capability?: {
+    readonly [K in keyof ModelCapability]?: ModelCapability[K] | undefined
+  }
+  readonly reasoningLevels?: readonly ReasoningLevel[]
+}
+
 export interface HarnessClient {
   listConnections(): Promise<HarnessResult<readonly ProviderConnection[]>>
+  /** The vendors any catalog can name, with the capability slots each serves. */
+  listLibrary(): Promise<HarnessResult<readonly LibraryProvider[]>>
+  /** One vendor's real icon as SVG text, or a failure naming why not. */
+  providerIcon(id: string): Promise<HarnessResult<ProviderIcon>>
   createConnection(draft: ProviderConnectionDraft): Promise<HarnessResult<ProviderConnection>>
   updateConnection(
     id: string,
@@ -139,6 +164,49 @@ export interface HarnessClient {
   listModels(filter?: ModelFilter): Promise<HarnessResult<readonly ProviderModel[]>>
   /** The user's chosen default models, per capability slot; absent slots are unset. */
   getDefaults(): Promise<HarnessResult<DefaultSelection>>
+  /** Sets (or, with undefined, clears) one slot's default. */
+  setDefault(
+    slot: CapabilitySlot,
+    ref: { readonly connectionId: string; readonly modelId: string } | undefined,
+  ): Promise<HarnessResult<void>>
+  /** Adds a model the catalogs have never heard of, under one connection. */
+  addManualModel(
+    connectionId: string,
+    model: ManualModelInput,
+  ): Promise<HarnessResult<ProviderModel>>
+  /** Renames or hides one existing model. */
+  setModelOverride(
+    connectionId: string,
+    modelId: string,
+    patch: { readonly displayName?: string; readonly hidden?: boolean },
+  ): Promise<HarnessResult<ProviderModel>>
+  /** Removes one model; a catalog row comes back hidden until shown again. */
+  removeModel(connectionId: string, modelId: string): Promise<HarnessResult<void>>
+  /** Sets exactly which models this connection offers. */
+  setModelSelection(
+    connectionId: string,
+    modelIds: readonly string[],
+  ): Promise<HarnessResult<void>>
+
+  /**
+   * Dictation: one recording in, its words out. The harness resolves the
+   * transcription slot itself, so the composer never learns which provider
+   * served the sentence.
+   */
+  transcribe(recording: {
+    /**
+     * The recording, base64. Named for the field the route parses
+     * (`transcribeRequestSchema`), because this object is posted as the body
+     * unchanged - a different name here is not a translation, it is a body the
+     * harness refuses.
+     */
+    readonly audio: string
+    readonly mimeType: string
+  }): Promise<HarnessResult<{ readonly text: string }>>
+  /** Read-aloud: text in, audio back as base64 under its mime type. */
+  speak(input: {
+    readonly text: string
+  }): Promise<HarnessResult<{ readonly audio: string; readonly mimeType: string }>>
 
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
@@ -169,6 +237,25 @@ export interface HarnessClient {
 const PROVIDERS_PATH = '/api/providers'
 const CONVERSATIONS_PATH = '/api/conversations'
 const PROJECTS_PATH = '/api/projects'
+const MEDIA_PATH = '/api/media'
+
+/** The media routes' answers, parsed with the same skepticism as every other. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseTranscribeResult(value: unknown): { text: string } | null {
+  if (!isRecord(value) || typeof value['text'] !== 'string') return null
+  return { text: value['text'] }
+}
+
+function parseSpeechResult(value: unknown): { audio: string; mimeType: string } | null {
+  if (!isRecord(value)) return null
+  const audio = value['audio']
+  const mimeType = value['mimeType']
+  if (typeof audio !== 'string' || typeof mimeType !== 'string') return null
+  return { audio, mimeType }
+}
 
 function failed(error: HarnessFailure): { ok: false; error: HarnessFailure } {
   return { ok: false, error }
@@ -267,9 +354,10 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     method: string,
     path: string,
     body: unknown,
+    budgetMs = timeoutMs,
   ): Promise<HarnessResult<Response>> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const timer = setTimeout(() => controller.abort(), budgetMs)
     try {
       const response = await send(join(baseUrl, path), {
         method,
@@ -288,7 +376,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
         kind: 'not-reachable',
         timedOut,
         message: timedOut
-          ? `The harness did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
+          ? `The harness did not answer within ${Math.round(budgetMs / 1000)} seconds.`
           : `The harness could not be reached at ${baseUrl}. ${describe(error)}`,
       })
     } finally {
@@ -302,8 +390,9 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
     path: string,
     body: unknown,
     parse: (value: unknown) => T | null,
+    budgetMs?: number,
   ): Promise<HarnessResult<T>> {
-    const sent = await call(method, path, body)
+    const sent = await call(method, path, body, budgetMs)
     if (!sent.ok) return sent
 
     const response = sent.value
@@ -331,8 +420,12 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
   }
 
   /** A request whose success carries nothing: the harness replies 204. */
-  async function empty(method: string, path: string): Promise<HarnessResult<void>> {
-    const sent = await call(method, path, undefined)
+  async function empty(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<HarnessResult<void>> {
+    const sent = await call(method, path, body)
     if (!sent.ok) return sent
     const response = sent.value
     return response.ok ? { ok: true, value: undefined } : failed(await failureFor(response))
@@ -340,6 +433,13 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
   function connectionPath(id: string, suffix = ''): string {
     return `${PROVIDERS_PATH}/connections/${encodeURIComponent(id)}${suffix}`
+  }
+
+  function modelPath(connectionId: string, modelId: string): string {
+    // The model id stays raw, slashes and all: the route names it with a
+    // wildcard segment (`:modelId{.+}`), and percent-encoding the slashes
+    // would change the id the harness sees.
+    return connectionPath(connectionId, `/models/${modelId}`)
   }
 
   function conversationIndexPath(id: string): string {
@@ -361,6 +461,19 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
   return {
     listConnections() {
       return json('GET', `${PROVIDERS_PATH}/connections`, undefined, parseProviderConnections)
+    },
+
+    listLibrary() {
+      return json('GET', `${PROVIDERS_PATH}/library`, undefined, parseLibraryProviders)
+    },
+
+    providerIcon(id) {
+      return json(
+        'GET',
+        `${PROVIDERS_PATH}/icons/${encodeURIComponent(id)}`,
+        undefined,
+        parseProviderIcon,
+      )
     },
 
     createConnection(draft) {
@@ -400,6 +513,50 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     getDefaults() {
       return json('GET', `${PROVIDERS_PATH}/defaults`, undefined, parseProviderDefaults)
+    },
+
+    setDefault(slot, ref) {
+      return empty('PUT', `${PROVIDERS_PATH}/defaults/${encodeURIComponent(slot)}`, ref)
+    },
+
+    addManualModel(connectionId, model) {
+      return json(
+        'POST',
+        connectionPath(connectionId, '/models'),
+        model,
+        parseProviderModel,
+      )
+    },
+
+    setModelOverride(connectionId, modelId, patch) {
+      return json(
+        'PATCH',
+        modelPath(connectionId, modelId),
+        patch,
+        parseProviderModel,
+      )
+    },
+
+    removeModel(connectionId, modelId) {
+      return empty('DELETE', modelPath(connectionId, modelId))
+    },
+
+    setModelSelection(connectionId, modelIds) {
+      return empty('PUT', connectionPath(connectionId, '/model-selection'), {
+        modelIds: [...modelIds],
+      })
+    },
+
+    transcribe(recording) {
+      // A real round trip: upload the recording, transcribe it at the
+      // provider, read the words back. The harness driver holds a 120s budget
+      // of its own; 150s here means the composer sees the provider's refusal
+      // rather than this client's.
+      return json('POST', `${MEDIA_PATH}/transcribe`, recording, parseTranscribeResult, 150_000)
+    },
+
+    speak(input) {
+      return json('POST', `${MEDIA_PATH}/speech`, input, parseSpeechResult, 150_000)
     },
 
     listConversations() {

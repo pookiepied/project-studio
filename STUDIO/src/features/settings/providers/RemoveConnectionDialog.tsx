@@ -10,14 +10,17 @@ import type { HarnessFailure, ProviderConnection } from '@/platform/harness'
  * look alike, and a confirmation that does not say which row it means is a
  * confirmation nobody can actually check.
  *
- * The stored credential going too is stated for the same reason. It is not a
- * detail: the harness deletes the keychain entry first and the row second, so
- * this is irreversible in a way that re-adding the connection will not undo —
- * the key has to be pasted again, and it may not be anywhere else.
+ * What happens to the key is stated for the same reason, and it has two
+ * answers since the stores were merged. A key typed into this app is deleted
+ * with the connection. A key carried over from an older build - kept under the
+ * vendor's own name from the days before connections had keys of their own -
+ * stays, which is why connecting the same vendor again may not ask for it
+ * again. Both are said, because a sentence that is only half true about where
+ * a secret lives is worse than a long sentence.
  *
  * Filled red is right here and wrong in the list. This is the step where the
  * choice has already been narrowed to yes or no, which is the one place
- * `danger` earns being the loudest thing on screen — see Button's docblock.
+ * `danger` earns being the loudest thing on screen - see Button's docblock.
  */
 export function RemoveConnectionDialog({
   connection,
@@ -75,8 +78,10 @@ export function RemoveConnectionDialog({
           Remove {connection?.displayName ?? 'this connection'}?
         </p>
         <p className="text-caption text-muted-foreground">
-          Its stored API key is deleted from this machine's credential store at the same time.
-          Adding the connection again will ask for the key again.
+          The API key stored with it is deleted from this machine's credential store. A key carried
+          over from an earlier version of Studio stays; connecting the same vendor again can find it
+          without retyping. Conversations that sent their turns through this connection will say so
+          on their next send.
         </p>
         {failure ? (
           <p role="alert" className="text-caption text-danger">

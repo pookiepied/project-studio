@@ -10,6 +10,7 @@ import {
   type ConversationDelivery,
   type ConversationSnapshotFacts,
   type SeamFailure,
+  type TurnImageWire,
   type TurnResult,
   type TurnSettingsWire,
 } from '@/platform/harness'
@@ -147,6 +148,7 @@ export interface ConversationView {
   submit: (
     message: string,
     settings: TurnSettingsWire,
+    images?: readonly TurnImageWire[],
   ) => Promise<TurnResult<{ readonly submissionId: string }>>
   /** Aborts the RUN, and says so; reading on is how the UI learns the outcome. */
   abort: () => Promise<TurnResult<boolean>>
@@ -669,7 +671,7 @@ export function useConversation(
   }, [attach])
 
   const submit = useCallback(
-    async (message: string, settings: TurnSettingsWire) => {
+    async (message: string, settings: TurnSettingsWire, images?: readonly TurnImageWire[]) => {
       const client = clientRef.current
       if (client === null) {
         return {
@@ -680,7 +682,7 @@ export function useConversation(
           },
         }
       }
-      const sent = await client.submitTurn(message, settings)
+      const sent = await client.submitTurn(message, settings, images)
       if (!sent.ok) {
         // The no-harness diagnosis belongs to the phase machine, which says
         // it permanently; stacking the same sentence in a second notice

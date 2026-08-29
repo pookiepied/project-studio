@@ -29,9 +29,12 @@ const CAPABILITY = {
   embeddings: 'unsupported',
   reranking: 'unsupported',
   imageGeneration: 'unsupported',
+  imageEditing: 'unsupported',
   videoGeneration: 'unsupported',
   speechGeneration: 'unsupported',
   transcription: 'unsupported',
+  webSearch: 'unsupported',
+  webFetch: 'unsupported',
   contextWindow: 200000,
   maxOutputTokens: 'unknown',
 } as const
@@ -175,7 +178,10 @@ describe('parseProviderModels', () => {
   })
 
   it('accepts a well-formed list', () => {
-    expect(parseProviderModels([MODEL])).toEqual([MODEL])
+    // `available` is absent from the wire fixture because it is optional with
+    // a default: a row that predates the field was never marked, and "not
+    // marked" parses as available.
+    expect(parseProviderModels([MODEL])).toEqual([{ ...MODEL, available: true }])
   })
 
   it('reads absent reasoning levels as a model with none, and refuses a bad one', () => {
@@ -184,6 +190,12 @@ describe('parseProviderModels', () => {
     const { reasoningLevels: _levels, ...without } = MODEL
     expect(parseProviderModel(without)?.reasoningLevels).toEqual([])
     expect(parseProviderModel({ ...MODEL, reasoningLevels: ['colossal'] })).toBeNull()
+  })
+
+  it('reads absent availability as available and keeps a stated false', () => {
+    const { available: _available, ...without } = { ...MODEL, available: true }
+    expect(parseProviderModel(without)?.available).toBe(true)
+    expect(parseProviderModel({ ...MODEL, available: false })?.available).toBe(false)
   })
 
   it('fails the whole list when one element is wrong', () => {

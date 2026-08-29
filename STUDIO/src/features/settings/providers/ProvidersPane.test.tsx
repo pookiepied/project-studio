@@ -4,19 +4,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ProvidersPane } from './ProvidersPane'
-import { KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from '@/features/settings/connections/harness.fixtures'
+import { KNOWN_VENDOR, UNKNOWN_VENDOR, modelFor } from './harness.fixtures'
 
 /**
  * The pane, from the env vars down to the request body.
  *
  * Nothing in this file mocks a module of ours. The harness address comes from
  * the same two Vite env vars `connection.ts` reads in production, and the only
- * substitution is `fetch` — so a passing test here exercises the real
+ * substitution is `fetch` - so a passing test here exercises the real
  * resolver, the real client, and the real parsers, and a change that breaks any
  * of them fails here rather than in front of a user.
  *
  * What is asserted is behaviour, not pixels: which requests went out, what a
- * refused create does to a dialog, whether a delete asks first.
+ * refused create does to a dialog, whether a delete asks first, and - new with
+ * the library and the slots - that the add flow probes what it created and the
+ * defaults section writes through the contract's own door.
  */
 
 const CANARY = 'sk-CANARY-DO-NOT-PERSIST'
@@ -39,8 +41,13 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 /** The harness answering the way its route module says it does. */
 function defaultRoute(url: string, method: string): Response {
+  if (url.includes('/library')) return jsonResponse([])
+  if (url.includes('/defaults')) return jsonResponse({})
   if (url.includes('/models')) return jsonResponse([modelFor(KNOWN_VENDOR.id, 'claude-opus-5')])
   if (method === 'POST' && url.endsWith('/connections')) return jsonResponse(KNOWN_VENDOR, 201)
+  if (method === 'POST' && url.endsWith('/probe')) {
+    return jsonResponse({ ok: true, reachedAt: 1, modelCount: 271 })
+  }
   if (method === 'DELETE') return new Response(null, { status: 204 })
   if (method === 'PATCH') return jsonResponse({ ...KNOWN_VENDOR, enabled: false })
   return jsonResponse([KNOWN_VENDOR, UNKNOWN_VENDOR])
@@ -84,14 +91,30 @@ afterEach(() => {
  * The open dialog by name.
  *
  * Scoped rather than global because the footer button repeats the dialog's own
- * title — "Add connection" opens it and "Add connection" submits it — which
+ * title - "Add connection" opens it and its close button reads "Close" - which
  * is right on screen and ambiguous to a query.
  */
 function dialog(name: string): HTMLElement {
   return screen.getByRole('dialog', { name })
 }
 
-/** Fills the add dialog. The key is optional so the no-key path is testable. */
+/**
+ * Opens the add dialog and walks to the custom endpoint form: the picker is
+ * the front door now, and a private endpoint is one click behind it. The
+ * dialog takes its accessible name from its title, which becomes
+ * "Custom endpoint" on that click.
+ */
+function openCustomForm() {
+  fireEvent.click(screen.getByText('Add connection'))
+  fireEvent.click(within(dialog('Add connection')).getByText('Custom endpoint'))
+}
+
+/** The custom form's dialog, named by the title the form shows. */
+function customDialog(): HTMLElement {
+  return dialog('Custom endpoint')
+}
+
+/** Fills the custom form. The key is optional so the no-key path is testable. */
 function fillDialog({ name, url, key }: { name: string; url: string; key?: string }) {
   fireEvent.change(screen.getByPlaceholderText('My gateway'), { target: { value: name } })
   fireEvent.change(screen.getByPlaceholderText('https://api.example.com/v1'), {
@@ -118,7 +141,7 @@ describe('with no harness', () => {
 
     // Nothing that reads as a failure, and nothing that offers a mutation
     // there is no harness to accept.
-    expect(screen.queryByText(/Could not read connections/)).toBeNull()
+    expect(screen.queryByText(/Could not read providers/)).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByText('Add connection')).toBeNull()
   })
@@ -141,7 +164,7 @@ describe('when the load fails', () => {
     })
     render(<ProvidersPane />)
 
-    await screen.findByText('Could not read connections.')
+    await screen.findByText('Could not read providers.')
     expect(screen.getByText(new RegExp(BASE_URL.replace(/[.]/g, '\\.')))).toBeTruthy()
 
     // Critically, it does not silently fall through to a fixture list:
@@ -162,7 +185,7 @@ describe('when the load fails', () => {
 })
 
 describe('the list', () => {
-  it('renders each connection with its models and credential status', async () => {
+  it('renders each connection with its offer and credential status', async () => {
     harnessConfigured()
     stubFetch()
     render(<ProvidersPane />)
@@ -170,9 +193,9 @@ describe('the list', () => {
     await screen.findByText('Work Anthropic')
     expect(screen.getByText('The box next door')).toBeTruthy()
 
-    // One model came back, and it belongs to the first connection only.
-    expect(screen.getByText('1 model')).toBeTruthy()
-    expect(screen.getByText('0 models')).toBeTruthy()
+    // One model came back, offered; the second connection has none.
+    expect(screen.getByText('1 of 1 models offered')).toBeTruthy()
+    expect(screen.getByText('0 of 0 models offered')).toBeTruthy()
 
     expect(screen.getByText('Key stored')).toBeTruthy()
     expect(screen.getByText('No key')).toBeTruthy()
@@ -196,7 +219,7 @@ describe('the list', () => {
   it('probes on demand and reports latency', async () => {
     harnessConfigured()
     const calls = stubFetch((url, method) => {
-      if (url.endsWith('/probe')) {
+      if (url.endsWith('/probe') && !url.endsWith('/connections')) {
         return jsonResponse({ ok: true, reachedAt: 1, modelCount: 12, latencyMs: 94 })
       }
       return defaultRoute(url, method)
@@ -242,25 +265,25 @@ describe('the list', () => {
 })
 
 describe('creating a connection', () => {
-  it('sends the key in the request body and keeps it nowhere afterwards', async () => {
+  it('sends the key in the request body, probes, and keeps the key nowhere', async () => {
     harnessConfigured()
     const calls = stubFetch()
     render(<ProvidersPane />)
     await screen.findByText('Work Anthropic')
 
-    fireEvent.click(screen.getByText('Add connection'))
+    openCustomForm()
     fillDialog({ name: 'My Gateway', url: 'https://api.example.com/v1', key: CANARY })
 
     // The id is derived and shown, because it is what a duplicate error names.
     expect(screen.getByText('Filed as my-gateway')).toBeTruthy()
 
-    fireEvent.click(within(dialog('Add connection')).getByRole('button', { name: 'Add connection' }))
+    fireEvent.click(within(customDialog()).getByRole('button', { name: 'Add and check' }))
 
     await waitFor(() => {
-      expect(calls.some((call) => call.method === 'POST')).toBe(true)
+      expect(calls.some((call) => call.method === 'POST' && call.url.endsWith('/connections'))).toBe(true)
     })
 
-    const post = calls.find((call) => call.method === 'POST')
+    const post = calls.find((call) => call.method === 'POST' && call.url.endsWith('/connections'))
     expect(post?.body).toContain(CANARY)
     const sent: unknown = JSON.parse(post?.body ?? '{}')
     expect(sent).toMatchObject({
@@ -273,18 +296,23 @@ describe('creating a connection', () => {
       apiKey: CANARY,
     })
 
-    // The dialog closed on success, which is what clears the field.
+    // The probe ran, inside the same dialog, and reported what it learned.
+    await waitFor(() => {
+      expect(calls.some((call) => call.url.endsWith('/my-gateway/probe'))).toBe(true)
+    })
+    await screen.findByText('271 models listed by the provider.')
+
+    // The key field is already empty - cleared on success, not on close.
+    const key = screen.getByLabelText('API key')
+    expect(key instanceof HTMLInputElement ? key.value : null).toBe('')
+
+    fireEvent.click(within(customDialog()).getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
     // And now the canary is nowhere that outlives it.
     expect(document.body.innerHTML).not.toContain(CANARY)
     expect(JSON.stringify(localStorage)).not.toContain(CANARY)
     expect(JSON.stringify(sessionStorage)).not.toContain(CANARY)
-
-    // Reopening gives an empty field rather than a remembered one.
-    fireEvent.click(screen.getByText('Add connection'))
-    const reopened = screen.getByLabelText('API key')
-    expect(reopened instanceof HTMLInputElement ? reopened.value : 'not an input').toBe('')
   })
 
   it('masks the key and does not offer to remember it', async () => {
@@ -293,7 +321,7 @@ describe('creating a connection', () => {
     render(<ProvidersPane />)
     await screen.findByText('Work Anthropic')
 
-    fireEvent.click(screen.getByText('Add connection'))
+    openCustomForm()
     const field = screen.getByLabelText('API key')
 
     expect(field.getAttribute('type')).toBe('password')
@@ -306,9 +334,9 @@ describe('creating a connection', () => {
     render(<ProvidersPane />)
     await screen.findByText('Work Anthropic')
 
-    fireEvent.click(screen.getByText('Add connection'))
+    openCustomForm()
     fillDialog({ name: 'Keyless', url: 'http://localhost:11434/v1' })
-    fireEvent.click(within(dialog('Add connection')).getByRole('button', { name: 'Add connection' }))
+    fireEvent.click(within(customDialog()).getByRole('button', { name: 'Add and check' }))
 
     await waitFor(() => expect(calls.some((call) => call.method === 'POST')).toBe(true))
     const sent: unknown = JSON.parse(calls.find((call) => call.method === 'POST')?.body ?? '{}')
@@ -316,10 +344,34 @@ describe('creating a connection', () => {
     expect(Object.keys(sent ?? {})).not.toContain('apiKey')
   })
 
-  it('leaves the dialog open with the fields intact when the harness refuses', async () => {
+  it('reports what the provider said when the probe is refused', async () => {
     harnessConfigured()
     stubFetch((url, method) => {
-      if (method === 'POST') {
+      if (url.endsWith('/probe')) {
+        return jsonResponse({
+          ok: false,
+          reachedAt: 1,
+          failure: 'The endpoint rejected the credential.',
+          status: 401,
+        })
+      }
+      return defaultRoute(url, method)
+    })
+    render(<ProvidersPane />)
+    await screen.findByText('Work Anthropic')
+
+    openCustomForm()
+    fillDialog({ name: 'Refusing', url: 'https://api.example.com/v1', key: CANARY })
+    fireEvent.click(within(customDialog()).getByRole('button', { name: 'Add and check' }))
+
+    // The provider's own sentence, in the dialog, where the user just typed.
+    await screen.findByText('The endpoint rejected the credential.')
+  })
+
+  it('leaves the form open with the fields intact when the harness refuses', async () => {
+    harnessConfigured()
+    stubFetch((url, method) => {
+      if (method === 'POST' && url.endsWith('/connections')) {
         return jsonResponse(
           { error: 'Provider connection "my-gateway" already exists.', code: 'models.configuration' },
           400,
@@ -330,9 +382,9 @@ describe('creating a connection', () => {
     render(<ProvidersPane />)
     await screen.findByText('Work Anthropic')
 
-    fireEvent.click(screen.getByText('Add connection'))
+    openCustomForm()
     fillDialog({ name: 'My Gateway', url: 'https://api.example.com/v1', key: CANARY })
-    fireEvent.click(within(dialog('Add connection')).getByRole('button', { name: 'Add connection' }))
+    fireEvent.click(within(customDialog()).getByRole('button', { name: 'Add and check' }))
 
     await screen.findByText('Provider connection "my-gateway" already exists.')
 
@@ -343,6 +395,64 @@ describe('creating a connection', () => {
     expect(name instanceof HTMLInputElement ? name.value : null).toBe('My Gateway')
     expect(url instanceof HTMLInputElement ? url.value : null).toBe('https://api.example.com/v1')
     expect(key instanceof HTMLInputElement ? key.value : null).toBe(CANARY)
+  })
+
+  it('offers the provider library with what each entry serves', async () => {
+    harnessConfigured()
+    const calls = stubFetch((url, method) => {
+      if (url.includes('/library')) {
+        return jsonResponse([
+          {
+            id: 'openai',
+            displayName: 'OpenAI',
+            kind: 'language',
+            protocol: 'openai-completions',
+            capabilities: ['textGeneration', 'imageGeneration'],
+            modelCount: 28,
+          },
+          {
+            id: 'tavily',
+            displayName: 'Tavily',
+            kind: 'retrieval',
+            protocol: 'tavily',
+            capabilities: ['webSearch'],
+            modelCount: 2,
+          },
+        ])
+      }
+      return defaultRoute(url, method)
+    })
+    render(<ProvidersPane />)
+    await screen.findByText('Work Anthropic')
+
+    fireEvent.click(screen.getByText('Add connection'))
+    const picker = dialog('Add connection')
+    await within(picker).findByText('OpenAI')
+    within(picker).getByText('Chat - Images')
+    await within(picker).findByText('Tavily')
+    within(picker).getByText('Web search')
+
+    // Choosing a library entry pre-fills the form from the harness's own
+    // answer: the display name defaults to the vendor, and no base URL is
+    // demanded because the library carries the vendor's own.
+    fireEvent.click(within(picker).getByText('Tavily'))
+    fireEvent.change(within(picker).getByLabelText('API key'), { target: { value: CANARY } })
+    fireEvent.click(within(picker).getByRole('button', { name: 'Add and check' }))
+
+    await waitFor(() => {
+      expect(calls.some((call) => call.method === 'POST' && call.url.endsWith('/connections'))).toBe(true)
+    })
+    const sent: unknown = JSON.parse(
+      calls.find((call) => call.method === 'POST' && call.url.endsWith('/connections'))?.body ?? '{}',
+    )
+    expect(sent).toMatchObject({
+      id: 'tavily',
+      displayName: 'Tavily',
+      kind: 'retrieval',
+      catalogProvider: 'tavily',
+      protocol: 'tavily',
+      apiKey: CANARY,
+    })
   })
 })
 
@@ -364,7 +474,7 @@ describe('enable and disable', () => {
 })
 
 describe('removing a connection', () => {
-  it('asks first, names the connection, and says the key goes too', async () => {
+  it('asks first, names the connection, and says what happens to the key', async () => {
     harnessConfigured()
     const calls = stubFetch()
     render(<ProvidersPane />)
@@ -401,30 +511,66 @@ describe('removing a connection', () => {
   })
 })
 
-describe('creating the very first connection', () => {
-  it('closes the dialog even when the list was empty before', async () => {
-    // The live app hit this and the jsdom suite did not: every other create
-    // test starts with rows already on screen, so the empty-state branch of
-    // the list was never the thing being replaced when the refresh landed.
+describe('the capability defaults', () => {
+  it('renders every slot and refuses to offer a picker nothing can fill', async () => {
     harnessConfigured()
-    let created = false
-    stubFetch((url, method) => {
-      if (url.includes('/models')) return jsonResponse([])
-      if (method === 'POST') {
-        created = true
-        return jsonResponse(KNOWN_VENDOR, 201)
-      }
-      return jsonResponse(created ? [KNOWN_VENDOR] : [])
-    })
+    stubFetch()
     render(<ProvidersPane />)
-    await screen.findByText(/No connections yet/)
-
-    fireEvent.click(screen.getByText('Add connection'))
-    fillDialog({ name: 'First', url: 'http://127.0.0.1:9999/v1', key: CANARY })
-    fireEvent.click(within(dialog('Add connection')).getByRole('button', { name: 'Add connection' }))
-
     await screen.findByText('Work Anthropic')
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(document.body.innerHTML).not.toContain(CANARY)
+
+    // Nine slots, in the contract's order, from the one derived list.
+    for (const label of [
+      'Chat',
+      'Images',
+      'Image editing',
+      'Video',
+      'Speech',
+      'Transcription',
+      'Embeddings',
+      'Web search',
+      'Web fetch',
+    ]) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
+
+    // The only model on screen has textGeneration supported; the image slots
+    // have nothing fillable and say so with the one honest sentence about
+    // what would invoke them, rather than rendering a dead picker.
+    expect(screen.getAllByText(/No model with images is connected/)).toHaveLength(1)
+    expect(screen.getAllByText(/studio-image tool arrives in a later update/)).toHaveLength(2)
+    expect(screen.getByText(/No model with image editing is connected/)).toBeTruthy()
+  })
+
+  it('shows the one honest sentence where the invocation would be', async () => {
+    harnessConfigured()
+    stubFetch()
+    render(<ProvidersPane />)
+    await screen.findByText('Work Anthropic')
+
+    // Both image slots name the same future server, so the sentence appears
+    // twice; the video slot names its own, and web search - which is invoked
+    // today - gets no invocation sentence at all.
+    expect(screen.getAllByText(/studio-image tool arrives in a later update/)).toHaveLength(2)
+    expect(screen.getByText(/studio-video tool arrives in a later update/)).toBeTruthy()
+    expect(screen.getByText(/Connect a provider serving web search/)).toBeTruthy()
+  })
+
+  it('writes a default through PUT with the contract reference', async () => {
+    harnessConfigured()
+    const calls = stubFetch()
+    render(<ProvidersPane />)
+    await screen.findByText('Work Anthropic')
+
+    fireEvent.click(screen.getAllByText('Choose')[0])
+    fireEvent.click(screen.getByText('claude-opus-5'))
+
+    await waitFor(() => {
+      expect(calls.some((call) => call.method === 'PUT' && call.url.includes('/defaults/'))).toBe(true)
+    })
+    const put = calls.find((call) => call.method === 'PUT')
+    expect(put?.url).toBe(`${BASE_URL}/api/providers/defaults/textGeneration`)
+    expect(put?.body).toBe(
+      JSON.stringify({ connectionId: KNOWN_VENDOR.id, modelId: 'claude-opus-5' }),
+    )
   })
 })

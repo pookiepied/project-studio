@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { rememberFirstAdmission } from '@/features/chat/first-attach'
 import { defaultContactFor, type ContactHarness } from '@/features/chat/useConversation'
 import { newId } from '@/lib/id'
-import type { SeamFailure, TurnSettingsWire } from '@/platform/harness'
+import type { SeamFailure, TurnImageWire, TurnSettingsWire } from '@/platform/harness'
 
 /**
  * The first turn of a conversation, sent from a page that has no conversation.
@@ -69,6 +69,8 @@ const NOT_RUNNING: SeamFailure = {
 export async function startConversation(request: {
   readonly text: string
   readonly settings: TurnSettingsWire
+  /** Images read and encoded beside the words; omitted for a text-only turn. */
+  readonly images?: readonly TurnImageWire[]
   /** Defaults to asking the supervisor, exactly as a conversation view does. */
   readonly contactFor?: (conversationId: string) => ContactHarness
   /**
@@ -82,7 +84,7 @@ export async function startConversation(request: {
   const found = await contact()
   if (found.kind !== 'ready') return { ok: false, error: NOT_RUNNING }
 
-  const sent = await found.client.submitTurn(request.text, request.settings)
+  const sent = await found.client.submitTurn(request.text, request.settings, request.images)
   if (!sent.ok) return { ok: false, error: sent.error }
 
   rememberFirstAdmission(conversationId, {
@@ -104,7 +106,13 @@ export interface FirstTurnView {
    * is where the record gets created and the view opens. Answers the receipt
    * shape the composer holds its words against.
    */
-  start: (text: string) => Promise<{ readonly ok: boolean }>
+  /**
+   * Sends, and on success hands the new conversation to `onStarted` — which
+   * is where the record gets created and the view opens. Answers the receipt
+   * shape the composer holds its words against. Images ride beside the words;
+   * on a refusal both stay exactly where they were.
+   */
+  start: (text: string, images?: readonly TurnImageWire[]) => Promise<{ readonly ok: boolean }>
 }
 
 export function useFirstTurn(options: {
@@ -120,10 +128,11 @@ export function useFirstTurn(options: {
   const { onStarted, contactFor, settings } = options
 
   const start = useCallback(
-    async (text: string) => {
+    async (text: string, images?: readonly TurnImageWire[]) => {
       const outcome = await startConversation({
         text,
         settings: settings(),
+        ...(images === undefined ? {} : { images }),
         ...(contactFor === undefined ? {} : { contactFor }),
       })
       if (!outcome.ok) {

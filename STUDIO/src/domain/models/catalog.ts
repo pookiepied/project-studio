@@ -1,4 +1,9 @@
-import type { ProviderConnection, ProviderModel } from '@/platform/harness'
+import type {
+  ModelCapability,
+  ModelPricing,
+  ProviderConnection,
+  ProviderModel,
+} from '@/platform/harness'
 import { REASONING_LEVEL_NOTES, type ReasoningChoice, type ReasoningLevel } from './types'
 
 /**
@@ -44,6 +49,14 @@ export interface CatalogModel {
   readonly connectionName: string
   readonly reasoningLevels: readonly ReasoningLevel[]
   readonly contextWindow: number | 'unknown'
+  /**
+   * The rest of the wire record's own facts, carried for the library's detail
+   * pane rather than re-derived: what the model can do, and what a million
+   * tokens of it costs. Nothing here is invented; a dimension the provider
+   * never described reads "unknown", which the pane shows as such.
+   */
+  readonly capability: ModelCapability
+  readonly pricing: ModelPricing
 }
 
 /** A catalog grouped the way the picker reads it: one group per connection. */
@@ -90,19 +103,29 @@ export function catalogModelOf(
     connectionName: connection?.displayName ?? model.connectionId,
     reasoningLevels: model.reasoningLevels,
     contextWindow: model.capability.contextWindow,
+    capability: model.capability,
+    pricing: model.pricing,
   }
 }
 
 /**
  * The whole catalog: wire rows plus the connections that name them, in the
  * order the harness listed them.
+ *
+ * Two rows never reach the picker and the filter states why, in the harness's
+ * own vocabulary: a model its provider has stopped offering (`available`
+ * false, learned by probe) and a model that cannot answer chat at all -
+ * the declared speech, image, and retrieval models - which have their own
+ * capability slots in Settings and no turn that could name them.
  */
 export function catalogFrom(
   connections: readonly ProviderConnection[],
   models: readonly ProviderModel[],
 ): CatalogModel[] {
   const byId = new Map(connections.map((connection) => [connection.id, connection]))
-  return models.map((model) => catalogModelOf(model, byId.get(model.connectionId)))
+  return models
+    .filter((model) => model.available && model.capability.textGeneration !== 'unsupported')
+    .map((model) => catalogModelOf(model, byId.get(model.connectionId)))
 }
 
 /** Groups a catalog under its connections, in connection order. */

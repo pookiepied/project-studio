@@ -47,6 +47,7 @@ export function LiveTranscript({
   pending,
   phase,
   viewport,
+  onBranch,
 }: {
   items: readonly TranscriptItem[]
   /**
@@ -58,6 +59,8 @@ export function LiveTranscript({
   phase: ConversationPhase
   /** The scroll container, needed to hold position while paging older turns. */
   viewport: React.RefObject<HTMLElement | null>
+  /** Forks the conversation with everything up to the named answer. */
+  onBranch?: (messageId: string) => void
 }) {
   // The newest assistant message, which is not the same as "the last item, if
   // it happens to be one". The log can put a user message after a reply has
@@ -110,6 +113,7 @@ export function LiveTranscript({
                 turnRunning: generating,
               })
             }
+            {...(onBranch === undefined ? {} : { onBranch: () => onBranch(item.id) })}
           />
         ),
       )}

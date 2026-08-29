@@ -112,11 +112,14 @@ export function DictationBar({
   stage,
   elapsedMs,
   denied,
+  note,
   onFrame,
 }: {
   stage: DictationStage
   elapsedMs: number
   denied: boolean
+  /** A sentence from the transcriber, when the words did not come back. */
+  note: string | null
   onFrame: (listener: MicFrameListener) => () => void
 }) {
   return (
@@ -174,9 +177,11 @@ export function DictationBar({
             transition={{ duration: DURATION.fast, ease: EASE_OUT }}
             className="truncate"
           >
-            {denied
-              ? 'Microphone blocked — allow it in Windows privacy settings, then try again'
-              : 'No microphone available right now'}
+            {note !== null
+              ? note
+              : denied
+                ? 'Microphone blocked — allow it in Windows privacy settings, then try again'
+                : 'No microphone available right now'}
           </motion.p>
         )}
       </AnimatePresence>

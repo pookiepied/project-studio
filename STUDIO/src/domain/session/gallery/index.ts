@@ -12,8 +12,8 @@ import type { Conversation } from '@/domain/session/types'
  *
  * It is seeded finished rather than empty on purpose: opening it should *show*
  * you the artifacts, not ask you to run something first. Sending anything in
- * it replays the whole sequence from the beginning — see `useGalleryTurn` —
- * so the working states are one keystroke away without being the default.
+ * it answers through the demo turn path (`demo-turns.ts`), so the working
+ * states below stay one keystroke away without being the default.
  */
 export const GALLERY_CONVERSATION_ID = 'cnv_gallery'
 

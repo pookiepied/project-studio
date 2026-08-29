@@ -12,6 +12,12 @@ import { cn } from '@/lib/cn'
  * the panel it works only while focus is inside it — which is every time
  * except the one that matters, after focus has drifted to a menu the sheet
  * opened.
+ *
+ * The overlay is `fixed`, not `absolute`. Absolute measures itself against
+ * the nearest positioned ancestor, and dialogs are opened from all over the
+ * shell — including the top strip, a fifty-pixel positioned bar, where the
+ * sheet once opened as a sliver inside it. Fixed means the viewport, whatever
+ * the mount point's ancestors are doing.
  */
 export function Dialog({
   open,
@@ -45,7 +51,7 @@ export function Dialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: DURATION.base, ease: EASE_OUT }}
-          className="studio-blur-scrim absolute inset-0 z-50 flex items-center justify-center bg-scrim p-6"
+          className="studio-blur-scrim fixed inset-0 z-50 flex items-center justify-center bg-scrim p-6"
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) onClose()
           }}

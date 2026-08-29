@@ -15,7 +15,20 @@ import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover } from '@/compo
  * of entering text, so it belongs with the other ways of adding to the turn —
  * and it keeps the resting field down to one control on each side.
  */
-export function AddMenu() {
+/**
+ * The plus menu: what to give the turn beyond the words.
+ *
+ * Two groups, because they answer different questions. The first adds context
+ * — files, folders, an image. The second changes how the turn runs: a goal
+ * survives the whole conversation, and plan mode makes the model propose before
+ * it acts. Flattening them into one list would put "attach a file" beside
+ * "change how the agent behaves", which are not peers.
+ *
+ * Dictation lives here rather than as a second glyph in the field. It is a way
+ * of entering text, so it belongs with the other ways of adding to the turn —
+ * and it keeps the resting field down to one control on each side.
+ */
+export function AddMenu({ onImage }: { onImage?: () => void }) {
   const [open, setOpen] = useState(false)
 
   const pick = (run?: () => void) => () => {
@@ -48,7 +61,11 @@ export function AddMenu() {
       <MenuItem icon={<Icons.project />} onSelect={pick()}>
         Folder
       </MenuItem>
-      <MenuItem icon={<Icons.image />} onSelect={pick()}>
+      <MenuItem
+        icon={<Icons.image />}
+        note="Seen by the model this turn and every turn after."
+        onSelect={pick(onImage)}
+      >
         Image
       </MenuItem>
 

@@ -1,27 +1,32 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
+import { MessageActions } from '@/features/chat/transcript/MessageActions'
 import type { TranscriptItem } from '@/features/chat/transcript/projection'
 
 /**
  * What you asked for, in the live conversation: the same bubble the demo
  * surface established, carrying exactly what the harness echoed back.
  *
- * There is no editing here yet, and that is honesty rather than an omission:
- * on this protocol an edit is a new submission with new semantics, and
- * pretending a bubble is editable when nothing defines what that does would
- * be a control that lies. The copy action survives, because it is free.
+ * The row under it carries copy and nothing else. Editing is not on this
+ * protocol at all — a sent message is in the journal, and pretending a bubble
+ * can be rewritten would be a control that lies — and copy is the one thing
+ * a message of yours owes a reader.
  */
 export function LiveUserMessage({
   item,
 }: {
   item: Extract<TranscriptItem, { kind: 'user' }>
 }) {
+  const [hovered, setHovered] = useState(false)
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: DURATION.base, ease: EASE_OUT }}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
       className="flex flex-col items-end"
     >
       <div className="max-w-[85%] rounded-2xl rounded-br-md bg-selected px-3.5 py-2.5 text-foreground">
@@ -39,6 +44,8 @@ export function LiveUserMessage({
           </div>
         ) : null}
       </div>
+
+      <MessageActions visible={hovered} align="end" copyPayload={item.text} actions={[]} />
     </motion.div>
   )
 }

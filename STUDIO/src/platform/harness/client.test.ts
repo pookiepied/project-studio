@@ -38,9 +38,12 @@ const CAPABILITY = {
   embeddings: 'unsupported',
   reranking: 'unsupported',
   imageGeneration: 'unsupported',
+  imageEditing: 'unsupported',
   videoGeneration: 'unsupported',
   speechGeneration: 'unsupported',
   transcription: 'unsupported',
+  webSearch: 'unsupported',
+  webFetch: 'unsupported',
   contextWindow: 200000,
   maxOutputTokens: 'unknown',
 } as const
@@ -455,5 +458,30 @@ describe('the api key', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(JSON.stringify(result.value)).not.toContain(CANARY)
+  })
+})
+
+/**
+ * The dictation body is posted to the route unchanged, so the field name here
+ * is the field name `transcribeRequestSchema` parses. They disagreed once -
+ * this side sent `data`, the route required `audio` - and because both halves
+ * were internally consistent, every type checked and dictation could never
+ * succeed. Pinning the wire is the only place that disagreement is visible.
+ */
+describe('the dictation body', () => {
+  it('names the recording the way the route parses it', async () => {
+    const stub = stubFetch(() => jsonResponse({ text: 'hello there' }))
+
+    const result = await clientWith(stub.fetch).transcribe({
+      audio: 'AQID',
+      mimeType: 'audio/webm',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(stub.calls[0]?.url).toContain('/api/media/transcribe')
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({
+      audio: 'AQID',
+      mimeType: 'audio/webm',
+    })
   })
 })

@@ -31,6 +31,28 @@ import { cn } from '@/lib/cn'
  * the bottom of the window flips to open upward, and one near an edge is pulled
  * back inside it. Both are cheap once the panel is measured against the
  * viewport rather than against whatever box it happened to be declared in.
+ *
+ * ---- Why the panel is measured with offsetWidth, not its rect --------------
+ *
+ * The panel animates in with a `scale(0.97)` transform, and `getBoundingClientRect`
+ * reports the transformed box. Measuring that meant every placement was computed
+ * against a panel ~3% smaller than the one that would still be on screen a frame
+ * later, and for an end-aligned menu - the kind anchored to a trigger on the
+ * window's right edge - that error is all on the left side: the first placement
+ * sat a few pixels too far right, and the first reposition after that (any
+ * scroll does it) snapped it left. With a long menu the user is scrolling while
+ * it is open, so the jump read as "the menu shifts when I scroll the list".
+ * `offsetWidth`/`offsetHeight` are layout sizes the transform never touches, so
+ * the measurement and the settled panel are the same box.
+ *
+ * ---- Why placement re-runs when content resizes ---------------------------
+ *
+ * A menu whose view changes in place - a model picker opening a wider library,
+ * a search field narrowing a list - changes its own box without closing, and a
+ * position computed for the old box is wrong for the new one. A ResizeObserver
+ * on the panel re-places it whenever its content's size moves; guarded to a
+ * no-op where the observer does not exist, because a menu that merely keeps its
+ * first position beats one that fails to open at all.
  */
 
 type Side = 'top' | 'bottom'
@@ -70,8 +92,14 @@ export function Popover({
    */
   const place = useCallback(() => {
     const trigger = anchor.current?.getBoundingClientRect()
-    const box = panel.current?.getBoundingClientRect()
-    if (!trigger || !box) return
+    const panelElement = panel.current
+    if (!trigger || !panelElement) return
+
+    // Layout sizes, not the bounding rect: the rect is multiplied by the
+    // entry animation's scale transform, and placing a menu against a box
+    // that will not exist a frame later is the shift described above.
+    const width = panelElement.offsetWidth
+    const height = panelElement.offsetHeight
 
     // Flip rather than overflow: if the preferred side has no room but the
     // opposite side does, use the opposite side. If neither does, keep the
@@ -79,23 +107,32 @@ export function Popover({
     const below = window.innerHeight - trigger.bottom - OFFSET - MARGIN
     const above = trigger.top - OFFSET - MARGIN
     let resolved = side
-    if (side === 'bottom' && box.height > below && above > below) resolved = 'top'
-    if (side === 'top' && box.height > above && below > above) resolved = 'bottom'
+    if (side === 'bottom' && height > below && above > below) resolved = 'top'
+    if (side === 'top' && height > above && below > above) resolved = 'bottom'
 
     const top =
-      resolved === 'bottom' ? trigger.bottom + OFFSET : trigger.top - box.height - OFFSET
+      resolved === 'bottom' ? trigger.bottom + OFFSET : trigger.top - height - OFFSET
 
     const preferred =
       align === 'end'
-        ? trigger.right - box.width
+        ? trigger.right - width
         : align === 'center'
-          ? trigger.left + trigger.width / 2 - box.width / 2
+          ? trigger.left + trigger.width / 2 - width / 2
           : trigger.left
 
     // Pulled back inside the window on both axes. A menu that hangs off the
-    // edge is not merely ugly — the rows past the edge cannot be clicked.
-    const left = Math.min(Math.max(preferred, MARGIN), window.innerWidth - box.width - MARGIN)
-    const clampedTop = Math.min(Math.max(top, MARGIN), window.innerHeight - box.height - MARGIN)
+    // edge is not merely ugly — the rows past the edge cannot be clicked. The
+    // bounds are floored at MARGIN so a panel wider than the window clamps to
+    // the left edge instead of the min/max pair collapsing and letting it
+    // through to the right.
+    const left = Math.min(
+      Math.max(preferred, MARGIN),
+      Math.max(MARGIN, window.innerWidth - width - MARGIN),
+    )
+    const clampedTop = Math.min(
+      Math.max(top, MARGIN),
+      Math.max(MARGIN, window.innerHeight - height - MARGIN),
+    )
 
     setPosition({ top: clampedTop, left, side: resolved })
   }, [align, side])
@@ -109,12 +146,25 @@ export function Popover({
 
     // The window can be resized and the page scrolled while a menu is open, and
     // a fixed panel does not follow its trigger on its own. `capture` catches
-    // scrolls on any ancestor, not just the document.
+    // scrolls on any ancestor, not just the document — including the menu's
+    // own scrolling list, which is why a re-place must be stable rather than
+    // slightly different every time.
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
+
+    // Content that resizes in place — a view swapped inside the same open
+    // menu, a list shortened by a filter — needs a fresh placement, and no
+    // scroll or resize event will announce it.
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver(() => place())
+    if (panel.current !== null && observer !== undefined) observer.observe(panel.current)
+
     return () => {
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
+      observer?.disconnect()
     }
   }, [open, place])
 
@@ -176,8 +226,10 @@ export function Popover({
               className={cn(
                 // `lg` panel with 4px padding puts rows on `sm` — the
                 // concentric rule, so the row corners run parallel to the
-                // panel's.
-                'studio-blur fixed z-50 min-w-48 rounded-lg border p-1',
+                // panel's. The max-width is the same hard clamp the placement
+                // math applies, said in CSS as well, so a panel can never be
+                // the thing that gives the page a horizontal scrollbar.
+                'studio-blur fixed z-50 min-w-48 max-w-[calc(100vw-1rem)] rounded-lg border p-1',
                 'shadow-overlay',
                 className,
               )}

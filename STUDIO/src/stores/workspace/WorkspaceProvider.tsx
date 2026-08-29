@@ -159,6 +159,13 @@ interface WorkspaceValue {
    * the other three" without being one of them.
    */
   readonly running: ReadonlySet<string>
+  /**
+   * Marks a conversation working, or settled. Kept on the store rather than
+   * derived, because the witnesses live in two places -- the phase machine of
+   * an open conversation, and the demo turn's own callbacks -- and neither
+   * should own the set both feed.
+   */
+  markRunning: (conversationId: string, active: boolean) => void
   readonly settings: TurnSettings
 
   setSettings: (settings: TurnSettings) => void
@@ -189,13 +196,12 @@ interface WorkspaceValue {
     readonly firstMessage: string
     readonly projectId: string | null
     readonly settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice }
+    readonly title?: string
   }) => void
   /** Stamps recency after an admitted later turn. */
   touch: (conversationId: string) => void
   send: (conversationId: string | null, text: string) => string
   stop: () => void
-  retry: (conversationId: string) => void
-  editMessage: (conversationId: string, messageId: string, text: string) => void
   fork: (conversationId: string, messageId: string) => string | null
 
   rename: (conversationId: string, title: string) => void
@@ -480,6 +486,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       firstMessage: string
       projectId: string | null
       settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice }
+      /** A title the caller already knows - a fork's " (Fork)" name. Absent starts untitled. */
+      title?: string
     }) => {
       setRemoteConversations((current) => {
         // A second record under one receipt would be two sidebar rows pointing
@@ -488,7 +496,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return [
           {
             id: input.id,
-            title: null,
+            title: input.title ?? null,
             projectId: input.projectId,
             messages: [],
             updatedAt: Date.now(),
@@ -742,6 +750,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       catalog,
       status,
       running,
+      markRunning,
       settings,
       setSettings,
       setConversationSettings,
@@ -752,8 +761,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       touch,
       send: turns.send,
       stop,
-      retry: turns.retry,
-      editMessage: turns.editMessage,
       fork: turns.fork,
       rename,
       setProject,
@@ -769,6 +776,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       conversations,
       createProject,
       ensureStore,
+      markRunning,
       remoteProjects,
       remove,
       removeMany,
@@ -786,9 +794,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       settings,
       touch,
       togglePin,
-      turns.editMessage,
       turns.fork,
-      turns.retry,
       turns.send,
     ],
   )

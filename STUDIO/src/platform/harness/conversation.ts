@@ -201,6 +201,23 @@ export interface TurnSettingsWire {
   readonly reasoningLevel: string
 }
 
+/**
+ * One image a turn carries beside its words, already read and encoded.
+ *
+ * The shape is Flue's submission contract, spelled once here: base64 bytes,
+ * never a path — the sandbox has no read root that reaches anything the user
+ * picked, and the model consumes pixels, not references. Bytes travel in the
+ * moment of sending; the harness persists them and re-sends them to the model
+ * on every later turn of the conversation, which is the only way a stateless
+ * provider can see an image twice.
+ */
+export interface TurnImageWire {
+  readonly type: 'image'
+  readonly data: string
+  readonly mimeType: string
+  readonly filename?: string
+}
+
 /* -------------------------------------------------------------------------- */
 /* Deliveries                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -302,9 +319,15 @@ export interface ConversationClient {
   /**
    * Submits one user turn and resolves with where its events begin. The
    * settings travel in the body; a model the harness cannot serve is refused
-   * at admission, before anything is created.
+   * at admission, before anything is created. Images ride beside the words
+   * as base64 parts, Flue's own submission shape — omitted entirely when the
+   * turn carries none, so a text turn's body is byte-for-byte what it was.
    */
-  submitTurn(message: string, settings?: TurnSettingsWire): Promise<TurnResult<SubmittedTurn>>
+  submitTurn(
+    message: string,
+    settings?: TurnSettingsWire,
+    images?: readonly TurnImageWire[],
+  ): Promise<TurnResult<SubmittedTurn>>
   /**
    * Attaches a reader.
    *
@@ -397,19 +420,23 @@ export function createConversationClient(options: ConversationClientOptions): Co
       return active !== null
     },
 
-    async submitTurn(message, settings) {
+    async submitTurn(message, settings, images) {
       // Never retried, here or above: an identical resend is a SECOND TURN
       // (the harness pins this behaviour in its own test), so a retry loop
       // would be duplication wearing a retry's clothes.
       //
       // The settings keys are the harness contract's own (`modelId`,
       // `reasoningLevel`), spelled once there. Null modelId is omitted: absent
-      // means the conversation's settled state stands.
+      // means the conversation's settled state stands. Images are Flue's own
+      // payload field, so they ride in the body unrenamed; empty means the
+      // key is absent, which is what a text-only turn has always sent.
       const wire = settings ?? { modelId: null, reasoningLevel: 'default' }
+      const carried = images ?? []
       const sent = await request('POST', agentsPath(), JSON.stringify({
         message,
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),
         reasoningLevel: wire.reasoningLevel,
+        ...(carried.length === 0 ? {} : { images: carried }),
       }))
       if ('failure' in sent) return { ok: false, error: sent.failure }
 

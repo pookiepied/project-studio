@@ -1,11 +1,13 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 
+import { visionRefusal } from '@/domain/attachments/images'
 import { Composer } from '@/features/chat/composer/Composer'
 import { useFirstTurn } from '@/features/chat/first-turn'
 import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
+import type { SeamFailure, TurnImageWire } from '@/platform/harness'
 
 /**
  * The composer that starts a conversation, wherever one can be started.
@@ -31,7 +33,7 @@ export function StartConversation({
   projectId: string | null
   placeholder: string
 }) {
-  const { beginConversation, settings } = useWorkspace()
+  const { beginConversation, settings, catalog } = useWorkspace()
   const { openChat } = useNavigation()
 
   const onStarted = useCallback(
@@ -55,16 +57,39 @@ export function StartConversation({
     settings: () => effectiveTurnSettings(null, settings),
   })
 
+  /** The send-time refusal for images a blind model cannot take. */
+  const [attachRefusal, setAttachRefusal] = useState<SeamFailure | null>(null)
+
+  const onSend = useCallback(
+    async (text: string, images: readonly TurnImageWire[]) => {
+      const refusal = visionRefusal(
+        effectiveTurnSettings(null, settings).modelId,
+        images.length,
+        catalog.models,
+      )
+      if (refusal !== null) {
+        setAttachRefusal(refusal)
+        return { ok: false }
+      }
+      setAttachRefusal(null)
+      return firstTurn.start(text, images)
+    },
+    [catalog.models, firstTurn.start, settings],
+  )
+
   return (
     <>
       {firstTurn.refused !== null ? (
         <SendRefusal failure={firstTurn.refused} onDismiss={firstTurn.dismissRefusal} />
       ) : null}
+      {attachRefusal !== null ? (
+        <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
+      ) : null}
 
       <Composer
         conversationId={null}
         placeholder={placeholder}
-        onSend={firstTurn.start}
+        onSend={onSend}
       />
     </>
   )
