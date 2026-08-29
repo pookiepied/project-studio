@@ -4,8 +4,7 @@ import { resolveProviderIcon } from '@/domain/providers/icons'
 import { cn } from '@/lib/cn'
 
 /**
- * Provider marks — the real brand logos, in the vendor's own colour where one
- * is known and the theme's everywhere else.
+ * Provider marks — the real brand logos, in the theme's own colour.
  *
  * ---- Why real logos at all -------------------------------------------------
  *
@@ -13,58 +12,62 @@ import { cn } from '@/lib/cn'
  * wrong one: a provider mark's whole job is to be recognised before it is read,
  * and an abstract figure standing in for Anthropic is recognisable to nobody.
  *
- * ---- Why the colour is not the brand's own hex -----------------------------
+ * ---- Why every mark is monochrome ------------------------------------------
  *
- * A vendor's brand colour is one value, chosen against a white page. Painted
- * literally on a dark surface it fails, and not gently: Anthropic is #191919,
- * xAI and Moonshot and Copilot read black, and on our dark theme those rows
- * render an empty tile. That is most of the vendors people actually use.
+ * These wore their vendors' real colours for a while, from Simple Icons' own
+ * per-brand `hex`. It was removed, and the reason is completeness rather than
+ * taste.
  *
- * This was settled once the wrong way. An earlier table carried raw hex and
- * handled the black brands by dropping them to the theme's foreground, which
- * meant the vendors at the top of every list rendered grey while Nvidia green
- * and HuggingFace yellow did not -- the colour was loudest exactly where it
- * mattered least, and the picker read as a mix of identities because it was
- * one. Removing colour altogether fixed that and cost the recognition cue.
+ * A colour policy cannot be finished. The table had twelve entries against a
+ * catalog where most of two hundred OpenRouter authors have no logo at all,
+ * let alone a colour; a self-hosted endpoint has no brand by definition and
+ * never will; and a brand that is effectively black — Anthropic, OpenAI, xAI,
+ * Moonshot, GitHub Copilot — cannot wear its own colour on a dark theme
+ * without being invisible. The old code handled that last case by falling back
+ * to the theme's foreground, which meant the vendors people actually use
+ * rendered grey while Nvidia green and HuggingFace yellow did not. The colour
+ * was loudest exactly where it mattered least, and the picker read as a mix of
+ * identities because it was one.
  *
- * What is here now keeps the hue and chroma and clamps only the lightness, per
- * theme. Anthropic stays Anthropic's near-neutral rather than becoming the
- * same grey as an unknown vendor; Nvidia stays green; nothing lands where the
- * surface already is. The table is `--brand-*` in `index.css`.
+ * The same argument was already settled once here, in `TrafficLights`: the
+ * macOS red, amber and green were removed because they would be the only
+ * saturated pixels in the interface. A list of thirty vendor logos is that
+ * argument at ten times the scale.
  *
- * It still cannot be complete, and that is the honest cost. Of the 51 vendors
- * that reach a mark in OpenRouter's live catalog, simple-icons publishes a
- * colour for 13; the table adds the well-known vendors whose colour they state
- * themselves and stops there. Everything else inherits `currentColor`. So a
- * direct connection, where every row is a named lab, is fully coloured, and an
- * OpenRouter connection is mostly not.
+ * Monochrome is completable today and stays complete for every vendor added
+ * later, including ones nobody has heard of yet. It is also the safer footing
+ * for what these marks are doing: naming the vendor a model came from is
+ * nominative use, and a single-colour rendition claims less than a faithful
+ * one. What it costs is colour as a recognition cue — acceptable because the
+ * mark never appears alone. All eleven call sites put it beside the vendor or
+ * model name, so it confirms an identity rather than carrying it.
  *
  * ---- Where the shapes come from --------------------------------------------
  *
- * One source: the harness, which serves the vendors' actual logos from
- * models.dev and caches them on this machine.
+ * One question, asked once: the harness's icon catalog. Which upstream
+ * actually had the mark is deliberately not this file's business — see
+ * `providers/icons` in the harness, where two sources sit behind one lookup
+ * and a disk cache.
  *
- * There were two for a while. Five brand paths were bundled from Simple Icons
- * as an offline floor beneath the harness lookup, and measuring the two
- * sources against each other ended the argument: models.dev publishes 207
- * providers and has a real logo for 190 of them, including every vendor
- * Simple Icons lacks — OpenAI, xAI, Groq, Cohere, Together, Fireworks. The
- * bundled five were a strictly smaller copy of a set we already had, and the
- * floor they were holding up is a floor nobody stands on: every surface that
- * draws a provider mark is a model picker or the Providers pane, and both of
- * those render "no harness is connected" when the harness is not running.
- * Nothing was being caught.
+ * Bundling marks here was tried and removed. Five brand paths from Simple
+ * Icons sat as an offline floor beneath the harness, and the floor turned out
+ * to be one nobody stands on: every surface that draws a provider mark is a
+ * model picker or the Providers pane, and both render "no harness is
+ * connected" when the harness is not running. Nothing was being caught, and
+ * the bundle was a strictly smaller copy of a set we already had.
  *
- * What remains is the honest shape of the problem. The harness answers, or
- * nobody does.
+ * So the harness answers or nobody does, and what that reaches is measured
+ * rather than assumed. Against the live catalogs: 193 of models.dev's 207
+ * providers, and 36 of the 51 model authors OpenRouter actually serves. The
+ * remaining fifteen are individuals publishing fine-tunes — `sao10k`,
+ * `thedrummer`, `gryphe` — for whom no logo exists anywhere to fetch.
  *
  * Those SVGs are monochrome `currentColor` by design — drop one into an
  * `<img>` and it renders black everywhere, ignoring the theme. So the logo is
- * not an image here: it becomes a CSS mask on a span, and the span's
- * background is what paints through it. That is also what makes colour
- * possible at all — the artwork carries none, so the background is the only
- * place a vendor's colour can come from. A mask image cannot execute
- * anything, so the SVG needs no sanitising to be safe.
+ * not an image here: it becomes a CSS mask on a span and the span's
+ * background is `currentColor`, which puts it under the same rule as every
+ * other mark in the app. A mask image cannot execute anything, so the SVG
+ * needs no sanitising to be safe.
  *
  * ---- What this does not solve ---------------------------------------------
  *
@@ -90,14 +93,15 @@ import { cn } from '@/lib/cn'
  * organisation whose avatar they do not have.
  *
  * Who actually falls through to a letter is worth being precise about, because
- * it is a much smaller set than it looks. models.dev names providers, but most
- * marks here are drawn for a model's *author* — the first segment of an
- * OpenRouter id. Measured against OpenRouter's live list: 58 distinct authors,
- * of which 19 are already models.dev ids and nine more are aliased to one in
- * the harness. OpenAI is not in the remainder; neither is xAI, Qwen or Moonshot.
- * What is left is Baidu, Writer, Liquid, AI21, Reka, the community fine-tuners,
- * and any endpoint someone is running themselves — vendors for whom no logo
- * exists to find, rather than ones we failed to look up.
+ * it is a much smaller set than it looks. Measured against OpenRouter's live
+ * list, 36 of 51 authors resolve to a real mark. The fifteen that do not are
+ * `sao10k`, `thedrummer`, `gryphe`, `undi95`, `mancer`, `anthracite-org` and
+ * their neighbours: individuals publishing fine-tunes, not companies. Writer
+ * and Reka are the only firms among them.
+ *
+ * That is the honest shape of the remainder — vendors for whom no logo exists
+ * anywhere, rather than vendors we failed to look up. A self-hosted endpoint
+ * is the same case by definition and always will be.
  *
  * Drawing a mark ourselves for that remainder is not on the table, for the
  * reason it never was: an invented figure in a row of real logos reads as a
@@ -135,44 +139,6 @@ function monogramFor(provider: string): string | null {
 const UNNAMED = (
   <rect x="4" y="4" width="16" height="16" rx="4.5" fill="none" stroke="currentColor" strokeWidth="2" />
 )
-
-/**
- * The vendors this app has a brand colour for.
- *
- * A closed literal rather than a string built from the prop, and that is a
- * boundary rather than a style choice: the value that arrives here is an
- * arbitrary vendor id, and interpolating it into a custom property name would
- * let a catalog entry name any variable in the document. Membership is checked
- * first, so only these twenty-seven strings ever reach `var()`.
- *
- * The colours themselves are `--brand-*` in `index.css`, which is also where
- * the note on what this table can and cannot cover lives. Anything absent
- * inherits `currentColor` and looks exactly as it did before.
- */
-const COLOURED = new Set([
-  'anthropic', 'openai', 'google', 'meta', 'meta-llama', 'nvidia', 'perplexity',
-  'qwen', 'baidu', 'bytedance', 'amazon', 'xiaomi', 'huggingface', 'cloudflare',
-  'databricks', 'ollama', 'github-copilot', 'deepseek', 'mistral', 'mistralai',
-  'xai', 'x-ai', 'groq', 'moonshotai', 'openrouter', 'togetherai', 'microsoft',
-])
-
-/**
- * The paint for one vendor's mark, or undefined to inherit the theme.
- *
- * Set as `color` on the tile rather than as a background on the mark, so that
- * one rule covers all three of them: the logo's mask paints `currentColor`,
- * the monogram is text, and the empty tile is a stroke. Setting it on the mask
- * alone would have left a coloured logo beside an uncoloured letter, and would
- * have broken the one thing a caller still controls from outside -- a disabled
- * connection dims its mark by setting a colour, and an inline background would
- * have ignored that.
- */
-function paintFor(provider: string): string | undefined {
-  // OpenRouter's routing-variant prefix is not part of the vendor's identity,
-  // for the same reason the harness strips it before looking up a logo.
-  const id = provider.startsWith('~') ? provider.slice(1) : provider
-  return COLOURED.has(id) ? `var(--brand-${id})` : undefined
-}
 
 /**
  * The real logo for one vendor id, or null while unknown.
@@ -242,7 +208,6 @@ export function ProviderMark({
         style={{
           width: mark,
           height: mark,
-          color: 'inherit',
           backgroundColor: 'currentColor',
           maskImage: `url("${realIcon}")`,
           WebkitMaskImage: `url("${realIcon}")`,
@@ -268,10 +233,7 @@ export function ProviderMark({
         'inline-flex shrink-0 items-center justify-center rounded-md bg-tint',
         className,
       )}
-      // The paint lives here, and the marks inherit it. `.studio-icon` sets a
-      // colour of its own, so each mark below overrides that with `inherit`
-      // rather than being given the colour separately three times.
-      style={{ width: tile, height: tile, color: paintFor(provider) ?? 'var(--muted-foreground)' }}
+      style={{ width: tile, height: tile }}
     >
       {inner}
     </span>
@@ -297,7 +259,6 @@ function Fallback({ provider, mark }: { provider: string; mark: string }) {
           // monogram and a logo beside it are the same height. Inter's cap
           // height is a shade over 0.7em, which puts the letter at about the
           // fill of a brand path in the same square.
-          color: 'inherit',
           fontSize: mark,
           lineHeight: 1,
           fontWeight: 500,
@@ -315,7 +276,7 @@ function Fallback({ provider, mark }: { provider: string; mark: string }) {
   // Neither a logo nor a name to take a letter from.
   return (
     <svg
-      style={{ width: mark, height: mark, color: 'inherit' }}
+      style={{ width: mark, height: mark }}
       viewBox="0 0 24 24"
       data-provider={provider}
       data-mark="unnamed"

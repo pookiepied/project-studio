@@ -26,7 +26,11 @@ import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
 import { ConnectionStore } from "./providers/connection-store.js";
 import { ModelCatalog } from "./providers/model-catalog.js";
-import { ProviderManagementService } from "./application/provider-management.js";
+import { ProviderManagementService } from "./providers/management.js";
+import { createProviderIcons } from "./providers/icons/index.js";
+import { CapabilityResolver } from "./providers/capability-defaults.js";
+import { MediaService } from "./media/service.js";
+import { studioPath } from "./platform/paths.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
 import { RetrievalSettingsStore } from "./retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
@@ -132,14 +136,38 @@ function createHarnessApplication(): HarnessApplication {
       db: database,
       credentials: new KeyringCredentialStore(),
     });
+    // Held here rather than inline: the capability resolver (media, and the
+    // generation tools when they land) reads the same catalog the provider
+    // surface does - one store, one truth about which models exist.
+    const modelCatalog = new ModelCatalog({
+      db: database,
+      connections: providerConnections,
+    });
     const providers = new ProviderManagementService({
       connections: providerConnections,
-      catalog: new ModelCatalog({
-        db: database,
-        connections: providerConnections,
+      catalog: modelCatalog,
+      // Real vendor icons, cached under the Studio home's disposable cache
+      // directory. One catalog over every source -- see providers/icons -- so
+      // the webview asks one question and never learns which vendors live
+      // where. Every lookup misses gracefully offline.
+      icons: createProviderIcons({
+        cacheDir: studioPath("cache", "provider-icons"),
       }),
     });
     bootLog("step 8: ConnectionStore, ProviderManagementService completed");
+
+    // Dictation and read-aloud resolve their slot through the same capability
+    // seam every consumer shares; the drivers they dispatch to live in
+    // src/media/drivers, one file per protocol.
+    bootLog("step 8b: MediaService entering");
+    const media = new MediaService({
+      resolver: new CapabilityResolver({
+        connections: providerConnections,
+        catalog: modelCatalog,
+        credentials: new KeyringCredentialStore(),
+      }),
+    });
+    bootLog("step 8b: MediaService completed");
 
     // Reads and writes the same app_setting keys and keychain entries the
     // retrieval tool path uses; its own store instances over the same
@@ -181,6 +209,7 @@ function createHarnessApplication(): HarnessApplication {
       servers: runtime.servers,
       providers,
       retrieval,
+      media,
       approvals,
       conversations,
       projects,
