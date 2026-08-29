@@ -157,7 +157,7 @@ export function TurnMenu() {
                   places. */}
               {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
               <span className="min-w-0 truncate">{label}</span>
-              <Icons.disclosure state={open ? 'on' : 'rest'} className="shrink-0 opacity-60" />
+              <Icons.disclosure state={open ? 'on' : 'rest'} className="opacity-60" />
             </button>
           </Tooltip>
         }
@@ -344,7 +344,7 @@ function ReasoningPanel({
       >
         {/* Pointing back the way it came. The same mark the disclosures
             use, turned — one idea of "there is more this way". */}
-        <Icons.disclosure className="shrink-0 rotate-180" />
+        <Icons.disclosure className="rotate-180" />
         Reasoning
       </button>
       <MenuSeparator />

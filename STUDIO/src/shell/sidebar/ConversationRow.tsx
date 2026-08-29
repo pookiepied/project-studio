@@ -69,7 +69,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
           active ? 'text-foreground' : 'text-muted-foreground group-hover/row:text-foreground',
         )}
       >
-        {conversation.pinned ? <Icons.pin className="shrink-0 text-muted-foreground" /> : null}
+        {conversation.pinned ? <Icons.pin /> : null}
         <span className="min-w-0 truncate">{conversation.title ?? 'Untitled'}</span>
 
         {/* After the title, not before it.

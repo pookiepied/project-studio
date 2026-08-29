@@ -219,7 +219,7 @@ export function AppShell() {
               'transition-colors duration-fast hover:text-foreground',
             )}
           >
-            <Icons.openLarger className="shrink-0" />
+            <Icons.openLarger />
             <span className="text-micro tabular-nums">{railEntryCount}</span>
           </motion.button>
         ) : null}

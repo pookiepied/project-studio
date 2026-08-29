@@ -229,9 +229,13 @@ export function VoiceModeOverlay({ open, onClose }: { open: boolean; onClose: ()
 
                     The mark scales with it. A `md` glyph is 15px, which inside
                     a 44px circle is 2.9x air where every other control in the
-                    app sits near 1.9x — a small square adrift in a large
-                    disc, which is what read as "not centred" even though the
-                    flex centring was exact. `lg` puts it back in proportion. */}
+                    app sits near 1.9x, so `lg` puts it back in proportion.
+
+                    That step was also once offered as the fix for this button
+                    reading as off-centre, and it was not: the flex centring was
+                    exact then and is exact now, measured at 0.00px on both
+                    axes. What was actually wrong was that the mark was an
+                    outline. See the note above `TRANSPORT` in `drawn.tsx`. */}
                 <IconButton
                   label={TRANSPORT_LABEL[session.stage as keyof typeof TRANSPORT_LABEL] ?? 'Interrupt'}
                   size="xl"

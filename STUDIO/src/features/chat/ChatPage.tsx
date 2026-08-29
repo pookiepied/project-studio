@@ -213,7 +213,7 @@ export function ChatPage({
               aria-label="Jump to latest"
               className="studio-blur absolute -top-14 left-1/2 z-20 flex size-8 -translate-x-1/2 items-center justify-center rounded-full border shadow-lifted"
             >
-              <Icons.jumpToLatest className="text-muted-foreground" />
+              <Icons.jumpToLatest />
             </motion.button>
           ) : null}
         </AnimatePresence>

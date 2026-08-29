@@ -143,6 +143,51 @@
   --control-xl: calc(var(--ui-size) * 11 / 3);
 }
 
+/* -- Control sizes land on whole pixels --------------------------------------
+
+   The fractions above are the right ratios and the wrong numbers. Sevens,
+   eighths and elevenths over three are exact integers at exactly one setting,
+   which is the 12px default:
+
+     ui        11        12        13        14
+     md    25.667        28    30.333    32.667
+     lg    29.333        32    34.667    37.333
+     xl    40.333        44    47.667    51.333
+
+   A round control does not care -- a circle's edge is curved, so it antialiases
+   evenly the whole way round and a third of a pixel of width is invisible on
+   it. What cares is anything with a straight vertical edge sitting inside one,
+   and the transport square is the clearest case in the app. Centring puts the
+   square's midpoint on the button's midpoint, so a button 47.667px wide has its
+   midpoint at 23.833 and the square's two edges land on different fractions of
+   a device pixel: one paints a faint partial column, the other a nearly solid
+   one. The geometry is exact -- measured at 0.00px on both axes -- and the
+   painted mark is still heavier on one side, which the eye reads as the square
+   having slid that way.
+
+   That is why this was reported as an alignment bug three times and survived
+   two fixes aimed at the mark. Growing the glyph a step and swapping Lucide's
+   outline for a solid square both changed what is drawn; neither changed which
+   pixel its edges fall on. Only the default setting was ever clean, which is
+   also why it kept measuring as centred on the machine it was measured on.
+
+   Rounding to whole pixels makes the offset from button edge to icon box a
+   whole or half pixel at every setting, and the square symmetric about its own
+   centre at all four. The ratios are unchanged in intent -- at most a third of
+   a pixel moves, on a control between 25 and 52px.
+
+   `@supports` because a custom property holding an unsupported function is not
+   rejected at parse time: it is stored, substituted, and only then found to be
+   invalid, at which point the control has no size at all rather than falling
+   back to the calc. The guard is what makes the fallback actually happen. */
+@supports (width: round(1px, 1px)) {
+  :root {
+    --control-md: round(calc(var(--ui-size) * 7 / 3), 1px);
+    --control-lg: round(calc(var(--ui-size) * 8 / 3), 1px);
+    --control-xl: round(calc(var(--ui-size) * 11 / 3), 1px);
+  }
+}
+
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;

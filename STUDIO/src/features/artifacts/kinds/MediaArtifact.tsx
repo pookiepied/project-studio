@@ -77,12 +77,18 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
             <span className="absolute inset-0 bg-black/0 transition-colors duration-base group-hover/media:bg-black/15" />
             <span
               className={cn(
-                'relative flex items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm',
+                // `text-white` alone does not reach the mark: `.studio-icon`
+                // holds every glyph at `--muted-foreground` so a mark never
+                // darkens with the row it sits in, and a grey glyph on a dark
+                // scrim over a picture is unreadable rather than quiet. The
+                // arbitrary variant lands in the utilities layer and wins, the
+                // same way the solid `IconButton` opts out.
+                'relative flex items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm [&_.studio-icon]:text-white',
                 'transition-transform duration-base group-hover/media:scale-105',
                 video ? 'size-12' : 'size-9 opacity-0 group-hover/media:opacity-100',
               )}
             >
-              {video ? <PlayGlyph /> : <Icons.openLarger />}
+              {video ? <Icons.play size="lg" /> : <Icons.openLarger />}
             </span>
           </button>
         ) : null}
@@ -111,22 +117,6 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
         </div>
       ) : null}
     </ArtifactShell>
-  )
-}
-
-/**
- * The play triangle.
- *
- * Drawn rather than taken from the icon set: every mark in the registry is a
- * 1.2px stroke at 14px, and a play button is a solid shape at 20 — borrowing
- * an outline glyph and filling it would put a shape in the app that answers to
- * neither rule.
- */
-function PlayGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5 translate-x-[1px]" aria-hidden>
-      <path d="M8 5.5 L19 12 L8 18.5 Z" fill="currentColor" />
-    </svg>
   )
 }
 

@@ -38,7 +38,7 @@ export function GeneralPane() {
             >
               <Glyph />
               {mode.name}
-              <Icons.expand className="text-muted-foreground" />
+              <Icons.expand />
             </button>
           }
         >

@@ -68,7 +68,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'models',
     name: 'Models',
-    sections: [{ id: 'providers', name: 'Providers', icon: Icons.reasoning }],
+    sections: [{ id: 'providers', name: 'Providers', icon: Icons.providers }],
   },
   {
     id: 'extensions',

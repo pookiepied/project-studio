@@ -120,7 +120,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
                 key={folder.path}
                 className="flex items-center gap-2 rounded-md border bg-surface px-2 py-1.5"
               >
-                <Icons.project className="text-muted-foreground" />
+                <Icons.project />
                 <span className="min-w-0 flex-1 truncate text-ui text-foreground">{folder.name}</span>
                 <span className="hidden shrink-0 text-micro text-muted-foreground sm:block">
                   {folder.path}

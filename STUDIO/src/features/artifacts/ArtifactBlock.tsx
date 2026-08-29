@@ -55,7 +55,7 @@ function Arriving() {
     <div className="my-4 w-full min-w-0 rounded-xl bg-surface-sunken p-3">
       <div className="flex items-start gap-2.5">
         <WorkingHalo working>
-          <Icons.goal />
+          <Icons.artifact />
         </WorkingHalo>
         <div className="min-w-0 flex-1">
           <div className="h-[1.15em] w-40 rounded bg-selected" />

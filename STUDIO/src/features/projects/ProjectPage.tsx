@@ -64,7 +64,7 @@ export function ProjectPage({ project }: { project: Project }) {
                 key={folder.id}
                 className="flex items-center gap-2 rounded-md border px-2.5 py-1.5"
               >
-                <Icons.project className="text-muted-foreground" />
+                <Icons.project />
                 <span className="min-w-0 flex-1 truncate text-ui text-foreground">{folder.name}</span>
                 <span className="shrink-0 truncate text-micro text-muted-foreground">
                   {folder.path}
@@ -87,7 +87,7 @@ export function ProjectPage({ project }: { project: Project }) {
                   className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-fast hover:bg-tint"
                 >
                   {conversation.pinned ? (
-                    <Icons.pin className="shrink-0 text-muted-foreground" />
+                    <Icons.pin />
                   ) : null}
                   <span className="min-w-0 flex-1 truncate text-ui text-foreground">
                     {conversation.title ?? 'Untitled'}

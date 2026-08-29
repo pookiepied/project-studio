@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
-import { Icons } from '@/components/icons'
+import { Icons, type IconComponent } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 export interface MessageAction {
   readonly id: string
   readonly label: string
-  readonly icon: typeof Icons.copy
+  readonly icon: IconComponent
   readonly run: () => void
 }
 

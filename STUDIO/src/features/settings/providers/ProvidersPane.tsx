@@ -255,7 +255,7 @@ function ConnectionRow({
             }
           >
             <MenuItem
-              icon={record.enabled ? <Icons.permissionManual /> : <Icons.check />}
+              icon={record.enabled ? <Icons.disable /> : <Icons.check />}
               onSelect={() => {
                 setMenuOpen(false)
                 void providers.setEnabled(record.id, !record.enabled)

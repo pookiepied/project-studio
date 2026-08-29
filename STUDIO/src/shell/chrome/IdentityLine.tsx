@@ -115,7 +115,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
             className="group/identity flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-ui transition-colors duration-fast hover:bg-tint"
           >
             {conversation.pinned ? (
-              <Icons.pin className="shrink-0 text-muted-foreground" />
+              <Icons.pin />
             ) : null}
             <span className="min-w-0 max-w-[11rem] truncate text-foreground @[26rem]:max-w-[15rem] @[40rem]:max-w-[20rem]">
               {conversation.title}

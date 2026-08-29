@@ -146,7 +146,7 @@ export function CommandPalette({ onNewProject }: { onNewProject: () => void }) {
             className="studio-blur w-full max-w-[30rem] overflow-hidden rounded-xl border shadow-modal"
           >
             <div className="flex items-center gap-2.5 border-b px-3.5 py-2.5">
-              <Icons.search className="text-muted-foreground" />
+              <Icons.search />
               <input
                 ref={field}
                 value={query}

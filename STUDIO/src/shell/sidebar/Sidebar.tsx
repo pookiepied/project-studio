@@ -250,7 +250,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                       *smaller* than its children's, which inverts the hierarchy the
                       arrows exist to express. A disclosure belongs to the tree, not
                       to the label it happens to sit next to. */}
-                  <Icons.disclosure state={sectionOpen ? 'on' : 'rest'} size="sm" className="shrink-0" />
+                  <Icons.disclosure state={sectionOpen ? 'on' : 'rest'} size="sm" />
                   {flat ? 'Conversations' : 'Projects'}
                 </button>
 

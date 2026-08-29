@@ -27,7 +27,7 @@ export function GenericArtifact({ artifact }: { artifact: Artifact }) {
   return (
     <ArtifactShell
       artifact={artifact}
-      mark={<Icons.goal />}
+      mark={<Icons.artifact />}
       status={working ? 'Working' : STATUS_WORDS[artifact.status]}
     >
       {artifact.stats?.length ? (

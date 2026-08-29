@@ -54,7 +54,7 @@ export function RailTabs() {
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   <span className="shrink-0">
-                    <Icons.goal />
+                    <Icons.artifact />
                   </span>
                   <span
                     className={cn(

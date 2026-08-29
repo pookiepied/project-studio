@@ -502,7 +502,10 @@ export function Composer({
                           circle while its own siblings painted 14.8px — the
                           mark was centred to the pixel and still looked
                           wrong, because it was two thirds the size of the
-                          arrow it replaced. */}
+                          arrow it replaced. It is a solid square now rather
+                          than Lucide's outlined one, which is what the rest
+                          of that complaint turned out to be about; see the
+                          note above `TRANSPORT` in `drawn.tsx`. */}
                       <Icons.stop size="md" />
                     </>
                   ) : (

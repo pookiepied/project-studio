@@ -190,7 +190,7 @@ function FileChanges({ items }: { items: readonly ArtifactFileChange[] }) {
     <AnimatedList className="gap-0.5">
       {items.map((item, index) => (
         <AnimatedItem key={item.path} index={index} className="flex items-center gap-2 py-0.5">
-          <Icons.file className="shrink-0" />
+          <Icons.file />
 
           {/* The path truncates from the *left*. A repo path is
               `src/features/chat/transcript/AssistantMessage.tsx`, and the end

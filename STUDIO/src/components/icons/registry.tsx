@@ -26,19 +26,19 @@
  * glyph inside it rather than the glyph having its own small hitbox.
  */
 import {
-  Archive, ArrowDown, ArrowLeft, ArrowUp, Cable, Check, ChevronDown, ChevronRight, ChevronUp,
+  Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
   MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
-  RefreshCw, RotateCw, Search, Settings2, Shield, SlidersHorizontal, Split, Square,
+  RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
-  FastForward, Bot, CalendarDays, CircleAlert, CircleCheck, CirclePause, CirclePlay, Clapperboard, FileText,
-  Link2, Mail, Maximize2, Sparkles, Users,
+  FastForward, CircleAlert, Clapperboard, FileText,
+  Link2, Maximize2, Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
-import { SidebarToggle, VoiceWave } from '@/components/icons/drawn'
+import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave } from '@/components/icons/drawn'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
 const SNAP = { type: 'spring', stiffness: 520, damping: 30, mass: 0.5 } as const
@@ -95,8 +95,8 @@ interface Entry {
 const REGISTRY = {
   // — Window and shell ----------------------------------------------------
   close: { mark: X },
-  // `sidebar` is not here: it is the one drawn mark, because its motion lives
-  // inside the glyph rather than on it. See `drawn.tsx`, and `Icons` below.
+  // `sidebar` is not here: it is drawn, because its motion lives inside the
+  // glyph rather than on it. See `drawn.tsx`, and `Icons` below.
   search: { mark: Search },
   command: { mark: Command },
   reload: { mark: RefreshCw, motion: WIND },
@@ -113,19 +113,27 @@ const REGISTRY = {
 
   // — Disclosure ----------------------------------------------------------
   expand: { mark: ChevronDown },
-  collapse: { mark: ChevronUp },
   disclosure: { mark: ChevronRight, motion: TURN },
 
   // — Model and permission ------------------------------------------------
   //
-  // Not shields. A shield says the app is a hazard being contained, which is
-  // the developer-tool reading of these modes and the wrong one here: choosing
-  // "manual" is not raising a guard, it is asking to be consulted. The triad is
-  // a transport control instead, because that is what the modes actually are —
-  // how far ahead the app may run before it stops for you. Pause, then write,
-  // then run on. Anyone who has used a media player can read it.
+  // The permission triad is not shields. A shield says the app is a hazard
+  // being contained, which is the developer-tool reading of these modes and the
+  // wrong one here: choosing "manual" is not raising a guard, it is asking to
+  // be consulted. It is a transport control instead, because that is what the
+  // modes actually are — how far ahead the app may run before it stops for
+  // you. Pause, then write, then run on. Anyone who has used a media player can
+  // read it.
+
+  // The dial, and only the dial. Settings' Providers section used to carry it
+  // too, which put the app's one picture of "how hard to think" on a row about
+  // which vendors are connected — the exact collision the note at the top of
+  // this file forbids.
   reasoning: { mark: Gauge },
-  permission: { mark: Shield },
+  // Where replies come from: a set of things to draw on, not a thing to plug
+  // in. `Plug` and `Cable` are already spoken for by MCP and connectors, and
+  // both of those describe reach rather than supply.
+  providers: { mark: Boxes },
   permissionManual: { mark: Pause },
   permissionEdits: { mark: PenLine },
   permissionAuto: { mark: FastForward },
@@ -139,23 +147,18 @@ const REGISTRY = {
 
   // — Message actions -----------------------------------------------------
   copy: { mark: Copy },
-  retry: { mark: RotateCw, motion: WIND },
   edit: { mark: Pencil },
   fork: { mark: Split },
   readAloud: { mark: Volume2 },
-  // The player controls a spoken message earns. Circled, because the bare
-  // Pause is already the manual permission mode's mark — one mark means one
-  // concept — and a circle is what a media player puts around a transport
-  // control anyway.
-  play: { mark: CirclePlay },
-  pause: { mark: CirclePause },
 
   // — Composer ------------------------------------------------------------
   add: { mark: Plus, motion: CROSS },
   attach: { mark: Paperclip },
   dictate: { mark: Mic },
   send: { mark: ArrowUp, motion: LIFT },
-  stop: { mark: Square },
+  // `stop`, `play` and `pause` are not here either: they are the drawn
+  // transport, the one solid family in the app, and Lucide has no filled mark
+  // of any kind to take them from. See `drawn.tsx`, and `Icons` below.
 
   // — Capabilities --------------------------------------------------------
   goal: { mark: Target },
@@ -184,10 +187,16 @@ const REGISTRY = {
   // — Artifacts -----------------------------------------------------------
   // Marks for things the model produced. `image` already exists above and is
   // deliberately not repeated here.
+  //
+  // `artifact` is the one every kind falls back to, and it used to be `goal`.
+  // That put the app's picture of "a standing aim for this conversation" on the
+  // rail tab, the generic renderer and the arriving placeholder — a target
+  // beside a piece of mail — so the mark meant an intention in one place and a
+  // produced object in three others. A plain container is the fallback because
+  // the fallback's whole claim is that it does not know what is inside.
+  artifact: { mark: Box },
   video: { mark: Clapperboard },
   file: { mark: FileText },
-  mail: { mark: Mail },
-  calendar: { mark: CalendarDays },
   link: { mark: Link2 },
   generate: { mark: Sparkles },
 
@@ -201,13 +210,12 @@ const REGISTRY = {
      happens. */
   openLarger: { mark: Maximize2 },
 
-  // — Agents ---------------------------------------------------------------
-  agent: { mark: Bot },
-  agents: { mark: Users },
-
   // — Confirmation and destructive ----------------------------------------
   check: { mark: Check },
-  succeeded: { mark: CircleCheck },
+  // Turning something off that stays installed. Not `permissionManual`, which
+  // is a Pause and belongs to the execution modes: a provider you switched off
+  // is not a provider waiting to be asked about.
+  disable: { mark: Ban },
   failed: { mark: CircleAlert },
   pin: { mark: Pin },
   delete: { mark: Trash2, motion: LIFT_LID },
@@ -257,5 +265,8 @@ export const Icons = {
   ) as Record<keyof typeof REGISTRY, ReturnType<typeof fromLucide>>),
   sidebar: SidebarToggle,
   voice: VoiceWave,
+  stop: StopSquare,
+  play: PlayTriangle,
+  pause: PauseBars,
 }
 

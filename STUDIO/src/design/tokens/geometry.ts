@@ -48,6 +48,13 @@ export const RADIUS = {
  * exact integers at the default rather than a rounded decimal here and an
  * unrounded `calc()` there.
  *
+ * `Math.round` matches the `round()` the CSS side now applies, and at the 12px
+ * default it changes nothing — every step there is already whole. It is here so
+ * the two sides stay the same function of `--ui-size` rather than agreeing by
+ * coincidence at one setting, which is the failure this block was written to
+ * prevent and which the missing rounding reintroduced: the CSS was rounding and
+ * this was not, so at 13px they would have disagreed by two thirds of a pixel.
+ *
  * That drift is worth naming, because it is what "changing the font size did
  * nothing" actually was. Text was driven by `--ui-size`; these numbers were
  * fixed px from when the interface text was 14. Nothing recomputed them at 12,
@@ -58,11 +65,11 @@ export const CONTROL = {
   /** Compact: row overflow buttons, menu affordances. */
   sm: (DEFAULT_UI_SIZE * 2) / 1,
   /** The default: icon buttons in the chrome, and the composer's row. */
-  md: (DEFAULT_UI_SIZE * 7) / 3,
+  md: Math.round((DEFAULT_UI_SIZE * 7) / 3),
   /** The largest round control in the chrome. */
-  lg: (DEFAULT_UI_SIZE * 8) / 3,
+  lg: Math.round((DEFAULT_UI_SIZE * 8) / 3),
   /** The stage control: voice mode's transport, and nothing else. */
-  xl: (DEFAULT_UI_SIZE * 11) / 3,
+  xl: Math.round((DEFAULT_UI_SIZE * 11) / 3),
 } as const
 
 /** The 4px spacing grid. Nothing in the app uses a value that is not here. */
