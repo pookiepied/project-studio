@@ -222,14 +222,17 @@ function ConnectionRow({
             case for a self-hosted endpoint.
 
             This row used to wrap the mark in a tile of its own. The mark brings
-            its own now, so the wrapper would have been a tile inside a tile;
-            what is left here is the colour the mark inherits. A disabled
-            connection is dimmed rather than removed or struck through: it still
-            exists, still holds its key, and is one menu click from working
-            again. */}
+            its own now, so the wrapper would have been a tile inside a tile.
+
+            A disabled connection is dimmed rather than removed or struck
+            through: it still exists, still holds its key, and is one menu click
+            from working again. Dimmed by opacity rather than by a text colour,
+            because the mark now carries its vendor's own colour and a colour
+            set from out here would replace it -- every disabled row would go
+            grey, which is the same grey an unbranded vendor already wears. */}
         <ProviderMark
           provider={record.catalogProvider ?? ''}
-          className={cn(record.enabled ? 'text-foreground' : 'text-muted-foreground/60')}
+          className={cn(record.enabled ? null : 'opacity-50')}
         />
 
         <div className="min-w-0 flex-1">

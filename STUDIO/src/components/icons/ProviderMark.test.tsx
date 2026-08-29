@@ -96,7 +96,7 @@ describe('the tile', () => {
 })
 
 describe('the real logo', () => {
-  it('replaces the monogram when the harness has one, in the theme colour', async () => {
+  it('replaces the monogram when the harness has one, wearing the vendor colour', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: URL | string) => {
@@ -130,9 +130,10 @@ describe('the real logo', () => {
     })
     const mark = container.querySelector<HTMLSpanElement>('span[data-provider="deepseek"]')
     expect(mark?.getAttribute('data-mark')).toBe('logo')
-    // DeepSeek is the vendor that used to prove the colour table worked here,
-    // which makes it the one that proves the table is gone.
+    // The mask paints `currentColor`, and the colour it resolves against is
+    // the tile's -- DeepSeek's own, here.
     expect(mark?.style.backgroundColor).toBe('currentcolor')
+    expect((container.firstElementChild as HTMLElement).style.color).toBe('var(--brand-deepseek)')
   })
 
   it('wears the theme colour for an unknown vendor too', async () => {
@@ -184,5 +185,46 @@ describe('the real logo', () => {
     // The mask path never ran. Asserted on `data-mark` rather than on the
     // element name, which no longer separates them: a monogram is a span too.
     expect(container.querySelector('[data-mark="logo"]')).toBeNull()
+  })
+})
+
+describe('brand colour', () => {
+  /**
+   * The paint, which is a table lookup rather than anything in the artwork.
+   *
+   * The logos are `currentColor` masks with no fill of their own, so the paint
+   * has to come from the element. It is set once on the tile and inherited by
+   * whichever of the three marks is showing, which is why these assert on the
+   * tile rather than on the mark.
+   */
+  const tileOf = (container: HTMLElement) => container.firstElementChild as HTMLElement
+
+  it('paints a known vendor with its own brand variable', () => {
+    const { container } = render(<ProviderMark provider="anthropic" />)
+    expect(tileOf(container).style.color).toBe('var(--brand-anthropic)')
+  })
+
+  it('leaves a vendor with no known colour on the theme', () => {
+    const { container } = render(<ProviderMark provider="nousresearch" />)
+    expect(tileOf(container).style.color).toBe('var(--muted-foreground)')
+  })
+
+  it('reads a routing variant as the vendor it is a variant of', () => {
+    const { container } = render(<ProviderMark provider="~anthropic" />)
+    expect(tileOf(container).style.color).toBe('var(--brand-anthropic)')
+  })
+
+  it('never builds a variable name out of the vendor string', () => {
+    // The prop is an arbitrary catalog value. Were it interpolated into the
+    // property name, this would reach `--foreground` and paint from it.
+    const { container } = render(<ProviderMark provider="foreground) var(--x" />)
+    expect(tileOf(container).style.color).toBe('var(--muted-foreground)')
+  })
+
+  it('lets the mark inherit the tile rather than keeping its own colour', () => {
+    // `.studio-icon` sets a colour of its own, and without this the brand
+    // colour would stop at the tile and never reach the logo inside it.
+    const { container } = render(<ProviderMark provider="anthropic" />)
+    expect(container.querySelector<HTMLElement>('[data-mark]')?.style.color).toBe('inherit')
   })
 })
