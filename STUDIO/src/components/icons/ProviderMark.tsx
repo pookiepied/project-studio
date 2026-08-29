@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { siAnthropic, siDeepseek, siGooglegemini, siMeta, siMistralai } from 'simple-icons'
 import { ICON_STEP, type IconSize } from '@/design/tokens'
 import { resolveProviderIcon } from '@/domain/providers/icons'
 import { cn } from '@/lib/cn'
@@ -45,14 +44,26 @@ import { cn } from '@/lib/cn'
  *
  * ---- Where the shapes come from --------------------------------------------
  *
- * Simple Icons ships each brand as a single path with no baked-in colour,
- * which is exactly the shape this app can use. Each is imported by name so the
- * bundler drops the other three thousand.
+ * One source: the harness, which serves the vendors' actual logos from
+ * models.dev and caches them on this machine.
  *
- * The harness serves the vendors' actual logos too (models.dev, cached on
- * disk), and those SVGs are monochrome `currentColor` by design — drop one
- * into an `<img>` and it renders black everywhere, ignoring the theme. So the
- * logo is not an image here: it becomes a CSS mask on a span and the span's
+ * There were two for a while. Five brand paths were bundled from Simple Icons
+ * as an offline floor beneath the harness lookup, and measuring the two
+ * sources against each other ended the argument: models.dev publishes 207
+ * providers and has a real logo for 190 of them, including every vendor
+ * Simple Icons lacks — OpenAI, xAI, Groq, Cohere, Together, Fireworks. The
+ * bundled five were a strictly smaller copy of a set we already had, and the
+ * floor they were holding up is a floor nobody stands on: every surface that
+ * draws a provider mark is a model picker or the Providers pane, and both of
+ * those render "no harness is connected" when the harness is not running.
+ * Nothing was being caught.
+ *
+ * What remains is the honest shape of the problem. The harness answers, or
+ * nobody does.
+ *
+ * Those SVGs are monochrome `currentColor` by design — drop one into an
+ * `<img>` and it renders black everywhere, ignoring the theme. So the logo is
+ * not an image here: it becomes a CSS mask on a span and the span's
  * background is `currentColor`, which puts it under the same rule as every
  * other mark in the app. A mask image cannot execute anything, so the SVG
  * needs no sanitising to be safe.
@@ -80,57 +91,21 @@ import { cn } from '@/lib/cn'
  * abstract figure is. It is what GitHub, Slack and Linear show for an
  * organisation whose avatar they do not have.
  *
- * Drawing the OpenAI knot ourselves is still not on the table, for the reason
- * it never was: reproducing the trademark whose removal from Simple Icons was
- * requested is the kind of thing that has to be undone later, publicly. When
- * the harness serves a real OpenAI logo, that logo is used; otherwise it is an
- * O, which claims nothing.
- */
-
-/**
- * The vendors this app has a mark for.
+ * Who actually falls through to a letter is worth being precise about, because
+ * it is a much smaller set than it looks. models.dev names providers, but most
+ * marks here are drawn for a model's *author* — the first segment of an
+ * OpenRouter id. Measured against OpenRouter's live list: 58 distinct authors,
+ * of which 19 are already models.dev ids and nine more are aliased to one in
+ * the harness. OpenAI is not in the remainder; neither is xAI, Qwen or Moonshot.
+ * What is left is Baidu, Writer, Liquid, AI21, Reka, the community fine-tuners,
+ * and any endpoint someone is running themselves — vendors for whom no logo
+ * exists to find, rather than ones we failed to look up.
  *
- * Closed, and it stays closed — it is a list of drawings we possess, not a
- * list of providers that may exist. The offline catalog in `domain/models`
- * types its rows against this because that catalog *is* these six; a harness
- * connection does not, because a user can point one at any vendor in the
- * world and most of them are not here. See `markFor` for how that gap is
- * closed at the boundary, and audit finding FE-05 for why it was a bug that
- * the two ever shared one type.
+ * Drawing a mark ourselves for that remainder is not on the table, for the
+ * reason it never was: an invented figure in a row of real logos reads as a
+ * missing asset, and reproducing a trademark is the kind of thing that has to
+ * be undone later, publicly.
  */
-const PROVIDER_IDS = [
-  'anthropic',
-  'openai',
-  'google',
-  'meta',
-  'deepseek',
-  'mistral',
-  'custom',
-] as const
-
-export type ProviderId = (typeof PROVIDER_IDS)[number]
-
-/**
- * The brand path for a vendor, or `null` when there is none to import.
- *
- * Shapes only. The colour that used to sit beside each path is gone, and with
- * it a defect worth naming: Google carried Gemini's purple here and Google's
- * blue in the colour table, so the same vendor rendered in two different
- * colours depending on whether the harness had resolved a logo yet — a
- * difference the user could not see the cause of.
- *
- * Google still resolves to the Gemini mark rather than the four-colour "G":
- * the "G" is the company, and what is being named here is the model family.
- */
-const BRAND: Record<ProviderId, string | null> = {
-  anthropic: siAnthropic.path,
-  google: siGooglegemini.path,
-  meta: siMeta.path,
-  deepseek: siDeepseek.path,
-  mistral: siMistralai.path,
-  openai: null,
-  custom: null,
-}
 
 /**
  * The letter a vendor with no logo is shown as.
@@ -155,45 +130,21 @@ function monogramFor(provider: string): string | null {
  * The mark for a vendor that has neither a logo nor a name to take a letter
  * from: an empty tile, which is exactly what is known about it.
  *
- * The one drawn figure left in this file, and it is not standing in for a
- * brand — it is the absence of one. Stroked on the same 24-unit grid as the
- * brand paths so it sits at their optical weight.
+ * The one drawn figure in this file, and it is not standing in for a brand —
+ * it is the absence of one. Stroked on a 24-unit grid so it sits at the
+ * optical weight of the logos it appears beside.
  */
 const UNNAMED = (
   <rect x="4" y="4" width="16" height="16" rx="4.5" fill="none" stroke="currentColor" strokeWidth="2" />
 )
 
 /**
- * A vendor name to the mark that stands for it.
- *
- * The prop is a `string` rather than `ProviderId` because the value that
- * arrives here for a harness connection is `catalogProvider` — the vendor a
- * connection draws its models from — and that field is open by contract: it
- * is whatever the built-in catalog calls the vendor, or absent entirely for a
- * self-hosted endpoint the catalog has never heard of. A closed union could
- * not name "together-ai" or "a box in the next room", so the component would
- * have had to be lied to at every call site.
- *
- * Note what must NOT be passed: a connection's `id`. That is the user's own
- * name for one account — "work-openai", "spare-key" — and the harness keeps
- * it deliberately separate from the vendor for exactly this reason.
- *
- * Anything unrecognised, including the empty string, resolves to `custom`.
- * A missing drawing is not an error worth a crash on a settings page.
- */
-function markFor(provider: string): ProviderId {
-  for (const id of PROVIDER_IDS) if (id === provider) return id
-  return 'custom'
-}
-
-/**
  * The real logo for one vendor id, or null while unknown.
  *
- * The drawn marks are the floor and render immediately; this upgrades to the
- * vendor's real logo when the harness has one (models.dev, cached on disk).
- * Null is cached as firmly as a success - most of the two hundred OpenRouter
- * authors have no logo anywhere, and a picker must not re-ask for them on
- * every render.
+ * The monogram renders immediately and this upgrades to the vendor's real
+ * logo when the harness has one (models.dev, cached on disk). Null is cached
+ * as firmly as a success - a community fine-tuner has no logo anywhere, and a
+ * picker must not re-ask for them on every render.
  */
 function useProviderIconDataUri(provider: string): string | null {
   const [uri, setUri] = useState<string | null>(null)
@@ -225,14 +176,18 @@ export function ProviderMark({
   // Sized from its text like every other mark, so a provider badge beside a
   // model name matches that name rather than a step chosen at the call site.
   const box = size === 'text' ? '1.1em' : ICON_STEP[size]
-  const id = markFor(provider)
-  const brand = BRAND[id]
   const realIcon = useProviderIconDataUri(provider)
 
-  // The real logo, when one resolved, replaces the drawn mark outright - and
-  // keeps the same `data-provider` resolution, so nothing observing which
-  // vendor a row names can tell the difference between the two sources. It is
-  // a mask rather than an image because the source SVGs are monochrome
+  // `data-provider` is the vendor string exactly as it arrived. It used to be
+  // the result of bucketing that string into a seven-value union, which threw
+  // away the answer at the moment it became interesting: a `qwen` row and a
+  // self-hosted box both reported `custom`, so neither an inspector nor a test
+  // could tell which vendor a mark was actually naming. `data-mark` says which
+  // source answered, which is not otherwise recoverable now that a logo and a
+  // monogram are both spans.
+  //
+  // The real logo, when one resolved, replaces the monogram outright. It is a
+  // mask rather than an image because the source SVGs are monochrome
   // `currentColor`; the background is what paints through it, and it is
   // `currentColor` for every vendor without exception.
   if (realIcon !== null) {
@@ -254,71 +209,59 @@ export function ProviderMark({
           maskPosition: 'center',
           WebkitMaskPosition: 'center',
         }}
-        data-provider={id}
+        data-provider={provider}
         className={cn('studio-icon shrink-0', className)}
       />
     )
   }
 
-  // No importable brand path: the vendor's initial, in the interface face at
-  // the mark's own size. A span rather than SVG `<text>`, which measures
-  // against whatever font happens to have loaded and is a well-known way to
-  // ship a glyph that jumps on first paint.
-  if (brand === null) {
-    const letter = monogramFor(provider)
-    if (letter !== null) {
-      return (
-        <span
-          aria-hidden
-          data-provider={id}
-          data-mark="monogram"
-          className={cn('studio-icon inline-flex shrink-0 items-center justify-center', className)}
-          style={{
-            width: box,
-            height: box,
-            // Sized from the mark's box rather than the surrounding text, so a
-            // monogram and a logo beside it are the same height. Inter's cap
-            // height is a shade over 0.7em, which puts the letter at about the
-            // fill of a brand path in the same square.
-            fontSize: box,
-            lineHeight: 1,
-            fontWeight: 500,
-            // Ids are lower-case and letters are not evenly weighted; a little
-            // negative tracking stops a wide cap sitting off its own centre.
-            letterSpacing: '-0.02em',
-            userSelect: 'none',
-          }}
-        >
-          {letter}
-        </span>
-      )
-    }
+  // No logo: the vendor's initial, in the interface face at the mark's own
+  // size. A span rather than SVG `<text>`, which measures against whatever
+  // font happens to have loaded and is a well-known way to ship a glyph that
+  // jumps on first paint.
+  const letter = monogramFor(provider)
+  if (letter !== null) {
+    return (
+      <span
+        aria-hidden
+        data-provider={provider}
+        data-mark="monogram"
+        className={cn('studio-icon inline-flex shrink-0 items-center justify-center', className)}
+        style={{
+          width: box,
+          height: box,
+          // Sized from the mark's box rather than the surrounding text, so a
+          // monogram and a logo beside it are the same height. Inter's cap
+          // height is a shade over 0.7em, which puts the letter at about the
+          // fill of a brand path in the same square.
+          fontSize: box,
+          lineHeight: 1,
+          fontWeight: 500,
+          // Ids are lower-case and letters are not evenly weighted; a little
+          // negative tracking stops a wide cap sitting off its own centre.
+          letterSpacing: '-0.02em',
+          userSelect: 'none',
+        }}
+      >
+        {letter}
+      </span>
+    )
   }
 
+  // Neither a logo nor a name to take a letter from.
   return (
     <svg
       style={{ width: box, height: box }}
       viewBox="0 0 24 24"
       aria-hidden
       // The mark is decorative, so it carries no accessible name and the row
-      // beside it does the naming. This says which drawing was resolved, which
-      // is the one thing an inspector or a test cannot otherwise recover from
-      // a path element. `data-mark` says which of the three sources answered,
-      // which used to be inferable from the element name and is not any more:
-      // a logo and a monogram are both spans.
-      data-provider={id}
-      data-mark={brand === null ? 'unnamed' : 'brand'}
+      // beside it does the naming.
+      data-provider={provider}
+      data-mark="unnamed"
       shapeRendering="geometricPrecision"
       className={cn('studio-icon shrink-0', className)}
     >
-      {brand === null ? (
-        UNNAMED
-      ) : (
-        // The brand paths are solid shapes, so they fill rather than stroke —
-        // and they must not inherit the `non-scaling-stroke` treatment meant for
-        // outlined marks, which is why `stroke` is explicitly none.
-        <path d={brand} fill="currentColor" stroke="none" />
-      )}
+      {UNNAMED}
     </svg>
   )
 }

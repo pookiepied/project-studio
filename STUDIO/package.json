@@ -34,7 +34,6 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "simple-icons": "^16.28.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3"
   },

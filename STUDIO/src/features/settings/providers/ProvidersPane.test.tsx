@@ -202,18 +202,20 @@ describe('the list', () => {
     expect(screen.getByText('Disabled')).toBeTruthy()
   })
 
-  it('falls back to the custom mark for a vendor it has no drawing for', async () => {
+  it('marks each row with the vendor it actually names', async () => {
     harnessConfigured()
     const { container } = render(<ProvidersPane />)
     stubFetch()
 
     await screen.findByText('The box next door')
 
-    // `catalogProvider: 'anthropic'` is known; 'together-ai' is not, and the
-    // closed union this used to be typed as could not have expressed it.
+    // Both rows report their own `catalogProvider`. `together-ai` used to be
+    // bucketed into `custom` here, which meant a row could not say which
+    // vendor it was for once the vendor was outside a seven-name union -- and
+    // the vendors outside it are most of them.
     expect(container.querySelector('[data-provider="anthropic"]')).not.toBeNull()
-    expect(container.querySelector('[data-provider="together-ai"]')).toBeNull()
-    expect(container.querySelector('[data-provider="custom"]')).not.toBeNull()
+    expect(container.querySelector('[data-provider="together-ai"]')).not.toBeNull()
+    expect(container.querySelector('[data-provider="custom"]')).toBeNull()
   })
 
   it('probes on demand and reports latency', async () => {
