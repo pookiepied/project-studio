@@ -64,6 +64,37 @@ describe('the mark before a logo arrives', () => {
   })
 })
 
+describe('the tile', () => {
+  /**
+   * The geometry, which is the whole reason a brand logo is not an icon.
+   *
+   * A vendor logo carries roughly ten times the detail of a Lucide glyph, so
+   * sizing it at `1.1em` like the marks beside it put OpenAI's eight-stroke
+   * knot into thirteen pixels, where every stroke lands under one device pixel.
+   * The step is its own now, and the tile is what makes a dense logo, a simple
+   * one and a fallback letter occupy one slot instead of three shapes.
+   */
+  it('puts every mark in a tile that is larger than the mark', () => {
+    const { container } = render(<ProviderMark provider="anthropic" />)
+    const tile = container.firstElementChild as HTMLElement
+    const mark = container.querySelector<HTMLElement>('[data-mark]')
+
+    expect(tile.style.width).toBe('var(--provider-tile)')
+    expect(mark?.style.width).toBe('var(--provider-mark)')
+    // Not `1.1em`: the mark is deliberately no longer sized from its text.
+    expect(mark?.style.width).not.toContain('em')
+  })
+
+  it('gives the fallback letter the same slot a logo gets', () => {
+    // The ragged column is the thing the tile exists to prevent, so the
+    // fallback must not opt out of it.
+    const { container } = render(<ProviderMark provider="nousresearch" />)
+    const tile = container.firstElementChild as HTMLElement
+    expect(tile.style.width).toBe('var(--provider-tile)')
+    expect(container.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('monogram')
+  })
+})
+
 describe('the real logo', () => {
   it('replaces the monogram when the harness has one, in the theme colour', async () => {
     vi.stubGlobal(

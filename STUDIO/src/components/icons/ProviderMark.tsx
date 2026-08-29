@@ -173,9 +173,13 @@ export function ProviderMark({
   size?: IconSize
   className?: string
 }) {
-  // Sized from its text like every other mark, so a provider badge beside a
-  // model name matches that name rather than a step chosen at the call site.
-  const box = size === 'text' ? '1.1em' : ICON_STEP[size]
+  // `text` is the ordinary case and it is deliberately NOT text-sized: see the
+  // note on `--provider-mark` in `index.css` for why a brand logo cannot be
+  // sized like a Lucide glyph. The named steps stay available for the two
+  // places that want a larger mark, and the tile keeps its ratio to whichever
+  // step was asked for so the slot never changes shape.
+  const mark = size === 'text' ? 'var(--provider-mark)' : ICON_STEP[size]
+  const tile = size === 'text' ? 'var(--provider-tile)' : `calc(${ICON_STEP[size]} * 1.32)`
   const realIcon = useProviderIconDataUri(provider)
 
   // `data-provider` is the vendor string exactly as it arrived. It used to be
@@ -186,19 +190,22 @@ export function ProviderMark({
   // source answered, which is not otherwise recoverable now that a logo and a
   // monogram are both spans.
   //
-  // The real logo, when one resolved, replaces the monogram outright. It is a
-  // mask rather than an image because the source SVGs are monochrome
-  // `currentColor`; the background is what paints through it, and it is
-  // `currentColor` for every vendor without exception.
-  if (realIcon !== null) {
-    return (
+  // Both live on the mark rather than on the tile, because the mark is the
+  // thing that varies and the tile is the thing that does not.
+  const inner =
+    realIcon !== null ? (
+      // The real logo. A mask rather than an image because the source SVGs are
+      // monochrome `currentColor`; the background is what paints through it,
+      // and it is `currentColor` for every vendor without exception.
       <span
         aria-hidden
         draggable={false}
+        data-provider={provider}
         data-mark="logo"
+        className="studio-icon shrink-0"
         style={{
-          width: box,
-          height: box,
+          width: mark,
+          height: mark,
           backgroundColor: 'currentColor',
           maskImage: `url("${realIcon}")`,
           WebkitMaskImage: `url("${realIcon}")`,
@@ -209,32 +216,48 @@ export function ProviderMark({
           maskPosition: 'center',
           WebkitMaskPosition: 'center',
         }}
-        data-provider={provider}
-        className={cn('studio-icon shrink-0', className)}
       />
+    ) : (
+      <Fallback provider={provider} mark={mark} />
     )
-  }
 
-  // No logo: the vendor's initial, in the interface face at the mark's own
-  // size. A span rather than SVG `<text>`, which measures against whatever
-  // font happens to have loaded and is a well-known way to ship a glyph that
-  // jumps on first paint.
+  // The tile. It is what makes a column of vendors read as one list: a dense
+  // logo, a simple one and a letter all occupy the same slot at the same size,
+  // so the eye tracks a single edge down the column instead of a ragged one.
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-md bg-tint',
+        className,
+      )}
+      style={{ width: tile, height: tile }}
+    >
+      {inner}
+    </span>
+  )
+}
+
+/** A vendor with no logo: its initial, or an empty tile when it has no name. */
+function Fallback({ provider, mark }: { provider: string; mark: string }) {
+  // A span rather than SVG `<text>`, which measures against whatever font
+  // happens to have loaded and is a well-known way to ship a glyph that jumps
+  // on first paint.
   const letter = monogramFor(provider)
   if (letter !== null) {
     return (
       <span
-        aria-hidden
         data-provider={provider}
         data-mark="monogram"
-        className={cn('studio-icon inline-flex shrink-0 items-center justify-center', className)}
+        className="studio-icon inline-flex shrink-0 items-center justify-center"
         style={{
-          width: box,
-          height: box,
+          width: mark,
+          height: mark,
           // Sized from the mark's box rather than the surrounding text, so a
           // monogram and a logo beside it are the same height. Inter's cap
           // height is a shade over 0.7em, which puts the letter at about the
           // fill of a brand path in the same square.
-          fontSize: box,
+          fontSize: mark,
           lineHeight: 1,
           fontWeight: 500,
           // Ids are lower-case and letters are not evenly weighted; a little
@@ -251,15 +274,12 @@ export function ProviderMark({
   // Neither a logo nor a name to take a letter from.
   return (
     <svg
-      style={{ width: box, height: box }}
+      style={{ width: mark, height: mark }}
       viewBox="0 0 24 24"
-      aria-hidden
-      // The mark is decorative, so it carries no accessible name and the row
-      // beside it does the naming.
       data-provider={provider}
       data-mark="unnamed"
       shapeRendering="geometricPrecision"
-      className={cn('studio-icon shrink-0', className)}
+      className="studio-icon shrink-0"
     >
       {UNNAMED}
     </svg>

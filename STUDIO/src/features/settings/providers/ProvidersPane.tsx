@@ -218,19 +218,19 @@ function ConnectionRow({
       <div className="flex items-start gap-2.5">
         {/* The mark is resolved from `catalogProvider`, the vendor whose model
             list applies - never from `id`, which is this connection's own name.
-            A vendor the app has no drawing for falls back to the custom mark,
-            which is the normal case for a self-hosted endpoint. */}
-        <span
-          className={cn(
-            'flex size-7 shrink-0 items-center justify-center rounded-md bg-selected',
-            // A disabled connection is dimmed rather than removed or struck
-            // through: it still exists, still holds its key, and is one menu
-            // click from working again.
-            record.enabled ? 'text-foreground' : 'text-muted-foreground/60',
-          )}
-        >
-          <ProviderMark provider={record.catalogProvider ?? ''} />
-        </span>
+            A vendor with no logo falls back to its initial, which is the normal
+            case for a self-hosted endpoint.
+
+            This row used to wrap the mark in a tile of its own. The mark brings
+            its own now, so the wrapper would have been a tile inside a tile;
+            what is left here is the colour the mark inherits. A disabled
+            connection is dimmed rather than removed or struck through: it still
+            exists, still holds its key, and is one menu click from working
+            again. */}
+        <ProviderMark
+          provider={record.catalogProvider ?? ''}
+          className={cn(record.enabled ? 'text-foreground' : 'text-muted-foreground/60')}
+        />
 
         <div className="min-w-0 flex-1">
           <p className={cn('text-ui', record.enabled ? 'text-foreground' : 'text-muted-foreground')}>

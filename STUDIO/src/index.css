@@ -103,6 +103,36 @@
   --icon-md: calc(var(--ui-size) + 3px);
   --icon-lg: calc(var(--ui-size) + 9px);
 
+  /* -- The provider mark, which is not an icon --------------------------------
+
+     A brand logo sized as text, at 1.1em, is unreadable, and the reason is
+     arithmetic rather than taste. Our marks come from Lucide, drawn at two or
+     three strokes precisely so they survive at 12px. A vendor logo is drawn
+     for a business card: OpenAI's knot is about eight interlocking strokes
+     across its width, so at 13px each stroke lands under one device pixel and
+     the mark is a smudge. Measured across the twenty vendors we cache, the
+     ones that survive at 1.1em are exactly the ones with three strokes or
+     fewer -- Anthropic, Meta, Google, Groq. Everything denser fails.
+
+     So the mark gets its own step, deliberately larger than the text beside
+     it, and a tile to sit in. The tile is doing real work: it gives every
+     vendor the same silhouette, so a dense logo, a simple one and a fallback
+     letter all occupy one identity slot rather than three different-looking
+     shapes in a column. It is also what stops the fix from being "make the
+     interface bigger" -- the type scale does not move at all.
+
+     1.4x and 1.85x of the interface text. Whole pixels at every setting, for
+     the reason `--control-*` is rounded below: a fractional box snaps its
+     painted background to the device grid and the mask inside it does not, so
+     the logo drifts off the centre of its own tile.
+
+     Declared unrounded here and rounded in the `@supports` block below, for
+     the reason stated there: a custom property holding a function the browser
+     does not know is stored as-is and only found invalid when it is
+     substituted, which leaves the property unset rather than falling back. */
+  --provider-mark: calc(var(--ui-size) * 1.4);
+  --provider-tile: calc(var(--ui-size) * 1.85);
+
   /* -- Control geometry ------------------------------------------------------
 
      The other half of the type scale, and the half that was missing.
@@ -185,6 +215,12 @@
     --control-md: round(calc(var(--ui-size) * 7 / 3), 1px);
     --control-lg: round(calc(var(--ui-size) * 8 / 3), 1px);
     --control-xl: round(calc(var(--ui-size) * 11 / 3), 1px);
+
+    /* The provider mark and its tile, for the same reason and one more: the
+       mark is painted as a CSS mask over a background, and a mask on a
+       fractional box resamples the logo off the pixel grid every render. */
+    --provider-mark: round(calc(var(--ui-size) * 1.4), 1px);
+    --provider-tile: round(calc(var(--ui-size) * 1.85), 1px);
   }
 }
 
