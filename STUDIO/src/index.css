@@ -282,6 +282,10 @@
 
   --duration-fast: 120ms;
   --duration-base: 180ms;
+  /* The third step, present in `DURATION` and in RULES.md from the start but
+     never carried into the CSS -- a CSS transition on a whole surface had no
+     variable to name and fell back to `base`. */
+  --duration-slow: 260ms;
 
   /* -- Elevation ------------------------------------------------------------
 
@@ -333,6 +337,10 @@
 
 @utility duration-base {
   transition-duration: var(--duration-base);
+}
+
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
 }
 
 /* ---------------------------------------------------------------------------

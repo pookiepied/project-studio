@@ -12,6 +12,7 @@ import {
   CatalogStateNote,
   type CatalogState,
 } from '@/features/models/CatalogStateNote'
+import { ModelListSkeleton } from '@/features/models/ModelListSkeleton'
 import { REASONING_LEVEL_NOTES, type ReasoningChoice } from '@/domain/models/types'
 import { cn } from '@/lib/cn'
 
@@ -128,7 +129,14 @@ export function ModelLibraryDialog({
           ) : null}
           <div className="studio-scroll-bounded min-h-0 flex-1 overflow-y-auto pr-1">
             {catalog.phase.status !== 'ready' ? (
-              <CatalogStateNote catalog={catalog} />
+              // Loading holds the list's shape (`ModelListSkeleton`); the other
+              // named states keep their sentence -- a menu that cannot be read
+              // says so, it does not preview rows that are not coming.
+              catalog.phase.status === 'loading' ? (
+                <ModelListSkeleton />
+              ) : (
+                <CatalogStateNote catalog={catalog} />
+              )
             ) : groups.length === 0 ? (
               <p className="px-2 py-2 text-ui text-muted-foreground">
                 {query.trim() === ''

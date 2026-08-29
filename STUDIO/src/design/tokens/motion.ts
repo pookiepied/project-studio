@@ -48,17 +48,69 @@ export const FADE = {
 } as const
 
 /**
- * The view transition: a short rise on enter, a short fall on exit.
+ * How one surface hands over to the next.
  *
- * 6px, not 16. The distance is a hint that something replaced something else,
- * not a journey.
+ * ---- Why direction, and why these distances -------------------------------
+ *
+ * A page used to enter with a 6px rise and no exit at all: the old surface was
+ * destroyed in the same commit and the new one settled upward. On a switch
+ * between conversations that read as "too basic", and entering Settings it
+ * read as a rendering fault -- the rise compounded with a second rise the
+ * page itself played, and both ran while the sidebar's spring was resizing
+ * the container under them. Vertical motion on a horizontal handover is the
+ * specific thing that looks like a glitch rather than a choice, because
+ * nothing in the app's hierarchy is stacked vertically.
+ *
+ * The hierarchy *is* directional, though. Home sits under a project, a
+ * project under its conversations, and Settings is the deepest layer of all.
+ * So a handover is a move in that hierarchy, and the transition says which
+ * way you moved:
+ *
+ * - **push** -- drilling in. The new surface arrives from the right while the
+ *   old one leaves to the left, both sliding the way a page turns: forward.
+ * - **pop** -- coming back. The mirror image. Back is a different motion from
+ *   forward or the direction stops meaning anything.
+ * - **sibling** -- a lateral move between things at the same depth, such as
+ *   one conversation for another. No translation: a crossfade, with the
+ *   sidebar's sliding selection chip carrying the sense of travel.
+ *
+ * The distances are a fraction of a column, not a journey: 32px in, 24px out.
+ * Large enough to read as movement along an axis, small enough that the
+ * surface arriving is readable before it finishes arriving. Both moves share
+ * one duration and one curve, so the outgoing and incoming surfaces are
+ * unmistakably the same event seen from two sides.
+ *
+ * `initial`/`animate`/`exit`/`transition` spread directly onto the keyed
+ * surface element. The exiting element plays `exit` with the same transition,
+ * which is why one object serves both roles.
  */
-export const VIEW_TRANSITION = {
-  initial: { opacity: 0, y: 6 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -6 },
+export type SurfaceMove = 'push' | 'pop' | 'sibling'
+
+export const SURFACE_PUSH = {
+  initial: { opacity: 0, x: 32 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
+  transition: { duration: DURATION.slow, ease: EASE_OUT },
+} as const
+
+export const SURFACE_POP = {
+  initial: { opacity: 0, x: -32 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 24 },
+  transition: { duration: DURATION.slow, ease: EASE_OUT },
+} as const
+
+export const SURFACE_SIBLING = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
   transition: { duration: DURATION.base, ease: EASE_OUT },
 } as const
+
+/** The transition preset for a move between surfaces. */
+export function surfaceTransition(move: SurfaceMove) {
+  return move === 'push' ? SURFACE_PUSH : move === 'pop' ? SURFACE_POP : SURFACE_SIBLING
+}
 
 /**
  * A height collapse — a thinking block, a disclosure.

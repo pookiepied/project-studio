@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, RADIUS, SHELL, VIEW_TRANSITION } from '@/design/tokens'
+import { DURATION, EASE_OUT, RADIUS, SHELL, surfaceTransition } from '@/design/tokens'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
 import { CommandPalette } from '@/features/palette'
@@ -31,7 +31,7 @@ import { cn } from '@/lib/cn'
  * transcript paints square right through the rounded edge.
  */
 export function AppShell() {
-  const { route, sidebarOpen, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
+  const { route, move, sidebarOpen, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
     useNavigation()
   const compact = useCompactLayout()
   const { conversations, projects } = useWorkspace()
@@ -163,31 +163,50 @@ export function AppShell() {
         <TopStrip />
 
         {/*
-          Entrance only, and no `AnimatePresence`.
+          One surface handing over to the next, in the direction the hierarchy
+          moved (`move` comes from the navigation store; the presets come from
+          `surfaceTransition`).
 
-          The obvious construction here is `<AnimatePresence mode="wait">`, so
-          the outgoing surface finishes leaving before the next arrives. It is
-          the wrong trade twice over. It puts a full exit *and* a full enter --
-          360ms — between clicking a conversation and seeing it, which makes
-          switching conversations feel slow in a way no amount of easing fixes.
-          And it makes navigation depend on an animation completing: anything
-          that stalls the frame loop leaves the old surface mounted and the new
-          one never arrives, with no way for the user to recover.
+          ---- Why `AnimatePresence`, when the comment here said not to -----------
 
-          Keying a plain `motion.main` gives the part that was worth having.
-          The old surface goes immediately, the new one rises the same 6px, and
-          navigation cannot get stuck because nothing waits on anything.
+          This used to be a keyed `motion.main` with no AnimatePresence: the old
+          surface was destroyed in the same commit and only the new one played an
+          entrance. That decision was made against `mode="wait"`, and everything
+          it said about `wait` is still true -- sequencing a full exit and a full
+          enter doubles the cost of every navigation, and makes the arrival depend
+          on an animation completing.
+
+          The default mode has neither of those problems, and this is what it
+          buys: both surfaces are mounted for the length of the handover, so the
+          change is a crossfade rather than a cut-then-appear; the outgoing
+          surface animates on its own clock and unmounts when it is done, so
+          navigation still cannot be blocked by anything; and because both
+          surfaces carry the same duration and curve from one preset, the
+          handover reads as one event.
+
+          ---- Why the surfaces are absolutely positioned -------------------------
+
+          Both pages are `inset-0` for the same reason the old one was `h-full`:
+          the strip above them is already out of the flow, so the page *is* the
+          container. Stacked rather than flowed, the outgoing page fades out in
+          place instead of pushing the incoming one down the document -- two
+          `h-full` blocks in the flow would each be a full page tall, and the
+          container would double in height for a quarter second.
+
+          The keyed element is still the only outlet, and `Surface` is still
+          called rather than rendered -- see the note on `Surface` below. None of
+          that reasoning changed.
         */}
-        <motion.main
-          key={routeKey(route)}
-          initial={VIEW_TRANSITION.initial}
-          animate={VIEW_TRANSITION.animate}
-          transition={VIEW_TRANSITION.transition}
-          className="h-full"
-        >
-          {/* Called, not rendered as `<Surface />`. See the note on `Surface`. */}
-          {Surface({ route, conversations, projects })}
-        </motion.main>
+        <AnimatePresence initial={false}>
+          <motion.main
+            key={routeKey(route)}
+            {...surfaceTransition(move)}
+            className="absolute inset-0"
+          >
+            {/* Called, not rendered as `<Surface />`. See the note on `Surface`. */}
+            {Surface({ route, conversations, projects })}
+          </motion.main>
+        </AnimatePresence>
       </div>
 
       {/* Outside the page's rounded container, so the rail is a sibling of the

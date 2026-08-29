@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { SHELL, VIEW_TRANSITION } from '@/design/tokens'
+import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { paneFor } from '@/features/settings/panes/registry'
 import { findSection } from '@/features/settings/sections'
 
@@ -27,14 +28,31 @@ import { findSection } from '@/features/settings/sections'
  * was argued in and out of existence twice. The argument ended structurally:
  * the section tree lives in the sidebar column while Settings is the route
  * (see `SettingsTree`), so there is never a second navigation column to make
- * peace with, and this page is only the pane. Switching sections still plays
- * the short rise every other view change in the app plays.
+ * peace with, and this page is only the pane.
+ *
+ * ---- Why the pane fades only on a section change --------------------------
+ *
+ * This pane used to spread `VIEW_TRANSITION` -- the same entrance the shell's
+ * outlet plays. Entering Settings therefore played the entrance twice, stacked:
+ * two opacity ramps and two vertical offsets compounding into a hop that read
+ * as a rendering fault, not a transition. The page-level handover belongs to
+ * the shell (`AppShell`); this file animates only the one change it owns, the
+ * section switch, and a pure crossfade at that -- the sidebar's selection chip
+ * is already travelling to the new section while it plays, and a second moving
+ * part inside the pane would compete with it rather than join it.
  */
 const DEFAULT_SECTION = 'general'
 
 export function SettingsPage({ sectionId }: { sectionId: string }) {
   const section = findSection(sectionId) ?? findSection(DEFAULT_SECTION)
   const active = section?.id ?? DEFAULT_SECTION
+
+  // False during the mount, true ever after: the shell owns the entrance, and
+  // only a `key` change -- a section switch -- re-runs the one below.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+  }, [])
 
   return (
     <div
@@ -43,7 +61,9 @@ export function SettingsPage({ sectionId }: { sectionId: string }) {
     >
       <motion.div
         key={active}
-        {...VIEW_TRANSITION}
+        initial={mounted.current ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        transition={{ duration: DURATION.base, ease: EASE_OUT }}
         className="w-full pb-24"
         style={{ maxWidth: '36rem' }}
       >

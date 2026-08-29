@@ -20,8 +20,43 @@ export type SidebarOrganize = 'project' | 'list'
 /** The order conversations are listed in, inside whatever grouping is active. */
 export type SidebarSort = 'priority' | 'updated' | 'manual'
 
+/**
+ * How one route hands over to the next, along the app's own hierarchy: home
+ * sits under nothing, a project under home, a conversation under its project,
+ * and Settings is the deepest layer. Deeper is a push, shallower is a pop,
+ * and a lateral step between routes of the same kind is a sibling. The page
+ * transition reads this (`surfaceTransition` in `design/tokens/motion.ts`);
+ * the hierarchy, not the click, decides which way the surfaces travel.
+ */
+export type NavigationMove = 'push' | 'pop' | 'sibling'
+
+function routeDepth(route: Route): number {
+  switch (route.kind) {
+    case 'home':
+      return 0
+    case 'project':
+      return 1
+    case 'chat':
+      return 2
+    case 'settings':
+      return 3
+  }
+}
+
+/** Pure so the classification can be tested without mounting the provider. */
+export function moveBetween(previous: Route, next: Route): NavigationMove {
+  if (previous.kind === next.kind) return 'sibling'
+  return routeDepth(next) > routeDepth(previous) ? 'push' : 'pop'
+}
+
 interface NavigationValue {
   readonly route: Route
+  /**
+   * How the current route was reached from the one before it. Read together
+   * with `route` at the moment the surface changes; both update in the same
+   * commit, so the transition can never describe a handover it was not part of.
+   */
+  readonly move: NavigationMove
   readonly sidebarOpen: boolean
   readonly paletteOpen: boolean
   readonly sidebarOrganize: SidebarOrganize
@@ -44,6 +79,7 @@ const HOME: Route = { kind: 'home' }
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(HOME)
+  const [move, setMove] = useState<NavigationMove>('push')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   // Presentation of the sidebar rather than navigation proper, but it lives
@@ -81,6 +117,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       if (route.kind === 'settings' && next.kind !== 'settings' && !sidebarMoved) {
         setSidebarOpen(sidebarAtEntry)
       }
+      setMove(moveBetween(route, next))
       setRoute(next)
       setPaletteOpen(false)
     },
@@ -111,6 +148,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const value = useMemo<NavigationValue>(
     () => ({
       route,
+      move,
       sidebarOpen,
       paletteOpen,
       sidebarOrganize,
@@ -131,7 +169,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setSidebarOrganize,
       setSidebarSort,
     }),
-    [route, sidebarOpen, paletteOpen, sidebarOrganize, sidebarSort, go, openSettings, leaveSettings],
+    [route, move, sidebarOpen, paletteOpen, sidebarOrganize, sidebarSort, go, openSettings, leaveSettings],
   )
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>

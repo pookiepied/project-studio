@@ -7,6 +7,7 @@ import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
 import { SettingsTree } from '@/shell/sidebar/SettingsTree'
+import { SidebarSkeleton, SidebarUnavailable } from '@/shell/sidebar/SidebarStates'
 import { startWindowDrag } from '@/platform/tauri'
 import { useCompactLayout } from '@/shell/useCompactLayout'
 import { useNavigation } from '@/stores/navigation'
@@ -74,7 +75,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
     setSidebarOrganize,
     setSidebarSort,
   } = useNavigation()
-  const { projects, conversations } = useWorkspace()
+  const { projects, conversations, storePhase, ensureStore } = useWorkspace()
   const [sectionOpen, setSectionOpen] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -237,6 +238,15 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             <SettingsTree active={activeSection} onSelect={(sectionId) => openSettings(sectionId)} />
           ) : (
             <>
+              {/* A store that cannot be read says so, above the column it
+                  failed -- the note is the column's state, and the rows below
+                  it are whatever local rows exist. The loading skeleton lives
+                  further down, holding the rows' own place. The states and
+                  their argument live in `SidebarStates`. */}
+              {storePhase.status === 'no-harness' || storePhase.status === 'failed' ? (
+                <SidebarUnavailable phase={storePhase} onEnsure={ensureStore} />
+              ) : null}
+
               <div className="group/section flex items-center gap-0.5 px-1 pt-1.5 pb-1">
                 <button
                   type="button"
@@ -341,7 +351,14 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
               <AnimatePresence initial={false}>
                 {sectionOpen ? (
                   <motion.div {...COLLAPSE} className="overflow-hidden">
-                    {flat ? (
+                    {storePhase.status === 'loading' ? (
+                      // The rows' shape, where the rows will be. Above the
+                      // header would be a state claiming to be the column; in
+                      // here it is only the list holding its own place.
+                      <div className="pt-1">
+                        <SidebarSkeleton organize={sidebarOrganize} />
+                      </div>
+                    ) : flat ? (
                       <div className="flex flex-col gap-1">
                         {sorted.map((conversation) => (
                           <ConversationRow key={conversation.id} conversation={conversation} />

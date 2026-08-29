@@ -56,6 +56,10 @@ vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
     projects: [],
     conversations: [CONVERSATION],
+    // Ready, so the column shows the list rather than its states; the states
+    // themselves are held in `SidebarStates.test.tsx`.
+    storePhase: { status: 'ready', error: null },
+    ensureStore: vi.fn(async () => true),
     running: new Set<string>(),
     rename: vi.fn(),
     togglePin: vi.fn(),

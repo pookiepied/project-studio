@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Icons, ProviderMark } from '@/components/icons'
 import { Button, MenuItem, Popover } from '@/components/primitives'
-import type { HarnessFailure, ProviderConnection } from '@/platform/harness'
+import { Placeholder, PlaceholderMark, PlaceholderText } from '@/components/placeholder'
+import { StateNote } from '@/components/state'
+import type { ProviderConnection } from '@/platform/harness'
 import { Pane } from '@/features/settings/panes/Pane'
 import { CredentialBadge } from './CredentialBadge'
 import { ProbeLine } from './ProbeLine'
@@ -44,16 +46,23 @@ function PaneBody({ providers }: { providers: Providers }) {
   const { view } = providers
 
   if (view.status === 'loading') {
-    // No spinner. This is a request to a process on the same machine and the
-    // honest expectation is that it is already done; a spinner that flashes
-    // for 30ms is worse than a line of text that does not move.
-    return <p className="py-4 text-ui text-muted-foreground">Reading connections...</p>
+    return <ProviderListSkeleton />
   }
 
   if (view.status === 'no-harness') return <NoHarness />
 
   if (view.status === 'failed') {
-    return <LoadFailure error={view.error} onRetry={() => void providers.refresh()} />
+    return (
+      <StateNote
+        title="Could not read providers."
+        detail={view.error.message}
+        action={
+          <Button variant="secondary" size="sm" icon={<Icons.reload />} onClick={() => void providers.refresh()}>
+            Try again
+          </Button>
+        }
+      />
+    )
   }
 
   return <ProviderList providers={providers} />
@@ -72,16 +81,38 @@ function NoHarness() {
   )
 }
 
-function LoadFailure({ error, onRetry }: { error: HarnessFailure; onRetry: () => void }) {
+/**
+ * The connection rows, before the connections arrive.
+ *
+ * This used to be one line of prose, on the argument that a spinner flashing
+ * for 30ms is worse than a line of text that does not move -- an argument with
+ * the right conclusion and the wrong shape. The bones keep the same virtue and
+ * add the missing one: the mark, the two text lines and the check button hold
+ * the exact space the rows will occupy, so nothing jumps when they do. No
+ * spinner, still: a spinner measures nothing here, where the honest
+ * expectation is that a request to this machine is already done.
+ */
+function ProviderListSkeleton() {
+  const widths = [
+    { title: '38%', detail: '52%' },
+    { title: '31%', detail: '44%' },
+    { title: '42%', detail: '58%' },
+  ]
   return (
-    <div className="flex flex-col items-start gap-3 py-4">
-      <div>
-        <p className="text-ui text-foreground">Could not read providers.</p>
-        <p className="mt-0.5 text-caption text-muted-foreground">{error.message}</p>
-      </div>
-      <Button variant="secondary" size="sm" icon={<Icons.reload />} onClick={onRetry}>
-        Try again
-      </Button>
+    <div role="status" aria-label="Loading connections" className="py-1 text-ui">
+      {widths.map((row) => (
+        <div key={row.title} className="flex items-start gap-2.5 py-3">
+          <PlaceholderMark />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <PlaceholderText className={row.title} />
+            {/* Caption-sized: the second line of a real row is a caption, and
+                the skeleton holds its leading too, so the arrival of the rows
+                moves nothing. */}
+            <PlaceholderText className={`mt-0.5 h-[1.375em] ${row.detail}`} />
+          </div>
+          <Placeholder className="mt-0.5 h-7 w-16 shrink-0 rounded-md" />
+        </div>
+      ))}
     </div>
   )
 }

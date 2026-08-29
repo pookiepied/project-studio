@@ -1,5 +1,9 @@
+import { useState } from 'react'
 import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
+import { Button } from '@/components/primitives'
+import { PlaceholderText } from '@/components/placeholder'
+import { StateNote } from '@/components/state'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { StartConversation } from '@/features/chat/composer'
 import { useNavigation } from '@/stores/navigation'
@@ -18,10 +22,16 @@ import type { Project } from '@/domain/projects/types'
  * Sending goes to the harness through `StartConversation`, the same component
  * home uses: this is the other entry point, and the only thing it decides
  * differently is that a conversation started here belongs to this project.
+ *
+ * The conversation list answers to the store's phase, not to its own length:
+ * "Nothing here yet." while the index is still in flight would be a claim
+ * about an answer nobody has received, so the list holds the rows' shape until
+ * the read comes back, and says what went wrong if it fails.
  */
 export function ProjectPage({ project }: { project: Project }) {
-  const { conversations } = useWorkspace()
+  const { conversations, storePhase, ensureStore } = useWorkspace()
   const { openChat } = useNavigation()
+  const [asking, setAsking] = useState(false)
 
   const inProject = conversations
     .filter((conversation) => conversation.projectId === project.id && !conversation.archived)
@@ -75,7 +85,32 @@ export function ProjectPage({ project }: { project: Project }) {
         </Section>
 
         <Section title="Conversations">
-          {inProject.length === 0 ? (
+          {storePhase.status === 'loading' ? (
+            <div role="status" aria-label="Loading conversations" className="flex flex-col gap-2 py-1 text-ui">
+              {['58%', '41%', '66%'].map((width) => (
+                <PlaceholderText key={width} className={width} />
+              ))}
+            </div>
+          ) : storePhase.status === 'failed' ? (
+            <StateNote
+              className="py-2"
+              title="Could not read the conversations."
+              detail={storePhase.error?.message ?? 'The harness stopped answering.'}
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  busy={asking}
+                  onClick={() => {
+                    setAsking(true)
+                    void ensureStore().finally(() => setAsking(false))
+                  }}
+                >
+                  Try again
+                </Button>
+              }
+            />
+          ) : inProject.length === 0 ? (
             <p className="text-ui text-muted-foreground">Nothing here yet.</p>
           ) : (
             <div className="flex flex-col">

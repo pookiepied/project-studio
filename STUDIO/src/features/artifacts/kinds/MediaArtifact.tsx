@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons } from '@/components/icons'
+import { Placeholder } from '@/components/placeholder'
 import { ArtifactShell } from '@/features/artifacts/ArtifactShell'
 import { MediaLightbox } from '@/features/artifacts/media'
 import { Timeline } from '@/features/artifacts/sections'
@@ -127,25 +128,19 @@ export function MediaArtifact({ artifact, video }: { artifact: Artifact; video: 
  * rectangle where an image will be reads as a *failed* image, and worse, it
  * sets an expectation about the colours of something that has not been made
  * yet. A neutral field with a slow sweep says "working" and predicts nothing.
+ *
+ * This was the first surface in the app to draw that field, and its recipe --
+ * neutral ground, foreground-tinted sweep, no colour -- is now the shared
+ * placeholder system's. `Placeholder` owns the sweep; this file keeps only the
+ * part that is genuinely local: the field fills the reserved frame and holds
+ * the medium's icon.
  */
 function Shimmer({ active, video }: { active: boolean; video: boolean }) {
   return (
-    <div className="relative flex size-full items-center justify-center bg-selected">
-      {active ? (
-        <motion.div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(110deg, transparent 20%, color-mix(in oklab, var(--foreground) 7%, transparent) 50%, transparent 80%)',
-          }}
-          animate={{ x: ['-60%', '60%'] }}
-          transition={{ duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
-        />
-      ) : null}
-      <span className="relative text-muted-foreground/60">
+    <Placeholder sweep={active} className="size-full">
+      <span className="text-muted-foreground/60">
         {video ? <Icons.video /> : <Icons.image />}
       </span>
-    </div>
+    </Placeholder>
   )
 }

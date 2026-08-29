@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { SPRING_SNAPPY } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
@@ -15,6 +17,16 @@ import { cn } from '@/lib/cn'
  * that is about the conversation as a record rather than as a place: fork,
  * pin, rename, archive, delete, open elsewhere. Keeping them here rather than
  * in a toolbar is what lets the row be a plain title the rest of the time.
+ *
+ * ---- The selection is a sliding chip ---------------------------------------
+ *
+ * The same device `SettingsTree` uses: the selection is one element with a
+ * `layoutId`, so switching conversations reads as the selection travelling
+ * down the column while the page crossfades beside it -- a lateral move in the
+ * hierarchy, carried by the list it happened in (`SURFACE_SIBLING` is a pure
+ * fade precisely because this chip already supplies the motion). A restyled
+ * row instead would make the selection vanish here and appear there, two
+ * events, and the page fade the only witness that one thing replaced another.
  */
 export function ConversationRow({ conversation }: { conversation: Conversation }) {
   const { route, openChat, goHome } = useNavigation()
@@ -52,10 +64,22 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
   return (
     <div
       className={cn(
-        'group/row flex items-center gap-1 rounded-md pr-0.5 transition-colors duration-fast',
-        active ? 'bg-selected' : 'hover:bg-tint',
+        'group/row relative flex items-center gap-1 rounded-md pr-0.5 transition-colors duration-fast',
+        // The selected row keeps its own chip and takes no hover tint: the chip
+        // is translucent, and a tint beneath it would deepen the selection
+        // under the pointer -- two channels for one state.
+        active ? null : 'hover:bg-tint',
       )}
     >
+      {/* Behind the label, and shared across the whole column. */}
+      {active ? (
+        <motion.span
+          layoutId="sidebar-selection"
+          transition={SPRING_SNAPPY}
+          aria-hidden
+          className="absolute inset-0 rounded-md bg-selected"
+        />
+      ) : null}
       <button
         type="button"
         onClick={() => openChat(conversation.id)}
@@ -65,7 +89,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
           // role class in `@layer components` — so it silently won and this row
           // rendered at a tighter leading than every other 13px row in the
           // column. Same size, different rhythm, which reads as a size mismatch.
-          'flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left text-ui',
+          'relative flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left text-ui',
           active ? 'text-foreground' : 'text-muted-foreground group-hover/row:text-foreground',
         )}
       >
@@ -95,7 +119,10 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
             aria-label="Conversation options"
             onClick={() => setMenuOpen((open) => !open)}
             className={cn(
-              'flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-fast',
+              // `relative` keeps this button above the selection chip: the chip
+              // is positioned, and a positioned element paints over anything
+              // static beside it -- the menu would vanish under its own row.
+              'relative flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-fast',
               'text-muted-foreground hover:bg-tint',
               // A working row keeps its mark visible until the pointer
               // arrives; the menu button then takes the slot, because the two

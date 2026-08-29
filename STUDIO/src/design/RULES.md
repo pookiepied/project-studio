@@ -65,6 +65,26 @@ purpose: a CSS transition and a Framer animation on the same element must not
 disagree. They did — fourteen files had reached for `duration-150`, which was
 not a step in either system.
 
+**A handover between surfaces moves along the hierarchy, not the vertical.**
+Home sits under nothing, a project under home, a conversation under its
+project, and Settings is the deepest layer. So navigation is a *move* — push
+(drilling in), pop (coming back), or sibling (lateral, one conversation for
+another) — and the surfaces say which way:
+
+- **push**: the new surface enters from the right (32px out) while the old
+  leaves to the left (24px out), on `--duration-slow`.
+- **pop**: the mirror image. Back must look like back, or direction stops
+  meaning anything.
+- **sibling**: a pure crossfade on `--duration-base`, no translation. The
+  sidebar's sliding selection chip carries the sense of travel.
+
+Distances are a fraction of a column, not a journey. Vertical motion on a
+horizontal handover is the one gesture that reliably reads as a rendering
+fault — nothing in the app's hierarchy is stacked vertically — and a page
+must never play the shell's entrance a second time inside itself: two stacked
+ramps compound into a hop. The shell owns the page-level handover; a page
+animates only the changes it owns, and a crossfade at that.
+
 The splash is the one exception to the ceiling. It is not interaction: it plays
 once, before anything can be clicked.
 
@@ -293,7 +313,52 @@ get a fourth look.
 
 ---
 
-## 10. How to add something
+## 10. States
+
+A surface has a life before its data arrives and after it fails to. Every
+state in that life is designed, once, in `components/placeholder` and
+`components/state`; a page that invents its own loading treatment is a page
+inventing a second vocabulary.
+
+**The lifecycle is named, not boolean.** `loading | ready | no-harness |
+failed` — the same four answers a local process honestly gives. A surface
+shows its truth: `loading` holds the shape of what is coming, `failed` says
+what went wrong with the remedy beside it, `no-harness` says what is absent,
+and `ready` may say *empty* — an absence naming itself ("Nothing archived."),
+never styled like a failure. A read that has not come back may not be
+answered with "nothing", because an empty list and a broken one are both a
+blank column to the person waiting.
+
+**Loading is structural, never a spinner.** A spinner measures a wait the
+reader did not ask to measure; a sentence that does not move is better; a
+skeleton is better still, because it holds the exact space the content will
+occupy so the handover is a change of fill, not a jump. Rules for bones:
+
+- Neutral only. `--selected` ground, a foreground-tinted sweep at 7%. Colour
+  claims something about content nobody has seen.
+- Composed where the content is composed — a row's skeleton is built from the
+  row's own padding, roles and cast (mark, line, hint), so the skeleton cannot
+  drift from the layout it stands in for. Primitives: `Placeholder`,
+  `PlaceholderText`, `PlaceholderMark`.
+- Announced once, quietly: `role="status"` with a spoken label on the region,
+  `aria-hidden` on every bone. A skeleton never pretends to be content.
+- **The transcript is exempt, by written decision** (`EarlierBoundary`): text
+  the reader is about to read does not get stand-ins. Small transient menus
+  keep their sentence too — a popover that lives for a moment wants a word,
+  not a wireframe.
+- A background re-read never replaces content with loading. What is on screen
+  stays until the new truth arrives; the refresh is visible in the rows that
+  change, not in a spinner that erases the page.
+
+**Failure repeats the wire, verbatim.** The cause sentence is the harness's
+own words, not a paraphrase, and the remedy is a control, not advice —
+"Start the harness" is a button, because a sentence naming a remedy the
+software does not offer is worse than no sentence. `StateNote` is the shape;
+an empty state is not `StateNote`, on purpose.
+
+---
+
+## 11. How to add something
 
 1. Use a role, a token, a scale step. If none fits, the missing step is the
    change — add it here first.

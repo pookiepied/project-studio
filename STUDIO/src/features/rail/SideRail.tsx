@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { SPRING_PANEL } from '@/design/tokens'
+import { DURATION, EASE_OUT, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
@@ -121,13 +121,16 @@ export function SideRail() {
 
           {/* Keyed by the entry, so switching plays the view transition rather
               than swapping content inside a frame that never acknowledges it
-              changed. */}
+              changed. A pure crossfade, like every other lateral move between
+              same-depth views: this one used to add a small rise, the vertical
+              motion that makes a horizontal handover look like a fault. */}
           <div className="studio-scroll-inset min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {active ? (
               <motion.div
                 key={active.id}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: DURATION.base, ease: EASE_OUT }}
                 className="studio-prose min-w-0"
               >
                 {renderArtifact(active.artifact)}
