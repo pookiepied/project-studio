@@ -21,9 +21,10 @@ import { TurnMenu } from './TurnMenu'
  * harness contract names.
  *
  * The picker is deliberately two surfaces: a short first level (the default,
- * the recents, the door) and the library dialog behind it, where every model
- * lives with its facts and choosing is an explicit button rather than a row
- * click. Most tests below therefore walk that path.
+ * the recents, the door) and the library dialog behind it, organised as
+ * families first and a model's own facts one drill deeper. Most tests below
+ * therefore walk that path: into a family, onto a model's row, into its
+ * facts, and out through the explicit button.
  */
 
 const BASE_URL = 'http://127.0.0.1:4319'
@@ -150,6 +151,16 @@ async function openLibrary() {
   await screen.findByRole('textbox', { name: 'Search models' })
 }
 
+/** The family index inside the library - the rows that name the families. */
+function familyIndex() {
+  return within(screen.getByRole('navigation', { name: 'Model families' }))
+}
+
+/** Walks from the landing into a family's page through the index. */
+async function openFamilyInLibrary(name: string | RegExp) {
+  fireEvent.click(familyIndex().getByRole('button', { name: name }))
+}
+
 beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
@@ -219,22 +230,29 @@ describe('the model picker', () => {
     expect(within(menu).getByText('Default model')).toBeTruthy()
   })
 
-  it('groups every model under its connection in the library and marks each with its author', async () => {
+  it('organises the library by family: the landing names the vendor, its page lists the models', async () => {
     harnessConfigured()
     mountPicker()
     stubFetch(defaultRoute([REASONING_MODEL]))
 
     await openLibrary()
-    await screen.findByText('Work Anthropic')
-    // The dialog renders in place, so the marks are queried on the document.
-    // The row's mark is the model's own author, resolved from the vendor the
-    // connection draws from - while the group header wears the connection's
-    // own vendor.
+    // The landing is the catalog's shape, not its rows: one card for the
+    // family, wearing the model's own author mark (resolved from the vendor
+    // the connection draws from) and naming the connection that serves it.
+    const card = await screen.findByRole('button', { name: /Work Anthropic/ })
+    expect(card.textContent).toContain('Anthropic')
+    expect(card.textContent).toContain('1 model')
     expect(document.querySelector('[data-provider="anthropic"]')).not.toBeNull()
-    expect(screen.getByRole('option', { name: /claude-sonnet-4\.5/ })).toBeTruthy()
+    // No model rows on the landing: a library opens on its index, not a wall.
+    expect(screen.queryByRole('button', { name: /claude-sonnet-4\.5/ })).toBeNull()
+
+    // Into the family, the model is a row; onto the row, its own page.
+    await openFamilyInLibrary(/Anthropic/)
+    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
+    await screen.findByText('Input price')
   })
 
-  it('narrows the library as the search is typed, and says so when nothing matches', async () => {
+  it('narrows the library as the search is typed, grouped by family, and says so when nothing matches', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([REASONING_MODEL, FLAT_MODEL]))
     mountPicker()
@@ -243,10 +261,11 @@ describe('the model picker', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
       target: { value: 'jamba' },
     })
-    // The needle matches by name; the other model's row is gone. The group
-    // header stays - the connection still serves the one model that matched.
-    expect(screen.getByRole('option', { name: /jamba-large-1\.7/ })).toBeTruthy()
-    expect(screen.queryByRole('option', { name: /claude-sonnet/ })).toBeNull()
+    // The needle matches by name; the other model's row is gone. The family
+    // header stays - the family still owns the one model that matched.
+    expect(await screen.findByRole('button', { name: /jamba-large-1\.7/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /claude-sonnet/ })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Anthropic' })).toBeTruthy()
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
       target: { value: 'nothing at all' },
@@ -260,9 +279,8 @@ describe('the model picker', () => {
     mountPicker()
 
     await openLibrary()
-    // Nothing is highlighted yet: the pane says what it is for.
-    await screen.findByText(/Select a model to see/)
-    fireEvent.click(screen.getByRole('option', { name: /claude-sonnet-4\.5/ }))
+    await openFamilyInLibrary(/Anthropic/)
+    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
 
     // The wire record's own facts, shown rather than buried: prices per
     // million tokens, the context size, and the capability chips.
@@ -271,6 +289,10 @@ describe('the model picker', () => {
     expect(screen.getByText('Context window')).toBeTruthy()
     expect(screen.getByText('Tool calling')).toBeTruthy()
     expect(screen.getByText('Vision')).toBeTruthy()
+
+    // The back row is named for where it returns to, and it does return.
+    fireEvent.click(screen.getByRole('button', { name: 'Anthropic' }))
+    expect(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ })).toBeTruthy()
   })
 
   it('hides the reasoning control entirely for a model that cannot reason', async () => {
@@ -279,7 +301,10 @@ describe('the model picker', () => {
     mountPicker()
 
     await openLibrary()
-    fireEvent.click(screen.getByRole('option', { name: /jamba-large-1\.7/ }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+      target: { value: 'jamba' },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
     await screen.findByText('Capabilities')
     // Present and inert would be a control that lies; it is absent instead.
     expect(screen.queryByText('Reasoning effort')).toBeNull()
@@ -294,9 +319,10 @@ describe('the model picker', () => {
     fireEvent.click(screen.getByText('open chat'))
 
     await openLibrary()
-    // Highlighting a row writes nothing: the details appear, the dial rests
+    await openFamilyInLibrary(/Anthropic/)
+    // Opening a model's page writes nothing: the facts appear, the dial rests
     // on Default, and the index is untouched until the button.
-    fireEvent.click(screen.getByRole('option', { name: /claude-sonnet-4\.5/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
     await screen.findByText('Reasoning effort')
     expect(
       calls.filter((call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1')),
@@ -333,7 +359,8 @@ describe('the model picker', () => {
     // Four picks, three seats: the oldest falls off the list entirely.
     for (const name of ['jamba-large-1\\.7', 'vox-small-1', 'kappa-mini', 'delta-pro']) {
       await openLibrary()
-      fireEvent.click(await screen.findByRole('option', { name: new RegExp(name) }))
+      await openFamilyInLibrary(/Anthropic/)
+      fireEvent.click(await screen.findByRole('button', { name: new RegExp(name) }))
       fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
       const plain = name.replace('\\.', '.')
       await waitFor(() => {
@@ -391,7 +418,8 @@ describe('the model picker', () => {
     fireEvent.click(screen.getByText('open chat'))
 
     await openLibrary()
-    fireEvent.click(await screen.findByRole('option', { name: /jamba-large-1\.7/ }))
+    await openFamilyInLibrary(/Anthropic/)
+    fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
     await waitFor(() => {
       expect(calls.some((call) => call.method === 'PATCH')).toBe(true)
@@ -414,7 +442,8 @@ describe('the model picker', () => {
     mountPicker()
 
     await openLibrary()
-    fireEvent.click(screen.getByRole('option', { name: /claude-sonnet-4\.5/ }))
+    await openFamilyInLibrary(/Anthropic/)
+    fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
 
     // One dial in the details pane, whose steps are Default then the model's
     // own levels: seven stops for this model, resting on Default.

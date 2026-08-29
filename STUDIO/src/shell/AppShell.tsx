@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, RADIUS, SHELL, surfaceTransition } from '@/design/tokens'
+import { DURATION, EASE_OUT, RADIUS, SHELL, surfaceVariants } from '@/design/tokens'
 import { ChatPage } from '@/features/chat'
 import { HomePage } from '@/features/home'
 import { CommandPalette } from '@/features/palette'
@@ -18,6 +18,9 @@ import { useRail } from '@/stores/rail'
 import { useWorkspace } from '@/stores/workspace'
 import { Icons } from '@/components/icons'
 import { cn } from '@/lib/cn'
+
+/** The page handover, re-read from the move at play time (`surfaceVariants` explains why). */
+const SURFACE_VARIANTS = surfaceVariants()
 
 /**
  * The window.
@@ -165,7 +168,7 @@ export function AppShell() {
         {/*
           One surface handing over to the next, in the direction the hierarchy
           moved (`move` comes from the navigation store; the presets come from
-          `surfaceTransition`).
+          `surfaceVariants`, and the move rides `custom`).
 
           ---- Why `AnimatePresence`, when the comment here said not to -----------
 
@@ -184,6 +187,15 @@ export function AppShell() {
           surfaces carry the same duration and curve from one preset, the
           handover reads as one event.
 
+          ---- Why the move arrives as `custom` ----------------------------------
+
+          AnimatePresence freezes an exiting element's props: left as spread
+          attributes, the outgoing page replays the PREVIOUS move's exit, and a
+          pop out of Settings left toward the wrong side while its replacement
+          entered from the right one. `custom` is the one channel AnimatePresence
+          re-renders onto an exiting element, so the variants re-read the move at
+          the moment each pose plays (`surfaceVariants`).
+
           ---- Why the surfaces are absolutely positioned -------------------------
 
           Both pages are `inset-0` for the same reason the old one was `h-full`:
@@ -197,10 +209,14 @@ export function AppShell() {
           called rather than rendered -- see the note on `Surface` below. None of
           that reasoning changed.
         */}
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} custom={move}>
           <motion.main
             key={routeKey(route)}
-            {...surfaceTransition(move)}
+            custom={move}
+            variants={SURFACE_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
             className="absolute inset-0"
           >
             {/* Called, not rendered as `<Surface />`. See the note on `Surface`. */}

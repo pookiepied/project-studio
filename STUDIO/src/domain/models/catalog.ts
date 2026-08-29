@@ -59,14 +59,6 @@ export interface CatalogModel {
   readonly pricing: ModelPricing
 }
 
-/** A catalog grouped the way the picker reads it: one group per connection. */
-export interface CatalogGroup {
-  readonly connectionId: string
-  readonly connectionName: string
-  readonly connectionVendor: string
-  readonly models: readonly CatalogModel[]
-}
-
 /**
  * The vendor a connection's model list belongs to: the catalog's own vendor
  * when it names one, otherwise the connection itself - the normal case for a
@@ -126,35 +118,6 @@ export function catalogFrom(
   return models
     .filter((model) => model.available && model.capability.textGeneration !== 'unsupported')
     .map((model) => catalogModelOf(model, byId.get(model.connectionId)))
-}
-
-/** Groups a catalog under its connections, in connection order. */
-export function groupCatalog(models: readonly CatalogModel[]): CatalogGroup[] {
-  // Built mutable, exposed readonly: the groups handed on are frozen shapes,
-  // while this one construction site needs to append.
-  const drafts: {
-    connectionId: string
-    connectionName: string
-    connectionVendor: string
-    models: CatalogModel[]
-  }[] = []
-  const index = new Map<string, number>()
-  for (const model of models) {
-    let at = index.get(model.connectionId)
-    if (at === undefined) {
-      drafts.push({
-        connectionId: model.connectionId,
-        connectionName: model.connectionName,
-        connectionVendor: model.connectionVendor,
-        models: [],
-      })
-      at = drafts.length - 1
-      index.set(model.connectionId, at)
-    }
-    const draft = drafts[at]
-    if (draft !== undefined) draft.models.push(model)
-  }
-  return drafts.map((draft) => ({ ...draft }))
 }
 
 /** Finds a catalog row by its runtime reference. */

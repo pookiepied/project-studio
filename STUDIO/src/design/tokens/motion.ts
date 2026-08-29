@@ -18,6 +18,7 @@
  * reducedMotion="user">`. CSS transitions are covered by the matching media
  * query in `index.css`. Never branch on the preference inside a component.
  */
+import type { Variants } from 'framer-motion'
 
 /** Ease-out quint. The house curve: fast start, long settle. */
 export const EASE_OUT = [0.16, 1, 0.3, 1] as const
@@ -110,6 +111,29 @@ export const SURFACE_SIBLING = {
 /** The transition preset for a move between surfaces. */
 export function surfaceTransition(move: SurfaceMove) {
   return move === 'push' ? SURFACE_PUSH : move === 'pop' ? SURFACE_POP : SURFACE_SIBLING
+}
+
+/**
+ * The same presets as variants, driven by `custom`.
+ *
+ * ---- Why the variants exist -----------------------------------------------
+ *
+ * AnimatePresence freezes an exiting element's props: it replays whatever
+ * `exit` the element carried on its last completed render, which is the
+ * PREVIOUS move's. Drill in and come straight back, and the surface leaving
+ * played push's exit (out to the left) while the one arriving played pop's
+ * entrance (in from the left) -- two halves of two different gestures in one
+ * handover. `custom` is the one channel AnimatePresence re-renders onto an
+ * exiting element, so the move lives there and each pose re-reads it at the
+ * moment it plays. Spread `surfaceTransition(move)` where there is no exit at
+ * all; use these wherever one does.
+ */
+export function surfaceVariants(): Variants {
+  return {
+    initial: (move: SurfaceMove) => ({ ...surfaceTransition(move).initial, transition: surfaceTransition(move).transition }),
+    animate: (move: SurfaceMove) => ({ ...surfaceTransition(move).animate, transition: surfaceTransition(move).transition }),
+    exit: (move: SurfaceMove) => ({ ...surfaceTransition(move).exit, transition: surfaceTransition(move).transition }),
+  }
 }
 
 /**

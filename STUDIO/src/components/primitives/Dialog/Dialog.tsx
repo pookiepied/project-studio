@@ -25,6 +25,7 @@ export function Dialog({
   title,
   footer,
   width = '26rem',
+  height,
   children,
 }: {
   open: boolean
@@ -32,6 +33,13 @@ export function Dialog({
   title: string
   footer?: ReactNode
   width?: string
+  /**
+   * A definite height, for sheets whose content must scroll independently
+   * inside itself. Without one the panel is as tall as its content and the
+   * sheet scrolls as a whole; a library with two columns that scroll
+   * separately needs the box itself to be of known height first.
+   */
+  height?: string
   children: ReactNode
 }) {
   useEffect(() => {
@@ -64,7 +72,7 @@ export function Dialog({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast } }}
             transition={SPRING_SURFACE}
-            style={{ width }}
+            style={{ width, height }}
             className={cn(
               'studio-blur flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border',
               'shadow-modal',

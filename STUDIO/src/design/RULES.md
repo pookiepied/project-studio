@@ -83,7 +83,18 @@ horizontal handover is the one gesture that reliably reads as a rendering
 fault — nothing in the app's hierarchy is stacked vertically — and a page
 must never play the shell's entrance a second time inside itself: two stacked
 ramps compound into a hop. The shell owns the page-level handover; a page
-animates only the changes it owns, and a crossfade at that.
+animates only the changes it owns, and a crossfade at that. One exception,
+for the same reason: a surface that owns a hierarchy the shell never plays —
+the model library's family → model drill-down — uses the same push / pop /
+sibling vocabulary for its own pages, because nothing is moving underneath
+it and direction is the only thing saying "deeper".
+
+**A direction-aware exit must receive the move through `custom`.**
+AnimatePresence freezes an exiting element's props at its last render, so a
+spread `exit` replays the PREVIOUS move — back out of a drill-in and the old
+surface leaves to the wrong side while the new one enters from the right.
+The variants in `tokens/motion.ts` (`surfaceVariants`) re-read the move as
+each pose plays; use them wherever a handover can change direction.
 
 The splash is the one exception to the ceiling. It is not interaction: it plays
 once, before anything can be clicked.

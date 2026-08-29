@@ -46,9 +46,10 @@ import { cn } from '@/lib/cn'
  * shortcut, and the facts that distinguish them - price, context, capability -
  * with nowhere to appear. So the first level holds only what a decision
  * actually needs: the harness's default, the models already picked recently,
- * and the door to the library - which is a dialog of its own now, wide enough
- * to show a list and a detail pane, where choosing is an explicit act with a
- * button rather than a row click that might have been an accident.
+ * the door to the library - which is a dialog of its own now, organised as
+ * families first and a model's own facts one drill deeper, where choosing is
+ * an explicit act with a button rather than a row click that might have been
+ * an accident.
  *
  * "Recent" is deliberately not an "auto" mode - Studio is nobody's first-party
  * client and invents no model; the resting choice remains the harness's own
@@ -72,7 +73,7 @@ import { cn } from '@/lib/cn'
 type View = 'root' | 'reasoning'
 
 export function TurnMenu() {
-  const { settings, setSettings, setConversationSettings, conversations, catalog } =
+  const { settings, setSettings, setConversationSettings, conversations, catalog, ensureStore } =
     useWorkspace()
   const { route, openSettings } = useNavigation()
   const [open, setOpen] = useState(false)
@@ -194,6 +195,7 @@ export function TurnMenu() {
           setLibraryOpen(false)
           openSettings('providers')
         }}
+        onEnsure={ensureStore}
       />
     </>
   )
