@@ -5,10 +5,10 @@ import type { StudioDatabase } from "./database.js";
  *
  * The table is a narrow key/value store for single-valued product state, which
  * makes it the one table every domain is tempted to write directly — and two
- * did: `models/local/settings-store.ts` and `retrieval/settings.ts` each
- * carried their own copy of the same upsert, delete, and read. Two copies of a
- * write is two places for the conflict clause to drift, and no single place to
- * change how settings are stored.
+ * did: the local BYOK settings store (merged away in migration 16) and
+ * `retrieval/settings.ts` each carried their own copy of the same upsert,
+ * delete, and read. Two copies of a write is two places for the conflict
+ * clause to drift, and no single place to change how settings are stored.
  *
  * Domains own their *keys*, not the table. A domain declares a namespace and
  * gets a view scoped to it; it cannot name another domain's key without

@@ -1,6 +1,6 @@
 import * as v from "valibot";
 
-import { ProviderConfigurationError } from "../../contracts/models.js";
+import { ProviderConfigurationError, type ReasoningLevel } from "../../contracts/models.js";
 import { DEFAULT_CUSTOM_API, supportedCustomApis } from "./apis.js";
 import { assertValidProviderId } from "./credential-bridge.js";
 
@@ -23,6 +23,30 @@ export interface CustomProviderConfig {
   readonly maxTokens: number | undefined;
 }
 
+/**
+ * One user-added model under a catalog-backed provider.
+ *
+ * A model the catalogs have never heard of, entered by hand under a vendor
+ * they do - "add a model to an existing provider". The runtime registers it
+ * beside the vendor's own models so a turn naming it resolves instead of
+ * failing; the levels and limits are the user's own word about the model.
+ */
+export interface ExtraRuntimeModel {
+  readonly id: string;
+  readonly name: string;
+  readonly reasoningLevels: readonly ReasoningLevel[];
+  readonly contextWindow: number | undefined;
+  readonly maxTokens: number | undefined;
+}
+
+/** The models one provider gains from the user's hand-entered rows. */
+export interface ExtraProviderModelGroup {
+  readonly provider: string;
+  readonly baseUrl: string;
+  readonly api: string;
+  readonly models: readonly ExtraRuntimeModel[];
+}
+
 export interface LocalModelConfig {
   /**
    * Provider id owning the model the stable alias routes to, or `undefined`
@@ -39,6 +63,7 @@ export interface LocalModelConfig {
   /** Model id within that provider. `undefined` under the same rule. */
   readonly defaultModel: string | undefined;
   readonly customProviders: readonly CustomProviderConfig[];
+  readonly extraModels: readonly ExtraProviderModelGroup[];
 }
 
 const DEFAULT_API = DEFAULT_CUSTOM_API;
@@ -105,6 +130,7 @@ export function resolveLocalModelConfig(
       | { readonly provider: string; readonly model: string }
       | undefined;
     readonly customProviders?: readonly CustomProviderConfig[] | undefined;
+    readonly extraModels?: readonly ExtraProviderModelGroup[] | undefined;
   } = {},
 ): LocalModelConfig {
   const selection = input.defaultSelection ?? resolveDefaultSelection(input.defaultModel);
@@ -118,6 +144,7 @@ export function resolveLocalModelConfig(
     defaultProvider: selection.provider,
     defaultModel: selection.model,
     customProviders: input.customProviders ?? readCustomProviders(),
+    extraModels: input.extraModels ?? [],
   };
 }
 
@@ -147,11 +174,13 @@ export function tolerantLocalModelConfig(input: {
     | { readonly provider: string; readonly model: string }
     | undefined;
   readonly customProviders: readonly CustomProviderConfig[];
+  readonly extraModels?: readonly ExtraProviderModelGroup[];
 }): LocalModelConfig {
   return {
     defaultProvider: input.defaultSelection?.provider,
     defaultModel: input.defaultSelection?.model,
     customProviders: input.customProviders,
+    extraModels: input.extraModels ?? [],
   };
 }
 

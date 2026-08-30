@@ -2,30 +2,38 @@ import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
 } from "../../contracts/capabilities.js";
+import { resolveInterpreter, type Interpreter } from "../../process/interpreter.js";
 import { ProcessError } from "../../process/errors.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
-import {
-  resolveProgram,
-  shellResource,
-  type ResolvedProgram,
-} from "./resolve.js";
+import { readCommandPrograms } from "./command.js";
+import { shellResource } from "./resolve.js";
 
-export { resolveProgram, shellResource } from "./resolve.js";
+export { shellResource } from "./resolve.js";
+export { readCommandPrograms, programName } from "./command.js";
 
 /**
- * Running a program the model chose.
+ * Running the command line the model wrote.
  *
- * The name is a compromise with what models expect. There is no shell: this
- * runs one program with one argument vector, and `shell: false` is what makes
- * that true. Calling it `shell` and then refusing shell syntax is friction we
- * accept, because every model is trained to reach for a tool by that name and
- * an unfamiliar one goes unused.
+ * The name is a compromise with what models expect, and so - since ADR 0046 -
+ * is the shape: this takes a command line and runs it through one
+ * interpreter, chosen for the machine in `src/process/interpreter.ts` and
+ * stated in the environment block. It used to take a program plus an argument
+ * vector and refuse interpreters outright, which on Windows meant `npm`,
+ * `pnpm`, `yarn`, and `tsc` - all `.cmd` shims - could not run at all. The
+ * refusal was honest and the tool was useless for the most common package
+ * manager on the most common desktop.
  *
- * It declares `execute`, alone among the native tools, and that is the honest
- * label. `git` and `grep` run programs too, but we chose those programs; here
- * the model does. See ADR 0019 for what that costs and what still holds.
+ * What the interpreter changes is what a command can *express*. What it
+ * cannot change is what a command can *reach*: the interpreter's children
+ * carry the same kernel token and the same grants as any program this tool
+ * started before it. That argument is ADR 0041's, checked rather than
+ * assumed; the amendment in ADR 0046 records where it bends.
+ *
+ * It still declares `execute`, alone among the native tools, and that is
+ * still the honest label: `git` and `grep` run programs we chose, and here
+ * the model does.
  */
 
 /** 400 lines, matching git. Beyond this it is a dump, not an answer. */
@@ -36,35 +44,35 @@ const MAX_TIMEOUT_MS = 600_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 export interface ShellInput {
+  /** A full command line, for the machine's interpreter. */
   readonly command: string;
-  readonly args: readonly string[];
   /** A directory inside the project. Defaults to the project root. */
   readonly cwd: string | undefined;
   readonly timeoutMs: number | undefined;
   /**
-   * The program, resolved once during parsing.
+   * Every program the line starts, in the order it names them.
    *
-   * Carried rather than re-derived. `parse`, `resource`, and `execute` each
-   * used to call `resolveProgram`, which walks `PATH` and stats every
-   * candidate — three times per call, for an answer that cannot change between
-   * them. Worse than the cost: it could disagree with itself if `PATH` changed
-   * mid-call, so the program authorized would not be the program run.
+   * Read at parse time by `command.ts`, which refuses a line it cannot see
+   * through - a refusal at parse time is one the user is never asked to
+   * approve, because there is nothing yet to approve.
    */
-  readonly program: ResolvedProgram;
+  readonly programs: readonly string[];
+  /** The interpreter this machine runs the line with, resolved once. */
+  readonly interpreter: Interpreter;
 }
 
 export const SHELL_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "shell" },
-  title: "Run a program",
+  title: "Run a command line",
   description:
-    "Runs one program and returns its output. Give the program and its arguments separately, " +
-    'for example command "node" with args ["build.js"]. There is no shell, so pipes, ' +
-    "redirects, &&, and quotes are not interpreted. Run one program per call.",
+    "Runs one command line through this machine's shell, for example " +
+    '"npm test" or "npm run build && node check.js". The shell interprets ' +
+    "pipes, chaining, quotes, and redirection. A line that names several " +
+    "programs - as a chain does - is approved for each of them.",
   inputSchema: {
     type: "object",
     properties: {
       command: { type: "string", minLength: 1 },
-      args: { type: "array", items: { type: "string" } },
       cwd: { type: "string" },
       timeoutMs: { type: "number", minimum: 1000, maximum: 600000 },
     },
@@ -73,7 +81,7 @@ export const SHELL_DESCRIPTOR: CapabilityDescriptor = {
   },
   effects: ["execute"],
   provenance: NATIVE_PROVENANCE,
-  // Running a program twice does whatever the program does twice.
+  // Running a command twice does whatever it does twice.
   idempotent: false,
 };
 
@@ -91,11 +99,10 @@ function clip(output: string): string {
  * What the model is told.
  *
  * Both streams, labelled, and the exit code always. A non-zero exit is a
- * result, not a failure — a failing test suite is the answer to the question
- * that was asked — so it is reported rather than thrown.
+ * result, not a failure - a failing test suite is the answer to the question
+ * that was asked - so it is reported rather than thrown.
  */
 function report(
-  program: string,
   result: { exitCode: number; stdout: string; stderr: string },
 ): string {
   const parts: string[] = [];
@@ -104,7 +111,7 @@ function report(
 
   if (stdout !== "") parts.push(stdout);
   if (stderr !== "") parts.push(`[stderr]\n${stderr}`);
-  if (parts.length === 0) parts.push(`${program} produced no output.`);
+  if (parts.length === 0) parts.push(`The command produced no output.`);
 
   const clipped = clip(parts.join("\n\n"));
   if (result.exitCode !== 0) {
@@ -116,12 +123,12 @@ function report(
 export function createShellTool(): ToolDefinition<ShellInput, string> {
   return defineStudioTool({
     descriptor: SHELL_DESCRIPTOR,
-    // The gate's default is two minutes, which is not a deadline for a build —
+    // The gate's default is two minutes, which is not a deadline for a build -
     // it is a guarantee the build fails. Declared here so the tool's own
     // ceiling and the gate's agree, instead of the shorter one winning
     // silently.
     deadlineMs: MAX_TIMEOUT_MS,
-    // Matched like `git:push`, so a rule can allow `shell:node` without
+    // Matched like `git:push`, so a rule can allow `shell:npm` without
     // allowing every program on the machine. A path-shaped match would glob
     // across separators and mean something nobody intended.
     resourceKind: "command",
@@ -131,24 +138,8 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
 
       if (typeof value.command !== "string" || value.command.trim() === "") {
         throw new ToolError("invalid_input", {
-          message: 'command is required, for example "node".',
+          message: 'command is required, for example "npm test".',
         });
-      }
-      if (value.args !== undefined && !Array.isArray(value.args)) {
-        throw new ToolError("invalid_input", {
-          message:
-            "args must be a list of separate arguments, not one string. " +
-            'Use ["run", "build"], not "run build".',
-        });
-      }
-
-      const args = (value.args ?? []) as unknown[];
-      for (const argument of args) {
-        if (typeof argument !== "string") {
-          throw new ToolError("invalid_input", {
-            message: "Every argument must be text.",
-          });
-        }
       }
 
       if (value.cwd !== undefined && typeof value.cwd !== "string") {
@@ -168,27 +159,35 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         timeoutMs = Math.min(Math.max(value.timeoutMs, 1_000), MAX_TIMEOUT_MS);
       }
 
-      // Resolved during parsing so an unrunnable program fails before the user
-      // is asked to approve something that cannot work — and kept, so the
-      // program that was authorized is the program that runs.
-      const program = resolveProgram(value.command);
+      // Read before authorization, for the same reason the program used to be
+      // resolved there: a line the reader refuses is one the user is never
+      // shown for approval.
+      const programs = readCommandPrograms(value.command);
+
+      const interpreter = resolveInterpreter();
+      if (interpreter === undefined) {
+        throw new ToolError("unavailable", {
+          message: "This machine has no command interpreter the shell tool can run.",
+        });
+      }
 
       return {
         command: value.command,
-        args: args as readonly string[],
         cwd: value.cwd as string | undefined,
         timeoutMs,
-        program,
+        programs,
+        interpreter,
       };
     },
 
-    // The program, not the arguments. `shell:node` is a decision a person can
-    // make; "node with these particular flags" is not, and offering it would
-    // produce an approval that never matches the next call.
-    resource: (input) => shellResource(input.program.name),
+    // Every program the line names, each authorized under its own name. The
+    // singular `resource` is the first one, so the snapshot and any caller
+    // that wants one label for the call keep a stable answer.
+    resource: (input) => shellResource(input.programs[0] as string),
+    resources: (input) => input.programs.map((program) => shellResource(program)),
 
     execute: async (input, context) => {
-      const program = input.program;
+      const interpreter = input.interpreter;
 
       // Through the sandbox, so a cwd escaping the project is refused here
       // rather than becoming the working directory of a real process.
@@ -199,30 +198,30 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
 
       try {
         // Through the sandbox rather than straight to `runProcess`, and the
-        // kind is the whole point: `shell` is the one tool where the *model*
-        // picks the executable, so it is the one that has to be contained. The
-        // sandbox builds the environment from policy too, so there is no
-        // remaining way for this call site to hand the program the machine's
-        // tokens by forgetting a field.
+        // kind is the whole point: the model writes the command line, so this
+        // is the one tool whose children exist only because the model asked.
+        // The sandbox builds the environment from policy too, so there is no
+        // remaining way for this call site to hand the interpreter the
+        // machine's tokens by forgetting a field.
         const result = await context.sandbox.run("shell", {
-          executable: program.path,
-          args: [...input.args],
+          executable: interpreter.path,
+          args: [...interpreter.args, input.command],
           cwd,
           timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
           ...(context.signal ? { signal: context.signal } : {}),
         });
 
-        return report(program.name, result);
+        return report(result);
       } catch (error) {
         if (error instanceof ProcessError && error.kind === "timeout") {
-          return `${program.name} was still running after the time limit and was stopped.`;
+          return `The command was still running after the time limit and was stopped.`;
         }
         if (error instanceof ProcessError && error.kind === "output_limit") {
-          return `${program.name} produced too much output and was stopped. Narrow what it prints.`;
+          return `The command produced too much output and was stopped. Narrow what it prints.`;
         }
         if (error instanceof ToolError) throw error;
         throw new ToolError("execution_failed", {
-          message: `${program.name} could not be started.`,
+          message: `The command could not be started in ${interpreter.label}.`,
           cause: error,
         });
       }

@@ -21,6 +21,7 @@ import {
   WorkspaceTrustStore,
   trustKey,
 } from "../../src/permissions/trust.js";
+import { conversationWorkspaceDirectory } from "../../src/platform/paths.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 const SCOPE: ExecutionScope = {
@@ -208,6 +209,34 @@ describe("the mode resolver on its own", () => {
   it("recognises only the three modes", () => {
     expect(isExecutionMode("full-auto")).toBe(true);
     expect(isExecutionMode("yolo")).toBe(false);
+  });
+});
+
+describe("a workspace this application made for itself", () => {
+  let db: StudioDatabase;
+
+  beforeEach(() => {
+    db = openDatabase({ path: ":memory:" });
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("is trusted without anyone having been asked", () => {
+    const store = new WorkspaceTrustStore(db);
+    const workspace = conversationWorkspaceDirectory("cnv_example");
+
+    expect(store.decision(workspace)).toBe("trusted");
+    // Structural, not stored: the table still holds only decisions a person
+    // made, so this folder never appears beside one the user really approved.
+    expect(store.list()).toEqual([]);
+  });
+
+  it("still asks about a folder the user pointed at", () => {
+    const store = new WorkspaceTrustStore(db);
+
+    expect(store.decision(ROOT)).toBe("undecided");
   });
 });
 

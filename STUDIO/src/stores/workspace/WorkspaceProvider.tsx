@@ -28,6 +28,7 @@ import {
 import { defaultListen } from '@/features/chat/useConversation'
 import { useDemoTurns } from '@/stores/workspace/demo-turns'
 import { readHandoff } from '@/stores/workspace/handoff'
+import { createTitleRefresh } from '@/stores/workspace/title-refresh'
 import { newId } from '@/lib/id'
 
 /**
@@ -246,14 +247,25 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [running, setRunning] = useState<ReadonlySet<string>>(() => new Set())
 
+  // Mirrors `running` so the true-to-false transition - a turn actually
+  // settling, not a page mounting on an idle conversation - is visible
+  // outside the state updater. The transition is what arms the one re-read
+  // that catches a harness-written title (see title-refresh).
+  const runningWitnessRef = useRef<ReadonlySet<string>>(new Set())
+  const titleRefreshRef = useRef<ReturnType<typeof createTitleRefresh> | null>(null)
+
   const markRunning = useCallback((conversationId: string, active: boolean) => {
-    setRunning((current) => {
-      if (active === current.has(conversationId)) return current
-      const next = new Set(current)
-      if (active) next.add(conversationId)
-      else next.delete(conversationId)
-      return next
-    })
+    const was = runningWitnessRef.current.has(conversationId)
+    if (was === active) return
+    const next = new Set(runningWitnessRef.current)
+    if (active) next.add(conversationId)
+    else next.delete(conversationId)
+    runningWitnessRef.current = next
+    setRunning(next)
+    // A conversation this window began has had its first exchange settle:
+    // the harness's own titling may land in the next few seconds, and this
+    // is the only moment the window will know to look.
+    if (!active) titleRefreshRef.current?.settled(conversationId)
   }, [])
 
   const [settings, setSettingsState] = useState<TurnSettings>(DEFAULT_TURN_SETTINGS)
@@ -365,6 +377,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       })),
     )
     setStorePhase({ status: 'ready', error: null })
+  }, [])
+
+  // The harness names conversations on its own after their first exchange
+  // settles (see title-refresh). This window witnesses that settlement only
+  // through `markRunning`, so the one re-read that catches the new title is
+  // armed here, once per conversation this window began.
+  if (titleRefreshRef.current === null) {
+    titleRefreshRef.current = createTitleRefresh({
+      refresh: () => {
+        void load()
+      },
+    })
+  }
+  useEffect(() => {
+    const titleRefresh = titleRefreshRef.current
+    return () => {
+      titleRefresh?.dispose()
+    }
   }, [])
 
   useEffect(() => {
@@ -489,6 +519,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       /** A title the caller already knows - a fork's " (Fork)" name. Absent starts untitled. */
       title?: string
     }) => {
+      // This window began the conversation, so its first exchange will
+      // settle before a witness here, and the harness may still rename the
+      // row afterwards: tracked, so the settlement arms the one re-read
+      // that catches it.
+      titleRefreshRef.current?.track(input.id)
       setRemoteConversations((current) => {
         // A second record under one receipt would be two sidebar rows pointing
         // at the same stream.

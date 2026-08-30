@@ -1,6 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import * as v from "valibot";
+
 import { StorageError, storageErrorFrom } from "./errors.js";
+import { majorityProtocolFor } from "../providers/library/language-catalog.js";
+import { languageProtocolSchema } from "../contracts/providers.js";
 
 /**
  * Schema evolution for the application-owned database.
@@ -541,7 +545,309 @@ export const MIGRATIONS: readonly Migration[] = [
       // user never stated.
       db.exec("ALTER TABLE conversation ADD COLUMN reasoning_level TEXT");
     },
-  },];
+  },
+  {
+    version: 16,
+    name: "provider_store_merge",
+    up(db) {
+      // Two provider stores existed and did not know about each other. This
+      // one (`provider_connection_record`, migrations 11-13) held the full
+      // user-declared connection the contract describes; the other
+      // (`custom_provider` + `provider_connection` + `app_setting`'s
+      // `local.*` keys, migration 1) held what the local BYOK runtime had
+      // actually been driven with - and on real machines it is the one holding
+      // the working connection. The merge direction follows from that: the
+      // runtime world's rows are carried INTO the contract's store, which has
+      // the richer shape and the HTTP surface, and the old tables stop being
+      // written. They are deliberately not dropped - migrations are
+      // append-only, and a machine may yet hold a database written by a build
+      // that still reads them.
+      //
+      // Nothing here touches the OS credential store. The keys keep their
+      // keychain entries (`provider:<pi-provider-id>`, Pi's own chunked JSON);
+      // the merged store's credential resolution reads those entries as the
+      // legacy location behind a connection's own key, so a connection that
+      // worked before this migration works after it, same key, nothing
+      // retyped. A row whose key is missing carries anyway and reports
+      // credential "absent" - asking for a key, not looking broken.
+      //
+      // One deliberate normalization: a connection's `protocol` is a closed
+      // contract union, so a carried built-in provider gets the protocol most
+      // of its own catalog models speak (computed from the installed package,
+      // since the value drives the probe and nothing else). A custom provider
+      // keeps the api it was declared with.
+
+      const now = Date.now();
+      const carried = new Set<string>();
+
+      const insertConnection = (
+        id: string,
+        record: Record<string, unknown>,
+        updatedAt: number,
+      ): void => {
+        db.prepare(
+          `INSERT INTO provider_connection_record (id, record_json, updated_at)
+           VALUES (?, ?, ?)`,
+        ).run(id, JSON.stringify(record), updatedAt);
+        carried.add(id);
+      };
+
+      // Custom providers first: their rows carry the richest facts (base URL,
+      // declared api, per-model ids, context window). A `provider_connection`
+      // row for the same id is subsumed by this one.
+      const customRows: readonly Record<string, unknown>[] = db
+        .prepare(
+          `SELECT id, name, base_url, api, models, context_window, max_tokens, updated_at
+             FROM custom_provider ORDER BY id`,
+        )
+        .all();
+
+      for (const raw of customRows) {
+        const row = readCustomRow(raw);
+        if (row === undefined || carried.has(row.id)) continue;
+        if (!v.safeParse(languageProtocolSchema, row.api).success) {
+          // A declared api outside the contract union cannot become a record
+          // the contract would parse. Nothing current writes one; leaving the
+          // row uncarried keeps the old tables as the honest record instead
+          // of inventing a protocol the endpoint does not speak.
+          continue;
+        }
+        insertConnection(
+          row.id,
+          {
+            id: row.id,
+            displayName: row.name,
+            kind: "language",
+            source: "local",
+            baseUrl: row.baseUrl,
+            enabled: true,
+            protocol: row.api,
+          },
+          row.updatedAt,
+        );
+
+        let modelIds: readonly unknown[] = [];
+        try {
+          const parsed: unknown = JSON.parse(row.models);
+          if (Array.isArray(parsed)) modelIds = parsed;
+        } catch {
+          modelIds = [];
+        }
+        for (const modelId of modelIds) {
+          if (typeof modelId !== "string" || modelId.length === 0) continue;
+          db.prepare(
+            `INSERT INTO provider_model_manual (connection_id, model_id, record_json, updated_at)
+             VALUES (?, ?, ?, ?)`,
+          ).run(
+            row.id,
+            modelId,
+            JSON.stringify({
+              connectionId: row.id,
+              modelId,
+              displayName: modelId,
+              capability: {
+                textGeneration: "supported",
+                streaming: "unknown",
+                reasoning: "unknown",
+                toolCalling: "unknown",
+                vision: "unknown",
+                embeddings: "unknown",
+                reranking: "unknown",
+                imageGeneration: "unknown",
+                imageEditing: "unknown",
+                videoGeneration: "unknown",
+                speechGeneration: "unknown",
+                transcription: "unknown",
+                webSearch: "unknown",
+                webFetch: "unknown",
+                contextWindow: typeof row.contextWindow === "number" ? row.contextWindow : "unknown",
+                maxOutputTokens: typeof row.maxTokens === "number" ? row.maxTokens : "unknown",
+              },
+              reasoningLevels: [],
+              shape: "stream",
+              pricing: { input: "unknown", output: "unknown", cacheRead: "unknown", cacheWrite: "unknown" },
+              hidden: false,
+              origin: "manual",
+            }),
+            row.updatedAt,
+          );
+        }
+        // A provider-level context window or token cap with no declared model
+        // has nothing to attach to and is dropped here; every real row names
+        // its models, and a model-less connection's window is meaningless.
+      }
+
+      // Built-in connections: one row per connected Pi provider, drawing that
+      // vendor's catalog.
+      const connectionRows: readonly Record<string, unknown>[] = db
+        .prepare(`SELECT provider_id, updated_at FROM provider_connection ORDER BY provider_id`)
+        .all();
+
+      for (const raw of connectionRows) {
+        const providerId = raw.provider_id;
+        const updatedAt = raw.updated_at;
+        if (typeof providerId !== "string" || typeof updatedAt !== "number") continue;
+        if (carried.has(providerId)) continue;
+        const protocol = majorityProtocolFor(providerId);
+        if (protocol === undefined) {
+          // Not a provider the installed catalog knows, and no custom row
+          // described it. There is no honest protocol to declare.
+          continue;
+        }
+        insertConnection(
+          providerId,
+          {
+            id: providerId,
+            displayName: providerId,
+            kind: "language",
+            source: "local",
+            enabled: true,
+            catalogProvider: providerId,
+            protocol,
+          },
+          updatedAt,
+        );
+      }
+
+      // The default model the stable alias routed to: carried into the
+      // contract's defaults table as the textGeneration slot, because that is
+      // what `local.default_model` meant. The legacy key stays where it is
+      // (append-only); a carried default makes it redundant, an uncarried one
+      // keeps the legacy fallback derivation the only reader.
+      const defaultRow = db
+        .prepare(`SELECT value FROM app_setting WHERE key = 'local.default_model'`)
+        .get() as Record<string, unknown> | undefined;
+      const defaultRaw = defaultRow?.value;
+      if (typeof defaultRaw === "string" && defaultRaw.length > 0) {
+        try {
+          const parsed: unknown = JSON.parse(defaultRaw);
+          if (isRecord(parsed)) {
+            const provider = parsed.provider;
+            const model = parsed.model;
+            if (typeof provider === "string" && typeof model === "string") {
+              const records: readonly Record<string, unknown>[] = db
+                .prepare(`SELECT id, record_json FROM provider_connection_record`)
+                .all();
+              const match = records
+                .map((row) => {
+                  const id = row.id;
+                  const rawRecord = row.record_json;
+                  if (typeof id !== "string" || typeof rawRecord !== "string") return undefined;
+                  try {
+                    const record: unknown = JSON.parse(rawRecord);
+                    if (!isRecord(record)) return undefined;
+                    const catalog = record.catalogProvider;
+                    return {
+                      id,
+                      vendor: typeof catalog === "string" ? catalog : id,
+                    };
+                  } catch {
+                    return undefined;
+                  }
+                })
+                .find((entry) => entry !== undefined && entry.vendor === provider);
+              if (match !== undefined) {
+                db.prepare(
+                  `INSERT INTO provider_default (slot, connection_id, model_id, updated_at)
+                   VALUES ('textGeneration', ?, ?, ?)
+                   ON CONFLICT(slot) DO NOTHING`,
+                ).run(match.id, model, now);
+              }
+            }
+          }
+        } catch {
+          // An unreadable legacy key is left exactly as it is; the fallback
+          // reader will refuse it the same way it always has.
+        }
+      }
+
+      // The probe's learned availability (added in this schema for the same
+      // task that unified the stores): what the provider's own model list
+      // named the last time its connection was probed. Keyed by connection so
+      // the catalog can mark what the provider no longer offers, and cascaded
+      // like every other per-connection table.
+      db.exec(`
+        CREATE TABLE provider_probe_state (
+          connection_id TEXT PRIMARY KEY,
+          served_ids    TEXT NOT NULL DEFAULT '[]',
+          probed_at     INTEGER NOT NULL,
+          FOREIGN KEY (connection_id)
+            REFERENCES provider_connection_record(id) ON DELETE CASCADE
+        ) STRICT;
+      `);
+    },
+  },
+  {
+    version: 17,
+    name: "conversation_permission_mode",
+    up(db) {
+      // The execution mode a conversation is held with, beside the model and
+      // reasoning columns (migrations 14 and 15) that were added for exactly
+      // this shape of fact: a per-conversation choice, settled at admission,
+      // read by the run. Until now the mode was a process-wide callback that
+      // every composition left unset, so every conversation was Manual forever
+      // and nothing could widen it.
+      //
+      // Nullable on purpose: the absence of a stored answer IS Manual. A mode
+      // is a consent, so a row written before this column existed records no
+      // consent, which is precisely what Manual means - backfilling it would
+      // rewrite a decision nobody made, and writing "manual" at creation would
+      // make an unset row indistinguishable from one the user looked at and
+      // left alone. The reader treats null, and any value that no longer
+      // parses, as Manual.
+      db.exec("ALTER TABLE conversation ADD COLUMN permission_mode TEXT");
+    },
+  },
+];
+
+/** A `custom_provider` row whose columns all carry the shapes this file reads. */
+interface CarriedCustomProvider {
+  readonly id: string;
+  readonly name: string;
+  readonly baseUrl: string;
+  readonly api: string;
+  readonly models: string;
+  readonly contextWindow: number | null;
+  readonly maxTokens: number | null;
+  readonly updatedAt: number;
+}
+
+function readCustomRow(raw: Record<string, unknown>): CarriedCustomProvider | undefined {
+  const id = raw.id;
+  const name = raw.name;
+  const baseUrl = raw.base_url;
+  const api = raw.api;
+  const models = raw.models;
+  const contextWindow = raw.context_window;
+  const maxTokens = raw.max_tokens;
+  const updatedAt = raw.updated_at;
+  if (
+    typeof id !== "string" ||
+    typeof name !== "string" ||
+    typeof baseUrl !== "string" ||
+    typeof api !== "string" ||
+    typeof models !== "string" ||
+    typeof updatedAt !== "number" ||
+    (contextWindow !== null && typeof contextWindow !== "number") ||
+    (maxTokens !== null && typeof maxTokens !== "number")
+  ) {
+    return undefined;
+  }
+  return {
+    id,
+    name,
+    baseUrl,
+    api,
+    models,
+    contextWindow,
+    maxTokens,
+    updatedAt,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
 

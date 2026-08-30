@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ConversationStore } from "../../src/conversations/store.js";
+import type { ConversationTitlingPort } from "../../src/conversations/titling.js";
 import { createTurnSettingsMiddleware } from "../../src/transport/http/middleware/turn-settings.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
@@ -23,14 +24,29 @@ let db: StudioDatabase;
 let store: ConversationStore;
 let served: Set<string>;
 let downstream: "admits" | "refuses";
+/** Records what the middleware handed to titling, when it is wired. */
+let titlingCalls: { conversationId: string; message: string }[];
 
-function composeApp(): Hono {
+/**
+ * A titling port that records. Undefined means the middleware was composed
+ * without one - the shape every existing case runs under.
+ */
+function titlingPort(): ConversationTitlingPort {
+  return {
+    firstAdmission: (conversationId, firstMessage) => {
+      titlingCalls.push({ conversationId, message: firstMessage });
+    },
+  };
+}
+
+function composeApp(withTitling: boolean): Hono {
   const app = new Hono();
   app.use(
     "*",
     createTurnSettingsMiddleware({
       conversations: store,
       isModelServed: async (modelId) => served.has(modelId),
+      ...(withTitling ? { titling: titlingPort() } : {}),
     }),
   );
   app.post("/agents/studio/:id", (context) =>
@@ -42,7 +58,15 @@ function composeApp(): Hono {
 }
 
 async function submit(id: string, body: unknown): Promise<Response> {
-  return composeApp().request(`http://harness.test/agents/studio/${id}`, {
+  return composeApp(true).request(`http://harness.test/agents/studio/${id}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function submitWithoutTitling(id: string, body: unknown): Promise<Response> {
+  return composeApp(false).request(`http://harness.test/agents/studio/${id}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -54,6 +78,7 @@ beforeEach(() => {
   store = new ConversationStore(db);
   served = new Set([MODEL, "google/gemini-3.5-flash"]);
   downstream = "admits";
+  titlingCalls = [];
 });
 
 describe("the turn settings a submission carries", () => {
@@ -146,6 +171,51 @@ describe("the turn settings a submission carries", () => {
     expect(store.count()).toBe(0);
   });
 
+  // The mode is a consent, and it settles the same way the model does: into
+  // the index, before the run is admitted, so the posture the run is decided
+  // under is the one the sender chose.
+  it("settles the permission mode before the run is admitted", async () => {
+    const response = await submit("cnv_mode", {
+      message: "Rearrange these files",
+      permissionMode: "auto-edit",
+    });
+
+    expect(response.status).toBe(202);
+    expect(store.get("cnv_mode")?.permissionMode).toBe("auto-edit");
+  });
+
+  it("keeps a conversation's stored mode when the submission carries none", async () => {
+    store.record({ id: "cnv_held", firstMessage: "Earlier", permissionMode: "full-auto" });
+
+    const response = await submit("cnv_held", { message: "Plain turn" });
+
+    expect(response.status).toBe(202);
+    expect(store.get("cnv_held")?.permissionMode).toBe("full-auto");
+  });
+
+  it("refuses a mode outside the harness's three names instead of translating it", async () => {
+    // The frontend's own picker names are deliberately not accepted here: a
+    // value this boundary cannot describe is a consent it cannot have been
+    // given, and silently mapping it onto a mode would be a grant.
+    const response = await submit("cnv_bad_mode", {
+      message: "Hello",
+      permissionMode: "edits",
+    });
+
+    expect(response.status).toBe(400);
+    expect(store.count()).toBe(0);
+  });
+
+  it("refuses a null mode rather than reading it as any mode", async () => {
+    const response = await submit("cnv_null_mode", {
+      message: "Hello",
+      permissionMode: null,
+    });
+
+    expect(response.status).toBe(400);
+    expect(store.count()).toBe(0);
+  });
+
   it("passes a submission through untouched when it carries no settings object", async () => {
     const response = await submit("cnv_plain", { message: "Just words" });
 
@@ -157,7 +227,7 @@ describe("the turn settings a submission carries", () => {
   });
 
   it("touches nothing that is not a studio submission", async () => {
-    const app = composeApp();
+    const app = composeApp(true);
     await app.request("http://harness.test/agents/studio/cnv_x/abort", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -165,5 +235,35 @@ describe("the turn settings a submission carries", () => {
     });
 
     expect(store.count()).toBe(0);
+  });
+
+  it("hands a first admission's message to titling, and only that", async () => {
+    const response = await submit("cnv_titled", {
+      message: "Can you help me figure out why my build keeps failing?",
+    });
+
+    expect(response.status).toBe(202);
+    expect(titlingCalls).toEqual([
+      {
+        conversationId: "cnv_titled",
+        message: "Can you help me figure out why my build keeps failing?",
+      },
+    ]);
+
+    // A later turn of the same conversation is not a first admission; the
+    // words have already been handed over once.
+    await submit("cnv_titled", { message: "Second turn entirely" });
+    expect(titlingCalls).toHaveLength(1);
+  });
+
+  it("hands nothing to titling when the middleware runs without it", async () => {
+    // Composing without a titler is the tests' own shape; it must stay
+    // silent rather than reach for a titler that was never composed.
+    const response = await submitWithoutTitling("cnv_unwired", {
+      message: "First words",
+    });
+
+    expect(response.status).toBe(202);
+    expect(store.get("cnv_unwired")).toBeDefined();
   });
 });

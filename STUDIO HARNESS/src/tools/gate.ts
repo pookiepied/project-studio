@@ -32,6 +32,7 @@ interface RegisteredTool {
   readonly resourceKind: ToolDefinition<unknown, unknown>["resourceKind"];
   readonly parse: (input: unknown) => unknown;
   readonly resource: (input: unknown, context: ToolContext) => string | undefined;
+  readonly resources?: (input: unknown, context: ToolContext) => readonly string[];
   readonly execute: (input: unknown, context: ToolContext) => Promise<unknown>;
 }
 
@@ -265,21 +266,31 @@ export class CallGate {
       // is refused whatever the permissions say, and it must never reach the
       // matcher: `src/../../.ssh/id_rsa` would otherwise be tested against a
       // rule scoped to `src/**` in its unresolved form and pass.
-      const resource = tool.resource(input, context);
-
-      await this.#kernel.authorize(
-        tool.descriptor.id,
-        call.scope,
-        {
-          resource,
-          kind: tool.resourceKind,
-          // Supplied so the kernel can offer "this project" as an approval scope
-          // and, more importantly, so it can offer nothing above it.
-          root: this.#sandbox.policy.workspaceRoot,
-        },
-        call.signal,
-      );
-
+      //
+      // A tool may name more than one resource - a command line that chains
+      // three programs is three decisions, not one - and every one of them is
+      // authorized, each under its own name. Falling out of the loop means
+      // every resource was allowed or approved; stopping at the first refusal
+      // means nothing runs.
+      const touched =
+        tool.resources === undefined
+          ? [tool.resource(input, context)]
+          : tool.resources(input, context);
+      for (const resource of touched) {
+        await this.#kernel.authorize(
+          tool.descriptor.id,
+          call.scope,
+          {
+            resource,
+            kind: tool.resourceKind,
+            // Supplied so the kernel can offer "this project" as an approval scope
+            // and, more importantly, so it can offer nothing above it.
+            root: this.#sandbox.policy.workspaceRoot,
+          },
+          call.signal,
+        );
+      }
+      const resource = touched[0];
       // Permission is not containment. Approval says the user agreed; this says
       // we can actually hold the boundary. Both are required, and the sandbox
       // is asked second so an unapproved call is refused before we consider

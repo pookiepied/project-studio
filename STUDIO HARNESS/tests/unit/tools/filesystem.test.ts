@@ -107,10 +107,35 @@ describe("read", () => {
 
   it("refuses a file that is not text", async () => {
     // Returned as text, binary becomes plausible-looking nonsense the model
-    // reasons about as if it were real.
-    writeFileSync(join(workspace, "image.png"), Buffer.from([0x89, 0x50, 0x00, 0x01]));
+    // reasons about as if it were real. Not a .png - a picture is no longer
+    // "not text", it is an attachment.
+    writeFileSync(join(workspace, "data.bin"), Buffer.from([0x89, 0x50, 0x00, 0x01]));
 
-    await expect(read({ path: "image.png" })).rejects.toThrow(/not text/i);
+    await expect(read({ path: "data.bin" })).rejects.toThrow(/not text/i);
+  });
+
+  it("suggests near misses when a path does not exist", async () => {
+    // A missing file is the most common failure a read has, and the name
+    // usually differs by a typo, a case, or an extension.
+    await expect(read({ path: "src/ap.ts" })).rejects.toThrow(/Did you mean[\s\S]*app\.ts/);
+    await expect(read({ path: "src/app.tsx" })).rejects.toThrow(/Did you mean[\s\S]*app\.ts/);
+  });
+
+  it("says there is no file when there is nothing to suggest", async () => {
+    // No parent directory to look in, so no near miss either.
+    await expect(read({ path: "nowhere/thing.ts" })).rejects.toThrow(
+      /There is no file at nowhere\/thing\.ts/,
+    );
+  });
+
+  it("does not suggest an unrelated name just because a dotfile stems to empty", async () => {
+    // `.env` stems to "", and includes("") matched everything once. The plain
+    // refusal, anchored exactly, proves no suggestion block was appended.
+    writeFileSync(join(workspace, ".env"), "X=1\n");
+
+    await expect(read({ path: "unrelated-thing.bin" })).rejects.toThrow(
+      /^There is no file at unrelated-thing\.bin\.$/,
+    );
   });
 
   it("refuses a file too large to read at once", async () => {
@@ -125,6 +150,106 @@ describe("read", () => {
 
   it("requires a path", async () => {
     await expect(read({})).rejects.toThrow(/path is required/i);
+  });
+});
+
+describe("read sees pictures", () => {
+  // A 1x1 PNG. The bytes are decoded and re-encoded by the tool, so asserting
+  // the base64 round-trips proves the file reached the model intact.
+  const TINY_PNG =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+  function pictureGate(acceptsImages: (conversationId: string) => boolean | undefined): CallGate {
+    const instance = new CallGate({
+      kernel: new PermissionKernel({
+        grants: new PermissionGrantStore(db),
+        approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
+      }),
+      sandbox: new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace })),
+    });
+    registerFilesystemTools(instance, new FileAccessLog(), { acceptsImages });
+    return instance;
+  }
+
+  function contentBlocksOf(value: unknown): readonly unknown[] | undefined {
+    if (typeof value !== "object" || value === null || !("content" in value)) return undefined;
+    const content = value.content;
+    return Array.isArray(content) ? content : undefined;
+  }
+
+  function isImageBlock(
+    block: unknown,
+  ): block is { type: "image"; data: string; mimeType: string } {
+    return (
+      typeof block === "object" &&
+      block !== null &&
+      "type" in block &&
+      block.type === "image" &&
+      "data" in block &&
+      "mimeType" in block
+    );
+  }
+
+  beforeEach(() => {
+    writeFileSync(join(workspace, "logo.png"), Buffer.from(TINY_PNG, "base64"));
+  });
+
+  it("returns an image as an attachment when the model can see it", async () => {
+    const result = await pictureGate(() => true).call({
+      name: "native/read",
+      input: { path: "logo.png" },
+      scope: SCOPE,
+    });
+
+    const blocks = contentBlocksOf(result);
+    expect(blocks).toHaveLength(2);
+    const image = blocks?.find(isImageBlock);
+    expect(image?.mimeType).toBe("image/png");
+    expect(image?.data).toBe(TINY_PNG);
+  });
+
+  it("returns the attachment when acceptance is merely unknown", async () => {
+    // The catalog not describing a model is not evidence that the model is
+    // blind; only an explicit "unsupported" refuses.
+    const result = await pictureGate(() => undefined).call({
+      name: "native/read",
+      input: { path: "logo.png" },
+      scope: SCOPE,
+    });
+
+    expect(contentBlocksOf(result)).toHaveLength(2);
+  });
+
+  it("refuses with a sentence rather than a wall of base64 for a text-only model", async () => {
+    await expect(
+      pictureGate(() => false).call({
+        name: "native/read",
+        input: { path: "logo.png" },
+        scope: SCOPE,
+      }),
+    ).rejects.toThrow(/does not accept image input/);
+  });
+
+  it("refuses a PDF, which nothing downstream can carry yet", async () => {
+    writeFileSync(join(workspace, "doc.pdf"), Buffer.from("%PDF-1.4\n"));
+
+    await expect(read({ path: "doc.pdf" })).rejects.toThrow(/PDF/);
+  });
+
+  it("keeps the read recorded, so the access log stays the one answer", async () => {
+    const log = new FileAccessLog();
+    const instance = new CallGate({
+      kernel: new PermissionKernel({
+        grants: new PermissionGrantStore(db),
+        approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
+      }),
+      sandbox: new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace })),
+    });
+    registerFilesystemTools(instance, log, { acceptsImages: () => true });
+
+    await instance.call({ name: "native/read", input: { path: "logo.png" }, scope: SCOPE });
+
+    expect(log.get(SCOPE, join(workspace, "logo.png"))).toBeDefined();
   });
 });
 

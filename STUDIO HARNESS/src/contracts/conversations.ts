@@ -1,6 +1,7 @@
 import * as v from "valibot";
 
 import { reasoningChoiceSchema } from "./models.js";
+import { executionModeSchema } from "../permissions/mode.js";
 
 /**
  * The conversation index contract.
@@ -20,6 +21,14 @@ import { reasoningChoiceSchema } from "./models.js";
  * the reasoning effort: a level, "default", or null - null and "default" are
  * the same state, kept distinct on the wire only so a choice is never turned
  * into an absence by a parser.
+ *
+ * `permissionMode` is the same shape of fact for the execution mode: the
+ * per-conversation answer to "what does an unapproved call do", stored in the
+ * harness's own vocabulary (`manual` / `auto-edit` / `full-auto`) and
+ * validated at every boundary that accepts one. It never reads as null - the
+ * store maps an unset row to Manual before this schema sees it, because an
+ * absent consent IS Manual and a nullable mode would put a fourth state
+ * beside three real ones.
  */
 
 export const conversationIdSchema = v.pipe(v.string(), v.minLength(1));
@@ -48,6 +57,7 @@ export const conversationRecordSchema = v.object({
   archived: v.boolean(),
   modelId: v.nullable(v.pipe(v.string(), v.minLength(1))),
   reasoningLevel: v.nullable(reasoningChoiceSchema),
+  permissionMode: executionModeSchema,
   createdAt: v.number(),
   lastTurnAt: v.number(),
 });
@@ -67,6 +77,9 @@ export type ConversationRecord = v.InferOutput<typeof conversationRecordSchema>;
  * with. They are normally written by the turn-settings middleware at
  * admission, before the run's initializer reads them; a create call carrying
  * them lands on an existing row through this schema and is the same write.
+ * `permissionMode` rides beside them on the same terms: a value here is the
+ * mode the conversation is held with from that turn on, absent leaves the
+ * stored answer (unset reads as Manual) standing.
  */
 export const conversationCreateSchema = v.object({
   id: conversationIdSchema,
@@ -74,6 +87,7 @@ export const conversationCreateSchema = v.object({
   projectId: v.optional(v.nullable(conversationIdSchema)),
   modelId: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
   reasoningLevel: v.optional(v.nullable(reasoningChoiceSchema)),
+  permissionMode: v.optional(executionModeSchema),
   createdAt: v.optional(v.number()),
 });
 
@@ -87,7 +101,10 @@ export type ConversationCreateInput = v.InferInput<typeof conversationCreateSche
  * `modelId` and `reasoningLevel` settle the conversation's settings before any
  * turn runs. null clears the model back to the stable default alias - the
  * picker's "Studio default" row is that write - and a level choice replaces
- * whatever was stored, "default" included.
+ * whatever was stored, "default" included. `permissionMode` patches the same
+ * way minus the null: Manual is the bottom of the scale, not a clearing of
+ * it, so an absent key leaves the stored mode alone and a named one replaces
+ * it.
  */
 export const conversationPatchSchema = v.object({
   title: v.optional(v.pipe(v.string(), v.minLength(1))),
@@ -96,6 +113,7 @@ export const conversationPatchSchema = v.object({
   projectId: v.optional(v.nullable(conversationIdSchema)),
   modelId: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
   reasoningLevel: v.optional(v.nullable(reasoningChoiceSchema)),
+  permissionMode: v.optional(executionModeSchema),
   lastTurnAt: v.optional(v.number()),
 });
 

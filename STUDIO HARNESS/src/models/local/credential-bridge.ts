@@ -1,4 +1,5 @@
 import type {
+  ApiKeyCredential,
   Credential,
   CredentialInfo,
   CredentialStore,
@@ -52,6 +53,16 @@ export function assertValidProviderId(providerId: string): string {
 
 export class PiCredentialStore implements CredentialStore {
   readonly #secrets: SecureCredentialStore;
+  /**
+   * Resolves a provider's key from the merged connection store, when the
+   * bridge is wired to one. Checked before the legacy entry: a key the user
+   * typed into the settings surface outranks one an older build wrote to the
+   * bridge's own location. Without it, the bridge reads only its own entries,
+   * which is the whole of the legacy behaviour.
+   */
+  readonly #connectionKey:
+    | ((providerId: string) => Promise<string | undefined>)
+    | undefined;
 
   /**
    * Per-provider write serialization. Pi documents `modify` as the only write
@@ -61,12 +72,23 @@ export class PiCredentialStore implements CredentialStore {
    */
   readonly #queues = new Map<string, Promise<unknown>>();
 
-  constructor(secrets: SecureCredentialStore) {
+  constructor(
+    secrets: SecureCredentialStore,
+    connectionKey?: (providerId: string) => Promise<string | undefined>,
+  ) {
     this.#secrets = secrets;
+    this.#connectionKey = connectionKey;
   }
 
   async read(providerId: string): Promise<Credential | undefined> {
     assertValidProviderId(providerId);
+    if (this.#connectionKey !== undefined) {
+      const fromConnection = await this.#connectionKey(providerId);
+      if (fromConnection !== undefined && fromConnection !== "") {
+        const credential: ApiKeyCredential = { type: "api_key", key: fromConnection };
+        return credential;
+      }
+    }
     return this.#read(providerId);
   }
 
@@ -222,4 +244,59 @@ export class PiCredentialStore implements CredentialStore {
 
 function key(id: string): CredentialKey {
   return { scope: "provider", id };
+}
+
+/**
+ * Reads one provider credential from the bridge's own keychain format, for
+ * callers outside this module that need to know whether a legacy entry exists
+ * and what it holds.
+ *
+ * The merged connection store resolves a connection's key from its own entry
+ * first and this legacy location second, which is how a provider connected
+ * before the stores were unified keeps working with nothing retyped. The
+ * value is returned to the caller only - never logged, never stored elsewhere.
+ */
+export async function readStoredProviderCredential(
+  secrets: SecureCredentialStore,
+  providerId: string,
+): Promise<{ readonly type: "api_key" | "oauth"; readonly apiKey?: string } | undefined> {
+  assertValidProviderId(providerId);
+  const raw = await readRawChunked(secrets, providerId);
+  if (raw === undefined) return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return undefined;
+    const type = parsed.type;
+    if (type !== "api_key" && type !== "oauth") return undefined;
+    return {
+      type,
+      ...(type === "api_key" && typeof parsed.key === "string" ? { apiKey: parsed.key } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function readRawChunked(secrets: SecureCredentialStore, id: string): Promise<string | undefined> {
+  const first = await secrets.get(key(id));
+  if (first === null) return undefined;
+
+  const match = /^v1:(\d+):/.exec(first);
+  if (!match) return undefined;
+
+  const count = Number(match[1]);
+  let value = first.slice(match[0].length);
+  for (let index = 1; index < count; index += 1) {
+    const chunk = await secrets.get(key(`${id}.${index}`));
+    // A missing chunk means a partial write; treat the value as absent
+    // rather than returning a truncated credential.
+    if (chunk === null) return undefined;
+    value += chunk;
+  }
+  return value;
 }

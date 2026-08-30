@@ -3,6 +3,7 @@ import * as v from "valibot";
 import type { ConversationCreateInput } from "../contracts/conversations.js";
 import type { ConversationRecord } from "../contracts/conversations.js";
 import { reasoningChoiceSchema, type ReasoningChoice } from "../contracts/models.js";
+import { isExecutionMode, type ExecutionMode } from "../permissions/mode.js";
 import { StorageError, storageErrorFrom } from "../storage/errors.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { deriveTitle } from "./title.js";
@@ -37,6 +38,7 @@ interface Row {
   archived: number;
   model_id: string | null;
   reasoning_level: string | null;
+  permission_mode: string | null;
   created_at: number;
   last_turn_at: number;
 }
@@ -53,6 +55,19 @@ function toReasoningChoice(value: string | null): ReasoningChoice | null {
   return parsed.success ? parsed.output : null;
 }
 
+/**
+ * The stored execution mode, read back as one of the three real ones.
+ *
+ * There is no null here on purpose: the column is nullable (migration 17
+ * writes nothing a user did not choose), but an absent answer IS Manual - a
+ * consent nobody recorded is a consent that was not given. A value that no
+ * longer parses reads the same way, for the same reason an unreadable level
+ * reads as unset: a corrupted answer must never widen what a run may do.
+ */
+function toExecutionMode(value: string | null): ExecutionMode {
+  return isExecutionMode(value) ? value : "manual";
+}
+
 function toRecord(row: Row): ConversationRecord {
   return {
     id: row.id,
@@ -63,6 +78,7 @@ function toRecord(row: Row): ConversationRecord {
     archived: row.archived === 1,
     modelId: row.model_id,
     reasoningLevel: toReasoningChoice(row.reasoning_level),
+    permissionMode: toExecutionMode(row.permission_mode),
     createdAt: row.created_at,
     lastTurnAt: row.last_turn_at,
   };
@@ -157,6 +173,7 @@ export class ConversationStore {
       archived: 0,
       model_id: input.modelId ?? null,
       reasoning_level: input.reasoningLevel ?? null,
+      permission_mode: input.permissionMode ?? null,
       created_at: input.createdAt ?? Date.now(),
       last_turn_at: input.createdAt ?? Date.now(),
     };
@@ -167,9 +184,9 @@ export class ConversationStore {
           .prepare(
             `INSERT INTO conversation (
                id, title, title_manual, project_id, pinned, archived,
-               model_id, reasoning_level, created_at, last_turn_at
+               model_id, reasoning_level, permission_mode, created_at, last_turn_at
              )
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             row.id,
@@ -180,6 +197,7 @@ export class ConversationStore {
             row.archived,
             row.model_id,
             row.reasoning_level,
+            row.permission_mode,
             row.created_at,
             row.last_turn_at,
           );
@@ -202,11 +220,22 @@ export class ConversationStore {
    */
   #settledSettings(
     input: ConversationCreateInput,
-  ): { modelId?: string | null; reasoningLevel?: string | null } | undefined {
-    if (input.modelId === undefined && input.reasoningLevel === undefined) return undefined;
+  ): {
+    modelId?: string | null;
+    reasoningLevel?: string | null;
+    permissionMode?: ExecutionMode;
+  } | undefined {
+    if (
+      input.modelId === undefined &&
+      input.reasoningLevel === undefined &&
+      input.permissionMode === undefined
+    ) {
+      return undefined;
+    }
     return {
       ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
       ...(input.reasoningLevel === undefined ? {} : { reasoningLevel: input.reasoningLevel }),
+      ...(input.permissionMode === undefined ? {} : { permissionMode: input.permissionMode }),
     };
   }
 
@@ -254,6 +283,7 @@ export class ConversationStore {
       projectId?: string | null | undefined;
       modelId?: string | null | undefined;
       reasoningLevel?: string | null | undefined;
+      permissionMode?: ExecutionMode | undefined;
       lastTurnAt?: number | undefined;
     },
   ): ConversationRecord {
@@ -293,6 +323,13 @@ export class ConversationStore {
       assignments.push("reasoning_level = ?");
       values.push(change.reasoningLevel);
     }
+    // The mode has no null the way the model has: Manual is the bottom of the
+    // scale rather than a clearing of it, so an absent key leaves the stored
+    // answer alone and a named mode replaces it outright.
+    if (change.permissionMode !== undefined) {
+      assignments.push("permission_mode = ?");
+      values.push(change.permissionMode);
+    }
     // Recency is a patch like any other, because the only caller that has it
     // is the one sending the receipt of a later turn. Applied with MAX for the
     // same reason `touch` is: two windows stamping one conversation must not
@@ -316,6 +353,40 @@ export class ConversationStore {
       }
     }
     return this.get(id) as ConversationRecord;
+  }
+
+  /**
+   * Writes an automatic title, only while the conversation is still unnamed
+   * by a person.
+   *
+   * The automatic titling agent and a person's rename can race - the model
+   * works for a few seconds after the first exchange settles, and a rename
+   * can land inside that window - so the guard lives in the statement rather
+   * than around it: the row is written only while `title_manual` is still 0,
+   * and a rename that arrived first wins without anyone re-reading. This is
+   * deliberately not `patch` with a flag: `patch` sets `title_manual`, which
+   * is the column's promise that a person typed the title, and a machine
+   * write must not spend that promise.
+   *
+   * Undefined means the write did not happen - the row was renamed first,
+   * or the row is gone (a conversation purged while its title job ran). Both
+   * end the job; neither is a fault to surface.
+   */
+  titleAutomatically(id: string, title: string): ConversationRecord | undefined {
+    try {
+      this.#db.transaction(() => {
+        this.#db
+          .prepare(
+            `UPDATE conversation SET title = ? WHERE id = ? AND title_manual = 0`,
+          )
+          .run(title, id);
+      });
+    } catch (error) {
+      throw storageErrorFrom(error);
+    }
+    const row = this.get(id);
+    if (row === undefined || row.titleManual) return undefined;
+    return row;
   }
 
   /**

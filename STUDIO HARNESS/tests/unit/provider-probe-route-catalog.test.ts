@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
-import { ProviderManagementService } from "../../src/application/provider-management.js";
+import { ProviderManagementService } from "../../src/providers/management.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { ConnectionStore } from "../../src/providers/connection-store.js";
 import { ModelCatalog } from "../../src/providers/model-catalog.js";

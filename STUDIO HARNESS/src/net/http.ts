@@ -96,7 +96,13 @@ export interface HttpRequestOptions {
   readonly author: UrlAuthor;
   readonly method?: string;
   readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string;
+  /**
+   * Text or bytes. The socket layer has always accepted both - `write` does -
+   * so widening the type only names what was already true; the multipart
+   * uploads the transcription endpoints need are the first callers that had
+   * to say it.
+   */
+  readonly body?: string | Uint8Array;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
   readonly maxBytes?: number;
@@ -108,6 +114,14 @@ export interface HttpResponse {
   readonly headers: Readonly<Record<string, string>>;
   readonly body: string;
   /** The address that actually answered, after any redirects. */
+  readonly url: string;
+}
+
+/** A response whose body is bytes, not text: audio, primarily. */
+export interface HttpBinaryResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly bytes: Buffer;
   readonly url: string;
 }
 
@@ -179,6 +193,26 @@ async function readBody(response: IncomingMessage, maxBytes: number): Promise<st
   });
 }
 
+/** The same read, keeping bytes as bytes: audio responses arrive as audio. */
+async function readBodyBytes(response: IncomingMessage, maxBytes: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+
+    response.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        response.destroy();
+        reject(new HttpError("too_large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    response.on("end", () => resolve(Buffer.concat(chunks)));
+    response.on("error", (error) => reject(new HttpError("unreachable", { cause: error })));
+  });
+}
+
 /**
  * Headers that may survive a move to a different origin.
  *
@@ -205,7 +239,7 @@ async function sendOnce(
   options: {
     readonly method: string;
     readonly headers: Readonly<Record<string, string>>;
-    readonly body: string | undefined;
+    readonly body: string | Uint8Array | undefined;
     readonly signal: AbortSignal;
   },
 ): Promise<IncomingMessage> {
@@ -337,4 +371,17 @@ export async function requestDirect(options: HttpRequestOptions): Promise<HttpRe
   const stream = await requestStream(options);
   const body = await readBody(stream.body, options.maxBytes ?? DEFAULT_MAX_BYTES);
   return { status: stream.status, headers: stream.headers, body, url: stream.url };
+}
+
+/**
+ * The same request, with the body read to the end and kept as bytes.
+ *
+ * Written as a wrapper on the same `requestStream`, for the same reason
+ * `requestDirect` is: one judge-and-pin path, not two. The 303 rule holds -
+ * a redirect turns the request into a GET, and a GET has no body to keep.
+ */
+export async function requestBinary(options: HttpRequestOptions): Promise<HttpBinaryResponse> {
+  const stream = await requestStream(options);
+  const bytes = await readBodyBytes(stream.body, options.maxBytes ?? DEFAULT_MAX_BYTES);
+  return { status: stream.status, headers: stream.headers, bytes, url: stream.url };
 }

@@ -123,7 +123,7 @@ function flag(value: unknown, name: string): boolean {
 
 function clip(text: string): string {
   return text.length > MAX_LINE_LENGTH
-    ? `${text.slice(0, MAX_LINE_LENGTH)}… [line truncated]`
+    ? `${text.slice(0, MAX_LINE_LENGTH)}... [line truncated]`
     : text;
 }
 

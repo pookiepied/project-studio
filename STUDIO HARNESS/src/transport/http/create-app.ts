@@ -5,14 +5,17 @@ import type { AdmissionVerifier } from "../../admission/verifier.js";
 import { ADMISSION_SCOPES } from "../../admission/scopes.js";
 import type { PermissionApprovalBroker } from "../../application/approval-broker.js";
 import type { McpAdministration } from "../../application/mcp-management.js";
-import type { ProviderAdministration } from "../../application/provider-management.js";
+import type { ProviderAdministration } from "../../providers/management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
+import type { MediaAdministration } from "../../media/service.js";
 import type { ConversationStore } from "../../conversations/store.js";
 import type { ProjectStore } from "../../projects/store.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createTurnSettingsMiddleware } from "./middleware/turn-settings.js";
+import type { ConversationTitlingPort } from "../../conversations/titling.js";
 import { createConversationRoutes } from "./routes/conversations.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
+import { createMediaRoutes } from "./routes/media.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 import { createProjectRoutes } from "./routes/projects.js";
@@ -29,9 +32,20 @@ export interface CreateHttpAppOptions {
    * tree and scope, kept separate because its storage and vocabulary are.
    */
   readonly retrieval: RetrievalAdministration;
+  /**
+   * The media surface - dictation and read-aloud. The person is the invoker,
+   * so it mounts beside the conversation routes rather than the tools.
+   */
+  readonly media: MediaAdministration;
   readonly approvals: PermissionApprovalBroker;
   /** The conversation index: rows, never transcript content. */
   readonly conversations: ConversationStore;
+  /**
+   * The automatic titling port, when a titler was composed. The turn-settings
+   * middleware hands it every first admission's message; absent means no
+   * titling happens, which tests rely on and production must not.
+   */
+  readonly titling?: ConversationTitlingPort;
   /** Projects and their folders over the same database. */
   readonly projects: ProjectStore;
   readonly admission: AdmissionVerifier;
@@ -63,6 +77,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/mcp", createMcpRoutes(options.servers));
   app.route("/api/providers", createProviderRoutes(options.providers));
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
+  app.route("/api/media", createMediaRoutes(options.media));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));
@@ -78,6 +93,7 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
     createTurnSettingsMiddleware({
       conversations: options.conversations,
       isModelServed: options.isModelServed,
+      ...(options.titling === undefined ? {} : { titling: options.titling }),
     }),
   );
   agentRoutes.route("/", options.flueApp ?? flue());

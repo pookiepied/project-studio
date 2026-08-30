@@ -6,7 +6,7 @@ import { ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
-import { ProviderManagementService } from "../../src/application/provider-management.js";
+import { ProviderManagementService } from "../../src/providers/management.js";
 import { RetrievalManagementService } from "../../src/application/retrieval-management.js";
 import { RetrievalSettingsStore } from "../../src/retrieval/settings.js";
 import { ConversationStore } from "../../src/conversations/store.js";
@@ -71,6 +71,10 @@ beforeEach(() => {
       settings: new RetrievalSettingsStore(db),
       credentials,
     }),
+    media: {
+      transcribe: () => Promise.resolve({ text: "" }),
+      speak: () => Promise.resolve({ audio: "", mimeType: "audio/mpeg" }),
+    },
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
     conversations: new ConversationStore(db),
     projects: new ProjectStore(db),

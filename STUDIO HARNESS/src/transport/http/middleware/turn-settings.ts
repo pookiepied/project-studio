@@ -6,6 +6,8 @@ import {
   type SubmissionTurnSettings,
 } from "../../../contracts/agents.js";
 import type { ReasoningChoice } from "../../../contracts/models.js";
+import type { ExecutionMode } from "../../../permissions/mode.js";
+import type { ConversationTitlingPort } from "../../../conversations/titling.js";
 import type { ConversationStore } from "../../../conversations/store.js";
 
 /**
@@ -24,21 +26,25 @@ import type { ConversationStore } from "../../../conversations/store.js";
  * That read is the race this middleware closes. The webview posts the
  * submission, and only after the receipt posts the index row for a first
  * conversation - so a first turn's run could start before its row existed and
- * take the default model. Here, on the way in, the body's `modelId` and
- * `reasoningLevel` are parsed, validated, and written to the index before
- * `next()` admits the run. The initializer can no longer observe the gap:
- * whatever it reads, the row already holds what this turn was sent with.
+ * take the default model. Here, on the way in, the body's `modelId`,
+ * `reasoningLevel`, and `permissionMode` are parsed, validated, and written to
+ * the index before `next()` admits the run. The initializer can no longer
+ * observe the gap: whatever it reads, the row already holds what this turn
+ * was sent with.
  *
  * ---- What is validated, and what happens to the fields ---------------------
  *
- * The two fields are parsed through `submissionTurnSettingsSchema`; anything
+ * The fields are parsed through `submissionTurnSettingsSchema`; anything
  * else in the body is ignored, and Flue strips the two from the payload it
  * stores. A body whose settings do not parse is refused before admission - a
  * run launched on a value the contract cannot describe is worse than a
  * refused send. A `modelId` that names no model the harness currently serves
  * is refused the same way: the picker only offers such models, so a mismatch
  * means a connection or model vanished between picking and sending, and a
- * clear 400 beats a run that dies resolving its model.
+ * clear 400 beats a run that dies resolving its model. A `permissionMode`
+ * outside the harness's three names is refused rather than translated: the
+ * mode is a consent, and silently mapping some other name onto one of the
+ * three would grant a consent nobody gave.
  *
  * ---- The refusal rule ------------------------------------------------------
  *
@@ -68,6 +74,15 @@ export interface TurnSettingsMiddlewareOptions {
    * picker was filled from.
    */
   readonly isModelServed: (modelId: string) => Promise<boolean>;
+  /**
+   * The titling port, when the composition built a titler. This middleware
+   * is the one place that reads a first submission's message on the way in -
+   * the same read that derives the fallback title - so it is the one place
+   * that can hand the words to the automatic titling. Optional only for
+   * tests; production always wires it, because a composition that forgets it
+   * silently keeps every conversation on the eight-word derivation.
+   */
+  readonly titling?: ConversationTitlingPort;
 }
 
 const AGENT_SUBMISSION_PATH = /^\/agents\/studio\/([^/]+)$/;
@@ -124,8 +139,16 @@ export function createTurnSettingsMiddleware(
         ...(settings.reasoningLevel === undefined
           ? {}
           : { reasoningLevel: settings.reasoningLevel }),
+        ...(settings.permissionMode === undefined
+          ? {}
+          : { permissionMode: settings.permissionMode }),
         createdAt: Date.now(),
       });
+      // The same words the derivation used are what the titling agent will
+      // read if this exchange settles: the trigger lives there, the capture
+      // lives here, because this is the only moment the message crosses the
+      // harness.
+      options.titling?.firstAdmission(conversationId, message);
       await next();
       if (context.res.status >= 400) {
         // The send was refused: the row this request created leaves with it.
@@ -134,12 +157,19 @@ export function createTurnSettingsMiddleware(
       return;
     }
 
-    if (settings.modelId !== undefined || settings.reasoningLevel !== undefined) {
+    if (
+      settings.modelId !== undefined ||
+      settings.reasoningLevel !== undefined ||
+      settings.permissionMode !== undefined
+    ) {
       options.conversations.patch(conversationId, {
         ...(settings.modelId === undefined ? {} : { modelId: settings.modelId }),
         ...(settings.reasoningLevel === undefined
           ? {}
           : { reasoningLevel: settings.reasoningLevel }),
+        ...(settings.permissionMode === undefined
+          ? {}
+          : { permissionMode: settings.permissionMode }),
       });
     }
     await next();
@@ -153,17 +183,22 @@ function refusal(context: Context, message: string): Response {
 
 /**
  * Normalizes the parsed settings into the patch shape: absent stays absent,
- * and null (clear to the default) passes through as a value.
+ * and null (clear to the default) passes through as a value. The mode has no
+ * null - Manual is a real answer, not a clearing of one - so it cannot
+ * arrive here as one.
  */
 function readSettings(output: SubmissionTurnSettings): {
   modelId?: string | null;
   reasoningLevel?: ReasoningChoice | null;
+  permissionMode?: ExecutionMode;
 } {
   const modelId = output.modelId;
   const reasoningLevel = output.reasoningLevel;
+  const permissionMode = output.permissionMode;
   return {
     ...(modelId === undefined ? {} : { modelId }),
     ...(reasoningLevel === undefined ? {} : { reasoningLevel }),
+    ...(permissionMode === undefined ? {} : { permissionMode }),
   };
 }
 

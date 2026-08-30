@@ -10,7 +10,7 @@ import {
 /**
  * Which provider fills each slot.
  *
- * The non-secret half, exactly as `ProviderSettingsStore` is for BYOK models.
+ * The non-secret half, exactly as the merged provider store is for BYOK models.
  * The API key is in the OS keychain and is never read here; what lives in
  * SQLite is the choice, because a keychain cannot enumerate itself and a
  * settings screen has to render something.

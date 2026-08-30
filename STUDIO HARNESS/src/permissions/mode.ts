@@ -1,3 +1,5 @@
+import * as v from "valibot";
+
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
 import { hasElevatedEffect } from "../contracts/effects.js";
 
@@ -42,6 +44,19 @@ export function describeMode(mode: ExecutionMode): string {
 export function isExecutionMode(value: unknown): value is ExecutionMode {
   return typeof value === "string" && EXECUTION_MODES.includes(value as ExecutionMode);
 }
+
+/**
+ * The mode on the wire.
+ *
+ * Built from `EXECUTION_MODES` rather than a second literal, so the vocabulary
+ * the submission body, the conversation index, and the mode resolver accept is
+ * one list in one file. These are the harness names - `manual`, `auto-edit`,
+ * `full-auto` - and they are the only ones any wire value is validated against;
+ * a caller that speaks another name is refused at the boundary, never
+ * translated. Whatever labels a picker shows are the frontend's own concern,
+ * on its own side of that boundary.
+ */
+export const executionModeSchema = v.picklist(EXECUTION_MODES);
 
 /**
  * Whether this mode may proceed without a person watching.

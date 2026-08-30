@@ -33,7 +33,7 @@ export interface RunningHarness {
 }
 
 function tail(value: string): string {
-  return value.length > 2_000 ? `…${value.slice(-2_000)}` : value;
+  return value.length > 2_000 ? `...${value.slice(-2_000)}` : value;
 }
 
 function safeOutput(value: string, credential: string): string {

@@ -12,6 +12,7 @@ import { registerApiProvider, registerProvider } from "@flue/runtime";
 import {
   defaultModelReference,
   ModelResolutionError,
+  STUDIO_MODEL_ID,
   type ModelCapability,
   type ModelDescriptor,
   type ModelProviderAdapter,
@@ -35,9 +36,12 @@ const TEST_CAPABILITY: ModelCapability = {
   embeddings: "unsupported",
   reranking: "unsupported",
   imageGeneration: "unsupported",
+  imageEditing: "unsupported",
   videoGeneration: "unsupported",
   speechGeneration: "unsupported",
   transcription: "unsupported",
+  webSearch: "unsupported",
+  webFetch: "unsupported",
   contextWindow: CONTEXT_WINDOW,
   maxOutputTokens: MAX_OUTPUT_TOKENS,
 };
@@ -406,5 +410,12 @@ export class TestModelProviderAdapter implements ModelProviderAdapter {
 
   listModels(): readonly ModelDescriptor[] {
     return [this.resolve(defaultModelReference(this.source))];
+  }
+
+  async backgroundModel(skip = 0): Promise<string | undefined> {
+    // The test source serves one model and costs nothing, so the cheapest
+    // reachable model is the alias itself, and the ladder has one rung.
+    if (skip > 0) return undefined;
+    return STUDIO_MODEL_ID;
   }
 }

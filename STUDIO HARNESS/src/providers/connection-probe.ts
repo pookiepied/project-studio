@@ -5,7 +5,7 @@ import {
   requestDirect,
   type HttpResponse,
 } from "../net/http.js";
-import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
+import { majorityBaseUrlFor } from "./library/language-catalog.js";
 
 /**
  * 8 seconds. A model list is one small JSON document — served from a warm
@@ -40,6 +40,12 @@ export const PROBE_TIMEOUT_MS = 8_000;
 interface ProbeTarget {
   /** The exact URL the probe requests. */
   readonly url: string;
+  /**
+   * The API base the probe resolved, path included, where a vendor-specific
+   * follow-up request could be sent. Present only for the bearer-style list
+   * endpoints a public-list quirk can apply to.
+   */
+  readonly base?: string;
   readonly headers: Record<string, string>;
 }
 
@@ -47,172 +53,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * The base URL a catalog-backed connection probes when the user never typed
- * one.
- *
- * Pi's generated catalog carries `baseUrl` per model, not per provider, and
- * for five providers the models disagree (region- or path-shaped differences:
- * amazon-bedrock's two regions, cloudflare-ai-gateway's per-upstream paths,
- * fireworks/opencode/opencode-go differing by a trailing `/v1`). The rule is
- * the majority URL, ties broken by first occurrence in catalog order —
- * deterministic, and when models disagree there is no answer that is right
- * for all of them, only one that is right for most. `azure-openai-responses`
- * has no baseUrl on any model (its URLs are per-deployment), so it resolves
- * to undefined and such a connection keeps the honest no-address message
- * until the user supplies one.
- */
-export function catalogBaseUrlFor(catalogProvider: string): string | undefined {
-  const known = getBuiltinProviders().find((provider) => provider === catalogProvider);
-  if (known === undefined) return undefined;
-
-  const counts = new Map<string, number>();
-  for (const model of getBuiltinModels(known)) {
-    const url = model.baseUrl;
-    if (typeof url !== "string" || url.length === 0) continue;
-    counts.set(url, (counts.get(url) ?? 0) + 1);
-  }
-
-  // Strictly-greater over an insertion-ordered Map: first-seen wins ties.
-  let best: string | undefined;
-  let bestCount = 0;
-  for (const [url, count] of counts) {
-    if (count > bestCount) {
-      best = url;
-      bestCount = count;
-    }
-  }
-  return best;
-}
-
-/**
- * Where "list models" lives for each protocol, and how the credential is
- * presented there.
- *
- * Retrieval protocols have no model list anywhere in their APIs, so their
- * probe is the base address itself: reachability plus whether the credential
- * was accepted. `modelCount` stays absent for them — reporting 0 would claim
- * a count nobody can make.
- */
-function probeTarget(
-  connection: ProviderConnection,
-  apiKey: string | undefined,
-): ProbeTarget | undefined {
-  // An explicit baseUrl always wins — a user who typed a URL meant it. Only
-  // when the connection never had one does the catalog answer, and where the
-  // URL came from is an implementation detail the result never mentions.
-  const base =
-    connection.baseUrl ?? catalogBaseUrlFor(connection.catalogProvider ?? "");
-  if (base === undefined) return undefined;
-  const origin = base.endsWith("/") ? base.slice(0, -1) : base;
-
-  const headers: Record<string, string> = { accept: "application/json" };
-  const bearer = apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
-
-  switch (connection.protocol) {
-    case "openai-completions":
-    case "openai-responses":
-    case "openai-images":
-    case "openrouter-images":
-      return { url: `${origin}/models`, headers: { ...headers, ...bearer } };
-    case "anthropic-messages":
-      return {
-        url: `${origin}/v1/models`,
-        headers: {
-          ...headers,
-          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
-          "anthropic-version": "2023-06-01",
-        },
-      };
-    case "google-generative-ai":
-      return {
-        url: `${origin}/v1beta/models`,
-        headers: {
-          ...headers,
-          ...(apiKey === undefined ? {} : { "x-goog-api-key": apiKey }),
-        },
-      };
-    case "brave":
-      return {
-        url: origin,
-        headers: {
-          ...headers,
-          ...(apiKey === undefined ? {} : { "x-subscription-token": apiKey }),
-        },
-      };
-    case "exa":
-      return {
-        url: origin,
-        headers: {
-          ...headers,
-          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
-        },
-      };
-    case "tavily":
-    case "firecrawl":
-    case "jina":
-      return { url: origin, headers: { ...headers, ...bearer } };
-  }
-}
-
-/**
- * Counts what the endpoint listed, or returns undefined when it listed
- * nothing countable.
- *
- * An empty array is a real answer — zero models — while a body with no array
- * in it is "we could not tell", and the two must not collapse into the same
- * 0. Anthropic paginates its model list, so the count there is the first
- * page's; a probe that paged to exhaustion would stop being one request.
- */
-function countModels(connection: ProviderConnection, body: string): number | undefined {
-  if (connection.kind === "retrieval") return undefined;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body);
-  } catch {
-    return undefined;
-  }
-  if (!isRecord(parsed)) return undefined;
-
-  const list = connection.protocol === "google-generative-ai" ? parsed.models : parsed.data;
-  if (!Array.isArray(list)) return undefined;
-  return list.length;
-}
-
-/**
- * A transport failure in the register of the rest of the file: what happened,
- * in words a person reading a settings screen can act on. The credential
- * never appears — it travelled in a header, and a failure message is not a
- * place it can accidentally reach.
- */
-function failureForTransport(
-  connection: ProviderConnection,
-  error: unknown,
-  timeoutMs: number,
-): string {
-  if (error instanceof HttpError) {
-    if (error.kind === "unreachable") {
-      return `${connection.displayName} could not be reached.`;
-    }
-    if (error.kind === "timeout") {
-      // Never "0 seconds": a caller may pass a sub-second deadline in a test,
-      // and a message that rounds the wait away misdescribes it.
-      const seconds = Math.max(1, Math.round(timeoutMs / 1000));
-      return `${connection.displayName} did not answer within ${seconds} second${seconds === 1 ? "" : "s"}.`;
-    }
-    return `${connection.displayName}: ${error.message}`;
-  }
-  if (error instanceof DestinationError) {
-    // Already written for a reader: "That address is Project Studio's own
-    // service..." says more than a status code could.
-    return error.message;
-  }
-  return `${connection.displayName} could not be probed.`;
-}
-
-export interface ProbeOptions {
-  readonly timeoutMs?: number;
+/** The probe's answer plus what it learned about what the provider serves. */
+export interface DetailedProbeResult extends ProbeResult {
+  /**
+   * The model ids the provider's own list named, present only when the probe
+   * could enumerate a list that carries ids. Consumed by the management
+   * service (which records it) and stripped from the wire response - the
+   * caller's screen wants the count, not four hundred ids.
+   */
+  readonly servedIds?: readonly string[];
 }
 
 export async function probeProviderConnection(
@@ -220,6 +69,65 @@ export async function probeProviderConnection(
   apiKey: string | undefined,
   options: ProbeOptions = {},
 ): Promise<ProbeResult> {
+  const detailed = await probeProviderConnectionDetailed(connection, apiKey, options);
+  const { servedIds: _servedIds, ...result } = detailed;
+  void _servedIds;
+  return result;
+}
+
+/**
+ * Vendors whose model list answers 200 without checking the credential.
+ *
+ * OpenRouter serves `/models` to anyone; a rejected key shows up only on the
+ * authenticated endpoints, `/key` among them. For these, a 2xx list is not
+ * yet a probe pass: one extra authenticated GET asks the vendor whether the
+ * key itself is good, and only then does the probe report success. Keyed by
+ * `catalogProvider` - the vendor, not the protocol - because a self-hosted
+ * OpenAI-compatible endpoint with no such route must not be sent there.
+ */
+const PUBLIC_LIST_VENDORS: Readonly<Record<string, string>> = {
+  openrouter: "/key",
+};
+
+async function checkCredential(
+  connection: ProviderConnection,
+  target: ProbeTarget,
+  apiKey: string | undefined,
+  timeoutMs: number,
+): Promise<DetailedProbeResult | undefined> {
+  if (apiKey === undefined || target.base === undefined) return undefined;
+  const path = PUBLIC_LIST_VENDORS[connection.catalogProvider ?? ""];
+  if (path === undefined) return undefined;
+
+  let response: HttpResponse;
+  try {
+    response = await requestDirect({
+      url: `${target.base}${path}`,
+      author: "user",
+      headers: { ...target.headers },
+      timeoutMs,
+    });
+  } catch {
+    // The list already answered: an unreachable key endpoint is not evidence
+    // of a bad key, and the probe reports what it knows.
+    return undefined;
+  }
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      reachedAt: Date.now(),
+      failure: `${connection.displayName} rejected the credential for this connection.`,
+      status: response.status,
+    };
+  }
+  return undefined;
+}
+
+export async function probeProviderConnectionDetailed(
+  connection: ProviderConnection,
+  apiKey: string | undefined,
+  options: ProbeOptions = {},
+): Promise<DetailedProbeResult> {
   const timeoutMs = options.timeoutMs ?? PROBE_TIMEOUT_MS;
   const reachedAt = Date.now();
 
@@ -292,11 +200,206 @@ export async function probeProviderConnection(
   }
 
   const modelCount = countModels(connection, response.body);
+  const servedIds = listModelIds(connection, response.body);
+  // A list the vendor serves to anyone proves reachability, not the key.
+  // The credential check below is what turns a wrong key into a refusal.
+  const credentialFailure = await checkCredential(connection, target, apiKey, timeoutMs);
+  if (credentialFailure !== undefined) return credentialFailure;
   return {
     ok: true,
     reachedAt,
     status: response.status,
     latencyMs,
     ...(modelCount === undefined ? {} : { modelCount }),
+    ...(servedIds === undefined ? {} : { servedIds }),
   };
+}
+
+/**
+ * The base URL a catalog-backed connection probes when the user never typed
+ * one: the majority URL among the vendor's own models, from the language
+ * catalog that owns that question.
+ */
+export function catalogBaseUrlFor(catalogProvider: string): string | undefined {
+  return majorityBaseUrlFor(catalogProvider);
+}
+
+/**
+ * Where "list models" lives for each protocol, and how the credential is
+ * presented there.
+ *
+ * Retrieval protocols have no model list anywhere in their APIs, so their
+ * probe is the base address itself: reachability plus whether the credential
+ * was accepted. `modelCount` stays absent for them — reporting 0 would claim
+ * a count nobody can make.
+ */
+function probeTarget(
+  connection: ProviderConnection,
+  apiKey: string | undefined,
+): ProbeTarget | undefined {
+  // An explicit baseUrl always wins — a user who typed a URL meant it. Only
+  // when the connection never had one does the catalog answer, and where the
+  // URL came from is an implementation detail the result never mentions.
+  const base =
+    connection.baseUrl ?? catalogBaseUrlFor(connection.catalogProvider ?? "");
+  if (base === undefined) return undefined;
+  const origin = base.endsWith("/") ? base.slice(0, -1) : base;
+
+  const headers: Record<string, string> = { accept: "application/json" };
+  const bearer = apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
+
+  switch (connection.protocol) {
+    case "openai-completions":
+    case "openai-responses":
+    case "mistral-conversations":
+    case "openai-images":
+    case "openrouter-images":
+      return { url: `${origin}/models`, base: origin, headers: { ...headers, ...bearer } };
+    case "azure-openai-responses":
+      // Azure authenticates with its own header, not a bearer token.
+      return {
+        url: `${origin}/models`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "api-key": apiKey }),
+        },
+      };
+    case "elevenlabs":
+      return {
+        url: `${origin}/models`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "xi-api-key": apiKey }),
+        },
+      };
+    case "anthropic-messages":
+      return {
+        url: `${origin}/v1/models`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
+          "anthropic-version": "2023-06-01",
+        },
+      };
+    case "google-generative-ai":
+      return {
+        url: `${origin}/v1beta/models`,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-goog-api-key": apiKey }),
+        },
+      };
+    case "brave":
+      return {
+        url: origin,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-subscription-token": apiKey }),
+        },
+      };
+    case "exa":
+      return {
+        url: origin,
+        headers: {
+          ...headers,
+          ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
+        },
+      };
+    case "tavily":
+    case "firecrawl":
+    case "jina":
+      return { url: origin, base: origin, headers: { ...headers, ...bearer } };
+  }
+}
+
+/** Whether this protocol's probe answers with a list that carries model ids. */
+function listsModels(connection: ProviderConnection): boolean {
+  return connection.kind !== "retrieval";
+}
+
+/**
+ * Counts what the endpoint listed, or returns undefined when it listed
+ * nothing countable.
+ *
+ * An empty array is a real answer — zero models — while a body with no array
+ * in it is "we could not tell", and the two must not collapse into the same
+ * 0. Anthropic paginates its model list, so the count there is the first
+ * page's; a probe that paged to exhaustion would stop being one request.
+ */
+function countModels(connection: ProviderConnection, body: string): number | undefined {
+  if (!listsModels(connection)) return undefined;
+  const list = modelListIn(body, connection);
+  return list?.length;
+}
+
+/**
+ * The model ids the endpoint listed, or undefined when it listed nothing
+ * usable. These are what the catalog later marks availability against, so
+ * they are collected verbatim - no trimming, no normalization - because the
+ * catalog's rows use the provider's own spelling.
+ */
+function listModelIds(
+  connection: ProviderConnection,
+  body: string,
+): readonly string[] | undefined {
+  if (!listsModels(connection)) return undefined;
+  const list = modelListIn(body, connection);
+  if (list === undefined) return undefined;
+
+  const ids: string[] = [];
+  for (const entry of list) {
+    if (!isRecord(entry)) continue;
+    const id = typeof entry.id === "string" ? entry.id : typeof entry.name === "string" ? entry.name : undefined;
+    if (id === undefined) continue;
+    ids.push(id.startsWith("models/") ? id.slice("models/".length) : id);
+  }
+  return ids;
+}
+
+function modelListIn(body: string, connection: ProviderConnection): readonly unknown[] | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) return undefined;
+
+  const list = connection.protocol === "google-generative-ai" ? parsed.models : parsed.data;
+  return Array.isArray(list) ? list : undefined;
+}
+
+/**
+ * A transport failure in the register of the rest of the file: what happened,
+ * in words a person reading a settings screen can act on. The credential
+ * never appears — it travelled in a header, and a failure message is not a
+ * place it can accidentally reach.
+ */
+function failureForTransport(
+  connection: ProviderConnection,
+  error: unknown,
+  timeoutMs: number,
+): string {
+  if (error instanceof HttpError) {
+    if (error.kind === "unreachable") {
+      return `${connection.displayName} could not be reached.`;
+    }
+    if (error.kind === "timeout") {
+      // Never "0 seconds": a caller may pass a sub-second deadline in a test,
+      // and a message that rounds the wait away misdescribes it.
+      const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+      return `${connection.displayName} did not answer within ${seconds} second${seconds === 1 ? "" : "s"}.`;
+    }
+    return `${connection.displayName}: ${error.message}`;
+  }
+  if (error instanceof DestinationError) {
+    // Already written for a reader: "That address is Project Studio's own
+    // service..." says more than a status code could.
+    return error.message;
+  }
+  return `${connection.displayName} could not be probed.`;
+}
+
+export interface ProbeOptions {
+  readonly timeoutMs?: number;
 }

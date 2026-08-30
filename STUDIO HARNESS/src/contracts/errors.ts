@@ -67,6 +67,14 @@ export type StudioErrorDomain =
    */
   | "retrieval"
   /**
+   * Speech, transcription, and the other media capabilities served through
+   * the provider store. Separate from `models` - which names chat models -
+   * and from `retrieval`: "no transcription model is connected" and
+   * "the provider could not read that audio" are different situations with
+   * different answers, and neither is a chat-model failure.
+   */
+  | "media"
+  /**
    * What can be added to STUDIO — MCP servers, skills, hooks — and the spine
    * that decides which of them a project gets. Separate from `tools`: "the gate
    * refused this call" and "this server is not switched on for this project"

@@ -56,10 +56,41 @@ index d05220033fe9d56662329e478c7ebc7db283f3ba..a7abc2ad2aecff98ef8a3aa60a0a094b
  function isCompletedAssistantResponse(message) {
  	return message.stopReason === "stop" || message.stopReason === "length";
 diff --git a/dist/conversation-stream-store-Bitz7UoW.mjs b/dist/conversation-stream-store-Bitz7UoW.mjs
-index 94032552cc83d3596ae6e53bd46ec6c9c9749b01..55f6bc09dac7afb55fb26394bb1c208761858281 100644
+index 94032552cc83d3596ae6e53bd46ec6c9c9749b01..2aea7d099e104916d6ed1f2af57fb5c58720ee0f 100644
 --- a/dist/conversation-stream-store-Bitz7UoW.mjs
 +++ b/dist/conversation-stream-store-Bitz7UoW.mjs	
-@@ -2385,20 +2385,77 @@ var Session = class {
+@@ -112,10 +112,9 @@ function mergeSkillCatalog(definitionSkills, discoveredSkills) {
+ * gained tool-call shape (it can't ask questions or wait for input
+ * regardless of what the user message says).
+ */
+-const HEADLESS_PREAMBLE = "You are running in headless mode with no human operator. Work autonomously — never ask questions, never wait for user input. Make your best judgment and proceed independently.";
+ function composeSystemPrompt(agentsMd, skills, env, instructions) {
+-	const parts = [HEADLESS_PREAMBLE];
+-	if (instructions) parts.push("", instructions);
++	const parts = [];
++	if (instructions) parts.push(instructions);
+ 	if (agentsMd) parts.push("", agentsMd);
+ 	const skillEntries = Object.values(skills);
+ 	if (skillEntries.length > 0) {
+@@ -125,17 +124,6 @@ function composeSystemPrompt(agentsMd, skills, env, instructions) {
+ 			parts.push(`- **${skill.name}**${desc}`);
+ 		}
+ 	}
+-	if (env) {
+-		const date = (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", {
+-			weekday: "short",
+-			year: "numeric",
+-			month: "short",
+-			day: "numeric"
+-		});
+-		parts.push("", `Date: ${date}`);
+-		parts.push(`Working directory: ${env.cwd}`);
+-		if (env.directoryListing && env.directoryListing.length > 0) parts.push("", "Directory structure:", env.directoryListing.join("\n"));
+-	}
+ 	return parts.join("\n");
+ }
+ /** Discover AGENTS.md, local skills, and directory listing from the session's cwd. */
+@@ -2385,20 +2373,77 @@ var Session = class {
  		}
  	}
  	async waitForTransientModelRetry(assistant, attempt) {

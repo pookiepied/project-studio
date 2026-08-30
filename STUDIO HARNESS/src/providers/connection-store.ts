@@ -8,16 +8,16 @@ import {
   type ProviderConnectionPatch,
 } from "../contracts/providers.js";
 import { ProviderConfigurationError } from "../contracts/models.js";
+import type { CredentialKey, SecureCredentialStore } from "../credentials/credential-store.js";
 import {
-  assertValidKey,
-  type CredentialKey,
-  type SecureCredentialStore,
-} from "../credentials/credential-store.js";
+  connectionCredentialKey,
+  connectionCredentialSecret,
+  connectionCredentialStatus,
+} from "./connection-credentials.js";
 import {
   createDomainReporter,
   type ErrorReporter,
 } from "../observability/error-reporter.js";
-import { customProviderEnvVar } from "../models/local/runtime.js";
 import type { StudioDatabase } from "../storage/database.js";
 
 /**
@@ -98,7 +98,15 @@ export class ConnectionStore {
 
       try {
         const connection = this.#validate(
-          this.#draftRecord(draft, await this.#credentialStatus(preliminary.id)),
+          this.#draftRecord(
+            draft,
+            await this.#credentialStatusFor({
+              id: preliminary.id,
+              ...(draft.catalogProvider === undefined
+                ? {}
+                : { catalogProvider: draft.catalogProvider }),
+            }),
+          ),
         );
         this.#insert(preliminary.id, this.#storedJson(connection));
         return connection;
@@ -140,7 +148,16 @@ export class ConnectionStore {
       }
 
       const connection = this.#validate(
-        this.#merge(current, patch, await this.#credentialStatus(id)),
+        this.#merge(
+          current,
+          patch,
+          await this.#credentialStatusFor({
+            id,
+            ...(current.catalogProvider === undefined
+              ? {}
+              : { catalogProvider: current.catalogProvider }),
+          }),
+        ),
       );
       this.#replace(id, this.#storedJson(connection));
       return connection;
@@ -223,7 +240,7 @@ export class ConnectionStore {
 
     let status: CredentialStatus;
     try {
-      status = await this.#credentialStatus(preliminary.id);
+      status = await this.#credentialStatusFor(preliminary);
     } catch {
       this.#reportCorrupt(rowId);
       return undefined;
@@ -377,12 +394,12 @@ export class ConnectionStore {
   #credentialKey(id: string): CredentialKey {
     try {
       // Not "provider": connection ids are arbitrary user strings, and
-      // "provider" is shared with fixed-id tenants — the local BYOK bridge
+      // "provider" is shared with fixed-id tenants - the local BYOK bridge
       // (Pi provider ids) and the retrieval registry (five constant ids). A
       // connection named "openai" under "provider" would overwrite the
       // bridge's key; one named "tavily" would hijack the web-search key.
       // A scope no fixed id can be named into is the separation.
-      return assertValidKey({ scope: "provider-connection", id });
+      return connectionCredentialKey(id);
     } catch {
       throw new ProviderConfigurationError(
         "Provider connection id is not valid for credential storage.",
@@ -393,48 +410,49 @@ export class ConnectionStore {
   /**
    * The secret a probe presents, or undefined when there is none to send.
    *
-   * Resolution mirrors `#credentialStatus` — the stored key, then the
-   * provider's environment variable — but returns the value, because a probe
-   * is the one operation that must present it rather than describe it. The
-   * value goes to an outbound header and nowhere else: not into a record, a
-   * log line, or a result a route could serialize.
+   * Resolution is the credential seam's: the connection's own entry, then the
+   * vendor's legacy entry, then the vendor's environment variable. The value
+   * goes to an outbound header and nowhere else: not into a record, a log
+   * line, or a result a route could serialize.
    */
   async credentialFor(id: string): Promise<string | undefined> {
-    const key = this.#credentialKey(id);
-    let stored: string | null;
+    const vendor = this.#catalogVendorFor(id);
     try {
-      stored = await this.#credentials.get(key);
+      return await connectionCredentialSecret(this.#credentials, {
+        id,
+        ...(vendor === undefined ? {} : { catalogProvider: vendor }),
+      });
     } catch {
       throw new ProviderConfigurationError(
         "Provider credential could not be read.",
       );
     }
-
-    if (stored !== null && stored !== "") return stored;
-
-    const envValue = process.env[customProviderEnvVar(id)];
-    return envValue !== undefined && envValue.trim() !== ""
-      ? envValue
-      : undefined;
   }
 
-  async #credentialStatus(id: string): Promise<CredentialStatus> {
-    const key = this.#credentialKey(id);
-    let stored: string | null;
+  async #credentialStatusFor(
+    connection: { readonly id: string; readonly catalogProvider?: string | undefined },
+  ): Promise<CredentialStatus> {
     try {
-      stored = await this.#credentials.get(key);
+      return await connectionCredentialStatus(this.#credentials, connection);
     } catch {
       throw new ProviderConfigurationError(
         "Provider credential status could not be read.",
       );
     }
+  }
 
-    if (stored !== null) return "set";
-
-    const envValue = process.env[customProviderEnvVar(id)];
-    return envValue !== undefined && envValue.trim() !== ""
-      ? "from-env"
-      : "absent";
+  /** The vendor a stored connection draws its catalog from, for credential resolution. */
+  #catalogVendorFor(id: string): string | undefined {
+    const row = this.#row(id);
+    if (row === undefined || typeof row.record_json !== "string") return undefined;
+    try {
+      const parsed: unknown = JSON.parse(row.record_json);
+      if (!isRecord(parsed)) return undefined;
+      const catalogProvider = parsed.catalogProvider;
+      return typeof catalogProvider === "string" ? catalogProvider : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async #setCredential(key: CredentialKey, secret: string): Promise<void> {
@@ -486,6 +504,62 @@ export class ConnectionStore {
 }
 
 export const ProviderConnectionStore = ConnectionStore;
+
+/**
+ * A stored connection row as the sync readers see it: the record parsed but
+ * its credential status not resolved, because resolving status needs the OS
+ * credential store and the callers below must not touch it.
+ */
+export interface StoredConnection {
+  readonly connection: ProviderConnection;
+  readonly updatedAt: number;
+}
+
+/**
+ * Reads every stored connection without resolving credential status.
+ *
+ * The sync counterpart of `ConnectionStore.list`, for callers that need the
+ * records but must not wait on the keychain: the runtime derives its
+ * configuration from these rows at startup, and a keychain that answers
+ * slowly must not delay a turn from starting. This module is the table's one
+ * owner, so the reader lives here rather than beside its callers.
+ */
+export function readStoredConnections(db: StudioDatabase): readonly StoredConnection[] {
+  let rows: readonly Record<string, unknown>[];
+  try {
+    rows = db
+      .prepare(`SELECT id, record_json, updated_at FROM provider_connection_record ORDER BY id`)
+      .all();
+  } catch {
+    return [];
+  }
+
+  const stored: StoredConnection[] = [];
+  for (const row of rows) {
+    const id = row.id;
+    const raw = row.record_json;
+    const updatedAt = row.updated_at;
+    if (typeof id !== "string" || typeof raw !== "string") continue;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isRecord(parsed)) continue;
+    const fields = parsed;
+    if ("apiKey" in fields || "credential" in fields) continue;
+
+    const result = v.safeParse(providerConnectionSchema, { ...fields, credential: "absent" });
+    if (!result.success || result.output.id !== id) continue;
+    stored.push({
+      connection: result.output,
+      updatedAt: typeof updatedAt === "number" ? updatedAt : 0,
+    });
+  }
+  return stored;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

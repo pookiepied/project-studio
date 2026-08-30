@@ -232,6 +232,66 @@ describe("the conversation index", () => {
       expect(store.get("cnv_1")?.reasoningLevel).toBeNull();
     });
   });
+
+  // The execution mode is the third per-conversation turn setting, and it has
+  // one difference from the other two: there is no null. An absent answer IS
+  // Manual - a consent nobody recorded is a consent that was not given - so
+  // the reader must produce one of the three real modes from every row.
+  describe("the permission mode a conversation is held with", () => {
+    it("reads an unset row as Manual, and stores nothing a user did not choose", () => {
+      const store = new ConversationStore(db);
+      store.record({ id: "cnv_1", firstMessage: "Hello" });
+
+      expect(store.get("cnv_1")?.permissionMode).toBe("manual");
+      expect(
+        (db.prepare("SELECT permission_mode FROM conversation WHERE id = ?").get("cnv_1") as
+          { permission_mode: string | null }).permission_mode,
+      ).toBeNull();
+    });
+
+    it("records the mode a first turn was sent with, and patches it later", () => {
+      const store = new ConversationStore(db);
+      const created = store.record({
+        id: "cnv_1",
+        firstMessage: "Hello",
+        permissionMode: "auto-edit",
+      });
+      expect(created.permissionMode).toBe("auto-edit");
+
+      expect(store.patch("cnv_1", { permissionMode: "full-auto" }).permissionMode).toBe(
+        "full-auto",
+      );
+      // Absent leaves the stored answer alone; there is no null to clear to,
+      // because Manual is a real answer rather than a clearing of one.
+      expect(store.patch("cnv_1", { pinned: true }).permissionMode).toBe("full-auto");
+    });
+
+    it("converges a repeated receipt that carries a mode on one row", () => {
+      const store = new ConversationStore(db);
+      store.record({ id: "cnv_1", firstMessage: "First words" });
+      const again = store.record({
+        id: "cnv_1",
+        firstMessage: "Words again",
+        permissionMode: "auto-edit",
+      });
+
+      expect(store.count()).toBe(1);
+      expect(again.permissionMode).toBe("auto-edit");
+    });
+
+    it("reads a stored value that is no longer a mode as Manual", () => {
+      const store = new ConversationStore(db);
+      store.record({ id: "cnv_1", firstMessage: "Hello", permissionMode: "full-auto" });
+      db.prepare("UPDATE conversation SET permission_mode = ? WHERE id = ?").run(
+        "utterly-bogus",
+        "cnv_1",
+      );
+
+      // A corrupted answer must never widen what a run may do, so it reads as
+      // the mode that grants nothing.
+      expect(store.get("cnv_1")?.permissionMode).toBe("manual");
+    });
+  });
 });
 
 describe("emptying the archive", () => {

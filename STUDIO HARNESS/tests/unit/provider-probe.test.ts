@@ -10,7 +10,7 @@ import type {
   ProviderConnectionDraft,
   RetrievalProtocol,
 } from "../../src/contracts/providers.js";
-import { ProviderManagementService } from "../../src/application/provider-management.js";
+import { ProviderManagementService } from "../../src/providers/management.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import {
   PROBE_TIMEOUT_MS,

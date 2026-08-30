@@ -136,9 +136,14 @@ export interface ModelCapability {
   readonly embeddings: CapabilityState;
   readonly reranking: CapabilityState;
   readonly imageGeneration: CapabilityState;
+  /** Producing a new image guided by one the user supplies. Distinct from imageGeneration: an editor consumes an input image, a generator need not accept one. */
+  readonly imageEditing: CapabilityState;
   readonly videoGeneration: CapabilityState;
   readonly speechGeneration: CapabilityState;
   readonly transcription: CapabilityState;
+  /** Retrieving web results for a query. Distinct from webFetch: a search answers a question, a fetch retrieves one named page. */
+  readonly webSearch: CapabilityState;
+  readonly webFetch: CapabilityState;
   readonly contextWindow: number | "unknown";
   readonly maxOutputTokens: number | "unknown";
 }
@@ -160,9 +165,12 @@ export const modelCapabilitySchema = v.object({
   embeddings: capabilityStateSchema,
   reranking: capabilityStateSchema,
   imageGeneration: capabilityStateSchema,
+  imageEditing: capabilityStateSchema,
   videoGeneration: capabilityStateSchema,
   speechGeneration: capabilityStateSchema,
   transcription: capabilityStateSchema,
+  webSearch: capabilityStateSchema,
+  webFetch: capabilityStateSchema,
   contextWindow: v.union([v.number(), v.literal("unknown")]),
   maxOutputTokens: v.union([v.number(), v.literal("unknown")]),
 });
@@ -187,6 +195,27 @@ export interface ModelProviderAdapter {
   register(): void;
   resolve(reference: ModelReference): ModelDescriptor;
   listModels(): readonly ModelDescriptor[];
+  /**
+   * The model a background job may run on, as a specifier this source can
+   * resolve at run time, or undefined when the source cannot name one.
+   *
+   * A background job - titling today - is a small one-shot model call whose
+   * output is a few words. Running it on the conversation's model would be
+   * the default silently spending whatever a person chats with on eight
+   * words, so the source is asked instead, and it answers with the least
+   * expensive model it can honestly reach: one whose provider holds working
+   * credentials, priced from its own listed rates. When that is the only
+   * model connected - the exactly-one-expensive-model case - it is still the
+   * answer, because the alternative is a conversation that stays badly named
+   * forever to save a fraction of a cent, and the choice is documented
+   * rather than silent. Undefined sends the caller to the stable alias, the
+   * same fallback an unconfigured source gets everywhere else.
+   *
+   * `skip` asks for a later rank: the first answer failed, and the caller is
+   * stepping down the ladder. A source with nothing at that rank answers
+   * undefined, which the caller reads as "the ladder is exhausted".
+   */
+  backgroundModel(skip?: number): Promise<string | undefined>;
 }
 
 export interface ModelProviderPort {

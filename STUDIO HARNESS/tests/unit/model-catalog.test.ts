@@ -149,7 +149,10 @@ describe("provider model catalog", () => {
     expect(await catalog.listModels({ connectionId: "ollama" })).toEqual([added]);
   });
 
-  it("reports once per call when a catalog provider is unknown to the built-in catalog", async () => {
+  it("serves only manual models for a vendor no catalog source knows", async () => {
+    // A catalogProvider neither Pi nor the declared catalog has heard of is
+    // the normal self-hosted spelling, not a fault: the connection simply
+    // has only the models entered by hand.
     const reports: unknown[] = [];
     const reportingCatalog = new ModelCatalog({
       db,
@@ -169,11 +172,7 @@ describe("provider model catalog", () => {
     expect(
       models.filter((model) => model.connectionId === "vendor-x"),
     ).toEqual([]);
-    expect(reports).toHaveLength(1);
-    expect(reports[0]).toBeInstanceOf(ProviderConfigurationError);
-
-    await reportingCatalog.listModels();
-    expect(reports).toHaveLength(2);
+    expect(reports).toHaveLength(0);
   });
 
   it("refuses to create a model through setOverride and writes nothing", async () => {

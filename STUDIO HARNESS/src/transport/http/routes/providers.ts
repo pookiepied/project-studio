@@ -3,8 +3,11 @@ import * as v from "valibot";
 
 import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
 import { authContext, requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
-import { ProviderConfigurationError } from "../../../contracts/models.js";
-import { modelCapabilitySchema } from "../../../contracts/models.js";
+import {
+  modelCapabilitySchema,
+  ProviderConfigurationError,
+  reasoningLevelSchema,
+} from "../../../contracts/models.js";
 import {
   capabilitySlotSchema,
   invocationShapeSchema,
@@ -21,7 +24,7 @@ import { toErrorReport } from "../../../observability/error-reporter.js";
 import type {
   ManualModelInput,
 } from "../../../providers/model-catalog.js";
-import type { ProviderAdministration } from "../../../application/provider-management.js";
+import type { ProviderAdministration } from "../../../providers/management.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -97,6 +100,9 @@ const manualModelSchema = v.object({
   modelId: v.pipe(v.string(), v.minLength(1)),
   displayName: v.pipe(v.string(), v.minLength(1)),
   capability: v.optional(v.partial(modelCapabilitySchema)),
+  // The model's own levels, chosen against the contract's vocabulary - not a
+  // fixed dial, so a model that reasons only at low and medium says so.
+  reasoningLevels: v.optional(v.array(reasoningLevelSchema)),
   pricing: v.optional(v.partial(modelPricingSchema)),
   shape: v.optional(invocationShapeSchema),
 });
@@ -113,10 +119,17 @@ function manualModelInput(value: unknown): ManualModelInput {
     modelId: parsed.modelId,
     displayName: parsed.displayName,
     ...(parsed.capability === undefined ? {} : { capability: parsed.capability }),
+    ...(parsed.reasoningLevels === undefined
+      ? {}
+      : { reasoningLevels: parsed.reasoningLevels }),
     ...(parsed.pricing === undefined ? {} : { pricing: parsed.pricing }),
     ...(parsed.shape === undefined ? {} : { shape: parsed.shape }),
   };
 }
+
+const selectionBodySchema = v.object({
+  modelIds: v.array(v.pipe(v.string(), v.minLength(1))),
+});
 
 const overridePatchSchema = v.object({
   displayName: v.optional(v.pipe(v.string(), v.minLength(1))),
@@ -178,6 +191,44 @@ export function createProviderRoutes(
   routes.get("/connections", async (context) =>
     context.json(await providers.listConnections()),
   );
+
+  routes.get("/library", async (context) =>
+    context.json(await providers.listLibrary()),
+  );
+
+  routes.get("/icons/:id", async (context) => {
+    try {
+      const svg = await providers.getProviderIcon(context.req.param("id"));
+      if (svg === undefined) {
+        return context.json(
+          { error: "No provider icon is known for that id.", code: "providers.icons.unknown" },
+          404,
+        );
+      }
+      return context.json({ svg });
+    } catch (error) {
+      return context.json(failure(error), 400);
+    }
+  });
+
+  routes.put("/connections/:id/model-selection", async (context) => {
+    try {
+      const parsed = v.safeParse(selectionBodySchema, await body(context));
+      if (!parsed.success) {
+        throw new ProviderConfigurationError(
+          "Provider model selection is not valid.",
+        );
+      }
+      await providers.setModelSelection(
+        context.req.param("id"),
+        parsed.output.modelIds,
+        authContext(context),
+      );
+      return context.body(null, 204);
+    } catch (error) {
+      return context.json(failure(error), 400);
+    }
+  });
 
   routes.post("/connections", async (context) => {
     try {
@@ -267,7 +318,10 @@ export function createProviderRoutes(
     }
   });
 
-  routes.patch("/connections/:id/models/:modelId", async (context) => {
+  // `:modelId{.+}` rather than `:modelId`: model ids carry slashes themselves
+  // (OpenRouter's are vendor/model), and a single-segment param would 404 on
+  // every one of them.
+  routes.patch("/connections/:id/models/:modelId{.+}", async (context) => {
     try {
       const model = await providers.setModelOverride(
         context.req.param("id"),
@@ -281,7 +335,7 @@ export function createProviderRoutes(
     }
   });
 
-  routes.delete("/connections/:id/models/:modelId", async (context) => {
+  routes.delete("/connections/:id/models/:modelId{.+}", async (context) => {
     try {
       await providers.removeModel(
         context.req.param("id"),

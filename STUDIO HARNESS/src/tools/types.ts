@@ -45,6 +45,18 @@ export interface ToolDefinition<Input, Output> {
    * `src/../../.ssh/id_rsa` slip past a rule scoped to `src/**`.
    */
   readonly resource: (input: Input, context: ToolContext) => string | undefined;
+  /**
+   * Everything the call touches, when that can be more than one resource.
+   *
+   * A single `resource` cannot describe a command line that names three
+   * programs: approving the first would silently approve the other two, and
+   * the seam where a wrong guess becomes an unreviewed execution is exactly
+   * there. When this is present the gate authorizes every entry and this
+   * field, not {@link ToolDefinition.resource}, is the answer to "what does
+   * this call touch". `resource` stays the first entry, for callers that want
+   * one label for a snapshot.
+   */
+  readonly resources?: (input: Input, context: ToolContext) => readonly string[];
   readonly execute: (input: Input, context: ToolContext) => Promise<Output>;
   /**
    * How long this tool may take, when the shared default is wrong for it.

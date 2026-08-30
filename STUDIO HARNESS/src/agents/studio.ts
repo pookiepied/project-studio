@@ -8,6 +8,8 @@ import {
   ensureDirectory,
 } from "../platform/paths.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
+import { environmentBlock, environmentFacts } from "../context/environment.js";
+import { STUDIO_SYSTEM_PROMPT } from "../context/system-prompt.js";
 import {
   DEFAULT_MODEL_PROVIDER,
   reasoningChoiceOr,
@@ -86,7 +88,19 @@ export default defineAgent(async ({ id }) => {
     model,
     thinkingLevel,
     cwd: workspace,
-    instructions: "Help the user complete work accurately.",
+    // The static prompt first, then what varies. The order is the cache
+    // argument: a breakpoint sits after the tool array, so the tools stay
+    // shared across every conversation on the machine and only this block
+    // re-bills when a conversation is new or the day has turned.
+    //
+    // In the instructions rather than on the message, which was tried and
+    // reverted: the webview renders a user message's text verbatim into the
+    // person's own bubble, so a block carried there is a block they read every
+    // time they speak. Paying the system block at full rate on a
+    // conversation's first turn is the cheaper of the two mistakes.
+    instructions: `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
+      environmentFacts(workspace, new Date()),
+    )}`,
     // `id` is the agent *instance* — one per conversation thread, measured
     // rather than assumed — so it is the conversation, and the agent is named
     // separately. Feeding it to `agentId` was #69.

@@ -35,12 +35,20 @@ export type ProviderSource = v.InferOutput<typeof providerSourceSchema>;
  * Separate from media and retrieval so a language connection cannot be given
  * a media protocol by mistake. The union is narrow on purpose — adding a
  * protocol is a contract change, not a string.
+ *
+ * Six of Pi's ten language protocols are named here. The four absent ones
+ * cannot be driven by a user-declared key: `openai-codex-responses` resolves
+ * only a ChatGPT OAuth credential, `bedrock-converse-stream` signs requests
+ * with an AWS access-key/secret pair, `google-vertex` needs a service
+ * account, and `pi-messages` is Pi's own service protocol.
  */
 export const languageProtocolSchema = v.picklist([
   "openai-completions",
   "openai-responses",
   "anthropic-messages",
   "google-generative-ai",
+  "mistral-conversations",
+  "azure-openai-responses",
 ]);
 
 export type LanguageProtocol = v.InferOutput<typeof languageProtocolSchema>;
@@ -52,7 +60,11 @@ export type LanguageProtocol = v.InferOutput<typeof languageProtocolSchema>;
  * shape and auth requirements, and a single union would let a text model be
  * asked to render an image without a type error.
  */
-export const mediaProtocolSchema = v.picklist(["openai-images", "openrouter-images"]);
+export const mediaProtocolSchema = v.picklist([
+  "openai-images",
+  "openrouter-images",
+  "elevenlabs",
+]);
 
 export type MediaProtocol = v.InferOutput<typeof mediaProtocolSchema>;
 
@@ -264,6 +276,14 @@ export const providerModelSchema = v.object({
   pricing: modelPricingSchema,
   hidden: v.boolean(),
   origin: v.picklist(["catalog", "manual", "fetched"]),
+  /**
+   * Whether the provider itself still offers this model, as far as anyone
+   * knows. Optional with a default of true so stored manual rows - which
+   * predate the field - parse unchanged. The value is learned by probing
+   * (the provider's own model list) and is advisory: an unavailable row is
+   * kept out of pickers, never silently deleted.
+   */
+  available: v.optional(v.boolean(), true),
 });
 
 export type ProviderModel = v.InferOutput<typeof providerModelSchema>;
@@ -275,14 +295,23 @@ export type ProviderModel = v.InferOutput<typeof providerModelSchema>;
  * handle this" is a meaningful user preference. Other capabilities like
  * `streaming` describe how a model behaves, not what it is for, so they are
  * not slots a user would pick a default for.
+ *
+ * Nine today. `imageEditing` is separate from `imageGeneration` because an
+ * editor consumes an input image a generator need not accept; `webSearch`
+ * and `webFetch` are separate because a search answers a question while a
+ * fetch retrieves one named page. Adding a slot is a change to this list and
+ * nothing else — the defaults schema below is derived from it.
  */
 export const CAPABILITY_SLOTS = [
   "textGeneration",
   "imageGeneration",
+  "imageEditing",
   "videoGeneration",
   "speechGeneration",
   "transcription",
   "embeddings",
+  "webSearch",
+  "webFetch",
 ] as const satisfies readonly (keyof ModelCapability)[];
 
 export const capabilitySlotSchema = v.picklist(CAPABILITY_SLOTS);

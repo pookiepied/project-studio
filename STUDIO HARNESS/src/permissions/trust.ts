@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 
+import { conversationsDirectory } from "../platform/paths.js";
+import { isInsideRoot } from "../sandbox/paths.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { storageErrorFrom } from "../storage/errors.js";
 import type { ExecutionMode } from "./mode.js";
@@ -35,6 +37,29 @@ export function trustKey(root: string): string {
   return CASE_INSENSITIVE ? absolute.toLowerCase() : absolute;
 }
 
+/**
+ * A root this application made for itself.
+ *
+ * Trust answers "do you vouch for a folder someone handed you" - a repository
+ * that may carry a build script, a git hook, or a file written to be read as
+ * instruction. A conversation's own workspace under `data/conversations/` is
+ * none of that. Studio created it, empty, inside its own data directory, and
+ * the user was never asked to point at it, so there is no user answer to
+ * record and nothing here for a stored decision to mean.
+ *
+ * Answered structurally rather than by writing a `workspace_trust` row when the
+ * directory is created, because that table holds decisions a person made. A row
+ * nobody chose would read back as an approval that never happened, and would
+ * list in the trust surface beside folders the user really did approve.
+ *
+ * This does not widen what a conversation can reach. The sandbox root is still
+ * that one directory, so trust only settles whether the workspace may be
+ * written in at all - which, before this, it could not be.
+ */
+function isStudioOwnedRoot(root: string): boolean {
+  return isInsideRoot(conversationsDirectory(), root);
+}
+
 interface TrustRow {
   trusted: number;
   decided_at: number;
@@ -49,6 +74,7 @@ export class WorkspaceTrustStore {
 
   decision(root: string | undefined): TrustDecision {
     if (root === undefined) return "undecided";
+    if (isStudioOwnedRoot(root)) return "trusted";
 
     try {
       const row = this.#db

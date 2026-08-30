@@ -18,7 +18,6 @@ import {
 import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
 import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
-import { ProviderSettingsStore } from "../../src/models/local/settings-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 // Bootstrapping `local` reads provider settings. Point the store at memory so
@@ -236,6 +235,7 @@ describe("createModelProviderAdapter", () => {
           defaultProvider: "openai",
           defaultModel: "gpt-4o-mini",
           customProviders: [],
+          extraModels: [],
         },
         credentials: new InMemoryCredentialStore(),
       },
@@ -331,22 +331,82 @@ describe("provider bootstrap coordinator", () => {
   });
 
   it("bootstraps local from a stored default model, with no environment variable", () => {
-    // The subphase 5 payoff: what the user chose in settings is what the
-    // harness starts on.
+    // The subphase 5 payoff, carried into the merged store: what the user
+    // chose in settings is what the harness starts on. The default now lives
+    // in `provider_default` pointing at a connection row, so that is what
+    // this writes - directly, because what is under test is the derivation
+    // from the merged rows, not the store's write path.
     delete process.env.PROJECT_STUDIO_LOCAL_DEFAULT_MODEL;
     const opened = openDatabase();
     database = opened;
-    const settings = new ProviderSettingsStore(opened);
-    settings.upsertCustomProvider({
-      id: "ollama",
-      name: "Ollama",
-      baseUrl: "http://127.0.0.1:11434/v1",
-      api: "openai-completions",
-      models: ["llama3.1:8b"],
-      contextWindow: undefined,
-      maxTokens: undefined,
-    });
-    settings.setDefaultModel({ provider: "ollama", model: "llama3.1:8b" });
+
+    opened
+      .prepare(
+        `INSERT INTO provider_connection_record (id, record_json, updated_at)
+         VALUES (?, ?, ?)`,
+      )
+      .run(
+        "ollama",
+        JSON.stringify({
+          id: "ollama",
+          displayName: "Ollama",
+          kind: "language",
+          source: "local",
+          baseUrl: "http://127.0.0.1:11434/v1",
+          enabled: true,
+          protocol: "openai-completions",
+        }),
+        Date.now(),
+      );
+    opened
+      .prepare(
+        `INSERT INTO provider_model_manual (connection_id, model_id, record_json, updated_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(
+        "ollama",
+        "llama3.1:8b",
+        JSON.stringify({
+          connectionId: "ollama",
+          modelId: "llama3.1:8b",
+          displayName: "llama3.1:8b",
+          capability: {
+            textGeneration: "supported",
+            streaming: "unknown",
+            reasoning: "unknown",
+            toolCalling: "unknown",
+            vision: "unknown",
+            embeddings: "unknown",
+            reranking: "unknown",
+            imageGeneration: "unknown",
+            imageEditing: "unknown",
+            videoGeneration: "unknown",
+            speechGeneration: "unknown",
+            transcription: "unknown",
+            webSearch: "unknown",
+            webFetch: "unknown",
+            contextWindow: "unknown",
+            maxOutputTokens: "unknown",
+          },
+          reasoningLevels: [],
+          shape: "stream",
+          pricing: {
+            input: "unknown",
+            output: "unknown",
+            cacheRead: "unknown",
+            cacheWrite: "unknown",
+          },
+          hidden: false,
+          origin: "manual",
+        }),
+        Date.now(),
+      );
+    opened
+      .prepare(
+        `INSERT INTO provider_default (slot, connection_id, model_id, updated_at)
+         VALUES ('textGeneration', 'ollama', 'llama3.1:8b', ?)`,
+      )
+      .run(Date.now());
 
     const result = createProviderBootstrapCoordinator().bootstrap(
       { source: "local" },

@@ -1,5 +1,5 @@
 /**
- * Provider management for local BYOK.
+ * Provider management over the one provider store.
  *
  * Usage:
  *   pnpm providers list
@@ -11,22 +11,30 @@
  *   pnpm providers select <provider/model>
  *   pnpm providers default
  *
- * This is a thin caller over `LocalProviderService`; the settings UI calls the
- * same methods. Keys entered here go straight into the OS keychain through Pi's
- * credential store — never echoed, never written to a file, never passed
- * through the harness's own model code.
+ * Every command reads and writes the merged store - `provider_connection_record`
+ * and the model tables the settings surface and the runtime both use - so the
+ * CLI can no longer drift from what the app shows. Keys entered here go into
+ * the OS keychain under the connection's own entry, exactly where the settings
+ * dialog puts them; a provider connected through the app is this CLI's
+ * `connect` with a dialog instead of a prompt.
+ *
+ * What was deliberately not carried over: the interactive OAuth/device-code
+ * login. It wrote tokens only the old store could read and no settings surface
+ * ever offered it; the vendors a person actually connects here accept a typed
+ * key, and Pi's own token refresh continues to work for credentials already in
+ * the keychain.
  */
 import { createInterface } from "node:readline";
 
-import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
-
 import { ProviderConfigurationError } from "../../contracts/models.js";
+import type { LanguageProtocol } from "../../contracts/providers.js";
 import { KeyringCredentialStore } from "../../credentials/keyring-store.js";
 import { createDomainReporter } from "../../observability/error-reporter.js";
 import { openDatabase, type StudioDatabase } from "../../storage/database.js";
+import { ConnectionStore } from "../../providers/connection-store.js";
+import { ModelCatalog } from "../../providers/model-catalog.js";
+import { majorityProtocolFor } from "../../providers/library/language-catalog.js";
 import { parseModelSpecifier } from "./config.js";
-import { LocalProviderService } from "./provider-service.js";
-import { ProviderSettingsStore } from "./settings-store.js";
 
 /**
  * This CLI is its own entry point, so it is its own composition root: it opens
@@ -34,13 +42,16 @@ import { ProviderSettingsStore } from "./settings-store.js";
  */
 const database: StudioDatabase = openDatabase();
 
-function buildService(): LocalProviderService {
-  return new LocalProviderService({
-    settings: new ProviderSettingsStore(database),
-    credentials: new KeyringCredentialStore(),
-    reporter: createDomainReporter("models"),
-  });
-}
+const connections = new ConnectionStore({
+  db: database,
+  credentials: new KeyringCredentialStore(),
+  reporter: createDomainReporter("models"),
+});
+const catalog = new ModelCatalog({
+  db: database,
+  connections,
+  reporter: createDomainReporter("models"),
+});
 
 /** Reads a line without echoing it, so a key never appears in the terminal. */
 function readSecret(message: string): Promise<string> {
@@ -75,45 +86,6 @@ function readSecret(message: string): Promise<string> {
   });
 }
 
-function readVisible(message: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(`${message}: `, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
-
-const interaction = {
-  async prompt(prompt: AuthPrompt): Promise<string> {
-    if (prompt.type === "secret") return readSecret(prompt.message);
-    if (prompt.type === "select") {
-      process.stdout.write(`${prompt.message}\n`);
-      for (const option of prompt.options) {
-        process.stdout.write(`  ${option.id}  ${option.label}\n`);
-      }
-      return readVisible("Choice");
-    }
-    return readVisible(prompt.message);
-  },
-  notify(event: AuthEvent): void {
-    if (event.type === "auth_url") {
-      process.stdout.write(`\nOpen this URL to continue:\n${event.url}\n\n`);
-      return;
-    }
-    if (event.type === "device_code") {
-      process.stdout.write(
-        `\nGo to ${event.verificationUri} and enter code: ${event.userCode}\n\n`,
-      );
-      return;
-    }
-    if (event.type === "info" || event.type === "progress") {
-      process.stdout.write(`${event.message}\n`);
-    }
-  },
-};
-
 /** Parses `--flag value` pairs from the tail of the argument list. */
 function readFlags(args: readonly string[]): Record<string, string> {
   const flags: Record<string, string> = {};
@@ -130,88 +102,132 @@ function readFlags(args: readonly string[]): Record<string, string> {
   return flags;
 }
 
-async function list(service: LocalProviderService): Promise<number> {
-  const providers = await service.listProviders();
-  const connected = providers.filter((entry) => entry.connected);
+async function list(): Promise<number> {
+  const [records, models, defaults] = await Promise.all([
+    connections.list(),
+    catalog.listModels(),
+    catalog.getDefaults(),
+  ]);
 
   process.stdout.write(
-    `${providers.length} providers available, ${connected.length} connected.\n\n`,
+    `${records.length} connection${records.length === 1 ? "" : "s"} configured.\n\n`,
   );
 
-  if (connected.length === 0) {
+  if (records.length === 0) {
     process.stdout.write(
-      "No providers are configured yet. Connect one:\n  pnpm providers connect openai\n",
+      "No providers are configured yet. Connect one:\n  pnpm providers connect openrouter\n",
     );
     return 0;
   }
 
-  for (const provider of connected) {
-    const managed = provider.managed ? "" : "  [ambient, not removable here]";
+  for (const record of records) {
+    const count = models.filter((model) => model.connectionId === record.id).length;
+    const vendor = record.catalogProvider === undefined ? "" : `  vendor: ${record.catalogProvider}`;
     process.stdout.write(
-      `  ${provider.id}  (${provider.authType ?? "unknown"}, ${
-        provider.credentialSource ?? "configured"
-      })${managed}\n`,
+      `  ${record.id}  (${record.kind}, ${record.credential}, ${count} model${count === 1 ? "" : "s"}, ${record.enabled ? "enabled" : "disabled"})${vendor}\n`,
     );
   }
 
-  const selection = service.getDefaultModel();
-  process.stdout.write(
-    `\nDefault model: ${
-      selection ? `${selection.provider}/${selection.model}` : "none selected"
-    }\n`,
-  );
+  const text = defaults.textGeneration;
+  const defaultText =
+    text === undefined
+      ? "none selected"
+      : `${await vendorOf(text.connectionId)}/${text.modelId}`;
+  process.stdout.write(`\nDefault model: ${defaultText}\n`);
   return 0;
 }
 
-function models(service: LocalProviderService, providerId: string | undefined): number {
-  const entries = service.listModels(providerId);
+async function vendorOf(connectionId: string): Promise<string> {
+  const record = await connections.get(connectionId);
+  return record?.catalogProvider ?? connectionId;
+}
+
+async function models(providerId: string | undefined): Promise<number> {
+  const all = await catalog.listModels();
+  const entries =
+    providerId === undefined
+      ? all
+      : all.filter((model) => {
+          const vendor = vendorCache.get(model.connectionId);
+          return vendor === providerId;
+        });
+  if (providerId !== undefined && entries.length === 0) {
+    process.stdout.write(`No known models for "${providerId}".\n`);
+    return 0;
+  }
   if (entries.length === 0) {
-    process.stdout.write(
-      providerId
-        ? `No known models for "${providerId}".\n`
-        : "No models are known yet.\n",
-    );
+    process.stdout.write("No models are known yet.\n");
     return 0;
   }
 
   for (const entry of entries) {
-    const window = entry.contextWindow ? `  ${entry.contextWindow} ctx` : "";
-    process.stdout.write(`  ${entry.id}${window}\n`);
+    const vendor = vendorCache.get(entry.connectionId) ?? entry.connectionId;
+    process.stdout.write(`  ${vendor}/${entry.modelId}  (${entry.displayName})\n`);
   }
   return 0;
 }
 
-async function connect(
-  service: LocalProviderService,
-  providerId: string | undefined,
-): Promise<number> {
+const vendorCache = new Map<string, string>();
+async function fillVendorCache(): Promise<void> {
+  for (const record of await connections.list()) {
+    vendorCache.set(record.id, record.catalogProvider ?? record.id);
+  }
+}
+
+async function connect(providerId: string | undefined): Promise<number> {
   if (!providerId) {
     process.stderr.write("Usage: pnpm providers connect <provider-id>\n");
     return 2;
   }
 
-  await service.connectInteractively(providerId, interaction);
+  const existing = await connectionForVendor(providerId);
+  const apiKey = await readSecret(`API key for ${providerId}`);
+  if (existing !== undefined) {
+    await connections.update(existing.id, { apiKey });
+    process.stdout.write(`Updated the credential for ${providerId}. It is in your OS keychain.\n`);
+    return 0;
+  }
+
+  await connections.add({
+    id: providerId,
+    displayName: providerId,
+    kind: "language",
+    source: "local",
+    enabled: true,
+    catalogProvider: providerId,
+    protocol: majorityProtocolFor(providerId) ?? "openai-completions",
+    apiKey,
+  });
   process.stdout.write(
-    `Connected ${providerId}. The credential is in your OS keychain.\n`,
+    `Connected ${providerId}. The credential is in your OS keychain; models draw from its catalog.\n`,
   );
   return 0;
 }
 
-async function disconnect(
-  service: LocalProviderService,
-  providerId: string | undefined,
-): Promise<number> {
+async function disconnect(providerId: string | undefined): Promise<number> {
   if (!providerId) {
     process.stderr.write("Usage: pnpm providers disconnect <provider-id>\n");
     return 2;
   }
 
-  await service.disconnect(providerId);
+  const existing = await connectionForVendor(providerId);
+  if (existing === undefined) {
+    process.stdout.write(`No connection for "${providerId}".\n`);
+    return 1;
+  }
+  await connections.remove(existing.id);
   process.stdout.write(`Disconnected ${providerId}.\n`);
   return 0;
 }
 
-function add(service: LocalProviderService, args: readonly string[]): number {
+async function connectionForVendor(providerId: string) {
+  for (const record of await connections.list()) {
+    if ((record.catalogProvider ?? record.id) === providerId) return record;
+  }
+  return undefined;
+}
+
+async function add(args: readonly string[]): Promise<number> {
   const [id, baseUrl] = args;
   if (!id || !baseUrl) {
     process.stderr.write(
@@ -221,87 +237,124 @@ function add(service: LocalProviderService, args: readonly string[]): number {
   }
 
   const flags = readFlags(args.slice(2));
-  const config = service.addCustomProvider({
-    id,
-    baseUrl,
-    ...(flags.name === undefined ? {} : { name: flags.name }),
-    ...(flags.api === undefined ? {} : { api: flags.api }),
-    ...(flags.models === undefined
-      ? {}
-      : { models: flags.models.split(",").map((entry) => entry.trim()).filter(Boolean) }),
-  });
+  const api = flags.api ?? "openai-completions";
+  const modelIds =
+    flags.models === undefined
+      ? []
+      : flags.models.split(",").map((entry) => entry.trim()).filter(Boolean);
 
+  const created = await connections.add({
+    id,
+    displayName: flags.name ?? id,
+    kind: "language",
+    source: "local",
+    enabled: true,
+    baseUrl,
+    protocol: parseCustomApi(api),
+  });  for (const modelId of modelIds) {
+    await catalog.addManualModel(created.id, {
+      modelId,
+      displayName: modelId,
+    });
+  }
   process.stdout.write(
-    `Added ${config.id} (${config.api}) at ${config.baseUrl} with ${config.models.length} model(s).\n`,
+    `Added ${created.id} (${created.protocol}) at ${baseUrl} with ${modelIds.length} model(s).\n`,
   );
   return 0;
 }
 
-async function remove(
-  service: LocalProviderService,
-  id: string | undefined,
-): Promise<number> {
+function parseCustomApi(api: string): LanguageProtocol {
+  const known: readonly LanguageProtocol[] = [
+    "openai-completions",
+    "openai-responses",
+    "anthropic-messages",
+    "google-generative-ai",
+    "mistral-conversations",
+    "azure-openai-responses",
+  ];
+  const parsed = known.find((entry) => entry === api);
+  if (parsed === undefined) {
+    throw new ProviderConfigurationError(
+      `Unsupported api "${api}". Supported: ${known.join(", ")}.`,
+    );
+  }
+  return parsed;
+}
+
+async function remove(id: string | undefined): Promise<number> {
   if (!id) {
     process.stderr.write("Usage: pnpm providers remove <id>\n");
     return 2;
   }
 
-  const removed = await service.removeCustomProvider(id);
-  process.stdout.write(
-    removed ? `Removed ${id}.\n` : `No custom provider "${id}".\n`,
-  );
-  return removed ? 0 : 1;
+  const records = await connections.list();
+  const existing = records.find((record) => record.id === id);
+  if (existing === undefined) {
+    process.stdout.write(`No custom provider "${id}".\n`);
+    return 1;
+  }
+  await connections.remove(id);
+  process.stdout.write(`Removed ${id}.\n`);
+  return 0;
 }
 
-async function select(
-  service: LocalProviderService,
-  specifier: string | undefined,
-): Promise<number> {
+async function select(specifier: string | undefined): Promise<number> {
   if (!specifier) {
     process.stderr.write("Usage: pnpm providers select <provider/model>\n");
     return 2;
   }
 
-  const selection = await service.selectDefaultModel(
-    parseModelSpecifier(specifier),
-  );
-  process.stdout.write(
-    `Default model is now ${selection.provider}/${selection.model}.\n`,
-  );
+  const selection = parseModelSpecifier(specifier);
+  await fillVendorCache();
+  const connectionId = [...vendorCache.entries()].find(
+    ([, vendor]) => vendor === selection.provider,
+  )?.[0];
+  if (connectionId === undefined) {
+    throw new ProviderConfigurationError(
+      `No connection for provider "${selection.provider}". Connect it first.`,
+    );
+  }
+
+  await catalog.setDefault("textGeneration", {
+    connectionId,
+    modelId: selection.model,
+  });
+  process.stdout.write(`Default model is now ${selection.provider}/${selection.model}.\n`);
   return 0;
 }
 
-function showDefault(service: LocalProviderService): number {
-  const selection = service.getDefaultModel();
-  process.stdout.write(
-    selection
-      ? `${selection.provider}/${selection.model}\n`
-      : "No default model selected. Run: pnpm providers select <provider/model>\n",
-  );
-  return selection ? 0 : 1;
+async function showDefault(): Promise<number> {
+  const defaults = await catalog.getDefaults();
+  const text = defaults.textGeneration;
+  if (text === undefined) {
+    process.stdout.write("No default model selected. Run: pnpm providers select <provider/model>\n");
+    return 1;
+  }
+  process.stdout.write(`${await vendorOf(text.connectionId)}/${text.modelId}\n`);
+  return 0;
 }
 
 async function main(): Promise<number> {
   const [, , command = "list", ...rest] = process.argv;
-  const service = buildService();
+  await fillVendorCache();
 
   switch (command) {
     case "list":
-      return list(service);
+      return list();
     case "models":
-      return models(service, rest[0]);
+      return models(rest[0]);
     case "connect":
-      return connect(service, rest[0]);
+      return connect(rest[0]);
     case "disconnect":
-      return disconnect(service, rest[0]);
+      return disconnect(rest[0]);
     case "add":
-      return add(service, rest);
+      return add(rest);
     case "remove":
-      return remove(service, rest[0]);
+      return remove(rest[0]);
     case "select":
-      return select(service, rest[0]);
+      return select(rest[0]);
     case "default":
-      return showDefault(service);
+      return showDefault();
     default:
       process.stderr.write(
         `Unknown command "${command}". Expected list, models, connect, disconnect, add, remove, select, or default.\n`,

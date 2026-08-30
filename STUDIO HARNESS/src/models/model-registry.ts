@@ -42,6 +42,21 @@ export class ModelRegistry implements ModelProviderPort {
     );
   }
 
+  /**
+   * The background-job model of the first registered source that can name
+   * one at the requested rank. One source is bootstrapped per process, so
+   * the loop is the contract's shape rather than a search; undefined means
+   * no registered source could name a model there, and the caller falls
+   * back to the alias at rank zero or gives up the ladder beyond it.
+   */
+  async backgroundModel(skip = 0): Promise<string | undefined> {
+    for (const adapter of this.#adapters.values()) {
+      const specifier = await adapter.backgroundModel(skip);
+      if (specifier !== undefined) return specifier;
+    }
+    return undefined;
+  }
+
   hasSource(source: ModelSource): boolean {
     return this.#adapters.has(source);
   }

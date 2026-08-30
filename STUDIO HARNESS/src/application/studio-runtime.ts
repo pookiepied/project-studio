@@ -6,6 +6,8 @@ import type { SandboxFactory, SessionEnv } from "@flue/runtime";
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
 import { capabilityKey, type ExecutionScope } from "../contracts/capabilities.js";
+import { DEFAULT_MODEL_NAME, DEFAULT_MODEL_PROVIDER } from "../contracts/models.js";
+import { bootstrappedModelRegistry } from "../models/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
@@ -53,9 +55,15 @@ export interface StudioRuntimeOptions {
   readonly approver?: PermissionApprover;
   readonly credentials?: SecureCredentialStore;
   readonly projectRoot?: string;
-  readonly mode?: () => ExecutionMode;
   readonly clientId?: string;
   readonly sessionId?: string;
+  // There was a `mode?: () => ExecutionMode` here, and nothing passed it: the
+  // mode was a process-wide callback with no writer, so every conversation ran
+  // Manual forever. It is gone rather than kept as dead surface. The mode is a
+  // per-conversation consent now, stored in the conversation index and read
+  // from there wherever the mode is actually consulted - see
+  // `createAgentSandbox`, the one place a kernel and a posture are built,
+  // which always knows which conversation it is building them for.
 }
 
 export interface StudioAgentSandboxOptions {
@@ -253,7 +261,6 @@ export class StudioRuntime implements AgentHost {
   readonly #credentials: SecureCredentialStore;
   readonly #projectRoot: string;
   readonly #projectId: string;
-  readonly #mode: () => ExecutionMode;
   readonly #clientId: string;
   readonly #sessionId: string;
   /**
@@ -303,7 +310,6 @@ export class StudioRuntime implements AgentHost {
     this.#credentials = options.credentials ?? new KeyringCredentialStore();
     this.#projectRoot = resolve(options.projectRoot ?? process.cwd());
     this.#projectId = projectKey(this.#projectRoot);
-    this.#mode = options.mode ?? (() => "manual");
     this.#clientId = options.clientId ?? "standalone";
     this.#sessionId = options.sessionId ?? "standalone";
 
@@ -384,6 +390,74 @@ export class StudioRuntime implements AgentHost {
     };
   }
 
+  /**
+   * The conversation index's own id for a scope id.
+   *
+   * The scope's conversation id is the `conversation:`-prefixed form
+   * `agents/studio.ts` writes; the store is keyed by the conversation's own
+   * id. Two consumers receive the prefixed form - the image-capability probe
+   * and the per-conversation mode - and both strip it here, at one place,
+   * rather than each keeping its own spelling of the rule.
+   */
+  #conversationRowId(conversationId: string): string {
+    return conversationId.startsWith("conversation:")
+      ? conversationId.slice("conversation:".length)
+      : conversationId;
+  }
+
+  /**
+   * The execution mode the named conversation is held with.
+   *
+   * Read from the index at the moment it is asked, not captured: the row is
+   * settled by the turn-settings middleware before the run is admitted, so
+   * the answer a decision gets is the one that conversation's turn was sent
+   * under, and a conversation whose mode changed takes the new one on its
+   * next decision rather than at its next run. A conversation the index does
+   * not know - a test sandbox, or a stream row the admission never wrote -
+   * is Manual, which is the same answer an unset row gives: no recorded
+   * consent, nothing widened.
+   */
+  #conversationMode(conversationId: string): ExecutionMode {
+    return this.#conversations.get(this.#conversationRowId(conversationId))?.permissionMode
+      ?? "manual";
+  }
+
+  /**
+   * Whether the conversation's model accepts image input, per its own catalog.
+   *
+   * Pi's catalog marks `input: ["text", "image"]`, carried onto the descriptor
+   * as `capability.vision`; this is the read path for it. The answer has three
+   * states and two are answered the same way on purpose: `unsupported` returns
+   * false, and every other state - the alias with no target, a model the
+   * source does not know, a bootstrap that never ran, a record that has no
+   * model yet - returns undefined, which the reader treats as "not known to
+   * refuse". A guessed refusal would block models the catalog simply has not
+   * described; only a catalog that says *no* gets a no.
+   */
+  #modelAcceptsImages(conversationId: string): boolean | undefined {
+    const record = this.#conversations.get(this.#conversationRowId(conversationId));
+
+    const registry = bootstrappedModelRegistry();
+    if (registry === undefined) return undefined;
+
+    // The same reference the run initializer builds: the stored choice is in
+    // the local runtime's `<provider>/<model>` vocabulary, and an unset choice
+    // is the stable alias, which resolves to whatever the alias targets.
+    const reference = {
+      source: "local",
+      provider: DEFAULT_MODEL_PROVIDER,
+      model: record?.modelId ?? DEFAULT_MODEL_NAME,
+    } as const;
+    try {
+      const vision = registry.resolveDescriptor(reference).capability.vision;
+      return vision === "unsupported" ? false : undefined;
+    } catch {
+      // An unresolvable reference is a configuration problem the turn itself
+      // will report; it is not evidence about the model's senses.
+      return undefined;
+    }
+  }
+
   start(): Promise<void> {
     this.#started ??= this.#extensions.reconcile([this.#projectId]).then(() => undefined);
     return this.#started;
@@ -420,21 +494,47 @@ export class StudioRuntime implements AgentHost {
       conversationId: options.conversationId,
       projectId,
     };
-    const policy = createSandboxPolicy({ workspaceRoot: projectRoot });
+    const policy = createSandboxPolicy({
+      workspaceRoot: projectRoot,
+      // PATH is the one grant a command line needs beyond the workspace: a
+      // shell's job is finding programs, and with the policy environment
+      // empty its children inherited nothing and could resolve no tool at
+      // all. Given deliberately, here, rather than inherited - which is
+      // ADR 0039's rule kept, and the move ADR 0046 pairs with approving the
+      // programs by name instead of by resolved path. Every other child kind
+      // keeps the blanked PATH from `buildEnvironment`.
+      environment: { PATH: process.env.PATH ?? "" },
+    });
     const sandbox = new LocalSandbox(policy);
     const reporter = createErrorReporter(
       this.#logger === undefined ? {} : { logger: this.#logger },
     );
+    // The mode this sandbox's decisions are made under. Closed over the
+    // conversation the caller named, and read from the index at each ask:
+    // the kernel below is the only kernel that will ever consult it, and its
+    // `authorize` calls all carry this same conversation's scope, so the
+    // mode a decision resolves under belongs to exactly the conversation the
+    // call came from. No process-wide value is consulted anywhere.
+    const mode = (): ExecutionMode => this.#conversationMode(options.conversationId);
     // Per project, and only per project. The undo history is one shadow
     // repository per workspace root — `SnapshotStore` derives its `gitDir` from
     // that root and nothing else — so the state in front of it has to share the
     // same unit or it is describing a resource it does not match. Keying this
     // by conversation as well is #72/#83/#84/#85; see the field's comment.
+    //
+    // `required` reads the mode through the same per-conversation closure,
+    // which keeps Full Auto's undo guarantee tied to the conversation that
+    // asked for it. Today every conversation's workspace root is its own
+    // (`agents/studio.ts` passes the conversation's directory and nothing
+    // overrides `projectId`), so one entry here is one conversation's; if a
+    // shared project root ever makes the map's key wider than a conversation,
+    // `required` moves with the caller, because the guarantee is per write,
+    // not per store.
     let snapshots = this.#turnSnapshots.get(projectId);
     if (snapshots === undefined) {
       snapshots = new TurnSnapshots({
         store: new SnapshotStore({ workspaceRoot: projectRoot }),
-        required: () => this.#mode() === "full-auto",
+        required: () => mode() === "full-auto",
         reporter,
       });
       this.#turnSnapshots.set(projectId, snapshots);
@@ -443,7 +543,7 @@ export class StudioRuntime implements AgentHost {
       kernel: new PermissionKernel({
         grants: this.#grants,
         ...(this.#approver === undefined ? {} : { approver: this.#approver }),
-        posture: posture({ mode: this.#mode, trust: this.#trust }),
+        posture: posture({ mode, trust: this.#trust }),
         reporter,
       }),
       sandbox,
@@ -458,6 +558,7 @@ export class StudioRuntime implements AgentHost {
     registerNativeTools(gate, {
       database: this.#db,
       credentials: this.#credentials,
+      acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
     });
 
     const registeredMcp = new Map<string, McpTool>();

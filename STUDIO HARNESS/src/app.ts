@@ -34,6 +34,7 @@ import { studioPath } from "./platform/paths.js";
 import { RetrievalManagementService } from "./application/retrieval-management.js";
 import { RetrievalSettingsStore } from "./retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
+import { ConversationTitler } from "./conversations/titling.js";
 import { ProjectStore } from "./projects/store.js";
 
 interface HarnessApplication {
@@ -186,6 +187,16 @@ function createHarnessApplication(): HarnessApplication {
     bootLog("step 10: conversation and project stores entering");
     const conversations = new ConversationStore(database);
     const projects = new ProjectStore(database);
+    // The automatic titling pass: watches the runtime for a conversation's
+    // first exchange settling and writes the title agent's answer into the
+    // index, once, while the row is still unnamed by a person. Subscribes
+    // here because the event bus is process-global and the composition root
+    // is the one place lifecycle is owned; unsubscribed in the drain below.
+    const titling = new ConversationTitler({
+      conversations,
+      logger: observability.logger,
+    });
+    titling.start();
     bootLog("step 10: conversation and project stores completed");
 
     let shutdownPromise: Promise<void> | undefined;
@@ -193,6 +204,7 @@ function createHarnessApplication(): HarnessApplication {
       shutdownPromise ??= (async () => {
         admission?.verifier.invalidate();
         try {
+          titling.stop();
           // Awaited: MCP servers run in the project directory, and returning
           // before they are gone leaves them orphaned.
           await runtime.stop();
@@ -213,6 +225,7 @@ function createHarnessApplication(): HarnessApplication {
       approvals,
       conversations,
       projects,
+      titling,
       admission: admission.verifier,
       // The same list the model picker is filled from: a submission's model
       // reference is settled against it at admission, so a choice the catalog

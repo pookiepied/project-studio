@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
 import type { McpAdministration } from "../../src/application/mcp-management.js";
-import type { ProviderAdministration } from "../../src/application/provider-management.js";
+import type { ProviderAdministration } from "../../src/providers/management.js";
 import type { ConversationStore } from "../../src/conversations/store.js";
 import type { ProjectStore } from "../../src/projects/store.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
@@ -42,6 +42,10 @@ function composeApp(clientType: "studio-host" | "studio-client") {
       setRetrievalKey: () => Promise.resolve(undefined),
       clearRetrievalKey: () => Promise.resolve(undefined),
       setRetrievalSlot: () => Promise.resolve(undefined),
+    },
+    media: {
+      transcribe: () => Promise.resolve({ text: "" }),
+      speak: () => Promise.resolve({ audio: "", mimeType: "audio/mpeg" }),
     },
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
     conversations: {

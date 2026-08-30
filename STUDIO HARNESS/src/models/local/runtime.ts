@@ -12,7 +12,11 @@ import {
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
 import { API_LOADERS } from "./apis.js";
-import type { CustomProviderConfig, LocalModelConfig } from "./config.js";
+import type {
+  CustomProviderConfig,
+  ExtraProviderModelGroup,
+  LocalModelConfig,
+} from "./config.js";
 
 /** Env var a custom provider's key may come from, e.g. `ollama` -> `OLLAMA_API_KEY`. */
 export function customProviderEnvVar(id: string): string {
@@ -127,6 +131,7 @@ export function createLocalRuntime(
 ): LocalRuntime {
   const models = createModelsCollection({
     customProviders: options.config.customProviders,
+    extraModels: options.config.extraModels,
     credentials: options.credentials,
   });
 
@@ -155,6 +160,7 @@ export function createLocalRuntime(
  */
 export function createModelsCollection(options: {
   readonly customProviders: readonly CustomProviderConfig[];
+  readonly extraModels?: readonly ExtraProviderModelGroup[];
   readonly credentials: CredentialStore;
 }): MutableModels {
   const models = builtinModels({ credentials: options.credentials });
@@ -170,6 +176,56 @@ export function createModelsCollection(options: {
         baseUrl: custom.baseUrl,
         auth: { apiKey: customProviderAuth(custom) },
         models: customProviderModels(custom),
+        api: lazyApi(load),
+      }),
+    );
+  }
+
+  for (const group of options.extraModels ?? []) {
+    const load = API_LOADERS[group.api];
+    if (!load || group.models.length === 0) continue;
+
+    // The user's hand-entered models join the vendor's own catalog rather
+    // than replacing it: re-registering the provider with only the extras
+    // would make every built-in model of that vendor vanish from the runtime.
+    const existing = models.getProvider(group.provider);
+    const extraModels: readonly Model<Api>[] = group.models.map((model) => ({
+      id: model.id,
+      name: model.name,
+      api: group.api as Api,
+      provider: group.provider,
+      baseUrl: group.baseUrl,
+      // The user's own word about reasoning; the levels they chose are what
+      // the request then asks for, rendered per protocol by pi-ai.
+      reasoning: model.reasoningLevels.length > 0,
+      input: ["text"],
+      cost: ZERO_COST,
+      contextWindow: model.contextWindow ?? 0,
+      maxTokens: model.maxTokens ?? 0,
+    }));
+
+    models.setProvider(
+      createProvider({
+        id: group.provider,
+        name: existing?.name ?? group.provider,
+        baseUrl: existing?.baseUrl ?? group.baseUrl,
+        auth:
+          existing?.auth ??
+          // No built-in provider to inherit auth from: the same auth shape a
+          // self-hosted provider gets, resolving the credential by the
+          // vendor's own id through the credential store.
+          {
+            apiKey: customProviderAuth({
+              id: group.provider,
+              name: group.provider,
+              baseUrl: group.baseUrl,
+              api: group.api,
+              models: [],
+              contextWindow: undefined,
+              maxTokens: undefined,
+            }),
+          },
+        models: [...(existing?.getModels() ?? []), ...extraModels],
         api: lazyApi(load),
       }),
     );

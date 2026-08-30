@@ -32,7 +32,7 @@ vi.mock("node:dns/promises", async (importOriginal) => {
   };
 });
 
-const { HttpError, requestDirect } = await import("../../src/net/http.js");
+const { HttpError, requestDirect, requestBinary } = await import("../../src/net/http.js");
 
 interface Running {
   readonly server: Server;
@@ -120,6 +120,46 @@ describe("requestDirect", () => {
 
     expect(target.requests[0]?.method).toBe("POST");
     expect(bodies[0]).toBe('{"jsonrpc":"2.0"}');
+  });
+
+  it("requestBinary keeps bytes as bytes, past a binary body and to the ceiling", async () => {
+    const audio = Buffer.from([0xff, 0xf3, 0x00, 0x00, 0x89, 0x50, 0x4e, 0x47]);
+    const payloads: Buffer[] = [];
+    const target = await serve((request, response) => {
+      const received: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => received.push(chunk));
+      request.on("end", () => {
+        payloads.push(Buffer.concat(received));
+        response.writeHead(200, { "content-type": "audio/mpeg" });
+        response.end(audio);
+      });
+    });
+
+    const answer = await requestBinary({
+      url: `http://127.0.0.1:${target.port}/speech`,
+      author: "user",
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: '{"model":"tts-1"}',
+    });
+
+    expect(payloads[0]?.toString()).toBe('{"model":"tts-1"}');
+    // The utf8 reader would have replaced every non-text byte; the binary
+    // reader hands back exactly what crossed the wire.
+    expect(answer.bytes.equals(audio)).toBe(true);
+    expect(answer.headers["content-type"]).toBe("audio/mpeg");
+
+    const huge = await serve((_request, response) => {
+      response.writeHead(200);
+      response.end(Buffer.alloc(16, 7));
+    });
+    await expect(
+      requestBinary({
+        url: `http://127.0.0.1:${huge.port}/`,
+        author: "user",
+        maxBytes: 8,
+      }),
+    ).rejects.toMatchObject({ kind: "too_large" });
   });
 
   describe("pinning", () => {

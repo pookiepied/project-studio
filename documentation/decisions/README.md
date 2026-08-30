@@ -67,6 +67,7 @@ wrong answer, and why we believed it, is the useful part.
 | [0016](0016-undo-history.md) | Undo history |
 | [0017](0017-call-bounds.md) | Call bounds |
 | [0019](0019-running-a-chosen-program.md) | Running a chosen program — `execute` as uncontained by consent |
+| [0046](0046-the-shell-takes-a-command-line.md) | The shell takes a command line — an interpreter chosen per machine, every named program approved, and `npm` working on Windows at last |
 
 ### Network
 | | |
