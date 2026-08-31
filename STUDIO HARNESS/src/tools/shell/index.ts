@@ -2,7 +2,11 @@ import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
 } from "../../contracts/capabilities.js";
-import { resolveInterpreter, type Interpreter } from "../../process/interpreter.js";
+import {
+  demoteInterpreter,
+  resolveInterpreter,
+  type Interpreter,
+} from "../../process/interpreter.js";
 import { ProcessError } from "../../process/errors.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
@@ -41,6 +45,15 @@ const MAX_OUTPUT_LINES = 400;
 
 /** Ten minutes. A build or a test run is the reason this tool exists. */
 const MAX_TIMEOUT_MS = 600_000;
+
+/**
+ * `STATUS_DLL_INIT_FAILED` (0xC0000142), as Windows reports it through an exit
+ * code. The process was created and then died initialising its libraries, so
+ * it never read the command line - which is what makes retrying it with
+ * another interpreter safe rather than a second attempt at whatever the line
+ * asked for.
+ */
+const STATUS_DLL_INIT_FAILED = 3_221_225_794;
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 export interface ShellInput {
@@ -187,7 +200,7 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
     resources: (input) => input.programs.map((program) => shellResource(program)),
 
     execute: async (input, context) => {
-      const interpreter = input.interpreter;
+      let interpreter = input.interpreter;
 
       // Through the sandbox, so a cwd escaping the project is refused here
       // rather than becoming the working directory of a real process.
@@ -203,13 +216,39 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         // The sandbox builds the environment from policy too, so there is no
         // remaining way for this call site to hand the interpreter the
         // machine's tokens by forgetting a field.
-        const result = await context.sandbox.run("shell", {
-          executable: interpreter.path,
-          args: [...interpreter.args, input.command],
-          cwd,
-          timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-          ...(context.signal ? { signal: context.signal } : {}),
-        });
+        const spawn = async (): Promise<{
+          exitCode: number;
+          stdout: string;
+          stderr: string;
+        }> =>
+          context.sandbox.run("shell", {
+            executable: interpreter.path,
+            args: [...interpreter.args, input.command],
+            cwd,
+            timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+            ...(context.signal ? { signal: context.signal } : {}),
+          });
+
+        let result = await spawn();
+
+        // The interpreter could not start. Retried, once, with the next
+        // interpreter this machine has - and safe to retry precisely because
+        // this status means the child died in its own loader, before it read
+        // the command line, so nothing the line asks for has happened.
+        //
+        // The case is real and was costing every command on this machine: on
+        // Windows without PowerShell 7 the choice is Git's `bash.exe`, which
+        // loads `msys-2.0.dll` from its own installation, and a contained
+        // child cannot read `C:\Program Files`. Granting it there needs
+        // elevation the runtime must never want, so the answer is to use an
+        // interpreter that does not need the grant.
+        if (result.exitCode === STATUS_DLL_INIT_FAILED && demoteInterpreter(interpreter)) {
+          const next = resolveInterpreter();
+          if (next !== undefined && next !== interpreter) {
+            interpreter = next;
+            result = await spawn();
+          }
+        }
 
         return report(result);
       } catch (error) {

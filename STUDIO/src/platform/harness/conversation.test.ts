@@ -148,6 +148,33 @@ describe('submitting a turn', () => {
     expect(JSON.parse(init.body)).toEqual({ message: 'hello', reasoningLevel: 'default' })
   })
 
+  it('carries the permission mode in the harness vocabulary, and omits it when the stored mode stands', async () => {
+    const { invoke, calls } = scriptedInvoke({
+      service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    await client.submitTurn('hello', {
+      modelId: null,
+      reasoningLevel: 'default',
+      permissionMode: 'full-auto',
+    })
+
+    const init = calls[0]?.args['init'] as { body: string }
+    // The wire value is the one the admission boundary validates; the
+    // picker's `auto` never reaches the body.
+    expect(JSON.parse(init.body)).toEqual({
+      message: 'hello',
+      reasoningLevel: 'default',
+      permissionMode: 'full-auto',
+    })
+
+    await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' })
+
+    const later = calls[1]?.args['init'] as { body: string }
+    expect(JSON.parse(later.body)).not.toHaveProperty('permissionMode')
+  })
+
   it('carries images in the Flue submission shape, spelled exactly as the contract names them', async () => {
     const { invoke, calls } = scriptedInvoke({
       service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),

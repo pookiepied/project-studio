@@ -9,8 +9,13 @@ import type {
   IsolationBackend,
 } from "../backend.js";
 import { containArgs, invokeLauncher, launcherInstalled, launcherPath } from "./launcher.js";
-import { forgetProfile, recordProfile } from "./ledger.js";
-import { ensureTraversable, revokeTraverse } from "./traversal.js";
+import { forgetProfile, readLedger, recordProfile, recordTraversed } from "./ledger.js";
+import {
+  ancestorsOf,
+  ensureTraversable,
+  holdsTraverse,
+  revokeTraverse,
+} from "./traversal.js";
 
 /**
  * OS containment on Windows, using an AppContainer.
@@ -98,6 +103,13 @@ class WindowsAppContainerBackend implements IsolationBackend {
   /** Memoised because the probe creates and deletes a real profile. */
   #availability: boolean | undefined;
   readonly #prepared = new Map<string, PreparedContainer>();
+  /**
+   * Ancestors the one-time setup advice has already been given for, so a
+   * containment that runs ten thousand times advises once and not ten thousand
+   * times. Per directory rather than a single flag, because a workspace on
+   * another drive is a shortfall the user has not been told about yet.
+   */
+  readonly #advised = new Set<string>();
 
   available(): boolean {
     if (this.#availability !== undefined) return this.#availability;
@@ -140,7 +152,36 @@ class WindowsAppContainerBackend implements IsolationBackend {
       container.sid,
     );
     for (const path of traversal.granted) container.traversed.add(path);
+    // Persisted here and not at release time, because the reader is a release
+    // in a *different* process, and this process is the thing that dies. A
+    // contain that fails below this line still granted part of a corridor, and
+    // part of a corridor is owed back all the same.
+    recordTraversed(request.policy.workspaceRoot, traversal.granted);
+    // Not fatal. The per-workspace entry works, and the machine-wide one is a
+    // preference about accumulation, not a precondition of containment — so
+    // the shortfall is reported and the run continues. It is reported on the
+    // *first* containment rather than after a few hundred of them: that is the
+    // whole difference between one setup command and a repair.
+    this.#advisePreparation(traversal.granted);
 
+    if (traversal.refused.length > 0) {
+      // The list these entries go into is physically full. `sandbox:prepare`
+      // would fail on the same directory with the same status, so the advice
+      // is to shrink the list first — which is what releasing recorded
+      // workspaces does, because every revoke takes a row out.
+      const folders = traversal.refused.map((path) => `"${path}"`).join(" ");
+      throw new SandboxError("unavailable", {
+        message:
+          "The permission list on " +
+          folders +
+          " is full, and the sandbox cannot add the entry it needs there. " +
+          "Run `pnpm sandbox:release --stale` to take back what finished " +
+          "workspaces were granted, then try again. If the list is still full, " +
+          "the remaining entries predate the corridor record and are shown as " +
+          "unresolvable S-1-15-2 rows by `icacls <directory>` — each one must be " +
+          "removed by hand.",
+      });
+    }
     if (traversal.needsElevation.length > 0) {
       // The exact folders, and the exact command. A message that says "run
       // setup" invites running it against everything; naming what is actually
@@ -221,11 +262,45 @@ class WindowsAppContainerBackend implements IsolationBackend {
     return container;
   }
 
+  /**
+   * Says which directories are accumulating one entry per workspace.
+   *
+   * Written to `process.stderr` directly rather than to the logger, on the
+   * boot-log precedent: this must work in the maintenance command's process,
+   * where nothing else is started, and it must be visible to the person rather
+   * than only to the telemetry. The advice names the exact command and the
+   * exact directories, as the elevation shortfall one branch below does — "run
+   * setup" invites running it against everything.
+   *
+   * Everything passed here was *granted* to this workspace, which is exactly
+   * the set that would have been skipped had the machine-wide entry existed.
+   * Directories already covered by `sandbox:prepare` never reach this list, so
+   * a fully prepared machine advises nothing.
+   */
+  #advisePreparation(granted: readonly string[]): void {
+    const fresh = granted.filter((path) => !this.#advised.has(path));
+    if (fresh.length === 0) return;
+    for (const path of fresh) this.#advised.add(path);
+    process.stderr.write(prepareAdvice(fresh));
+  }
+
   async release(policy: SandboxPolicy): Promise<void> {
     const key = policy.workspaceRoot;
     const container = this.#prepared.get(key);
     const sid = container?.sid ?? deriveExisting(key);
-    if (sid === undefined) return;
+    if (sid === undefined) {
+      // Reported, not swallowed. An exit-zero release that revoked nothing is
+      // how this defect survived its first cleanup: silence here reads as
+      // "nothing was owed", when the truth is "nothing could be identified".
+      // The ledger record is deliberately kept, so the workspace stays listed
+      // and a later attempt — after the launcher works again — can retry.
+      throw new SandboxError("unavailable", {
+        message:
+          "The sandbox launcher could not recover the identity of this " +
+          "workspace, so nothing was revoked and its record was kept. " +
+          "The launcher's own failure explains why.",
+      });
+    }
 
     // Revoked before the profile goes. Afterwards the SID no longer resolves,
     // and the entry stays in the user's folder properties as an unreadable
@@ -241,10 +316,17 @@ class WindowsAppContainerBackend implements IsolationBackend {
       if (!existsSync(root)) continue;
       invokeLauncher(["revoke", "--sid", sid, "--path", root]);
     }
-    // The corridor goes too. These are entries on directories the user owns —
-    // their home folder among them — and leaving them behind would be the
-    // "only ever adds" growth this method exists to prevent.
-    for (const ancestor of container?.traversed ?? []) {
+    // The corridor goes too. Three sources, and the union is the point: the
+    // in-memory set covers what this process granted, the ledger covers what
+    // any process granted since the corridor was recorded, and the measured
+    // sweep below covers what a process granted *before* it was recorded —
+    // those entries have no field to read, and reading their absence as "no
+    // corridor" is precisely the bug that let 610 entries pile up on a user's
+    // home directory. The sweep asks the launcher whether this workspace's own
+    // SID holds traverse on each ancestor of the policy's roots, so it can only
+    // ever name entries this SID holds: nothing that belongs to anyone else is
+    // ever in the answer.
+    for (const ancestor of this.#corridorFor(key, policy, sid, container)) {
       if (!existsSync(ancestor)) continue;
       revokeTraverse(ancestor, sid);
     }
@@ -254,6 +336,36 @@ class WindowsAppContainerBackend implements IsolationBackend {
     // lose the one thing that can tell a user this workspace still has a
     // profile if the delete failed.
     forgetProfile(key);
+  }
+
+  /**
+   * Every ancestor owed a revoke, from the three places the corridor is known.
+   *
+   * The measured sweep exists for the entries written before the ledger had a
+   * corridor field: their `traversed` is undefined, which means *unknown*, and
+   * an unknown corridor is answered with a measurement rather than with an
+   * empty set. It can only ever add ancestors this workspace's SID actually
+   * holds traverse on — the same attribution rule the record itself obeys.
+   */
+  #corridorFor(
+    key: string,
+    policy: SandboxPolicy,
+    sid: string,
+    container: PreparedContainer | undefined,
+  ): readonly string[] {
+    const corridor = new Set<string>(container?.traversed ?? []);
+
+    const recorded = readLedger().find((entry) => entry.workspaceRoot === key)?.traversed;
+    if (recorded !== undefined) for (const ancestor of recorded) corridor.add(ancestor);
+
+    const roots = new Set<string>([policy.workspaceRoot, ...policy.readRoots, ...policy.writeRoots]);
+    for (const root of roots) {
+      for (const ancestor of ancestorsOf(root)) {
+        if (corridor.has(ancestor)) continue;
+        if (holdsTraverse(ancestor, sid)) corridor.add(ancestor);
+      }
+    }
+    return [...corridor];
   }
 }
 
@@ -271,6 +383,27 @@ export function grantsFor(
   for (const root of policy.readRoots) modes.set(root, "read");
   for (const root of policy.writeRoots) modes.set(root, "write");
   return modes;
+}
+
+/**
+ * The one-time advice for directories accumulating a traverse entry each.
+ *
+ * Exported because its content is a rule rather than a string: it names the
+ * directories, it names the exact command, and it never says the command needs
+ * an administrator — the user's own directories, which is where this
+ * accumulation actually happens, need no elevation. What does need elevation
+ * gets the separate, conditional line from the launcher's own failure.
+ */
+export function prepareAdvice(paths: readonly string[]): string {
+  const listed = paths.map((path) => `[sandbox]   ${path}`).join("\n");
+  const command = paths.map((path) => `"${path}"`).join(" ");
+  return (
+    `[sandbox] These directories are taking one traverse permission entry per workspace:\n` +
+    `${listed}\n` +
+    `[sandbox] One setup run makes that a single machine-wide entry instead, and\n` +
+    `[sandbox] nothing further accumulates there:\n` +
+    `[sandbox]   pnpm sandbox:prepare ${command}\n`
+  );
 }
 
 function grant(container: PreparedContainer, path: string, mode: "read" | "write"): void {

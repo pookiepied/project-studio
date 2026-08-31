@@ -62,6 +62,7 @@ const CONVERSATION: Conversation = {
   archived: false,
   modelId: null,
   reasoningLevel: null,
+  permissionMode: 'manual',
   messages: [],
 }
 

@@ -10,9 +10,13 @@ import type { IconComponent } from '@/components/icons'
  * describes what happens to their work, and that is what someone is choosing
  * between.
  *
- * These are declared as data rather than hardcoded in the picker so the harness
- * can own the real set later. The UI reads whatever this exports, so replacing
- * it with a fetched policy changes no component.
+ * These ids are this webview's own vocabulary. The harness names the same
+ * three modes `manual` / `auto-edit` / `full-auto` - the one spelling every
+ * wire value is validated against, and it refuses `edits` and `auto` on
+ * purpose, because a mode is a consent and the harness will not translate one
+ * name into another on the user's behalf. The translation lives exactly once,
+ * at the wire boundary (`platform/harness/contracts.ts`), so a change here
+ * touches no component and no wire value.
  */
 
 export type PermissionMode = 'manual' | 'edits' | 'auto'

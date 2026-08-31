@@ -98,6 +98,27 @@ function isRedirect(token: string): boolean {
   return /^[0-9&]*[<>]/.test(token) && token !== "<(" && token !== ">(";
 }
 
+/**
+ * Programs that run another program, and are therefore not the program.
+ *
+ * `env FOO=1 node build.js` runs `node`. Approving `shell:env` and calling
+ * that the decision would be a lie with a dialog attached: the name the user
+ * agreed to is not the name that executes. So these are stepped through to
+ * the program they carry, exactly as a path prefix is stripped, and the
+ * question the user is asked names what actually runs.
+ *
+ * Only wrappers that take no options of their own are here, because a wrapper
+ * that does - `timeout 30 node x`, `nice -n 5 node x` - hides its program
+ * behind an argument this reader would have to know the shape of, and
+ * guessing which token is the program is the thing this file exists not to
+ * do. `xargs` builds its command from input it has not read yet, `sudo` is
+ * not ours to reason about, and `find -exec` buries the command mid-list.
+ * Those remain the wider approval-granularity question that this does not
+ * claim to close; they are still refused or still named as themselves, never
+ * silently stepped through.
+ */
+const COMMAND_WRAPPERS = new Set(["env", "nohup"]);
+
 /** An environment assignment prefix, POSIX (`FOO=1`) or PowerShell (`$env:FOO=`). */
 function isAssignment(token: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || /^\$env:[A-Za-z0-9_]+=/.test(token);
@@ -262,11 +283,18 @@ export function readCommandPrograms(command: string): readonly string[] {
   // including inside an argument: what reaches the interpreter is a command
   // line, and the program that `$(…)` would run is never one we checked.
   if (/`|\$\(|<\(|>\(|<</.test(command)) {
+    // The refusal says what to do instead, because a bare "no" is a wasted
+    // turn: models reach for `$(...)` and heredocs constantly, and one that is
+    // only told no tries the same shape again. Naming the two replacements -
+    // separate commands, and the write tool for file bodies - turns a dead end
+    // into the next call.
     throw new ToolError("invalid_input", {
       message:
         "This command uses command substitution, a heredoc, or process " +
-        "substitution, and the programs it would run cannot be read from it. " +
-        "Run the steps as separate commands instead.",
+        "substitution, and the programs it would run cannot be read from it, " +
+        "so there is nothing to approve. Run the steps as separate commands " +
+        "and use the result of one in the next, and write file contents with " +
+        "the write tool rather than a heredoc.",
     });
   }
 
@@ -302,6 +330,14 @@ export function readCommandPrograms(command: string): readonly string[] {
             "program it holds cannot be approved in advance. Name the program " +
             "directly.",
         });
+      }
+      if (COMMAND_WRAPPERS.has(programName(token))) {
+        // A wrapper is not the program. Keep reading: the next plain token in
+        // this segment is what actually runs, and that is the name the user
+        // will be asked about. The wrapper itself is not recorded - approving
+        // `env` means nothing, and asking twice for one execution is a worse
+        // question, not a safer one.
+        continue;
       }
       program = token;
       break;

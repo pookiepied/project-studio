@@ -11,18 +11,24 @@ import {
 import type { CatalogModel } from '@/domain/models/catalog'
 import { catalogFrom } from '@/domain/models/catalog'
 import type { ReasoningChoice } from '@/domain/models/types'
-import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
+import { DEFAULT_PERMISSION_MODE, type PermissionMode } from '@/domain/permissions/modes'
 import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/session/gallery'
 import type { Conversation, SessionStatus, TurnSettings } from '@/domain/session/types'
 import type { Project } from '@/domain/projects/types'
 import { detachedConversationId } from '@/platform/tauri'
 import {
   createHarnessClient,
+  executionModeFromWire,
+  executionModeToWire,
   resolveHarnessAddress,
   startHarness,
+  type ApprovalAnswer,
   type DefaultSelection,
+  type ExecutionModeWire,
   type HarnessClient,
   type HarnessFailure,
+  type HarnessResult,
+  type PendingApprovalRecord,
   type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
@@ -120,6 +126,8 @@ function mapRecord(record: ConversationRecordLike): Conversation {
     archived: record.archived,
     modelId: record.modelId,
     reasoningLevel: record.reasoningLevel,
+    // The wire vocabulary becomes the picker's here, once, at the store.
+    permissionMode: executionModeFromWire(record.permissionMode),
   }
 }
 
@@ -133,6 +141,7 @@ interface ConversationRecordLike {
   readonly lastTurnAt: number
   readonly modelId: string | null
   readonly reasoningLevel: ReasoningChoice | null
+  readonly permissionMode: ExecutionModeWire
 }
 
 function findIn(
@@ -179,6 +188,26 @@ interface WorkspaceValue {
     conversationId: string,
     settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice },
   ) => void
+  /**
+   * Settles the execution mode a conversation is held with, in the index -
+   * its own method rather than a fourth key on `setConversationSettings`,
+   * because the mode is a consent with its own control and its own rate of
+   * change. The window's settings follow, and the harness reads the stored
+   * value at every permission decision, so a change lands on the very next
+   * ask, including one a running turn raises.
+   */
+  setConversationPermission: (conversationId: string, permission: PermissionMode) => void
+  /**
+   * The permission questions the harness is holding: every row still waiting,
+   * across conversations, each naming the conversation it belongs to. Bound
+   * to the store's own client so a restart - which replaces the client - is
+   * survived by the next call rather than by a captured object.
+   */
+  readonly approvals: {
+    list: () => Promise<HarnessResult<readonly PendingApprovalRecord[]>>
+    answer: (id: string, answer: ApprovalAnswer) => Promise<HarnessResult<void>>
+    cancel: (id: string) => Promise<HarnessResult<void>>
+  }
 
   createProject: (input: NewProjectInput) => Project
   removeProject: (projectId: string) => void
@@ -196,7 +225,11 @@ interface WorkspaceValue {
     readonly id: string
     readonly firstMessage: string
     readonly projectId: string | null
-    readonly settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice }
+    readonly settings: {
+      readonly modelId: string | null
+      readonly reasoningLevel: ReasoningChoice
+      readonly permission: PermissionMode
+    }
     readonly title?: string
   }) => void
   /** Stamps recency after an admitted later turn. */
@@ -510,12 +543,72 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [mutateIndex],
   )
 
+  const setConversationPermission = useCallback(
+    (conversationId: string, permission: PermissionMode) => {
+      setSettingsState((current) => ({ ...current, permission }))
+      // The wire value is translated here, at the one boundary the store
+      // already owns; the picker's vocabulary never leaves the domain.
+      void mutateIndex(
+        conversationId,
+        { permissionMode: executionModeToWire(permission) },
+        (conversation) => ({ ...conversation, permissionMode: permission }),
+      )
+    },
+    [mutateIndex],
+  )
+
+  /**
+   * The approval surface, bound to the client the store already holds rather
+   * than to an address, so a harness restart - which replaces the client -
+   * is survived by the next call. With no client there is nothing to ask;
+   * that is the same `not-reachable` failure every other call answers with.
+   */
+  const approvals = useMemo(
+    () => ({
+      list: () =>
+        clientRef.current?.listPendingApprovals() ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so there is nothing to ask it.',
+          },
+        }),
+      answer: (id: string, answer: ApprovalAnswer) =>
+        clientRef.current?.answerApproval(id, answer) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the answer went nowhere.',
+          },
+        }),
+      cancel: (id: string) =>
+        clientRef.current?.cancelApproval(id) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the question could not be withdrawn.',
+          },
+        }),
+    }),
+    [],
+  )
+
   const beginConversation = useCallback(
     (input: {
       id: string
       firstMessage: string
       projectId: string | null
-      settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice }
+      settings: {
+        readonly modelId: string | null
+        readonly reasoningLevel: ReasoningChoice
+        readonly permission: PermissionMode
+      }
       /** A title the caller already knows - a fork's " (Fork)" name. Absent starts untitled. */
       title?: string
     }) => {
@@ -539,6 +632,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             archived: false,
             modelId: input.settings.modelId,
             reasoningLevel: input.settings.reasoningLevel,
+            permissionMode: input.settings.permission,
           },
           ...current,
         ]
@@ -553,6 +647,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           ...(input.projectId === null ? {} : { projectId: input.projectId }),
           modelId: input.settings.modelId,
           reasoningLevel: input.settings.reasoningLevel,
+          permissionMode: executionModeToWire(input.settings.permission),
           createdAt: Date.now(),
         })
         .then(async (result) => {
@@ -789,6 +884,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       settings,
       setSettings,
       setConversationSettings,
+      setConversationPermission,
+      approvals,
       createProject,
       removeProject,
       setBranch,
@@ -806,6 +903,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ensureStore,
     }),
     [
+      approvals,
       beginConversation,
       catalog,
       conversations,
@@ -821,6 +919,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setArchived,
       setBranch,
       setConversationSettings,
+      setConversationPermission,
       setProject,
       setSettings,
       status,

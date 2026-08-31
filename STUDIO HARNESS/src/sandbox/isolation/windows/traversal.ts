@@ -102,6 +102,40 @@ export interface TraversalOutcome {
   readonly granted: readonly string[];
   /** Ancestors that need `pnpm sandbox:prepare`, in root-first order. */
   readonly needsElevation: readonly string[];
+  /**
+   * Ancestors whose permission list refused a new entry because it is full.
+   *
+   * Split out from `needsElevation` because the two need opposite advice.
+   * A system-owned directory is fixed by one setup command; a full permission
+   * list is not fixed by running that command — the list has to shrink first,
+   * which is what releasing recorded workspaces does. Sending a user whose
+   * list is full to run `sandbox:prepare` sends them into a command that fails
+   * the same way, which is precisely how this defect survived its first
+   * cleanup attempts.
+   */
+  readonly refused: readonly string[];
+}
+
+/**
+ * Whether a failed grant was refused because the directory's permission list
+ * cannot hold another entry.
+ *
+ * The signature is the launcher's own message, which carries the Win32 status:
+ * `could not build the new permissions for <path> (error 87)`. Status 87 is
+ * `ERROR_INVALID_PARAMETER`, which is how `SetEntriesInAclW` reports a DACL
+ * with no room for the merged entry — measured on a machine whose
+ * user-directory DACL had reached the 64 KB hard limit, not read off a doc
+ * page. Any other failure is the ordinary "cannot write here" and stays in
+ * `needsElevation`.
+ */
+export function isFullPermissionList(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  // The closing parenthesis is part of the match on purpose: a substring test
+  // for "error 87" also matches "error 870" and "error 8712", which are
+  // different Win32 statuses with different answers. The launcher always
+  // writes the status inside parentheses, so matching that is both narrower
+  // and closer to the contract being relied on.
+  return /\(error 87\)/.test(message);
 }
 
 /**
@@ -118,6 +152,7 @@ export function ensureTraversable(
 ): TraversalOutcome {
   const granted: string[] = [];
   const needsElevation: string[] = [];
+  const refused: string[] = [];
   const seen = new Set<string>();
 
   for (const path of paths) {
@@ -137,12 +172,17 @@ export function ensureTraversable(
       try {
         grantTraverse(ancestor, workspaceSid);
         granted.push(ancestor);
-      } catch {
-        // A system-owned directory. Not an error here — it is the list.
-        needsElevation.push(ancestor);
+      } catch (error) {
+        // A system-owned directory, or a full list — not an error here, it is
+        // the bucket, and the caller decides what each one means.
+        if (isFullPermissionList(error)) {
+          refused.push(ancestor);
+        } else {
+          needsElevation.push(ancestor);
+        }
       }
     }
   }
 
-  return { granted, needsElevation };
+  return { granted, needsElevation, refused };
 }

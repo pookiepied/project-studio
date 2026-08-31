@@ -11,7 +11,6 @@ import { registerGitTools } from "../git/index.js";
 import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
 import { registerWebTools } from "../web/index.js";
-import { registerWorkspaceSummaryTool } from "../workspace-summary.js";
 
 export interface NativeToolRegistrationOptions {
   readonly database: StudioDatabase;
@@ -24,6 +23,17 @@ export interface NativeToolRegistrationOptions {
    * described the model is not evidence that the model is blind.
    */
   readonly acceptsImages?: (conversationId: string) => boolean | undefined;
+  /**
+   * The read history the filesystem family enforces read-before-modify with.
+   *
+   * Passed in rather than built here, because this function runs once per run
+   * and the history belongs to the conversation: a log created here forgot
+   * every read the moment the turn ended, so the second message had to re-read
+   * what the first one already had. A composition that omits it gets a fresh
+   * log, which is the old behaviour and is right for a test that takes one
+   * turn.
+   */
+  readonly accessLog?: FileAccessLog;
 }
 
 /** Registers every shipped capability through the one application CallGate. */
@@ -33,7 +43,7 @@ export function registerNativeTools(
 ): void {
   registerFilesystemTools(
     gate,
-    new FileAccessLog(),
+    options.accessLog ?? new FileAccessLog(),
     // A ternary rather than a bare field: the option is optional-without-
     // undefined, and passing an explicit undefined would widen the type
     // instead of omitting it.
@@ -50,7 +60,6 @@ export function registerNativeTools(
       merged: mergedRetrievalLink(options.database, options.credentials),
     }),
   );
-  registerWorkspaceSummaryTool(gate);
 }
 
 /**

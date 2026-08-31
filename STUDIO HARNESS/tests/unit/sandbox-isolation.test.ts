@@ -31,7 +31,12 @@ import {
   PROFILE_PATH,
 } from "../../src/sandbox/isolation/linux/apparmor.js";
 import { containArgs } from "../../src/sandbox/isolation/windows/launcher.js";
-import { grantsFor, profileName } from "../../src/sandbox/isolation/windows/appcontainer.js";
+import {
+  grantsFor,
+  prepareAdvice,
+  profileName,
+} from "../../src/sandbox/isolation/windows/appcontainer.js";
+import { isFullPermissionList } from "../../src/sandbox/isolation/windows/traversal.js";
 import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
@@ -620,6 +625,63 @@ describe("the Windows launcher's argument rules", () => {
     // punctuation, which is why this is a hash and not the path.
     expect(first.length).toBeLessThanOrEqual(64);
     expect(first).toMatch(/^studio-[0-9a-f]{32}$/);
+  });
+});
+
+describe("the advice given while containment is still working", () => {
+  // Task 50: a per-workspace traverse entry on a user-owned ancestor is legal,
+  // unelevated, and unbounded across workspaces. The machine-wide entry that
+  // ends the accumulation needs no refusal to install it — only a message the
+  // user sees on the *first* containment, not after a few hundred. So the
+  // message is a pure function with rules of its own.
+
+  it("names the directories and the exact command", () => {
+    const advice = prepareAdvice(["C:\\Users\\pooki", "C:\\Users\\pooki\\AppData"]);
+    expect(advice).toContain("C:\\Users\\pooki");
+    expect(advice).toContain("C:\\Users\\pooki\\AppData");
+    expect(advice).toContain('pnpm sandbox:prepare "C:\\Users\\pooki"');
+  });
+
+  it("never claims the setup command needs elevation", () => {
+    // The accumulation happens on directories the user owns — their home
+    // folder above all — and those need no elevation at all. Saying "run this
+    // as administrator" makes the fix look heavier than it is, and is the same
+    // wrong advice the elevation failure once gave for every error.
+    const advice = prepareAdvice(["C:\\Users\\pooki"]);
+    expect(advice.toLowerCase()).not.toContain("administrator");
+  });
+});
+
+describe("what a failed traverse grant means", () => {
+  // The launcher's message carries the Win32 status, and the two statuses that
+  // reach this code need opposite advice. Error 5 means "not yours": one setup
+  // command fixes it. Error 87 means the directory's permission list is
+  // physically full: that same setup command fails the same way, and the list
+  // has to shrink first. Sending a user with a full list to run prepare is how
+  // this defect survived its first cleanups.
+  const FULL = "The Windows sandbox launcher failed: could not build the new " +
+    "permissions for C:\\Users\\pooki (error 87)";
+
+  it("reads status 87 as a full permission list", () => {
+    expect(isFullPermissionList(new SandboxError("unavailable", { message: FULL }))).toBe(true);
+    expect(isFullPermissionList(FULL)).toBe(true);
+  });
+
+  it("reads any other status as a directory we cannot write", () => {
+    const denied = FULL.replace("error 87", "error 5");
+    expect(isFullPermissionList(new SandboxError("unavailable", { message: denied }))).toBe(false);
+    expect(isFullPermissionList(new Error("something else entirely"))).toBe(false);
+  });
+
+  it("does not read a longer status that starts with 87 as a full list", () => {
+    // "error 870" and "error 8712" are their own Win32 statuses, and a
+    // substring test for "error 87" answered yes to both - which would send a
+    // user whose problem is something else entirely to the one piece of advice
+    // that cannot help them.
+    for (const status of ["error 870", "error 8712"]) {
+      const other = FULL.replace("error 87", status);
+      expect(isFullPermissionList(new SandboxError("unavailable", { message: other }))).toBe(false);
+    }
   });
 });
 

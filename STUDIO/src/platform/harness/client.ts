@@ -29,6 +29,7 @@ import {
   parseConversationRecord,
   parseConversationRecords,
   parseLibraryProviders,
+  parsePendingApprovals,
   parseProviderIcon,
   parseProbeResult,
   parseProjectRecord,
@@ -39,6 +40,7 @@ import {
   parseProviderModel,
   parseProviderModels,
   parsePurgeOutcome,
+  type ApprovalAnswer,
   type CapabilitySlot,
   type ConversationCreateDraft,
   type ConversationPatch,
@@ -46,6 +48,7 @@ import {
   type DefaultSelection,
   type LibraryProvider,
   type ModelCapability,
+  type PendingApprovalRecord,
   type ProbeResult,
   type ProjectCreateDraft,
   type ProjectPatch,
@@ -218,6 +221,21 @@ export interface HarnessClient {
   deleteConversation(id: string): Promise<HarnessResult<PurgeOutcome>>
   purgeConversations(ids: readonly string[]): Promise<HarnessResult<PurgeOutcome>>
 
+  /**
+   * The permission questions the kernel has raised and nobody has answered.
+   *
+   * Harness-wide rather than per conversation - the list carries every
+   * conversation's parked rows, and each row names the conversation it
+   * belongs to - so this lives on the administration client beside the index
+   * routes, not on the conversation client. Every route sits behind the
+   * APPROVAL admission scope, the same credential as everything else here.
+   */
+  listPendingApprovals(): Promise<HarnessResult<readonly PendingApprovalRecord[]>>
+  /** Settles one question with a verdict and how long the allow lasts. */
+  answerApproval(id: string, answer: ApprovalAnswer): Promise<HarnessResult<void>>
+  /** Withdraws one question without answering it; 204 or a 404 for a row already gone. */
+  cancelApproval(id: string): Promise<HarnessResult<void>>
+
   listProjects(): Promise<HarnessResult<readonly ProjectRecord[]>>
   createProject(draft: ProjectCreateDraft): Promise<HarnessResult<ProjectRecord>>
   updateProject(id: string, patch: ProjectPatch): Promise<HarnessResult<ProjectRecord>>
@@ -238,6 +256,7 @@ const PROVIDERS_PATH = '/api/providers'
 const CONVERSATIONS_PATH = '/api/conversations'
 const PROJECTS_PATH = '/api/projects'
 const MEDIA_PATH = '/api/media'
+const PENDING_APPROVALS_PATH = '/api/permissions/pending'
 
 /** The media routes' answers, parsed with the same skepticism as every other. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -577,6 +596,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
           ...(draft.projectId === undefined ? {} : { projectId: draft.projectId }),
           ...(draft.modelId === undefined ? {} : { modelId: draft.modelId }),
           ...(draft.reasoningLevel === undefined ? {} : { reasoningLevel: draft.reasoningLevel }),
+          ...(draft.permissionMode === undefined ? {} : { permissionMode: draft.permissionMode }),
           ...(draft.createdAt === undefined ? {} : { createdAt: draft.createdAt }),
         },
         parseConversationRecord,
@@ -591,6 +611,7 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       if (patch.projectId !== undefined) body.projectId = patch.projectId
       if (patch.modelId !== undefined) body.modelId = patch.modelId
       if (patch.reasoningLevel !== undefined) body.reasoningLevel = patch.reasoningLevel
+      if (patch.permissionMode !== undefined) body.permissionMode = patch.permissionMode
       if (patch.lastTurnAt !== undefined) body.lastTurnAt = patch.lastTurnAt
       return json('PATCH', conversationIndexPath(id), body, parseConversationRecord)
     },
@@ -601,6 +622,18 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     purgeConversations(ids) {
       return json('POST', `${CONVERSATIONS_PATH}/purge`, { ids: [...ids] }, parsePurgeOutcome)
+    },
+
+    listPendingApprovals() {
+      return json('GET', PENDING_APPROVALS_PATH, undefined, parsePendingApprovals)
+    },
+
+    answerApproval(id, answer) {
+      return empty('POST', `${PENDING_APPROVALS_PATH}/${encodeURIComponent(id)}`, answer)
+    },
+
+    cancelApproval(id) {
+      return empty('DELETE', `${PENDING_APPROVALS_PATH}/${encodeURIComponent(id)}`)
     },
 
     listProjects() {

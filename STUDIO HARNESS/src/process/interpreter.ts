@@ -23,6 +23,10 @@ import { resolveBinary } from "../vendor/resolver.js";
  * difference between choosing it and silently trading one confusing failure
  * for another.
  *
+ * **Which interpreter survives containment is a separate question**, and it is
+ * answered by measurement rather than by this order - see
+ * {@link demoteInterpreter}.
+ *
  * Lives in `src/process/` rather than beside the shell tool because the
  * environment block needs the same answer, and a second copy of "which shell
  * is this" is how the block and the tool drift apart. It spawns nothing and
@@ -113,17 +117,54 @@ const BASH_ARGS = ["-c"] as const;
 const CMD_ARGS = ["/d", "/s", "/c"] as const;
 
 /**
- * The one interpreter this process will use, resolved once and remembered.
+ * Every interpreter this machine has, best first, measured once.
  *
- * Undefined is a real state, not an error: a machine with no shell at all
+ * A list rather than a single answer because the best one is not always the
+ * one that works: an interpreter that cannot be contained on this machine has
+ * to be given up on, and the next one tried. `chosen` only ever moves forward,
+ * and only through `demoteInterpreter`.
+ *
+ * An empty list is a real state, not an error: a machine with no shell at all
  * gets a shell tool that refuses with that sentence, rather than a crash at
  * registration time.
  */
-let resolved: Interpreter | undefined;
+let candidates: readonly Interpreter[] | undefined;
+let chosen = 0;
 
 export function resolveInterpreter(): Interpreter | undefined {
-  resolved ??= measure();
-  return resolved;
+  candidates ??= measure();
+  return candidates[chosen];
+}
+
+/**
+ * Gives up on the current interpreter and moves to the next one this machine
+ * has, for the rest of the process.
+ *
+ * There is exactly one caller and one reason: a contained child that dies at
+ * `STATUS_DLL_INIT_FAILED`, which is what happens when the interpreter cannot
+ * read the libraries beside its own executable. Git for Windows' `bash.exe`
+ * loads `msys-2.0.dll` from its own installation, an AppContainer cannot read
+ * `C:\Program Files`, and granting it there would need elevation this feature
+ * must never want - so on a machine with Git and no PowerShell 7, the shell
+ * tool could not run a single line. That was nine failing tests and the reason
+ * a Full Auto build could not include a command.
+ *
+ * Demotion rather than a reordered preference list, because the preference is
+ * still right where it works: `bash` interprets what models write, and on a
+ * machine where it can be contained it should keep being chosen. Which
+ * interpreters survive containment is a property of the machine, not of the
+ * ordering, so it is measured once, on the first line that fails, instead of
+ * predicted. Returns false when there is nothing left to fall back to.
+ */
+export function demoteInterpreter(failed: Interpreter): boolean {
+  if (candidates === undefined) return false;
+  // Compared by identity against the current choice: two calls racing on the
+  // same failure must demote once, not twice, or a machine with three
+  // interpreters would skip the middle one on a single failure.
+  if (candidates[chosen] !== failed) return true;
+  if (chosen + 1 >= candidates.length) return false;
+  chosen += 1;
+  return true;
 }
 
 /**
@@ -134,11 +175,13 @@ export function interpreterStatement(): readonly string[] | undefined {
   return resolveInterpreter()?.statement;
 }
 
-function measure(): Interpreter | undefined {
+function measure(): readonly Interpreter[] {
+  const found: Interpreter[] = [];
+
   if (process.platform === "win32") {
     const pwsh = scanPath("pwsh.exe");
     if (pwsh !== undefined) {
-      return {
+      found.push({
         path: pwsh,
         label: "pwsh",
         kind: "pwsh",
@@ -147,12 +190,12 @@ function measure(): Interpreter | undefined {
           "Commands run through PowerShell 7 (pwsh). Pipes, &&, quotes, and",
           "redirection are interpreted by the shell.",
         ],
-      };
+      });
     }
 
     const bash = bashFromGit() ?? bashFromPath();
     if (bash !== undefined) {
-      return {
+      found.push({
         path: bash,
         label: "bash",
         kind: "bash",
@@ -161,14 +204,14 @@ function measure(): Interpreter | undefined {
           "Commands run through bash. Pipes, &&, quotes, and redirection are",
           "interpreted by the shell.",
         ],
-      };
+      });
     }
 
     const powershell =
       scanPath("powershell.exe") ??
       join(systemRoot(), "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
     if (isFile(powershell)) {
-      return {
+      found.push({
         path: powershell,
         label: "powershell",
         kind: "powershell",
@@ -178,12 +221,12 @@ function measure(): Interpreter | undefined {
           "redirection are interpreted, but && is not supported: separate",
           "commands with ; or run them one per call.",
         ],
-      };
+      });
     }
 
     const cmd = join(systemRoot(), "System32", "cmd.exe");
     if (isFile(cmd)) {
-      return {
+      found.push({
         path: cmd,
         label: "cmd",
         kind: "cmd",
@@ -192,10 +235,10 @@ function measure(): Interpreter | undefined {
           "Commands run through cmd.exe. Pipes, &&, double quotes, and",
           "redirection are interpreted by the shell.",
         ],
-      };
+      });
     }
 
-    return undefined;
+    return found;
   }
 
   for (const [path, label] of [
@@ -203,7 +246,7 @@ function measure(): Interpreter | undefined {
     ["/bin/sh", "sh"],
   ] as const) {
     if (isFile(path)) {
-      return {
+      found.push({
         path,
         label,
         kind: label === "bash" ? "bash" : "sh",
@@ -212,8 +255,8 @@ function measure(): Interpreter | undefined {
           `Commands run through ${label}. Pipes, &&, quotes, and redirection`,
           "are interpreted by the shell.",
         ],
-      };
+      });
     }
   }
-  return undefined;
+  return found;
 }

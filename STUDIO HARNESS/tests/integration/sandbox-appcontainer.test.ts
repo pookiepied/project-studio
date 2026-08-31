@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 import { profileName } from "../../src/sandbox/isolation/windows/appcontainer.js";
-import { launcherPath } from "../../src/sandbox/isolation/windows/launcher.js";
+import { invokeLauncher, launcherPath } from "../../src/sandbox/isolation/windows/launcher.js";
+import { holdsTraverse } from "../../src/sandbox/isolation/windows/traversal.js";
 import { readLedger } from "../../src/sandbox/isolation/windows/ledger.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
@@ -226,6 +227,50 @@ windows("a contained child on Windows", () => {
     await expect(sandbox.releaseIsolation()).resolves.toBeUndefined();
     expect(readLedger().some((record) => record.workspaceRoot === doomed)).toBe(false);
   }, 60_000);
+
+  it("takes the corridor back in a process that never contained the workspace", async () => {
+    // Task 50's own case, measured. `release` used to know the corridor only
+    // through the memory of the process that granted it, so the maintenance
+    // command — which runs in a fresh process, by design — revoked the
+    // workspace's own entry and nothing else: the ancestor entries stayed, one
+    // per contained workspace, until the user's directory permission list was
+    // physically full. The corridor now survives in the ledger, and this test
+    // runs the real delivery path (`pnpm sandbox:release <directory>`, a
+    // separate node process whose `#prepared` is necessarily empty) against a
+    // workspace whose directory is gone, then asks the kernel whether the
+    // recorded ancestors still hold anything for the workspace's identity.
+    const doomed = await mkdtemp(join(tmpdir(), "studio-corridor-gone-"));
+    const sandbox = new LocalSandbox(createSandboxPolicy({ workspaceRoot: doomed }));
+    await sandbox.run("shell", { executable: NODE, args: ["-e", "0"], cwd: doomed });
+
+    // The corridor is recorded at grant time, beside the profile it belongs to.
+    // It may legitimately be empty — a machine whose ancestors are all covered
+    // by the machine-wide entry grants nothing per workspace — but it must be
+    // present: absence means nobody measured, and nobody measured is the leak.
+    const recorded = readLedger().find((record) => record.workspaceRoot === doomed)?.traversed;
+    expect(recorded).toBeDefined();
+
+    // The identity outlives the run (profiles persist), so the SID can be asked
+    // for here and checked against the same ancestors after a release in a
+    // process that never saw this workspace.
+    const sid = invokeLauncher(["profile-ensure", "--name", profileName(doomed)]);
+    for (const ancestor of recorded ?? []) {
+      expect(holdsTraverse(ancestor, sid)).toBe(true);
+    }
+
+    await rm(doomed, { recursive: true, force: true });
+
+    execFileSync(
+      process.execPath,
+      ["--import", "tsx", "src/sandbox/cli.ts", doomed],
+      { cwd: process.cwd(), encoding: "utf8", windowsHide: true, timeout: 120_000 },
+    );
+
+    for (const ancestor of recorded ?? []) {
+      expect(holdsTraverse(ancestor, sid)).toBe(false);
+    }
+    expect(readLedger().some((record) => record.workspaceRoot === doomed)).toBe(false);
+  }, 120_000);
 
   it("records the profile against a path a person can recognise", async () => {
     // #94. Removal always worked; what a user could not do was *see* what

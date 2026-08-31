@@ -336,6 +336,12 @@ async function prepare(targets: readonly string[]): Promise<void> {
  * have: this reads Studio's own record, so a profile minted before the record
  * existed does not appear. Claiming to be the machine's inventory would be the
  * more useful-sounding answer and the false one.
+ *
+ * Entries written before the corridor was recorded are marked, because on the
+ * machine this defect was found on those are exactly the ones that leaked: a
+ * release could not read what they had granted, so the ancestor entries stayed
+ * while the profile went. The mark tells the user which listings deserve a
+ * second look, not that anything is certainly still there.
  */
 function listProfiles(): void {
   if (process.platform !== "win32") {
@@ -363,6 +369,15 @@ function listProfiles(): void {
     const gone = existsSync(entry.workspaceRoot) ? "" : "   (project directory is gone)";
     const when = new Date(entry.createdAt).toISOString().slice(0, 10);
     process.stdout.write(`  ${when}  ${entry.workspaceRoot}${gone}\n`);
+    if (entry.traversed === undefined) {
+      process.stdout.write(
+        "         (no corridor recorded - this entry predates it, and is the\n" +
+          "          kind that leaked ancestor entries on this machine. A release\n" +
+          "          measures the workspace's own ancestors and revokes what its\n" +
+          "          identity still holds there; grants outside that chain can\n" +
+          "          only be found with `icacls <directory>`.)\n",
+      );
+    }
   }
   process.stdout.write(
     `\nRemove one with:  pnpm sandbox:release <project-directory>\n` +
@@ -395,7 +410,14 @@ async function releaseStale(): Promise<void> {
     );
     try {
       await sandbox.releaseIsolation();
-      process.stdout.write(`Released ${entry.workspaceRoot}\n`);
+      // The caveat matters on exactly the entries this command exists for. A
+      // corridor-less entry releases with a measured sweep of the workspace's
+      // own ancestors; anything granted outside that chain has no record and
+      // no sweep, and saying "Released" with no qualification would hide it.
+      const note = entry.traversed === undefined
+        ? " (no corridor recorded: the workspace's own ancestors were measured and revoked where its identity still held them)"
+        : "";
+      process.stdout.write(`Released ${entry.workspaceRoot}${note}\n`);
     } catch (error) {
       // Reported and stepped over. One unremovable profile should not strand
       // the other thirteen, and the record keeps it visible for a retry.
@@ -460,8 +482,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Read before the release, which forgets the entry as its last step. The
+  // corridor field is the difference between "revoked from the record" and
+  // "revoked from a measurement", and the user is entitled to know which
+  // happened.
+  const entry = readLedger().find((candidate) => candidate.workspaceRoot === workspaceRoot);
   await sandbox.releaseIsolation();
   process.stdout.write(`Released the sandbox for ${workspaceRoot}.\n`);
+  if (entry !== undefined && entry.traversed === undefined) {
+    process.stdout.write(
+      "  (its ledger entry predates the corridor record: the workspace's own\n" +
+        "   ancestors were measured and revoked where its identity still held\n" +
+        "   them. Grants outside that chain have no record here.)\n",
+    );
+  }
 }
 
 await main();

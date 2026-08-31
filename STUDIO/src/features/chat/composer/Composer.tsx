@@ -389,8 +389,11 @@ export function Composer({
               machine, and it is the one you reconsider while looking at what
               you are about to send — so it sits by the send button rather
               than three clicks deep in a menu in the window chrome. Mark only
-              at rest; the name is a hover and a click away. */}
-          <PermissionControl />
+              at rest; the name is a hover and a click away. With a live
+              conversation it shows and settles that conversation's own stored
+              mode; on the gallery and on home there is nothing stored, so it
+              is the window's setting. */}
+          <PermissionControl conversationId={live ? conversationId : null} />
         </motion.div>
 
         <motion.div

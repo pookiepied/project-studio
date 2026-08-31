@@ -51,6 +51,7 @@ const CONVERSATION = {
   archived: false,
   modelId: null,
   reasoningLevel: null,
+  permissionMode: 'manual',
   createdAt: 1_000,
   lastTurnAt: 2_000,
 }

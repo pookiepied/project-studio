@@ -114,7 +114,37 @@ export default defineAgent(async ({ id }) => {
     }),
     durability: {
       maxAttempts: 3,
-      timeoutMs: 300_000,
+      /**
+       * The wall-clock ceiling on one submission, which now has to allow for
+       * the time a person spends deciding.
+       *
+       * This was five minutes, chosen when the longest thing a turn could do
+       * was think and read. A turn can now stop and ask, and a question in
+       * Manual parks the run until somebody answers it - which is minutes if
+       * they are at the keyboard and hours if they are not.
+       *
+       * Measured before changing it, because the contract and the behaviour
+       * disagree: Flue documents this as the wall-clock limit on one
+       * submission and says a submission over it "is aborted and settled as
+       * failed", but on the Node target a question left unanswered for eight
+       * minutes was still in the queue, and answering it woke the run and
+       * wrote the file. So five minutes was not costing anyone a turn today.
+       *
+       * It is still the wrong number to be carrying. It describes a patience
+       * this agent does not have any more, it is a quarter of what the
+       * runtime's own default would give, and the enforcement it depends on
+       * not having is enforcement the runtime says it does - which is exactly
+       * the kind of assumption a version upgrade turns into a bug report from
+       * a user who stepped away from a question. An hour is the runtime's own
+       * default and is safe here for a reason worth stating: this bound is not
+       * what protects the machine from a run that misbehaves. Every tool call
+       * is bounded separately and far more tightly by `CallBounds` (two
+       * minutes by default, ten for `shell`), the model's own requests carry
+       * their own timeouts, and a person watching has a stop control. What is
+       * left for this number to cover is the one thing that legitimately takes
+       * a long time: waiting for a human.
+       */
+      timeoutMs: 3_600_000,
     },
   };
 });

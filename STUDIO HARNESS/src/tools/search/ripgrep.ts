@@ -99,11 +99,7 @@ export function buildSearchArgs(input: SearchArgsInput): string[] {
   if (input.glob !== undefined) args.push(option("--glob", input.glob));
   if (input.type !== undefined) args.push(option("--type", input.type));
 
-  if (input.includeIgnored) {
-    args.push("--no-ignore", "--hidden");
-  } else {
-    for (const exclude of DEFAULT_EXCLUDES) args.push(option("--glob", exclude));
-  }
+  args.push(...visibilityArgs(input.includeIgnored));
 
   // `--regexp=` rather than a positional: a pattern beginning with `-` would
   // otherwise be read as a flag.
@@ -115,13 +111,34 @@ export function buildSearchArgs(input: SearchArgsInput): string[] {
 export function buildFilesArgs(input: FilesArgsInput): string[] {
   const args: string[] = ["--files", "--color", "never", option("--glob", input.pattern)];
 
-  if (input.includeIgnored) {
-    args.push("--no-ignore", "--hidden");
-  } else {
-    for (const exclude of DEFAULT_EXCLUDES) args.push(option("--glob", exclude));
-  }
+  args.push(...visibilityArgs(input.includeIgnored));
 
   args.push("--", input.searchPath);
+  return args;
+}
+
+/**
+ * What a search is allowed to see, in one place for both argument builders.
+ *
+ * `--hidden` always. A dotfile is not a private file: `.env.example`,
+ * `.github/workflows/*`, `.eslintrc`, `.gitignore` itself are ordinary parts
+ * of a project, and they used to be reachable only by also passing
+ * `--no-ignore`, which drags `node_modules` back in. Answering "No files
+ * matched" for a file that is sitting right there teaches the model the file
+ * does not exist, and it goes on to create a second one.
+ *
+ * Ignore rules and the default excludes are untouched by this: a caller that
+ * asked for the ignored files still gets them all, and a caller that did not
+ * still gets `.git` and `node_modules` kept out. The only thing that changed
+ * is that a dotfile is no longer invisible by default.
+ */
+function visibilityArgs(includeIgnored: boolean): string[] {
+  const args = ["--hidden"];
+  if (includeIgnored) {
+    args.push("--no-ignore");
+    return args;
+  }
+  for (const exclude of DEFAULT_EXCLUDES) args.push(option("--glob", exclude));
   return args;
 }
 

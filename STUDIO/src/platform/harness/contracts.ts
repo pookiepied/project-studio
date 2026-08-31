@@ -34,6 +34,8 @@
  * exception the UI has to catch.
  */
 
+import type { PermissionMode } from '@/domain/permissions/modes'
+
 /* -------------------------------------------------------------------------- */
 /* Primitive guards                                                            */
 /* -------------------------------------------------------------------------- */
@@ -151,6 +153,43 @@ export type ModelOrigin = (typeof MODEL_ORIGINS)[number]
  */
 export const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 export type ReasoningLevel = (typeof REASONING_LEVELS)[number]
+
+/**
+ * `executionModeSchema`, mirrored from `STUDIO HARNESS/src/permissions/mode.ts`.
+ *
+ * These are the harness's own names for the three execution modes, and the
+ * only spelling every wire value is validated against: the submission body,
+ * the conversation create and patch bodies, the stored column, and the record
+ * the index returns. The frontend's picker vocabulary (`manual` / `edits` /
+ * `auto`, in `domain/permissions/modes.ts`) is deliberately a different set -
+ * the mode is a consent, and the harness refuses to translate one name into
+ * another on the user's behalf, so the translation happens here, on this side
+ * of the boundary, and nowhere else.
+ */
+export const EXECUTION_MODES = ['manual', 'auto-edit', 'full-auto'] as const
+export type ExecutionModeWire = (typeof EXECUTION_MODES)[number]
+
+const MODE_TO_WIRE: Record<PermissionMode, ExecutionModeWire> = {
+  manual: 'manual',
+  edits: 'auto-edit',
+  auto: 'full-auto',
+}
+
+const WIRE_TO_MODE: Record<ExecutionModeWire, PermissionMode> = {
+  manual: 'manual',
+  'auto-edit': 'edits',
+  'full-auto': 'auto',
+}
+
+/** The picker's word for a mode becomes the word the harness validates. */
+export function executionModeToWire(mode: PermissionMode): ExecutionModeWire {
+  return MODE_TO_WIRE[mode]
+}
+
+/** The wire value becomes the picker's word. */
+export function executionModeFromWire(value: ExecutionModeWire): PermissionMode {
+  return WIRE_TO_MODE[value]
+}
 
 /**
  * A reasoning choice as the index stores it: a level, or "default" - the
@@ -794,6 +833,14 @@ export interface ConversationRecord {
   readonly modelId: string | null
   /** The reasoning choice it is held with; null is the same state as "default". */
   readonly reasoningLevel: ReasoningChoice | null
+  /**
+   * The execution mode the conversation is held with, in the harness's own
+   * vocabulary. Never null on the wire: the absence of a stored answer IS
+   * Manual, and the store resolves that before the record leaves
+   * (`STUDIO HARNESS/src/conversations/store.ts`), so a fourth "unset" state
+   * cannot reach this side and be guessed at.
+   */
+  readonly permissionMode: ExecutionModeWire
   readonly createdAt: number
   readonly lastTurnAt: number
 }
@@ -834,6 +881,17 @@ function nullableText(value: unknown): { ok: true; value: string | null } | { ok
   return parsed === null ? { ok: false } : { ok: true, value: parsed }
 }
 
+/**
+ * A nullable text field the wire may drop entirely. `JSON.stringify` never
+ * carries an `undefined`, so a request the harness built with `resource:
+ * undefined` arrives with no `resource` key at all - and "no key" is the
+ * same fact as null here, not a contract break.
+ */
+function nullableTextOrAbsent(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === undefined) return { ok: true, value: null }
+  return nullableText(value)
+}
+
 function nullableChoice(
   value: unknown,
 ): { ok: true; value: ReasoningChoice | null } | { ok: false } {
@@ -853,6 +911,7 @@ export function parseConversationRecord(value: unknown): ConversationRecord | nu
   const archived = flag(value['archived'])
   const modelId = nullableText(value['modelId'])
   const reasoningLevel = nullableChoice(value['reasoningLevel'])
+  const permissionMode = oneOf(EXECUTION_MODES, value['permissionMode'])
   const createdAt = finiteNumber(value['createdAt'])
   const lastTurnAt = finiteNumber(value['lastTurnAt'])
 
@@ -865,6 +924,7 @@ export function parseConversationRecord(value: unknown): ConversationRecord | nu
     archived === null ||
     !modelId.ok ||
     !reasoningLevel.ok ||
+    permissionMode === null ||
     createdAt === null ||
     lastTurnAt === null
   ) {
@@ -882,6 +942,7 @@ export function parseConversationRecord(value: unknown): ConversationRecord | nu
     archived,
     modelId: modelId.value,
     reasoningLevel: reasoningLevel.value,
+    permissionMode,
     createdAt,
     lastTurnAt,
   }
@@ -951,6 +1012,8 @@ export interface ConversationCreateDraft {
   /** The settings the first turn is being sent with, when one is settled. */
   readonly modelId?: string | null
   readonly reasoningLevel?: ReasoningChoice | null
+  /** The mode the first turn was admitted under, in the wire vocabulary. */
+  readonly permissionMode?: ExecutionModeWire
   /** The moment the admission receipt arrived; defaults to the harness's clock. */
   readonly createdAt?: number
 }
@@ -958,7 +1021,9 @@ export interface ConversationCreateDraft {
 /**
  * What a rename, pin, archive, filing change, or later-turn stamp changes.
  * Absent keys are left alone; `projectId: null` clears the filing, and
- * `modelId: null` clears the model back to the default alias.
+ * `modelId: null` clears the model back to the default alias. `permissionMode`
+ * is never null: a mode is a consent, and there is no "unset" state to clear
+ * back to - the bottom of the ladder is Manual, which is a real answer.
  */
 export interface ConversationPatch {
   readonly title?: string
@@ -967,6 +1032,7 @@ export interface ConversationPatch {
   readonly projectId?: string | null
   readonly modelId?: string | null
   readonly reasoningLevel?: ReasoningChoice | null
+  readonly permissionMode?: ExecutionModeWire
   readonly lastTurnAt?: number
 }
 
@@ -1015,6 +1081,163 @@ export interface ProjectPatch {
   readonly name?: string
   readonly icon?: string
   readonly description?: string
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pending approvals                                                           */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Mirrored from `GET /api/permissions/pending`: one element of what
+ * `broker.list()` answers, which is a row of the durable store
+ * (`STUDIO HARNESS/src/application/approval-broker.ts`). A pending row is a
+ * question the permission kernel raised and nobody has answered yet - the run
+ * that asked is parked until it is answered or cancelled, and the list is the
+ * one source that survives a harness restart, which is why the webview polls
+ * it instead of reading the conversation stream (the stream's chunk union is
+ * closed; see Task 47's report, section 6).
+ *
+ * Only the fields the prompt renders are carried. The request's full
+ * descriptor - provenance, input schema, idempotence - stays on the wire side;
+ * a parser that rebuilt all of it would have to refuse rows it could have
+ * shown, and a parked run is the one state this file must not make harder to
+ * see.
+ */
+
+/** The verdict half of an answer; the harness accepts nothing else. */
+export const APPROVAL_VERDICTS = ['allow', 'deny'] as const
+export type ApprovalVerdict = (typeof APPROVAL_VERDICTS)[number]
+
+/**
+ * How long an allow lasts. `always` outlives the conversation: a real grant
+ * in the harness's store, which is why the prompt that offers it treats it as
+ * the heavier choice.
+ */
+export const GRANT_DURATIONS = ['once', 'conversation', 'always'] as const
+export type GrantDuration = (typeof GRANT_DURATIONS)[number]
+
+export interface ApprovalAnswer {
+  readonly verdict: ApprovalVerdict
+  readonly duration: GrantDuration
+  /**
+   * Which rung of the kernel's own ladder the grant is stored against.
+   *
+   * Omitted means the narrowest rung the kernel offered, which for a file is
+   * that one file. That default is right for "just once" and wrong for the
+   * two lasting answers: a grant pinned to one file makes "this conversation"
+   * ask again about the next file, which is not what the words say. Only a
+   * rung the kernel actually offered may be sent; anything else is narrowed
+   * server-side and reported as an approver bug.
+   */
+  readonly scopeId?: string
+}
+
+/** One rung of the scope ladder the kernel offered; rendered, never invented here. */
+export interface ApprovalScopeOption {
+  readonly id: string
+  readonly label: string
+  readonly detail: string
+  /**
+   * The rule this rung would store, when the kernel sent one.
+   *
+   * Read for one reason: the `this-folder` rung's pattern is the conversation's
+   * workspace, which is what turns an absolute resource into the
+   * workspace-relative path the question shows. Optional because it is the
+   * kernel's own field and a row without it must still render - the sentence
+   * falls back to the file's name.
+   */
+  readonly pattern: string | null
+}
+
+/** Why the kernel asked. `policy` asks survive every mode and are worth explaining. */
+export type DecisionSourceWire = 'policy' | 'grant' | 'default'
+
+export interface PendingApprovalRecord {
+  readonly id: string
+  readonly createdAt: number
+  readonly capabilityNamespace: string
+  readonly capabilityName: string
+  /** The harness's own title for the capability, e.g. "Write file". */
+  readonly capabilityTitle: string
+  /** What the call touches - a resolved path, or `shell:npm`. Null when the call is not narrowable. */
+  readonly resource: string | null
+  /** `conversation:<id>`, the conversation whose run raised the question. */
+  readonly conversationId: string | null
+  /** The scope ladder, narrowest first, exactly as the kernel offered it. */
+  readonly scopes: readonly ApprovalScopeOption[]
+  readonly source: DecisionSourceWire
+  /** The kernel's short sentence for why this needs a person. */
+  readonly reason: string
+}
+
+export function parsePendingApproval(value: unknown): PendingApprovalRecord | null {
+  if (!isRecord(value)) return null
+
+  const id = text(value['id'])
+  const createdAt = finiteNumber(value['createdAt'])
+  if (id === null || createdAt === null) return null
+
+  // Everything the prompt renders lives under `request` and `decision`.
+  const request = value['request']
+  const decision = value['decision']
+  if (!isRecord(request) || !isRecord(decision)) return null
+
+  const capability = request['capability']
+  const scope = request['scope']
+  if (!isRecord(capability) || !isRecord(scope)) return null
+
+  const capabilityId = capability['id']
+  if (!isRecord(capabilityId)) return null
+  const capabilityNamespace = text(capabilityId['namespace'])
+  const capabilityName = text(capabilityId['name'])
+  const capabilityTitle = text(capability['title'])
+  if (capabilityNamespace === null || capabilityName === null || capabilityTitle === null) {
+    return null
+  }
+
+  const resource = nullableTextOrAbsent(request['resource'])
+  const conversationId = nullableTextOrAbsent(scope['conversationId'])
+
+  const scopes = listOf(parseApprovalScope, request['scopes'])
+  const source = oneOf<DecisionSourceWire>(['policy', 'grant', 'default'], decision['source'])
+  const reason = text(decision['reason'])
+  if (
+    scopes === null ||
+    source === null ||
+    reason === null ||
+    !resource.ok ||
+    !conversationId.ok
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    createdAt,
+    capabilityNamespace,
+    capabilityName,
+    capabilityTitle,
+    resource: resource.value,
+    conversationId: conversationId.value,
+    scopes,
+    source,
+    reason,
+  }
+}
+
+function parseApprovalScope(value: unknown): ApprovalScopeOption | null {
+  if (!isRecord(value)) return null
+  const id = text(value['id'])
+  const label = text(value['label'])
+  const detail = text(value['detail'])
+  if (id === null || label === null || detail === null) return null
+  return { id, label, detail, pattern: text(value['pattern']) }
+}
+
+export function parsePendingApprovals(
+  value: unknown,
+): readonly PendingApprovalRecord[] | null {
+  return listOf(parsePendingApproval, value)
 }
 
 /* -------------------------------------------------------------------------- */

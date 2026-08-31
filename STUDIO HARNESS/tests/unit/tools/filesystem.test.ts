@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -448,7 +448,7 @@ describe("the three tools share one record of what was read", () => {
 
   it("forgets a conversation when it ends", () => {
     const standalone = new FileAccessLog();
-    standalone.record(SCOPE, "C:/x/a.ts", { modifiedAt: 1 });
+    standalone.record(SCOPE, "C:/x/a.ts", { modifiedAt: 1, size: 1 });
     standalone.forget(SCOPE.conversationId);
 
     expect(standalone.get(SCOPE, "C:/x/a.ts")).toBeUndefined();
@@ -462,7 +462,7 @@ describe("the three tools share one record of what was read", () => {
     const first = { ...SCOPE, conversationId: "a" };
     const second = { ...SCOPE, conversationId: "a b" };
 
-    standalone.record(first, "b c", { modifiedAt: 1 });
+    standalone.record(first, "b c", { modifiedAt: 1, size: 1 });
 
     expect(standalone.get(first, "b c")?.modifiedAt).toBe(1);
     expect(standalone.get(second, "c")).toBeUndefined();
@@ -473,13 +473,121 @@ describe("the three tools share one record of what was read", () => {
     const first = { ...SCOPE, conversationId: "a" };
     const second = { ...SCOPE, conversationId: "a b" };
 
-    standalone.record(first, "x.ts", { modifiedAt: 1 });
-    standalone.record(second, "x.ts", { modifiedAt: 2 });
+    standalone.record(first, "x.ts", { modifiedAt: 1, size: 1 });
+    standalone.record(second, "x.ts", { modifiedAt: 2, size: 2 });
     standalone.forget("a");
 
     expect(standalone.get(first, "x.ts")).toBeUndefined();
     // A space-prefixed match would have swept this away too.
     expect(standalone.get(second, "x.ts")?.modifiedAt).toBe(2);
+  });
+});
+
+describe("a window past the end of the file says so", () => {
+  it("names the offset and the length rather than returning nothing", () => {
+    // The empty string was indistinguishable from an empty file and from a
+    // failed read, so the model answered as though the file held nothing.
+    const output = formatNumbered("one\ntwo\n", 50, 100);
+
+    expect(output).toContain("offset 50");
+    expect(output).toContain("2 lines");
+  });
+
+  it("counts one line in the singular", () => {
+    expect(formatNumbered("only\n", 9, 10)).toContain("1 line)");
+  });
+});
+
+describe("a file's own line endings survive an edit", () => {
+  it("matches text copied out of a read against a CRLF file", async () => {
+    // `read` shows lines without their carriage returns, so a model copying
+    // two of them back sends "\n" where the file holds "\r\n". Before this,
+    // every multi-line edit of a Windows file failed to match.
+    writeFileSync(join(workspace, "crlf.ts"), "const a = 1;\r\nconst b = 2;\r\n");
+    await read({ path: "crlf.ts" });
+
+    await edit({
+      path: "crlf.ts",
+      oldString: "const a = 1;\nconst b = 2;",
+      newString: "const a = 9;\nconst b = 8;",
+    });
+
+    const after = readFileSync(join(workspace, "crlf.ts"), "utf8");
+    expect(after).toBe("const a = 9;\r\nconst b = 8;\r\n");
+  });
+
+  it("leaves an LF file alone", async () => {
+    await read({ path: "src/app.ts" });
+    await edit({
+      path: "src/app.ts",
+      oldString: "const a = 1;\nconst b = 2;",
+      newString: "const a = 9;",
+    });
+
+    expect(readFileSync(join(workspace, "src", "app.ts"), "utf8")).toBe("const a = 9;\n");
+  });
+});
+
+describe("two writers to one file", () => {
+  it("does not lose one of two edits issued together", async () => {
+    // Each edit is a read, a computation, and a write across several awaits.
+    // Interleaved, both read the same content and the second overwrote the
+    // first - while both reported success. Serialized per path, the second
+    // reads what the first wrote.
+    await read({ path: "src/app.ts" });
+
+    await Promise.all([
+      edit({ path: "src/app.ts", oldString: "const a = 1;", newString: "const a = 9;" }),
+      edit({ path: "src/app.ts", oldString: "const b = 2;", newString: "const b = 8;" }),
+    ]);
+
+    const after = readFileSync(join(workspace, "src", "app.ts"), "utf8");
+    expect(after).toContain("const a = 9;");
+    expect(after).toContain("const b = 8;");
+  });
+});
+
+describe("what counts as the file having changed", () => {
+  it("catches a rewrite that kept the modification time", () => {
+    // FAT, exFAT and network shares keep timestamps to a second or two, and
+    // some writers restore them outright. A different size is proof of a
+    // different file and costs nothing - the stat was already taken.
+    const log = new FileAccessLog();
+    log.record(SCOPE, "C:/x/a.ts", { modifiedAt: 10, size: 100 });
+
+    expect(() =>
+      log.assertSafeToModify(SCOPE, "C:/x/a.ts", {
+        exists: true,
+        modifiedAt: 10,
+        size: 120,
+      }),
+    ).toThrow(ToolError);
+  });
+
+  it("believes the content over the timestamp when both are known", () => {
+    const log = new FileAccessLog();
+    log.record(SCOPE, "C:/x/a.ts", { modifiedAt: 10, size: 100, contentHash: "abc" });
+
+    // Same bytes, later timestamp: a formatter that rewrote the file
+    // identically has changed nothing the model needs to re-read.
+    expect(() =>
+      log.assertSafeToModify(SCOPE, "C:/x/a.ts", {
+        exists: true,
+        modifiedAt: 99,
+        size: 100,
+        contentHash: "abc",
+      }),
+    ).not.toThrow();
+
+    // Different bytes, unchanged timestamp: changed, whatever the clock says.
+    expect(() =>
+      log.assertSafeToModify(SCOPE, "C:/x/a.ts", {
+        exists: true,
+        modifiedAt: 10,
+        size: 100,
+        contentHash: "def",
+      }),
+    ).toThrow(ToolError);
   });
 });
 

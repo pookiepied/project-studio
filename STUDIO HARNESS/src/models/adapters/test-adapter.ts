@@ -91,11 +91,19 @@ function latestUserText(context: Context): string {
   return "";
 }
 
+/**
+ * Whether the scripted native tool has already answered.
+ *
+ * `glob` rather than the old `workspace_summary` stub: that tool existed only
+ * so this fake model had something to call, returned a constant, and cost its
+ * schema on every real request. `glob` is a real read-only tool that answers
+ * in any directory, including an empty one, so the pipeline this exercises -
+ * model asks, gate authorizes, tool runs, result returns - is now exercised
+ * with a tool the product actually ships.
+ */
 function hasToolResult(context: Context): boolean {
   return context.messages.some(
-    (message) =>
-      message.role === "toolResult" &&
-      message.toolName === "workspace_summary",
+    (message) => message.role === "toolResult" && message.toolName === "glob",
   );
 }
 
@@ -293,9 +301,9 @@ function stream(
       ) {
         const toolCall = {
           type: "toolCall" as const,
-          id: "workspace-summary-1",
-          name: "workspace_summary",
-          arguments: { workspace: "Project Studio V2" },
+          id: "workspace-glob-1",
+          name: "glob",
+          arguments: { pattern: "**/*" },
         };
         const message = createMessage(model, [toolCall]);
         message.stopReason = "toolUse";

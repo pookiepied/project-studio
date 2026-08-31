@@ -56,12 +56,17 @@ const BASE = {
 
 describe("the argument vector is built, never supplied", () => {
   it("passes the pattern as a value, so one starting with a dash is not a flag", () => {
-    const args = buildSearchArgs({ ...BASE, pattern: "--hidden" });
+    // A flag ripgrep really has, and one this builder never passes itself -
+    // the assertion below is that the pattern did not become a flag, so it
+    // must not be a flag the vector legitimately contains for its own reasons.
+    // `--hidden` used to serve here and no longer can: every search passes it
+    // now, so its presence would prove nothing.
+    const args = buildSearchArgs({ ...BASE, pattern: "--files" });
 
     // `--regexp=<pattern>`: everything after the equals sign is the value, so
     // there is nothing left for ripgrep's parser to interpret.
-    expect(args).toContain("--regexp=--hidden");
-    expect(args).not.toContain("--hidden");
+    expect(args).toContain("--regexp=--files");
+    expect(args).not.toContain("--files");
   });
 
   it("separates the path with --, so a path is never read as a flag", () => {
@@ -103,6 +108,27 @@ describe("the argument vector is built, never supplied", () => {
     expect(everything).toContain("--no-ignore");
     expect(everything).toContain("--hidden");
     expect(everything).not.toContain("--glob=!node_modules");
+  });
+
+  it("looks at dotfiles without also looking in ignored directories", () => {
+    // `.env.example`, `.github/workflows/*` and `.eslintrc` are ordinary parts
+    // of a project. They used to be reachable only by also passing
+    // `--no-ignore`, which drags `node_modules` back in, so "No files matched"
+    // was the answer for a file sitting right there.
+    const args = buildSearchArgs(BASE);
+
+    expect(args).toContain("--hidden");
+    expect(args).not.toContain("--no-ignore");
+    // Making dotfiles visible must not mean walking the object store.
+    expect(args).toContain("--glob=!.git");
+
+    const files = buildFilesArgs({
+      pattern: "**/*",
+      searchPath: "C:/work",
+      includeIgnored: false,
+    });
+    expect(files).toContain("--hidden");
+    expect(files).not.toContain("--no-ignore");
   });
 
   it("passes filters through", () => {

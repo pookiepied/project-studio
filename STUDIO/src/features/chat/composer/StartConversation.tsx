@@ -7,6 +7,7 @@ import { SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
+import { turnSettingsToWire } from '@/platform/harness'
 import type { SeamFailure, TurnImageWire } from '@/platform/harness'
 
 /**
@@ -43,7 +44,8 @@ export function StartConversation({
         firstMessage: text,
         projectId,
         // The settings the turn went out with, so the record and the
-        // admission path's own write describe the same conversation.
+        // admission path's own write describe the same conversation - the
+        // mode included, which the harness holds per conversation.
         settings: effectiveTurnSettings(null, settings),
       })
       openChat(conversationId)
@@ -54,7 +56,7 @@ export function StartConversation({
   // sending is the one the turn should use.
   const firstTurn = useFirstTurn({
     onStarted,
-    settings: () => effectiveTurnSettings(null, settings),
+    settings: () => turnSettingsToWire(effectiveTurnSettings(null, settings)),
   })
 
   /** The send-time refusal for images a blind model cannot take. */

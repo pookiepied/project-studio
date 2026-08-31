@@ -4,7 +4,7 @@ import {
 } from "../../contracts/capabilities.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
-import type { FileAccessLog } from "./access-log.js";
+import { hashContent, type FileAccessLog } from "./access-log.js";
 import { currentState } from "./write.js";
 
 /**
@@ -72,6 +72,36 @@ function literal(replacement: string): () => string {
   return () => replacement;
 }
 
+/**
+ * Matching a file that uses Windows line endings against text the model typed.
+ *
+ * `read` shows a file's lines without their carriage returns - it splits on
+ * `/\r?\n/` - so a model copying two lines out of a read and back into
+ * `oldString` sends `\n` where the file holds `\r\n`. The match then finds
+ * nothing, the model is told to "match it exactly, including whitespace", and
+ * it retries the same string, because from where it is sitting the string it
+ * sent *is* what it was shown. On a product whose first platform is Windows
+ * that is not an edge case, it is most multi-line edits.
+ *
+ * So the file's own convention decides. A file that uses CRLF is matched with
+ * a CRLF-converted needle, and the replacement is converted with it, which
+ * also stops an edit from quietly leaving one LF-only line in a CRLF file. A
+ * needle that already carries `\r` is left exactly as the model wrote it: it
+ * may be matching a mixed-ending region deliberately, and rewriting a string
+ * that was already right is how a helpful conversion becomes a bug.
+ */
+function usesCarriageReturns(content: string): boolean {
+  const newlines = content.split("\n").length - 1;
+  if (newlines === 0) return false;
+  const carriageReturns = content.split("\r\n").length - 1;
+  // Not "any", because one stray CRLF in an LF file must not convert the rest.
+  return carriageReturns * 2 >= newlines;
+}
+
+function toCarriageReturns(text: string): string {
+  return text.replace(/\r?\n/g, "\r\n");
+}
+
 function countOccurrences(haystack: string, needle: string): number {
   let count = 0;
   let index = haystack.indexOf(needle);
@@ -124,51 +154,70 @@ export function createEditTool(log: FileAccessLog): ToolDefinition<EditInput, st
 
     resource: (input, context) => context.sandbox.resolveWrite(input.path),
 
-    execute: async (input, context) => {
-      const absolute = context.sandbox.resolveWrite(input.path);
-      const state = await currentState(context, input.path);
+    // One writer per file, from the staleness check through to the record.
+    // See `PathLocks`: the read-modify-write below spans several awaits, and
+    // two edits interleaving inside it lose one of the two changes while
+    // reporting both as applied.
+    execute: async (input, context) =>
+      log.serialize(context.sandbox.resolveWrite(input.path), async () => {
+        const absolute = context.sandbox.resolveWrite(input.path);
+        const state = await currentState(context, input.path);
 
-      if (!state.exists) {
-        throw new ToolError("invalid_input", {
-          message: "That file does not exist. Use write to create it.",
+        if (!state.exists) {
+          throw new ToolError("invalid_input", {
+            message: "That file does not exist. Use write to create it.",
+          });
+        }
+        if (state.isDirectory) {
+          throw new ToolError("invalid_input", { message: "That path is a directory." });
+        }
+
+        // Read before the staleness check rather than after it, because the
+        // content is the evidence: an edit reads the whole file anyway, so the
+        // hash comparison costs nothing here and catches what a timestamp
+        // cannot - a rewrite inside one filesystem tick, or a writer that put
+        // the timestamp back.
+        const content = await context.sandbox.readFile(input.path);
+        log.assertSafeToModify(context.scope, absolute, {
+          ...state,
+          contentHash: hashContent(content),
         });
-      }
-      if (state.isDirectory) {
-        throw new ToolError("invalid_input", { message: "That path is a directory." });
-      }
 
-      log.assertSafeToModify(context.scope, absolute, state);
+        const crlf = usesCarriageReturns(content) && !input.oldString.includes("\r");
+        const oldString = crlf ? toCarriageReturns(input.oldString) : input.oldString;
+        const newString = crlf ? toCarriageReturns(input.newString) : input.newString;
 
-      const content = await context.sandbox.readFile(input.path);
-      const occurrences = countOccurrences(content, input.oldString);
+        const occurrences = countOccurrences(content, oldString);
 
-      if (occurrences === 0) {
-        throw new ToolError("invalid_input", {
-          message:
-            "That exact text was not found in the file. Read the file again and match it exactly, including whitespace.",
+        if (occurrences === 0) {
+          throw new ToolError("invalid_input", {
+            message:
+              "That exact text was not found in the file. Read the file again and match it exactly, including whitespace.",
+          });
+        }
+
+        if (occurrences > 1 && !input.replaceAll) {
+          throw new ToolError("invalid_input", {
+            message: `That text appears ${occurrences} times. Include more surrounding text to identify one, or set replaceAll to change every occurrence.`,
+          });
+        }
+
+        const updated = input.replaceAll
+          ? content.replaceAll(oldString, literal(newString))
+          : content.replace(oldString, literal(newString));
+
+        await context.sandbox.writeFile(input.path, updated);
+
+        const after = await context.sandbox.stat(input.path);
+        log.record(context.scope, absolute, {
+          modifiedAt: after.modifiedAt,
+          size: after.size,
+          contentHash: hashContent(updated),
         });
-      }
 
-      if (occurrences > 1 && !input.replaceAll) {
-        throw new ToolError("invalid_input", {
-          message: `That text appears ${occurrences} times. Include more surrounding text to identify one, or set replaceAll to change every occurrence.`,
-        });
-      }
-
-      const updated = input.replaceAll
-        ? content.replaceAll(input.oldString, literal(input.newString))
-        : content.replace(input.oldString, literal(input.newString));
-
-      await context.sandbox.writeFile(input.path, updated);
-
-      const after = await context.sandbox.stat(input.path);
-      log.record(context.scope, absolute, {
-        modifiedAt: after.modifiedAt,
-      });
-
-      return occurrences === 1
-        ? `Edited ${input.path}`
-        : `Edited ${input.path} (${occurrences} occurrences)`;
-    },
+        return occurrences === 1
+          ? `Edited ${input.path}`
+          : `Edited ${input.path} (${occurrences} occurrences)`;
+      }),
   });
 }

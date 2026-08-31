@@ -224,7 +224,7 @@ describe.sequential("observability vertical slice", () => {
       expect(agent).toBeDefined();
       expect(chat).toBeDefined();
       expect(tool).toBeDefined();
-      expect(tool?.name).toContain("workspace_summary");
+      expect(tool?.name).toContain("glob");
 
       expect(chat?.parentSpanId).toBe(agent?.spanId);
       expect(tool?.parentSpanId).toBe(agent?.spanId);

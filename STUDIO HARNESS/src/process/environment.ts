@@ -40,8 +40,23 @@
  *
  * `PATH` is absent from this list and then **explicitly blanked** in
  * `buildEnvironment`, which is not the same thing — see the comment there.
+ *
+ * `PATHEXT` is here and `PATH` is not, and the difference is the whole point:
+ * `PATH` says *where* a child may look for programs, which is reach and
+ * belongs to policy; `PATHEXT` says which file extensions count as executable
+ * on this OS, which is spelling. Without it a Windows shell handed a perfectly
+ * good `PATH` still cannot run `node`, because it never tries `node.exe` —
+ * measured, as "The term 'node' is not recognized", from a contained shell
+ * whose PATH was granted and correct. It grants nothing on its own: a child
+ * with no `PATH` and every extension in the world can still reach nothing.
  */
-export const OS_REQUIRED_VARIABLES = ["SystemRoot", "windir", "TEMP", "TMP"] as const;
+export const OS_REQUIRED_VARIABLES = [
+  "SystemRoot",
+  "windir",
+  "TEMP",
+  "TMP",
+  "PATHEXT",
+] as const;
 
 /**
  * What the desktop Host passes through to the Harness.

@@ -1,4 +1,5 @@
 import { SCENE_DONE, renderScene } from '@/domain/session/gallery/scene'
+import { DEFAULT_PERMISSION_MODE } from '@/domain/permissions/modes'
 import type { Conversation } from '@/domain/session/types'
 
 /**
@@ -28,6 +29,9 @@ export function galleryConversation(): Conversation {
     updatedAt: Date.now() - 5 * 60 * 1000,
     modelId: null,
     reasoningLevel: null,
+    // Not a conversation the harness holds, so the mode is the window's
+    // default. It is never sent anywhere: the gallery answers locally.
+    permissionMode: DEFAULT_PERMISSION_MODE,
     messages: [
       {
         id: 'msg_gallery_user',

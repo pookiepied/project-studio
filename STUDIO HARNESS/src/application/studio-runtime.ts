@@ -39,6 +39,7 @@ import type { StudioDatabase } from "../storage/database.js";
 import { CallGate } from "../tools/gate.js";
 import { ToolError } from "../tools/errors.js";
 import { registerNativeTools } from "../tools/native/index.js";
+import { FileAccessLog } from "../tools/filesystem/index.js";
 import { ConversationStore } from "../conversations/store.js";
 
 export interface StudioRuntimeOptions {
@@ -302,6 +303,19 @@ export class StudioRuntime implements AgentHost {
    * records. Growth is now bounded by the workspace roots a process serves.
    */
   readonly #turnSnapshots = new Map<string, TurnSnapshots>();
+  /**
+   * What each conversation has read, for as long as the conversation lasts.
+   *
+   * Held here rather than built inside `registerNativeTools`, because that
+   * runs inside `createAgentSandbox` and Flue re-runs an agent's initializer
+   * for every turn. A log built there remembered one run: a file read in the
+   * first message had to be read again in the second before it could be
+   * edited, and the rule that exists to stop a blind overwrite was charging
+   * the conversation for a read it had already done. Keyed by conversation
+   * for the same reason the log's own key is - "I have seen this file" is one
+   * conversation's knowledge - and cleared with the conversation.
+   */
+  readonly #accessLogs = new Map<string, FileAccessLog>();
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -417,6 +431,19 @@ export class StudioRuntime implements AgentHost {
    * is Manual, which is the same answer an unset row gives: no recorded
    * consent, nothing widened.
    */
+  /**
+   * The read history of one conversation, created on that conversation's first
+   * run and kept until the conversation is forgotten.
+   */
+  #accessLogFor(conversationId: string): FileAccessLog {
+    let log = this.#accessLogs.get(conversationId);
+    if (log === undefined) {
+      log = new FileAccessLog();
+      this.#accessLogs.set(conversationId, log);
+    }
+    return log;
+  }
+
   #conversationMode(conversationId: string): ExecutionMode {
     return this.#conversations.get(this.#conversationRowId(conversationId))?.permissionMode
       ?? "manual";
@@ -503,7 +530,17 @@ export class StudioRuntime implements AgentHost {
       // ADR 0039's rule kept, and the move ADR 0046 pairs with approving the
       // programs by name instead of by resolved path. Every other child kind
       // keeps the blanked PATH from `buildEnvironment`.
-      environment: { PATH: process.env.PATH ?? "" },
+      // `PATHEXT` beside it, and for the same reason rather than as a
+      // afterthought: on Windows a shell handed a perfectly good PATH still
+      // cannot run `node`, because command discovery never tries `node.exe`
+      // without it. Measured as "The term 'node' is not recognized" from a
+      // contained shell whose PATH was correct. It grants no reach of its own
+      // - it is a list of file extensions - so it is the cheapest half of
+      // making the grant above actually work.
+      environment: {
+        PATH: process.env.PATH ?? "",
+        ...(process.env.PATHEXT === undefined ? {} : { PATHEXT: process.env.PATHEXT }),
+      },
     });
     const sandbox = new LocalSandbox(policy);
     const reporter = createErrorReporter(
@@ -559,6 +596,7 @@ export class StudioRuntime implements AgentHost {
       database: this.#db,
       credentials: this.#credentials,
       acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
+      accessLog: this.#accessLogFor(options.conversationId),
     });
 
     const registeredMcp = new Map<string, McpTool>();

@@ -5,7 +5,7 @@ import {
 import { SandboxError } from "../../sandbox/errors.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
-import type { FileAccessLog } from "./access-log.js";
+import { hashContent, type FileAccessLog } from "./access-log.js";
 
 /**
  * Creating a file, or replacing one whole.
@@ -47,14 +47,24 @@ export const WRITE_DESCRIPTOR: CapabilityDescriptor = {
  * refusal rather than as absence.
  */
 export async function currentState(
-  context: { sandbox: { exists: (path: string) => Promise<boolean>; stat: (path: string) => Promise<{ modifiedAt: number; isDirectory: boolean }> } },
+  context: {
+    sandbox: {
+      exists: (path: string) => Promise<boolean>;
+      stat: (path: string) => Promise<{ modifiedAt: number; size: number; isDirectory: boolean }>;
+    };
+  },
   path: string,
-): Promise<{ exists: boolean; modifiedAt: number; isDirectory: boolean }> {
+): Promise<{ exists: boolean; modifiedAt: number; size: number; isDirectory: boolean }> {
   const exists = await context.sandbox.exists(path);
-  if (!exists) return { exists: false, modifiedAt: 0, isDirectory: false };
+  if (!exists) return { exists: false, modifiedAt: 0, size: 0, isDirectory: false };
 
   const stat = await context.sandbox.stat(path);
-  return { exists: true, modifiedAt: stat.modifiedAt, isDirectory: stat.isDirectory };
+  return {
+    exists: true,
+    modifiedAt: stat.modifiedAt,
+    size: stat.size,
+    isDirectory: stat.isDirectory,
+  };
 }
 
 export function createWriteTool(log: FileAccessLog): ToolDefinition<WriteInput, string> {
@@ -79,36 +89,44 @@ export function createWriteTool(log: FileAccessLog): ToolDefinition<WriteInput, 
     // fail here rather than at the last moment inside the tool.
     resource: (input, context) => context.sandbox.resolveWrite(input.path),
 
-    execute: async (input, context) => {
-      const absolute = context.sandbox.resolveWrite(input.path);
-      const state = await currentState(context, input.path);
+    // Everything from the staleness check to the record that follows the write
+    // is one critical section per file. Two writes to one path that interleave
+    // here both pass the same check and the later one silently discards the
+    // earlier, which the log would then describe as both having landed.
+    execute: async (input, context) =>
+      log.serialize(context.sandbox.resolveWrite(input.path), async () => {
+        const absolute = context.sandbox.resolveWrite(input.path);
+        const state = await currentState(context, input.path);
 
-      if (state.isDirectory) {
-        throw new ToolError("invalid_input", {
-          message: "That path is a directory.",
+        if (state.isDirectory) {
+          throw new ToolError("invalid_input", {
+            message: "That path is a directory.",
+          });
+        }
+
+        log.assertSafeToModify(context.scope, absolute, state);
+
+        try {
+          await context.sandbox.writeFile(input.path, input.content);
+        } catch (error) {
+          if (error instanceof SandboxError || error instanceof ToolError) throw error;
+          throw new ToolError("execution_failed", {
+            message: "The file could not be written.",
+            cause: error,
+          });
+        }
+
+        // The file the model just wrote is a file it knows the contents of, so
+        // a following edit does not have to re-read it - and the content is in
+        // hand here, so the hash costs nothing.
+        const written = await context.sandbox.stat(input.path);
+        log.record(context.scope, absolute, {
+          modifiedAt: written.modifiedAt,
+          size: written.size,
+          contentHash: hashContent(input.content),
         });
-      }
 
-      log.assertSafeToModify(context.scope, absolute, state);
-
-      try {
-        await context.sandbox.writeFile(input.path, input.content);
-      } catch (error) {
-        if (error instanceof SandboxError || error instanceof ToolError) throw error;
-        throw new ToolError("execution_failed", {
-          message: "The file could not be written.",
-          cause: error,
-        });
-      }
-
-      // The file the model just wrote is a file it knows the contents of, so a
-      // following edit does not have to re-read it.
-      const written = await context.sandbox.stat(input.path);
-      log.record(context.scope, absolute, {
-        modifiedAt: written.modifiedAt,
-      });
-
-      return state.exists ? `Replaced ${input.path}` : `Created ${input.path}`;
-    },
+        return state.exists ? `Replaced ${input.path}` : `Created ${input.path}`;
+      }),
   });
 }

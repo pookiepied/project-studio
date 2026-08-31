@@ -7,6 +7,7 @@ import {
   createConversationClient,
   createHarnessClient,
   resolveHarnessAddress,
+  turnSettingsToWire,
   type ConversationMessageFacts,
 } from '@/platform/harness'
 import { startConversation } from '@/features/chat/first-turn'
@@ -166,11 +167,12 @@ export function useForkConversation() {
         const seed = renderSeed(input.source.title, input.turns)
         const conversationId = newId('cnv')
         // The fork speaks with the settings its source was holding - the same
-        // model and reasoning the words were written under - not whatever the
-        // window's picker happens to show right now.
+        // model, reasoning and permission mode the words were written under -
+        // not whatever the window's picker happens to show right now.
+        const effective = effectiveTurnSettings(input.source, settings)
         const outcome = await startConversation({
           text: seed,
-          settings: effectiveTurnSettings(input.source, settings),
+          settings: turnSettingsToWire(effective),
         })
         if (!outcome.ok) {
           return { ok: false, note: outcome.error.message }
@@ -186,7 +188,7 @@ export function useForkConversation() {
           id: conversationId,
           firstMessage: seed,
           projectId: input.source.projectId,
-          settings: effectiveTurnSettings(input.source, settings),
+          settings: effective,
           title,
         })
         openChat(conversationId)

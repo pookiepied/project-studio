@@ -85,8 +85,12 @@ function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recor
       workspaceRoot: workspace,
       allowExec: options.allowExec ?? true,
       // The same grant the runtime makes: a shell's job is finding programs,
-      // and the approval names them instead of their resolved paths.
-      environment: { PATH: process.env.PATH ?? "" },
+      // and the approval names them instead of their resolved paths. PATHEXT
+      // rides with it, because without it Windows never tries `node.exe`.
+      environment: {
+        PATH: process.env.PATH ?? "",
+        ...(process.env.PATHEXT === undefined ? {} : { PATHEXT: process.env.PATHEXT }),
+      },
     }),
   );
   const instance = new CallGate({
@@ -249,7 +253,13 @@ describe("every program a line names is authorized", () => {
     const instance = new CallGate({
       kernel,
       sandbox: new LocalSandbox(
-        createSandboxPolicy({ workspaceRoot: workspace, environment: { PATH: process.env.PATH ?? "" } }),
+        createSandboxPolicy({
+          workspaceRoot: workspace,
+          environment: {
+            PATH: process.env.PATH ?? "",
+            ...(process.env.PATHEXT === undefined ? {} : { PATHEXT: process.env.PATHEXT }),
+          },
+        }),
       ),
     });
     registerShellTools(instance);
@@ -288,6 +298,14 @@ describe("the command reader", () => {
     expect(readCommandPrograms("node script.js 2>&1")).toEqual(["node"]);
     expect(readCommandPrograms("> preface.txt node script.js")).toEqual(["node"]);
     expect(readCommandPrograms("~/.local/bin/tool --flag")).toEqual(["tool"]);
+  });
+
+  it("names what a wrapper runs, not the wrapper", () => {
+    // `env node build.js` runs node. Naming `env` in the approval would put a
+    // name in front of the user that is not the name that executes.
+    expect(readCommandPrograms("env node build.js")).toEqual(["node"]);
+    expect(readCommandPrograms("env FOO=1 npm test")).toEqual(["npm"]);
+    expect(readCommandPrograms("nohup node server.js")).toEqual(["node"]);
   });
 
   it("strips the script extension a Windows shim is named by", () => {

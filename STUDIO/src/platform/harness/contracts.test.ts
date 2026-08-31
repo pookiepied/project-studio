@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  executionModeFromWire,
+  executionModeToWire,
   parseHarnessErrorBody,
   parseModelCapability,
+  parsePendingApprovals,
   parseProbeResult,
   parseProviderConnection,
   parseProviderModel,
@@ -609,5 +612,89 @@ describe('readConversationSnapshot', () => {
     if (chunk?.type !== 'conversation-reset') throw new Error('expected a reset chunk')
     expect(chunk.snapshot?.messages).toHaveLength(2)
     expect(chunk.position).toBeNull()
+  })
+})
+
+describe('execution mode translation', () => {
+  it('round-trips every mode through the wire vocabulary', () => {
+    for (const domain of ['manual', 'edits', 'auto'] as const) {
+      expect(executionModeFromWire(executionModeToWire(domain))).toBe(domain)
+    }
+  })
+
+  it('uses the harness names and only those', () => {
+    // The submission boundary refuses `edits` and `auto` on purpose: the mode
+    // is a consent, and the translation belongs to this side of the boundary.
+    expect(executionModeToWire('manual')).toBe('manual')
+    expect(executionModeToWire('edits')).toBe('auto-edit')
+    expect(executionModeToWire('auto')).toBe('full-auto')
+  })
+})
+
+describe('parsePendingApprovals', () => {
+  const APPROVAL = {
+    id: 'b15b4a33-6223-4359',
+    createdAt: 1_000,
+    request: {
+      capability: {
+        id: { namespace: 'native', name: 'write' },
+        title: 'Write file',
+        effects: ['write'],
+      },
+      scope: {
+        agentId: 'studio',
+        conversationId: 'conversation:cnv_1',
+      },
+      resource: 'C:\\home\\workspace\\index.html',
+      scopes: [
+        { id: 'this-file', label: 'Just this file', detail: 'index.html', pattern: 'C:\\home' },
+      ],
+    },
+    decision: {
+      verdict: 'ask',
+      source: 'default',
+      reason: 'native/write has not been approved yet.',
+    },
+  }
+
+  it('accepts a row the broker stores', () => {
+    const parsed = parsePendingApprovals([APPROVAL])
+    expect(parsed).toHaveLength(1)
+    expect(parsed?.[0]).toMatchObject({
+      id: 'b15b4a33-6223-4359',
+      capabilityName: 'write',
+      capabilityTitle: 'Write file',
+      resource: 'C:\\home\\workspace\\index.html',
+      conversationId: 'conversation:cnv_1',
+      source: 'default',
+      reason: 'native/write has not been approved yet.',
+    })
+  })
+
+  it('carries a resource that is absent, not empty', () => {
+    // A harness request built with `resource: undefined` serializes with no
+    // resource key at all; null on the wire reads as null here.
+    const parsed = parsePendingApprovals([
+      { ...APPROVAL, request: { ...APPROVAL.request, resource: undefined } },
+    ])
+    expect(parsed?.[0]?.resource).toBeNull()
+  })
+
+  it('refuses a row missing the fields the prompt renders', () => {
+    expect(parsePendingApprovals([{ ...APPROVAL, id: '' }])).toBeNull()
+    expect(parsePendingApprovals([{ ...APPROVAL, decision: undefined }])).toBeNull()
+    expect(parsePendingApprovals([{ ...APPROVAL, decision: { verdict: 'ask' } }])).toBeNull()
+    expect(
+      parsePendingApprovals([{ ...APPROVAL, decision: { ...APPROVAL.decision, source: 'vibes' } }]),
+    ).toBeNull()
+    expect(parsePendingApprovals([APPROVAL, { id: 'broken' }])).toBeNull()
+  })
+
+  it('refuses a scope ladder entry that is not the shape offered', () => {
+    expect(
+      parsePendingApprovals([
+        { ...APPROVAL, request: { ...APPROVAL.request, scopes: [{ id: 'this-file' }] } },
+      ]),
+    ).toBeNull()
   })
 })

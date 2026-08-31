@@ -18,6 +18,11 @@ vi.mock('@/stores/workspace', () => ({
     stop: vi.fn(),
     settings: { permission: 'manual' },
     setSettings: vi.fn(),
+    // The permission control now reads the conversation's stored mode; this
+    // test runs on a surface with no conversations, so the window setting is
+    // the whole story and the setter is never called.
+    conversations: [],
+    setConversationPermission: vi.fn(),
   }),
 }))
 

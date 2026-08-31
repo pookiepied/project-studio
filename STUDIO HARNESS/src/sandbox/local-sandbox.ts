@@ -300,6 +300,14 @@ export class LocalSandbox {
    * Built from the policy alone and never from `process.env`. An agent that
    * inherits the host environment inherits every API token on the machine,
    * which would undo the entire credential design in one line.
+   *
+   * Deliberately *not* routed through `buildEnvironment`, which is the MCP and
+   * tool-child path and adds a short list of OS variables of its own. This one
+   * passes through exactly what the policy names and nothing else, which two
+   * tests in `sandbox.test.ts` pin by name. Anything a contained command needs
+   * — `PATH` to find programs, `PATHEXT` to know that `node` means `node.exe`
+   * — is granted deliberately where the policy is built, not acquired here by
+   * a side effect.
    */
   environment(): Record<string, string> {
     return { ...this.#policy.environment };

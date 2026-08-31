@@ -26,6 +26,7 @@ const CONVERSATION = {
   archived: false,
   modelId: null,
   reasoningLevel: null,
+  permissionMode: 'manual',
   createdAt: 1_000,
   lastTurnAt: 2_000,
 } as const
@@ -74,6 +75,24 @@ describe('parseConversationRecord', () => {
     expect(
       parseConversationRecord({ ...CONVERSATION, reasoningLevel: 'colossal' }),
     ).toBeNull()
+  })
+
+  it('requires the mode the store never hands back as null', () => {
+    // The harness resolves an unset row to Manual before the record leaves,
+    // so a missing field here is drift, not an old row - refusing it is the
+    // visible failure the mirror is designed to produce.
+    const { permissionMode: _mode, ...without } = CONVERSATION
+    expect(parseConversationRecord(without)).toBeNull()
+  })
+
+  it('carries the mode in the harness vocabulary only', () => {
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'auto-edit' })?.permissionMode).toBe('auto-edit')
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'full-auto' })?.permissionMode).toBe('full-auto')
+    // The picker's own spellings are a different vocabulary on purpose; a
+    // value the submission boundary would refuse cannot arrive on a record.
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'edits' })).toBeNull()
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: 'auto' })).toBeNull()
+    expect(parseConversationRecord({ ...CONVERSATION, permissionMode: null })).toBeNull()
   })
 
   it('fails the whole list when one element does not match', () => {

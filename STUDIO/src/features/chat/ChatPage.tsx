@@ -10,8 +10,11 @@ import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/C
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/useConversation'
+import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
+import { usePendingApprovals } from '@/features/chat/permissions/usePendingApprovals'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { effectiveTurnSettings } from '@/domain/session/settings'
+import { turnSettingsToWire } from '@/platform/harness'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import type { SeamFailure, TurnImageWire } from '@/platform/harness'
@@ -60,6 +63,14 @@ export function ChatPage({
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
 
   const live = useConversationTranscript(conversation.id)
+
+  // The permission questions this conversation's runs raise, and the answers
+  // a person gives here. Inactive on the gallery: nothing there is real
+  // enough to need consent.
+  const approvals = usePendingApprovals(conversation.id, {
+    enabled: !gallery,
+    active: isTurnRunning(live.phase),
+  })
 
   // The sidebar's working mark is only as honest as its witness, and for a
   // real turn this page is the only one there is: the phase machine here is
@@ -112,12 +123,27 @@ export function ChatPage({
         return { ok: false }
       }
       setAttachRefusal(null)
-      const sent = await live.submit(text, effective, images)
+      // The mode travels in the submission body like the model and reasoning
+      // do, translated into the harness's vocabulary at the wire boundary:
+      // what the picker shows is what the turn is admitted under.
+      const sent = await live.submit(text, turnSettingsToWire(effective), images)
       if (sent.ok) touch(conversation.id)
       return sent
     },
     [conversation, catalog.models, live.submit, settings, touch],
   )
+
+  /**
+   * Stopping the run withdraws its questions. The abort itself usually
+   * cancels the pending approvals on the harness side - the kernel hands the
+   * run's abort signal to the approver - but the withdrawal here is what
+   * guarantees nothing is left waiting when the signal is not heard, and a
+   * cancel on an already-cleared row is an honest 404.
+   */
+  const stopTurn = useCallback(() => {
+    approvals.cancelAll()
+    void live.abort()
+  }, [approvals, live])
 
   return (
     <div className="relative flex h-full flex-col">
@@ -233,12 +259,34 @@ export function ChatPage({
               {attachRefusal !== null ? (
                 <SendRefusal failure={attachRefusal} onDismiss={() => setAttachRefusal(null)} />
               ) : null}
+              {approvals.questions.length > 0 ? (
+                <div className="mb-3">
+                  <ApprovalPrompt
+                    // Keyed by the active question, so answering one and
+                    // moving to the next remounts the card. Without it the
+                    // duration chosen for the previous question stays
+                    // selected, and a person who granted "Always" once would
+                    // find the next question already set to "Always" - a
+                    // wider consent than they were asked for, preselected by
+                    // an answer they gave about something else.
+                    key={approvals.questions[0]?.id}
+                    questions={approvals.questions}
+                    answeringId={approvals.answeringId}
+                    onAnswer={approvals.answer}
+                  />
+                </div>
+              ) : null}
             </>
           ) : null}
 
           <Composer
             conversationId={conversation.id}
-            placeholder="Reply"
+            // While a question holds the run, the field must not invite a new
+            // message: the turn is stopped, and what the page is waiting for
+            // is the answer above, not more words.
+            placeholder={
+              approvals.questions.length > 0 ? 'Waiting for your answer above' : 'Reply'
+            }
             {...(gallery
               ? {}
               : {
@@ -250,7 +298,7 @@ export function ChatPage({
                   // turn's length. Reading `streaming` alone is what left the
                   // composer idle for six of a seven-second turn.
                   busy: isTurnRunning(live.phase),
-                  onStop: () => void live.abort(),
+                  onStop: stopTurn,
                 })}
           />
         </div>

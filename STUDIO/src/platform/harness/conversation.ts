@@ -64,14 +64,17 @@ import { Channel, invoke as tauriInvoke } from '@tauri-apps/api/core'
 
 import { newId } from '@/lib/id'
 import {
+  executionModeToWire,
   parseHarnessErrorBody,
   parseWireStreamEvent,
   readChunkFacts,
   readConversationSnapshot,
+  type ExecutionModeWire,
   type ChunkFacts,
   type ConversationSnapshotFacts,
   type WireStreamEvent,
 } from './contracts'
+import type { PermissionMode } from '@/domain/permissions/modes'
 
 /**
  * How a command leaves the process. Narrower than `typeof invoke` on
@@ -195,10 +198,44 @@ export interface SubmittedTurn {
  * before the run's initializer reads them. `modelId` is the runtime reference
  * in `<provider>/<model>` form, or null for the stable default; the reasoning
  * choice is "default" or a level, never folded into a synonym.
+ *
+ * `permissionMode` is the execution mode the turn is sent under, in the
+ * harness's own vocabulary (`manual` / `auto-edit` / `full-auto`). Absent
+ * means the conversation's stored mode stands, which is why it is optional
+ * here while the send paths above always carry one: what the picker shows is
+ * what is sent.
  */
 export interface TurnSettingsWire {
   readonly modelId: string | null
   readonly reasoningLevel: string
+  readonly permissionMode?: ExecutionModeWire
+}
+
+/**
+ * The domain's shape for the settings a turn goes out with - what
+ * `effectiveTurnSettings` answers and what every send path reads. Named here
+ * so the wire builder below and the domain function can be checked against
+ * one shape without either importing the other's module for values.
+ */
+export interface EffectiveTurnSettings {
+  readonly modelId: string | null
+  readonly reasoningLevel: string
+  /** The frontend's word for the mode; the wire builder does the translation. */
+  readonly permission: PermissionMode
+}
+
+/**
+ * Builds the settings a submission body carries from the effective settings a
+ * surface has settled on. One builder rather than one object literal per send
+ * path, because the mode's translation from the picker's vocabulary to the
+ * harness's is exactly the kind of thing two copies start disagreeing about.
+ */
+export function turnSettingsToWire(settings: EffectiveTurnSettings): TurnSettingsWire {
+  return {
+    modelId: settings.modelId,
+    reasoningLevel: settings.reasoningLevel,
+    permissionMode: executionModeToWire(settings.permission),
+  }
 }
 
 /**
@@ -426,16 +463,18 @@ export function createConversationClient(options: ConversationClientOptions): Co
       // would be duplication wearing a retry's clothes.
       //
       // The settings keys are the harness contract's own (`modelId`,
-      // `reasoningLevel`), spelled once there. Null modelId is omitted: absent
-      // means the conversation's settled state stands. Images are Flue's own
-      // payload field, so they ride in the body unrenamed; empty means the
-      // key is absent, which is what a text-only turn has always sent.
+      // `reasoningLevel`, `permissionMode`), spelled once there. Null modelId
+      // is omitted: absent means the conversation's settled state stands.
+      // Images are Flue's own payload field, so they ride in the body
+      // unrenamed; empty means the key is absent, which is what a text-only
+      // turn has always sent.
       const wire = settings ?? { modelId: null, reasoningLevel: 'default' }
       const carried = images ?? []
       const sent = await request('POST', agentsPath(), JSON.stringify({
         message,
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),
         reasoningLevel: wire.reasoningLevel,
+        ...(wire.permissionMode === undefined ? {} : { permissionMode: wire.permissionMode }),
         ...(carried.length === 0 ? {} : { images: carried }),
       }))
       if ('failure' in sent) return { ok: false, error: sent.failure }

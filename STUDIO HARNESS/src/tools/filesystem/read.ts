@@ -8,7 +8,7 @@ import {
 import type { SandboxFileStat } from "../../sandbox/local-sandbox.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
-import type { FileAccessLog } from "./access-log.js";
+import { hashContent, type FileAccessLog } from "./access-log.js";
 
 /**
  * Reading a file, the way a model can actually use it.
@@ -118,6 +118,15 @@ export function formatNumbered(content: string, offset: number, limit: number): 
 
   const start = Math.min(offset - 1, lines.length);
   const window = lines.slice(start, start + limit);
+
+  if (window.length === 0) {
+    // An offset past the end used to return the empty string, which the model
+    // cannot tell apart from an empty file or a failed read - so it answers as
+    // though the file held nothing. Say which of the three this is.
+    return `(no lines at offset ${offset} - this file has ${lines.length} ${
+      lines.length === 1 ? "line" : "lines"
+    })`;
+  }
 
   const numbered = window.map((line, index) => {
     const number = String(start + index + 1).padStart(6, " ");
@@ -333,6 +342,8 @@ export function createReadTool(
         // access log stays the one answer to "what has this agent looked at".
         log.record(context.scope, absolute, {
           modifiedAt: stat.modifiedAt,
+          size: stat.size,
+          contentHash: hashContent(bytes),
         });
 
         return {
@@ -354,9 +365,13 @@ export function createReadTool(
       }
 
       // Recorded against the resolved path, so a later edit naming the same
-      // file differently still counts as having read it.
+      // file differently still counts as having read it. The hash is the
+      // content just read, so a later edit can compare bytes rather than
+      // trusting a timestamp.
       log.record(context.scope, absolute, {
         modifiedAt: stat.modifiedAt,
+        size: stat.size,
+        contentHash: hashContent(content),
       });
 
       return formatNumbered(content, input.offset, input.limit);

@@ -50,6 +50,12 @@ export interface Conversation {
   readonly modelId: string | null
   /** The reasoning choice it is held with; null is the same state as "default". */
   readonly reasoningLevel: ReasoningChoice | null
+  /**
+   * The execution mode the conversation is held with - the consent its runs
+   * are decided under. Mapped from the index like the model, so the picker
+   * shows the mode the harness actually holds rather than the window's.
+   */
+  readonly permissionMode: PermissionMode
 }
 
 /** What the session is doing. Drives the mark, the send button, and the composer. */
@@ -61,7 +67,9 @@ export type SessionStatus = 'idle' | 'thinking' | 'streaming'
  * `modelId` is the runtime reference or null for the stable default; the
  * conversation index settles it at admission, and the harness refuses a model
  * nothing serves before creating anything. `reasoningLevel` carries "default"
- * or one of the model's levels. Permission modes are Task 40's.
+ * or one of the model's levels. `permission` is the picker's word for the
+ * execution mode - the submission path translates it into the harness's
+ * vocabulary at the wire boundary, and nowhere else.
  */
 export interface TurnSettings {
   readonly modelId: string | null

@@ -494,7 +494,7 @@ describe.sequential("Flue harness vertical slice", () => {
         parts.some(
           (part) =>
             part.type === "dynamic-tool" &&
-            part.toolName === "workspace_summary" &&
+            part.toolName === "glob" &&
             part.state === "output-available",
         ),
       ).toBe(true);
