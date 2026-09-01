@@ -24,6 +24,9 @@ ACCESS_TEAM_DOMAIN = "REPLACE_ME.cloudflareaccess.com"
 ACCESS_AUD = "REPLACE_ME"
 CF_ACCOUNT_ID = "REPLACE_ME"
 ANALYTICS_DATASET = "pookiepied_events"
+# Checked against the Origin header of every mutating request. Must match the
+# route above exactly, scheme included.
+CONSOLE_ORIGIN = "https://console.pookiepied.dev"
 
 # Secrets — `wrangler secret put`:
 #   CF_API_TOKEN   read-only token with Account Analytics:Read

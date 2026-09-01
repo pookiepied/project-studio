@@ -18,7 +18,15 @@ interface CachedKeys {
 }
 
 const CACHE_TTL_MS = 60 * 60_000;
+const REFETCH_COOLDOWN_MS = 60_000;
 let cache: CachedKeys | null = null;
+let lastRefetch = 0;
+
+/** Test-only. The cache is module state and would otherwise leak between cases. */
+export function resetKeyCache(): void {
+  cache = null;
+  lastRefetch = 0;
+}
 
 function b64urlToBytes(s: string): Uint8Array {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -29,8 +37,7 @@ function b64urlToBytes(s: string): Uint8Array {
   return out;
 }
 
-async function keys(teamDomain: string): Promise<Jwk[]> {
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.keys;
+async function fetchKeys(teamDomain: string): Promise<Jwk[]> {
   const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
   if (!res.ok) throw new Error(`access certs unavailable: ${res.status}`);
   const body = (await res.json()) as { keys: Jwk[] };
@@ -38,12 +45,44 @@ async function keys(teamDomain: string): Promise<Jwk[]> {
   return body.keys;
 }
 
+async function keys(teamDomain: string): Promise<Jwk[]> {
+  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.keys;
+  return fetchKeys(teamDomain);
+}
+
+/**
+ * A `kid` we have never seen means the cache predates a key rotation. Refetch
+ * once before giving up, or every token signed by the new key is refused until
+ * the hour is out — an outage that looks exactly like a broken Access policy.
+ */
+async function keyFor(teamDomain: string, kid: string): Promise<Jwk | null> {
+  const found = (await keys(teamDomain)).find((k) => k.kid === kid);
+  if (found) return found;
+  // Rate-limited on the *refetch*, not on the cache's age: a cache populated
+  // one minute ago is the normal case, and keying the cooldown off that would
+  // refuse to look for a rotated key exactly when it is most likely to be new.
+  // The cooldown is what stops a stream of junk kids becoming a fetch storm.
+  if (Date.now() - lastRefetch < REFETCH_COOLDOWN_MS) return null;
+  lastRefetch = Date.now();
+  return (await fetchKeys(teamDomain)).find((k) => k.kid === kid) ?? null;
+}
+
+/** Thrown when the identity provider cannot be reached. Never means "allow". */
+export class AccessUnavailableError extends Error {}
+
 export interface AccessIdentity {
   email: string;
   sub: string;
 }
 
-/** Returns the verified identity, or null. Never throws for a bad token. */
+/**
+ * Returns the verified identity, or null for any token that fails a check.
+ *
+ * Never throws for a bad token. It DOES throw `AccessUnavailableError` when the
+ * team's JWKS cannot be fetched, because that is not a verdict about the token
+ * — nobody may be admitted, and the caller must say so rather than treat it as
+ * an ordinary refusal.
+ */
 export async function verifyAccessJwt(
   token: string | null,
   teamDomain: string,
@@ -65,7 +104,12 @@ export async function verifyAccessJwt(
   // Reject anything that is not the algorithm we expect, before touching keys.
   if (header.alg !== "RS256" || !header.kid) return null;
 
-  const jwk = (await keys(teamDomain)).find((k) => k.kid === header.kid);
+  let jwk: Jwk | null;
+  try {
+    jwk = await keyFor(teamDomain, header.kid);
+  } catch (err) {
+    throw new AccessUnavailableError(err instanceof Error ? err.message : String(err));
+  }
   if (!jwk) return null;
 
   const key = await crypto.subtle.importKey(

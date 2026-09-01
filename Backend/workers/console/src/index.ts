@@ -1,10 +1,11 @@
 import { json } from "@pookiepied/core";
 import type { Role, User } from "@pookiepied/core";
-import { verifyAccessJwt } from "./access.js";
+import { AccessUnavailableError, verifyAccessJwt } from "./access.js";
 import { activity, facets, summary } from "./analytics.js";
 import { aggregate, type HealthEnv } from "./health.js";
 
 interface AdminBinding {
+  operator(email: string): Promise<User | null>;
   listUsers(): Promise<User[]>;
   invite(email: string, role?: Role, actorId?: string): Promise<User>;
   setStatus(userId: string, status: "active" | "disabled", actorId?: string): Promise<void>;
@@ -19,9 +20,17 @@ export interface Env extends HealthEnv {
   ADMIN: AdminBinding;
   /** The built SPA. Served only after the Access assertion has been verified. */
   ASSETS: Fetcher;
+  /** The console's own origin. Any other Origin on a mutating request is refused. */
+  CONSOLE_ORIGIN: string;
 }
 
+/**
+ * `Number(null)` is 0 and 0 is finite, so an absent parameter has to be caught
+ * before the conversion or it never reaches the fallback — it silently becomes
+ * zero, gets clamped up to 1 downstream, and returns a plausible wrong answer.
+ */
 const num = (v: string | null, fallback: number) => {
+  if (v === null || v.trim() === "") return fallback;
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
@@ -41,15 +50,64 @@ const num = (v: string | null, fallback: number) => {
  */
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    const identity = await verifyAccessJwt(
-      req.headers.get("cf-access-jwt-assertion"),
-      env.ACCESS_TEAM_DOMAIN,
-      env.ACCESS_AUD,
-    );
+    let identity;
+    try {
+      identity = await verifyAccessJwt(
+        req.headers.get("cf-access-jwt-assertion"),
+        env.ACCESS_TEAM_DOMAIN,
+        env.ACCESS_AUD,
+      );
+    } catch (err) {
+      // The identity provider is unreachable, so no assertion can be checked.
+      // Refusing is the only safe answer, but it is a different answer from
+      // "this token is bad" and says so.
+      console.error(
+        JSON.stringify({
+          evt: "access_unavailable",
+          message: err instanceof AccessUnavailableError ? err.message : String(err),
+        }),
+      );
+      return json({ error: "identity_provider_unavailable" }, 503);
+    }
     if (!identity) return json({ error: "unauthorized" }, 401);
+
+    /**
+     * Access said this person may reach the console. The umbrella still has to
+     * say they are an administrator of it.
+     *
+     * Without this, the Access policy is the entire authorization: widening it
+     * to a domain or a second person would silently hand full account control
+     * to everyone it now admits, and nothing in the code would change or fail.
+     */
+    const operator = await env.ADMIN.operator(identity.email);
+    if (!operator || operator.role !== "admin" || operator.status !== "active") {
+      console.warn(
+        JSON.stringify({
+          evt: "console_access_denied",
+          email: identity.email,
+          reason: !operator ? "no_account" : `${operator.role}/${operator.status}`,
+        }),
+      );
+      return json({ error: "forbidden" }, 403);
+    }
 
     const url = new URL(req.url);
     const actor = identity.email;
+
+    /**
+     * CSRF. These routes invite administrators and disable accounts, and
+     * `req.json()` parses a body whatever its Content-Type claims — so the JSON
+     * shape is not the barrier it looks like. The cross-site protection was
+     * resting entirely on the SameSite attribute of a cookie set by Cloudflare,
+     * which is real but lives outside this repo and is invisible here.
+     */
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const origin = req.headers.get("origin");
+      if (origin !== env.CONSOLE_ORIGIN) {
+        console.warn(JSON.stringify({ evt: "console_bad_origin", origin, actor }));
+        return json({ error: "bad_origin" }, 403);
+      }
+    }
 
     if (!url.pathname.startsWith("/api/")) {
       const res = await env.ASSETS.fetch(req);
@@ -150,13 +208,12 @@ export default {
 
       return json({ error: "not_found" }, 404);
     } catch (err) {
-      console.error(
-        JSON.stringify({
-          evt: "console_error",
-          path: url.pathname,
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      // Refusals AdminService raises deliberately. They are answers, not faults,
+      // and a 500 would tell the operator nothing about what to do next.
+      if (message === "last_active_admin") return json({ error: "last_active_admin" }, 409);
+      if (message === "invalid_email") return json({ error: "invalid_email" }, 400);
+      console.error(JSON.stringify({ evt: "console_error", path: url.pathname, message }));
       return json({ error: "internal_error" }, 500);
     }
   },
