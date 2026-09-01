@@ -125,6 +125,16 @@ runs for them. The worker verifies the Access JWT anyway (`aud`, `iss`, `exp`,
 RS256 against the team JWKS) so its safety does not depend on a route being
 configured correctly.
 
+It then asks a second, different question: Access said *this person may reach
+the console*, and the umbrella still has to say *this person administers it*.
+The verified email is resolved through `AdminService.operator()` and refused
+unless that row is `role = 'admin'` and `status = 'active'`. Without that step
+the Access policy would be the entire authorization, and widening it later —
+to a domain, a group, a second person — would hand full account control to
+everyone it newly admits, with nothing in the code changing or failing to mark
+the moment. Authorization belongs in the identity database, not in a Cloudflare
+policy this repository cannot see.
+
 **Not folded into the API**, though it was considered. Sharing a hostname puts
 the most and least privileged surfaces behind one router, one origin, one cookie
 scope, one deploy. Path-scoped Access policies have a fail-open shape — a
@@ -157,8 +167,22 @@ worker: an email with no row is refused at callback.
 `Set-Cookie: __Host-session` (HttpOnly, Secure, SameSite=Lax) for browsers; a
 one-time handoff code exchanged over `POST /oauth/exchange` for desktop clients
 on an RFC 8252 loopback redirect. The handoff row holds a **user id, never a
-token** — the session is minted at exchange time, so no credential is ever
+token** — the session is minted at exchange time, so no *session token* is ever
 placed in a URL or stored at rest.
+
+The one-time code itself does travel in the loopback URL; that is what the
+redirect is for. So each side of the flow is bound to the party that began it,
+and neither binding is optional:
+
+- **Web** — the `state` is also set as a short-lived `__Host-` cookie and must
+  match at the callback. The row alone proves only that *someone* started a
+  flow; without the pair, an attacker can walk a victim's browser through their
+  own callback and leave the victim signed in as them.
+- **Desktop** — the client sends its own PKCE challenge at `/oauth/start` and
+  its verifier at `/oauth/exchange`. This is a second pair, separate from the
+  one the worker uses against Google: that one binds us to Google, this one
+  binds the code to the process that asked for it, so a local race for the
+  loopback port wins nothing.
 
 ~15 lines in one place now, versus retrofitting the token model when STUDIO
 adopts the umbrella later.
@@ -213,11 +237,21 @@ Expertise does not prevent it; structure does.
 3. **Ownership lives in the query.** `ctx.owned(db)` puts `user_id = ?` in every
    statement. `OwnedDb` has no unscoped escape hatch — an omitted check is a
    type error, not a silent hole.
-4. **404, not 403,** for rows we do not own. A 403 confirms existence and hands
+4. **The ownership column is not writable.** `user_id` is set by `OwnedDb` and
+   refused in the values of an insert or an update, so the column the WHERE
+   clause checks cannot be reassigned by the caller it protects. A check in the
+   query is only worth something if the thing it checks is out of reach.
+5. **404, not 403,** for rows we do not own. A 403 confirms existence and hands
    over an enumeration oracle.
-5. **The attack is a test.** `packages/core/test/authz.test.ts` asserts each of
-   the above, including the forgotten-route case and the spoofed-header case.
-   Per-app: authenticate as B, request A's ids on every route, expect 404.
+6. **Every gate is checked twice, by different authorities.** Access *and* the
+   role column for the console; the state row *and* a browser cookie for a web
+   login; our PKCE pair *and* the client's for a desktop one. Each pair is two
+   parties that would both have to be wrong.
+7. **The attack is a test.** `packages/core/test/authz.test.ts` asserts each of
+   the above, including the forgotten-route case, the spoofed-header case, and
+   the ownership-reassignment case; `workers/console/test/access.test.ts`
+   forges assertions against the real verifier. Per-app: authenticate as B,
+   request A's ids on every route, expect 404.
 
 ### Deploy checklist — per worker
 

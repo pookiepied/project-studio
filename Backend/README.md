@@ -56,10 +56,18 @@ cd ../telemetry
 wrangler secret put INGEST_KEYS   # {"studio":"<random>","site":"<random>"}
 ```
 
+The seeded row must be `role = 'admin'`. Access decides who may reach the
+console; this column decides who may administer the umbrella, and the console
+refuses anyone whose row is not an active admin — so seeding a `user` row and
+expecting the dashboard to open will not work.
+
 **5 · Console behind Access.** In the Cloudflare dashboard, create a
 Zero Trust → Access application for `console.pookiepied.dev`, allow only your
 email, then fill `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in
-`workers/console/wrangler.toml`. Also set `CF_ACCOUNT_ID` and:
+`workers/console/wrangler.toml`. Also set `CF_ACCOUNT_ID`, check that
+`CONSOLE_ORIGIN` matches the route exactly — it is compared against the `Origin`
+header of every mutating request, so a mismatch makes the dashboard read-only —
+and set:
 
 ```bash
 wrangler secret put CF_API_TOKEN   # read-only, Account Analytics:Read
