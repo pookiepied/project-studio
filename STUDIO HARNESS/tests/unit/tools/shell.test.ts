@@ -228,6 +228,16 @@ describe("the interpreter is chosen once, by the machine", () => {
     expect(statSync(interpreter?.path ?? "/").isFile()).toBe(true);
     expect(interpreter?.statement.join(" ")).toMatch(/Commands run through/);
   });
+
+  it("declares how it reads a line, and only cmd reads a command line", () => {
+    // The join is per interpreter and it is not a preference: a PowerShell
+    // host given the cmd join loses the quotes inside its own -Command, and
+    // a cmd given the argv join reads the escaped quotes as data, which is
+    // how a fully-qualified path became `'\"C:\Program Files\...\"' is not
+    // recognized` on every contained line this machine ran.
+    const interpreter = resolveInterpreter();
+    expect(interpreter?.takes).toBe(interpreter?.kind === "cmd" ? "command-line" : "argv");
+  });
 });
 
 describe("every program a line names is authorized", () => {

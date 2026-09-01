@@ -8,12 +8,27 @@ import type {
   ContainmentRequest,
   IsolationBackend,
 } from "../backend.js";
-import { containArgs, invokeLauncher, launcherInstalled, launcherPath } from "./launcher.js";
-import { forgetProfile, readLedger, recordProfile, recordTraversed } from "./ledger.js";
 import {
+  containArgs,
+  invokeLauncher,
+  launcherInstalled,
+  launcherPath,
+  type LauncherJoin,
+} from "./launcher.js";
+import {
+  forgetProfile,
+  readLedger,
+  recordProfile,
+  recordProgramRoots,
+  recordTraversed,
+} from "./ledger.js";
+import {
+  ALL_APPLICATION_PACKAGES,
   ancestorsOf,
   ensureTraversable,
+  holdsRead,
   holdsTraverse,
+  isFullPermissionList,
   revokeTraverse,
 } from "./traversal.js";
 
@@ -86,6 +101,13 @@ interface PreparedContainer {
   readonly granted: Set<string>;
   /** Ancestors made statable for this workspace, so `release` can undo them. */
   readonly traversed: Set<string>;
+  /**
+   * Program directories granted read for this workspace, so `release` can
+   * take them back even when the ledger write failed. Same rule as
+   * `traversed`: the in-memory set is what this process did, the ledger is
+   * the copy that outlives it.
+   */
+  readonly programRoots: Set<string>;
 }
 
 /**
@@ -200,7 +222,13 @@ class WindowsAppContainerBackend implements IsolationBackend {
     // after the policy's roots so a program root that *is* the workspace keeps
     // the stronger mode — `grant` is keyed by mode, so a read grant cannot
     // replace a write one.
-    for (const root of request.programRoots ?? []) grant(container, root, "read");
+    const programRoots = grantProgramRoots(container, request.programRoots ?? []);
+    if (programRoots.length > 0) {
+      // Recorded here and not at release time, for the same reason the
+      // corridor is: the reader is a release in a different process, and this
+      // process is the one that dies.
+      recordProgramRoots(request.policy.workspaceRoot, programRoots);
+    }
     return {
       executable: launcherPath(),
       args: containArgs({
@@ -208,6 +236,9 @@ class WindowsAppContainerBackend implements IsolationBackend {
         cwd: request.cwd,
         executable: request.executable,
         args: request.args,
+        ...(request.lineJoin === undefined || request.lineJoin === "argv"
+          ? {}
+          : { join: request.lineJoin as LauncherJoin }),
         // Named holes in the wall, and only the one asked for. `internetClient`
         // is outbound internet and nothing else — measured, not read: loopback
         // and the LAN stay refused with it granted, and loopback stays refused
@@ -243,7 +274,7 @@ class WindowsAppContainerBackend implements IsolationBackend {
           message: "The Windows sandbox did not return a usable identity.",
         });
       }
-      container = { sid, granted: new Set(), traversed: new Set() };
+      container = { sid, granted: new Set(), traversed: new Set(), programRoots: new Set() };
       this.#prepared.set(key, container);
       // Written here, where the profile is actually minted, so the record
       // cannot claim something the machine does not have. The name is a hash of
@@ -316,6 +347,19 @@ class WindowsAppContainerBackend implements IsolationBackend {
       if (!existsSync(root)) continue;
       invokeLauncher(["revoke", "--sid", sid, "--path", root]);
     }
+    // The program roots go too - the directories granted read so a contained
+    // interpreter could find its programs. A grant this feature adds without
+    // ever taking back is a feature that grows without bound, which is the
+    // exact shape the corridor's leak took: one entry per contained command,
+    // for ever. A root that is one of the policy's roots is skipped, because
+    // the loop above already took its entry back - revoking twice would take
+    // the second entry's read down to nothing and leave the workspace
+    // unreadable to its own container.
+    for (const root of this.#programRootsFor(key, container)) {
+      if (!existsSync(root)) continue;
+      if (policy.readRoots.includes(root) || policy.writeRoots.includes(root)) continue;
+      invokeLauncher(["revoke", "--sid", sid, "--path", root, "--mode", "read"]);
+    }
     // The corridor goes too. Three sources, and the union is the point: the
     // in-memory set covers what this process granted, the ledger covers what
     // any process granted since the corridor was recorded, and the measured
@@ -336,6 +380,26 @@ class WindowsAppContainerBackend implements IsolationBackend {
     // lose the one thing that can tell a user this workspace still has a
     // profile if the delete failed.
     forgetProfile(key);
+  }
+
+  /**
+   * Every program directory owed a revoke, from the two places the grants are
+   * known.
+   *
+   * The in-memory set covers what this process granted, the ledger covers
+   * what any process granted since the field was recorded - including the
+   * holds observed on this workspace's own SID, which are attributed to the
+   * workspace for the same reason the corridor's measured sweep attributes
+   * its ancestors: only this runtime ever grants these SIDs.
+   */
+  #programRootsFor(
+    key: string,
+    container: PreparedContainer | undefined,
+  ): readonly string[] {
+    const roots = new Set<string>(container?.programRoots ?? []);
+    const recorded = readLedger().find((entry) => entry.workspaceRoot === key)?.programRoots;
+    if (recorded !== undefined) for (const root of recorded) roots.add(root);
+    return [...roots];
   }
 
   /**
@@ -416,6 +480,100 @@ function grant(container: PreparedContainer, path: string, mode: "read" | "write
   if (mode === "read" && container.granted.has(`write:${path}`)) return;
   invokeLauncher(["grant", "--sid", container.sid, "--path", path, "--mode", mode]);
   container.granted.add(key);
+}
+
+/**
+ * Makes every program directory a command names readable, and answers for
+ * the ones it cannot.
+ *
+ * Three states, each its own answer:
+ *
+ * - **Already reachable** - this workspace holds read, or the machine-wide
+ *   `ALL APPLICATION PACKAGES` entry covers it, as it does for the system
+ *   directories whose programs already run. Nothing is written, and nothing
+ *   is recorded: an entry we did not create is not ours to revoke.
+ * - **Grantable** - added for this workspace's own SID, read-only, and
+ *   recorded so a release takes it back. Bounded by how many directories a
+ *   project's command lines actually name.
+ * - **Not grantable** - a system-owned directory, where adding the entry
+ *   needs elevation the runtime never takes. The command is refused with the
+ *   sentence the model and the user need: which directories, why, and the
+ *   exact command that fixes them. A shell's own `not recognized` would read
+ *   as a typo and send the model to rewrite its line instead of the machine.
+ *
+ * Returns what this call granted or attributed, for the ledger; the refusal
+ * is thrown only after every root has had its answer, so one ungrantable
+ * directory does not hide the others.
+ */
+function grantProgramRoots(
+  container: PreparedContainer,
+  roots: readonly string[],
+): readonly string[] {
+  const attributed: string[] = [];
+  const ungrantable: string[] = [];
+
+  for (const root of roots) {
+    if (container.granted.has(`read:${root}`) || container.granted.has(`write:${root}`)) {
+      if (container.programRoots.has(root)) attributed.push(root);
+      continue;
+    }
+    if (container.programRoots.has(root)) {
+      attributed.push(root);
+      continue;
+    }
+
+    // Either identity answers "already readable". The workspace's own entry is
+    // attributable to this workspace - only this runtime grants these SIDs -
+    // so a hold observed here is recorded for release even when it came from
+    // a containment this process did not run, which is how the grants of a
+    // ledger entry written before this field existed are found again.
+    if (holdsRead(root, container.sid)) {
+      container.programRoots.add(root);
+      attributed.push(root);
+      continue;
+    }
+    if (holdsRead(root, ALL_APPLICATION_PACKAGES)) continue;
+
+    try {
+      grant(container, root, "read");
+    } catch (error) {
+      if (isFullPermissionList(error)) {
+        // The list these entries go into is physically full. Same advice, and
+        // the same reason, as the traverse case: the list has to shrink before
+        // anything else can be added to it.
+        throw new SandboxError("unavailable", {
+          message:
+            "The permission list on " +
+            `"${root}"` +
+            " is full, and the sandbox cannot add the entry it needs there. " +
+            "Run `pnpm sandbox:release --stale` to take back what finished " +
+            "workspaces were granted, then try again.",
+        });
+      }
+      ungrantable.push(root);
+      continue;
+    }
+    container.programRoots.add(root);
+    attributed.push(root);
+  }
+
+  if (ungrantable.length > 0) {
+    const listed = ungrantable.map((path) => `  ${path}`).join("\n");
+    const command = ungrantable.map((path) => `"${path}"`).join(" ");
+    throw new SandboxError("unavailable", {
+      message:
+        "These directories hold programs the command needs, and the sandbox\n" +
+        "cannot make them readable from here:\n" +
+        listed +
+        "\n" +
+        "They are system-owned, and adding the read entry they need needs\n" +
+        "elevation the runtime never takes. In a terminal opened as\n" +
+        "administrator, run:\n" +
+        `  pnpm sandbox:prepare --read ${command}\n`,
+    });
+  }
+
+  return attributed;
 }
 
 /**

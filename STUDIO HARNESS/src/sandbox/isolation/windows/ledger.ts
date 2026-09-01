@@ -73,11 +73,25 @@ export interface ProfileEntry {
    *
    * **Absent means unknown, never nothing.** An entry written before the
    * corridor was recorded has no field, and a release must not read that as
-   * "nothing to revoke" — that reading is the leak this field exists to close.
+   * "nothing to revoke" - that reading is the leak this field exists to close.
    * A present-but-empty array is a real measurement: every ancestor needed was
    * already covered by the machine-wide entry.
    */
   readonly traversed?: readonly string[];
+  /**
+   * The program roots: directories granted read so a contained interpreter
+   * could find its programs - its own runtime, an npm global tree, whatever
+   * the workspace's command lines actually named. Same lifetime rule as the
+   * corridor: recorded at grant time, because the reader is a release in a
+   * different process, and the process that granted them is the one thing
+   * that cannot be counted on to still be around.
+   *
+   * Absent means the same thing it means for `traversed`: unknown, never
+   * nothing - which is also why entries written before this field existed
+   * must have their grants found some other way, and why the field is
+   * recorded from the first containment that uses it rather than backfilled.
+   */
+  readonly programRoots?: readonly string[];
 }
 
 function ledgerPath(): string {
@@ -137,7 +151,12 @@ function readEntry(candidate: unknown): ProfileEntry | undefined {
   if (!("traversed" in candidate)) return base;
   const traversed = candidate.traversed;
   if (!isStringArray(traversed)) return base;
-  return { ...base, traversed };
+
+  const withTraversed: ProfileEntry = { ...base, traversed };
+  if (!("programRoots" in candidate)) return withTraversed;
+  const programRoots = candidate.programRoots;
+  if (!isStringArray(programRoots)) return withTraversed;
+  return { ...withTraversed, programRoots };
 }
 
 function isStringArray(value: unknown): value is readonly string[] {
@@ -214,6 +233,38 @@ export function recordTraversed(workspaceRoot: string, ancestors: readonly strin
     if (known !== undefined && merged.length === known.length) return;
 
     const updated: ProfileEntry = { ...existing, traversed: merged };
+    write([...entries.slice(0, index), updated, ...entries.slice(index + 1)]);
+  } catch {
+    // Deliberately silent: see above.
+  }
+}
+
+/**
+ * Adds the program directories a containment just granted read on.
+ *
+ * The same rule as `recordTraversed`, for the same reason: the reader is a
+ * release in a different process, the grant happens per contained command,
+ * and every directory ever granted is owed back. Merged rather than replaced,
+ * first-seen order, and a merge with nothing new writes nothing.
+ */
+export function recordProgramRoots(
+  workspaceRoot: string,
+  directories: readonly string[],
+): void {
+  try {
+    const entries = readLedger();
+    const index = entries.findIndex((entry) => entry.workspaceRoot === workspaceRoot);
+    if (index === -1) return;
+
+    const existing = entries[index];
+    if (existing === undefined) return;
+    const known = existing.programRoots;
+    const merged = known === undefined
+      ? [...directories]
+      : [...known, ...directories.filter((directory) => !known.includes(directory))];
+    if (known !== undefined && merged.length === known.length) return;
+
+    const updated: ProfileEntry = { ...existing, programRoots: merged };
     write([...entries.slice(0, index), updated, ...entries.slice(index + 1)]);
   } catch {
     // Deliberately silent: see above.

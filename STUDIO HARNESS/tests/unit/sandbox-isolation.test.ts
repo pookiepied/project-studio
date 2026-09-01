@@ -601,6 +601,30 @@ describe("the Windows launcher's argument rules", () => {
     ]);
   });
 
+  it("asks for a join only when the interpreter needs the other one", () => {
+    // The launcher's default is `argv`, and the programs the harness chose
+    // (git, rg) are correct only under it - so the flag's absence is as much
+    // of the contract as its presence, and a threading mistake that sent
+    // `--join command-line` for everything would escape nothing for them.
+    const base = { sid: "S-1-15-2-1", cwd: "C:\\p", executable: "n.exe", args: [] };
+    expect(containArgs(base)).not.toContain("--join");
+    expect(containArgs({ ...base, join: "argv" })).not.toContain("--join");
+
+    // `cmd.exe` reads the raw remainder after `/c`, and the flag has to reach
+    // the launcher ahead of `--` or it becomes an argument the model wrote.
+    const args = containArgs({
+      sid: "S-1-15-2-1",
+      cwd: "C:\\project",
+      executable: "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", "node -v"],
+      join: "command-line",
+    });
+    const flag = args.indexOf("--join");
+    expect(flag).toBeGreaterThan(-1);
+    expect(args[flag + 1]).toBe("command-line");
+    expect(flag).toBeLessThan(args.indexOf("--"));
+  });
+
   it("grants each root once, at the strongest mode it is owed", () => {
     // The bug this pins shipped for one test run: the roots were applied as a
     // write pass and then a read pass, and `SetEntriesInAcl` replaces a

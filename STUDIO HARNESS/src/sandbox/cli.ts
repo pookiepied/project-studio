@@ -1,13 +1,15 @@
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 
 import { readLedger } from "./isolation/windows/ledger.js";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,
   grantTraverse,
+  holdsRead,
   holdsTraverse,
+  invokeLauncher,
 } from "./isolation/index.js";
 import {
   canInstall,
@@ -47,19 +49,27 @@ import { createSandboxPolicy } from "./policy.js";
  * container mid-call, and "cleaned up correctly" is not worth that.
  */
 /**
- * `pnpm sandbox:prepare [drive...]`
+ * `pnpm sandbox:prepare [project-directory...]`
  *
  * Adds the one entry containment needs that an unelevated process cannot add:
- * traverse on the **system-owned** ancestors of a project — `C:\` and
- * `C:\Users` among them — for `ALL APPLICATION PACKAGES`. Without them a
+ * traverse on the **system-owned** ancestors of a project - `C:\` and
+ * `C:\Users` among them - for `ALL APPLICATION PACKAGES`. Without them a
  * contained program dies resolving its own path, because `realpath` stats every
  * component of it. See `windows/traversal.ts` for what a traverse entry grants
  * and, more importantly, what it does not.
  *
  * Only the ancestors that need elevation come here. Everything inside the
  * user's own folders is granted per workspace, automatically, and removed again
- * by `sandbox:release` — so this is one prompt for the machine rather than one
+ * by `sandbox:release` - so this is one prompt for the machine rather than one
  * per project, which is the difference between a decision and a habit.
+ *
+ * `--read <directory...>` is the other half of the same step (ADR 0047): read,
+ * not traverse, on the directories a contained command's programs live in.
+ * With no directories named it covers the one toolchain Studio depends on by
+ * construction - the Node runtime this process runs on - and anything beyond
+ * that is opt-in per machine. `--read --undo` takes those grants back, and
+ * nothing else: it revokes that trustee's entry on the paths named or
+ * defaulted, and touches no other entry in any descriptor it visits.
  */
 /**
  * `sudo pnpm sandbox:prepare` on Linux, and `--undo` to reverse it.
@@ -279,6 +289,85 @@ function networkPackageAdvice(): string {
   );
 }
 
+/**
+ * `pnpm sandbox:prepare --read [directory...]`, and `--read --undo` to reverse.
+ *
+ * Read, not traverse, for `ALL APPLICATION PACKAGES` on the directories a
+ * contained command's programs live in. A contained interpreter finds its
+ * programs by walking the PATH it was granted, and can only find one in a
+ * directory the container may read - so a toolchain under `C:\Program Files`
+ * stays invisible to every contained command until this runs, however correct
+ * the PATH is. The default set is the Node runtime this process runs on,
+ * because Studio is a Node application and its runtime is the one toolchain it
+ * depends on by construction; anything else is named by hand, per machine.
+ */
+async function prepareRead(targets: readonly string[], undo: boolean): Promise<void> {
+  const paths =
+    targets.length > 0
+      ? targets.map((target) => resolve(target))
+      : [dirname(process.execPath)];
+  // Said only when the default was actually used. Keyed on what the caller
+  // asked for rather than on what the default resolved to: a person who names
+  // one directory by hand was told "no directories were named" about the
+  // directory they had just typed, and told System32 was the Node runtime.
+  const subject = targets.length === 0 ? paths[0] : undefined;
+  if (subject !== undefined) {
+    process.stdout.write(
+      undo
+        ? "No directories were named, so this revokes the grant on the Node\n" +
+            `runtime this command runs on: ${subject}\n`
+        : "No directories were named, so this covers the one toolchain Studio\n" +
+            `depends on by construction: the Node runtime at ${subject}\n`,
+    );
+  }
+
+  let failed = false;
+  for (const path of paths) {
+    if (undo) {
+      try {
+        invokeLauncher(["revoke", "--sid", ALL_APPLICATION_PACKAGES, "--path", path, "--mode", "read"]);
+        process.stdout.write(`${path} — taken back\n`);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`${path} — failed: ${detail}\n`);
+        if (detail.includes("error 5")) {
+          process.stderr.write("  This needs a terminal opened as administrator.\n");
+        }
+        failed = true;
+      }
+      continue;
+    }
+
+    if (holdsRead(path, ALL_APPLICATION_PACKAGES)) {
+      process.stdout.write(`${path} — already set up\n`);
+      continue;
+    }
+    try {
+      invokeLauncher(["grant", "--sid", ALL_APPLICATION_PACKAGES, "--path", path, "--mode", "read"]);
+      // Measured back, because a grant that exits zero and grants nothing is
+      // the failure class this whole command exists to catch. One check, per
+      // path, once: setup is not a hot path.
+      if (!holdsRead(path, ALL_APPLICATION_PACKAGES)) {
+        process.stderr.write(
+          `${path} — the grant reported success and the container still cannot read it.\n`,
+        );
+        failed = true;
+        continue;
+      }
+      process.stdout.write(`${path} — ready\n`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`${path} — failed: ${detail}\n`);
+      if (detail.includes("error 5")) {
+        process.stderr.write("  This needs a terminal opened as administrator.\n");
+      }
+      failed = true;
+    }
+  }
+
+  if (failed) process.exitCode = 1;
+}
+
 async function prepare(targets: readonly string[]): Promise<void> {
   const paths = targets.length > 0 ? targets.map((target) => resolve(target)) : [process.cwd()];
   const seen = new Set<string>();
@@ -449,11 +538,25 @@ async function main(): Promise<void> {
     // machine needs one setup step" is the same sentence everywhere; only the
     // mechanism behind it differs, and asking the user to know which one they
     // are on would be leaking our implementation into their instructions.
+    const readMode = rest.includes("--read");
+    const paths = rest.filter((entry) => entry !== "--read" && entry !== "--undo");
     if (process.platform === "linux") {
+      if (readMode) {
+        process.stdout.write(
+          "--read is the Windows half of the setup step. On Linux, containment\n" +
+            "is a namespace: nothing outside a mounted root is visible to a\n" +
+            "contained program, so there is no per-directory grant to make.\n",
+        );
+        return;
+      }
       await prepareLinux(rest.includes("--undo"));
       return;
     }
-    await prepare(rest);
+    if (readMode) {
+      await prepareRead(paths, rest.includes("--undo"));
+      return;
+    }
+    await prepare(paths);
     return;
   }
 
@@ -464,6 +567,7 @@ async function main(): Promise<void> {
         ? "Usage: sudo pnpm sandbox:prepare [--undo]\n" +
             "       pnpm sandbox:release <project-directory>\n"
         : "Usage: pnpm sandbox:prepare [project-directory...]\n" +
+            "       pnpm sandbox:prepare --read [toolchain-directory...]\n" +
             "       pnpm sandbox:release <project-directory>\n" +
             "       pnpm sandbox:release --stale\n" +
             "       pnpm sandbox:list\n",

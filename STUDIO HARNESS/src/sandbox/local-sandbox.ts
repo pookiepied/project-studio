@@ -32,6 +32,19 @@ export interface SandboxRunOptions {
   readonly executable: string;
   readonly args: readonly string[];
   readonly cwd: string;
+  /**
+   * How the launcher joins the arguments, when the child is contained.
+   *
+   * The only caller that sets anything but the default is the shell tool,
+   * whose interpreter reads a command line rather than an argv. See
+   * `ContainmentRequest.lineJoin`.
+   */
+  readonly lineJoin?: "argv" | "command-line";
+  /**
+   * Directories the child must be able to read to run - its own program
+   * files, granted read-only. See `program-roots.ts`.
+   */
+  readonly programRoots?: readonly string[];
   readonly timeoutMs?: number;
   readonly maxOutputBytes?: number;
   readonly signal?: AbortSignal;
@@ -215,7 +228,14 @@ export class LocalSandbox {
     // spawn, and it is worth re-asking on the path that actually starts code.
     assertIsolationAvailable(required, this.#isolationSupport);
 
-    const command = await this.plan(kind, options);
+    const command = await this.plan(kind, {
+      executable: options.executable,
+      args: options.args,
+      cwd: options.cwd,
+      ...(options.lineJoin === undefined ? {} : { lineJoin: options.lineJoin }),
+      ...(options.programRoots === undefined ? {} : { programRoots: options.programRoots }),
+      network: this.#policy.allowNetwork,
+    });
 
     return runProcess({
       executable: command.executable,
@@ -246,6 +266,10 @@ export class LocalSandbox {
       readonly executable: string;
       readonly args: readonly string[];
       readonly cwd?: string;
+      /** How the launcher joins the arguments. See `SandboxRunOptions`. */
+      readonly lineJoin?: "argv" | "command-line";
+      /** Read-only grants for the program's own files. See `program-roots.ts`. */
+      readonly programRoots?: readonly string[];
       /** Defaults to the policy switch, which is the operator's answer. */
       readonly network?: boolean;
     },
@@ -258,6 +282,8 @@ export class LocalSandbox {
         args: command.args,
         cwd: command.cwd ?? this.#policy.workspaceRoot,
         network: command.network ?? this.#policy.allowNetwork,
+        ...(command.lineJoin === undefined ? {} : { lineJoin: command.lineJoin }),
+        ...(command.programRoots === undefined ? {} : { programRoots: command.programRoots }),
       },
       this.#isolationSupport,
     );

@@ -20,6 +20,16 @@ export interface ContainmentRequest {
   readonly args: readonly string[];
   readonly cwd: string;
   /**
+   * How the launcher joins the arguments into the child's command line.
+   *
+   * Omitted means `argv`, the escaping every program we chose is correct
+   * under today. A command interpreter that reads the raw remainder of its
+   * own line - `cmd.exe` - needs `command-line`, declared where the
+   * interpreter is described and threaded here rather than guessed at the
+   * call site. See `launcher.ts` for the launcher's side of the vocabulary.
+   */
+  readonly lineJoin?: "argv" | "command-line";
+  /**
    * Whether the child may reach the internet.
    *
    * A boolean, and platform-neutral on purpose. Windows expresses it as the

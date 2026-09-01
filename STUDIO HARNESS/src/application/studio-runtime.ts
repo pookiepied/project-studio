@@ -602,13 +602,26 @@ export class StudioRuntime implements AgentHost {
     const registeredMcp = new Map<string, McpTool>();
 
     const refreshTools = (): void => {
+      // The project the MCP surface is decided on is this runtime's, not the
+      // sandbox root's. The two were the same thing until conversations were
+      // given a directory of their own: the fallback sandbox root *was* the
+      // runtime's project, so a project key derived from the root happened to
+      // match the one the registry, the selection store, the catalog and the
+      // reconcile pass all use. Once a projectless conversation stood in
+      // `~/.studio/workspace/<conversation>`, the derived key stopped
+      // matching, the enabled set came back empty, and every MCP tool a user
+      // had enabled for their project vanished from every conversation's
+      // tool list - while the server itself still started, because the
+      // reconcile pass asks the runtime's project. Enablement is a property
+      // of the project the harness serves; where a particular conversation
+      // happens to stand is not that.
       const active = this.#registry
         .list()
         .filter((record) =>
           this.#selection.isEnabled({
             kind: "mcp",
             extensionId: record.id,
-            projectId,
+            projectId: this.#projectId,
           }),
         )
         .map((record) => record.id);

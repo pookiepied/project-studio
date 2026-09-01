@@ -28,6 +28,8 @@ export interface ContainRequest {
   readonly cwd: string;
   /** See `ContainmentRequest.network` — internet only, never loopback or LAN. */
   readonly network: boolean;
+  /** How the launcher joins the child's arguments. See `ContainmentRequest`. */
+  readonly lineJoin?: "argv" | "command-line";
   /** Read-only grants for the program's own files. See `program-roots.ts`. */
   readonly programRoots?: readonly string[];
 }
@@ -60,6 +62,7 @@ export async function containCommand(
     args: request.args,
     cwd: request.cwd,
     network: request.network,
+    ...(request.lineJoin === undefined ? {} : { lineJoin: request.lineJoin }),
     ...(request.programRoots === undefined ? {} : { programRoots: request.programRoots }),
   });
 }

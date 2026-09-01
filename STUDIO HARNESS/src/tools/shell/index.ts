@@ -8,11 +8,12 @@ import {
   type Interpreter,
 } from "../../process/interpreter.js";
 import { ProcessError } from "../../process/errors.js";
+import { SandboxError } from "../../sandbox/errors.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { readCommandPrograms } from "./command.js";
-import { shellResource } from "./resolve.js";
+import { programDirectories, shellResource } from "./resolve.js";
 
 export { shellResource } from "./resolve.js";
 export { readCommandPrograms, programName } from "./command.js";
@@ -209,6 +210,21 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
           ? context.sandbox.policy.workspaceRoot
           : context.sandbox.resolveRead(input.cwd);
 
+      // A contained interpreter finds its programs by walking the PATH the
+      // policy granted, and can only find one in a directory the container
+      // may read. The shell resolves every name the line runs through that
+      // same PATH and hands the resolved directories to containment as read
+      // program roots - so `node` is found before the line runs, not after
+      // the shell has already said `not recognized`. A name that resolves
+      // nowhere is left alone: it may be a builtin the interpreter runs
+      // without touching the disk, and guessing which is a refusal built on
+      // a guess (ADR 0047).
+      const granted = programDirectories(
+        input.programs,
+        context.sandbox.policy.environment.PATH ?? "",
+        context.sandbox.policy.environment.PATHEXT,
+      );
+
       try {
         // Through the sandbox rather than straight to `runProcess`, and the
         // kind is the whole point: the model writes the command line, so this
@@ -225,6 +241,14 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
             executable: interpreter.path,
             args: [...interpreter.args, input.command],
             cwd,
+            // The line the interpreter reads is handed over the way that
+            // interpreter reads lines, declared where the interpreter is
+            // described. A `cmd.exe` takes the raw remainder after `/c` and
+            // takes its quotes itself; escaping them for it is what turned a
+            // fully-qualified path into `'\"C:\Program Files\nodejs\node.exe\"'
+            // is not recognized` on every machine this tool was broken on.
+            lineJoin: interpreter.takes,
+            programRoots: granted.directories,
             timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
             ...(context.signal ? { signal: context.signal } : {}),
           });
@@ -238,10 +262,8 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         //
         // The case is real and was costing every command on this machine: on
         // Windows without PowerShell 7 the choice is Git's `bash.exe`, which
-        // loads `msys-2.0.dll` from its own installation, and a contained
-        // child cannot read `C:\Program Files`. Granting it there needs
-        // elevation the runtime must never want, so the answer is to use an
-        // interpreter that does not need the grant.
+        // cannot run inside a container, and the answer is to use an
+        // interpreter that does not need what it cannot read.
         if (result.exitCode === STATUS_DLL_INIT_FAILED && demoteInterpreter(interpreter)) {
           const next = resolveInterpreter();
           if (next !== undefined && next !== interpreter) {
@@ -259,6 +281,20 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
           return `The command produced too much output and was stopped. Narrow what it prints.`;
         }
         if (error instanceof ToolError) throw error;
+        // A sandbox shortfall - a program directory the runtime cannot make
+        // readable, a permission list that is full, a corridor that needs one
+        // elevated setup run - is an answer, not a crash. The message names
+        // what is missing and the exact command that fixes it, so returning it
+        // is how the model can tell a person what to do instead of reporting a
+        // failure with nowhere to go.
+        if (error instanceof SandboxError) {
+          const programs = input.programs.join(", ");
+          return [
+            `The command runs ${programs}, and the sandbox could not make ` +
+              `everything it needs readable, so nothing ran.`,
+            error.message,
+          ].join("\n");
+        }
         throw new ToolError("execution_failed", {
           message: `The command could not be started in ${interpreter.label}.`,
           cause: error,

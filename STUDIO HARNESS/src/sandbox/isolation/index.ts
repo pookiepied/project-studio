@@ -21,6 +21,8 @@
 export { isolationForKind, type ChildKind } from "./kinds.js";
 export { containCommand, type ContainRequest } from "./contain.js";
 export { programRoots } from "./program-roots.js";
+export { invokeLauncher } from "./windows/launcher.js";
+export { recordProgramRoots } from "./windows/ledger.js";
 export { bwrapArgs, linuxBwrap, type BwrapInput } from "./linux/bwrap.js";
 export { unprivilegedIdentity, type ProbeIdentity } from "./linux/identity.js";
 export {
@@ -34,7 +36,10 @@ export {
   ancestorsOf,
   ensureTraversable,
   grantTraverse,
+  holdsRead,
   holdsTraverse,
+  isFullPermissionList,
+  revokeTraverse,
 } from "./windows/traversal.js";
 export {
   assertIsolationAvailable,

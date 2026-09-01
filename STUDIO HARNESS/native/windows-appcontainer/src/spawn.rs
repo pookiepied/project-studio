@@ -22,9 +22,43 @@ use crate::capability::Capabilities;
 use crate::sid::OwnedSid;
 use crate::wide::{from_wide_ptr, to_wide};
 
+/// How the argument vector becomes the one string the child will parse.
+///
+/// Windows has no argv at the API boundary: `CreateProcessW` takes a single
+/// string, and the child splits it again by its own rule. There is more than
+/// one rule in use, and the difference is the whole reason this type exists.
+/// A command interpreter reads a *command line*; a program reads *arguments*;
+/// escaping arguments for one and handing them to the other is how a
+/// fully-qualified path arrives as `'\"C:\Program Files\...\"' is not
+/// recognized`, which is what the first contained command on Windows produced.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Join {
+    /// Each argument quoted and escaped the way `CommandLineToArgvW` reads it
+    /// back. Right for any child whose runtime builds an argv from the line -
+    /// a program we chose (`git`, `rg`), and every interpreter whose host
+    /// parses its own line with the standard rules before deciding what the
+    /// arguments mean (bash, and the two PowerShell hosts, whose `-Command`
+    /// therefore arrives as one intact argument).
+    Argv,
+    /// Arguments joined with single spaces, verbatim, with only this much
+    /// structure: an argument holding whitespace (or an empty one) is wrapped
+    /// in one pair of quotes, and nothing inside is escaped. Right for a child
+    /// that reads the raw remainder of its own command line and parses it as
+    /// shell syntax — `cmd.exe` after `/c`, whose `/s` strip rule then removes
+    /// exactly the one pair of quotes this join adds.
+    ///
+    /// It is deliberately *not* a mode that could serve every interpreter:
+    /// `cmd.exe` must have the wrap, a PowerShell host must not have it (its
+    /// parser would take the wrap as the whole command and lose the inner
+    /// quotes), and the programs we chose need full escaping. Which child
+    /// wants which is declared where the interpreter is described, in
+    /// `src/process/interpreter.ts`, and handed over as `--join`.
+    CommandLine,
+}
+
 /// Quotes one argument the way `CommandLineToArgvW` will read it back.
 ///
-/// Windows has no argument vector at the API boundary — `CreateProcessW` takes
+/// Windows has no argument vector at the API boundary - `CreateProcessW` takes
 /// a single string and the child splits it again. This function is the join
 /// half of that round trip, and it is the reason the harness can keep promising
 /// that an argument is never reinterpreted: a path with a space or a quote in
@@ -66,14 +100,37 @@ fn quote(argument: &str) -> String {
     quoted
 }
 
+/// One argument in `Join::CommandLine` form.
+///
+/// Wrapping and nothing else. An inner quote is left exactly as it arrived,
+/// because the child that reads this line is a shell whose parser owns the
+/// quotes; escaping them would hand the shell backslash-quote pairs it reads
+/// as data, which is the defect this mode exists to fix. An argument with no
+/// whitespace needs no wrap, and a wrapper on it would hand `cmd.exe /s` a
+/// first character that is a quote where none was intended.
+fn command_argument(argument: &str) -> String {
+    if argument.is_empty() {
+        // An empty argument vanishes from a bare join; the empty string is the
+        // form every parser agrees means "an argument that is there and empty".
+        return "\"\"".to_string();
+    }
+    if argument.contains([' ', '\t']) {
+        return format!("\"{argument}\"");
+    }
+    argument.to_string()
+}
+
 /// The full command line for an executable and its arguments.
 ///
 /// Public so the harness's tests can assert the join without spawning anything.
-pub fn command_line(executable: &str, arguments: &[String]) -> String {
+pub fn command_line(executable: &str, arguments: &[String], join: Join) -> String {
     let mut line = quote(executable);
     for argument in arguments {
         line.push(' ');
-        line.push_str(&quote(argument));
+        line.push_str(&match join {
+            Join::Argv => quote(argument),
+            Join::CommandLine => command_argument(argument),
+        });
     }
     line
 }
@@ -197,6 +254,8 @@ pub struct Request<'a> {
     pub capabilities: &'a [String],
     pub executable: &'a str,
     pub arguments: &'a [String],
+    /// How the arguments become the child's command line. See `Join`.
+    pub join: Join,
     pub working_directory: Option<&'a str>,
 }
 
@@ -225,7 +284,7 @@ pub fn run(request: Request<'_>) -> Result<u32, String> {
     startup.StartupInfo.hStdError = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
     startup.lpAttributeList = attributes.pointer();
 
-    let mut line = to_wide(&command_line(request.executable, request.arguments));
+    let mut line = to_wide(&command_line(request.executable, request.arguments, request.join));
     let executable = to_wide(request.executable);
     let directory = request.working_directory.map(to_wide);
 
@@ -281,5 +340,120 @@ pub fn run(request: Request<'_>) -> Result<u32, String> {
 fn close(handle: HANDLE) {
     if !handle.is_null() && handle != INVALID_HANDLE_VALUE {
         unsafe { CloseHandle(handle) };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{command_line, Join};
+
+    fn arguments(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    /// The defect this whole mode exists for, asserted on the join itself: an
+    /// interpreter command line joined as argv data escapes its inner quotes,
+    /// and `cmd.exe` reads the result as a program named `\"C:\Program`.
+    #[test]
+    fn argv_join_escapes_quotes_inside_an_interpreter_line() {
+        let line = command_line(
+            "C:\\Windows\\System32\\cmd.exe",
+            &arguments(&[
+                "/d",
+                "/s",
+                "/c",
+                "\"C:\\Program Files\\nodejs\\node.exe\" -e \"console.log('hello')\"",
+            ]),
+            Join::Argv,
+        );
+        assert_eq!(
+            line,
+            "C:\\Windows\\System32\\cmd.exe /d /s /c \"\\\"C:\\Program Files\\nodejs\\node.exe\\\" -e \\\"console.log('hello')\\\"\""
+        );
+    }
+
+    /// The same line, joined the way the reader of it wants it: verbatim, with
+    /// one pair of quotes around the argument that carries whitespace, and
+    /// nothing escaped. `cmd.exe /s` strips exactly that outer pair and runs
+    /// the line the model wrote.
+    #[test]
+    fn command_line_join_keeps_the_interpreter_line_verbatim() {
+        let line = command_line(
+            "C:\\Windows\\System32\\cmd.exe",
+            &arguments(&[
+                "/d",
+                "/s",
+                "/c",
+                "\"C:\\Program Files\\nodejs\\node.exe\" -e \"console.log('hello')\"",
+            ]),
+            Join::CommandLine,
+        );
+        assert_eq!(
+            line,
+            "C:\\Windows\\System32\\cmd.exe /d /s /c \
+             \"\"C:\\Program Files\\nodejs\\node.exe\" -e \"console.log('hello')\"\""
+                .replace("\\\\", "\\")
+        );
+    }
+
+    /// An argument with no whitespace needs no wrap: `cmd.exe /s` only strips
+    /// a leading quote, and adding one would make it strip a pair the model
+    /// never wrote.
+    #[test]
+    fn command_line_join_wraps_only_whitespace() {
+        let line = command_line(
+            "C:\\Windows\\System32\\cmd.exe",
+            &arguments(&["/d", "/s", "/c", "ver"]),
+            Join::CommandLine,
+        );
+        assert_eq!(line, "C:\\Windows\\System32\\cmd.exe /d /s /c ver");
+    }
+
+    /// An argument-shaped child gets the same line from both joins, because a
+    /// quoted `-c` body is one argument either way. The executable is always
+    /// quoted - it is a path, and paths carry spaces.
+    #[test]
+    fn both_joins_agree_for_an_argument_shaped_child() {
+        for join in [Join::Argv, Join::CommandLine] {
+            let line = command_line(
+                "C:\\Program Files\\Git\\bin\\bash.exe",
+                &arguments(&["-c", "exit 0"]),
+                join,
+            );
+            assert_eq!(
+                line,
+                "\"C:\\Program Files\\Git\\bin\\bash.exe\" -c \"exit 0\""
+            );
+        }
+    }
+
+    /// The programs the harness chose (`git`, `rg`) keep the escaping that
+    /// makes an argument with a space or a quote arrive as one argument. This
+    /// is the invariant the mode split must not break.
+    #[test]
+    fn argv_join_still_escapes_a_path_with_spaces() {
+        let line = command_line(
+            "C:\\Program Files\\Git\\cmd\\git.exe",
+            &arguments(&["-C", "D:\\my project", "status"]),
+            Join::Argv,
+        );
+        assert_eq!(
+            line,
+            "\"C:\\Program Files\\Git\\cmd\\git.exe\" -C \"D:\\my project\" status"
+        );
+    }
+
+    /// An empty argument is wrapped in both modes, so it arrives as an
+    /// argument rather than vanishing from the line.
+    #[test]
+    fn empty_arguments_survive_the_join() {
+        for join in [Join::Argv, Join::CommandLine] {
+            let line = command_line(
+                "C:\\Program Files\\nodejs\\node.exe",
+                &arguments(&["-e", ""]),
+                join,
+            );
+            assert_eq!(line, "\"C:\\Program Files\\nodejs\\node.exe\" -e \"\"");
+        }
     }
 }

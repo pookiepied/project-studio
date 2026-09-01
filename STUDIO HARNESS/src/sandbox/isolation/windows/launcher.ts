@@ -27,6 +27,18 @@ import { SandboxError } from "../../errors.js";
 export const LAUNCHER_BINARY = "studio-contain.exe";
 
 /**
+ * How the launcher joins the child's arguments into one command line.
+ *
+ * The launcher's own vocabulary, spelled out here so the interpreter
+ * descriptions in `src/process/interpreter.ts` can declare which one their
+ * child needs without anyone guessing at the flag's spelling. `argv` is the
+ * default and the only mode the programs we chose (git, rg) may ever use;
+ * `command-line` is for an interpreter that reads the raw remainder of its
+ * own line - `cmd.exe` after `/c` - and is wrong for everything else.
+ */
+export type LauncherJoin = "argv" | "command-line";
+
+/**
  * Where the launcher is expected to be, whether or not it is there.
  *
  * Returns the path rather than throwing so `available()` can ask without
@@ -79,8 +91,8 @@ export function invokeLauncher(
  * The argument vector for running a program inside a container.
  *
  * Split out from the spawn so it can be asserted on a machine that has no
- * launcher at all. The order matters — everything after `--` belongs to the
- * child, including anything that looks like one of the launcher's own flags —
+ * launcher at all. The order matters - everything after `--` belongs to the
+ * child, including anything that looks like one of the launcher's own flags -
  * and an order test is worth more than a comment saying so.
  */
 export function containArgs(input: {
@@ -88,6 +100,8 @@ export function containArgs(input: {
   readonly cwd: string;
   readonly executable: string;
   readonly args: readonly string[];
+  /** Omitted means `argv`, the launcher's default. */
+  readonly join?: LauncherJoin;
   readonly capabilities?: readonly string[];
 }): readonly string[] {
   return [
@@ -96,6 +110,9 @@ export function containArgs(input: {
     input.sid,
     "--cwd",
     input.cwd,
+    ...(input.join === undefined || input.join === "argv"
+      ? []
+      : ["--join", input.join]),
     // Repeated rather than comma-joined. A list encoded into one string needs
     // an escape rule the first time a value contains the separator, and a
     // capability is not a thing to get subtly wrong.

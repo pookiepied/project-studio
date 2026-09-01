@@ -34,6 +34,7 @@ mod spawn;
 mod wide;
 
 use crate::sid::OwnedSid;
+use crate::spawn::Join;
 
 /// The exit code this binary uses for its own failures.
 ///
@@ -51,7 +52,8 @@ studio-contain — run a program inside a Windows AppContainer
   grant  --sid <sid> --path <path> --mode traverse|read|write
   revoke --sid <sid> --path <path> [--mode traverse|read|write]
   check  --sid <sid> --path <path> --mode traverse|read|write
-  run    --sid <sid> [--cwd <dir>] [--capability <name>]... -- <program> [args...]
+  run    --sid <sid> [--cwd <dir>] [--capability <name>]...
+         [--join argv|command-line] -- <program> [args...]
   probe  --path <path> | --connect <host:port> | --resolve <host>
 ";
 
@@ -114,11 +116,22 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
                 return Err("no program to run was given after `--`".to_string());
             };
             let capabilities = options.all("--capability");
+            let join = match options.get("--join") {
+                Some("argv") => Join::Argv,
+                Some("command-line") => Join::CommandLine,
+                Some(other) => {
+                    return Err(format!(
+                        "unknown join: {other} (argv or command-line)"
+                    ))
+                }
+                None => Join::Argv,
+            };
             let code = spawn::run(spawn::Request {
                 sid: &sid,
                 capabilities: &capabilities,
                 executable,
                 arguments: rest,
+                join,
                 working_directory: options.get("--cwd"),
             })?;
             Ok(code as i32)

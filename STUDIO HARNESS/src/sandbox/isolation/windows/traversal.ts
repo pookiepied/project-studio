@@ -86,6 +86,28 @@ export function holdsTraverse(path: string, sid: string): boolean {
   }
 }
 
+/**
+ * Whether a trustee already holds read on a directory. Read-only.
+ *
+ * Asked with two trustees and never one: the workspace's own identity, or
+ * `ALL APPLICATION PACKAGES` for the system-owned directories that carry the
+ * machine-wide entry. The second is what makes a program directory check
+ * answer "already readable" for `C:\Windows\System32` instead of attempting a
+ * grant an unelevated runtime cannot make on a directory whose programs
+ * already run - the check is an explicit-ACE scan, and an inherited entry is
+ * in the DACL it scans, so the machine-wide answer is measurable without
+ * writing anything.
+ */
+export function holdsRead(path: string, sid: string): boolean {
+  if (!launcherInstalled()) return false;
+  try {
+    invokeLauncher(["check", "--sid", sid, "--path", path, "--mode", "read"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function grantTraverse(path: string, sid: string): void {
   invokeLauncher(["grant", "--sid", sid, "--path", path, "--mode", "traverse"]);
 }

@@ -13,15 +13,17 @@ import { resolveBinary } from "../vendor/resolver.js";
  * choice is stated in the environment block, so the model writes the syntax
  * the machine will actually interpret instead of guessing.
  *
- * **The order prefers syntax models write.** Models reach for POSIX syntax
- * first (`&&`, pipes, `$VARS`), PowerShell second, cmd last. On Windows that
- * means: PowerShell 7 if installed, then the bash that ships with Git for
- * Windows (found beside the git binary this harness already resolves), then a
- * `bash.exe` on PATH, then Windows PowerShell 5.1, then cmd. The 5.1 fallback
- * is picked only when nothing better exists, and its `&&` gap is a stated
- * fact in the environment block rather than a surprise - which is the whole
- * difference between choosing it and silently trading one confusing failure
- * for another.
+ * **The order prefers syntax models write, measured where it differs.** Models
+ * reach for POSIX syntax first (`&&`, pipes, `$VARS`), and every fallback
+ * below it is stated rather than silent. On Windows that means: PowerShell 7
+ * if installed, then the bash that ships with Git for Windows (found beside
+ * the git binary this harness already resolves), then a `bash.exe` on PATH,
+ * then `cmd.exe`, then Windows PowerShell 5.1 - the last two in that order
+ * because of what each can run, measured on the machine this was built on:
+ * 5.1 refuses a quoted absolute path without a call operator and has no `&&`,
+ * while cmd runs both. The 5.1 fallback is picked only when nothing better
+ * exists, and its gaps are stated facts in the environment block rather than
+ * surprises.
  *
  * **Which interpreter survives containment is a separate question**, and it is
  * answered by measurement rather than by this order - see
@@ -35,6 +37,9 @@ import { resolveBinary } from "../vendor/resolver.js";
 
 export type InterpreterKind = "pwsh" | "bash" | "powershell" | "cmd" | "sh";
 
+/** How a command line is handed to an interpreter, as the launcher joins it. */
+export type LineJoin = "argv" | "command-line";
+
 export interface Interpreter {
   /** Absolute path to a real executable, as `runProcess` requires. */
   readonly path: string;
@@ -43,6 +48,24 @@ export interface Interpreter {
   readonly kind: InterpreterKind;
   /** Arguments that put the interpreter into read-a-line-and-run mode. */
   readonly args: readonly string[];
+  /**
+   * How this interpreter reads the line the harness hands it.
+   *
+   * Windows has no argument vector at the process boundary - a child is given
+   * one string and parses it by its own rule - and the interpreters do not
+   * share a rule. A bash host builds an argv from the line with the standard
+   * rules, so the line must arrive as one escaped argument; a PowerShell host
+   * does the same before `-Command` reads it; `cmd.exe` reads the raw
+   * remainder after `/c` and takes the quotes itself. Joining all three the
+   * first way is how a fully-qualified path arrived at a contained `cmd.exe`
+   * as `'\"C:\Program Files\nodejs\node.exe\"' is not recognized`, which is
+   * what made every command line on Windows fail, quoted or not.
+   *
+   * The launcher joins by this value (`--join argv|command-line`); the
+   * difference lives here, beside the args that are also per interpreter,
+   * and not in a branch inside the launcher.
+   */
+  readonly takes: LineJoin;
   /**
    * How the environment block states the choice, as lines to splice in.
    *
@@ -85,8 +108,13 @@ function scanPath(file: string): string | undefined {
  *
  * `bash.exe` is rarely on Windows PATH even where Git is - the installer puts
  * `Git\cmd` there, not `Git\bin` - so the derivation walks up from wherever
- * git actually is. A `bash.exe` under System32 is WSL and is never chosen:
- * its filesystem, paths, and network are another machine's.
+ * git actually is. The walk strips the program's own name first and then
+ * every installer-layout directory on the way up, because this machine's PATH
+ * resolves git from `Git\mingw64\bin\git.exe` and a walk that stops one level
+ * short left the root at `Git\mingw64`, where no bash lives, so the machine
+ * fell through to its next interpreter as if the bash beside git did not
+ * exist. A `bash.exe` under System32 is WSL and is never chosen: its
+ * filesystem, paths, and network are another machine's.
  */
 function bashFromGit(): string | undefined {
   let gitPath: string;
@@ -95,8 +123,20 @@ function bashFromGit(): string | undefined {
   } catch {
     return undefined;
   }
-  const root = gitPath.replace(/[\\/](?:cmd|mingw64|bin)[\\/]git\.exe$/i, "");
-  if (root === gitPath) return undefined;
+
+  const withoutProgram = gitPath.replace(/[\\/]git\.(?:exe|com)$/i, "");
+  if (withoutProgram === gitPath) return undefined;
+
+  let root = withoutProgram;
+  for (;;) {
+    // Stripped repeatedly, because a git path may be two of these deep:
+    // `Git\mingw64\bin\git.exe` is `Git` after both, and a single strip left
+    // the root one level short, which is how the fallback got chosen here.
+    const stripped = root.replace(/[\\/](?:usr|cmd|mingw64|bin)$/i, "");
+    if (stripped === root) break;
+    root = stripped;
+  }
+
   for (const candidate of [join(root, "bin", "bash.exe"), join(root, "usr", "bin", "bash.exe")]) {
     if (isFile(candidate)) return candidate;
   }
@@ -123,6 +163,19 @@ const CMD_ARGS = ["/d", "/s", "/c"] as const;
  * one that works: an interpreter that cannot be contained on this machine has
  * to be given up on, and the next one tried. `chosen` only ever moves forward,
  * and only through `demoteInterpreter`.
+ *
+ * The Windows order is measured, not only preferred. On the machine this
+ * harness is built on - Windows 11 Home, no PowerShell 7 - the preferred
+ * bash cannot be contained, and the demotion lands on whichever fallback
+ * follows it. With Windows PowerShell 5.1 next, that chain could not run a
+ * single line the shell's own tests write: 5.1 refuses a quoted absolute
+ * path without a call operator in front of it (measured as a ParserError on
+ * every such line, seven test failures' worth) and has no `&&` at all, while
+ * `cmd.exe` runs quoted paths, `&&`, pipes and redirection alike. So cmd
+ * outranks 5.1, and 5.1 stays last - reachable only where cmd is somehow
+ * absent, which is nowhere Windows ships. The statement each entry carries
+ * says what its syntax can and cannot do, so the model writes for the shell
+ * it actually got.
  *
  * An empty list is a real state, not an error: a machine with no shell at all
  * gets a shell tool that refuses with that sentence, rather than a crash at
@@ -186,9 +239,11 @@ function measure(): readonly Interpreter[] {
         label: "pwsh",
         kind: "pwsh",
         args: PWSH_ARGS,
+        takes: "argv",
         statement: [
           "Commands run through PowerShell 7 (pwsh). Pipes, &&, quotes, and",
-          "redirection are interpreted by the shell.",
+          "redirection are interpreted by the shell. A quoted absolute path",
+          'needs the call operator in front of it: & "C:\\path\\tool.exe" args.',
         ],
       });
     }
@@ -200,9 +255,25 @@ function measure(): readonly Interpreter[] {
         label: "bash",
         kind: "bash",
         args: BASH_ARGS,
+        takes: "argv",
         statement: [
           "Commands run through bash. Pipes, &&, quotes, and redirection are",
           "interpreted by the shell.",
+        ],
+      });
+    }
+
+    const cmd = join(systemRoot(), "System32", "cmd.exe");
+    if (isFile(cmd)) {
+      found.push({
+        path: cmd,
+        label: "cmd",
+        kind: "cmd",
+        args: CMD_ARGS,
+        takes: "command-line",
+        statement: [
+          "Commands run through cmd.exe. Pipes, &&, double quotes, and",
+          "redirection are interpreted by the shell.",
         ],
       });
     }
@@ -216,24 +287,12 @@ function measure(): readonly Interpreter[] {
         label: "powershell",
         kind: "powershell",
         args: POWERSHELL_ARGS,
+        takes: "argv",
         statement: [
           "Commands run through Windows PowerShell 5.1. Pipes, quotes, and",
           "redirection are interpreted, but && is not supported: separate",
-          "commands with ; or run them one per call.",
-        ],
-      });
-    }
-
-    const cmd = join(systemRoot(), "System32", "cmd.exe");
-    if (isFile(cmd)) {
-      found.push({
-        path: cmd,
-        label: "cmd",
-        kind: "cmd",
-        args: CMD_ARGS,
-        statement: [
-          "Commands run through cmd.exe. Pipes, &&, double quotes, and",
-          "redirection are interpreted by the shell.",
+          "commands with ; or run them one per call. A quoted absolute path",
+          'needs the call operator in front of it: & "C:\\path\\tool.exe" args.',
         ],
       });
     }
@@ -251,6 +310,7 @@ function measure(): readonly Interpreter[] {
         label,
         kind: label === "bash" ? "bash" : "sh",
         args: BASH_ARGS,
+        takes: "argv",
         statement: [
           `Commands run through ${label}. Pipes, &&, quotes, and redirection`,
           "are interpreted by the shell.",
