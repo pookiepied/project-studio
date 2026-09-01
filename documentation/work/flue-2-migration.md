@@ -84,6 +84,20 @@ behaviour our CLI patch injects - the fd-4 admission bootstrap read, the
 is server-entry work. We can write that entry ourselves, in our own source,
 importing `dist/app.mjs`, and delete the patch instead of re-deriving it.
 
+The API shape supports this. `@flue/vite` ships
+`dist/bootstrap/node-server.mjs` exporting `loadFlueNodeApplication()`, which
+resolves to the complete lifecycle surface - `fetch`, `enterActivity`,
+`pauseAdmissions`, `stop`, `closeSync`. An entry that calls it and then calls
+`serve()` from `@hono/node-server` itself owns the listen, and therefore owns
+the bind address, the bound port and the moment of readiness.
+
+That last part matters, because the alternative does not work:
+`startFlueNodeServer` accepts `hostname` but its `onReady` is typed
+`() => void` with no address, and the `FlueNodeServer` it returns exposes only
+`stop()` and `closeSync()`. Neither surfaces the bound port - the same gap our
+patch's third hunk fixes today. Owning the listen is what makes the patch
+unnecessary rather than merely smaller.
+
 That is a strictly better outcome than the report predicted, and it is the
 single biggest reason to sequence the handshake early: if the embed path does
 not work the way the docs say, everything downstream needs replanning, and we
