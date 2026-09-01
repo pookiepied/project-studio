@@ -1,20 +1,23 @@
 import type { HealthStatus } from "@pookiepied/core/contracts";
+import { STATUS_MARK } from "./primitives/Chart";
 import { cn } from "../lib/cn";
 
 /**
- * The status indicator, and the only element in the console permitted a hue.
+ * The status indicator.
  *
- * Three states have to be distinguishable without reading a label, and the
- * palette is chroma 0 apart from `--danger` — so the ladder cannot be three
- * colours. It is **form first, then colour**: `ok` is a quiet filled muted dot,
- * `degraded` is a hollow foreground ring, and only `down` fills with
- * `--danger`. A ring and a disc differ in shape rather than in value, which
- * survives both themes and the greyscale the palette commits to; two greys one
- * step apart did not, and "which service is unhappy" is the question this
- * whole page exists to answer.
+ * Three states, drawn from the reserved status set in `Chart`. `ok` stays a
+ * quiet neutral: on a console where almost everything is healthy, a field of
+ * green is noise, and it spends the reader's attention on exactly the rows that
+ * need none. Only trouble is coloured, and the two kinds of trouble differ by
+ * hue rather than by shape.
  *
- * 8px rather than 6px for the same reason: a ring needs an interior to read as
- * one. It is still small enough to sit inline in a table row.
+ * That last part is the change. `degraded` used to be a hollow ring, because a
+ * monochrome palette had no second colour to spend on it — a workaround that
+ * worked at 8px and nowhere else. With a status set available the ring is not
+ * needed, and a disc reads at any size.
+ *
+ * The dot never travels alone: every place it appears, a word or a legend entry
+ * sits beside it, so hue is never the only channel carrying the state.
  */
 export function StatusDot({
   status,
@@ -31,18 +34,14 @@ export function StatusDot({
         <span
           className={cn(
             "absolute size-2 animate-ping rounded-full opacity-60",
-            status === "down" ? "bg-danger" : "bg-foreground",
+            status === "down" ? "bg-viz-critical" : "bg-viz-warning",
           )}
         />
       ) : null}
       <span
         className={cn(
           "size-2 rounded-full",
-          status === "ok" && "bg-muted-foreground",
-          // Hollow: the ring is drawn by the inset shadow, so the dot keeps its
-          // footprint and rows do not shift when a status changes.
-          status === "degraded" && "bg-transparent ring-[1.5px] ring-inset ring-foreground",
-          status === "down" && "bg-danger",
+          STATUS_MARK[status],
         )}
       />
     </span>

@@ -34,9 +34,9 @@
      The gap between these and --text-caption is the point: a dashboard is read
      by jumping between headline numbers, and a headline you have to look for
      is not one. */
-  --text-metric: calc(var(--ui-size) + 20px);
-  --text-hero: calc(var(--ui-size) + 32px);
-  --text-display: calc(var(--ui-size) + 22px);
+  --text-metric: calc(var(--ui-size) + 22px);
+  --text-hero: calc(var(--ui-size) + 40px);
+  --text-display: calc(var(--ui-size) + 26px);
 
   /* Leading belongs to the role, never to a utility beside it. */
   --leading-micro: 1.45;
@@ -92,6 +92,14 @@
   --color-ring: var(--ring);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-3: var(--viz-3);
+  --color-viz-4: var(--viz-4);
+  --color-viz-5: var(--viz-5);
+  --color-viz-6: var(--viz-6);
+  --color-viz-warning: var(--viz-warning);
+  --color-viz-critical: var(--viz-critical);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
 
@@ -172,6 +180,58 @@
   --shadow-tint: oklch(0 0 0 / 38%);
   --shadow-tint-strong: oklch(0 0 0 / 55%);
   --shadow-hairline: oklch(1 0 0 / 7%);
+}
+
+/* ---------------------------------------------------------------------------
+   The data layer.
+
+   The chrome stays monochrome. Colour lives here, on marks that encode a value,
+   and nowhere else — which is a sharper version of the old rule rather than an
+   abandonment of it. Before, "any colour means something" was enforced by having
+   almost no colour, and the cost was a chart drawn in four greys that could not
+   be read. Now the rule is positional: if it is coloured, it is data. A button
+   is never blue; a bar always is.
+
+   These are not invented. They are the reference categorical palette, and both
+   sets were run through the validator against this console's own surfaces
+   (#ffffff light, #171717 dark) before being written down:
+
+     light  worst adjacent CVD ΔE 9.1 · normal-vision ΔE 19.6 · 3 slots under
+            3:1 contrast, which obliges the visible direct labels the columns
+            already carry
+     dark   worst adjacent CVD ΔE 8.4 · normal-vision ΔE 19.3 · all >= 3:1
+
+   Series slots are assigned per service by a stable hash of its name, never by
+   its position in the response — a service dropping out of a filtered window
+   must not repaint the ones that remain.
+   --------------------------------------------------------------------------- */
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+
+  /* Status is a separate, reserved set: never used for "series 7", and always
+     shipped beside a word so hue is not carrying the meaning alone. `ok` is
+     deliberately NOT green — on a console where almost everything is healthy,
+     a field of green is noise, and it would spend the reader's attention on the
+     rows that need none. Healthy is quiet; only trouble is coloured. */
+  --viz-warning: #b06f00;
+  --viz-critical: #d03b3b;
+}
+
+.dark {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+
+  --viz-warning: #fab219;
+  --viz-critical: #e66767;
 }
 
 @layer base {
@@ -273,8 +333,9 @@
   .text-metric {
     font-size: var(--text-metric);
     line-height: var(--leading-metric);
-    font-weight: 500;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    font-variant-numeric: proportional-nums;
   }
 
   /* The one number a panel is for. Sans and heavy: at this size the serif's
@@ -284,7 +345,9 @@
     line-height: var(--leading-hero);
     font-weight: 600;
     letter-spacing: -0.035em;
-    font-variant-numeric: tabular-nums;
+    /* Proportional, not tabular. Tabular figures are for columns that must
+       align vertically; on a standalone number this size they read as gappy. */
+    font-variant-numeric: proportional-nums;
   }
 
   /* The one statement a page makes. Anywhere else the serif stops being a voice

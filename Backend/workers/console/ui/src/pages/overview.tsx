@@ -5,7 +5,7 @@ import { useLive } from "../lib/useLive";
 import { Appear, Button, Empty, List, Row } from "../components/ui";
 import { Panel, PanelBody, PanelFooter, PanelHeader } from "../components/primitives/Panel";
 import { Delta, Metric, Tile } from "../components/primitives/Metric";
-import { Columns, DotMatrix, Meter } from "../components/primitives/Chart";
+import { Columns, DotMatrix, Meter, assignSeries } from "../components/primitives/Chart";
 import { StatusDot } from "../components/status";
 import type { PageId } from "../components/chrome";
 
@@ -41,6 +41,9 @@ export function OverviewPage({ onNavigate }: { onNavigate: (page: PageId) => voi
   const services = health.data?.services ?? [];
   const unhealthy = services.filter((s) => s.status !== "ok").length;
   const errorRate = requests > 0 ? (failures / requests) * 100 : 0;
+
+  // One assignment for the whole set, so the chart and its legend agree.
+  const fills = assignSeries(sources.map((s) => serviceLabel(s.source)));
 
   const failureRows = errors.data?.events ?? [];
   const events = recent.data?.events ?? [];
@@ -98,26 +101,38 @@ export function OverviewPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel>
           <PanelHeader title="Traffic by service" actions={link("activity", "Activity")} />
-          <PanelBody>
+          <PanelBody className="flex flex-col gap-5">
+            <Metric label="Requests, last 24 hours" value={count(requests)} />
             {sources.length === 0 ? (
               <Empty>{summary.loading ? "Loading…" : "Nothing has reported yet."}</Empty>
             ) : (
               <Columns
-                height={190}
-                data={sources.map((s) => ({
-                  label: serviceLabel(s.source),
-                  value: Number(s.requests ?? 0),
-                  display: count(Number(s.requests ?? 0)),
-                  status: Number(s.errors ?? 0) > 0 ? ("degraded" as const) : ("ok" as const),
-                }))}
+                className="max-w-sm"
+                height={150}
+                data={sources.map((s) => {
+                  const total = Number(s.requests ?? 0);
+                  const failed = Number(s.errors ?? 0);
+                  const name = serviceLabel(s.source);
+                  return {
+                    label: name,
+                    fill: fills.get(name) ?? "bg-viz-1",
+                    // `requests` is the total, so the success segment is the
+                    // remainder — stacking total + errors would double-count
+                    // every failure and inflate the column.
+                    value: Math.max(0, total - failed),
+                    errors: failed,
+                    display: count(total),
+                  };
+                })}
               />
             )}
           </PanelBody>
           <PanelFooter
-            legend={[
-              { label: "Clean", status: "ok" },
-              { label: "Has errors", status: "degraded" },
-            ]}
+            swatches={sources.map((s) => ({
+              label: serviceLabel(s.source),
+              className: fills.get(serviceLabel(s.source)) ?? "bg-viz-1",
+            }))}
+            legend={failures > 0 ? [{ label: "Failed", status: "down" }] : []}
             total={`Total: ${count(requests)} requests`}
           />
         </Panel>

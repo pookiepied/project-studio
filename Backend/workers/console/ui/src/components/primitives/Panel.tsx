@@ -106,10 +106,13 @@ export interface LegendEntry {
  */
 export function PanelFooter({
   legend,
+  swatches,
   total,
   className,
 }: {
   legend?: readonly LegendEntry[];
+  /** Series keys: a mark in the series colour beside the entity's own name. */
+  swatches?: readonly { label: string; className: string }[];
   total?: string;
   className?: string;
 }) {
@@ -121,6 +124,15 @@ export function PanelFooter({
       )}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {(swatches ?? []).map((sw) => (
+          <span key={sw.label} className="flex items-center gap-1.5">
+            {/* The swatch carries the colour; the label stays in ink. Text never
+                wears a series hue — a light categorical colour is illegible as
+                text on a white surface. */}
+            <span className={cn("size-2.5 flex-none rounded-full", sw.className)} />
+            <span className="text-caption text-muted-foreground">{sw.label}</span>
+          </span>
+        ))}
         {(legend ?? []).map((e) => (
           <span key={e.label} className="flex items-center gap-1.5">
             <StatusDot status={e.status} />
