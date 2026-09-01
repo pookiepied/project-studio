@@ -17,11 +17,23 @@ export function parseRule(rule: Rule): { method: string; path: string; prefix: b
   return { method, path, prefix };
 }
 
+/**
+ * A prefix matches only at a segment boundary. `GET /v1/public*` opens
+ * `/v1/public` and `/v1/public/anything`, and deliberately does NOT open
+ * `/v1/publicsecrets` — a bare `startsWith` would, which is this module's
+ * fail-closed promise failing open on the one rule kind that grants access.
+ */
+function prefixMatches(prefix: string, path: string): boolean {
+  if (!path.startsWith(prefix)) return false;
+  // A prefix that already ends in "/" is its own boundary.
+  return prefix.endsWith("/") || path.length === prefix.length || path[prefix.length] === "/";
+}
+
 export function matches(rules: readonly Rule[], method: string, path: string): boolean {
   for (const rule of rules) {
     const r = parseRule(rule);
     if (r.method !== "ALL" && r.method !== method.toUpperCase()) continue;
-    if (r.prefix ? path.startsWith(r.path) : path === r.path) return true;
+    if (r.prefix ? prefixMatches(r.path, path) : path === r.path) return true;
   }
   return false;
 }

@@ -10,6 +10,22 @@ function table(name: string): string {
 }
 
 /**
+ * Columns this class owns and a caller may never write.
+ *
+ * `user_id` is the ownership check itself. Without this guard it passes the
+ * identifier test like any other column and lands in the SET list, next to the
+ * WHERE clause that is supposed to protect it — so a caller could hand one of
+ * their own rows to somebody else's account. The check being in the query is
+ * only worth something if the column it checks cannot be assigned.
+ */
+function reject(values: Record<string, unknown>, cols: readonly string[], reserved: readonly string[]): void {
+  if (cols.some((c) => !IDENTIFIER.test(c))) throw new Error("unsafe column name");
+  for (const r of reserved) {
+    if (r in values) throw new Error(`${r} is set by OwnedDb and cannot be assigned by a caller`);
+  }
+}
+
+/**
  * Ownership-scoped D1 access.
  *
  * Every read and write carries `user_id = ?` in the WHERE clause, added here
@@ -52,7 +68,8 @@ export class OwnedDb {
 
   async insert(name: string, values: Record<string, unknown>): Promise<void> {
     const cols = Object.keys(values);
-    if (cols.some((c) => !IDENTIFIER.test(c))) throw new Error("unsafe column name");
+    // `id` is allowed here — setting a row's own id is what an insert is for.
+    reject(values, cols, ["user_id"]);
     const all = [...cols, "user_id"];
     await this.db
       .prepare(
@@ -66,7 +83,9 @@ export class OwnedDb {
   async update(name: string, id: string, values: Record<string, unknown>): Promise<boolean> {
     const cols = Object.keys(values);
     if (cols.length === 0) return false;
-    if (cols.some((c) => !IDENTIFIER.test(c))) throw new Error("unsafe column name");
+    // `id` too: the row was addressed by it, so reassigning it in the same
+    // statement is never what the caller meant.
+    reject(values, cols, ["user_id", "id"]);
     const res = await this.db
       .prepare(
         `UPDATE ${table(name)} SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ? AND user_id = ?`,

@@ -79,12 +79,19 @@ importers:
       vite:
         specifier: ^8.1.1
         version: 8.2.2(esbuild@0.28.1)(jiti@2.7.0)
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@10.2.2)
 
   workers/telemetry:
     dependencies:
       '@pookiepied/core':
         specifier: workspace:*
         version: link:../../packages/core
+    devDependencies:
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@10.2.2)
 
 packages:
 

@@ -56,6 +56,19 @@ describe("deny by default", () => {
     expect(res.status).toBe(401);
   });
 
+  it("does not let a prefix rule leak past a path segment", async () => {
+    // `GET /open*` must open /open and /open/anything — never /opensesame.
+    const w = withAuth<UmbrellaEnv>({
+      public: ["GET /open*"],
+      publicFetch: async () => json({ ok: true }),
+      fetch: async () => json({ ok: false }),
+    });
+    expect((await call(w, new Request("https://x.dev/open"), envWith({}))).status).toBe(200);
+    expect((await call(w, new Request("https://x.dev/open/thing"), envWith({}))).status).toBe(200);
+    expect((await call(w, new Request("https://x.dev/opensesame"), envWith({}))).status).toBe(401);
+    expect((await call(w, new Request("https://x.dev/open-secrets"), envWith({}))).status).toBe(401);
+  });
+
   it("does not treat a public rule as a prefix unless it says so", async () => {
     const res = await call(worker, new Request("https://x.dev/health/secrets"), envWith({}));
     expect(res.status).toBe(401);
@@ -184,5 +197,34 @@ describe("ownership is in the query, not the handler", () => {
     await expect(new OwnedDb(db, "alice").find("docs; DROP TABLE users", "x")).rejects.toThrow(
       /unsafe table name/,
     );
+  });
+
+  it("refuses to let a caller reassign the column that proves ownership", async () => {
+    // The row is Alice's, so the WHERE clause is satisfied. Without this guard
+    // `user_id` lands in the SET list and the row moves into Bob's account.
+    const { db, seen } = spyDb();
+    const owned = new OwnedDb(db, "alice");
+
+    await expect(owned.update("docs", "d1", { title: "t", user_id: "bob" })).rejects.toThrow(
+      /user_id is set by OwnedDb/,
+    );
+    await expect(owned.insert("docs", { id: "d2", user_id: "bob" })).rejects.toThrow(
+      /user_id is set by OwnedDb/,
+    );
+    // Refused before any statement was prepared, not after.
+    expect(seen).toHaveLength(0);
+  });
+
+  it("refuses to reassign the id the row was addressed by", async () => {
+    const { db } = spyDb();
+    await expect(new OwnedDb(db, "alice").update("docs", "d1", { id: "d2" })).rejects.toThrow(
+      /id is set by OwnedDb/,
+    );
+  });
+
+  it("still allows an ordinary insert to set its own id", async () => {
+    const { db, seen } = spyDb();
+    await new OwnedDb(db, "alice").insert("docs", { id: "d1", title: "t" });
+    expect(seen[0]?.sql).toMatch(/INSERT INTO docs \(id, title, user_id\)/);
   });
 });
