@@ -208,13 +208,25 @@ describe("probe-learned availability", () => {
     // The set a live probe of the user's vendor returned: real ids only.
     catalog.recordServedModels("openrouter", ["openai/gpt-5.2", "anthropic/claude-sonnet-4.5"]);
     const listed = await catalog.listModels({ connectionId: "openrouter" });
-    const jamba = listed.find((model) => model.modelId === "ai21/jamba-large-1.7");
     const gpt = listed.find((model) => model.modelId === "openai/gpt-5.2");
-    expect(jamba?.available).toBe(false);
+    // A model the catalog carries but the probe did not name - found
+    // dynamically rather than pinned to an id, because Pi regenerates the
+    // catalog with every release and the property under test is "omitted
+    // from the provider's own list", not "this one retired model".
+    const omitted = listed.find(
+      (model) =>
+        model.modelId !== "openai/gpt-5.2" &&
+        model.modelId !== "anthropic/claude-sonnet-4.5",
+    );
+    expect(omitted).toBeDefined();
+    expect(omitted?.available).toBe(false);
     expect(gpt?.available).toBe(true);
 
+    if (omitted === undefined) {
+      throw new Error("no omitted model found to refuse as a default");
+    }
     await expect(
-      catalog.setDefault("textGeneration", { connectionId: "openrouter", modelId: "ai21/jamba-large-1.7" }),
+      catalog.setDefault("textGeneration", { connectionId: "openrouter", modelId: omitted.modelId }),
     ).rejects.toThrow(/not offered by its provider/i);
     await expect(
       catalog.setDefault("textGeneration", { connectionId: "openrouter", modelId: "openai/gpt-5.2" }),
@@ -529,7 +541,10 @@ describe("the declared catalog", () => {
     const catalog = new ModelCatalog({ db, connections });
     const listed = await catalog.listModels({ connectionId: "openrouter-images" });
 
-    expect(listed.length).toBe(35);
+    // The count is a snapshot of Pi's generated image catalog, which moves
+    // with the package (35 on pi-ai 0.80, 50 on 0.84); the identity and
+    // shape assertions below are the real contract.
+    expect(listed.length).toBe(50);
     const flux = listed.find((model) => model.modelId === "black-forest-labs/flux.2-max");
     expect(flux).toBeDefined();
     expect(flux?.capability.imageGeneration).toBe("supported");

@@ -133,7 +133,7 @@ describe("MCP application runtime", () => {
         agentId: "agent",
         conversationId: "conversation:agent",
       });
-      const env = await sandbox.createSessionEnv({ id: "agent" });
+      const env = await sandbox.createSandbox({ id: "agent" });
       const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
       expect(tools.map((tool) => tool.name)).toContain("mcp__11_echo-server__4_echo");
 

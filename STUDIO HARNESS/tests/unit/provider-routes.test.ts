@@ -41,6 +41,16 @@ let session: ReturnType<typeof createAdmissionSession>;
 let probeServer: Server | undefined;
 let probeRequests: IncomingMessage[];
 
+/**
+ * The mountable stand-in for the studio agent: this suite never addresses
+ * the agent mount, so the stand-in only has to be resolvable by
+ * `createAgentRouter` when the app is built.
+ */
+function probeAgent(): string {
+  return "provider routes probe";
+}
+probeAgent.agentName = "provider-probe";
+
 function authorized(path: string, init: RequestInit = {}): Promise<Response> {
   return Promise.resolve(
     app.request(`http://harness.test${path}`, {
@@ -59,8 +69,6 @@ beforeEach(() => {
   credentials = new InMemoryCredentialStore();
   const connections = new ConnectionStore({ db, credentials });
   session = createAdmissionSession();
-  const flueApp = new Hono();
-  flueApp.get("/probe", () => new Response("entered"));
   app = createHttpApp({
     servers: { list: () => [] } as unknown as McpAdministration,
     providers: new ProviderManagementService({
@@ -85,7 +93,9 @@ beforeEach(() => {
     // This suite never posts to the shutdown route; the no-op keeps the
     // process out of a composition that would otherwise be able to end it.
     requestShutdown: () => undefined,
-    flueApp,
+    // This suite never addresses the agent mount; the stand-in only has to
+    // be resolvable so the router can be built.
+    agent: probeAgent,
   });
 });
 

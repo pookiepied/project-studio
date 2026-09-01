@@ -9,6 +9,16 @@ import type { ProjectStore } from "../../src/projects/store.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 
 /**
+ * The mountable stand-in for the studio agent: this suite never addresses
+ * the agent mount, so the stand-in only has to be resolvable by
+ * `createAgentRouter` when the app is built.
+ */
+function probeAgent(): string {
+  return "shutdown probe";
+}
+probeAgent.agentName = "shutdown-probe";
+
+/**
  * Composes the real app the way `src/app.ts` does, minus everything the
  * admission boundary stops this route from ever reaching. The port doubles are
  * the two lines each route actually uses, in the same spirit as
@@ -63,6 +73,9 @@ function composeApp(clientType: "studio-host" | "studio-client") {
     requestShutdown: () => {
       requested += 1;
     },
+    // This suite never addresses the agent mount; the stand-in only has to
+    // be resolvable so the router can be built.
+    agent: probeAgent,
   });
   return { app, session, requested: () => requested };
 }

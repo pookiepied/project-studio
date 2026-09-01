@@ -81,6 +81,14 @@ export type StudioErrorDomain =
    * are different situations, and only the second one is fixed in settings.
    */
   | "extend"
+  /**
+   * The harness's own host lifecycle: the server entrypoint, the readiness
+   * handshake, and the stop sequence. Separate from `process` - which
+   * supervises CHILD processes - because "the entry armed its stop twice"
+   * and "a spawned command timed out" are different situations with
+   * different answers.
+   */
+  | "host"
   | "unclassified";
 
 /** Stable, machine-readable failure identity: `${domain}.${kind}`. */

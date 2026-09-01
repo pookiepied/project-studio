@@ -38,16 +38,16 @@ export function registerFlueInstrumentation(config: ObservabilityConfig): void {
   }
 
   instrumentation = createOpenTelemetryInstrumentation({
+    // Flue 2.0's content option is `false` (opt out) or `{ transform }` (on
+    // with a policy hook); the old `enabled` key is gone. The redaction
+    // policy below is the one thing that must keep running either way.
     content: config.captureContent
       ? {
-          enabled: true,
           transform(content) {
             return redactGenAiContent(content);
           },
         }
-      : {
-          enabled: false,
-        },
+      : false,
   });
 
   disposeInstrumentation = instrument(instrumentation);
@@ -99,8 +99,12 @@ function operationKind(operation: FlueExecutionOperation): ExecutionOperationKin
       return "tool";
     case "task":
       return "subagent";
-    case "workflow":
-      return "workflow";
+    case "coordinator":
+      // Flue 2.0's coordinator operations are the runtime's storage
+      // bookkeeping - no request, model, tool or subagent of ours. "unknown"
+      // is its honest label in our vocabulary; Phase 7 decides whether it
+      // earns its own kind once real traces exist to read.
+      return "unknown";
   }
 }
 

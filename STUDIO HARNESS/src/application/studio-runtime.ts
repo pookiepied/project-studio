@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import type { SandboxFactory, SessionEnv } from "@flue/runtime";
+import type { Sandbox, SandboxFactory } from "@flue/runtime";
 
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
@@ -155,7 +155,7 @@ function modelToolResult(value: unknown): ModelToolResult {
   };
 }
 
-function sessionEnvironment(sandbox: LocalSandbox): SessionEnv {
+function sessionEnvironment(sandbox: LocalSandbox): Sandbox {
   const workspaceRoot = sandbox.policy.workspaceRoot;
 
   return {
@@ -183,7 +183,7 @@ function sessionEnvironment(sandbox: LocalSandbox): SessionEnv {
       };
     },
     readdir: (path) => sandbox.readdir(path),
-    // Flue's `SessionEnv.exists` is a total predicate, and the runtime calls it
+    // Flue's `exists` is a total predicate, and the runtime calls it
     // on *ancestor* directories while discovering `AGENTS.md` before a turn.
     // `LocalSandbox.exists` deliberately throws for a path outside the
     // workspace (see `local-sandbox.ts`) so a model-facing probe cannot walk
@@ -637,7 +637,14 @@ export class StudioRuntime implements AgentHost {
     };
 
     return {
-      createSessionEnv: async () => sessionEnvironment(sandbox),
+      // Flue 2.0 renamed the factory entry: `createSessionEnv` (deprecated)
+      // became `createSandbox`, and the runtime calls it once per initialized
+      // harness - which, measured in Phase 0, is once per submission, with
+      // the instance id (= the conversation id) in `options.id`. Phase 4
+      // moves the runtime's async setup (`start()`, `reconcile()`, the
+      // conversation directories) into this call; until then the environment
+      // is built from the sandbox exactly as before, idempotently.
+      createSandbox: async (_options) => sessionEnvironment(sandbox),
       tools: (_env, _options) => {
         refreshTools();
         const names = new Set<string>();

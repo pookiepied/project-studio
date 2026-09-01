@@ -309,6 +309,34 @@ is expected - it is the one phase that does not end green, so it ends
 
 **Exit:** `vite build` produces `dist/server.mjs` and `dist/app.mjs`.
 
+**Done, 2026-09-01** (squashed with Phase 3; see
+`report/PHASE-2-3-the-pins-and-the-entry-we-own.md`). The pins are in with
+the exit met: `vite build` emits both entries and scans both agents under
+their pinned identities. What the phase actually added beyond the plan:
+
+- `@flue/cli` is **deleted**, not upgraded - nothing needs it once the entry
+  is ours and the build is Vite's.
+- The runtime patch failed the install exactly as designed
+  (`ERR_PNPM_PATCH_FAILED`, hunks anchored to beta hashes), so its workspace
+  entry is **removed until Phase 8** with the regression documented in
+  `pnpm-workspace.yaml`: invisible retries, one shipped budget, no quota
+  guard, and the unstable `Date:` line are back until the hunks are
+  re-derived.
+- `@hono/node-server` became a direct dependency (our entry imports it;
+  under 1.0 it was only transitive).
+- **The journal reset arrived here, not in a phase of its own:** Flue
+  2.0.3's store rejects the beta journal on the DEFAULT path
+  (`storedVersion: 4, supportedVersion: 1` - not the v5-to-v8 story this
+  document carried), so no 2.0 harness starts until the old journal moves.
+  With Phase 1's export verified, `~/.studio/data/flue.db` (+`-shm`,
+  `-wal`) was RENAMED to `*.beta9-journal` - preserved, reversible, nothing
+  deleted. Every machine taking this migration needs the same step.
+- pi-ai is dual-installed (Flue's own `^0.83` beside our `^0.84`); Phase 5
+  must register providers against the runtime's instance.
+- The pi-ai bump moved Pi's generated catalogs (jamba retired from
+  OpenRouter's list, image catalog 35 -> 50), and two `provider-merge`
+  expectations were updated to the new data.
+
 ### Phase 3 - The handshake, before the agents
 
 Land the four behaviours the Rust host cannot flex - fd-4 admission
@@ -328,6 +356,31 @@ host cannot negotiate; everything after it assumes it holds.
 
 **Exit:** the Rust supervisor starts the 2.0 artifact and gets its readiness
 frame. Committed with Phase 2.
+
+**Done, 2026-09-01.** The exit is met and the whole proof ran: unmodified
+Rust suite 65/65 (`a_real_harness_starts...` green, output verbatim in the
+report), negative control FAILED against a frame-less entry exactly as it
+must (supervisor kills it at the 30 s bound), the real app launched - eager
+start, `harness ready`, webview up, and the window close drove the graceful
+stop - and the Unix transport proof ran on the VPS (built 2.0 entry on real
+Linux, bootstrap in on fd 4, readiness out on fd 3, 401/200/202, exit 0).
+
+Two things the spike shape got wrong, fixed and recorded in the report:
+
+- **The bootstrap read is its own module** (`src/host/bootstrap.ts`),
+  imported first by the entry AND by the composition root: in the built
+  artifact the app chunk's evaluation is hoisted to the facade's import
+  line, so the spike's entry-body bootstrap read ran AFTER the admission
+  session was created - random credential, everything 401. Phase 0's
+  conclusion stands; its verbatim entry does not.
+- The loopback bind **falls back to 127.0.0.1** when
+  `PROJECT_STUDIO_HARNESS_HOSTNAME` is absent (fail closed toward ADR 0028;
+  the supervisor refuses non-loopback frames anyway).
+
+The Unix gap that remains is the Rust half only (`command-fds`' `pre_exec`
+`dup2`, `process_group`, the SIGTERM sweep): compiling `src-tauri` on the
+VPS needs system webkit/gtk packages that were outside the `~/temp` remit.
+One `cargo test` run there, by someone with the package remit, closes it.
 
 ### Phase 4 - Routing and the two agents
 
@@ -357,6 +410,22 @@ without a pin is a storage-identity change.
 a command - the same proof Task 51 had to produce, because it is the proof
 that the whole stack is connected.
 
+**Amended, 2026-09-01, by Phases 2/3:** the routing half and both agent
+shells landed with the pins (the phase could not typecheck otherwise); what
+remains here is the substance. `createAgentRouter` is mounted at
+`/agents/studio` with an injectable `agent` option; `studio.ts` is a
+`'use agent'` module with `agentName` pinned `"studio"`, the sync
+turn-settings read, and an honest list in its docblock of what is missing;
+`title.ts` is converted, unmounted, pinned `"title"`, with its model ladder
+DOWN (both attempts run the stable alias - restore the ladder here).
+`SandboxFactory.createSandbox` replaced `createSessionEnv` early (2.0
+renamed it). One decision this phase now owns that the plan did not have:
+1.0's permission scope used a `conversation:<id>` prefix on the instance id;
+in 2.0 the instance id IS the conversation id, so the scope vocabulary is
+just the id - carry `#69`'s guard (scope built from the instance id) into
+the factory port and assert it in `agent-scope.test.ts`, which now pins
+identity and the model contracts instead.
+
 ### Phase 5 - Providers
 
 Both adapters to `createProvider` + `setProvider`; the catalog to full `Model`
@@ -365,10 +434,23 @@ are gone with no replacement - check nothing depended on them.
 
 Fold in the OpenRouter "Default" reasoning fix we have been deferring
 (`thinkingLevelMap.off = null`) and the wrong docblock at
-`contracts/models.ts:66`, because this is the phase that has the file open.
+`contracts/models.ts:66`, because this phase has the file open.
 
 **Exit:** a real turn against the user's OpenRouter connection, one short
 message, and the reasoning level the person chose is the one that is sent.
+
+**Amended, 2026-09-01, by Phases 2/3:** both adapters' `register()` are
+documented no-ops and the test adapter's scripted `stream` is exported,
+waiting for its `createProvider`/`setProvider` mount - every turn-driven
+integration test currently fails with an internal run error, and comes back
+when this phase lands. Two cautions the plan did not have: **pi-ai is
+dual-installed** (Flue 2.0.3 depends on `^0.83`, we pin `^0.84` directly), so
+`setProvider` objects must be built against the pi-ai instance the RUNTIME
+resolves models through, or the registration silently does nothing - the
+safest move is likely aligning our direct pin to the runtime's range. And
+`AgentPromptResponse` is gone from the SDK: `harness-client.ts` already
+returns `AgentReadResult` from `wait()` (adapted early for typecheck), so
+check `storeResponses`-era assumptions against that shape here.
 
 ### Phase 6 - The client and the stream
 
@@ -379,6 +461,21 @@ shapes by reading `harness/` on the Rust side, not by assuming.
 
 **Exit:** streaming works in the real app - a long turn watched end to end,
 interrupted once, resumed.
+
+**Amended, 2026-09-01, by Phases 2/3:** the client moved early because the
+2.0 SDK would not typecheck otherwise: `FlueHarnessClient` builds one
+conversation-scoped client per thread id (`createFlueClient({ url:
+<base>/agents/<name>/<id> })`), `send` wraps the bare string into
+`{ kind: "user", body }` (the 2.0 `send` takes the full delivered message,
+not the input shorthand), `wait` is `read(submissionId)` (the re-attach
+form - `AgentPromptResponse` no longer exists, the reply is an
+`AgentReadResult`), and `abort`/`history`/`observe` take no addressing
+arguments. The wrapper's per-conversation call shape is unchanged, so no
+caller moved. What remains here is the real work: the Rust `service_stream`
+offset/retry assumptions against the new chunk shapes, `wait()` semantics
+written down, the abort scope (in-flight AND queued now) documented, and the
+dedup decision - `idempotencyKey` exists upstream in 2.0, and adopting or
+declining it belongs to this phase with ADR 0033 reopened or reaffirmed.
 
 ### Phase 7 - Events, observability, and the stores
 
@@ -392,6 +489,20 @@ store, which is free coverage on the one component this migration most
 threatens.
 
 **Exit:** telemetry shows a complete turn, and the contract suites pass.
+
+**Amended, 2026-09-01, by Phases 2/3:** the titling event consumption moved
+early (typecheck): `submission_settled` is the studio trigger and the title
+ladder's failure signal, and the title reply text now comes from the run's
+`agent_end` messages (2.0 observations carry messages, not a settled result
+object) via a bounded reply stash; `dispatch` is by agent reference.
+`titling.test.ts` pins the routing with 2.0-shaped events. What this phase
+still owns: **verify the envelope fields against real events** (which fields
+the runtime stamps on direct submissions and dispatched title runs - the
+routing was written from the type surface, not from a live trace, because no
+turn can run until Phase 5), the observability event renames, the
+`dispatchId`-to-`submissionId` sweep across receipts and telemetry, and the
+lost `title_model` log fact (restore it from a response event if one carries
+the model).
 
 ### Phase 8 - The patches, last
 
@@ -407,6 +518,20 @@ proven we can run is a patch derived twice.
 
 **Exit:** retries are visible again, the budget is per class, and the system
 prompt has been read by a person.
+
+**Amended, 2026-09-01, by Phases 2/3:** the workspace entry is already
+REMOVED - the 2.0.3 install failed loudly on the beta-anchored patch
+(`ERR_PNPM_PATCH_FAILED`), so the regression this phase closes (invisible
+retries, one budget, no quota guard, unstable `Date:`) is live NOW and
+documented in `pnpm-workspace.yaml` and the Phase 2/3 report. The
+`VALID_THINKING_LEVELS` hunk has nothing to re-derive against (confirmed: the
+constant does not exist in 2.0.3). The `composeSystemPrompt` facts to read
+the diff against: 2.0.3 re-adds `Date:` at compose time, cwd, the directory
+listing, and an always-present `## Available Agents` section whose
+empty-roster paragraph is in the bundle at
+`conversation-stream-store-*.mjs` ("None. No subagents are currently
+declared, so the `task` tool has no valid `agent` value - do not call it
+unless an agent is introduced later in the conversation.").
 
 ---
 
@@ -478,8 +603,22 @@ Recorded because a plan that hides its unknowns is a plan that gets believed.
    bound. The `@flue/cli` patch is deleted, not re-derived. One gap stands:
    the Unix fd 3/4 transport was not exercised on this Windows machine; the
    spike report names it for Phase 3's proof run.
+   **Phase 3 addendum, 2026-09-01:** the gap is closed on the Node side
+   (real Linux, real fds 3/4: readiness, 401/200/202, exit 0) and the whole
+   unmodified Rust suite passes on Windows against the 2.0 artifact. The
+   one proof still open is the RUST Unix transport (`command-fds`' `pre_exec`
+   `dup2`, `process_group`) - the VPS run needs system webkit/gtk packages
+   that were outside the `~/temp` remit. Also learned here: the spike's
+   verbatim entry does NOT survive the real composition (the built app chunk
+   evaluates before the entry body, so the bootstrap read had to become a
+   module imported by both the entry and `app.ts`); see the Phase 2/3
+   report, item 2.
 3. What is in 2.0.3's empty-roster `## Available Agents` paragraph, in full,
-   and do we want the model reading it? (Phase 8)
+   and do we want the model reading it? (Phase 8) **Answered early,
+   2026-09-01, from the bundle:** "None. No subagents are currently
+   declared, so the `task` tool has no valid `agent` value - do not call it
+   unless an agent is introduced later in the conversation." Whether the
+   model should read it stays Phase 8's decision.
 4. Does anything depend on `storeResponses` or the removed telemetry
    overrides? (Phase 5)
 5. How many of the orphaned Flue transcripts are real history? (Phase 1)
@@ -490,3 +629,13 @@ Recorded because a plan that hides its unknowns is a plan that gets believed.
    not the 5 the migration guide describes - below 8 either way, so the
    rejection is unchanged, but an export must read the tables rather than
    assume a version's shapes.
+6. **New, 2026-09-01:** what is 2.0.3's journal format version story,
+   actually? The store refuses the beta journal with
+   `storedVersion: 4, supportedVersion: 1` - the 2.0 line's own format
+   version is 1, and neither the migration guide's v5-to-v8 story nor any
+   phase owned the reset of the default-path journal. The reset happened in
+   Phase 2/3 by RENAME (`~/.studio/data/flue.db*` ->
+   `*.beta9-journal`, preserved byte-for-byte; the Phase 1 export was
+   verified first). Every machine taking this migration needs the same
+   step; it belongs in the release notes, and the beta journal files stay
+   until a confident cutover decides otherwise.

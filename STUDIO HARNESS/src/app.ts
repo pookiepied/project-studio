@@ -1,3 +1,16 @@
+// The admission bootstrap, evaluated before anything this file composes.
+//
+// This is an ordering constraint, not a style choice: the composition root
+// reads `PROJECT_STUDIO_ADMISSION_CREDENTIAL` from the environment below,
+// and in the built artifact this module's side effects run during the static
+// import phase - the bundler hoists the app chunk's evaluation to the entry
+// facade's import line, before `src/server.ts`'s own body runs. Importing
+// the bootstrap HERE is what guarantees the frame is read (and the three
+// `PROJECT_STUDIO_ADMISSION_*` variables published) before the admission
+// session is created. `src/server.ts` imports the same module for the same
+// reason; module evaluation makes the second import a no-op.
+import "./host/bootstrap.js";
+
 import {
   admissionCredentialFromEnvironment,
 } from "./admission/verifier.js";
@@ -22,6 +35,8 @@ import {
   installTransientModelRetryPolicy,
 } from "./reliability/model-retry-policy.js";
 import { createHttpApp } from "./transport/http/create-app.js";
+import { registerShutdownDrain, requestShutdown } from "./host/shutdown.js";
+import { Studio } from "./agents/studio.js";
 import { openDatabase, type StudioDatabase } from "./storage/database.js";
 import { KeyringCredentialStore } from "./credentials/keyring-store.js";
 import { ConnectionStore } from "./providers/connection-store.js";
@@ -233,13 +248,13 @@ function createHarnessApplication(): HarnessApplication {
       // inside the run.
       isModelServed: async (modelId) =>
         (await providers.servedModelReferences()).has(modelId),
-      // The same drain the signal handlers run, reached over HTTP because the
-      // Host has no deliverable signal on Windows (see the route module). The
-      // response goes out first: `requestShutdown` only starts the async drain,
-      // and the exit at its end is always after the socket has flushed.
-      requestShutdown: () => {
-        void shutdown().finally(() => process.exit(0));
-      },
+      // The studio agent, mounted under /agents/studio by createHttpApp.
+      // Its render reads the turn-settings row this admission settled.
+      agent: Studio,
+      // The unified stop (see src/host/shutdown.ts): the response goes out
+      // first, then the runtime and the composition drain run, then the
+      // process exits - always after the socket has flushed.
+      requestShutdown: () => requestShutdown(0),
     });
     bootLog("step 11: createHttpApp completed");
 
@@ -269,26 +284,30 @@ function createHarnessApplication(): HarnessApplication {
 const { app, shutdown } = createHarnessApplication();
 
 /**
- * Graceful shutdown.
+ * The composition half of the unified stop (see `src/host/shutdown.ts`).
  *
- * `SIGTERM` is not deliverable on Windows — `process.kill` there maps to
- * `TerminateProcess`, which ends the process without running a handler. So the
- * database was never closed and its WAL never checkpointed, leaving a hot
- * `-wal` beside every stopped harness. `SIGINT` and `SIGBREAK` do arrive on
- * Windows, and the TypeScript launcher can send the parent-owned `shutdown`
- * message. The Rust Host uses none of those: it asks over
- * `POST /api/shutdown` with the admission bearer, which works identically on
- * both platforms and is the reason this process can always be stopped politely
- * by the one that owns it.
+ * The server entry (`src/server.ts`) owns the listen, the signals and the
+ * Flue application's own stop, and registers both halves into one
+ * `requestShutdown`; every exit path - the Host's authenticated
+ * `POST /api/shutdown`, SIGINT/SIGTERM, the launcher's IPC message, the
+ * parent's disconnect - runs the same sequence. This registration closes the
+ * half the composition owns.
  */
-for (const signal of ["SIGTERM", "SIGINT", "SIGBREAK"] as const) {
-  process.once(signal, () => {
-    void shutdown().finally(() => process.exit(0));
-  });
-}
+registerShutdownDrain(shutdown);
 
+/**
+ * The TypeScript launcher's stop channel.
+ *
+ * `SIGTERM` is not deliverable on Windows - `process.kill` there maps to
+ * `TerminateProcess`, which ends the process without running a handler. The
+ * launcher (and the test harnesses) therefore ask over the Node IPC channel,
+ * which reaches a handler on every platform. The Rust Host uses none of
+ * those: it asks over `POST /api/shutdown` with the admission bearer, which
+ * works identically on both platforms and is the reason this process can
+ * always be stopped politely by the one that owns it.
+ */
 process.on("message", (message) => {
-  if (message === "shutdown") void shutdown().finally(() => process.exit(0));
+  if (message === "shutdown") requestShutdown(0);
 });
 
 export default app;

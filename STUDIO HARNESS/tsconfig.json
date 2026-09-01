@@ -27,6 +27,7 @@
     "src/**/*.ts",
     "tests/**/*.ts",
     "flue.config.ts",
+    "vite.config.ts",
     "vitest.config.ts"
   ]
 }

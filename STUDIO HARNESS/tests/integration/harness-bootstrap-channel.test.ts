@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { createInterface } from "node:readline";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -180,11 +180,24 @@ describe("the Windows bootstrap channel", () => {
   );
 });
 
-describe("the generated entrypoint and the Rust channel", () => {
+describe("the built entrypoint and the Rust channel", () => {
   // The same structural guard as the environment allowlist (ADR 0039): two
   // sides that cannot import each other, bound by a test, because each is
   // internally consistent and drift is silent.
-  const entrypoint = (): string => readFileSync(SERVER, "utf8");
+  //
+  // Since Phases 2 and 3 the entrypoint is our own source compiled by Vite,
+  // and the bundler splits it: `dist/server.mjs` is the facade and the
+  // bootstrap, app and agents live in the shared chunk(s) it imports. The
+  // contract is with the ARTIFACT, so the read follows the entry's own
+  // import statements one level deep - a behaviour that moved chunks still
+  // counts, and a behaviour that left the build entirely still fails.
+  function entrypoint(): string {
+    const entry = readFileSync(SERVER, "utf8");
+    const chunks = [...entry.matchAll(/from "(\.\/[^"]+\.mjs)"/g)].map(
+      (match) => join(dirname(SERVER), match[1] ?? ""),
+    );
+    return entry + chunks.map((path) => readFileSync(path, "utf8")).join("\n");
+  }
   const rust = (): string => readFileSync(RUST_CHANNEL, "utf8");
 
   it("agree on the two variable names", () => {
@@ -192,7 +205,7 @@ describe("the generated entrypoint and the Rust channel", () => {
       "PROJECT_STUDIO_ADMISSION_BOOTSTRAP_FD",
       "PROJECT_STUDIO_READINESS_FD",
     ]) {
-      expect(entrypoint(), `${name} missing from dist/server.mjs`).toContain(name);
+      expect(entrypoint(), `${name} missing from the built entrypoint`).toContain(name);
       expect(rust(), `${name} missing from channel.rs`).toContain(name);
     }
   });

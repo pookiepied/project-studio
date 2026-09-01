@@ -27,13 +27,17 @@ export const STUDIO_AGENT_ID = "studio";
 /**
  * The automatic titling agent, named for the same reason.
  *
- * Its module is `agents/title.ts`, so the basename below is also the name
- * Flue discovers it under and the stream prefix it owns
- * (`agents/title/<conversation id>`). The module exports no `route`, which is
- * what keeps it off the HTTP surface entirely: Flue only exposes agents that
- * export a route handler, so the only caller that can reach this agent is
- * this harness, in process, through `dispatch()`. A person can never start a
- * conversation with it, and no client can address it over HTTP.
+ * Its module is `agents/title.ts`, and since Flue 2.0 the identity comes from
+ * that module's `Title.agentName` literal rather than the basename - the
+ * value below is asserted equal to it so the two cannot drift. It is also the
+ * stream prefix the agent owns (`agents/title/<conversation id>`).
+ *
+ * What keeps it off the HTTP surface is the mount, not the module: 2.0 has no
+ * catch-all router, and `transport/http/create-app.ts` calls
+ * `createAgentRouter` for the studio agent only. The only caller that can
+ * reach this agent is this harness, in process, through `dispatch()`. A
+ * person can never start a conversation with it, and no client can address it
+ * over HTTP.
  */
 export const TITLE_AGENT_ID = "title";
 

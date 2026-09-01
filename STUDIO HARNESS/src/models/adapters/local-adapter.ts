@@ -5,7 +5,6 @@ import type {
   Model,
   SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { registerApiProvider, registerProvider } from "@flue/runtime";
 
 import {
   DEFAULT_MODEL_NAME,
@@ -35,15 +34,18 @@ export interface LocalModelProviderAdapterOptions {
 /**
  * Local BYOK model source.
  *
- * The agent only ever names `project-studio/default`, so this adapter registers
- * that alias as its own wire protocol and forwards each request to the Pi model
- * the user actually configured. Delegating to Pi's `Models` collection rather
- * than to a protocol implementation is deliberate: `Models.stream()` resolves
- * credentials, refreshes OAuth tokens under a lock, and dispatches to the
- * provider that owns the model, so none of that has to be reimplemented here.
+ * The agent only ever names `project-studio/default`, so this adapter is the
+ * seam between that alias and the Pi model the user actually configured:
+ * it forwards each request to Pi's `Models` collection rather than to a
+ * protocol implementation. Delegating to Pi is deliberate: `Models.stream()`
+ * resolves credentials, refreshes OAuth tokens under a lock, and dispatches
+ * to the provider that owns the model, so none of that has to be
+ * reimplemented here.
  *
- * The user's keys never pass through this file. They live in the OS keychain
- * and are read by Pi during auth resolution.
+ * Under Flue 2.0 the registration half of this seam is Phase 5's port
+ * (`setProvider` over full Pi `Model` objects); see `register()` for the
+ * current no-op state. The user's keys never pass through this file. They
+ * live in the OS keychain and are read by Pi during auth resolution.
  */
 export class LocalModelProviderAdapter implements ModelProviderAdapter {
   readonly source = "local" as const;
@@ -57,42 +59,21 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
     this.#runtime = options.runtime;
   }
 
-  register(): void {
-    registerApiProvider({
-      api: LOCAL_ALIAS_API,
-      stream: this.stream,
-      streamSimple: this.stream,
-    });
-
-    const { defaultProvider, defaultModel } = this.#config;
-
-    // An unconfigured source registers only what Flue structurally requires:
-    // the alias resolves to its unoperational descriptor, and no telemetry
-    // names a provider this harness has never been given.
-    if (defaultProvider === undefined || defaultModel === undefined) {
-      registerProvider(DEFAULT_MODEL_PROVIDER, {
-        api: LOCAL_ALIAS_API,
-        baseUrl: "http://127.0.0.1",
-      });
-      return;
-    }
-
-    const target = this.#runtime.target();
-
-    // Flue requires a baseUrl for a provider id its catalog does not know. The
-    // target's own endpoint is the honest value, and it is never used to build
-    // a request: this adapter delegates before any URL is assembled.
-    registerProvider(DEFAULT_MODEL_PROVIDER, {
-      api: LOCAL_ALIAS_API,
-      baseUrl: target?.baseUrl ?? "http://127.0.0.1",
-      ...(target?.contextWindow ? { contextWindow: target.contextWindow } : {}),
-      ...(target?.maxTokens ? { maxTokens: target.maxTokens } : {}),
-      telemetry: {
-        providerName: defaultProvider,
-        serverAddress: target?.baseUrl ?? "local",
-      },
-    });
-  }
+  /**
+   * Phase 2/3 state (Flue 2.0 pins): deliberately a no-op.
+   *
+   * Under Flue 1.0 this method registered the `project-studio` alias protocol
+   * with Flue's own registries (`registerApiProvider`/`registerProvider`,
+   * both removed in 2.0) and pointed the alias at the configured target.
+   * Flue 2.0 resolves models through Pi's own provider objects (`setProvider`
+   * over full Pi `Model` values), which is Phase 5's port - the catalog
+   * mapping, the alias retirement and the `streamSimple` delegation all move
+   * there. Until then nothing is registered: the harness boots and serves
+   * every non-model route, but any turn that reaches `useModel` fails with
+   * no provider to resolve the specifier. That is the documented,
+   * broken-by-construction state Phases 2 and 3 accept.
+   */
+  register(): void {}
 
   /**
    * Fails loudly when a turn cannot be routed, rather than at the first user

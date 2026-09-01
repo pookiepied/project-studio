@@ -16,6 +16,18 @@ import {
   type AdmissionEnv,
 } from "../../src/transport/http/middleware/admission.js";
 
+/**
+ * The mountable stand-in for the studio agent. Flue 2.0's routers resolve
+ * their identity from the function (its `agentName` static here), and the
+ * suite only needs the mount to exist so admission can be proven to sit
+ * before it. No cast: a named function carrying the static satisfies
+ * `Agent` structurally.
+ */
+function probeAgent(): string {
+  return "ordering probe";
+}
+probeAgent.agentName = "ordering-probe";
+
 describe("Harness HTTP admission", () => {
   it("stops a route before its handler for missing and wrong credentials", async () => {
     const session = createAdmissionSession();
@@ -89,20 +101,14 @@ describe("Harness HTTP admission", () => {
     });
   });
 
-  it("places one admission boundary before Flue, MCP, and permission routes", async () => {
+  it("places one admission boundary before the agent mount, MCP, and permission routes", async () => {
     const session = createAdmissionSession();
-    const flueApp = new Hono();
-    let flueEntered = 0;
     let mcpEntered = 0;
     let permissionEntered = 0;
     let providerEntered = 0;
     let retrievalEntered = 0;
     let conversationEntered = 0;
     let projectEntered = 0;
-    flueApp.get("/probe", () => {
-      flueEntered += 1;
-      return new Response("entered");
-    });
 
     const app = createHttpApp({
       // A port, so the double is the three lines the route actually uses
@@ -173,11 +179,13 @@ describe("Harness HTTP admission", () => {
       // Never exercised here; required so the route cannot be mounted without
       // a way to actually stop the process.
       requestShutdown: () => undefined,
-      flueApp,
+      // A stand-in agent: this suite never reaches a run, so the mount's
+      // identity only has to be resolvable by createAgentRouter.
+      agent: probeAgent,
     });
 
     for (const path of [
-      "/probe",
+      "/agents/studio/ordering-probe",
       "/api/mcp/servers",
       "/api/permissions/pending",
       "/api/providers/connections",
@@ -185,15 +193,23 @@ describe("Harness HTTP admission", () => {
       "/api/conversations",
       "/api/projects",
     ]) {
-      const response = await app.request(`http://harness.test${path}`);
+      const response = await app.request(`http://harness.test${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
       expect(response.status, path).toBe(401);
 
       const wrong = await app.request(`http://harness.test${path}`, {
-        headers: { authorization: "Bearer wrong-token" },
+        method: "POST",
+        headers: {
+          authorization: "Bearer wrong-token",
+          "content-type": "application/json",
+        },
+        body: "{}",
       });
       expect(wrong.status, path).toBe(401);
     }
-    expect(flueEntered).toBe(0);
     expect(mcpEntered).toBe(0);
     expect(permissionEntered).toBe(0);
     expect(providerEntered).toBe(0);
@@ -201,9 +217,23 @@ describe("Harness HTTP admission", () => {
     expect(conversationEntered).toBe(0);
     expect(projectEntered).toBe(0);
 
-    const admittedProbe = await app.request("http://harness.test/probe", {
-      headers: { authorization: `Bearer ${session.credential}` },
-    });
+    // The boundary is provably BEFORE the agent mount: an admitted request
+    // to a mounted path is no longer answered by admission at all. Without
+    // a Flue runtime in this test process the router itself refuses the
+    // submission - which is exactly the proof that the request crossed the
+    // boundary and reached the mount (a 401 would mean admission ate it).
+    const admitted = await app.request(
+      "http://harness.test/agents/studio/ordering-probe",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session.credential}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      },
+    );
+    expect(admitted.status).not.toBe(401);
     const admittedMcp = await app.request("http://harness.test/api/mcp/servers", {
       headers: { authorization: `Bearer ${session.credential}` },
     });
@@ -216,12 +246,9 @@ describe("Harness HTTP admission", () => {
         headers: { authorization: `Bearer ${session.credential}` },
       },
     );
-    expect(admittedProbe.status).toBe(200);
-    expect(await admittedProbe.text()).toBe("entered");
     expect(admittedMcp.status).toBe(200);
     expect(admittedPermissions.status).toBe(200);
     expect(admittedProviders.status).toBe(200);
-    expect(flueEntered).toBe(1);
     expect(mcpEntered).toBe(1);
     expect(permissionEntered).toBe(1);
     expect(providerEntered).toBe(1);

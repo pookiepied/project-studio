@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getApiProvider } from "@earendil-works/pi-ai/compat";
 import type { Context, Model } from "@earendil-works/pi-ai";
 
 import {
@@ -15,7 +14,7 @@ import {
   createModelProviderAdapter,
   createProviderBootstrapCoordinator,
 } from "../../src/models/bootstrap.js";
-import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
+import { TestModelProviderAdapter, stream } from "../../src/models/adapters/test-adapter.js";
 import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
@@ -144,12 +143,10 @@ describe("test adapter", () => {
     // during the turn from a replay made after it. `[pace]` is the seam's
     // answer, and this test is its contract: more than two deltas, and a
     // first-to-last span that no synchronous emission could produce.
-    const adapter = new TestModelProviderAdapter();
-    adapter.register();
-    const provider = getApiProvider("project-studio-test");
-    if (provider === undefined) {
-      throw new Error("the test adapter registered no api provider");
-    }
+    // The scripted stream is called directly: under Flue 2.0 the adapter's
+    // registration half is Phase 5's port, and this test's subject is the
+    // [pace] contract of the script itself, not a registry lookup.
+    const streamSimple = stream;
 
     const model: Model<"project-studio-test"> = {
       id: "default",
@@ -170,7 +167,7 @@ describe("test adapter", () => {
     };
 
     const deltaArrivals: number[] = [];
-    for await (const event of provider.streamSimple(model, context)) {
+    for await (const event of streamSimple(model, context)) {
       if (event.type === "text_delta") deltaArrivals.push(Date.now());
     }
 

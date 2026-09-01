@@ -120,7 +120,7 @@ async function toolOf(
     conversationId,
     projectRoot: harness.projectRoot,
   });
-  const env = await sandbox.createSessionEnv({ id: "studio" });
+  const env = await sandbox.createSandbox({ id: "studio" });
   const tools: readonly SandboxTool[] = sandbox.tools?.(env, { subagents: {} }) ?? [];
   const tool = tools.find((candidate) => candidate.name === name);
   if (tool === undefined) throw new Error(`The sandbox did not offer a "${name}" tool.`);
@@ -290,7 +290,7 @@ describe("the permission mode follows the conversation", () => {
           conversationId: "conversation:cnv_restart",
           projectRoot,
         });
-        const env = await sandbox.createSessionEnv({ id: "studio" });
+        const env = await sandbox.createSandbox({ id: "studio" });
         const tools: readonly SandboxTool[] = sandbox.tools?.(env, { subagents: {} }) ?? [];
         const write = tools.find((candidate) => candidate.name === "write");
         if (write === undefined) throw new Error('The sandbox did not offer a "write" tool.');

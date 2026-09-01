@@ -150,7 +150,8 @@ describe("the declared Node version", () => {
     // against.
     const dependencies = [
       "@flue/runtime",
-      "@flue/cli",
+      "@flue/sdk",
+      "@flue/vite",
       "@flue/opentelemetry",
       "@earendil-works/pi-ai",
     ];

@@ -1,4 +1,5 @@
-import { flue } from "@flue/runtime/routing";
+import { createAgentRouter } from "@flue/runtime/routing";
+import type { Agent } from "@flue/runtime";
 import { Hono } from "hono";
 
 import type { AdmissionVerifier } from "../../admission/verifier.js";
@@ -61,8 +62,14 @@ export interface CreateHttpAppOptions {
    * cannot wire the route while forgetting that it has to end the process.
    */
   readonly requestShutdown: () => void;
-  /** Injectable Flue app for tests; production uses the generated Flue app. */
-  readonly flueApp?: Hono;
+  /**
+   * The agent mounted under `/agents/studio`. Production passes the studio
+   * agent module's own export; tests inject a stand-in function so the
+   * router shape and the middleware ordering can be exercised without the
+   * real agent's render. Flue 2.0 mounts one router per agent - there is no
+   * catch-all `flue()` app any more - which is why the mount is explicit.
+   */
+  readonly agent: Agent;
 }
 
 /**
@@ -85,9 +92,10 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
 
   const agentRoutes = new Hono<AdmissionEnv>();
   agentRoutes.use("*", requireAdmissionScope(ADMISSION_SCOPES.AGENT_RUN));
-  // Before the Flue app: a submission's model and reasoning level are settled
-  // into the conversation index on the way in, so the run's initializer reads
-  // a row that already holds what this turn was sent with. See the middleware.
+  // Before the agent router: a submission's model and reasoning level are
+  // settled into the conversation index on the way in, so the run's render
+  // reads a row that already holds what this turn was sent with. See the
+  // middleware.
   agentRoutes.use(
     "*",
     createTurnSettingsMiddleware({
@@ -96,7 +104,11 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
       ...(options.titling === undefined ? {} : { titling: options.titling }),
     }),
   );
-  agentRoutes.route("/", options.flueApp ?? flue());
+  // The URL shape is ours and must not move: the webview, the Tauri IPC seam
+  // and the tests all address `/agents/studio/<conversation id>`. Flue 2.0's
+  // agent routers serve `/:id` relative to their mount, so the studio agent's
+  // router mounts under the same prefix the 1.0 auto-router used to expose.
+  agentRoutes.route("/agents/studio", createAgentRouter(options.agent));
   app.route("/", agentRoutes);
 
   return app;

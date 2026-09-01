@@ -7,7 +7,6 @@ import {
   type Model,
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { registerApiProvider, registerProvider } from "@flue/runtime";
 
 import {
   defaultModelReference,
@@ -230,7 +229,13 @@ function pacedSlices(text: string): string[] {
   return slices.length > 0 ? slices : [text];
 }
 
-function stream(
+/**
+ * The scripted stream. Phase 2/3 state: `register()` is a no-op, so nothing
+ * consumes this yet - Phase 5 mounts it as the test source's Pi provider
+ * (`createProvider` + `setProvider`) exactly as scripted here. Exported so
+ * the script stays one module's business when that port lands.
+ */
+export function stream(
   model: Model<Api>,
   context: Context,
   options?: SimpleStreamOptions,
@@ -371,28 +376,20 @@ function stream(
 export class TestModelProviderAdapter implements ModelProviderAdapter {
   readonly source = "test" as const;
   readonly operational = true;
-  #registered = false;
 
-  register(): void {
-    if (this.#registered) {
-      return;
-    }
-
-    registerApiProvider({
-      api,
-      stream,
-      streamSimple: stream,
-    });
-
-    registerProvider(TEST_PROVIDER, {
-      api,
-      baseUrl: "in-process://project-studio-test",
-      contextWindow: CONTEXT_WINDOW,
-      maxTokens: MAX_OUTPUT_TOKENS,
-    });
-
-    this.#registered = true;
-  }
+  /**
+   * Phase 2/3 state (Flue 2.0 pins): deliberately a no-op.
+   *
+   * Under Flue 1.0 this method registered the scripted stream with Flue's own
+   * provider registry (`registerApiProvider`/`registerProvider`, both removed
+   * in 2.0). Flue 2.0 resolves models through Pi's own provider objects
+   * (`setProvider`), which is Phase 5's port - until then nothing is
+   * registered, so the harness boots and answers every non-model route, but
+   * any turn that reaches `useModel` fails with no provider to resolve it.
+   * That is the documented, broken-by-construction state Phases 2 and 3
+   * accept: the integration suites that drive real turns fail until Phase 5.
+   */
+  register(): void {}
 
   resolve(reference: ModelReference): ModelDescriptor {
     if (reference.source !== this.source) {

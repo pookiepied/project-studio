@@ -84,7 +84,7 @@ describe("the model-turn boundary", () => {
           sandbox: ReturnType<StudioRuntime["createAgentSandbox"]>,
           name: string,
         ): Promise<void> => {
-          const env = await sandbox.createSessionEnv({ id: "studio" });
+          const env = await sandbox.createSandbox({ id: "studio" });
           const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
           const tool = tools.find((candidate) => candidate.name === "write");
           expect(tool).toBeDefined();
@@ -157,7 +157,7 @@ describe("the model-turn boundary", () => {
           sandbox: ReturnType<StudioRuntime["createAgentSandbox"]>,
           name: string,
         ): Promise<void> => {
-          const env = await sandbox.createSessionEnv({ id: "studio" });
+          const env = await sandbox.createSandbox({ id: "studio" });
           const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];
           const tool = tools.find((candidate) => candidate.name === "write");
           expect(tool).toBeDefined();

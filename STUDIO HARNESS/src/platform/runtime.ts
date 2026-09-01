@@ -21,7 +21,8 @@
  *
  * ```
  * @flue/runtime        >=22.19.0
- * @flue/cli            >=22.19.0
+ * @flue/sdk            >=22.19.0
+ * @flue/vite           >=22.19.0
  * @flue/opentelemetry  >=22.19.0
  * @earendil-works/pi-ai >=22.19.0
  * ```
@@ -35,7 +36,7 @@
  *
  * ## Why it is stated here rather than read from `package.json`
  *
- * `flue build --target node` bundles the Harness to a single `dist/server.mjs`,
+ * `vite build` bundles the Harness to `dist/server.mjs` plus its chunks,
  * and `package.json` is not reliably beside it at runtime. The same shape as the
  * environment allowlist (ADR 0039): the value is a constant in the module that
  * needs it, and a test binds the copies together. Each copy is internally
