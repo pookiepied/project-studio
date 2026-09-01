@@ -165,7 +165,6 @@ Plus, outside `src`: `package.json` scripts, `flue.config.ts`,
 
 | Hunk | Verdict | Why |
 |---|---|---|
-| `@flue/cli` - bootstrap fd, loopback bind, readiness frames | **Delete the patch, own the entry** | Per correction 3. Falls back to post-build injection only if the embed path fails. |
 | runtime - `VALID_THINKING_LEVELS` + `max` | **Delete** | The anchor no longer exists. |
 | runtime - delegate retry classification to pi-ai | **Re-derive** | 2.0.3 still has no quota exclusion. Anchor moved to `dispatch-*.mjs`. |
 | runtime - visible retries, per-class budget | **Re-derive, and grow it** | Still invisible, still one budget of 3. 2.0.3 also computes its own delay curve, so the hunk must now own the delay as well as the budget. |
@@ -246,6 +245,46 @@ Output: three answers, written into this document. Not code.
 
 **Exit:** the answers exist, and Phase 3's shape is decided.
 
+**Found, 2026-09-01.** Spike run from a scratch directory outside the repo
+(`D:\Creative Library\Workspace\flue2-phase0-spike`); full measurements,
+verbatim configs and honest gaps in
+`report/PHASE-0-the-three-questions-before-the-work.md`.
+
+1. **The embed path works, and the shape is better than an embed: the
+   `@flue/cli` patch is deleted, not re-derived.** A hand-written
+   `src/server.ts` imports `virtual:flue/server` and calls
+   `loadFlueNodeApplication()`, then `serve()` from `@hono/node-server`
+   itself - whose listener callback carries the bound `AddressInfo`, so the
+   readiness frame, the loopback bind, the fd bootstrap read and the
+   graceful stop are ordinary code in our source. `vite build` compiles it
+   as the `server` input via a one-key config-merging plugin listed after
+   `flue()`. `build.rolldownOptions.input` is one of `flue()`'s enforced
+   paths, so setting it directly in `vite.config.ts` is overridden - with a
+   warning naming the path, not silently, so expect that line and do not
+   hunt it. A later plugin's `config` hook merges over the forced map
+   instead, which is why the `app` entry survives and only `server` is
+   replaced. The unmodified Rust integration test passes
+   against the scratch build on Windows: frame parsed, admitted request 200,
+   unauthenticated 401, polite shutdown inside the drain bound. The default
+   generated entry, run under the same supervisor first, timed out without a
+   frame - the negative control. One measured hazard: on Windows, the fd-0
+   bootstrap read blocks forever when the entry is spawned by Node's
+   `child_process` pipe stdio, and works when spawned the supervisor's way
+   (`Stdio::piped`); Node-side test harnesses must spawn like the supervisor
+   or feed the bootstrap from a file.
+2. **`createSandbox` runs after the first render, once per submission.**
+   Measured across two turns of one conversation: render, then
+   `createSandbox` one millisecond later, then a second render - repeated
+   identically on turn two. The async setup therefore moves into the
+   factory's `createSandbox(options)` (`options.id` carries the
+   conversation), which must stay idempotent per call; the render's
+   synchronous `conversationTurnSettings` read needs no warmed cache.
+3. **The build survives our shape.** `vite build` emits `dist/server.mjs`
+   plus `dist/app.mjs`, scans and registers the `'use agent'` module, and
+   accepts `flue.config.ts` from `@flue/runtime/config` with `root` and
+   `output` strictly rejected. The working configs are recorded verbatim in
+   the spike report for Phase 2 to lift.
+
 ### Phase 1 - The export, before anything moves
 
 Write the conversation export and re-seed path, against the **beta** runtime,
@@ -272,10 +311,16 @@ is expected - it is the one phase that does not end green, so it ends
 
 ### Phase 3 - The handshake, before the agents
 
-Re-land the four behaviours the Rust host cannot flex - fd-4 admission
-bootstrap, loopback bind, fd-3 readiness frames, and the port contract -
-against whatever Phase 0 said the shape is. Delete the `@flue/cli` patch if
-the embed path worked.
+Land the four behaviours the Rust host cannot flex - fd-4 admission
+bootstrap, loopback bind, fd-3 readiness frames, and the port contract - in
+our own server entry, the shape Phase 0 proved: author `src/server.ts`
+importing `virtual:flue/server` and calling `serve()` from
+`@hono/node-server`, claim the `server` input with the config-merging plugin
+recorded verbatim in the spike report, and **delete the `@flue/cli` patch**
+from `patches/`. Nothing is re-derived; the behaviours are ordinary code.
+One proof remains open from Phase 0: the Unix fd 3/4 transport was not
+exercised on the Windows machine the spike ran on, so the integration test
+runs once on a Unix box too.
 
 Prove it against the existing harness-launcher test seam **and** by launching
 the real app, before a single agent is ported. This is the contract the Tauri
@@ -295,6 +340,15 @@ function: `useModel` carrying the thinking level, `useSandbox(factory, { cwd })`
 `useTool` per tool, instructions as the return string, `durability` as a
 static, `export const route` deleted. `title.ts` is the same conversion and
 stays unmounted, because its only caller is an in-process `dispatch()`.
+
+Phase 0's measured ordering shapes the port: the render runs before
+`createSandbox` and the pair repeats on every submission, so `useModel`'s
+argument comes from the synchronous `conversationTurnSettings` read in the
+render - no warmed cache - while `runtime.start()`, `reconcile()` and the
+three `ensureDirectory` calls move into the sandbox factory's
+`createSandbox(options)`, which runs once per submission and therefore stays
+idempotent per call (the runtime's project-keyed maps and recursive `mkdir`
+already are).
 
 Pin `agentName` on both. Identity is the function name now, and a rename
 without a pin is a storage-identity change.
@@ -403,8 +457,27 @@ Three things wait until after Phase 8, each for its own reason:
 
 Recorded because a plan that hides its unknowns is a plan that gets believed.
 
-1. Does `createSandbox` run before the first agent render? (Phase 0)
-2. Does the `dist/app.mjs` embed support our fd handshake? (Phase 0)
+1. ~~Does `createSandbox` run before the first agent render?~~ **Answered in
+   Phase 0: no, and it runs again on every turn.** Measured ordering is
+   render, then `createSandbox` about a millisecond later, then a second
+   render - and the same sequence repeats on the second turn. The factory is
+   called once per submission's harness initialization, not once per
+   conversation. The render's synchronous `conversationTurnSettings` read
+   needs no warmed cache: it reads the row the turn-settings middleware
+   settled before admission, which does not depend on the factory having
+   run. Details in `report/PHASE-0-the-three-questions-before-the-work.md`.
+2. ~~Does the `dist/app.mjs` embed support our fd handshake?~~ **Answered in
+   Phase 0: yes, and the entry is ours rather than an embed of `app.mjs`.**
+   A hand-written `src/server.ts` is compiled by `vite build` as the
+   `server` input (a small plugin listed after `flue()` re-overrides that
+   one key of the forced input map), imports `virtual:flue/server`, and
+   calls `serve()` from `@hono/node-server` itself, whose listener callback
+   carries the bound address. The unmodified Rust integration test passes
+   against the scratch build on Windows: readiness frame parsed, admitted
+   request 200, unauthenticated 401, graceful shutdown inside the drain
+   bound. The `@flue/cli` patch is deleted, not re-derived. One gap stands:
+   the Unix fd 3/4 transport was not exercised on this Windows machine; the
+   spike report names it for Phase 3's proof run.
 3. What is in 2.0.3's empty-roster `## Available Agents` paragraph, in full,
    and do we want the model reading it? (Phase 8)
 4. Does anything depend on `storeResponses` or the removed telemetry
