@@ -541,6 +541,10 @@ describe("modular monolith — 008.3 gate", () => {
         "app.ts",
         "models/local/cli.ts",
         "auth/cli.ts",
+        // The conversation export is an entry point of the same kind: it opens
+        // the Flue journal and the Studio index, both read-only, to write the
+        // history out before the Flue 2.0 upgrade destroys the source.
+        "conversations/export-cli.ts",
       ]);
       const offenders: string[] = [];
 

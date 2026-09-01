@@ -851,7 +851,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
 
-function readUserVersion(db: DatabaseSync): number {
+/**
+ * Reads the schema version the file itself records.
+ *
+ * Exported for the read-only open in `database.ts`, which must know the
+ * version without ever advancing it: a reader that migrated would be a writer.
+ */
+export function readUserVersion(db: DatabaseSync): number {
   const row = db.prepare("PRAGMA user_version").get() as
     | { user_version?: number }
     | undefined;

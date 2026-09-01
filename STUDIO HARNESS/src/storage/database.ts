@@ -4,7 +4,11 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { databasePath, resolveConfigured } from "../platform/paths.js";
 import { StorageError, storageErrorFrom } from "./errors.js";
-import { LATEST_SCHEMA_VERSION, migrate } from "./migrations.js";
+import {
+  LATEST_SCHEMA_VERSION,
+  migrate,
+  readUserVersion,
+} from "./migrations.js";
 
 /**
  * The application-owned database.
@@ -169,6 +173,106 @@ export function openDatabase(options: OpenDatabaseOptions = {}): StudioDatabase 
 
   handles.set(database, handle);
   return database;
+}
+
+/**
+ * Opens the application database with SQLite's read-only flag, for readers
+ * that must never write: the conversation export opens the user's real
+ * database this way, because a rescue that ran migrations or flipped journal
+ * modes behind the user's back would be writing the thing it promised only to
+ * read. No migration runs and the connection requests no journal change; the
+ * version is read, not advanced.
+ *
+ * The same newer-build refusal as `migrate` applies: reading a table whose
+ * shape a newer schema moved is corruption, quietly.
+ */
+export function openReadOnlyDatabase(
+  options: OpenDatabaseOptions = {},
+): StudioDatabase {
+  const path = resolveDatabasePath(options);
+
+  let handle: DatabaseSync;
+  try {
+    if (path !== ":memory:") {
+      if (!existsSync(path)) {
+        throw new StorageError("unavailable", {
+          message: `The Project Studio database at ${path} does not exist.`,
+        });
+      }
+      if (statSync(path).size === 0) {
+        throw new StorageError("unavailable", {
+          message: `The Project Studio database at ${path} is empty.`,
+        });
+      }
+    }
+    handle = new DatabaseSync(path, path === ":memory:" ? {} : { readOnly: true });
+  } catch (error) {
+    if (error instanceof StorageError) throw error;
+    throw new StorageError("unavailable", {
+      message: `The Project Studio database at ${path} could not be opened for reading.`,
+      cause: error,
+    });
+  }
+
+  try {
+    handle.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+
+    const version = readUserVersion(handle);
+    if (version > LATEST_SCHEMA_VERSION) {
+      throw new StorageError("migration", {
+        message: `The database was written by a newer version of Project Studio (schema ${version}, this build supports ${LATEST_SCHEMA_VERSION}).`,
+      });
+    }
+
+    let depth = 0;
+
+    const database: StudioDatabase = {
+      path,
+      schemaVersion: version,
+
+      prepare(sql: string): StatementSync {
+        return handle.prepare(sql);
+      },
+
+      exec(sql: string): void {
+        handle.exec(sql);
+      },
+
+      transaction<T>(work: () => T): T {
+        if (depth > 0) {
+          throw new StorageError("internal", {
+            message: "Nested database transactions are not supported.",
+          });
+        }
+
+        depth += 1;
+        handle.exec("BEGIN");
+        try {
+          const result = work();
+          handle.exec("COMMIT");
+          return result;
+        } catch (error) {
+          handle.exec("ROLLBACK");
+          throw error instanceof StorageError
+            ? error
+            : storageErrorFrom(error);
+        } finally {
+          depth -= 1;
+        }
+      },
+
+      close(): void {
+        handle.close();
+      },
+    };
+
+    handles.set(database, handle);
+    return database;
+  } catch (error) {
+    handle.close();
+    if (error instanceof StorageError) throw error;
+    throw storageErrorFrom(error, "unavailable");
+  }
 }
 
 /**
