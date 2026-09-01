@@ -1,0 +1,19 @@
+{
+  "name": "@pookiepied/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "deploy:auth": "pnpm --filter @pookiepied/auth deploy",
+    "deploy:telemetry": "pnpm --filter @pookiepied/telemetry deploy",
+    "deploy:console": "pnpm --filter @pookiepied/console deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250809.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5",
+    "wrangler": "^4.0.0"
+  },
+  "packageManager": "pnpm@11.22.0"
+}

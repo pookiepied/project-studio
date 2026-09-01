@@ -1,0 +1,22 @@
+name = "pookiepied-telemetry"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Public, because things outside Cloudflare post here: a desktop build, a web
+# project, anything that wants to report. Authenticated by write key, not by
+# network position.
+routes = [{ pattern = "telemetry.pookiepied.dev", custom_domain = true }]
+
+workers_dev = false
+preview_urls = false
+
+[[analytics_engine_datasets]]
+binding = "EVENTS"
+dataset = "pookiepied_events"
+
+# Secrets — `wrangler secret put`:
+#   INGEST_KEYS   JSON object: {"studio":"<random>","site":"<random>"}
+
+# Heartbeat. Absence of one is how the console learns this worker is gone.
+[triggers]
+crons = ["*/5 * * * *"]

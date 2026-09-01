@@ -1,0 +1,35 @@
+name = "pookiepied-console"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Its own hostname, never a path under the API. Cloudflare Access sits in front
+# of this route: an unauthenticated request is terminated at the edge and this
+# worker never runs. See ADR-0001 §Control plane.
+routes = [{ pattern = "console.pookiepied.dev", custom_domain = true }]
+
+workers_dev = false
+preview_urls = false
+
+# Only the console holds AdminService. App workers get AuthService and cannot
+# reach account mutation at all.
+[[services]]
+binding = "ADMIN"
+service = "pookiepied-auth"
+entrypoint = "AdminService"
+
+tail_consumers = [{ service = "pookiepied-telemetry" }]
+
+[vars]
+ACCESS_TEAM_DOMAIN = "REPLACE_ME.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE_ME"
+CF_ACCOUNT_ID = "REPLACE_ME"
+ANALYTICS_DATASET = "pookiepied_events"
+
+# Secrets — `wrangler secret put`:
+#   CF_API_TOKEN   read-only token with Account Analytics:Read
+
+# The built dashboard. The worker runs first for every request, so no file here
+# is reachable without a verified Access assertion — see src/index.ts.
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
