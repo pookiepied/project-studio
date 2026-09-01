@@ -482,4 +482,11 @@ Recorded because a plan that hides its unknowns is a plan that gets believed.
    and do we want the model reading it? (Phase 8)
 4. Does anything depend on `storeResponses` or the removed telemetry
    overrides? (Phase 5)
-5. How many of the 23 orphaned Flue transcripts are real history? (Phase 1)
+5. How many of the orphaned Flue transcripts are real history? (Phase 1)
+   **Counted, 2026-09-01:** 51 streams, 27 matching a conversation we still
+   have, **24 orphans** with real content (offsets up to 224). Our side has
+   16 conversations of which 7 are `cnv49_*` test fixtures, so real history
+   is 9. Also measured: this machine's `flue_meta.schema_version` is **4**,
+   not the 5 the migration guide describes - below 8 either way, so the
+   rejection is unchanged, but an export must read the tables rather than
+   assume a version's shapes.
