@@ -62,30 +62,3 @@ export function StatusLabel({ status }: { status: HealthStatus }) {
     </span>
   );
 }
-
-/**
- * A number and what it counts.
- *
- * No sparkline, no bar, no delta arrow. A count over a window is a fact; a
- * chart of six data points is a decoration that implies a trend the data
- * cannot support.
- */
-export function Readout({
-  label,
-  value,
-  hint,
-  emphasis = false,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5 px-3 py-2.5">
-      <span className="text-micro uppercase text-muted-foreground">{label}</span>
-      <span className={cn("text-title tnum", emphasis && "text-danger")}>{value}</span>
-      {hint ? <span className="text-caption text-muted-foreground">{hint}</span> : null}
-    </div>
-  );
-}

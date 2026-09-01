@@ -4,7 +4,8 @@ import { api, type ActivityEvent } from "../lib/api";
 import { clock, ms, parseTimestamp, serviceLabel } from "../lib/format";
 import { useLive } from "../lib/useLive";
 import { cn } from "../lib/cn";
-import { Appear, Card, Chip, Empty, List, Section } from "../components/ui";
+import { Appear, Chip, Empty, List } from "../components/ui";
+import { Panel, PanelBody, PanelFooter, PanelHeader } from "../components/primitives/Panel";
 import { Segmented } from "../components/primitives/Segmented";
 import { StatusDot } from "../components/status";
 import { COLLAPSE } from "../design/tokens";
@@ -102,8 +103,9 @@ export function ActivityPage() {
   const events = feed.data?.events ?? [];
 
   return (
-    <Appear className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
+    <Appear className="flex flex-col gap-3">
+      <Panel>
+        <PanelBody className="flex flex-col gap-2">
         {/* The window is exactly one of three, always — a segmented control.
             Everything below is an independent toggle over a set that changes
             with the data, which is what a chip is for. */}
@@ -154,18 +156,20 @@ export function ActivityPage() {
             ))}
           </div>
         ) : null}
-      </div>
+        </PanelBody>
+      </Panel>
 
-      <Section
-        title={`${events.length} event${events.length === 1 ? "" : "s"}`}
-        action={
-          <span className="flex items-center gap-1.5">
-            <StatusDot status="ok" />
-            <span className="text-caption text-muted-foreground">Live</span>
-          </span>
-        }
-      >
-        <Card className="overflow-hidden">
+      <Panel className="overflow-hidden">
+        <PanelHeader
+          title={`${events.length} event${events.length === 1 ? "" : "s"}`}
+          actions={
+            <span className="flex items-center gap-1.5 pr-1">
+              <StatusDot status="ok" pulse />
+              <span className="text-caption text-muted-foreground">Live</span>
+            </span>
+          }
+        />
+        <div className="mt-3">
           {feed.error ? (
             <Empty>Could not load activity — {feed.error}</Empty>
           ) : feed.loading ? (
@@ -188,8 +192,16 @@ export function ActivityPage() {
               </List>
             </div>
           )}
-        </Card>
-      </Section>
+        </div>
+        <PanelFooter
+          legend={[
+            { label: "OK", status: "ok" },
+            { label: "4xx", status: "degraded" },
+            { label: "5xx or exception", status: "down" },
+          ]}
+          total={`Window: ${WINDOWS.find((w) => w.id === hours)?.label ?? ""}`}
+        />
+      </Panel>
     </Appear>
   );
 }

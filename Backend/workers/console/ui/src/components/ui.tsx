@@ -3,40 +3,6 @@ import { useEffect, useState, type ComponentProps, type ReactNode } from "react"
 import { SURFACE } from "../design/tokens";
 import { cn } from "../lib/cn";
 
-/* ── Surfaces ──────────────────────────────────────────────────────────────
-   Depth is carried by surface ordering plus a hairline, never by a drop shadow
-   alone — a shadow on its own makes a panel read as a sticker.
-   ────────────────────────────────────────────────────────────────────────── */
-
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <div className={cn("rounded-xl bg-surface ring-1 ring-hairline shadow-chip", className)}>
-      {children}
-    </div>
-  );
-}
-
-/** A titled block. The label is micro and muted: a signpost, not content. */
-export function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-2.5">
-      <header className="flex min-h-(--control-sm) items-center justify-between gap-3">
-        <h2 className="text-micro uppercase text-muted-foreground">{title}</h2>
-        {action}
-      </header>
-      {children}
-    </section>
-  );
-}
-
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="text-caption px-3 py-8 text-center text-muted-foreground">{children}</div>;
 }

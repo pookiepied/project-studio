@@ -4,7 +4,8 @@ import { api, type ServiceHealth } from "../lib/api";
 import { ms, relative, serviceLabel } from "../lib/format";
 import { cn } from "../lib/cn";
 import { useLive } from "../lib/useLive";
-import { Appear, Card, Empty, List, Section } from "../components/ui";
+import { Appear, Empty, List } from "../components/ui";
+import { Panel, PanelBody, PanelHeader } from "../components/primitives/Panel";
 import { StatusDot, StatusLabel } from "../components/status";
 
 /**
@@ -59,7 +60,7 @@ function Detail({ detail }: { detail: Record<string, string | number | boolean |
 
 function Check({ check }: { check: HealthCheck }) {
   return (
-    <div className="flex gap-3 px-3 py-2.5">
+    <div className="flex gap-3 px-4 py-3">
       <StatusDot status={check.status} className="mt-[0.45rem]" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
@@ -87,8 +88,8 @@ function Check({ check }: { check: HealthCheck }) {
 function Service({ service }: { service: ServiceHealth }) {
   const Origin = service.origin === "live" ? Zap : Radio;
   return (
-    <Card>
-      <div className="flex items-center justify-between gap-3 border-b border-hairline px-3 py-2.5">
+    <Panel>
+      <div className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3">
         <div className="flex items-center gap-2">
           <StatusDot status={service.status} />
           <span className="text-ui">{serviceLabel(service.service)}</span>
@@ -119,7 +120,7 @@ function Service({ service }: { service: ServiceHealth }) {
       ) : (
         <Empty>No checks reported.</Empty>
       )}
-    </Card>
+    </Panel>
   );
 }
 
@@ -127,38 +128,45 @@ export function HealthPage() {
   const health = useLive(() => api.health(), 30_000, []);
 
   return (
-    <Appear className="flex flex-col gap-6">
-      <Section
-        title="Services"
-        action={
-          health.refreshedAt ? (
-            <span className="text-caption text-muted-foreground">
-              Checked {relative(health.refreshedAt)}
-            </span>
-          ) : null
-        }
-      >
-        {health.error ? (
-          <Card>
-            <Empty>Could not reach the health endpoint — {health.error}</Empty>
-          </Card>
-        ) : health.loading ? (
-          <Card>
-            <Empty>Checking…</Empty>
-          </Card>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {(health.data?.services ?? []).map((s) => (
-              <Service key={s.service} service={s} />
-            ))}
-          </div>
-        )}
-      </Section>
+    <Appear className="flex flex-col gap-3">
+      <div className="flex min-h-(--control-md) items-center justify-between gap-3">
+        <h2 className="text-micro uppercase tracking-wide text-muted-foreground">Services</h2>
+        {health.refreshedAt ? (
+          <span className="text-caption text-muted-foreground">
+            Checked {relative(health.refreshedAt)}
+          </span>
+        ) : null}
+      </div>
 
-      <p className="text-caption text-muted-foreground">
-        Auth is probed live on every load; everything else reports a heartbeat every five minutes.
-        A service with no heartbeat for fifteen minutes is shown as down — absence is the signal.
-      </p>
+      {health.error ? (
+        <Panel>
+          <Empty>Could not reach the health endpoint — {health.error}</Empty>
+        </Panel>
+      ) : health.loading ? (
+        <Panel>
+          <Empty>Checking…</Empty>
+        </Panel>
+      ) : (
+        /* Two columns once there is room. A service card is a fixed-width
+           object — a header and a handful of checks — so stretching one across
+           a wide window only lengthens the gap between a check and its
+           reading. */
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {(health.data?.services ?? []).map((s) => (
+            <Service key={s.service} service={s} />
+          ))}
+        </div>
+      )}
+
+      <Panel>
+        <PanelBody>
+          <p className="text-caption text-muted-foreground">
+            Auth is probed live on every load; everything else reports a heartbeat every five
+            minutes. A service with no heartbeat for fifteen minutes is shown as down — absence
+            is the signal.
+          </p>
+        </PanelBody>
+      </Panel>
     </Appear>
   );
 }

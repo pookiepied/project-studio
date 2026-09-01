@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
+import type { ReactNode } from "react";
 import type { HealthStatus } from "@pookiepied/core/contracts";
 import { SPRING_SNAPPY } from "../design/tokens";
 import { cn } from "../lib/cn";
@@ -17,31 +18,52 @@ const PAGES: { id: PageId; label: string }[] = [
 ];
 
 /**
+ * The mark.
+ *
+ * A ring with a dot in it, which is the status indicator this whole console is
+ * built out of, drawn once at size. That is the only reason it earns a place:
+ * an abstract glyph in the corner would be decoration, and a wordmark would be
+ * a second typeface. This one is the interface's own vocabulary saying what the
+ * product is — something that watches and reports.
+ */
+export function Mark({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "grid size-8 flex-none place-items-center rounded-full",
+        "bg-primary text-primary-foreground",
+        className,
+      )}
+    >
+      <span className="grid size-3.5 place-items-center rounded-full ring-[1.5px] ring-current">
+        <span className="size-1 rounded-full bg-current" />
+      </span>
+    </span>
+  );
+}
+
+/**
  * Four text tabs, not a sidebar.
  *
  * A sidebar reserves a column for navigation whether or not there is anything
  * to navigate, and at four destinations it reads as scaffolding for an app that
  * expects to grow into an admin suite. This is not that; it is a small number of
- * pages and the tabs say so.
+ * pages and the tabs say so. Both reference dashboards reach the same
+ * conclusion at the same count and put the nav in the top bar as pills.
  */
-export function Nav({
-  page,
-  onChange,
-}: {
-  page: PageId;
-  onChange: (page: PageId) => void;
-}) {
+export function Nav({ page, onChange }: { page: PageId; onChange: (page: PageId) => void }) {
   return (
-    <nav className="flex items-center gap-0.5">
+    <nav className="flex items-center gap-0.5 rounded-full bg-surface-sunken p-0.5">
       {PAGES.map((p) => (
         <button
           key={p.id}
           onClick={() => onChange(p.id)}
           aria-current={p.id === page ? "page" : undefined}
           className={cn(
-            "text-ui relative h-(--control-md) rounded-lg px-2.5",
+            "text-ui relative h-(--control-md) rounded-full px-3",
             "transition-colors duration-fast",
-            p.id === page ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            p.id === page ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {/* The chip is the thing that moved, so it gets a spring — the physics
@@ -49,7 +71,7 @@ export function Nav({
           {p.id === page ? (
             <motion.span
               layoutId="nav-chip"
-              className="absolute inset-0 rounded-lg bg-selected"
+              className="absolute inset-0 rounded-full bg-primary"
               transition={SPRING_SNAPPY}
             />
           ) : null}
@@ -83,41 +105,82 @@ export function ThemeToggle({
 }
 
 /**
- * The page header.
+ * Who is signed in.
  *
- * The title is the one statement the page makes, so it is the only serif on
- * screen. Everything else — who you are, what the system is doing — sits beside
- * it at caption weight, because it is context rather than content.
+ * The references put a photograph here. There is no photograph to put: the
+ * console knows an email address and nothing else, because the identity comes
+ * from an Access assertion rather than from a profile anyone filled in. So the
+ * avatar is the initial, which is the honest version of the same shape — and
+ * the address stays beside it, since on a control plane "which account am I
+ * acting as" is a question worth being able to answer without hovering.
  */
-export function Header({
-  title,
-  email,
-  status,
-  theme,
-  onTheme,
+export function Identity({ email }: { email: string | null }) {
+  if (!email) return null;
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="text-caption hidden min-w-0 truncate text-muted-foreground sm:inline">
+        {email}
+      </span>
+      <span
+        aria-hidden
+        className="text-caption grid size-7 flex-none place-items-center rounded-full bg-surface-sunken ring-1 ring-hairline"
+      >
+        {email.charAt(0).toUpperCase()}
+      </span>
+    </span>
+  );
+}
+
+/** The bar across the top of the shell: what this is, where you are, who you are. */
+export function TopBar({
   page,
   onPage,
+  email,
+  theme,
+  onTheme,
 }: {
-  title: string;
-  email: string | null;
-  status: HealthStatus | null;
-  theme: Theme;
-  onTheme: (t: Theme) => void;
   page: PageId;
   onPage: (p: PageId) => void;
+  email: string | null;
+  theme: Theme;
+  onTheme: (t: Theme) => void;
 }) {
   return (
-    <header className="flex flex-col gap-5 pb-6">
-      <div className="flex items-center justify-between gap-4">
+    <header className="flex items-center gap-3 border-b border-hairline px-4 py-3 sm:px-5">
+      <Mark />
+      {/* The nav is centred on wide windows and left-aligned once the identity
+          block folds away, rather than being centred against a shrinking gap. */}
+      <div className="min-w-0 flex-1 overflow-x-auto">
         <Nav page={page} onChange={onPage} />
-        <div className="flex items-center gap-2">
-          {email ? (
-            <span className="text-caption hidden text-muted-foreground sm:inline">{email}</span>
-          ) : null}
-          <ThemeToggle theme={theme} onChange={onTheme} />
-        </div>
       </div>
+      <div className="flex flex-none items-center gap-2">
+        <Identity email={email} />
+        <ThemeToggle theme={theme} onChange={onTheme} />
+      </div>
+    </header>
+  );
+}
 
+/**
+ * The page header: the one statement the page makes, and the controls that act
+ * on the whole page rather than on one panel.
+ *
+ * The references put the title and the page-level actions on one line, and it
+ * is worth copying because it makes the distinction visible: what is up here
+ * governs everything below, and what is in a panel's own header governs only
+ * that panel.
+ */
+export function PageHeader({
+  title,
+  status,
+  actions,
+}: {
+  title: string;
+  status: HealthStatus | null;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 pt-5 sm:px-5">
       <div className="flex items-baseline gap-3">
         <h1 className="text-display">{title}</h1>
         {status ? (
@@ -138,6 +201,7 @@ export function Header({
           </span>
         ) : null}
       </div>
-    </header>
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+    </div>
   );
 }

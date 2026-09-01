@@ -26,7 +26,7 @@ import { cn } from "../../lib/cn";
  *
  * The obvious construction is `position: absolute` inside the trigger's own
  * box, and it is wrong the moment a trigger sits inside anything that scrolls
- * or clips. Ours do: every menu in this console opens inside a `Card`, which is
+ * or clips. Ours do: every menu in this console opens inside a `Panel`, which is
  * `overflow-hidden` so its rows can have square corners against a rounded
  * shell. An absolutely positioned panel would be cut off by the card that
  * contains it — which looks like a bug in the menu and is not one.

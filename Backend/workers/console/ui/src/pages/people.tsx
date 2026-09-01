@@ -6,7 +6,8 @@ import { api, type SessionRow } from "../lib/api";
 import { relative } from "../lib/format";
 import { useLive } from "../lib/useLive";
 import { cn } from "../lib/cn";
-import { Appear, Button, Card, Chip, Confirm, Empty, List, Section } from "../components/ui";
+import { Appear, Button, Chip, Confirm, Empty, List } from "../components/ui";
+import { Panel, PanelBody, PanelFooter, PanelHeader } from "../components/primitives/Panel";
 import { Field } from "../components/primitives/Field";
 import { Menu, MenuItem } from "../components/primitives/Menu";
 import { COLLAPSE } from "../design/tokens";
@@ -188,9 +189,10 @@ export function PeoplePage() {
   };
 
   return (
-    <Appear className="flex flex-col gap-6">
-      <Section title="Invite">
-        <Card className="p-3">
+    <Appear className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <Panel className="xl:col-span-2">
+        <PanelHeader title="Invite" />
+        <PanelBody>
           <form onSubmit={invite} className="flex flex-wrap items-center gap-2">
             <Field
               type="email"
@@ -230,11 +232,16 @@ export function PeoplePage() {
             There is no signup. An address only becomes an account here, and stays{" "}
             <span className="text-foreground">invited</span> until its first login.
           </p>
-        </Card>
-      </Section>
+        </PanelBody>
+      </Panel>
 
-      <Section title={`People · ${users.data?.users.length ?? 0}`}>
-        <Card className="overflow-hidden">
+      <Panel className="overflow-hidden">
+        <PanelHeader title="People" actions={
+          <span className="text-caption tnum pr-1 text-muted-foreground">
+            {users.data?.users.length ?? 0}
+          </span>
+        } />
+        <div className="mt-3 border-t border-hairline">
           {users.loading ? (
             <Empty>Loading…</Empty>
           ) : (users.data?.users ?? []).length === 0 ? (
@@ -246,11 +253,19 @@ export function PeoplePage() {
               ))}
             </List>
           )}
-        </Card>
-      </Section>
+        </div>
+        <PanelFooter
+          legend={[
+            { label: "Active", status: "ok" },
+            { label: "Invited or disabled", status: "degraded" },
+          ]}
+          total={`Admins: ${(users.data?.users ?? []).filter((u) => u.role === "admin").length}`}
+        />
+      </Panel>
 
-      <Section title="Audit">
-        <Card className="overflow-hidden">
+      <Panel className="overflow-hidden">
+        <PanelHeader title="Audit" />
+        <div className="mt-3 border-t border-hairline">
           {(audit.data?.events ?? []).length === 0 ? (
             <Empty>No recorded actions.</Empty>
           ) : (
@@ -268,8 +283,8 @@ export function PeoplePage() {
               ))}
             </List>
           )}
-        </Card>
-      </Section>
+        </div>
+      </Panel>
     </Appear>
   );
 }
