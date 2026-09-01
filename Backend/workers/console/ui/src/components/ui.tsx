@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import type { ComponentProps, ReactNode } from "react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 
 /* ── Surfaces ──────────────────────────────────────────────────────────────
@@ -67,6 +67,63 @@ export function Button({
         className,
       )}
     />
+  );
+}
+
+/**
+ * A destructive action that asks once, in place.
+ *
+ * Revoking a session or disabling an account takes effect immediately and
+ * cannot be undone from here — and both of these sit at the end of a row, a few
+ * pixels from a harmless one, on a page where the rows look alike. That is a
+ * misclick waiting to happen.
+ *
+ * The second press is the confirmation. A dialog would be the usual answer, but
+ * it moves focus, covers the row you were reading, and trains you to dismiss it
+ * — whereas a label that changes under the cursor is read, because the word you
+ * were about to click is not the word that is there now. It disarms on a timer
+ * and on mouse-out, so an armed button is never left lying around.
+ */
+export function Confirm({
+  label,
+  confirm,
+  onConfirm,
+  disabled,
+  className,
+}: {
+  label: string;
+  confirm: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  return (
+    <Button
+      variant="danger"
+      disabled={disabled}
+      aria-label={armed ? confirm : label}
+      onMouseLeave={() => setArmed(false)}
+      onBlur={() => setArmed(false)}
+      onClick={() => {
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+        }
+      }}
+      className={cn(armed && "bg-danger/10", className)}
+    >
+      {armed ? confirm : label}
+    </Button>
   );
 }
 

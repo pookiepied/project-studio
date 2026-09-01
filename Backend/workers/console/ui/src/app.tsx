@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { api } from "./lib/api";
+import { cn } from "./lib/cn";
 import { useLive } from "./lib/useLive";
 import { applyTheme, readTheme, watchSystem, type Theme } from "./lib/theme";
 import { Header, type PageId } from "./components/chrome";
@@ -14,6 +15,14 @@ const TITLES: Record<PageId, string> = {
   activity: "Activity",
   health: "Health",
   people: "People",
+};
+
+/** Reading width for the pages that read; table width for the pages that tabulate. */
+const MEASURE: Record<PageId, string> = {
+  overview: "max-w-[46rem]",
+  activity: "max-w-[68rem]",
+  health: "max-w-[62rem]",
+  people: "max-w-[52rem]",
 };
 
 /** The hash is the whole router. Four pages do not need a routing library. */
@@ -54,8 +63,16 @@ export function App() {
      * centre — something you brace for before opening. Held at a narrow column
      * it reads as a page, and the density stays the same whatever the window is
      * doing. The window is not the layout.
+     *
+     * The cap is per page, though, because that argument is about proportion
+     * and not about a number. Overview and People are prose and short rows and
+     * belong at reading width. Activity is a log with seven columns and Health
+     * nests a detail bag inside a check inside a service; at 46rem both were
+     * being folded into a column narrower than their content, which is the
+     * same mistake in the other direction. They get room, and still stop well
+     * short of the window.
      */
-    <div className="mx-auto min-h-dvh w-full max-w-[46rem] px-5 py-8 sm:px-6">
+    <div className={cn("mx-auto min-h-dvh w-full px-5 py-8 sm:px-6", MEASURE[page])}>
       <Header
         title={TITLES[page]}
         email={session.data?.email ?? null}

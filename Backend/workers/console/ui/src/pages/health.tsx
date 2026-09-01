@@ -2,6 +2,7 @@ import { Radio, Zap } from "lucide-react";
 import type { HealthCheck } from "@pookiepied/core/contracts";
 import { api, type ServiceHealth } from "../lib/api";
 import { ms, relative, serviceLabel } from "../lib/format";
+import { cn } from "../lib/cn";
 import { useLive } from "../lib/useLive";
 import { Appear, Card, Empty, List, Section } from "../components/ui";
 import { StatusDot, StatusLabel } from "../components/status";
@@ -19,13 +20,39 @@ function Detail({ detail }: { detail: Record<string, string | number | boolean |
   const entries = Object.entries(detail);
   if (entries.length === 0) return null;
   return (
-    <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-      {entries.map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className="text-caption text-muted-foreground">{key.replace(/_/g, " ")}</dt>
-          <dd className="text-caption tnum">{value === null ? "—" : String(value)}</dd>
-        </div>
-      ))}
+    /**
+     * Wrapped into columns rather than one tall two-column grid.
+     *
+     * A probe reports between two and eight fields, and stacked in a single
+     * column they became a paragraph of trivia in which the one number that
+     * mattered — a cleanup backlog of eleven thousand — sat at the same weight
+     * as `users 4`. Side by side they read as a set of readings, which is what
+     * they are, and the long ones still get a full column to themselves.
+     */
+    <dl className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-6 gap-y-1">
+      {entries.map(([key, value]) => {
+        const text = value === null ? "—" : String(value);
+        // A URI or a team domain is not a reading, and squeezing it into a
+        // column beside `users 4` truncates the key to make room for a value
+        // that still does not fit. Anything long takes the whole row.
+        const wide = text.length > 24;
+        return (
+          <div
+            key={key}
+            className={cn(
+              "flex items-baseline justify-between gap-3 border-b border-hairline/60 py-0.5",
+              wide && "col-span-full",
+            )}
+          >
+            <dt className="text-caption flex-none text-muted-foreground">
+              {key.replace(/_/g, " ")}
+            </dt>
+            <dd className={cn("text-caption tnum min-w-0 truncate text-right", !wide && "flex-none")} title={text}>
+              {text}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
@@ -37,8 +64,13 @@ function Check({ check }: { check: HealthCheck }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-ui">{check.label}</span>
-          <span className="text-caption tnum flex-none text-muted-foreground">
-            {ms(check.latencyMs)}
+          <span className="flex items-baseline gap-3">
+            {/* A dot says the service is unhappy; this says which dependency is,
+                without making the reader match colours across three cards. */}
+            {check.status !== "ok" ? <StatusLabel status={check.status} /> : null}
+            <span className="text-caption tnum flex-none text-muted-foreground">
+              {ms(check.latencyMs)}
+            </span>
           </span>
         </div>
         <span className="text-caption text-muted-foreground">{check.kind}</span>

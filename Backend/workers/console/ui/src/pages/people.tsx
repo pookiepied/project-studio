@@ -6,7 +6,18 @@ import { api, type SessionRow } from "../lib/api";
 import { relative } from "../lib/format";
 import { useLive } from "../lib/useLive";
 import { cn } from "../lib/cn";
-import { Appear, Button, Card, Chip, Empty, Input, List, Section, Select } from "../components/ui";
+import {
+  Appear,
+  Button,
+  Card,
+  Chip,
+  Confirm,
+  Empty,
+  Input,
+  List,
+  Section,
+  Select,
+} from "../components/ui";
 
 /**
  * Status is carried by a word, not a colour.
@@ -59,9 +70,12 @@ function Sessions({ userId }: { userId: string }) {
           <span className="text-caption flex-none text-muted-foreground">
             {relative(s.created_at)}
           </span>
-          <Button variant="danger" disabled={busy === s.id} onClick={() => revoke(s.id)}>
-            revoke
-          </Button>
+          <Confirm
+            label="revoke"
+            confirm="revoke?"
+            disabled={busy === s.id}
+            onConfirm={() => revoke(s.id)}
+          />
         </div>
       ))}
     </List>
@@ -95,17 +109,20 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
         <span className="w-16 flex-none">
           <Status status={user.status} />
         </span>
-        <Button
-          disabled={busy}
-          variant={user.status === "disabled" ? "quiet" : "danger"}
-          onClick={() =>
-            act(() =>
-              api.setStatus(user.id, user.status === "disabled" ? "active" : "disabled"),
-            )
-          }
-        >
-          {user.status === "disabled" ? "enable" : "disable"}
-        </Button>
+        {/* Enabling is reversible and adds access; disabling revokes every live
+            session in the same statement, so only one of the two asks twice. */}
+        {user.status === "disabled" ? (
+          <Button disabled={busy} onClick={() => act(() => api.setStatus(user.id, "active"))}>
+            enable
+          </Button>
+        ) : (
+          <Confirm
+            label="disable"
+            confirm="disable?"
+            disabled={busy}
+            onConfirm={() => act(() => api.setStatus(user.id, "disabled"))}
+          />
+        )}
       </div>
 
       <AnimatePresence initial={false}>

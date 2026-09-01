@@ -174,11 +174,20 @@ export function ActivityPage() {
           ) : events.length === 0 ? (
             <Empty>Nothing in this window.</Empty>
           ) : (
-            <List>
-              {events.map((e, i) => (
-                <Event key={`${e.ts}-${i}`} event={e} />
-              ))}
-            </List>
+            /**
+             * The row has seven columns at fixed widths, which below roughly
+             * 44rem stopped fitting — and a card that clips simply loses the
+             * path and the duration off the right edge with nothing to say it
+             * has. Scrolling the table inside its own card keeps every column
+             * reachable on a narrow window and changes nothing on a wide one.
+             */
+            <div className="overflow-x-auto">
+              <List className="min-w-[44rem]">
+                {events.map((e, i) => (
+                  <Event key={`${e.ts}-${i}`} event={e} />
+                ))}
+              </List>
+            </div>
           )}
         </Card>
       </Section>
