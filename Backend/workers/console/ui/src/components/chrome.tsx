@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
 import type { HealthStatus } from "@pookiepied/core/contracts";
+import { SPRING_SNAPPY } from "../design/tokens";
 import { cn } from "../lib/cn";
 import { IconButton } from "./ui";
 import { StatusDot } from "./status";
@@ -38,8 +39,8 @@ export function Nav({
           onClick={() => onChange(p.id)}
           aria-current={p.id === page ? "page" : undefined}
           className={cn(
-            "text-ui relative h-(--control-md) rounded-lg px-2.5 outline-none",
-            "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-ring/40",
+            "text-ui relative h-(--control-md) rounded-lg px-2.5",
+            "transition-colors duration-fast",
             p.id === page ? "text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -49,7 +50,7 @@ export function Nav({
             <motion.span
               layoutId="nav-chip"
               className="absolute inset-0 rounded-lg bg-selected"
-              transition={{ type: "spring", stiffness: 520, damping: 38, mass: 0.7 }}
+              transition={SPRING_SNAPPY}
             />
           ) : null}
           <span className="relative">{p.label}</span>
@@ -129,10 +130,10 @@ export function Header({
               )}
             >
               {status === "ok"
-                ? "all systems operational"
+                ? "All systems operational"
                 : status === "degraded"
-                  ? "degraded"
-                  : "service down"}
+                  ? "Degraded"
+                  : "Service down"}
             </span>
           </span>
         ) : null}

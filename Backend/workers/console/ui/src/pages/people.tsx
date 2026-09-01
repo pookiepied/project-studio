@@ -6,18 +6,26 @@ import { api, type SessionRow } from "../lib/api";
 import { relative } from "../lib/format";
 import { useLive } from "../lib/useLive";
 import { cn } from "../lib/cn";
-import {
-  Appear,
-  Button,
-  Card,
-  Chip,
-  Confirm,
-  Empty,
-  Input,
-  List,
-  Section,
-  Select,
-} from "../components/ui";
+import { Appear, Button, Card, Chip, Confirm, Empty, List, Section } from "../components/ui";
+import { Field } from "../components/primitives/Field";
+import { Menu, MenuItem } from "../components/primitives/Menu";
+import { COLLAPSE } from "../design/tokens";
+
+/**
+ * The words shown for a role, separate from the values stored for one.
+ *
+ * `role` is a database column and stays lowercase everywhere it is a value —
+ * in the URL, in the audit log, in D1. What a person reads is a label, and a
+ * label is a sentence fragment, so it is capitalised. Conflating the two is how
+ * an interface ends up shouting `disabled` at someone in a table cell.
+ */
+const ROLE_LABEL: Record<Role, string> = { user: "User", admin: "Admin" };
+
+const STATUS_LABEL: Record<User["status"], string> = {
+  invited: "Invited",
+  active: "Active",
+  disabled: "Disabled",
+};
 
 /**
  * Status is carried by a word, not a colour.
@@ -35,7 +43,7 @@ function Status({ status }: { status: User["status"] }) {
         status === "active" ? "text-muted-foreground" : "text-foreground",
       )}
     >
-      {status}
+      {STATUS_LABEL[status]}
     </span>
   );
 }
@@ -71,8 +79,8 @@ function Sessions({ userId }: { userId: string }) {
             {relative(s.created_at)}
           </span>
           <Confirm
-            label="revoke"
-            confirm="revoke?"
+            label="Revoke"
+            confirm="Confirm?"
             disabled={busy === s.id}
             onConfirm={() => revoke(s.id)}
           />
@@ -105,7 +113,9 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
         >
           {user.email}
         </button>
-        <span className="text-caption w-12 flex-none text-muted-foreground">{user.role}</span>
+        <span className="text-caption w-14 flex-none text-muted-foreground">
+          {ROLE_LABEL[user.role]}
+        </span>
         <span className="w-16 flex-none">
           <Status status={user.status} />
         </span>
@@ -113,12 +123,12 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
             session in the same statement, so only one of the two asks twice. */}
         {user.status === "disabled" ? (
           <Button disabled={busy} onClick={() => act(() => api.setStatus(user.id, "active"))}>
-            enable
+            Enable
           </Button>
         ) : (
           <Confirm
-            label="disable"
-            confirm="disable?"
+            label="Disable"
+            confirm="Confirm?"
             disabled={busy}
             onConfirm={() => act(() => api.setStatus(user.id, "disabled"))}
           />
@@ -128,14 +138,11 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
       <AnimatePresence initial={false}>
         {open ? (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            {...COLLAPSE}
             className="overflow-hidden"
           >
             <div className="flex items-center gap-2 px-3 pb-2">
-              <span className="text-caption text-muted-foreground">role</span>
+              <span className="text-caption text-muted-foreground">Role</span>
               {(["user", "admin"] as Role[]).map((r) => (
                 <Chip
                   key={r}
@@ -143,7 +150,7 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
                   disabled={busy || user.role === r}
                   onClick={() => act(() => api.setRole(user.id, r))}
                 >
-                  {r}
+                  {ROLE_LABEL[r]}
                 </Chip>
               ))}
             </div>
@@ -185,21 +192,37 @@ export function PeoplePage() {
       <Section title="Invite">
         <Card className="p-3">
           <form onSubmit={invite} className="flex flex-wrap items-center gap-2">
-            <Input
+            <Field
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.com"
+              aria-label="Email address to invite"
               className="min-w-56 flex-1"
             />
-            <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              <option value="user">user</option>
-              <option value="admin">admin</option>
-            </Select>
+            <Menu
+              ariaLabel={`Role: ${ROLE_LABEL[role]}`}
+              trigger={<span>{ROLE_LABEL[role]}</span>}
+            >
+              {(close) =>
+                (["user", "admin"] as Role[]).map((r) => (
+                  <MenuItem
+                    key={r}
+                    selected={role === r}
+                    onSelect={() => {
+                      setRole(r);
+                      close();
+                    }}
+                  >
+                    {ROLE_LABEL[r]}
+                  </MenuItem>
+                ))
+              }
+            </Menu>
             <Button type="submit" variant="solid" disabled={busy}>
               <UserPlus className="mark text-primary-foreground" strokeWidth={1.75} />
-              invite
+              Invite
             </Button>
           </form>
           {error ? <p className="text-caption mt-2 text-danger">{error}</p> : null}

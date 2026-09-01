@@ -5,13 +5,15 @@ import { clock, ms, parseTimestamp, serviceLabel } from "../lib/format";
 import { useLive } from "../lib/useLive";
 import { cn } from "../lib/cn";
 import { Appear, Card, Chip, Empty, List, Section } from "../components/ui";
+import { Segmented } from "../components/primitives/Segmented";
 import { StatusDot } from "../components/status";
+import { COLLAPSE } from "../design/tokens";
 
 const WINDOWS = [
-  { hours: 1, label: "1h" },
-  { hours: 24, label: "24h" },
-  { hours: 168, label: "7d" },
-];
+  { id: 1, label: "1 hour" },
+  { id: 24, label: "24 hours" },
+  { id: 168, label: "7 days" },
+] as const;
 
 function statusOf(e: ActivityEvent): "ok" | "degraded" | "down" {
   if (e.event === "exception" || e.status >= 500) return "down";
@@ -67,13 +69,7 @@ function Event({ event }: { event: ActivityEvent }) {
 
       <AnimatePresence initial={false}>
         {open && fields ? (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden"
-          >
+          <motion.div {...COLLAPSE} className="overflow-hidden">
             <pre className="text-mono mx-3 mb-2 overflow-x-auto rounded-md bg-surface-sunken px-2.5 py-2 text-muted-foreground">
               {JSON.stringify(fields, null, 2)}
             </pre>
@@ -108,16 +104,19 @@ export function ActivityPage() {
   return (
     <Appear className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        {/* Window and severity: the two filters that always apply. */}
-        <div className="flex flex-wrap items-center gap-1">
-          {WINDOWS.map((w) => (
-            <Chip key={w.hours} active={hours === w.hours} onClick={() => setHours(w.hours)}>
-              {w.label}
-            </Chip>
-          ))}
-          <span className="mx-1 h-4 w-px bg-hairline" />
+        {/* The window is exactly one of three, always — a segmented control.
+            Everything below is an independent toggle over a set that changes
+            with the data, which is what a chip is for. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Segmented
+            options={WINDOWS}
+            value={hours}
+            onChange={setHours}
+            ariaLabel="Time window"
+            layoutId="activity-window"
+          />
           <Chip active={errorsOnly} onClick={() => setErrorsOnly((v) => !v)}>
-            errors only
+            Errors only
           </Chip>
         </div>
 
@@ -125,7 +124,7 @@ export function ActivityPage() {
             new worker appears here the moment it reports for the first time. */}
         <div className="flex flex-wrap items-center gap-1">
           <Chip active={source === null} onClick={() => setSource(null)}>
-            all systems
+            All systems
           </Chip>
           {(facets.data?.sources ?? []).map((s) => (
             <Chip
@@ -142,7 +141,7 @@ export function ActivityPage() {
         {(facets.data?.events ?? []).length > 1 ? (
           <div className="flex flex-wrap items-center gap-1">
             <Chip active={event === null} onClick={() => setEvent(null)}>
-              all events
+              All events
             </Chip>
             {(facets.data?.events ?? []).map((e) => (
               <Chip
@@ -162,7 +161,7 @@ export function ActivityPage() {
         action={
           <span className="flex items-center gap-1.5">
             <StatusDot status="ok" />
-            <span className="text-caption text-muted-foreground">live</span>
+            <span className="text-caption text-muted-foreground">Live</span>
           </span>
         }
       >

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { SURFACE } from "../design/tokens";
 import { cn } from "../lib/cn";
 
 /* ── Surfaces ──────────────────────────────────────────────────────────────
@@ -57,8 +58,7 @@ export function Button({
       {...props}
       className={cn(
         "text-ui inline-flex h-(--control-md) items-center gap-1.5 rounded-lg px-2.5",
-        "outline-none transition-colors duration-fast",
-        "focus-visible:ring-2 focus-visible:ring-ring/40",
+        "transition-colors duration-fast",
         "disabled:pointer-events-none disabled:opacity-40",
         variant === "quiet" && "hover:bg-tint active:bg-selected",
         variant === "solid" &&
@@ -137,38 +137,7 @@ export function IconButton({ className, ...props }: ComponentProps<"button">) {
       {...props}
       className={cn(
         "inline-grid size-(--control-md) place-items-center rounded-full",
-        "outline-none transition-colors duration-fast",
-        "hover:bg-tint active:bg-selected focus-visible:ring-2 focus-visible:ring-ring/40",
-        className,
-      )}
-    />
-  );
-}
-
-export function Input({ className, ...props }: ComponentProps<"input">) {
-  return (
-    <input
-      {...props}
-      className={cn(
-        "text-ui h-(--control-md) min-w-0 rounded-lg bg-surface-sunken px-2.5",
-        "ring-1 ring-hairline outline-none transition-shadow duration-fast",
-        "placeholder:text-muted-foreground",
-        "focus-visible:ring-2 focus-visible:ring-ring/40",
-        className,
-      )}
-    />
-  );
-}
-
-export function Select({ className, ...props }: ComponentProps<"select">) {
-  return (
-    <select
-      {...props}
-      className={cn(
-        "text-ui h-(--control-md) appearance-none rounded-lg bg-surface-sunken pl-2.5 pr-6",
-        "ring-1 ring-hairline outline-none transition-shadow duration-fast",
-        "focus-visible:ring-2 focus-visible:ring-ring/40",
-        "chevron",
+        "transition-colors duration-fast hover:bg-tint active:bg-selected",
         className,
       )}
     />
@@ -190,8 +159,7 @@ export function Chip({
       {...props}
       className={cn(
         "text-caption inline-flex h-(--control-sm) items-center gap-1.5 whitespace-nowrap rounded-full px-2.5",
-        "outline-none transition-colors duration-fast",
-        "focus-visible:ring-2 focus-visible:ring-ring/40",
+        "transition-colors duration-fast",
         active ? "bg-selected text-foreground" : "text-muted-foreground hover:bg-tint",
         className,
       )}
@@ -232,18 +200,10 @@ export function Row({
   return <div className={cn("flex items-center gap-3 px-3 py-2", className)}>{children}</div>;
 }
 
-/**
- * Things that appear or vanish use a duration and an ease-out. There is no
- * object to model, so a spring would only be latency.
- */
+/** A page arriving. The preset lives in `design/tokens`; see the note there. */
 export function Appear({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-      className={className}
-    >
+    <motion.div {...SURFACE} className={className}>
       {children}
     </motion.div>
   );

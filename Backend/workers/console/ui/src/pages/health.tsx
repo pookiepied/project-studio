@@ -105,7 +105,7 @@ function Service({ service }: { service: ServiceHealth }) {
           >
             <Origin className="mark" strokeWidth={1.75} />
             <span className="text-caption text-muted-foreground">
-              {service.origin === "live" ? "live" : relative(service.observedAt)}
+              {service.origin === "live" ? "Live" : relative(service.observedAt)}
             </span>
           </span>
         </div>
@@ -133,7 +133,7 @@ export function HealthPage() {
         action={
           health.refreshedAt ? (
             <span className="text-caption text-muted-foreground">
-              checked {relative(health.refreshedAt)}
+              Checked {relative(health.refreshedAt)}
             </span>
           ) : null
         }

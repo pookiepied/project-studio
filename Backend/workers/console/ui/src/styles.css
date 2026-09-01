@@ -190,6 +190,21 @@
     background-color: var(--selected);
   }
 
+  /* There was no focus rule here at all, which meant tabbing through the
+     console moved focus invisibly on everything the components did not style
+     by hand — the footer link, the disclosure buttons, the table rows. An
+     outline is used rather than a ring because it is drawn outside the box and
+     cannot change the layout of what it surrounds.
+
+     `:focus-visible` is the whole reason this can be a real, visible ring: it
+     fires for the keyboard and not for the mouse, which is what people mean
+     when they call a focus style ugly — a ring that appears under the pointer
+     is noise. Fields opt out and draw their own; see `primitives/Field`. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklch, var(--foreground) 15%, transparent) transparent;
@@ -273,12 +288,3 @@
   }
 }
 
-@layer components {
-  /* The one place a native control needs help: a <select> arrow that matches
-     the mark weight instead of the OS default. */
-  .chevron {
-    background-repeat: no-repeat;
-    background-position: right 0.45rem center;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888888' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  }
-}

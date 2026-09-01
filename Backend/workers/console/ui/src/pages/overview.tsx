@@ -50,7 +50,7 @@ export function OverviewPage({ onNavigate }: { onNavigate: (page: PageId) => voi
             onClick={() => onNavigate("health")}
             className="text-caption text-muted-foreground transition-colors duration-fast hover:text-foreground"
           >
-            details
+            Details
           </button>
         }
       >
@@ -71,7 +71,7 @@ export function OverviewPage({ onNavigate }: { onNavigate: (page: PageId) => voi
                       </span>
                     ) : null}
                     <span className="text-caption w-16 flex-none text-right text-muted-foreground">
-                      {s.origin === "live" ? "live" : relative(s.observedAt)}
+                      {s.origin === "live" ? "Live" : relative(s.observedAt)}
                     </span>
                   </Row>
                 );
@@ -88,7 +88,7 @@ export function OverviewPage({ onNavigate }: { onNavigate: (page: PageId) => voi
             onClick={() => onNavigate("activity")}
             className="text-caption text-muted-foreground transition-colors duration-fast hover:text-foreground"
           >
-            all activity
+            All activity
           </button>
         }
       >
