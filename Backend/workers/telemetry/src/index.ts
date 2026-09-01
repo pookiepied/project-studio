@@ -66,12 +66,48 @@ function authorize(req: Request, env: Env): string | null {
   return matched;
 }
 
+/**
+ * Analytics Engine caps the *total* bytes across all blobs in one data point,
+ * not each blob individually. Truncating the fields bag alone to a fixed size
+ * lets a long path push the point over that cap — and `writeDataPoint` does not
+ * throw, so the row simply never arrives. Silent loss, in the worker whose only
+ * job is not losing rows.
+ *
+ * So the four blobs are budgeted together, the fields bag absorbs the whole
+ * shortfall as the only one that can be shortened without losing its meaning,
+ * and a truncation is itself counted.
+ */
+const BLOB_BUDGET_BYTES = 5000;
+const utf8 = new TextEncoder();
+
+function fitBlobs(event: string, path: string, outcome: string, fields: string): string[] {
+  const fixed = utf8.encode(event).length + utf8.encode(path).length + utf8.encode(outcome).length;
+  const room = BLOB_BUDGET_BYTES - fixed;
+  if (room <= 0) return [event, path, outcome, ""];
+  let body = fields;
+  // Trim by bytes, not characters: one emoji in a field is four of them.
+  while (utf8.encode(body).length > room) {
+    body = body.slice(0, Math.max(0, Math.floor(body.length * 0.9) - 1));
+    if (body.length === 0) break;
+  }
+  return [event, path, outcome, body];
+}
+
 function write(env: Env, n: Normalized): void {
+  const full = JSON.stringify(n.fields);
+  const blobs = fitBlobs(n.event, n.path, n.outcome, full);
   env.EVENTS.writeDataPoint({
     indexes: [n.source],
-    blobs: [n.event, n.path, n.outcome, JSON.stringify(n.fields).slice(0, 5000)],
+    blobs,
     doubles: [n.status, n.durationMs],
   });
+  if (blobs[3] !== full) {
+    env.EVENTS.writeDataPoint({
+      indexes: [n.source],
+      blobs: ["fields_truncated", n.path, n.outcome, JSON.stringify({ from: full.length, to: blobs[3]?.length ?? 0 })],
+      doubles: [0, 0],
+    });
+  }
 }
 
 export default {
@@ -96,8 +132,16 @@ export default {
     const source = authorize(req, env);
     if (!source) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
 
+    // Declared size first, so an oversized body is refused before it is read
+    // into memory rather than after. The post-read check stays as the backstop
+    // for a caller that lies about, or omits, the header.
+    const declared = Number(req.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+      return new Response(JSON.stringify({ error: "payload_too_large" }), { status: 413 });
+    }
+
     const raw = await req.text();
-    if (raw.length > MAX_BODY_BYTES) {
+    if (utf8.encode(raw).length > MAX_BODY_BYTES) {
       return new Response(JSON.stringify({ error: "payload_too_large" }), { status: 413 });
     }
 
