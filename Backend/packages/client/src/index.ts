@@ -26,14 +26,34 @@ export async function logout(cfg: UmbrellaConfig): Promise<void> {
 
 /* ── Desktop (RFC 8252 loopback) ─────────────────────────────────────────── */
 
+function b64url(bytes: ArrayBuffer): string {
+  let s = "";
+  for (const b of new Uint8Array(bytes)) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 /**
  * The URL to open in the *system* browser — not an embedded webview, which
  * would defeat the point by letting the app see the user's Google credentials.
  * Listen on `port`; the auth worker redirects back with `?code=`.
+ *
+ * Keep the returned `verifier` in memory until the exchange. It is what proves
+ * the code came back to the process that asked for it: the code itself arrives
+ * over a loopback URL that any other local process could race for, and without
+ * the verifier, holding it would be enough.
  */
-export function desktopLoginUrl(cfg: UmbrellaConfig, port: number): string {
-  const redirect = encodeURIComponent(`http://127.0.0.1:${port}/`);
-  return `${cfg.authOrigin}/oauth/start?mode=desktop&redirect=${redirect}`;
+export async function beginDesktopLogin(
+  cfg: UmbrellaConfig,
+  port: number,
+): Promise<{ url: string; verifier: string }> {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const params = new URLSearchParams({
+    mode: "desktop",
+    redirect: `http://127.0.0.1:${port}/`,
+    challenge: b64url(digest),
+  });
+  return { url: `${cfg.authOrigin}/oauth/start?${params}`, verifier };
 }
 
 /**
@@ -44,11 +64,12 @@ export function desktopLoginUrl(cfg: UmbrellaConfig, port: number): string {
 export async function exchangeDesktopCode(
   cfg: UmbrellaConfig,
   code: string,
+  verifier: string,
 ): Promise<{ token: string; expiresAt: number }> {
   const res = await fetch(`${cfg.authOrigin}/oauth/exchange`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, verifier }),
   });
   if (!res.ok) throw new Error(`exchange failed: ${res.status}`);
   const body = (await res.json()) as { token: string; expires_at: number };

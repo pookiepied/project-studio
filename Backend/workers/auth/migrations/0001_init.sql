@@ -31,18 +31,25 @@ CREATE INDEX sessions_expiry_idx ON sessions(expires_at);
 -- Short-lived PKCE state for an in-flight authorization. Rows are single-use.
 CREATE TABLE oauth_flows (
   state      TEXT PRIMARY KEY,
-  verifier   TEXT NOT NULL,
+  verifier   TEXT NOT NULL,          -- our PKCE verifier, for Google
   mode       TEXT NOT NULL,          -- 'web' | 'desktop'
   redirect   TEXT,                   -- loopback URL for 'desktop'
+  -- The desktop client's own PKCE challenge. Separate from `verifier` above:
+  -- that one binds us to Google, this one binds the handoff to the process
+  -- that started the flow. NULL for 'web', which is bound by a cookie instead.
+  client_challenge TEXT,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
 
--- Desktop handoff. Holds a user id, never a token: the session is minted at
--- exchange time, so no credential is ever at rest here or in a URL.
+-- Desktop handoff. Holds a user id, never a session token: the session is
+-- minted at exchange time, so no session token is ever at rest here or in a
+-- URL. The one-time code itself does travel in the loopback URL, which is what
+-- `client_challenge` exists to make useless to anyone who intercepts it.
 CREATE TABLE handoffs (
   code_hash  TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_challenge TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   used_at    INTEGER

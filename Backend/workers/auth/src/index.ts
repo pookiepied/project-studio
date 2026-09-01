@@ -42,6 +42,18 @@ export class AdminService extends WorkerEntrypoint<Env> {
     return selfCheck(this.env);
   }
 
+  /**
+   * The account behind a console operator's Access identity, or null.
+   *
+   * Access decides who may reach the console at all; this decides whether that
+   * person is an administrator of the umbrella. Keeping the second question
+   * here means the answer comes from the identity database rather than from a
+   * Cloudflare policy nothing in this repo can see.
+   */
+  operator(email: string): Promise<User | null> {
+    return findUserByEmail(this.env, email);
+  }
+
   async listUsers(): Promise<User[]> {
     const { results } = await this.env.IDENTITY.prepare(
       `SELECT id, email, name, role, status FROM users ORDER BY created_at DESC`,
@@ -74,8 +86,28 @@ export class AdminService extends WorkerEntrypoint<Env> {
     return { id, email: normalized, name: null, role, status: "invited" };
   }
 
+  /**
+   * Refuses a change that would leave the umbrella with no way back in.
+   *
+   * There is no signup path and no password reset, so the last active admin
+   * disabling or demoting themselves is not an inconvenience — it is a locked
+   * door whose only key is `wrangler d1 execute` against production.
+   */
+  async #wouldStrandUs(userId: string): Promise<boolean> {
+    const row = await this.env.IDENTITY.prepare(
+      `SELECT count(*) AS n FROM users
+        WHERE role = 'admin' AND status = 'active' AND id != ?`,
+    )
+      .bind(userId)
+      .first<{ n: number }>();
+    return (row?.n ?? 0) === 0;
+  }
+
   /** Disabling revokes every live session immediately — that is the point of opaque tokens. */
   async setStatus(userId: string, status: "active" | "disabled", actorId?: string): Promise<void> {
+    if (status === "disabled" && (await this.#wouldStrandUs(userId))) {
+      throw new Error("last_active_admin");
+    }
     await this.env.IDENTITY.prepare(`UPDATE users SET status = ?, updated_at = ? WHERE id = ?`)
       .bind(status, Date.now(), userId)
       .run();
@@ -84,6 +116,9 @@ export class AdminService extends WorkerEntrypoint<Env> {
   }
 
   async setRole(userId: string, role: Role, actorId?: string): Promise<void> {
+    if (role !== "admin" && (await this.#wouldStrandUs(userId))) {
+      throw new Error("last_active_admin");
+    }
     await this.env.IDENTITY.prepare(`UPDATE users SET role = ?, updated_at = ? WHERE id = ?`)
       .bind(role, Date.now(), userId)
       .run();
