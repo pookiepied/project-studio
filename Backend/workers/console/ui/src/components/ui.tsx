@@ -4,7 +4,7 @@ import { SURFACE } from "../design/tokens";
 import { cn } from "../lib/cn";
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="text-caption px-3 py-8 text-center text-muted-foreground">{children}</div>;
+  return <div className="text-caption px-6 py-10 text-center text-muted-foreground">{children}</div>;
 }
 
 /* ── Controls ──────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ export function Row({
       <button
         onClick={onClick}
         className={cn(
-          "flex w-full items-center gap-3 px-3 py-2 text-left",
+          "flex w-full items-center gap-3 px-6 py-2.5 text-left",
           "transition-colors duration-fast hover:bg-tint",
           className,
         )}
@@ -163,7 +163,7 @@ export function Row({
       </button>
     );
   }
-  return <div className={cn("flex items-center gap-3 px-3 py-2", className)}>{children}</div>;
+  return <div className={cn("flex items-center gap-3 px-6 py-2.5", className)}>{children}</div>;
 }
 
 /** A page arriving. The preset lives in `design/tokens`; see the note there. */

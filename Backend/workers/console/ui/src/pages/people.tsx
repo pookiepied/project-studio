@@ -107,7 +107,7 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
 
   return (
     <div>
-      <div className="flex items-center gap-3 px-3 py-2">
+      <div className="flex items-center gap-3 px-6 py-2.5">
         <button
           onClick={() => setOpen((v) => !v)}
           className="text-ui min-w-0 flex-1 truncate text-left transition-colors duration-fast hover:text-muted-foreground"
@@ -142,7 +142,7 @@ function Person({ user, onChanged }: { user: User; onChanged: () => void }) {
             {...COLLAPSE}
             className="overflow-hidden"
           >
-            <div className="flex items-center gap-2 px-3 pb-2">
+            <div className="flex items-center gap-2 px-6 pb-3">
               <span className="text-caption text-muted-foreground">Role</span>
               {(["user", "admin"] as Role[]).map((r) => (
                 <Chip
@@ -271,7 +271,7 @@ export function PeoplePage() {
           ) : (
             <List>
               {(audit.data?.events ?? []).slice(0, 25).map((e) => (
-                <div key={e.id} className="flex items-center gap-3 px-3 py-1.5">
+                <div key={e.id} className="flex items-center gap-3 px-6 py-2">
                   <span className="text-caption w-40 flex-none truncate">{e.action}</span>
                   <span className="text-mono min-w-0 flex-1 truncate text-muted-foreground">
                     {e.target ?? "—"}

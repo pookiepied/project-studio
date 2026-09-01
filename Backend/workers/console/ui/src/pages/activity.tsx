@@ -47,7 +47,7 @@ function Event({ event }: { event: ActivityEvent }) {
       <button
         onClick={() => fields && setOpen((v) => !v)}
         className={cn(
-          "flex w-full items-center gap-3 px-3 py-1.5 text-left",
+          "flex w-full items-center gap-3 px-6 py-2 text-left",
           fields && "transition-colors duration-fast hover:bg-tint",
         )}
       >
@@ -71,7 +71,7 @@ function Event({ event }: { event: ActivityEvent }) {
       <AnimatePresence initial={false}>
         {open && fields ? (
           <motion.div {...COLLAPSE} className="overflow-hidden">
-            <pre className="text-mono mx-3 mb-2 overflow-x-auto rounded-md bg-surface-sunken px-2.5 py-2 text-muted-foreground">
+            <pre className="text-mono mx-6 mb-3 overflow-x-auto rounded-md bg-surface-sunken px-2.5 py-2 text-muted-foreground">
               {JSON.stringify(fields, null, 2)}
             </pre>
           </motion.div>

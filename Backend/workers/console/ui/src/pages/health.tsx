@@ -60,7 +60,7 @@ function Detail({ detail }: { detail: Record<string, string | number | boolean |
 
 function Check({ check }: { check: HealthCheck }) {
   return (
-    <div className="flex gap-3 px-4 py-3">
+    <div className="flex gap-3 px-6 py-3.5">
       <StatusDot status={check.status} className="mt-[0.45rem]" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
@@ -89,7 +89,7 @@ function Service({ service }: { service: ServiceHealth }) {
   const Origin = service.origin === "live" ? Zap : Radio;
   return (
     <Panel>
-      <div className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
         <div className="flex items-center gap-2">
           <StatusDot status={service.status} />
           <span className="text-ui">{serviceLabel(service.service)}</span>

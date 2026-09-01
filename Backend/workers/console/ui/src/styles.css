@@ -29,11 +29,14 @@
   --text-caption: calc(var(--ui-size) - 1px);
   --text-ui: var(--ui-size);
   --text-body: var(--ui-size);
-  --text-title: calc(var(--ui-size) + 7px);
-  /* The number a panel exists for. Between title and display on purpose: it has
-     to beat every label around it without competing with the page's own name. */
-  --text-metric: calc(var(--ui-size) + 13px);
-  --text-display: calc(var(--ui-size) + 19px);
+  --text-title: calc(var(--ui-size) + 5px);
+  /* The number a panel exists for, and the number a whole page is about.
+     The gap between these and --text-caption is the point: a dashboard is read
+     by jumping between headline numbers, and a headline you have to look for
+     is not one. */
+  --text-metric: calc(var(--ui-size) + 20px);
+  --text-hero: calc(var(--ui-size) + 32px);
+  --text-display: calc(var(--ui-size) + 22px);
 
   /* Leading belongs to the role, never to a utility beside it. */
   --leading-micro: 1.45;
@@ -41,7 +44,8 @@
   --leading-ui: 1.55;
   --leading-body: 1.7;
   --leading-title: 1.3;
-  --leading-metric: 1.15;
+  --leading-metric: 1.1;
+  --leading-hero: 1.02;
 
   /* Standalone marks track --ui-size exactly as text-paired ones do. */
   --icon-xs: calc(var(--ui-size) - 1px);
@@ -271,6 +275,16 @@
     line-height: var(--leading-metric);
     font-weight: 500;
     letter-spacing: -0.02em;
+  }
+
+  /* The one number a panel is for. Sans and heavy: at this size the serif's
+     thin strokes fall apart and the figures stop being scannable. */
+  .text-hero {
+    font-size: var(--text-hero);
+    line-height: var(--leading-hero);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
   }
 
   /* The one statement a page makes. Anywhere else the serif stops being a voice

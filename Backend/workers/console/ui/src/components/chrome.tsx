@@ -146,7 +146,7 @@ export function TopBar({
   onTheme: (t: Theme) => void;
 }) {
   return (
-    <header className="flex items-center gap-3 border-b border-hairline px-4 py-3 sm:px-5">
+    <header className="flex items-center gap-4 px-4 py-4 sm:px-7">
       <Mark />
       {/* The nav is centred on wide windows and left-aligned once the identity
           block folds away, rather than being centred against a shrinking gap. */}
@@ -180,7 +180,7 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 pt-5 sm:px-5">
+    <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-5 pt-3 sm:px-7">
       <div className="flex items-baseline gap-3">
         <h1 className="text-display">{title}</h1>
         {status ? (

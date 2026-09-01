@@ -49,24 +49,23 @@ export function App() {
 
   return (
     /**
-     * A shell resting on a canvas, rather than a column of content in a window.
+     * One frame, not two.
      *
-     * The measure is still capped — a control plane that runs edge to edge on a
-     * 27-inch display reads as an operations centre, something you brace for
-     * before opening. What changed is what the cap produces: a bounded column of
-     * text became a bounded *object*, with an inside and an edge, which is what
-     * lets a grid of panels sit in it without any of them touching the window.
+     * The previous attempt drew a ringed, rounded shell and then filled it with
+     * ringed, rounded panels — two borders of the same weight and radius saying
+     * the same thing, one inside the other. That reads as chrome nested in
+     * chrome, and it is what made a page of content look like a page of boxes.
      *
-     * The cap is one number again rather than one per page. It was four numbers
-     * because the pages disagreed about how wide their content was; now they
-     * share a grid, and a shell that resized when you changed tab would be the
-     * window jumping under the cursor for no reason the reader can see.
+     * So the shell keeps the rounding and loses the ring, the interior takes the
+     * sunken tone, and the panels are the *lighter* surface sitting on it. The
+     * separation is now a tonal step rather than a second outline: panels read
+     * as objects resting on a table, and nothing on screen is framed twice.
      */
-    <div className="min-h-dvh bg-canvas p-0 sm:p-5 lg:p-7">
+    <div className="min-h-dvh bg-canvas sm:p-6 lg:p-8">
       <div
         className={cn(
-          "mx-auto flex min-h-dvh w-full max-w-[84rem] flex-col overflow-hidden",
-          "bg-background sm:min-h-0 sm:rounded-3xl sm:ring-1 sm:ring-hairline sm:shadow-lifted",
+          "mx-auto flex min-h-dvh w-full max-w-[88rem] flex-col overflow-hidden",
+          "bg-surface-sunken sm:min-h-0 sm:rounded-[28px] sm:shadow-lifted",
         )}
       >
         <TopBar
@@ -79,7 +78,7 @@ export function App() {
 
         <PageHeader title={TITLES[page]} status={health.data?.status ?? null} />
 
-        <main className="flex-1 px-4 pb-6 sm:px-5">
+        <main className="flex-1 px-4 pb-8 sm:px-7">
           <AnimatePresence mode="wait" initial={false}>
             {page === "overview" ? (
               <OverviewPage key="overview" onNavigate={navigate} />
@@ -93,7 +92,7 @@ export function App() {
           </AnimatePresence>
         </main>
 
-        <footer className="text-caption border-t border-hairline px-4 py-3 text-muted-foreground sm:px-5">
+        <footer className="text-caption px-4 pb-6 text-muted-foreground sm:px-7">
           pookiepied · control plane
         </footer>
       </div>
