@@ -548,6 +548,43 @@ attempts are dropped from the projection - anything the webview or the
 transcript rendered from those channels now needs the stream/telemetry
 shapes instead.
 
+**Done, 2026-09-03** (see
+`report/PHASE-6-the-message-the-user-can-finally-send.md`). The composer
+sends the 2.0 envelope (`kind`/`body`, settings beside them, images under
+`attachments` - 1.0's `images` key would have been STRIPPED silently by
+valibot, not refused), and the error reader takes both refusal shapes, so
+the 400 a person could not read now names what was wrong. The stream items
+were measured on a live 2.0 harness, frames off the wire, and the headline
+is a contract fact no type surface showed: **2.0 never sends `closed`** -
+the updates stream is endless by design, a finished run is told by the
+`submission-settled` chunk, and Rust's parser honours the field without any
+production stream using it (docblocks rewritten; behaviour unchanged;
+65/65). `wait()` semantics and the abort scope (in-flight AND queued -
+measured, with the queued half actually a join via `answeredBySubmissionId`)
+are written where they will be read. **The dedup decision: declined**, ADR
+0033 reopened and reaffirmed - the key works upstream (measured:
+convergence, `deduplicated: true`, 409 on payload mismatch) but nothing in
+the tree resends automatically, and the reopen condition (any automated
+resend path must carry the key) is named in both the ADR and
+`harness-client.ts`. What the transcript lost turned out to be visible
+nowhere (no component renders model, usage, or message timestamp), but the
+same wire change broke something the brief had not listed: an abort records
+a `role: "system"` advisory into history, and the webview's strict mirror
+refused it, so EVERY stopped conversation failed its cold start. Fixed: the
+mirror accepts `system` and the projection skips it (rendering stays with
+the settlement card); proven in the real app by re-opening the aborted exit
+conversation cold. The exit ran as a person's exit: typed, sent, streamed
+("Hello, world is wonderful. Wednesday."), a long turn stopped mid-stream
+(settled visibly aborted, partial story kept), resumed in the same
+conversation, and the aborted conversation re-opened cold and rendered.
+Suite twice from clean: **10 failed / 1492 passed both runs** - the Phase 8
+floor, nothing above it; mcp-flue passed inside both (32.6s) and under
+concurrent AppContainer churn (17.9s); the eleventh failure did not
+reproduce, and the instrumentation (flat process/memory/socket samples) and
+the EBUSY mechanism (no job object around test-spawned harnesses, so a
+SIGKILL fallback orphans descendants into the afterEach rm) are recorded in
+the report.
+
 ### Phase 7 - Events, observability, and the stores
 
 `run_start`/`run_end` to `agent_start`/`agent_end`; `runId` to `instanceId`
@@ -585,6 +622,25 @@ events (or be re-derived from the settled settings row), and the retry
 attempt count is invisible until Phase 8's hunks land. The titler's ladder
 reads the model layer's synchronous snapshot (Phase 4/5), so a real titling
 run can be verified end to end for the first time in this phase.
+
+**Amended, 2026-09-03, by Phase 6:** the chunk shapes this phase verifies
+against are now measured off a live wire (quoted in the Phase 6 report):
+`message-started` carries `messageId`/`submissionId`/`turnId`/`timestamp`
+and NO `model`; `message-completed` carries NO `usage`; `message-appended`
+and snapshots can carry `role: "system"` advisories (an aborted or
+interrupted submission's terminal marker), which the webview mirror now
+accepts and the transcript deliberately does not render - the settlement
+card is the failure surface; and the stream carries three chunk types the
+1.0 mirror never met (`message-metadata`, `data-part`,
+`stream-checkpoint`), all tolerated as facts. The metadata channel 1.0's
+runtime stamped (model, usage, timestamp) is confirmed agent-authored-only
+in 2.0 and stamped by nobody today, so the model-identification work this
+phase owns (the `title_model` log fact, any run-side model display) has
+exactly the two candidate sources the brief already named: the telemetry
+events and the settled settings row. The titling run can also rely on
+`wait()`'s measured semantics (immediate on settled, 404 on unknown
+conversation, throws on failed/aborted - never resolves on an unknown
+submission id, so only receipt-backed ids).
 
 ### Phase 8 - The patches, last
 
@@ -628,7 +684,10 @@ decision is unchanged. One dependency note: pi-ai is deduped to a single
 0.84.4 instance by a pnpm override (Phase 4/5), so the re-derived hunks
 anchor against the 2.0.3 bundles under an overridden dependency tree - the
 bundle bytes are unchanged, but re-verify the anchor hashes after any lock
-file move.
+file move. **Confirmed twice more, 2026-09-03 (Phase 6):** two consecutive
+full runs landed on exactly those ten, nothing above them, with the retry
+tests' durations stable (the longest at 134s); the acceptance list stands
+verbatim.
 
 ---
 

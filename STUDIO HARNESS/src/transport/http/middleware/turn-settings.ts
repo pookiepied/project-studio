@@ -16,12 +16,13 @@ import type { ConversationStore } from "../../../conversations/store.js";
  * ---- Why this exists -------------------------------------------------------
  *
  * The model and reasoning level a person picked have to reach the run that
- * answers. Flue's submission payload is `message` and images, nothing else -
- * `DirectAgentPayloadSchema` strips unknown keys - and the agent initializer
- * receives only `{ id, env }`, so nothing a caller adds to the body can cross
- * into the run's config. The choice therefore has to be durable BEFORE the run
- * starts, and the durable place is the conversation index: the run's
- * initializer reads the row and names its model from it.
+ * answers. Flue's submission payload is the delivered-message envelope -
+ * `kind`, `body`, `attachments` - nothing else - and its validation strips
+ * unknown keys - so the agent render receives only `{ id }`, and nothing a
+ * caller adds to the body can cross into the run's config. The choice
+ * therefore has to be durable BEFORE the run starts, and the durable place
+ * is the conversation index: the run's render reads the row and names its
+ * model from it.
  *
  * That read is the race this middleware closes. The webview posts the
  * submission, and only after the receipt posts the index row for a first

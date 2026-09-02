@@ -603,6 +603,14 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
   const items: TranscriptItem[] = []
 
   for (const message of snapshot.messages) {
+    // 2.0 records runtime advisories (an aborted or interrupted submission's
+    // terminal marker, the recovery signals around a materialized partial
+    // stream) as `system` messages. They are diagnostics, not chat: the
+    // failure a person needs is already carried by the settlement below,
+    // which renders as the `submission-failed` card. The reader accepts the
+    // role only so a stop control press does not make the whole snapshot
+    // unparseable; nothing system-shaped becomes a transcript item.
+    if (message.role === 'system') continue
     if (message.role === 'user') {
       const texts: string[] = []
       const attachments: UserAttachmentView[] = []
@@ -698,13 +706,12 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
   // open tail takes the outcome, finished work stays finished, empty retry
   // attempts withdraw — applies here through the same function.
   //
-  // One thing history forces on top: ASSISTANT messages in a snapshot carry
-  // no submissionId (observed on a live harness; the SDK type calls the
-  // field optional and the projection omits it), so matching by id alone
-  // finds nothing — that is how a cold start came to render four empty
-  // complete bubbles. A submission's records are therefore also recognised
-  // by position: in a linear append-only log, the assistant messages between
-  // ITS user message and the next one are its attempts, and nothing else.
+  // A submission's records are recognised two ways: 2.0 stamps
+  // `submissionId` on a snapshot's assistant messages (measured on a live
+  // harness), so matching by id finds them; the position fallback - the
+  // assistant messages between THIS settlement's user message and the next
+  // one - stands for records that predate the stamp, and is what rescued the
+  // cold start that once rendered four empty complete bubbles.
   for (const settlement of snapshot.settlements) {
     if (settlement.outcome === 'completed') continue
 
@@ -942,6 +949,8 @@ function applyChunk(draft: Draft, chunk: ChunkFacts, arrivedAt: number | null): 
         settlements: [],
       })
       const appended = seeded[0]
+      // Also the exit for a system message appended live (an abort advisory
+      // crossing the updates stream): seededFrom skips those on purpose.
       if (appended === undefined) return
       draft.items.push(appended)
       if (appended.kind === 'assistant') {

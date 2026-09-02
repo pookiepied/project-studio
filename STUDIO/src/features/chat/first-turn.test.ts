@@ -78,7 +78,7 @@ describe('starting a conversation with a live first turn', () => {
     expect(outcome.ok).toBe(true)
     if (!outcome.ok) throw new Error('unreachable')
     expect(attempt.bodies).toEqual([
-      JSON.stringify({ message: 'the first thing anyone types', modelId: SETTINGS.modelId, reasoningLevel: SETTINGS.reasoningLevel }),
+      JSON.stringify({ kind: 'user', body: 'the first thing anyone types', modelId: SETTINGS.modelId, reasoningLevel: SETTINGS.reasoningLevel }),
     ])
     // The handoff: where this turn's events begin, what to call it while it
     // has produced nothing, and the words themselves. Without the first the
@@ -110,7 +110,7 @@ describe('starting a conversation with a live first turn', () => {
     expect(outcome.ok).toBe(true)
     if (!outcome.ok) throw new Error('unreachable')
     expect(attempt.bodies).toEqual([
-      JSON.stringify({ message: 'on the default', reasoningLevel: 'default' }),
+      JSON.stringify({ kind: 'user', body: 'on the default', reasoningLevel: 'default' }),
     ])
     forgetFirstAdmission(outcome.conversationId)
   })

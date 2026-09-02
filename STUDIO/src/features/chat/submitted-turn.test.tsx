@@ -202,7 +202,8 @@ describe('what the receipt licenses the page to say', () => {
     const init = submission?.args['init']
     const body = isRecord(init) && typeof init['body'] === 'string' ? init['body'] : ''
     expect(JSON.parse(body)).toEqual({
-      message: 'watch this one',
+      kind: 'user',
+      body: 'watch this one',
       modelId: SETTINGS.modelId,
       reasoningLevel: SETTINGS.reasoningLevel,
     })

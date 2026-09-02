@@ -30,6 +30,26 @@ Status: Accepted — steps 1-3 implemented; steps 4-5 open, see below
 > consumer yet, which is the condition the step itself names.
 > `createRetryExecutionContext` exists with a test and no production caller; it
 > is marked declared-not-wired at the source under meta-task **#31**.
+>
+> **Reopened and reaffirmed, 2026-09-02 (Flue 2 migration, Phase 6).** The
+> step 4 condition has arrived: Flue 2.0 admits a caller-chosen
+> `idempotencyKey` upstream, and the semantics were measured against a live
+> 2.0 harness — a retried send with the same key converges on the original
+> submission (same receipt, `deduplicated: true`), and reusing a key with a
+> different payload rejects 409 `submission_conflict`. **The key is declined
+> for the current shape, and the conservative rule is reaffirmed:** nothing in
+> the tree resends a submission automatically, a lost acknowledgement
+> surfaces as `unreachable` with the instruction to check the transcript
+> before sending again, and the durable transcript read (ADR 0045) is the
+> answer to the ambiguity. Adoption would put the key's lifecycle in the
+> composer — minted per composed message, invalidated on any content or
+> settings change (a mismatch is a 409), retired when a person deliberately
+> resends after checking — which is a product decision of its own, not a
+> rider on the envelope reshape. **Reopen condition, named:** any future path
+> that resends a submission automatically (a scheduled send, a durable
+> outbox, a reconnecting admission queue) must carry the key; the mechanism
+> is now upstream and one option away. The decision is recorded with the
+> same wording at the harness client (`src/application/harness-client.ts`).
 
 ## Context
 

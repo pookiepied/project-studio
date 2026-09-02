@@ -258,6 +258,31 @@ describe('parseHarnessErrorBody', () => {
     expect(parseHarnessErrorBody({ code: 'models.configuration' })).toBeNull()
     expect(parseHarnessErrorBody('gateway exploded')).toBeNull()
   })
+
+  it('reads Flue own nested envelope, preferring details over the class sentence', () => {
+    expect(
+      parseHarnessErrorBody({
+        error: {
+          type: 'invalid_request',
+          message: 'Request is malformed.',
+          details: 'Delivered messages must be { kind: "user", body: string }.',
+        },
+      }),
+    ).toEqual({ error: 'Delivered messages must be { kind: "user", body: string }.' })
+  })
+
+  it('falls back to the nested message when details is empty or absent', () => {
+    expect(
+      parseHarnessErrorBody({ error: { type: 'operation_failed', message: 'The turn failed.', details: '' } }),
+    ).toEqual({ error: 'The turn failed.' })
+    expect(parseHarnessErrorBody({ error: { type: 'internal_error' } })).toBeNull()
+  })
+
+  it('reads a code from either shape', () => {
+    expect(
+      parseHarnessErrorBody({ error: { type: 'invalid_request', message: 'Bad.' }, code: 'x' }),
+    ).toEqual({ error: 'Bad.', code: 'x' })
+  })
 })
 
 describe('parseWireStreamEvent', () => {
@@ -612,6 +637,52 @@ describe('readConversationSnapshot', () => {
     if (chunk?.type !== 'conversation-reset') throw new Error('expected a reset chunk')
     expect(chunk.snapshot?.messages).toHaveLength(2)
     expect(chunk.position).toBeNull()
+  })
+
+  it('accepts the system advisory an aborted turn records, verbatim from a live 2.0 harness', () => {
+    // Measured off a real harness (Phase 6): using the stop control leaves
+    // history holding user, the empty assistant attempt, and this system
+    // message. Refusing it made every aborted conversation's cold start
+    // fail to parse at all.
+    const aborted = {
+      v: 1,
+      conversationId: 'conv_1',
+      offset: '0000000000000000_0000000000000007',
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          submissionId: 's1',
+          parts: [{ type: 'text', text: 'turn A [slow]', state: 'done' }],
+        },
+        { id: 'a1', role: 'assistant', submissionId: 's1', parts: [] },
+        {
+          id: 'entry_submission_aborted_s1',
+          role: 'system',
+          purpose: 'advisory',
+          display: 'diagnostic',
+          signal: { attributes: { submissionId: 's1', kind: 'direct', reason: 'aborted' } },
+          settlement: { outcome: 'aborted' },
+          parts: [{ type: 'text', text: 'Submission was aborted.', state: 'done' }],
+        },
+      ],
+      settlements: [
+        {
+          submissionId: 's1',
+          outcome: 'aborted',
+          error: {
+            name: 'FlueError',
+            message: 'Submission was aborted.',
+            type: 'submission_aborted',
+            details: 'The operation was stopped before it produced a completed response.',
+          },
+        },
+      ],
+    }
+    const parsed = readConversationSnapshot(aborted)
+    expect(parsed).not.toBeNull()
+    expect(parsed?.messages).toHaveLength(3)
+    expect(parsed?.messages[2]?.role).toBe('system')
   })
 })
 

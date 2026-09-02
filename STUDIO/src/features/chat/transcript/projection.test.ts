@@ -885,6 +885,69 @@ describe('a cold start applies the same failure rule to history-shaped snapshots
     expect(items[1]).toMatchObject({ kind: 'submission-failed', reason: SENTENCE })
   })
 
+  it('skips the system advisory an aborted turn records, and still renders the failure', () => {
+    // Measured verbatim on a live 2.0 harness (Phase 6): an aborted turn
+    // leaves history holding the user message, the empty assistant attempt,
+    // and a `system` advisory. The advisory itself is diagnostics; the
+    // settlement below it is what the transcript shows.
+    const items = seededFrom({
+      version: 1,
+      conversationId: CONVERSATION,
+      offset: '0000000000000000_0000000000000007',
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          submissionId: SUBMISSION,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [{ kind: 'text', text: 'too slow', state: 'done' }],
+        },
+        {
+          id: 'a1',
+          role: 'assistant',
+          submissionId: SUBMISSION,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [],
+        },
+        {
+          id: 'entry_submission_aborted_sub1',
+          role: 'system',
+          submissionId: null,
+          timestamp: null,
+          model: null,
+          usage: null,
+          parts: [{ kind: 'text', text: 'Submission was aborted.', state: 'done' }],
+        },
+      ],
+      settlements: [
+        {
+          submissionId: SUBMISSION,
+          outcome: 'aborted',
+          result: { present: false, value: undefined },
+          error: {
+            present: true,
+            name: 'FlueError',
+            type: 'submission_aborted',
+            message: 'Submission was aborted.',
+          },
+        },
+      ],
+    })
+    expect(items).toHaveLength(2)
+    expect(items[0]?.kind).toBe('user')
+    expect(items[1]).toMatchObject({
+      kind: 'submission-failed',
+      submissionId: SUBMISSION,
+      outcome: 'aborted',
+      reason: 'Submission was aborted.',
+    })
+    expect(items.some((item) => item.kind === 'assistant')).toBe(false)
+  })
+
   it('leaves another turn between the two user messages entirely alone', () => {
     const base = failedHistory()
     const snapshot: ConversationSnapshotFacts = {

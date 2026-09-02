@@ -127,10 +127,12 @@ describe('submitting a turn', () => {
     expect(calls[0].args['path']).toBe(`/agents/studio/${CONVERSATION}`)
     const init = calls[0].args['init'] as { method: string; body: string }
     expect(init.method).toBe('POST')
-    // The settings ride the same body as the words, spelled exactly as the
-    // harness contract names them.
+    // The words ride the 2.0 delivered-message envelope; the settings sit at
+    // the top level beside it, spelled exactly as the harness contract names
+    // them, where the turn-settings middleware reads them.
     expect(JSON.parse(init.body)).toEqual({
-      message: 'hello',
+      kind: 'user',
+      body: 'hello',
       modelId: 'google/gemini-3.5-flash',
       reasoningLevel: 'high',
     })
@@ -145,7 +147,7 @@ describe('submitting a turn', () => {
     await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' })
 
     const init = calls[0]?.args['init'] as { body: string }
-    expect(JSON.parse(init.body)).toEqual({ message: 'hello', reasoningLevel: 'default' })
+    expect(JSON.parse(init.body)).toEqual({ kind: 'user', body: 'hello', reasoningLevel: 'default' })
   })
 
   it('carries the permission mode in the harness vocabulary, and omits it when the stored mode stands', async () => {
@@ -164,7 +166,8 @@ describe('submitting a turn', () => {
     // The wire value is the one the admission boundary validates; the
     // picker's `auto` never reaches the body.
     expect(JSON.parse(init.body)).toEqual({
-      message: 'hello',
+      kind: 'user',
+      body: 'hello',
       reasoningLevel: 'default',
       permissionMode: 'full-auto',
     })
@@ -175,7 +178,7 @@ describe('submitting a turn', () => {
     expect(JSON.parse(later.body)).not.toHaveProperty('permissionMode')
   })
 
-  it('carries images in the Flue submission shape, spelled exactly as the contract names them', async () => {
+  it('carries images under attachments in the Flue delivered-attachment shape', async () => {
     const { invoke, calls } = scriptedInvoke({
       service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
     })
@@ -191,18 +194,21 @@ describe('submitting a turn', () => {
     )
 
     const init = calls[0]?.args['init'] as { body: string }
+    // 2.0 renamed the payload field: 1.0's `images` key is stripped at
+    // validation, so the images must travel under `attachments`.
     expect(JSON.parse(init.body)).toEqual({
-      message: 'look at this',
+      kind: 'user',
+      body: 'look at this',
       modelId: 'openai/gpt-4o',
       reasoningLevel: 'default',
-      images: [
+      attachments: [
         { type: 'image', data: 'aGk=', mimeType: 'image/png', filename: 'shot.png' },
         { type: 'image', data: 'aGk=', mimeType: 'image/jpeg' },
       ],
     })
   })
 
-  it('sends a text-only turn with no images key at all, byte-for-byte what it always sent', async () => {
+  it('sends a text-only turn with no attachments key at all', async () => {
     const { invoke, calls } = scriptedInvoke({
       service_fetch: () => serviceResponse(200, admission('sub_1', '7_2')),
     })
@@ -211,8 +217,8 @@ describe('submitting a turn', () => {
     await client.submitTurn('hello', { modelId: null, reasoningLevel: 'default' }, [])
 
     const init = calls[0]?.args['init'] as { body: string }
-    expect(init.body).not.toContain('images')
-    expect(JSON.parse(init.body)).toEqual({ message: 'hello', reasoningLevel: 'default' })
+    expect(init.body).not.toContain('attachments')
+    expect(JSON.parse(init.body)).toEqual({ kind: 'user', body: 'hello', reasoningLevel: 'default' })
   })
 
   it('keeps the harness refusal together with its status and its own sentence', async () => {
@@ -227,6 +233,58 @@ describe('submitting a turn', () => {
       ok: false,
       error: { kind: 'refused', status: 403, message: 'admission denied' },
     })
+  })
+
+  it('reads Flue own nested refusal envelope as the sentence a person can act on', async () => {
+    const { invoke } = scriptedInvoke({
+      // The 2.0 shape, verbatim from a live harness: the flat `error` string
+      // our own refusals send is replaced by a nested object whose `details`
+      // carries the reason and whose `message` is only the class sentence.
+      service_fetch: () =>
+        serviceResponse(
+          400,
+          JSON.stringify({
+            error: {
+              type: 'invalid_request',
+              message: 'Request is malformed.',
+              details:
+                'Delivered messages must be { kind: "user", body: string, attachments?: attachment[] }.',
+            },
+          }),
+        ),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    const result = await client.submitTurn('hello')
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: 'refused',
+        status: 400,
+        message:
+          'Delivered messages must be { kind: "user", body: string, attachments?: attachment[] }.',
+      },
+    })
+  })
+
+  it('falls back to the envelope class sentence when no details rode along', async () => {
+    const { invoke } = scriptedInvoke({
+      service_fetch: () =>
+        serviceResponse(
+          400,
+          JSON.stringify({ error: { type: 'invalid_request', message: 'Request is malformed.' } }),
+        ),
+    })
+    const client = createConversationClient({ conversationId: CONVERSATION, invoke })
+
+    const result = await client.submitTurn('hello')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.kind).toBe('refused')
+      expect(result.error.message).toBe('Request is malformed.')
+    }
   })
 
   it('reports a success whose body breaks the contract as malformed, not as a turn', async () => {

@@ -103,6 +103,10 @@ export function turnsUpTo(
 function turnsOfMessages(messages: readonly ConversationMessageFacts[]): SeedTurn[] {
   const turns: SeedTurn[] = []
   for (const message of messages) {
+    // 2.0's runtime advisories (abort markers and the like) arrive as
+    // `system` messages. They are not words anybody said, so a fork's
+    // inherited transcript does not carry them either.
+    if (message.role === 'system') continue
     const written = message.parts
       .filter((part) => part.kind === 'text')
       .map((part) => part.text)

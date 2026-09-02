@@ -112,6 +112,12 @@ pub enum StreamEvent {
     KeepAlive { offset: String },
     /// The run finished and the stream closed. The only normal end; the
     /// command returns `Ok(())` alongside it.
+    ///
+    /// The 2.0 harness never sends the `closed` control field that produces
+    /// this (see `deliver` for the measured contract), so in production a
+    /// run's end is learned from a `submission-settled` chunk on a stream
+    /// that stays open. The variant stays: it is the mirror's own end fact,
+    /// and the parser honours the field wherever a stream does send it.
     Ended { offset: String },
 }
 
@@ -131,7 +137,9 @@ enum BodyChunk {
 /// the same classification, so the loop says what happened and one `match`
 /// decides what it means.
 enum Outcome {
-    /// The harness said the run is over (`closed: true`).
+    /// The harness said the run is over (`closed: true`) - a field the 2.0
+    /// harness does not send (see `deliver`); reached only from a stream
+    /// that does, or from the tests that pin the shape.
     Closed,
     /// The server finished the body without the close frame that ends a
     /// finished run.
@@ -468,6 +476,19 @@ pub(crate) async fn harness_stream(
 /// consumed here rather than forwarded: their facts reach the webview as the
 /// offset on every event and as `UpToDate`/`Ended`. Everything else is the
 /// run itself, and goes through untouched.
+///
+/// The control contract as measured on a real 2.0 harness (Phase 6,
+/// frames read off the wire): `streamNextOffset` is always present and is
+/// the only field a frame cannot omit; `upToDate` appears only on the frames
+/// where it is true and is absent otherwise; **`closed` is never sent** -
+/// the 2.0 updates stream is endless by design (the server loops and
+/// heartbeats until the reader goes away) and a finished run is told to the
+/// webview by a `submission-settled` chunk, not by a close frame. This
+/// parser still honours `closed` - the field is in the stream protocol the
+/// module implements, the webview's `ended` delivery is part of its mirror,
+/// and the tests pin the shape - but nothing in production ends a stream
+/// with it any more: a read finishes by cancellation, by the reader
+/// vanishing, or by the connection breaking.
 fn deliver(
     frame: SseFrame,
     current_offset: &mut String,

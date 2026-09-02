@@ -192,12 +192,15 @@ export interface SubmittedTurn {
 /**
  * The settings a turn is sent with, beside its words.
  *
- * A submission body cannot carry these through Flue - its payload schema is
- * `message` and images, unknown keys stripped - so they are consumed at the
- * harness's own admission boundary and settled into the conversation index
- * before the run's initializer reads them. `modelId` is the runtime reference
- * in `<provider>/<model>` form, or null for the stable default; the reasoning
- * choice is "default" or a level, never folded into a synonym.
+ * Flue 2.0's submission payload is the delivered-message envelope - `kind`,
+ * `body`, and `attachments` - and its own validation strips unknown keys from
+ * it, so no setting can cross into the run inside the envelope. These keys
+ * therefore ride at the top level BESIDE the envelope, where the harness's
+ * turn-settings middleware reads and settles them into the conversation index
+ * before the run's render does; the runtime strips them from the payload it
+ * stores. `modelId` is the runtime reference in `<provider>/<model>` form, or
+ * null for the stable default; the reasoning choice is "default" or a level,
+ * never folded into a synonym.
  *
  * `permissionMode` is the execution mode the turn is sent under, in the
  * harness's own vocabulary (`manual` / `auto-edit` / `full-auto`). Absent
@@ -241,12 +244,15 @@ export function turnSettingsToWire(settings: EffectiveTurnSettings): TurnSetting
 /**
  * One image a turn carries beside its words, already read and encoded.
  *
- * The shape is Flue's submission contract, spelled once here: base64 bytes,
- * never a path — the sandbox has no read root that reaches anything the user
- * picked, and the model consumes pixels, not references. Bytes travel in the
- * moment of sending; the harness persists them and re-sends them to the model
- * on every later turn of the conversation, which is the only way a stateless
- * provider can see an image twice.
+ * The item shape is Flue's `DeliveredAttachment`, spelled once here: base64
+ * bytes, never a path - the sandbox has no read root that reaches anything
+ * the user picked, and the model consumes pixels, not references. The body
+ * key is `attachments` (Flue 2.0's own name for the field; 1.0 called it
+ * `images`, and a body still using the old name would have the images
+ * stripped silently at validation). Bytes travel in the moment of sending;
+ * the harness persists them and re-sends them to the model on every later
+ * turn of the conversation, which is the only way a stateless provider can
+ * see an image twice.
  */
 export interface TurnImageWire {
   readonly type: 'image'
@@ -376,7 +382,13 @@ export interface ConversationClient {
    * attached supersedes the older read first.
    */
   attach(handlers: AttachHandlers, options?: { readonly from?: string }): AttachHandle
-  /** Aborts the RUN: Flue's abort route, and the only thing that means abort. */
+  /**
+   * Aborts the RUN: Flue's abort route, and the only thing that means
+   * abort. 2.0's scope is the conversation's whole durable work - the
+   * in-flight submission AND anything queued behind it - not "the current
+   * turn" the way 1.0's was. Resolves with whether there was work to abort;
+   * the `aborted` settlement arrives asynchronously on the stream.
+   */
   abortRun(): Promise<TurnResult<boolean>>
 }
 
@@ -462,20 +474,26 @@ export function createConversationClient(options: ConversationClientOptions): Co
       // (the harness pins this behaviour in its own test), so a retry loop
       // would be duplication wearing a retry's clothes.
       //
-      // The settings keys are the harness contract's own (`modelId`,
-      // `reasoningLevel`, `permissionMode`), spelled once there. Null modelId
-      // is omitted: absent means the conversation's settled state stands.
-      // Images are Flue's own payload field, so they ride in the body
-      // unrenamed; empty means the key is absent, which is what a text-only
-      // turn has always sent.
+      // The body is Flue 2.0's delivered-message envelope - `kind: "user"`
+      // with the words in `body` - which is what the runtime validates before
+      // admission; the 1.0 wire's bare `message` string is refused with a 400
+      // before anything runs. The settings keys travel at the top level
+      // beside the envelope under the harness contract's own spellings
+      // (`modelId`, `reasoningLevel`, `permissionMode`): the turn-settings
+      // middleware reads them there, and Flue strips them from the stored
+      // payload. Null modelId is omitted: absent means the conversation's
+      // settled state stands. Images ride under `attachments`, Flue's own
+      // payload field (1.0's `images` key is gone and would be stripped) -
+      // empty means the key is absent, which is what a text-only turn sends.
       const wire = settings ?? { modelId: null, reasoningLevel: 'default' }
       const carried = images ?? []
       const sent = await request('POST', agentsPath(), JSON.stringify({
-        message,
+        kind: 'user',
+        body: message,
         ...(wire.modelId === null ? {} : { modelId: wire.modelId }),
         reasoningLevel: wire.reasoningLevel,
         ...(wire.permissionMode === undefined ? {} : { permissionMode: wire.permissionMode }),
-        ...(carried.length === 0 ? {} : { images: carried }),
+        ...(carried.length === 0 ? {} : { attachments: carried }),
       }))
       if ('failure' in sent) return { ok: false, error: sent.failure }
 
@@ -724,6 +742,17 @@ export function createConversationClient(options: ConversationClientOptions): Co
       return registration
     },
 
+    /**
+     * Aborts the RUN: Flue's abort route, and the only thing that means
+     * abort. 2.0's scope is the conversation's durable work - the in-flight
+     * submission AND anything queued behind it (measured on a live harness:
+     * a submission sent while a response was live joins that host response,
+     * so in practice one conversation holds at most one running response,
+     * but the contract is conversation-wide, not per-submission). The
+     * answer says whether there was work to abort; the `aborted` settlement
+     * itself arrives asynchronously on the stream, which is why the stop
+     * control reads on instead of ending anything.
+     */
     async abortRun() {
       const sent = await request('POST', `${agentsPath()}/abort`, undefined)
       if ('failure' in sent) return { ok: false, error: sent.failure }

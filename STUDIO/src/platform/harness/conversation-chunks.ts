@@ -75,8 +75,20 @@ export function readChunkPosition(value: unknown): ChunkPosition | null {
 /* Messages, parts, usage                                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Which side of the conversation a message is on. */
-export type MessageRole = 'user' | 'assistant'
+/**
+ * Which side of the conversation a message is on.
+ *
+ * `system` is 2.0's channel for runtime advisories - the terminal marker an
+ * aborted or interrupted submission records ("Submission was aborted."), and
+ * the recovery signals around a materialized partial stream. Measured on a
+ * live 2.0 harness: an aborted turn's history carries user, the empty
+ * assistant attempt, then a system message whose `settlement` names the
+ * outcome. A snapshot containing one is REJECTED unless the reader accepts
+ * the role, which is why the role is mirrored rather than filtered upstream:
+ * one stop control press must not make a conversation's history unreadable.
+ * The transcript does not render these; see `seededFrom`.
+ */
+export type MessageRole = 'user' | 'assistant' | 'system'
 
 /** How far a projected text or reasoning part had got when the snapshot was taken. */
 export type PartState = 'streaming' | 'done'
@@ -336,10 +348,14 @@ function readParts(value: unknown): readonly MessagePartFacts[] | null {
 export function readConversationMessage(value: unknown): ConversationMessageFacts | null {
   if (!isRecord(value)) return null
   const id = text(value['id'])
-  const role = oneOf(['user', 'assistant'] as const, value['role'])
+  const role = oneOf(['user', 'assistant', 'system'] as const, value['role'])
   const parts = readParts(value['parts'])
   if (id === null || role === null || parts === null) return null
 
+  // 2.0 stamps nothing into message metadata: whatever is there is
+  // agent-authored, and no Studio agent attaches any. `model`, `timestamp`
+  // and `usage` therefore read null on every 2.0 record - 1.0's
+  // `metadata.model` and friends are gone from the wire entirely.
   const metadata = isRecord(value['metadata']) ? value['metadata'] : {}
   return {
     id,
