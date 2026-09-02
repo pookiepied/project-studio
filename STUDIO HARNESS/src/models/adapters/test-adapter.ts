@@ -1,12 +1,16 @@
 import {
   createAssistantMessageEventStream,
+  createProvider,
   type Api,
   type AssistantMessage,
   type AssistantMessageEventStream,
   type Context,
   type Model,
+  type ModelCost,
+  type ProviderStreams,
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
+import { setProvider } from "@flue/runtime";
 
 import {
   defaultModelReference,
@@ -25,6 +29,53 @@ const TEST_PROVIDER = "project-studio";
 const TEST_MODEL = "default";
 const CONTEXT_WINDOW = 32_000;
 const MAX_OUTPUT_TOKENS = 4_096;
+
+/**
+ * Flue's dynamic-model opt-in, keyed the way its runtime declares it - a
+ * `Symbol.for` registry key, so the symbol this module builds is the one its
+ * bundle resolves, whatever copies of either package are loaded.
+ *
+ * A provider carrying this template answers `resolveModel` for ANY model id
+ * under it: the runtime synthesizes a zero-metadata model when the id is not
+ * in the declared list. That is the 2.0 spelling of what 1.0's
+ * `registerProvider` did for the test source by omitting a model list - a
+ * scripted model that answers whatever reference a conversation's index
+ * carries, because the source's job is to exercise the pipeline, not to
+ * second-guess the stored choice.
+ */
+const DYNAMIC_MODEL_TEMPLATE = Symbol.for("flue.dynamicModelTemplate");
+
+/** The scripted source prices nothing and carries no rates. */
+const UNPRICED: ModelCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+
+const TEST_MODEL_ENTRY: Model<Api> = {
+  id: TEST_MODEL,
+  name: "Scripted test model",
+  api,
+  provider: TEST_PROVIDER,
+  baseUrl: "in-process://project-studio-test",
+  reasoning: false,
+  input: ["text"],
+  cost: UNPRICED,
+  contextWindow: CONTEXT_WINDOW,
+  maxTokens: MAX_OUTPUT_TOKENS,
+};
+
+/**
+ * Auth that answers configured while promising nothing - the same shape
+ * pi-ai's faux provider uses. The runtime refuses to stream through a
+ * provider whose auth resolves to nothing; the scripted stream reads no
+ * credential, so the honest answer is an empty auth, which injects no key
+ * and no header into any request.
+ */
+const TEST_AUTH = {
+  apiKey: {
+    name: "Project Studio test source",
+    async resolve() {
+      return { auth: {} };
+    },
+  },
+};
 
 const TEST_CAPABILITY: ModelCapability = {
   textGeneration: "supported",
@@ -378,18 +429,36 @@ export class TestModelProviderAdapter implements ModelProviderAdapter {
   readonly operational = true;
 
   /**
-   * Phase 2/3 state (Flue 2.0 pins): deliberately a no-op.
+   * Mounts the scripted provider with the Flue runtime.
    *
-   * Under Flue 1.0 this method registered the scripted stream with Flue's own
-   * provider registry (`registerApiProvider`/`registerProvider`, both removed
-   * in 2.0). Flue 2.0 resolves models through Pi's own provider objects
-   * (`setProvider`), which is Phase 5's port - until then nothing is
-   * registered, so the harness boots and answers every non-model route, but
-   * any turn that reaches `useModel` fails with no provider to resolve it.
-   * That is the documented, broken-by-construction state Phases 2 and 3
-   * accept: the integration suites that drive real turns fail until Phase 5.
+   * The declared model list names the alias (`project-studio/default`, what
+   * this source's own `resolve` describes); the dynamic template lets any
+   * other reference a conversation carries resolve to a synthesized
+   * zero-metadata model, so a turn stored against a real catalog id still
+   * runs the scripted stream. Idempotent by replacement: the runtime keys
+   * providers by id, and a second registration with the same id replaces
+   * the first.
    */
-  register(): void {}
+  register(): void {
+    const scripted: ProviderStreams = {
+      stream: (model, context, options) => stream(model, context, options),
+      streamSimple: (model, context, options) => stream(model, context, options),
+    };
+    const provider = createProvider({
+      id: TEST_PROVIDER,
+      name: "Project Studio test source",
+      auth: TEST_AUTH,
+      models: [TEST_MODEL_ENTRY],
+      api: scripted,
+    });
+    setProvider(
+      Object.assign(provider, {
+        // Outside the declared Provider shape by design - the runtime reads
+        // it off the stored object - so it is attached, not constructed.
+        [DYNAMIC_MODEL_TEMPLATE]: { api, baseUrl: TEST_MODEL_ENTRY.baseUrl },
+      }),
+    );
+  }
 
   resolve(reference: ModelReference): ModelDescriptor {
     if (reference.source !== this.source) {
@@ -422,5 +491,20 @@ export class TestModelProviderAdapter implements ModelProviderAdapter {
     // reachable model is the alias itself, and the ladder has one rung.
     if (skip > 0) return undefined;
     return STUDIO_MODEL_ID;
+  }
+
+  /**
+   * The ladder snapshot: one rung, the alias, whatever rank zero would
+   * answer - the scripted source's availability is a constant, so the
+   * snapshot is too and the refresh is synchronous work in name only.
+   */
+  #ladder: readonly string[] = [];
+
+  backgroundLadder(): readonly string[] {
+    return this.#ladder;
+  }
+
+  async refreshBackgroundLadder(): Promise<void> {
+    this.#ladder = [STUDIO_MODEL_ID];
   }
 }

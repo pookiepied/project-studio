@@ -615,7 +615,7 @@ describe("modular monolith — 008.3 gate", () => {
       ].map((match) => match[1] as string);
 
       // Empty. All ten repositories are private; what the outside needs is
-      // reached through `servers` (a port) and the four `AgentHost` members,
+      // reached through `servers` (a port) and the two `AgentHost` members,
       // none of which is a repository handed over whole.
       expect(publicBags.sort()).toEqual([]);
     });

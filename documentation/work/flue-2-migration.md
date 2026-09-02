@@ -426,6 +426,34 @@ just the id - carry `#69`'s guard (scope built from the instance id) into
 the factory port and assert it in `agent-scope.test.ts`, which now pins
 identity and the model contracts instead.
 
+**Done, 2026-09-02** (see
+`report/PHASE-4-5-the-turn-that-actually-runs.md`). The render is the full
+port: `useModel` + `useSandbox` with the gated factory, the environment
+block after the static prompt, the hour-long `durability` static, and the
+async setup (`start`, `reconcile`, the three conversation directories)
+inside the factory's `createSandbox`, idempotent per submission. **The scope
+prefix is dropped** (grants re-measured at 0 rows first), the guard is
+asserted with values against a real runtime (two conversations, two scopes),
+and the render does NOT pass the `cwd` option - measured: 2.0 never
+validates a `cwd`'s existence anywhere, and `normalizePath` mangles Windows
+paths, so the sandbox environment's own cwd carries the workspace. **The
+titler's ladder is UP** via a synchronous snapshot the model layer
+maintains (`backgroundLadder` / `refreshBackgroundLadder` on the adapter
+contract, awaited once at boot before the server accepts a dispatch);
+1.0's fallbacks are preserved and the orchestrator's `-t<N>` contract is
+unchanged. Found and fixed en route: `installationRoot()` resolved two
+levels too high from the 2.0 bundle (containment silently absent in every
+built harness since Phase 2 - the Windows launcher was "not installed"), and
+the turn-settings middleware's `readMessage` still read the dead 1.0
+`message` field (no first-turn row could ever be created). The real-app exit
+ran: the desktop app launched, its harness went ready, and - the webview's
+send body still being 1.0-shaped (Phase 6's client reshape) - the proof
+turns drove the same artifact, home, journal and OpenRouter connection over
+the same HTTP surface: Full Auto wrote `phase45.txt` and `shell` answered
+**42**; a Manual turn asked, was answered, and wrote its file. Ten harness
+tests stay red until Phase 8 (the visible-retry/per-class-budget regression
+- enumerated in the report); nothing was weakened to get here.
+
 ### Phase 5 - Providers
 
 Both adapters to `createProvider` + `setProvider`; the catalog to full `Model`
@@ -452,6 +480,32 @@ safest move is likely aligning our direct pin to the runtime's range. And
 returns `AgentReadResult` from `wait()` (adapted early for typecheck), so
 check `storeResponses`-era assumptions against that shape here.
 
+**Done, 2026-09-02** (with Phase 4; see
+`report/PHASE-4-5-the-turn-that-actually-runs.md`). Both adapters mount
+through `createProvider` + `setProvider`. The local source registers ONE
+alias provider (`project-studio`) whose models mirror the local runtime's
+catalog under qualified `<provider>/<model>` ids and whose api is the alias
+router - it delegates through the local runtime's own Models collection,
+where the credential bridge and `streamSimple`'s translation live (registering
+real providers directly would have put auth in the runtime's
+credential-less collection). The test source mounts the scripted stream with
+Flue's `DYNAMIC_MODEL_TEMPLATE` so any stored reference resolves, 1.0's
+any-id behaviour in 2.0's spelling. **pi-ai is deduped, not aligned:** a
+`pnpm.overrides` entry forces `^0.84.0` everywhere, so the runtime resolves
+through the same 0.84.4 the adapters build against - the measured mechanism
+differed from the caution above (`setProvider` is a structural Map insert
+and a foreign-built provider WOULD register; the true risk was the delegated
+stream surface, which deduping removes). The deferred OpenRouter fix landed
+(`thinkingLevelMap.off = null` on every OpenRouter reasoning model in the
+local collection) and the wrong docblock at `contracts/models.ts` is
+rewritten to the real per-protocol picture. `storeResponses` / telemetry
+overrides: nothing in the tree references them (open question 4 answered).
+Measured on the user's real OpenRouter: a free-model turn with
+`reasoningLevel: "default"` admitted and completed; the reasoning-level-on-
+the-wire verification against real telemetry remains Phase 7's (2.0's
+history projection carries no per-message model metadata at all, so the old
+history-based assertion channel is gone).
+
 ### Phase 6 - The client and the stream
 
 `harness-client.ts` to conversation-scoped clients; the new send body shape;
@@ -476,6 +530,23 @@ offset/retry assumptions against the new chunk shapes, `wait()` semantics
 written down, the abort scope (in-flight AND queued now) documented, and the
 dedup decision - `idempotencyKey` exists upstream in 2.0, and adopting or
 declining it belongs to this phase with ADR 0033 reopened or reaffirmed.
+
+**Amended, 2026-09-02, by Phases 4/5:** the reshape has a SECOND half that
+moved from "eventual cleanup" to "the UI cannot admit a turn without it."
+`STUDIO/src/platform/harness/conversation.ts` `submitTurn` still posts the
+1.0 body (`{ message, modelId, reasoningLevel, ... }`), which Flue 2.0
+refuses with 400 before admission - measured in the real app: the composer's
+send answers 400 and the webview renders "the harness answered 400 with no
+explanation" (its error-shape reader also expects a field the 2.0 refusal
+bodies do not carry; our turn-settings refusal is `{ error, code }`). The
+harness side of the envelope is done (`turn-settings` reads `kind`/`body`,
+proven by the Phase 4/5 exit turns), so this phase's work is the webview's
+body, its refusal rendering, and the stream-path items above. Also measured
+for this phase: 2.0's history projection carries no model identity on
+assistant messages (1.0's `metadata.model` is gone), and errored assistant
+attempts are dropped from the projection - anything the webview or the
+transcript rendered from those channels now needs the stream/telemetry
+shapes instead.
 
 ### Phase 7 - Events, observability, and the stores
 
@@ -503,6 +574,17 @@ turn can run until Phase 5), the observability event renames, the
 `dispatchId`-to-`submissionId` sweep across receipts and telemetry, and the
 lost `title_model` log fact (restore it from a response event if one carries
 the model).
+
+**Amended, 2026-09-02, by Phases 4/5:** turns are real now, so the
+verification against LIVE events is finally possible, and two channel facts
+change what this phase verifies: 2.0's history projection carries no model
+identity on assistant messages (`metadata.model` is gone from the record
+entirely) and drops errored assistant attempts, so the `title_model` log
+fact and any run-side model identification must come from the telemetry
+events (or be re-derived from the settled settings row), and the retry
+attempt count is invisible until Phase 8's hunks land. The titler's ladder
+reads the model layer's synchronous snapshot (Phase 4/5), so a real titling
+run can be verified end to end for the first time in this phase.
 
 ### Phase 8 - The patches, last
 
@@ -532,6 +614,21 @@ empty-roster paragraph is in the bundle at
 `conversation-stream-store-*.mjs` ("None. No subagents are currently
 declared, so the `task` tool has no valid `agent` value - do not call it
 unless an agent is introduced later in the conversation.").
+
+**Amended, 2026-09-02, by Phases 4/5:** the regression's cost is now
+COUNTED: ten harness tests are red on exactly this regression (enumerated in
+`report/PHASE-4-5-the-turn-that-actually-runs.md`), and they are this
+phase's acceptance list - when the hunks land, those ten come back green and
+nothing else needs to move. One sharpening for the retry hunk: under 2.0.3,
+the retries that do happen are invisible in BOTH channels at once (no
+`submission-retrying` chunk AND the errored assistant attempt is dropped
+from the history projection), so the re-derived patch should treat the
+attempt record itself as part of "visible". The `composeSystemPrompt`
+decision is unchanged. One dependency note: pi-ai is deduped to a single
+0.84.4 instance by a pnpm override (Phase 4/5), so the re-derived hunks
+anchor against the 2.0.3 bundles under an overridden dependency tree - the
+bundle bytes are unchanged, but re-verify the anchor hashes after any lock
+file move.
 
 ---
 

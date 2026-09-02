@@ -32,7 +32,10 @@ function scopeFor(
     clientId: "test-client",
     sessionId: "test-session",
     agentId: overrides.agentId ?? STUDIO_AGENT_ID,
-    conversationId: `conversation:${threadId}`,
+    // Under Flue 2.0 the agent instance id IS the conversation id, so the
+    // scope vocabulary is the bare id - the 1.0 `conversation:` prefix is
+    // gone, and what the store keys on is what the render passed.
+    conversationId: threadId,
     projectId: overrides.projectId ?? "proj-1",
   };
 }

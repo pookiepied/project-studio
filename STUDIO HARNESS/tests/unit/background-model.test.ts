@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import { LocalModelProviderAdapter } from "../../src/models/adapters/local-adapter.js";
 import { TestModelProviderAdapter } from "../../src/models/adapters/test-adapter.js";
-import { backgroundModelSpecifier } from "../../src/models/background-model.js";
+import {
+  backgroundLadderSpecifier,
+} from "../../src/models/background-model.js";
 import { ModelRegistry } from "../../src/models/model-registry.js";
 import type { LocalModelConfig } from "../../src/models/local/config.js";
 import { API_LOADERS } from "../../src/models/local/apis.js";
@@ -204,12 +206,52 @@ describe("the background model policy", () => {
     expect(await registry.backgroundModel()).toBeUndefined();
   });
 
-  it("keeps the alias fallback when the registry has no answer", async () => {
-    // BootstrappedModelRegistry is undefined in this process (nothing
-    // bootstrapped it), so the specifier falls back to the alias rather
-    // than building a second model source.
-    expect(await backgroundModelSpecifier()).toBe("project-studio/default");
-    // A retry with no model layer has no ladder to step down.
-    expect(await backgroundModelSpecifier(1)).toBeUndefined();
+  it("keeps the alias fallback in a process with no model layer", () => {
+    // The ladder read is synchronous now (a Flue 2.0 render cannot await),
+    // and the fallback is the same as 1.0's: no bootstrapped registry means
+    // nothing cheaper is known, rank zero reads the alias, and a retry has
+    // no rung to step down to.
+    expect(backgroundLadderSpecifier(0)).toBe("project-studio/default");
+    expect(backgroundLadderSpecifier(1)).toBeUndefined();
+  });
+
+  it("serves the ladder from the snapshot, and the snapshot only changes on refresh", async () => {
+    // The ladder a render reads is the model layer's maintained answer, not
+    // a live query: an unrefreshed registry answers nothing, and a refresh
+    // - what the composition root awaits before the server can accept a
+    // dispatch - fills every rank the source can name, in the same order
+    // the per-rank query answers them.
+    const adapter = adapterOver(
+      collectionWith([
+        {
+          id: "budget",
+          configured: true,
+          models: [
+            pricedModel("budget", "cheap", 0.5, 2),
+            pricedModel("budget", "cheaper", 0, 0),
+          ],
+        },
+      ]),
+    );
+    const registry = new ModelRegistry();
+    registry.registerAdapter(adapter);
+
+    expect(registry.backgroundLadder()).toEqual([]);
+
+    await registry.refreshBackgroundLadder();
+    expect(registry.backgroundLadder()).toEqual([
+      "project-studio/budget/cheaper",
+      "project-studio/budget/cheap",
+    ]);
+    expect(await registry.backgroundModel(0)).toBe(registry.backgroundLadder()[0]);
+    expect(await registry.backgroundModel(1)).toBe(registry.backgroundLadder()[1]);
+
+    // The refresh recomputes; a second one changes nothing when the
+    // availability has not moved.
+    await registry.refreshBackgroundLadder();
+    expect(registry.backgroundLadder()).toEqual([
+      "project-studio/budget/cheaper",
+      "project-studio/budget/cheap",
+    ]);
   });
 });

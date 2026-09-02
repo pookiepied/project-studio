@@ -1,8 +1,11 @@
 'use agent';
 
-import { useModel, type AgentProps } from "@flue/runtime";
+import { useModel, useSandbox, type AgentProps } from "@flue/runtime";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
+import { STUDIO_AGENT_ID } from "../contracts/agents.js";
+import { conversationWorkspaceDirectory } from "../platform/paths.js";
+import { environmentBlock, environmentFacts } from "../context/environment.js";
 import { STUDIO_SYSTEM_PROMPT } from "../context/system-prompt.js";
 import {
   DEFAULT_MODEL_PROVIDER,
@@ -49,35 +52,84 @@ export function studioThinkingLevel(
 }
 
 /**
- * Project Studio's local-first general agent.
+ * Why every root argument the sandbox factory receives is passed instead of
+ * inherited.
  *
- * Phase 2/3 minimum (Flue 2.0 pins): this is the shape that compiles and
- * mounts so the server starts under the Rust supervisor. What the full port
- * re-lands in Phase 4, measured rather than forgotten:
+ * A normal conversation has no project, and a projectless turn needs somewhere
+ * to stand that is not somebody else's working directory. Passing neither
+ * `projectRoot` nor a conversation workspace would drop the sandbox onto the
+ * runtime default - the harness process's own cwd, which under the desktop
+ * host is the Tauri build directory - and every read that `defaultVerdict`
+ * allows without a grant (a studio-authored read-only capability) would
+ * reach whatever source tree surrounds the process.
  *
- * - `useSandbox(...)` with the gated factory (`createAgentSandbox` - the
- *   permission kernel, `CallGate`, native tools, the conversation workspace).
- *   Omitted here on purpose: without it the runtime's default in-memory
- *   sandbox gives the model no filesystem reach, which is the safe posture
- *   for a phase where no turn can run anyway (no provider is registered -
- *   Phase 5).
- * - `runtime.start()`, `runtime.reconcile()` and the three `ensureDirectory`
- *   calls move into the factory's `createSandbox(options)`, which runs once
- *   per submission (Phase 0's measurement) and must stay idempotent per call.
- * - The environment block appended after the static prompt.
+ * So each conversation stands in a directory of its own under the Studio
+ * home: `workspace/` is the sandbox root and starts empty, so what a
+ * default-allowed read can see is exactly what this conversation owns.
+ * `attachments/` and `artifacts/` are siblings on purpose - nothing inside
+ * them is the model's to browse by default. The directories themselves are
+ * created by the factory's `createSandbox` (Phase 0's measured ordering:
+ * the render runs first, the factory once per submission), which is also
+ * what makes the tree's existence the consequence of an admitted
+ * submission: a send the harness refuses never reaches a render, and
+ * creates nothing.
  *
- * The static prompt first, then what varies - that order is the cache
- * argument and Phase 4 keeps it. The identity is pinned with a string
- * literal because the build derives the durable identifier statically: a
- * rename here would orphan every stored conversation, and the contract
- * constant is asserted against the literal by the unit suite.
+ * A conversation belonging to a project will pass its project's roots here
+ * rather than take this tree; the shape is ready for that -
+ * `createAgentSandbox` already accepts both arguments per call.
+ *
+ * ---- Where the model comes from -------------------------------------------
+ *
+ * The model and reasoning level a person picked are read from the conversation
+ * index, once per render, from the settled row. A submission cannot carry
+ * them: Flue parses the payload down to `message` and images, and this render
+ * receives only `{ id }` - so the durable row, settled by the turn-settings
+ * middleware before the submission was admitted, is the only channel that
+ * exists. The reference is in the local runtime's own `<provider>/<model>`
+ * vocabulary; prefixed with the studio provider it becomes the specifier
+ * Flue resolves, which the local adapter routes at the named model.
+ *
+ * An unset model stays the stable alias, which routes to the harness's own
+ * default. Values are submission-scoped: a run already in flight keeps the
+ * model its submission started with; a change takes effect from the next
+ * one.
+ *
+ * ---- The static prompt first, then what varies ----------------------------
+ *
+ * The order is the cache argument: the static prompt is byte-identical for
+ * every conversation so that it and the tool array form one cached prefix,
+ * and only the environment block re-bills when a conversation is new or the
+ * day has turned. Carrying the block on the submission instead of the
+ * instructions was tried and reverted: the webview renders a user message's
+ * text verbatim into the person's own bubble, so a block delivered that way
+ * is a block they read every time they speak. Paying the system block at
+ * full rate on a conversation's first turn is the cheaper of the two
+ * mistakes.
  */
 export function Studio({ id }: AgentProps) {
-  const settings = getStudioRuntime().conversationTurnSettings(id);
+  const runtime = getStudioRuntime();
+  const settings = runtime.conversationTurnSettings(id);
   useModel(studioModelSpecifier(settings), {
     thinkingLevel: studioThinkingLevel(settings),
   });
-  return STUDIO_SYSTEM_PROMPT;
+  const workspace = conversationWorkspaceDirectory(id);
+  useSandbox(
+    runtime.createAgentSandbox({
+      // `id` is the agent *instance* - one per conversation thread, measured
+      // rather than assumed - so under Flue 2.0 it IS the conversation id,
+      // and the agent is named separately. Feeding it to `agentId` was #69.
+      agentId: STUDIO_AGENT_ID,
+      conversationId: id,
+      // Per conversation, always. Passing these explicitly is the whole
+      // reason this conversation cannot read the host's build directory by
+      // default; a project conversation overrides them from its project
+      // record later.
+      projectRoot: workspace,
+    }),
+  );
+  return `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
+    environmentFacts(workspace, new Date()),
+  )}`;
 }
 
 /**
@@ -86,3 +138,26 @@ export function Studio({ id }: AgentProps) {
  * literal equals `STUDIO_AGENT_ID` so the two cannot drift apart.
  */
 Studio.agentName = "studio";
+
+/**
+ * The wall-clock ceiling on one submission, which has to allow for the time
+ * a person spends deciding.
+ *
+ * This was five minutes, chosen when the longest thing a turn could do was
+ * think and read. A turn can now stop and ask, and a question in Manual
+ * parks the run until somebody answers it - which is minutes if they are at
+ * the keyboard and hours if they are not.
+ *
+ * Measured before settling on it, because the contract and the behaviour
+ * disagreed: Flue documents this as the wall-clock limit on one submission
+ * and says a submission over it "is aborted and settled as failed", but a
+ * question left unanswered for eight minutes stayed parked and answering it
+ * woke the run. It is still the right number to carry deliberately rather
+ * than inherit silently: this bound is not what protects the machine from a
+ * run that misbehaves. Every tool call is bounded separately and far more
+ * tightly by `CallBounds` (two minutes by default, ten for `shell`), the
+ * model's own requests carry their own timeouts, and a person watching has
+ * a stop control. What is left for this number to cover is the one thing
+ * that legitimately takes a long time: waiting for a human.
+ */
+Studio.durability = { maxAttempts: 3, timeoutMs: 3_600_000 };

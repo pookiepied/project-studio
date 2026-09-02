@@ -3,7 +3,8 @@
 import { useModel, type AgentProps } from "@flue/runtime";
 
 import { TITLE_PROMPT } from "../context/title-prompt.js";
-import { STUDIO_MODEL_ID } from "../contracts/models.js";
+import { ProviderConfigurationError, STUDIO_MODEL_ID } from "../contracts/models.js";
+import { backgroundLadderSpecifier } from "../models/background-model.js";
 
 /**
  * The automatic titling agent.
@@ -34,28 +35,51 @@ import { STUDIO_MODEL_ID } from "../contracts/models.js";
  *   crosses back into the product is the parsed title, written by the
  *   titling orchestrator, never by this module.
  *
- * The model is supposed to be the model layer's choice - the least expensive
- * model the harness can honestly reach, because eight words must not
- * silently ride a frontier model. Phase 2/3 state (Flue 2.0 pins): the
- * ladder is DOWN. The old initializer resolved `backgroundModelSpecifier`
- * asynchronously, and a 2.0 agent function must be synchronous, so for now
- * every run uses the stable alias and the retry ladder below is out of
- * reach. The orchestrator's retry contract (attempt N dispatched to a
- * `<conversation id>-t<N>` instance id) survives unchanged; restoring the
- * ladder - a synchronous read of the model layer's cheapest reachable model
- * - is Phase 4/5 work and must land before titling goes back into service.
+ * The model is the model layer's choice (`backgroundLadderSpecifier`): the
+ * least expensive model the harness can honestly reach, because eight words
+ * must not silently ride a frontier model. The prompt is fixed - it is the
+ * entire instruction the run gets, verbatim, and it is a security property
+ * in one line: the input is untrusted text, and the agent must not follow
+ * it.
  */
 /**
  * The retry contract between this agent and the titling orchestrator, stated
  * where it will be read again: the orchestrator dispatches attempt N (N >= 1)
- * to the instance id `<conversation id>-t<N>`, and the agent-side half - the
- * render parsing the suffix to step down the ladder - returns together with
- * the ladder itself (Phase 4/5). With the ladder down both attempts run the
- * same model; the orchestrator's one-bounded-second-chance behaviour is
- * unchanged.
+ * to the instance id `<conversation id>-t<N>`, and the render parses the
+ * suffix to step one rung down the model ladder. A fresh instance id is what
+ * makes the model choice move: the render sees the instance id and nothing
+ * else. The suffix cannot collide with a real conversation id: the webview
+ * mints `cnv_<uuid>`, and `t` is not a hexadecimal digit, so no uuid ends in
+ * `-t<digits>`.
  */
-export function Title(_props: AgentProps) {
-  useModel(STUDIO_MODEL_ID, {
+const ATTEMPT_SUFFIX = /-t(\d+)$/;
+
+/**
+ * The model an attempt runs on, from the model layer's ladder.
+ *
+ * The ladder is a synchronous read (`background-model.ts` explains why it
+ * must be one and how it stays honest): rank N for attempt N, undefined past
+ * the end. Past rank zero an exhausted ladder fails the run - the fallback
+ * alias is the expensive model the policy exists to avoid, and the derived
+ * title already covers the conversation. At rank zero the alias is 1.0's
+ * documented fallback, reached only when the model layer can name nothing
+ * cheaper (nothing connected, or no model layer in this process at all); the
+ * ladder itself, restored in Phase 4/5, is what keeps titling OFF the
+ * frontier alias whenever a cheaper candidate exists to name.
+ */
+export function titleModelSpecifier(attempt: number): string {
+  const specifier = backgroundLadderSpecifier(attempt);
+  if (specifier !== undefined) return specifier;
+  if (attempt === 0) return STUDIO_MODEL_ID;
+  throw new ProviderConfigurationError(
+    `No background model candidate at rank ${attempt} for titling.`,
+  );
+}
+
+export function Title(props: AgentProps) {
+  const parsed = ATTEMPT_SUFFIX.exec(props.id);
+  const attempt = parsed === null ? 0 : Number(parsed[1]);
+  useModel(titleModelSpecifier(attempt), {
     // Eight words need no reasoning spend; an explicit off also stops the
     // runtime substituting its own medium for an unset level.
     thinkingLevel: "off",

@@ -335,13 +335,25 @@ describe("MCP through the Flue agent", () => {
 
     const client = new FlueHarnessClient({ baseUrl: harness.baseUrl, token: harness.token });
     const run = await client.send("mcp", "use mcp");
+    // The first containment of a workspace runs the Windows launcher
+    // synchronously - a second or so per check and grant - and during one of
+    // those blocked windows the harness's HTTP layer drops a keep-alive
+    // socket. A dropped poll is a transport hiccup, not an answer: the
+    // predicate asks "is an approval waiting?" and a failed fetch means "not
+    // yet", so it is absorbed and the poll continues inside the same
+    // deadline rather than failing a test whose subject is the permission
+    // flow.
     await waitUntil(async () => {
-      const response = await fetch(`${harness?.baseUrl}/api/permissions/pending`, {
-        headers: { authorization: `Bearer ${harness?.token}` },
-      });
-      const pending = (await response.json()) as readonly unknown[];
-      return pending.length > 0;
-    }).catch(() => {
+      try {
+        const response = await fetch(`${harness?.baseUrl}/api/permissions/pending`, {
+          headers: { authorization: `Bearer ${harness?.token}` },
+        });
+        const pending = (await response.json()) as readonly unknown[];
+        return pending.length > 0;
+      } catch {
+        return false;
+      }
+    }, 30_000).catch(() => {
       throw new Error(`No approval arrived. Harness output: ${harness?.output()}`);
     });
 

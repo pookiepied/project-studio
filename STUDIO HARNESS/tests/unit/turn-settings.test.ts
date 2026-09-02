@@ -84,7 +84,7 @@ beforeEach(() => {
 describe("the turn settings a submission carries", () => {
   it("creates a first conversation's row at admission, carrying the settings", async () => {
     const response = await submit("cnv_first", {
-      message: "What files can you see?",
+      kind: "user", body: "What files can you see?",
       modelId: MODEL,
       reasoningLevel: "high",
     });
@@ -101,7 +101,7 @@ describe("the turn settings a submission carries", () => {
   it("removes a row it created when the run is refused", async () => {
     downstream = "refuses";
     const response = await submit("cnv_refused", {
-      message: "Never admitted",
+      kind: "user", body: "Never admitted",
       modelId: MODEL,
     });
 
@@ -116,7 +116,7 @@ describe("the turn settings a submission carries", () => {
     store.record({ id: "cnv_two", firstMessage: "Earlier words" });
 
     const response = await submit("cnv_two", {
-      message: "Now with a model",
+      kind: "user", body: "Now with a model",
       modelId: "google/gemini-3.5-flash",
       reasoningLevel: "default",
     });
@@ -138,7 +138,7 @@ describe("the turn settings a submission carries", () => {
       reasoningLevel: "max",
     });
 
-    const response = await submit("cnv_keep", { message: "Plain turn" });
+    const response = await submit("cnv_keep", { kind: "user", body: "Plain turn" });
 
     expect(response.status).toBe(202);
     const record = store.get("cnv_keep");
@@ -148,7 +148,7 @@ describe("the turn settings a submission carries", () => {
 
   it("refuses settings the contract cannot describe", async () => {
     const response = await submit("cnx_bad", {
-      message: "Hello",
+      kind: "user", body: "Hello",
       reasoningLevel: "colossal",
     });
 
@@ -161,7 +161,7 @@ describe("the turn settings a submission carries", () => {
 
   it("refuses a model no connection currently serves", async () => {
     const response = await submit("cnv_unserved", {
-      message: "Hello",
+      kind: "user", body: "Hello",
       modelId: "openrouter/gone/model",
     });
 
@@ -176,7 +176,7 @@ describe("the turn settings a submission carries", () => {
   // under is the one the sender chose.
   it("settles the permission mode before the run is admitted", async () => {
     const response = await submit("cnv_mode", {
-      message: "Rearrange these files",
+      kind: "user", body: "Rearrange these files",
       permissionMode: "auto-edit",
     });
 
@@ -187,7 +187,7 @@ describe("the turn settings a submission carries", () => {
   it("keeps a conversation's stored mode when the submission carries none", async () => {
     store.record({ id: "cnv_held", firstMessage: "Earlier", permissionMode: "full-auto" });
 
-    const response = await submit("cnv_held", { message: "Plain turn" });
+    const response = await submit("cnv_held", { kind: "user", body: "Plain turn" });
 
     expect(response.status).toBe(202);
     expect(store.get("cnv_held")?.permissionMode).toBe("full-auto");
@@ -198,7 +198,7 @@ describe("the turn settings a submission carries", () => {
     // value this boundary cannot describe is a consent it cannot have been
     // given, and silently mapping it onto a mode would be a grant.
     const response = await submit("cnv_bad_mode", {
-      message: "Hello",
+      kind: "user", body: "Hello",
       permissionMode: "edits",
     });
 
@@ -208,7 +208,7 @@ describe("the turn settings a submission carries", () => {
 
   it("refuses a null mode rather than reading it as any mode", async () => {
     const response = await submit("cnv_null_mode", {
-      message: "Hello",
+      kind: "user", body: "Hello",
       permissionMode: null,
     });
 
@@ -217,7 +217,7 @@ describe("the turn settings a submission carries", () => {
   });
 
   it("passes a submission through untouched when it carries no settings object", async () => {
-    const response = await submit("cnv_plain", { message: "Just words" });
+    const response = await submit("cnv_plain", { kind: "user", body: "Just words" });
 
     expect(response.status).toBe(202);
     // The middleware created the row itself here (first turn, no settings) -
@@ -239,7 +239,7 @@ describe("the turn settings a submission carries", () => {
 
   it("hands a first admission's message to titling, and only that", async () => {
     const response = await submit("cnv_titled", {
-      message: "Can you help me figure out why my build keeps failing?",
+      kind: "user", body: "Can you help me figure out why my build keeps failing?",
     });
 
     expect(response.status).toBe(202);
@@ -252,7 +252,7 @@ describe("the turn settings a submission carries", () => {
 
     // A later turn of the same conversation is not a first admission; the
     // words have already been handed over once.
-    await submit("cnv_titled", { message: "Second turn entirely" });
+    await submit("cnv_titled", { kind: "user", body: "Second turn entirely" });
     expect(titlingCalls).toHaveLength(1);
   });
 
@@ -260,7 +260,7 @@ describe("the turn settings a submission carries", () => {
     // Composing without a titler is the tests' own shape; it must stay
     // silent rather than reach for a titler that was never composed.
     const response = await submitWithoutTitling("cnv_unwired", {
-      message: "First words",
+      kind: "user", body: "First words",
     });
 
     expect(response.status).toBe(202);

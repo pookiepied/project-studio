@@ -23,6 +23,35 @@ export function customProviderEnvVar(id: string): string {
   return `${id.replace(/-/g, "_").toUpperCase()}_API_KEY`;
 }
 
+/**
+ * The Pi provider id whose reasoning models route through OpenRouter's own
+ * reasoning object.
+ */
+const OPENROUTER_PROVIDER = "openrouter";
+
+/**
+ * "No explicit effort requested" must reach OpenRouter as silence.
+ *
+ * The OpenRouter request format injects `reasoning: { effort: "none" }` when
+ * a reasoning model is asked without an explicit level, and effort "none" is
+ * not silence - it is a request to think not at all. A person whose reasoning
+ * choice is "default" (the dial's resting state) asked for the provider's own
+ * behaviour, and got reasoning switched off instead. The deferred fix, long
+ * named and never taken while pi-ai was off limits, is pi-ai's own opt-out:
+ * a model whose `thinkingLevelMap.off` is `null` makes the format layer send
+ * no reasoning parameter at all. Applied here, at the one place this harness
+ * composes Pi's catalog, to every OpenRouter reasoning model; a model record
+ * that already maps other levels keeps them. Task 38 measured the wire shape
+ * this corrects; `runThinkingLevelForChoice` documents the full protocol
+ * picture.
+ */
+function applyOpenRouterDefaultReasoning(models: MutableModels): void {
+  for (const model of models.getModels(OPENROUTER_PROVIDER)) {
+    if (!model.reasoning) continue;
+    model.thinkingLevelMap = { ...model.thinkingLevelMap, off: null };
+  }
+}
+
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
@@ -230,6 +259,10 @@ export function createModelsCollection(options: {
       }),
     );
   }
+
+  // After every setProvider above, so the extras' rebuilt providers are
+  // covered too - the fix edits the model records the catalog holds.
+  applyOpenRouterDefaultReasoning(models);
 
   return models;
 }

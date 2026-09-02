@@ -29,6 +29,12 @@ import type { ExecutionMode } from "../permissions/mode.js";
 import { posture, WorkspaceTrustStore } from "../permissions/trust.js";
 import { createErrorReporter } from "../observability/error-reporter.js";
 import type { Logger } from "../observability/logger.js";
+import {
+  conversationArtifactsDirectory,
+  conversationAttachmentsDirectory,
+  conversationWorkspaceDirectory,
+  ensureDirectory,
+} from "../platform/paths.js";
 import { SandboxError } from "../sandbox/errors.js";
 import { LocalSandbox } from "../sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../sandbox/policy.js";
@@ -68,17 +74,20 @@ export interface StudioRuntimeOptions {
 }
 
 export interface StudioAgentSandboxOptions {
-  /** The agent, not the thread — see `contracts/agents.ts`. */
+  /** The agent, not the thread - see `contracts/agents.ts`. */
   readonly agentId: string;
   /**
-   * Required, and deliberately without a default.
+   * The conversation the sandbox and its permission scope belong to.
    *
-   * It defaulted to `` `conversation:${agentId}` ``, which is safe only while
-   * `agentId` happens to be unique per conversation. Now that it is not, that
-   * default would collapse every conversation of one agent into a single
-   * permission scope — a grant given in one would silently apply in all of
-   * them. Making the caller say which conversation this is keeps that
-   * structural rather than conventional (ADR 0015's reasoning, one level down).
+   * Required, and deliberately without a default. Under Flue 2.0 the agent
+   * instance id IS the conversation id, so the caller passes it bare - the
+   * 1.0 `conversation:` prefix is gone from the scope vocabulary. The guard
+   * #69 bought stays: the scope is built from the instance id, and the agent
+   * is named separately, so a standing grant can leave the thread that gave
+   * it only through the duration it was granted for. A default here would
+   * collapse every conversation of one agent into a single permission scope
+   * the moment the two readings of "id" drift apart again (ADR 0015's
+   * reasoning, one level down).
    */
   readonly conversationId: string;
   readonly projectId?: string;
@@ -207,27 +216,28 @@ function sessionEnvironment(sandbox: LocalSandbox): Sandbox {
 /**
  * What the Flue agent module needs from the runtime.
  *
- * `agents/studio.ts` is default-exported to Flue's `defineAgent` and loaded by
- * Flue's own module resolution, so there is no point at which anything can be
- * injected into it — which is why a service locator exists there at all. This
- * is the narrowest type that locator can return: five members, not the class
- * (ADR 0035 §6).
+ * `agents/studio.ts` is loaded by Flue's own module resolution, so there is no
+ * point at which anything can be injected into it — which is why a service
+ * locator exists there at all. This is the narrowest type that locator can
+ * return, and it is two members, not the class (ADR 0035 §6): the sandbox
+ * factory the render mounts, and the turn-settings read that decides the
+ * model. Everything else the run needs - runtime start, extension
+ * reconciliation, the conversation's directories - happens inside the
+ * factory's `createSandbox`, once per submission, where the measured
+ * ordering puts it.
  */
 export interface AgentHost {
-  readonly projectRoot: string;
-  start(): Promise<void>;
-  reconcile(): Promise<void>;
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory;
   /**
-   * The model and reasoning level a conversation is held with, as the run
-   * initializer needs them: the model reference in the local runtime's own
+   * The model and reasoning level a conversation is held with, as the render
+   * needs them: the model reference in the local runtime's own
    * `<provider>/<model>` vocabulary, or null for the stable default alias,
    * and the stored reasoning choice or null for the provider's own default.
    *
-   * Read once per run, inside the initializer. Flue re-runs it for every run,
-   * so a conversation whose model changed between turns takes the new one on
-   * the next run, and a run already in flight keeps the model its own
-   * initializer resolved - that is the behaviour, not an accident to fix.
+   * Read once per render, synchronously. Flue re-renders for every run, so a
+   * conversation whose model changed between turns takes the new one on the
+   * next run, and a run already in flight keeps the model its own
+   * submission started with - that is the behaviour, not an accident to fix.
    */
   conversationTurnSettings(conversationId: string): {
     readonly modelId: string | null;
@@ -242,7 +252,7 @@ export interface AgentHost {
  * happened here and nothing stopped it leaking; counting the callers showed six
  * of the ten had no consumer outside this class at all (ADR 0035 §1). What the
  * outside needs is exposed deliberately: `servers` for the HTTP surface, and
- * the four `AgentHost` members for the Flue agent module.
+ * the `AgentHost` members for the Flue agent module.
  */
 export class StudioRuntime implements AgentHost {
   readonly #db: StudioDatabase;
@@ -405,18 +415,16 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
-   * The conversation index's own id for a scope id.
-   *
-   * The scope's conversation id is the `conversation:`-prefixed form
-   * `agents/studio.ts` writes; the store is keyed by the conversation's own
-   * id. Two consumers receive the prefixed form - the image-capability probe
-   * and the per-conversation mode - and both strip it here, at one place,
-   * rather than each keeping its own spelling of the rule.
+   * The read history of one conversation, created on that conversation's first
+   * run and kept until the conversation is forgotten.
    */
-  #conversationRowId(conversationId: string): string {
-    return conversationId.startsWith("conversation:")
-      ? conversationId.slice("conversation:".length)
-      : conversationId;
+  #accessLogFor(conversationId: string): FileAccessLog {
+    let log = this.#accessLogs.get(conversationId);
+    if (log === undefined) {
+      log = new FileAccessLog();
+      this.#accessLogs.set(conversationId, log);
+    }
+    return log;
   }
 
   /**
@@ -431,22 +439,8 @@ export class StudioRuntime implements AgentHost {
    * is Manual, which is the same answer an unset row gives: no recorded
    * consent, nothing widened.
    */
-  /**
-   * The read history of one conversation, created on that conversation's first
-   * run and kept until the conversation is forgotten.
-   */
-  #accessLogFor(conversationId: string): FileAccessLog {
-    let log = this.#accessLogs.get(conversationId);
-    if (log === undefined) {
-      log = new FileAccessLog();
-      this.#accessLogs.set(conversationId, log);
-    }
-    return log;
-  }
-
   #conversationMode(conversationId: string): ExecutionMode {
-    return this.#conversations.get(this.#conversationRowId(conversationId))?.permissionMode
-      ?? "manual";
+    return this.#conversations.get(conversationId)?.permissionMode ?? "manual";
   }
 
   /**
@@ -462,7 +456,7 @@ export class StudioRuntime implements AgentHost {
    * described; only a catalog that says *no* gets a no.
    */
   #modelAcceptsImages(conversationId: string): boolean | undefined {
-    const record = this.#conversations.get(this.#conversationRowId(conversationId));
+    const record = this.#conversations.get(conversationId);
 
     const registry = bootstrappedModelRegistry();
     if (registry === undefined) return undefined;
@@ -637,14 +631,28 @@ export class StudioRuntime implements AgentHost {
     };
 
     return {
-      // Flue 2.0 renamed the factory entry: `createSessionEnv` (deprecated)
-      // became `createSandbox`, and the runtime calls it once per initialized
-      // harness - which, measured in Phase 0, is once per submission, with
-      // the instance id (= the conversation id) in `options.id`. Phase 4
-      // moves the runtime's async setup (`start()`, `reconcile()`, the
-      // conversation directories) into this call; until then the environment
-      // is built from the sandbox exactly as before, idempotently.
-      createSandbox: async (_options) => sessionEnvironment(sandbox),
+      // The runtime calls this once per initialized harness - measured in
+      // Phase 0 as once per submission, with the instance id (= the
+      // conversation id) in `options.id`. Everything 1.0's initializer did
+      // asynchronously lives here now, and every piece is idempotent per
+      // call: `start` memoizes itself, a reconcile pass re-reads the same
+      // registry rows, and the directories are created recursively, so a
+      // second submission on the same conversation repeats the work for
+      // nothing and changes nothing.
+      createSandbox: async (_options) => {
+        await this.start();
+        await this.reconcile();
+        // Admission of the first prompt is when a conversation comes into
+        // existence on disk. The render computed this conversation's roots
+        // and passed them in; creating the tree here rather than in the
+        // render keeps a refused send from creating anything, and the
+        // sandbox root is in place before the runtime's first AGENTS.md and
+        // skills discovery reads the environment.
+        ensureDirectory(conversationWorkspaceDirectory(options.conversationId));
+        ensureDirectory(conversationAttachmentsDirectory(options.conversationId));
+        ensureDirectory(conversationArtifactsDirectory(options.conversationId));
+        return sessionEnvironment(sandbox);
+      },
       tools: (_env, _options) => {
         refreshTools();
         const names = new Set<string>();

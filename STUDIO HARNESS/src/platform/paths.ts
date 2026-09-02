@@ -1,6 +1,6 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { StorageError } from "../storage/errors.js";
@@ -66,13 +66,39 @@ export function studioPath(...segments: string[]): string {
 }
 
 /**
- * The installation directory — where shipped assets live.
+ * The installation directory - where shipped assets live.
  *
  * Resolved from this module's own location, so it is correct whether running
  * from `src/`, from a build output, or from inside a packaged application.
+ *
+ * "This module's own location" is a walk upward to the nearest `package.json`,
+ * not a fixed number of levels. The source tree sits two levels below the
+ * installation root (`src/platform/`), and the 2.0 build bundles the same code
+ * one level below it (`dist/`), so a hard-coded `../../` resolves the vendor
+ * directory differently per layout - measured under the Flue 2.0 build, where
+ * the bundled artifact walked out of the installation entirely and the sandbox
+ * launcher was "not installed" on a machine it ships with. The nearest
+ * `package.json` is the one thing every layout has at the root and no layout
+ * has in its intermediate directories. Cached: the answer cannot change while
+ * the process runs.
  */
+let cachedInstallationRoot: string | undefined;
+
 export function installationRoot(): string {
-  return resolve(fileURLToPath(new URL("../../", import.meta.url)));
+  cachedInstallationRoot ??= ((): string => {
+    let current = dirname(fileURLToPath(import.meta.url));
+    for (;;) {
+      if (existsSync(join(current, "package.json"))) return current;
+      const parent = dirname(current);
+      if (parent === current) {
+        // The filesystem root: nowhere to walk. The old two-level answer is
+        // the best guess left, and the consumers' own refusals take over.
+        return resolve(fileURLToPath(new URL("../../", import.meta.url)));
+      }
+      current = parent;
+    }
+  })();
+  return cachedInstallationRoot;
 }
 
 /** Binaries shipped with the application. Read-only. */

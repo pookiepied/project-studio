@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,16 +18,20 @@ import { STUDIO_MODEL_ID } from "../../src/contracts/models.js";
  * What the agent module tells the runtime about itself.
  *
  * #69 did not live in the grant store - that code was right. It lived in one
- * argument at one call site: `agents/studio.ts` passed Flue's initializer
- * `id` where the conversation was meant, and a defect in that field went
- * unnoticed because nothing covered how the scope was built. Under Flue 2.0
- * the wiring moves: the instance id IS the conversation id, and the sandbox
- * factory that turns it into a permission scope is Phase 4's port, together
- * with the assertion that the scope is built from it. What this phase pins
- * instead is the two contracts the module itself owns - the durable identity
- * and the model read - because a rename without a pin is a storage-identity
- * change, and a render that ignores the picker's choice decides for the
- * person.
+ * argument at one call site: the agent passed Flue's initializer `id` where
+ * the conversation was meant, and a defect in that field went unnoticed
+ * because nothing covered how the scope was built. Under Flue 2.0 the
+ * instance id IS the conversation id, so the render passes it bare, and the
+ * factory turns it into the permission scope. What is pinned here is the
+ * render's half of that guard - the instance id goes to `conversationId`,
+ * the pinned constant goes to `agentId`, and neither can drift - while
+ * conversation-mode.test.ts pins the factory's half against a real runtime:
+ * two conversations of one agent build two scopes.
+ *
+ * Flue 2.0's hooks throw outside a render and the runtime ships no public
+ * render harness, so the call-shape assertions below read the module's
+ * source - the same precedent title-agent.test.ts sets, for the same reason.
+ * Everything the module's VALUES can answer is asserted against the values.
  *
  * The sync read needs no warmed cache: `conversationTurnSettings` reads the
  * row the turn-settings middleware settled before admission (Phase 0's
@@ -33,15 +39,21 @@ import { STUDIO_MODEL_ID } from "../../src/contracts/models.js";
  * runtime does.
  */
 
+const STUDIO_SOURCE = readFileSync(
+  new URL("../../src/agents/studio.ts", import.meta.url),
+  "utf8",
+);
+
 const host: AgentHost = {
-  projectRoot: process.cwd(),
-  start: async () => undefined,
-  reconcile: async () => undefined,
-  // Never called by this phase's agent: the gated factory is Phase 4's port.
-  // A throw here keeps an accidental mount loud instead of silent.
-  createAgentSandbox: () => {
-    throw new Error("The Phase 2/3 agent mounts no sandbox factory yet.");
-  },
+  // The recorded factory: what the render passes to `createAgentSandbox` is
+  // the contract under test here, and the factory's behaviour is the real
+  // runtime's, covered in conversation-mode.test.ts. A sandbox whose
+  // createSandbox throws keeps an accidental turn loud instead of silent.
+  createAgentSandbox: () => ({
+    createSandbox: async () => {
+      throw new Error("The unit harness mounts no usable sandbox.");
+    },
+  }),
   conversationTurnSettings: (conversationId) => {
     if (conversationId === "cnv_chosen") {
       return {
@@ -61,6 +73,14 @@ describe("the studio agent's identity and model contracts", () => {
     // drift. The same pin exists for the title agent in title-agent.test.ts.
     expect(Studio.agentName).toBe("studio");
     expect(STUDIO_AGENT_ID).toBe("studio");
+  });
+
+  it("carries the hour-long durability the permission path waits under", () => {
+    // A turn in Manual can park on a question for as long as a person is
+    // away; the ceiling exists for that wait and nothing else. The value is
+    // asserted so a silent change to either number is a decision, not a
+    // drift.
+    expect(Studio.durability).toEqual({ maxAttempts: 3, timeoutMs: 3_600_000 });
   });
 
   it("maps an unset model choice to the stable alias", () => {
@@ -102,5 +122,42 @@ describe("the studio agent's identity and model contracts", () => {
     expect(studioModelSpecifier(host.conversationTurnSettings("cnv_fresh"))).toBe(
       STUDIO_MODEL_ID,
     );
+  });
+
+  it("hands the factory the instance id as the conversation, and the agent separately", () => {
+    // The #69 guard at its call site. A render cannot be driven in a unit
+    // test (no public render harness), so the shape is read from the module
+    // - but the HALF that has values is asserted as values below: the
+    // factory the render mounts is the locator runtime's, and the
+    // conversation id it will be given is the render's own props id, which
+    // is what the source names.
+    expect(STUDIO_SOURCE).toContain("conversationId: id,");
+    expect(STUDIO_SOURCE).toContain("agentId: STUDIO_AGENT_ID,");
+    // The scope the factory builds from those arguments is covered against
+    // a real runtime in conversation-mode.test.ts, which asserts that two
+    // conversations of one agent are two scopes.
+  });
+
+  it("mounts no tool hooks: the gate's tools ride the sandbox factory", () => {
+    // Studio's tools are the CallGate's, exposed through the factory's own
+    // `tools` member (studio-runtime.ts). A second path - `useTool` here -
+    // would be ungated capability reach; its absence is a security property,
+    // and the runtime ships no render harness, so the module's shape is the
+    // check.
+    expect(STUDIO_SOURCE).not.toMatch(/useTool\(/);
+    expect(STUDIO_SOURCE).toContain("useSandbox(");
+  });
+
+  it("appends the environment block after the static prompt", () => {
+    // The order is the cache argument: the static prompt stays
+    // byte-identical across conversations so it and the tool array form one
+    // cached prefix, and the environment block rides after it. Checked on
+    // the module's shape because the rendered instructions are only
+    // observable through a render.
+    const promptReturn = STUDIO_SOURCE.slice(
+      STUDIO_SOURCE.indexOf("return `${STUDIO_SYSTEM_PROMPT}"),
+    );
+    expect(promptReturn).toContain("STUDIO_SYSTEM_PROMPT");
+    expect(promptReturn.indexOf("environmentBlock")).toBeGreaterThan(-1);
   });
 });

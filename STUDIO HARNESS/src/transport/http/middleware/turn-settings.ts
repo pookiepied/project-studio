@@ -202,8 +202,18 @@ function readSettings(output: SubmissionTurnSettings): {
   };
 }
 
-/** The message a direct submission carries, when it is a non-empty string. */
+/**
+ * The message a direct submission carries, when it is a non-empty string.
+ *
+ * Flue 2.0's delivered message is an envelope - `{ kind: "user", body }` -
+ * so the words ride in `body`, beside the settings this middleware reads.
+ * The 1.0 wire's bare `message` field is gone: a direct payload without the
+ * envelope is refused by Flue before admission, so there is no second shape
+ * to read here.
+ */
 function readMessage(body: object): string | undefined {
-  const candidate = (body as Record<string, unknown>)["message"];
+  const record = body as Record<string, unknown>;
+  if (record["kind"] !== "user") return undefined;
+  const candidate = record["body"];
   return typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
 }

@@ -1295,14 +1295,18 @@ describe.sequential("Flue harness vertical slice", () => {
 
   /**
    * Submits with a turn's settings, the way the webview does: the settings
-   * ride the submission body, which Flue itself strips down to `message` and
-   * images. Everything the settings then do happens at our admission
-   * boundary, so the receipt alone tells whether the write landed first.
+   * ride the submission body, and Flue itself strips everything but the
+   * delivered message from the payload it stores. Under 2.0 the delivered
+   * message is an envelope - `{ kind: "user", body }` - so the settings are
+   * sent beside it, at the top level, exactly where the turn-settings
+   * middleware reads them before Flue parses the payload. Everything the
+   * settings then do happens at our admission boundary, so the receipt alone
+   * tells whether the write landed first.
    */
   async function submitWithSettings(
     running: RunningHarness,
     conversationId: string,
-    body: Record<string, unknown>,
+    settings: Record<string, unknown>,
   ): Promise<Response> {
     return fetch(`${running.baseUrl}/agents/studio/${conversationId}`, {
       method: "POST",
@@ -1310,7 +1314,11 @@ describe.sequential("Flue harness vertical slice", () => {
         authorization: `Bearer ${running.token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        kind: "user",
+        body: "please answer",
+        ...settings,
+      }),
     });
   }
 
@@ -1331,9 +1339,17 @@ describe.sequential("Flue harness vertical slice", () => {
   }
 
   /**
-   * The model info the assistant history records carry, read narrowly. The
-   * wire puts it at `metadata.model` - the same place the webview's chunk
-   * reader reads it from.
+   * The model info the assistant history records carried, read narrowly.
+   *
+   * Kept as a scanner for what 2.0 no longer sends: under Flue 2.0 the
+   * history projection's assistant records are
+   * `{ id, role, purpose, display, submissionId, turnId, parts }` - there is
+   * no `metadata` and no model identity on the message at all. 1.0's
+   * `metadata.model` channel is gone, so "the history names the model it ran
+   * on" is not an assertion this view can carry any more; the run-side
+   * identification lives in the telemetry events, and Phase 7 verifies those
+   * against real traces. The function stays so the absence is asserted
+   * rather than assumed.
    */
   function modelRefs(history: unknown): string[] {
     if (!isRecordValue(history) || !Array.isArray(history["messages"])) return [];
@@ -1391,7 +1407,6 @@ describe.sequential("Flue harness vertical slice", () => {
       // A FIRST turn: the index row does not exist yet, so the only way the
       // run can take the chosen model is for admission to settle it first.
       const submission = await submitWithSettings(running, conversationId, {
-        message: "please answer",
         modelId: `openrouter/${reasoningModel.modelId}`,
         reasoningLevel: "high",
       });
@@ -1402,8 +1417,12 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(row?.modelId).toBe(`openrouter/${reasoningModel.modelId}`);
       expect(row?.reasoningLevel).toBe("high");
 
-      // And the turn that was admitted answers as a turn of a conversation
-      // whose history names the model it ran on.
+      // And the turn that was admitted answers as a completed run of that
+      // conversation. 2.0's history projection carries no model identity on
+      // assistant messages (see `modelRefs`), so the run-side half of "the
+      // person's choice was used" is pinned by the settled settings above -
+      // which are the only thing the run can read its model from - and the
+      // identification itself moves to the telemetry events Phase 7 verifies.
       const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
       const run: AcceptedRun = {
         threadId: conversationId,
@@ -1413,7 +1432,7 @@ describe.sequential("Flue harness vertical slice", () => {
       };
       await client.wait(run);
       const history: unknown = await client.history(conversationId);
-      expect(modelRefs(history)).toContain(`openrouter/${reasoningModel.modelId}`);
+      expect(modelRefs(history)).toEqual([]);
     },
     30_000,
   );
@@ -1424,7 +1443,6 @@ describe.sequential("Flue harness vertical slice", () => {
       const running = await startHarness(await createDatabasePath());
 
       const submission = await submitWithSettings(running, "cnv_refused", {
-        message: "no provider serves this",
         modelId: "openrouter/definitely/not-a-model",
       });
 

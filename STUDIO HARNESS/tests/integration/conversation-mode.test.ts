@@ -107,8 +107,9 @@ interface SandboxTool {
 /**
  * The named tool of the named conversation's own sandbox.
  *
- * The sandbox is built the way the agent initializer builds it: per call,
- * with the `conversation:`-prefixed scope id.
+ * The sandbox is built the way the agent render builds it: per call, with
+ * the conversation's own id as the scope's conversation id - under Flue 2.0
+ * the instance id IS the conversation id, so the vocabulary is bare.
  */
 async function toolOf(
   harness: Harness,
@@ -120,7 +121,7 @@ async function toolOf(
     conversationId,
     projectRoot: harness.projectRoot,
   });
-  const env = await sandbox.createSandbox({ id: "studio" });
+  const env = await sandbox.createSandbox({ id: conversationId });
   const tools: readonly SandboxTool[] = sandbox.tools?.(env, { subagents: {} }) ?? [];
   const tool = tools.find((candidate) => candidate.name === name);
   if (tool === undefined) throw new Error(`The sandbox did not offer a "${name}" tool.`);
@@ -138,7 +139,7 @@ describe("the permission mode follows the conversation", () => {
     async () => {
       const harness = await harnessWith([{ id: "cnv_manual", permissionMode: "manual" }]);
       try {
-        const write = await toolOf(harness, "conversation:cnv_manual", "write");
+        const write = await toolOf(harness, "cnv_manual", "write");
         // Starting the call is synchronous up to the parking: the durable
         // row exists by the time this line returns.
         const settled = write.execute("call-1", { path: "note.txt", content: "a note" });
@@ -156,7 +157,7 @@ describe("the permission mode follows the conversation", () => {
           name: "write",
         });
         expect(question?.request.resource).toBe(join(harness.projectRoot, "note.txt"));
-        expect(question?.request.scope.conversationId).toBe("conversation:cnv_manual");
+        expect(question?.request.scope.conversationId).toBe("cnv_manual");
 
         // Denying settles the run's own promise, the queue empties, and the
         // write did not happen.
@@ -189,7 +190,7 @@ describe("the permission mode follows the conversation", () => {
     async () => {
       const harness = await harnessWith([{ id: "cnv_allow", permissionMode: "manual" }]);
       try {
-        const write = await toolOf(harness, "conversation:cnv_allow", "write");
+        const write = await toolOf(harness, "cnv_allow", "write");
         const settled = write.execute("call-1", { path: "note.txt", content: "a note" });
 
         const pending = harness.broker.list(AUTH);
@@ -214,11 +215,55 @@ describe("the permission mode follows the conversation", () => {
   );
 
   it(
+    "builds two scopes for two conversations of one agent",
+    async () => {
+      // The #69 guard, positively: the scope is built from the instance id
+      // (which under Flue 2.0 IS the conversation id) and the agent is named
+      // separately, so two conversations of the same agent ask their
+      // questions under two different scopes. A collapsed scope would let a
+      // grant made in one conversation answer the other's asks.
+      const harness = await harnessWith([
+        { id: "cnv_scope_a", permissionMode: "manual" },
+        { id: "cnv_scope_b", permissionMode: "manual" },
+      ]);
+      try {
+        const scopes: string[] = [];
+        for (const conversationId of ["cnv_scope_a", "cnv_scope_b"]) {
+          const write = await toolOf(harness, conversationId, "write");
+          const settled = write.execute("call", { path: "note.txt", content: "x" });
+          const pending = harness.broker.list(AUTH);
+          expect(pending).toHaveLength(1);
+          const scope = pending[0]?.request.scope.conversationId;
+          if (typeof scope === "string") scopes.push(scope);
+          expect(
+            harness.broker.answer(
+              pending[0]?.id ?? "",
+              { verdict: "deny", duration: "once" },
+              AUTH,
+            ),
+          ).toBe(true);
+          await settled.then(
+            () => undefined,
+            () => undefined,
+          );
+          expect(harness.broker.list(AUTH)).toEqual([]);
+        }
+
+        expect(scopes).toEqual(["cnv_scope_a", "cnv_scope_b"]);
+      } finally {
+        await harness.runtime.stop();
+        harness.database.close();
+      }
+    },
+    60_000,
+  );
+
+  it(
     "in Auto Edit a write proceeds without a question, and a shell line still stops",
     async () => {
       const harness = await harnessWith([{ id: "cnv_edit", permissionMode: "auto-edit" }]);
       try {
-        const write = await toolOf(harness, "conversation:cnv_edit", "write");
+        const write = await toolOf(harness, "cnv_edit", "write");
         const outcome = await write.execute("call-1", { path: "note.txt", content: "a note" });
         expect(outcome).toBeDefined();
         expect(existsSync(join(harness.projectRoot, "note.txt"))).toBe(true);
@@ -227,7 +272,7 @@ describe("the permission mode follows the conversation", () => {
 
         // Shell declares `execute`, which the effect table marks elevated, so
         // the mode does not resolve its ask: still a question, even here.
-        const shell = await toolOf(harness, "conversation:cnv_edit", "shell");
+        const shell = await toolOf(harness, "cnv_edit", "shell");
         const shellRun = shell.execute("call-2", { command: "node --version" });
         const asked = harness.broker.list(AUTH);
         expect(asked).toHaveLength(1);
@@ -287,10 +332,10 @@ describe("the permission mode follows the conversation", () => {
       try {
         const sandbox = runtime.createAgentSandbox({
           agentId: "studio",
-          conversationId: "conversation:cnv_restart",
+          conversationId: "cnv_restart",
           projectRoot,
         });
-        const env = await sandbox.createSandbox({ id: "studio" });
+        const env = await sandbox.createSandbox({ id: "cnv_restart" });
         const tools: readonly SandboxTool[] = sandbox.tools?.(env, { subagents: {} }) ?? [];
         const write = tools.find((candidate) => candidate.name === "write");
         if (write === undefined) throw new Error('The sandbox did not offer a "write" tool.');

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Context, Model } from "@earendil-works/pi-ai";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
+import { createModels, createProvider, lazyApi } from "@earendil-works/pi-ai";
+import { hasProvider, resolveModel } from "@flue/runtime/internal";
 
 import {
+  DEFAULT_MODEL_NAME,
+  DEFAULT_MODEL_PROVIDER,
   defaultModelReference,
   ModelResolutionError,
   ProviderConfigurationError,
@@ -10,6 +14,8 @@ import {
 } from "../../src/contracts/models.js";
 import { ModelRegistry } from "../../src/models/model-registry.js";
 import { resolveProviderConfig } from "../../src/models/provider-config.js";
+import { API_LOADERS } from "../../src/models/local/apis.js";
+import type { LocalModelConfig } from "../../src/models/local/config.js";
 import {
   createModelProviderAdapter,
   createProviderBootstrapCoordinator,
@@ -491,5 +497,113 @@ describe("capability representation", () => {
     expect(capability.contextWindow).not.toBe(0);
     expect(capability.maxOutputTokens).not.toBe(0);
     expect(typeof capability.contextWindow).toBe("number");
+  });
+});
+
+describe("the Flue provider mount", () => {
+  it("registers the alias provider with the runtime's own model collection", () => {
+    // The proof the registration TOOK is read from the runtime's own side -
+    // the same Models instance the session's streamSimple dispatches
+    // through - not from our module state. The hazard Phase 5 inherited was
+    // a dual pi-ai install, where a provider built against the wrong copy
+    // could never be the one the runtime resolves through; the pnpm
+    // override in package.json dedupes pi-ai to one instance, so this
+    // registration and the runtime's resolution are one collection by
+    // construction, and a positive read here would fail loudly if two
+    // copies ever came back.
+    const coordinator = createProviderBootstrapCoordinator();
+    coordinator.bootstrap({ source: "test" });
+    expect(hasProvider(DEFAULT_MODEL_PROVIDER)).toBe(true);
+  });
+
+  it("resolves the alias and any stored reference against the test mount", () => {
+    const coordinator = createProviderBootstrapCoordinator();
+    coordinator.bootstrap({ source: "test" });
+
+    const alias = resolveModel(STUDIO_MODEL_ID);
+    expect(alias.provider).toBe(DEFAULT_MODEL_PROVIDER);
+    expect(alias.id).toBe(DEFAULT_MODEL_NAME);
+
+    // A conversation may store a real catalog id (the picker's vocabulary);
+    // the dynamic template resolves it to a synthesized model so the turn
+    // still runs the scripted stream - 1.0's any-id registration behaviour,
+    // in 2.0's spelling.
+    const stored = resolveModel(`${DEFAULT_MODEL_PROVIDER}/openrouter/anthropic/claude-test`);
+    expect(stored.id).toBe("openrouter/anthropic/claude-test");
+    expect(stored.provider).toBe(DEFAULT_MODEL_PROVIDER);
+  });
+
+  it("mounts the local catalog under qualified ids with mirrored facts", () => {
+    // The local source mounts one alias provider whose model list mirrors
+    // the local runtime's catalog: the stable default plus every model under
+    // its qualified `<provider>/<model>` id - exactly the reference the
+    // conversation index stores. The facts ride along, so the runtime reads
+    // an honest context window instead of a zero.
+    const collection = createModels();
+    const gatewayModel: Model<Api> = {
+      id: "gpt-x",
+      name: "GPT X",
+      api: "openai-completions",
+      provider: "my-gateway",
+      baseUrl: "https://gateway.invalid/v1",
+      reasoning: true,
+      input: ["text"],
+      cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 8_000,
+      maxTokens: 1_000,
+    };
+    collection.setProvider(
+      createProvider({
+        id: "my-gateway",
+        name: "my-gateway",
+        baseUrl: "https://gateway.invalid/v1",
+        auth: {
+          apiKey: {
+            name: "test key",
+            async resolve() {
+              return { auth: { apiKey: "test-key" }, source: "test" };
+            },
+          },
+        },
+        models: [gatewayModel],
+        api: lazyApi(
+          API_LOADERS["openai-completions"] ??
+            (() => Promise.reject(new Error("no loader"))),
+        ),
+      }),
+    );
+    const config: LocalModelConfig = {
+      defaultProvider: undefined,
+      defaultModel: undefined,
+      customProviders: [],
+      extraModels: [],
+    };
+    const adapter = new LocalModelProviderAdapter({
+      config,
+      runtime: {
+        models: collection,
+        target: () => undefined,
+        listModels: () => collection.getModels(),
+      },
+    });
+    adapter.register();
+
+    const mounted = resolveModel(`${DEFAULT_MODEL_PROVIDER}/my-gateway/gpt-x`);
+    expect(mounted.provider).toBe(DEFAULT_MODEL_PROVIDER);
+    expect(mounted.contextWindow).toBe(8_000);
+    expect(mounted.maxTokens).toBe(1_000);
+    expect(mounted.reasoning).toBe(true);
+
+    // And the alias itself resolves even with no configured default: the
+    // entry exists so resolution succeeds and the turn fails later, in
+    // assertTargetResolvable, which names what to fix.
+    const alias = resolveModel(STUDIO_MODEL_ID);
+    expect(alias.id).toBe(DEFAULT_MODEL_NAME);
+
+    // The local mount is exact: a reference the catalog does not name is a
+    // resolution failure, not a silent route to something else.
+    expect(() =>
+      resolveModel(`${DEFAULT_MODEL_PROVIDER}/my-gateway/not-in-catalog`),
+    ).toThrow();
   });
 });

@@ -23,6 +23,7 @@ import {
 } from "./application/studio-runtime.js";
 import { resolveProviderConfig } from "./models/provider-config.js";
 import { bootstrapModelProviders } from "./models/bootstrap.js";
+import { refreshBackgroundLadder } from "./models/background-model.js";
 import {
   initializeObservability,
   registerFlueTurnBoundary,
@@ -57,7 +58,15 @@ interface HarnessApplication {
   readonly shutdown: () => Promise<void>;
 }
 
-function createHarnessApplication(): HarnessApplication {
+/**
+ * Async, and awaited at the module's top level below: the titler's ladder
+ * refresh (step 2b) is the one composition step that cannot be synchronous,
+ * and it must finish before the app module's evaluation does - so no server
+ * can listen, and no dispatch can arrive, while the snapshot is uncomputed.
+ * The entry imports this module through the same static-import chain it
+ * already awaits, so the ordering is structural rather than hoped for.
+ */
+async function createHarnessApplication(): Promise<HarnessApplication> {
   bootLog("composition root entered");
   let observability: ObservabilityHandle | undefined;
   let admission: ReturnType<typeof createAdmissionSession> | undefined;
@@ -79,6 +88,27 @@ function createHarnessApplication(): HarnessApplication {
     const providerConfig = resolveProviderConfig();
     bootstrapModelProviders(providerConfig, { database });
     bootLog("step 2: resolveProviderConfig() and bootstrapModelProviders() completed");
+
+    // The titler's model ladder is read synchronously at render time (a Flue
+    // 2.0 agent function cannot await), so the model layer computes it here,
+    // once, before the server can accept a dispatch - the only moment the
+    // uncomputed state would ever be visible. A failed refresh is logged and
+    // absorbed: titling is not on any turn's path, and an empty ladder
+    // degrades to the documented alias fallback rather than to a dead
+    // server. Said out loud, because a silent empty snapshot is exactly the
+    // "titling quietly rode the frontier alias" shape the ladder exists to
+    // refuse.
+    bootLog("step 2b: refreshBackgroundLadder() entering");
+    try {
+      await refreshBackgroundLadder();
+      bootLog("step 2b: refreshBackgroundLadder() completed");
+    } catch (error) {
+      bootLog(
+        `step 2b: refreshBackgroundLadder() FAILED: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
     // The patched runtime owns the transient-retry loop but not its budget:
     // the per-class table lives in src/reliability/model-retry-policy.ts, and
@@ -281,7 +311,7 @@ function createHarnessApplication(): HarnessApplication {
   }
 }
 
-const { app, shutdown } = createHarnessApplication();
+const { app, shutdown } = await createHarnessApplication();
 
 /**
  * The composition half of the unified stop (see `src/host/shutdown.ts`).

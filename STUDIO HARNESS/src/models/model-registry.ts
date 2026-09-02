@@ -57,6 +57,30 @@ export class ModelRegistry implements ModelProviderPort {
     return undefined;
   }
 
+  /**
+   * The ladder snapshot, read synchronously.
+   *
+   * The same first-source rule as `backgroundModel`: the loop is the
+   * contract's shape, and an empty answer from one source means the next is
+   * asked, never that the search failed. The snapshot each source answers
+   * is as of its last `refreshBackgroundLadder()` - a render reads this
+   * without awaiting anything, which is the only reason it exists.
+   */
+  backgroundLadder(): readonly string[] {
+    for (const adapter of this.#adapters.values()) {
+      const ladder = adapter.backgroundLadder();
+      if (ladder.length > 0) return ladder;
+    }
+    return [];
+  }
+
+  /** Recomputes every source's ladder snapshot from live availability. */
+  async refreshBackgroundLadder(): Promise<void> {
+    for (const adapter of this.#adapters.values()) {
+      await adapter.refreshBackgroundLadder();
+    }
+  }
+
   hasSource(source: ModelSource): boolean {
     return this.#adapters.has(source);
   }

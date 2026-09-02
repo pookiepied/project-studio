@@ -61,14 +61,26 @@ export const reasoningChoiceSchema = v.union([
 export type ReasoningChoice = v.InferOutput<typeof reasoningChoiceSchema>;
 
 /**
- * Maps a stored choice onto the `thinkingLevel` the agent initializer returns.
+ * Maps a stored choice onto the `thinkingLevel` the agent render passes.
  *
  * "default" maps to "off", which is how this runtime says "no explicit effort
- * requested": Pi's agent loop turns "off" into an absent reasoning option and
- * Pi's protocol layer then renders that per provider (an omitted parameter for
- * OpenAI-style endpoints). It cannot be left unset instead, because Flue
- * substitutes "medium" for an unset thinkingLevel - and a default that arrived
- * as medium would be exactly the synonym this contract refuses.
+ * requested": the agent loop drops "off" before any request is built, so the
+ * protocol layer receives an absent reasoning option and renders that absence
+ * per protocol. The rendering differs by protocol and is the reason this
+ * mapping is explicit rather than left unset - Flue would substitute "medium"
+ * for an unset thinkingLevel, and a default that arrived as medium would be
+ * exactly the synonym this contract refuses:
+ *
+ * - OpenAI-style endpoints omit the reasoning parameter entirely, which is
+ *   literally the provider's own default.
+ * - OpenRouter format would inject `reasoning: { effort: "none" }` for a
+ *   reasoning model - turning reasoning OFF - so the local catalog maps every
+ *   OpenRouter reasoning model's `off` to null (`models/local/runtime.ts`),
+ *   which is pi-ai's spelling of "send nothing".
+ * - Anthropic sends `thinkingEnabled: false`.
+ *
+ * A default is never medium anywhere, and after the OpenRouter mapping it is
+ * never an explicit "none" either; it is "the provider decides".
  */
 export function runThinkingLevelForChoice(
   choice: ReasoningChoice | null | undefined,
@@ -216,6 +228,27 @@ export interface ModelProviderAdapter {
    * undefined, which the caller reads as "the ladder is exhausted".
    */
   backgroundModel(skip?: number): Promise<string | undefined>;
+  /**
+   * The whole ranked ladder, as the source would answer `backgroundModel`
+   * rank by rank, computed in one sweep and held for synchronous reads.
+   *
+   * The ladder exists for a render that cannot await: a Flue 2.0 agent
+   * function is synchronous, so the titling render asks for rank N and must
+   * be answered without touching the keychain. The snapshot is the model
+   * layer's maintained answer, not a cache the reader manages - the source
+   * recomputes it when `refreshBackgroundLadder()` runs and answers the
+   * snapshot as-is at every other moment, even if the credential picture has
+   * moved since. Empty means never computed (or nothing was reachable at the
+   * last refresh); the caller reads that the same way 1.0 read an undefined
+   * rank, rank by rank.
+   */
+  backgroundLadder(): readonly string[];
+  /**
+   * Recomputes the ladder snapshot from live availability. Awaited by the
+   * composition root at boot - before the server can accept a dispatch -
+   * so a titling render never sees the uncomputed state in production.
+   */
+  refreshBackgroundLadder(): Promise<void>;
 }
 
 export interface ModelProviderPort {

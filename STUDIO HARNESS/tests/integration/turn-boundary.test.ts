@@ -29,11 +29,12 @@ import { openDatabase } from "../../src/storage/database.js";
  * turn counter continues across the second initializer *because* the
  * conversation did not end. This used to be implicit — both calls passed
  * `agentId: "studio"` and the conversation id was derived from it — so the
- * test passed for a reason it never stated. Since #69 the caller says it.
+ * test passed for a reason it never stated. Since #69 the caller says it,
+ * and under Flue 2.0 the scope vocabulary is the bare conversation id.
  */
 const SAME_CONVERSATION = {
   agentId: "studio",
-  conversationId: "conversation:thread-1",
+  conversationId: "thread-1",
 } as const;
 
 const credentials: SecureCredentialStore = {
@@ -166,7 +167,7 @@ describe("the model-turn boundary", () => {
 
         const alpha = runtime.createAgentSandbox({
           agentId: "studio",
-          conversationId: "conversation:alpha",
+          conversationId: "alpha",
         });
         await runtime.prepareModelTurn();
         await write(alpha, "alpha.txt");
@@ -175,7 +176,7 @@ describe("the model-turn boundary", () => {
         // workspace changed, so nothing about its history should restart.
         const beta = runtime.createAgentSandbox({
           agentId: "studio",
-          conversationId: "conversation:beta",
+          conversationId: "beta",
         });
         await runtime.prepareModelTurn();
         await write(beta, "beta.txt");

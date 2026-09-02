@@ -3,8 +3,12 @@ import type {
   AssistantMessageEventStream,
   Context,
   Model,
+  ModelCost,
+  ProviderStreams,
   SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
+import { createProvider } from "@earendil-works/pi-ai";
+import { setProvider } from "@flue/runtime";
 
 import {
   DEFAULT_MODEL_NAME,
@@ -32,20 +36,69 @@ export interface LocalModelProviderAdapterOptions {
 }
 
 /**
+ * Auth that answers configured while promising nothing.
+ *
+ * The Flue runtime refuses to stream through a provider it cannot resolve
+ * auth for, and the alias provider this adapter registers is resolved by the
+ * runtime's Models collection before anything of ours runs. The alias sends
+ * nothing itself - it delegates one layer down, where the real target
+ * provider's own auth resolves the user's key through the Studio credential
+ * bridge - so the honest answer is "configured, with no credential": an empty
+ * auth injects no key, no header and no environment into the request. The
+ * same shape pi-ai's own faux provider uses for its scripted stream.
+ */
+const ALIAS_AUTH = {
+  apiKey: {
+    name: "Project Studio model alias",
+    async resolve() {
+      return { auth: {} };
+    },
+  },
+};
+
+/** Zero rates for the placeholder entry that stands in for an unset default. */
+const UNPRICED: ModelCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+
+/**
+ * The `default` entry registered when no target is configured.
+ *
+ * An unconfigured default is a state, not a fault: the entry exists so the
+ * alias RESOLVES - the turn then fails in `assertTargetResolvable`, which
+ * names what to fix - and its zero facts are never read, because nothing
+ * streams through it.
+ */
+const UNCONFIGURED_DEFAULT_ENTRY: Model<Api> = {
+  id: DEFAULT_MODEL_NAME,
+  name: DEFAULT_MODEL_NAME,
+  api: LOCAL_ALIAS_API,
+  provider: DEFAULT_MODEL_PROVIDER,
+  baseUrl: "",
+  reasoning: false,
+  input: ["text"],
+  cost: UNPRICED,
+  contextWindow: 0,
+  maxTokens: 0,
+};
+
+/**
  * Local BYOK model source.
  *
  * The agent only ever names `project-studio/default`, so this adapter is the
  * seam between that alias and the Pi model the user actually configured:
- * it forwards each request to Pi's `Models` collection rather than to a
- * protocol implementation. Delegating to Pi is deliberate: `Models.stream()`
- * resolves credentials, refreshes OAuth tokens under a lock, and dispatches
- * to the provider that owns the model, so none of that has to be
- * reimplemented here.
+ * under Flue 2.0 it registers ONE provider with the runtime (`setProvider`,
+ * id `project-studio`) whose model list mirrors the local runtime's catalog -
+ * the stable `default` plus every model under its qualified
+ * `<provider>/<model>` id - and whose API implementation is an alias router:
+ * it resolves the real target out of the model id the run asked for and
+ * delegates to it through the local runtime's own Models collection, where
+ * credentials, OAuth refresh and `streamSimple`'s protocol translation all
+ * live. Delegating to Pi is deliberate, and so is routing the delegation
+ * through our collection rather than registering real providers directly:
+ * Pi's Models collection owns credential resolution, and the runtime's
+ * collection carries no credentials of ours.
  *
- * Under Flue 2.0 the registration half of this seam is Phase 5's port
- * (`setProvider` over full Pi `Model` objects); see `register()` for the
- * current no-op state. The user's keys never pass through this file. They
- * live in the OS keychain and are read by Pi during auth resolution.
+ * The user's keys never pass through this file. They live in the OS keychain
+ * and are read by Pi during auth resolution.
  */
 export class LocalModelProviderAdapter implements ModelProviderAdapter {
   readonly source = "local" as const;
@@ -60,20 +113,96 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
   }
 
   /**
-   * Phase 2/3 state (Flue 2.0 pins): deliberately a no-op.
+   * Mounts the alias provider with the Flue runtime.
    *
-   * Under Flue 1.0 this method registered the `project-studio` alias protocol
-   * with Flue's own registries (`registerApiProvider`/`registerProvider`,
-   * both removed in 2.0) and pointed the alias at the configured target.
-   * Flue 2.0 resolves models through Pi's own provider objects (`setProvider`
-   * over full Pi `Model` values), which is Phase 5's port - the catalog
-   * mapping, the alias retirement and the `streamSimple` delegation all move
-   * there. Until then nothing is registered: the harness boots and serves
-   * every non-model route, but any turn that reaches `useModel` fails with
-   * no provider to resolve the specifier. That is the documented,
-   * broken-by-construction state Phases 2 and 3 accept.
+   * The runtime resolves a model specifier by splitting it on the first
+   * slash, so every specifier this source can honour - `project-studio`
+   * followed by the qualified reference or the alias - resolves against this
+   * one registration. The model objects mirror the real catalog's facts
+   * (context window, cost, reasoning, vision) so the runtime reads honest
+   * metadata, while their `api` is the alias router: the wire rendering
+   * happens one delegation down, on the real model record.
+   *
+   * Idempotent by replacement: the runtime keys providers by id, and a
+   * second registration with the same id replaces the first.
    */
-  register(): void {}
+  register(): void {
+    const adapter = this;
+    const aliasApi: ProviderStreams = {
+      stream: (model, context, options) => adapter.#streamAlias(model, context, options),
+      streamSimple: (model, context, options) => adapter.#streamAlias(model, context, options),
+    };
+    setProvider(
+      createProvider({
+        id: DEFAULT_MODEL_PROVIDER,
+        name: "Project Studio local models",
+        auth: ALIAS_AUTH,
+        models: this.#aliasModels(),
+        api: aliasApi,
+      }),
+    );
+  }
+
+  /**
+   * The model objects the runtime's specifier resolution reads.
+   *
+   * `default` is the stable route to the configured target; every catalog
+   * model rides under its qualified `<provider>/<model>` id, which is exactly
+   * the reference vocabulary the conversation index stores. Built once at
+   * registration from the same collection the runs delegate into, so the two
+   * can never disagree about what exists.
+   */
+  #aliasModels(): readonly Model<Api>[] {
+    const target = this.#runtime.target();
+    const defaultEntry =
+      target === undefined ? UNCONFIGURED_DEFAULT_ENTRY : this.#aliasEntry(target, DEFAULT_MODEL_NAME);
+    return [
+      defaultEntry,
+      ...this.#runtime.listModels().map((model) =>
+        this.#aliasEntry(model, `${model.provider}/${model.id}`),
+      ),
+    ];
+  }
+
+  /** One catalog model, re-addressed under the studio alias provider. */
+  #aliasEntry(model: Model<Api>, id: string): Model<Api> {
+    return {
+      id,
+      name: model.name,
+      api: LOCAL_ALIAS_API,
+      provider: DEFAULT_MODEL_PROVIDER,
+      baseUrl: model.baseUrl,
+      reasoning: model.reasoning,
+      input: model.input,
+      cost: model.cost,
+      contextWindow: model.contextWindow,
+      maxTokens: model.maxTokens,
+    };
+  }
+
+  /**
+   * The delegation itself: resolve the target, trace it, hand the request to
+   * the real provider through the local runtime's collection.
+   *
+   * `streamSimple`, not `stream`, on the far side: the options crossing this
+   * boundary are protocol-independent, because the alias is not a real wire
+   * protocol and nothing upstream knows which one the target speaks. Only
+   * `streamSimple` translates them - `reasoning` becomes Google's
+   * `thinkingConfig` or OpenAI's `reasoning_effort` there. `stream` takes
+   * options already in the target's protocol and silently ignores anything
+   * else, which is how every model reasoned invisibly once: the request
+   * never asked for the trace.
+   */
+  #streamAlias(
+    alias: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AssistantMessageEventStream {
+    const target = this.#resolveTarget(alias);
+    // The last point the request is ours. Off unless STUDIO_PROMPT_TRACE=1.
+    tracePrompt(`${target.provider}/${target.id}`, context, options);
+    return this.#runtime.models.streamSimple(target, context, options);
+  }
 
   /**
    * Fails loudly when a turn cannot be routed, rather than at the first user
@@ -158,6 +287,26 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
    * layer learning why.
    */
   async backgroundModel(skip = 0): Promise<string | undefined> {
+    return (await this.#rankedBackgroundSpecifiers())[skip];
+  }
+
+  /** The ladder snapshot, computed by `refreshBackgroundLadder` and read as-is. */
+  #backgroundLadder: readonly string[] = [];
+
+  backgroundLadder(): readonly string[] {
+    return this.#backgroundLadder;
+  }
+
+  /**
+   * Recomputes the ladder from live availability, one sweep of the same
+   * ranking `backgroundModel` answers from - one keychain read covers every
+   * rank, so a snapshot and a per-rank query cost the same.
+   */
+  async refreshBackgroundLadder(): Promise<void> {
+    this.#backgroundLadder = await this.#rankedBackgroundSpecifiers();
+  }
+
+  async #rankedBackgroundSpecifiers(): Promise<readonly string[]> {
     const available = await this.#runtime.models.getAvailable();
     const ranked = [...available]
       .filter((model) => model.cost.input + model.cost.output >= 0)
@@ -167,9 +316,9 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
           a.cost.output -
           (b.cost.input + b.cost.output),
       );
-    const chosen = ranked[skip];
-    if (chosen === undefined) return undefined;
-    return `${DEFAULT_MODEL_PROVIDER}/${chosen.provider}/${chosen.id}`;
+    return ranked.map(
+      (model) => `${DEFAULT_MODEL_PROVIDER}/${model.provider}/${model.id}`,
+    );
   }
 
   /**

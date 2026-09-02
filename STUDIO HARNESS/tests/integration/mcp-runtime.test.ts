@@ -131,7 +131,11 @@ describe("MCP application runtime", () => {
 
       const sandbox = runtime.createAgentSandbox({
         agentId: "agent",
-        conversationId: "conversation:agent",
+        // The scope vocabulary is the bare conversation id under Flue 2.0 -
+        // the instance id IS the conversation id - and the id is also the
+        // conversation's directory name, which the colon in the old
+        // `conversation:` prefix was never a legal answer for.
+        conversationId: "agent",
       });
       const env = await sandbox.createSandbox({ id: "agent" });
       const tools = sandbox.tools?.(env, { subagents: {} }) ?? [];

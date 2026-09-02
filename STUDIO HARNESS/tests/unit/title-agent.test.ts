@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import * as titleModule from "../../src/agents/title.js";
 import { TITLE_AGENT_ID } from "../../src/contracts/agents.js";
+import { ProviderConfigurationError, STUDIO_MODEL_ID } from "../../src/contracts/models.js";
+import { bootstrapModelProviders } from "../../src/models/bootstrap.js";
+import { refreshBackgroundLadder } from "../../src/models/background-model.js";
 import { TITLE_PROMPT } from "../../src/context/title-prompt.js";
 
 /** One line of the fixed prompt, quoted from the module. */
@@ -21,14 +24,19 @@ describe("the title agent", () => {
     expect(titleModule.Title.agentName).toBe("title");
   });
 
-  it("exposes no route, so no HTTP surface can address it", () => {
+  it("exposes no agent route, so no HTTP surface can address it", () => {
     // Flue 2.0 mounts one agent router per agent, and `create-app.ts`
     // mounts the studio agent only - but the mount is not the whole story:
-    // nothing in this module may hand the HTTP layer a second agent. The
-    // export list is the whole module surface: the `Title` function and
-    // nothing else, so the titling orchestrator's in-process `dispatch()`
-    // is the only caller that can ever reach it.
-    expect(Object.keys(titleModule).sort()).toEqual(["Title"]);
+    // nothing in this module may hand the HTTP layer a second agent. In a
+    // `'use agent'` module every exported CAPITALIZED function is an agent,
+    // so the export list is the whole module surface: `Title` is the one
+    // capitalized export, and `titleModelSpecifier` is a lowercase helper
+    // the render calls, nothing addressable. The titling orchestrator's
+    // in-process `dispatch()` stays the only caller that can ever reach it.
+    const capitalized = Object.keys(titleModule)
+      .filter((name) => /^[A-Z]/.test(name))
+      .sort();
+    expect(capitalized).toEqual(["Title"]);
   });
 
   it("carries the fixed prompt as its whole instruction set", () => {
@@ -57,14 +65,29 @@ describe("the title agent", () => {
     expect(titleModule.Title.durability).toEqual({ maxAttempts: 1, timeoutMs: 30_000 });
   });
 
-  it("runs on the stable alias while the model ladder is down", () => {
-    // Phase 2/3 state: the 1.0 initializer resolved the background-model
-    // ladder asynchronously, which a synchronous 2.0 render cannot do, so
-    // every run currently uses the stable alias and both retry attempts
-    // run the same model. Restoring the ladder is Phase 4/5 work; this
-    // assertion fails loudly the day the alias is replaced so the
-    // regression cannot pass unnoticed.
-    expect(TITLE_PROMPT_SOURCE).toContain("useModel(STUDIO_MODEL_ID");
+  it("reads the ladder with no model layer: the alias at rank zero, nothing beyond", () => {
+    // Before any bootstrap in this file, the production registry is
+    // unconfigured - the state a unit process or a sideways import is in.
+    // Rank zero falls to the stable alias, 1.0's documented fallback for an
+    // unconfigured source; beyond it the ladder is exhausted, and failing
+    // the run is the honest answer because the alias is the expensive model
+    // the policy exists to avoid.
+    expect(titleModule.titleModelSpecifier(0)).toBe(STUDIO_MODEL_ID);
+    expect(() => titleModule.titleModelSpecifier(1)).toThrow(ProviderConfigurationError);
+  });
+
+  it("steps down the restored ladder by attempt, off a bootstrapped model layer", async () => {
+    // The ladder is UP again. With the test source bootstrapped and its
+    // ladder refreshed - what the composition root does before the server
+    // can accept a dispatch - the specifier the render asks for is the
+    // model layer's answer at that rank. The test source has one rung: rank
+    // zero is the alias, rank one does not exist and must fail loudly
+    // rather than fall upward onto it.
+    bootstrapModelProviders({ source: "test" });
+    await refreshBackgroundLadder();
+
+    expect(titleModule.titleModelSpecifier(0)).toBe("project-studio/default");
+    expect(() => titleModule.titleModelSpecifier(1)).toThrow(ProviderConfigurationError);
   });
 });
 
@@ -77,7 +100,8 @@ describe("the title agent", () => {
  * ("useModel() was called outside an agent function") and the runtime ships
  * no public render harness, so the alternative to a source check here is no
  * check at all. Everything the agent's VALUES can answer - the prompt, the
- * identity, the durability - is asserted against the values above.
+ * identity, the durability, the ladder reads - is asserted against the
+ * values above.
  */
 const TITLE_PROMPT_SOURCE = readFileSync(
   new URL("../../src/agents/title.ts", import.meta.url),
