@@ -121,17 +121,15 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
       return {
         kind,
         code: 'HARNESS_NOT_FOUND',
-        headline: 'The harness could not be found.',
-        // Deliberately not "reinstall Studio". Studio ships the harness inside
-        // itself, so a copy that cannot find it is a copy that is incomplete --
-        // but the same message is what a development tree produces before the
-        // harness has ever been built, and telling that reader to reinstall is
-        // advice they cannot act on and would not need. Naming the condition
-        // and pointing at the path is true in both cases; the details say which
-        // one this is, because they carry the path that was searched.
+        headline: 'The harness was not found.',
+        // Deliberately not a flat "reinstall Studio". Studio ships the harness
+        // inside itself, so an installed copy that cannot find it is
+        // incomplete -- but the same message is what a development tree
+        // produces before the harness has been built, and that reader cannot
+        // act on reinstall advice. Naming the path covers both.
         remedy:
-          'Studio ships with the harness, so this usually means the installation is ' +
-          'incomplete. The details name the path it looked in.',
+          'Studio could not find the harness at the path it expects. Reinstall Studio to ' +
+          'restore it. The details show the path that was searched.',
       }
     case 'node-missing':
       return {
@@ -139,55 +137,60 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
         code: 'HARNESS_NODE_MISSING',
         headline: 'Node.js could not be started.',
         remedy:
-          'The harness runs on Node.js, and Studio could not launch it. It is either ' +
-          'not installed, or not on the PATH this machine searches.',
+          'The harness requires Node.js. It is either not installed or not on the system ' +
+          'PATH. The details show the command that failed.',
       }
     case 'crashed':
       return {
         kind,
         code: 'HARNESS_EXITED',
-        headline: 'The harness stopped while starting.',
+        headline: 'The harness exited during startup.',
         remedy:
-          'It began and then exited before it was ready. Its last output is in the ' +
-          'details, and that is the part worth sending on.',
+          'The harness process started and then stopped before it was ready. The details ' +
+          'contain its exit status and its output.',
       }
     case 'timed-out':
       return {
         kind,
         code: 'HARNESS_TIMEOUT',
-        headline: 'The harness did not finish starting.',
+        headline: 'The harness did not become ready.',
+        // The timeout is not repeated here. It is a constant in supervisor.rs
+        // and the raw text already states the elapsed value, so naming a
+        // number in this file is one more place for it to go stale.
         remedy:
-          'It began but never reported itself ready. A slow machine or a firewall ' +
-          'holding the local connection can do this, and trying again often clears it.',
+          'The harness started but did not report readiness before the startup timeout. ' +
+          'Start it again. If this repeats, check whether a firewall is blocking local ' +
+          'connections.',
       }
     case 'bad-handshake':
       return {
         kind,
         code: 'HARNESS_BAD_HANDSHAKE',
-        headline: 'The harness answered unexpectedly.',
+        headline: 'The harness sent an invalid startup message.',
         remedy:
-          'It started, but what it said on the way up was not something this version ' +
-          'of Studio recognises. That usually means the two are different versions.',
+          'The harness started, but the message it sent on startup could not be read. ' +
+          'This usually means Studio and the harness are different versions.',
       }
     case 'blocked':
       return {
         kind,
         code: 'HARNESS_CONTAINMENT_REFUSED',
-        headline: 'The system refused to contain the harness.',
+        headline: 'The harness could not be contained.',
         remedy:
-          'Studio confines the harness and the tools it runs so nothing outlives it, ' +
-          'and the operating system declined. Restarting the machine usually clears it.',
+          'The operating system refused to place the harness in a job object, which Studio ' +
+          'requires so that tool processes cannot outlive it. Restart the machine and try ' +
+          'again.',
       }
     case 'busy':
       return {
         kind,
         code: 'HARNESS_BUSY',
-        headline: 'The harness is already starting.',
-        remedy: 'A start is in flight. Give it a moment before trying again.',
+        headline: 'A harness start is already running.',
+        remedy: 'Wait for the current start to finish.',
       }
     case 'unknown':
-      // No remedy on purpose. There is nothing true to say about a cause
-      // nobody identified, and the details carry its own words.
+      // No remedy on purpose. There is nothing accurate to say about a cause
+      // that was not identified, and the details carry the raw text.
       return {
         kind,
         code: 'HARNESS_UNKNOWN',

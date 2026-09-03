@@ -61,10 +61,10 @@ describe('what the person reads', () => {
     expect(copy.headline).not.toContain('dist/server.mjs')
     expect(copy.remedy).not.toContain('pnpm')
     expect(copy.remedy).not.toContain('dist/server.mjs')
-    expect(copy.remedy).toContain('installation is incomplete')
-    // And it does not tell a development tree to reinstall, which is advice
-    // that reader cannot act on. The path in the details says which case it is.
-    expect(copy.remedy).toContain('path it looked in')
+    // It names the path instead of only saying "reinstall", because the same
+    // message is what a development tree produces before the harness is built,
+    // and that reader cannot act on reinstall advice.
+    expect(copy.remedy).toContain('path that was searched')
   })
 
   it('gives every recognised kind a remedy, and unknown none', () => {
@@ -78,6 +78,37 @@ describe('what the person reads', () => {
     expect(unknown.kind).toBe('unknown')
     expect(unknown.remedy).toBeNull()
     expect(unknown.headline).toBe('The harness is not running.')
+    expect(unknown.code).toBe('HARNESS_UNKNOWN')
+  })
+
+  it('gives every kind its own code', () => {
+    // One code per KIND, not per sentence: several supervisor messages map to
+    // the same kind on purpose (an exit and a closed stream are both a crash).
+    // What must not happen is two different kinds answering with one code,
+    // which would make a quoted code ambiguous at exactly the wrong moment.
+    const byKind = new Map<string, string>()
+    for (const sentence of [...Object.values(REAL), null]) {
+      const { kind, code } = describeHarnessFailure(sentence)
+      expect(code).toMatch(/^HARNESS_[A-Z_]+$/)
+      const seen = byKind.get(kind)
+      if (seen !== undefined) expect(code).toBe(seen)
+      byKind.set(kind, code)
+    }
+    const codes = [...byKind.values()]
+    expect(new Set(codes).size).toBe(codes.length)
+  })
+
+  it('states the failure plainly, without flourish', () => {
+    // House style for error copy: say what happened and what to do. These
+    // were written as prose and read as prose, which is the wrong register
+    // for a line someone hits when their app will not start.
+    for (const sentence of Object.values(REAL)) {
+      const { headline, remedy } = describeHarnessFailure(sentence)
+      expect(headline.endsWith('.')).toBe(true)
+      expect(remedy).not.toBeNull()
+      // No second-person storytelling and no metaphor about the machinery.
+      expect(remedy).not.toMatch(/worth sending on|the part worth|began and then/)
+    }
   })
 
   it('keeps every headline short enough for the display serif', () => {

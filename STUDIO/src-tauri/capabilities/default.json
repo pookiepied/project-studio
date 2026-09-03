@@ -2,10 +2,11 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
-  "//": "A detached conversation is built as `conversation-<id>` (see `open_conversation_window` in lib.rs). Listing only `main` here granted it no window permissions at all, so its traffic lights did nothing and its title bar could not drag the window -- the frontend called `startDragging`, `minimize` and `close`, and Tauri rejected every one because the capability did not cover that label. Decorations are off on both kinds of window, so the app *is* the title bar; without these the second window had no way to be moved, resized or closed.",
+  "//": "A detached conversation is built as `conversation-<id>` (see `open_conversation_window` in lib.rs). Listing only `main` here granted it no window permissions at all, so its traffic lights did nothing and its title bar could not drag the window -- the frontend called `startDragging`, `minimize` and `close`, and Tauri rejected every one because the capability did not cover that label. Decorations are off on both kinds of window, so the app *is* the title bar; without these the second window had no way to be moved, resized or closed. EVERY new window label must be added here, and the harness diagnostic (`diagnostic-harness`) proved the point a second time: unlisted, it lost `store:allow-load` as well as the window controls, so `loadAppearance` fell through to the shipped default and the window opened in the system colour scheme while the rest of the app sat in the theme the user had chosen. A window missing from this list does not fail loudly; it renders wrong.",
   "windows": [
     "main",
-    "conversation-*"
+    "conversation-*",
+    "diagnostic-*"
   ],
   "permissions": [
     "core:default",

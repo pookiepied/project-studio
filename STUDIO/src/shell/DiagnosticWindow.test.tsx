@@ -19,16 +19,10 @@ import { DiagnosticWindow } from './DiagnosticWindow'
  */
 
 const harnessFailureReason = vi.fn<() => Promise<string | null>>()
-const closeWindow = vi.fn<() => Promise<void>>()
 
 vi.mock('@/platform/harness', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/platform/harness')>()
   return { ...actual, harnessFailureReason: () => harnessFailureReason() }
-})
-
-vi.mock('@/platform/tauri', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/platform/tauri')>()
-  return { ...actual, closeWindow: () => closeWindow() }
 })
 
 /** Shaped like a real crash: a headline sentence and then the child's output. */
@@ -55,8 +49,24 @@ describe('DiagnosticWindow', () => {
     // Nothing is plumbed between windows: no copy to go stale, and no payload
     // that could carry a token across.
     await waitFor(() => expect(harnessFailureReason).toHaveBeenCalledTimes(1))
-    expect(screen.getByText('The harness stopped while starting.')).toBeTruthy()
+    // Named like an open file, not titled like a page.
     expect(screen.getByText('HARNESS_EXITED')).toBeTruthy()
+  })
+
+  it('is the text and nothing else', async () => {
+    harnessFailureReason.mockResolvedValue(CRASH)
+    render(<DiagnosticWindow />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy())
+
+    // The page behind this window already states the failure and offers the
+    // remedy. Repeating either here made this a second, worse copy of that
+    // page with a log stapled underneath.
+    expect(screen.queryByText('The harness exited during startup.')).toBeNull()
+    expect(screen.queryByText(/exit status and its output/)).toBeNull()
+
+    // And no Close button in the content: the traffic lights in the corner
+    // are the close button, and shipping both asks the same question twice.
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
   })
 
   it('numbers every line, including the blank ones', async () => {
@@ -117,11 +127,11 @@ describe('DiagnosticWindow', () => {
     expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
   })
 
-  it('closes through the platform seam', async () => {
-    harnessFailureReason.mockResolvedValue(CRASH)
+  it('offers nothing to copy when there is nothing to show', async () => {
+    harnessFailureReason.mockResolvedValue(null)
     render(<DiagnosticWindow />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    await waitFor(() => expect(closeWindow).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByText(/not reporting a failure/)).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
   })
 })

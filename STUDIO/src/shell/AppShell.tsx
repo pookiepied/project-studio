@@ -109,17 +109,38 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome])
 
-  // The harness is the thing every page here runs on — the index, the
-  // catalog, every send — and when it is down none of this shell is worth
-  // rendering. The window becomes one page instead: the brand, the absence,
-  // the supervisor's reason, and the two actions that still exist. The shell
-  // comes back with the harness; nothing below is mounted to be missed.
+  // ---- When the whole shell is replaced ------------------------------------
+  //
+  // One rule: Studio and the harness cannot talk to each other at all. Not
+  // "a read failed" -- that is a different situation with a different answer.
+  //
+  //   no-harness                    the supervisor has no running endpoint.
+  //                                 There is no address to send to.
+  //   failed + `not-reachable`      an endpoint exists and nothing answers on
+  //                                 it. A dead port, a harness that hung.
+  //   failed + `unauthorized`       something answers and rejects our
+  //                                 credential. The two cannot establish a
+  //                                 session.
+  //
+  // Everything else stays in the shell, and the distinction is whether the
+  // harness spoke. `harness-error` and `malformed-response` both mean it
+  // answered -- it is alive, reachable, and authenticated, and it either
+  // refused one request or sent a body this build could not parse. Replacing
+  // the entire window over one bad read would throw away a working app and a
+  // sidebar full of real conversations, so those surface where they happened
+  // and the shell stays up.
   //
   // Deliberately after every hook in this component: an early return above
-  // the two effects would drop them from the no-harness render, and a render
-  // that calls fewer hooks than the one before it is the blank-window crash
-  // this page was written to prevent, not cause.
-  if (storePhase.status === 'no-harness') {
+  // the two effects would drop them from this render, and a render that calls
+  // fewer hooks than the one before it is the blank-window crash this page
+  // was written to prevent, not cause.
+  const cannotReachHarness =
+    storePhase.status === 'no-harness' ||
+    (storePhase.status === 'failed' &&
+      storePhase.error !== null &&
+      (storePhase.error.kind === 'not-reachable' || storePhase.error.kind === 'unauthorized'))
+
+  if (cannotReachHarness) {
     return <HarnessDownPage />
   }
 

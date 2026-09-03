@@ -143,20 +143,20 @@ export function HarnessDownPage() {
         ) : null}
 
         <div className="flex items-center gap-2">
-          {/* "Try again", not "Restart the harness". Restart is a lie on the
-              common path: the eager start already failed, so for almost
-              everyone who reads this button nothing has ever been running and
-              there is nothing to re-start. "Try again" is also true on the
-              second press, which "Start" would not be, and it says what the
-              person wants rather than naming the machinery — the word "harness"
-              is already in the headline and the remedy, where it is explained. */}
-          <Button variant="secondary" busy={starting} onClick={restart} icon={<Icons.reload />}>
-            Try again
+          {/* `sm`, like every other real action in the app. These were `md`,
+              which is a size nothing else uses: settings, dialogs and rows are
+              all `sm`, so two `md` buttons alone on a page did not read as
+              emphasis, they read as a different app. */}
+          <Button variant="secondary" size="sm" busy={starting} onClick={restart} icon={<Icons.reload />}>
+            Start the harness
           </Button>
-          {/* Quit stays. With close-to-tray on, the window's own close means
-              hide, so this is the one control on screen that means out — and
-              "Quit" is the verb the tray item already uses for it. */}
-          <Button variant="ghost" onClick={() => void quitApp()}>
+          {/* Named for what it does, which is start the harness and nothing
+              else -- `ensureStore` asks the supervisor to bring it up and then
+              re-reads the index. It does not restart Studio, and "Try again"
+              left that open to being read either way. This is also the label
+              the chat notice already uses for the same action, so the app has
+              one name for it. */}
+          <Button variant="ghost" size="sm" onClick={() => void quitApp()}>
             Quit Studio
           </Button>
         </div>

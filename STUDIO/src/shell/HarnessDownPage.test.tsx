@@ -62,7 +62,7 @@ describe('HarnessDownPage', () => {
     render(<HarnessDownPage />)
 
     expect(screen.getByText('The harness is not running.')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start the harness' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Quit Studio' })).toBeTruthy()
     await waitFor(() => expect(harnessFailureReason).toHaveBeenCalledTimes(1))
 
@@ -86,8 +86,8 @@ describe('HarnessDownPage', () => {
     render(<HarnessDownPage />)
 
     // Classified, in the app's voice.
-    await waitFor(() => expect(screen.getByText('The harness could not be found.')).toBeTruthy())
-    expect(screen.getByText(/the installation is incomplete/)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('The harness was not found.')).toBeTruthy())
+    expect(screen.getByText(/path that was searched/)).toBeTruthy()
 
     // And the developer sentence is nowhere on it. `pnpm build` is an
     // instruction for whoever holds the repository; a person who installed
@@ -127,7 +127,7 @@ describe('HarnessDownPage', () => {
     )
     render(<HarnessDownPage />)
 
-    await waitFor(() => expect(screen.getByText('The harness did not finish starting.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('The harness did not become ready.')).toBeTruthy())
   })
 
   it('classifies again when a press is refused, and stays on the page', async () => {
@@ -138,11 +138,11 @@ describe('HarnessDownPage', () => {
     harnessFailureReason.mockResolvedValue(
       'Harness exited before readiness (status=exit code: 1). stderr=StorageError: this build supports 17.',
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start the harness' }))
     expect(ensureStore).toHaveBeenCalledTimes(1)
 
-    await waitFor(() => expect(screen.getByText('The harness stopped while starting.')).toBeTruthy())
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('The harness exited during startup.')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Start the harness' })).toBeTruthy()
   })
 
   it('fetches no second sentence when the start lands', async () => {
@@ -150,7 +150,7 @@ describe('HarnessDownPage', () => {
     ensureStore.mockResolvedValue(true)
     render(<HarnessDownPage />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start the harness' }))
     await waitFor(() => expect(ensureStore).toHaveBeenCalledTimes(1))
     // Up means the harness answered and the page unmounts under the shell
     // coming back; nothing it fetched may name a failure that is over.
