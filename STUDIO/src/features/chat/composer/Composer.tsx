@@ -13,6 +13,7 @@ import { AddMenu } from '@/features/chat/composer/AddMenu'
 import { PendingImages } from '@/features/chat/composer/PendingImages'
 import { PermissionControl } from '@/features/chat/composer/PermissionControl'
 import { ComposerField, type ComposerFieldHandle } from '@/features/chat/composer/ComposerField'
+import { clearDraft, readDraft, writeDraft } from '@/features/chat/composer/drafts'
 import { useTypeToFocus } from '@/features/chat/composer/useTypeToFocus'
 import { DictationBar, useDictation } from '@/features/voice'
 import { useVoiceModeContext } from '@/features/voice'
@@ -126,12 +127,36 @@ export function Composer({
   onStop?: () => void
 }) {
   const { status, send, stop } = useWorkspace()
-  const [text, setText] = useState('')
+  // Seeded from the stored draft rather than the empty string. An async read
+  // would mount the field blank and fill it a frame later, which reads as the
+  // app losing the sentence and then changing its mind.
+  const [text, setTextState] = useState(() => readDraft(conversationId))
   // Mirror of `text` for callbacks that must judge the CURRENT field against
   // what was sent — the closure below would otherwise see the render in
   // which the send began.
   const textRef = useRef('')
   textRef.current = text
+  /**
+   * Every path that changes the field records the draft.
+   *
+   * Wrapping the setter rather than watching `text` with an effect keeps the
+   * two in step for changes that never touch `onChange` — dictation appends
+   * through the updater form, and it is exactly the long, spoken, expensive
+   * message a person would most hate to lose.
+   *
+   * The updater form is resolved here against `textRef` rather than inside
+   * `setTextState`, because the draft write is a side effect and React may
+   * call a state updater more than once.
+   */
+  const setText = useCallback(
+    (next: string | ((current: string) => string)) => {
+      const resolved = typeof next === 'function' ? next(textRef.current) : next
+      textRef.current = resolved
+      setTextState(resolved)
+      writeDraft(conversationId, resolved)
+    },
+    [conversationId],
+  )
   /**
    * The images riding on this message, already read and encoded. The ref is
    * the receipt check's twin of `textRef`: a send clears them only when the
@@ -222,6 +247,10 @@ export function Composer({
             return
           }
           setText('')
+          // Written out now rather than after the quiet window. A quit inside
+          // that window would otherwise restore words the harness already
+          // took, which reads as the app duplicating the message.
+          clearDraft(conversationId)
           setMultiline(false)
           setImages([])
           setRefusals([])
@@ -236,6 +265,7 @@ export function Composer({
     }
     const id = send(conversationId, text)
     setText('')
+    clearDraft(conversationId)
     setImages([])
     setRefusals([])
     setMultiline(false)

@@ -4,6 +4,7 @@ import './index.css'
 import App from '@/App'
 import { applyAppearance, loadAppearance } from '@/design/theme'
 import { assertScaleDefaults } from '@/design/tokens'
+import { flushDrafts, primeDrafts } from '@/features/chat/composer/drafts'
 
 // Before anything writes to the root: compares the defaults `index.css`
 // declares against the ones `typography.ts` owns, and complains in development
@@ -22,6 +23,21 @@ assertScaleDefaults()
 // the alternative, and it costs a visible flash at the wrong size and theme.
 const appearance = await loadAppearance()
 applyAppearance(appearance)
+
+// Unsent composer text, read before the first composer mounts so its initial
+// value is the draft rather than an empty field corrected a frame later.
+// Awaited alongside the appearance for the same reason: nothing is on screen
+// yet, so the read costs a frame nobody sees.
+await primeDrafts()
+
+// A debounce is a bet that the process survives another moment, and a window
+// going away is when that bet is worst. `pagehide` is the event that still
+// fires when a webview is torn down, unlike `beforeunload`, and `hidden` also
+// covers the app being sent to the background without closing.
+window.addEventListener('pagehide', () => void flushDrafts())
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') void flushDrafts()
+})
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Missing #root element')
