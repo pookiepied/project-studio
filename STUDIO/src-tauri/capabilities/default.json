@@ -21,8 +21,16 @@
     "store:allow-get",
     "store:allow-set",
     "store:allow-delete",
-    "store:allow-save"
+    "store:allow-save",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-unminimize",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ],
+  "//autostart": "Three operations, not `autostart:default`, for the same reason the store grant is enumerated: the settings toggle needs to read the current state and set it either way, and nothing else. Enabling writes a real entry under Windows' `Run` key, so disabling has to be reachable from the same place -- a preference that records `false` while the entry survives is the version of this feature that lies to the user.",
+  "//window-visibility": "`hide`, `show` and `unminimize` are the close-to-tray path. The native side hides the window on close and the tray brings it back, but the frontend needs the same three to offer `Hide to tray` and to raise a window from within the app.",
   "//http": "Removed with the service seam (task 19). Harness requests leave through the `service_fetch` command, which is our own Rust and needs no capability grant -- the webview no longer names URLs, so there was nothing left for `http:default` to scope. A granted capability nothing needs is the FE-02 problem again. The `connect-src` entries for loopback came out of the CSP for the same reason.",
   "//store": "FE-02. This was `store:default`, which the generated ACL manifest expands to all fourteen store operations (load, get-store, set, get, has, delete, clear, reset, keys, values, entries, length, reload, save) on any file the webview names. The appearance feature calls exactly five of them against exactly one file: `load` opens `preferences.json`, then `get`, `set`, `delete`, `save` (src/design/theme/appearance.ts:58, 76, 83/97, 119, 84/98/120). Those five are what is granted now. A path scope was wanted here too and is not available: tauri-plugin-store 2.4.4 declares `global_scope_schema: null` in gen/schemas/acl-manifests.json, so the plugin defines no scope vocabulary and there is nothing to pin `preferences.json` with. The file therefore remains reachable by name only, and the standing rule stands on its own: this store is plaintext JSON in the app config dir and no credential ever enters it."
 }

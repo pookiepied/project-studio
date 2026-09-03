@@ -20,9 +20,25 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+# `tray-icon` and `image-png` are what let the app keep a presence in the
+# notification area: the first compiles the tray and its menu, the second
+# decodes the PNG the icon is built from. Neither is on by default.
+tauri = { version = "2.11.3", features = ["tray-icon", "image-png"] }
 tauri-plugin-log = "2"
 tauri-plugin-window-state = "2"
+
+# One app, however many times it is launched. Without this a second launch
+# starts a second process with its own Harness child, and two supervisors then
+# race for the same port and the same database. The plugin hands the argv of
+# the launch that lost to the one that won, which is also how a click on a
+# shortcut raises the window that already exists.
+tauri-plugin-single-instance = "2"
+
+# Launch at login, as a real registry entry under Windows' `Run` key rather
+# than a flag the app checks. Enabling and disabling it is the plugin's job so
+# that turning it off actually removes the entry - a stored `false` that
+# leaves the entry behind is the version of this feature that lies.
+tauri-plugin-autostart = "2"
 # Preferences live in a real JSON file in the OS config directory, not in the
 # webview's localStorage. localStorage is browser cache: it is scoped to the
 # webview's origin, it is wiped by anything that clears site data, and it is

@@ -1,9 +1,48 @@
 mod harness;
 mod services;
+mod tray;
 mod window;
 
 use harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri_plugin_store::StoreExt;
+
+/// Guards the one-shot suppression of the first `app_ready` show when the app
+/// was launched by the login item. See `app_ready`.
+static MAIN_WINDOW_REVEALED: AtomicBool = AtomicBool::new(false);
+
+/// The preferences file the frontend writes, read here for the one setting
+/// that has to be honoured by native code.
+const PREFERENCES_FILE: &str = "preferences.json";
+const WINDOW_PREFERENCES_KEY: &str = "studio.window";
+
+/// Whether closing the main window should hide it rather than end the app.
+///
+/// **Defaults to false, deliberately.** Today closing the window quits, and a
+/// person who has not been offered a choice should not discover that their
+/// app is still running because a release changed its mind. The tray exists
+/// either way; this only decides what the close button means. The settings
+/// toggle writes the key, and until something writes it the behaviour is
+/// exactly what it has always been.
+///
+/// Read from the store on each close rather than cached at startup, so the
+/// toggle takes effect the moment it is flipped instead of at the next
+/// launch. A close happens once in a while and this is a small JSON file
+/// already held open by the plugin.
+fn close_hides_to_tray(app: &AppHandle) -> bool {
+  let Ok(store) = app.store(PREFERENCES_FILE) else {
+    return false;
+  };
+  store
+    .get(WINDOW_PREFERENCES_KEY)
+    .and_then(|value| {
+      value
+        .get("closeToTray")
+        .and_then(serde_json::Value::as_bool)
+    })
+    .unwrap_or(false)
+}
 
 /// The frontend invokes this once it has mounted and painted. Windows start
 /// hidden (`visible: false` in tauri.conf.json, and explicitly for detached
@@ -15,6 +54,20 @@ use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Wind
 /// while the main one was re-shown instead.
 #[tauri::command]
 async fn app_ready(window: tauri::WebviewWindow) -> Result<(), String> {
+  // An autostarted launch stays in the tray. The frontend still mounts and
+  // still reports ready -- the Harness starts, the conversation list loads,
+  // and showing the window later is instant -- it simply is not put in front
+  // of someone who was signing in to do something else.
+  //
+  // Consumed once. A webview reload calls this again, and a window the person
+  // has since opened must not vanish because the process was started hidden
+  // an hour ago.
+  if window.label() == "main"
+    && tray::launched_hidden()
+    && !MAIN_WINDOW_REVEALED.swap(true, Ordering::SeqCst)
+  {
+    return Ok(());
+  }
   let _ = window.show();
   let _ = window.set_focus();
   Ok(())
@@ -238,6 +291,24 @@ pub fn run() {
     // `resetWindowSize` in the frontend is the way back to the default.
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_store::Builder::default().build())
+    // Must be registered before anything that could take time: the whole
+    // point is for the losing process to hand over and exit quickly, and the
+    // callback below runs in the process that already owns the app.
+    //
+    // The argv of the second launch is deliberately ignored except for the
+    // hidden flag. A launch someone performed by hand -- a shortcut, the Start
+    // menu -- means "show me Studio", and the only launch that does not is the
+    // login item, which never reaches here because it is the first one.
+    .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+      tray::reveal_main(app);
+    }))
+    // The login item, registered with the flag that keeps it quiet. Passing
+    // the argument at registration time is what makes an autostarted launch
+    // distinguishable from a deliberate one.
+    .plugin(tauri_plugin_autostart::init(
+      tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+      Some(vec![tray::HIDDEN_FLAG]),
+    ))
     .setup(move |app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -247,6 +318,7 @@ pub fn run() {
         )?;
       }
       lifecycle_supervisor.attach_lifecycle_emitter(app.handle().clone());
+      tray::install(app)?;
       if let Some(main_window) = app.get_webview_window("main") {
         window::apply_rounded_corners(&main_window);
       }
@@ -262,6 +334,20 @@ pub fn run() {
     // user closes one, and they share this Harness — reacting to their label
     // would kill it out from under the window the user is still working in.
     .on_window_event(|window, event| {
+      // Close-to-tray, when the person has asked for it. The window is kept
+      // and hidden rather than destroyed, so reopening it from the tray is
+      // instant and the Harness child and every running turn survive -- which
+      // is the entire reason someone turns this on.
+      //
+      // Only `main`. A detached conversation window has no tray presence and
+      // hiding one would strand it: nothing in the app could bring it back.
+      if let WindowEvent::CloseRequested { api, .. } = event {
+        if window.label() == "main" && close_hides_to_tray(window.app_handle()) {
+          api.prevent_close();
+          let _ = window.hide();
+          return;
+        }
+      }
       if matches!(event, WindowEvent::Destroyed) && window.label() == "main" {
         if let Some(sup) = window.try_state::<HarnessSupervisor>() {
           sup.shutdown_all();
