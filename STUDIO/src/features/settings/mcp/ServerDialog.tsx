@@ -142,7 +142,27 @@ export function ServerDialog({
       title={editing === null ? 'Add MCP server' : `Edit ${editing.title}`}
       width="30rem"
       footer={
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => void submit()}
+            disabled={saving || (mode === 'form' && problem !== null)}
+          >
+            {editing === null ? 'Add server' : 'Save'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        {/* The view switch belongs at the top, not beside the save button.
+            Form and JSON are two ways of looking at the same server, so the
+            control that swaps them is a header for the content below it; sat
+            in the footer it read as a third action of equal rank to Cancel
+            and Save, which is a thing to decide rather than a way to look. */}
+        <div className="flex justify-end">
           <Segmented
             layoutId="mcp-dialog-view"
             ariaLabel="How to edit this server"
@@ -153,22 +173,8 @@ export function ServerDialog({
               { id: 'json', label: 'JSON' },
             ]}
           />
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void submit()}
-              disabled={saving || (mode === 'form' && problem !== null)}
-            >
-              {editing === null ? 'Add server' : 'Save'}
-            </Button>
-          </div>
         </div>
-      }
-    >
-      <div className="flex flex-col gap-3.5">
+
         {mode === 'json' ? (
           <JsonView value={json} onChange={setJson} error={jsonError} />
         ) : (

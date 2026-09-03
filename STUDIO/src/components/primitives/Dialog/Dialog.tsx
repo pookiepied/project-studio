@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SURFACE } from '@/design/tokens'
+import { DURATION, EASE_OUT, SHELL, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives/IconButton/IconButton'
 import { cn } from '@/lib/cn'
@@ -18,6 +19,23 @@ import { cn } from '@/lib/cn'
  * shell — including the top strip, a fifty-pixel positioned bar, where the
  * sheet once opened as a sliver inside it. Fixed means the viewport, whatever
  * the mount point's ancestors are doing.
+ *
+ * ---- Why it is also portalled -----------------------------------------------
+ *
+ * `fixed` alone did not keep that promise. A transformed or filtered ancestor
+ * becomes the containing block for its fixed descendants, and the page every
+ * settings sheet opens over is a `motion.main` that animates on every
+ * navigation — so `inset-0` resolved to the page rather than to the window.
+ * The scrim stopped at the sidebar's edge, which is why its blur read as cut
+ * in half: it was not clipped, it was correctly covering a box that was the
+ * wrong box. The same ancestor's `overflow-hidden` would have clipped it
+ * anyway.
+ *
+ * A portal to `document.body` removes the ancestor, and with it the whole
+ * class of problem — the same move `Popover`, `Tooltip` and the lightbox
+ * already make for the same reason. The window's corner is then drawn here
+ * rather than inherited, because the OS window is transparent and a square
+ * scrim over a rounded panel paints into the corners the panel cut away.
  */
 export function Dialog({
   open,
@@ -51,7 +69,7 @@ export function Dialog({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <motion.div
@@ -59,7 +77,11 @@ export function Dialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: DURATION.base, ease: EASE_OUT }}
-          className="studio-blur-scrim fixed inset-0 z-50 flex items-center justify-center bg-scrim p-6"
+          className="studio-blur-scrim fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-scrim p-6"
+          // The window's own corner, restated. Portalled to the body, the
+          // scrim no longer inherits the rounded panel's clip, and the OS
+          // window behind it is transparent.
+          style={{ borderRadius: SHELL.windowRadius }}
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) onClose()
           }}
@@ -95,6 +117,7 @@ export function Dialog({
           </motion.div>
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
