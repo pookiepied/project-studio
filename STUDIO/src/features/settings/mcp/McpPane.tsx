@@ -6,6 +6,7 @@ import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Pane } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
 import { useMcpServers, type McpView } from '@/features/settings/mcp/useMcpServers'
+import { ServerDialog } from '@/features/settings/mcp/ServerDialog'
 import type { McpServerRecord, McpState } from '@/platform/harness'
 
 /**
@@ -19,6 +20,16 @@ import type { McpServerRecord, McpState } from '@/platform/harness'
  */
 export function McpPane() {
   const servers = useMcpServers()
+  /**
+   * What the dialog is doing: closed, adding, or editing one server.
+   *
+   * One value rather than an open flag beside a selection, because "open with
+   * nothing selected" and "closed but still remembering a selection" are
+   * states that can disagree, and neither has a meaning here.
+   */
+  const [editor, setEditor] = useState<
+    { readonly kind: 'closed' } | { readonly kind: 'add' } | { readonly kind: 'edit'; readonly server: McpServerRecord }
+  >({ kind: 'closed' })
 
   return (
     <Pane
@@ -28,9 +39,20 @@ export function McpPane() {
       <Header
         busy={servers.refreshing}
         onRefresh={() => void servers.refresh()}
+        onAdd={() => setEditor({ kind: 'add' })}
         status={servers.view.status}
       />
-      <Body servers={servers} />
+      <Body
+        servers={servers}
+        onEdit={(server) => setEditor({ kind: 'edit', server })}
+      />
+      <ServerDialog
+        open={editor.kind !== 'closed'}
+        editing={editor.kind === 'edit' ? editor.server : null}
+        onClose={() => setEditor({ kind: 'closed' })}
+        onSave={servers.save}
+        onSaveCredential={servers.setCredential}
+      />
     </Pane>
   )
 }
@@ -39,10 +61,12 @@ function Header({
   busy,
   status,
   onRefresh,
+  onAdd,
 }: {
   busy: boolean
   status: McpView['status']
   onRefresh: () => void
+  onAdd: () => void
 }) {
   // The label follows the state rather than splitting it in two. "Reading what
   // is installed" beside "the harness is not running" is the header
@@ -67,7 +91,7 @@ function Header({
         <IconButton label="Refresh" onClick={onRefresh} disabled={busy}>
           <Icons.reload />
         </IconButton>
-        <Button variant="secondary" size="sm" disabled={status !== 'ready'}>
+        <Button variant="secondary" size="sm" onClick={onAdd} disabled={status !== 'ready'}>
           <Icons.add />
           Add server
         </Button>
@@ -76,7 +100,13 @@ function Header({
   )
 }
 
-function Body({ servers }: { servers: ReturnType<typeof useMcpServers> }) {
+function Body({
+  servers,
+  onEdit,
+}: {
+  servers: ReturnType<typeof useMcpServers>
+  onEdit: (server: McpServerRecord) => void
+}) {
   const { view } = servers
 
   if (view.status === 'loading') return <ListSkeleton />
@@ -110,6 +140,8 @@ function Body({ servers }: { servers: ReturnType<typeof useMcpServers> }) {
           key={server.id}
           server={server}
           onToggle={(enabled) => void servers.setEnabled(server.id, enabled)}
+          onEdit={() => onEdit(server)}
+          onRemove={() => void servers.remove(server.id)}
         />
       ))}
     </div>
@@ -127,10 +159,23 @@ function Body({ servers }: { servers: ReturnType<typeof useMcpServers> }) {
 function ServerRow({
   server,
   onToggle,
+  onEdit,
+  onRemove,
 }: {
   server: McpServerRecord
   onToggle: (enabled: boolean) => void
+  onEdit: () => void
+  onRemove: () => void
 }) {
+  /**
+   * Removal asks first, in the row itself.
+   *
+   * Uninstalling revokes every approval the server was ever granted and
+   * forgets it at every scope, so it is not a thing to do on one click. A
+   * second dialog over the settings dialog would be a stack nobody enjoys;
+   * the row answers the question where the question was asked.
+   */
+  const [confirming, setConfirming] = useState(false)
   // Seeded from the stored default and held locally so the switch moves the
   // moment it is clicked, rather than waiting for the write and the re-read.
   // The list is re-read on success, so the harness remains the authority; this
@@ -149,21 +194,44 @@ function ServerRow({
           <StatusLine server={server} />
         </div>
       </div>
-      <div className="shrink-0">
-        <Segmented
-          layoutId={`mcp-${server.id}`}
-          ariaLabel={`${server.title} default`}
-          value={enabled ? 'on' : 'off'}
-          onChange={(value) => {
-            const next = value === 'on'
-            setEnabled(next)
-            onToggle(next)
-          }}
-          options={[
-            { id: 'off', label: 'Off' },
-            { id: 'on', label: 'On' },
-          ]}
-        />
+      <div className="flex shrink-0 items-center gap-1">
+        {confirming ? (
+          <>
+            <span className="text-caption text-muted-foreground">Remove?</span>
+            <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
+              Keep
+            </Button>
+            <Button variant="danger" size="sm" onClick={onRemove}>
+              Remove
+            </Button>
+          </>
+        ) : (
+          <>
+            <IconButton label="Edit" onClick={onEdit}>
+              <Icons.edit />
+            </IconButton>
+            {/* Quiet, not danger. The mark stays `--muted-foreground` like
+                every other mark in the app; the weight belongs on the confirm
+                button, where the consequence actually is. */}
+            <IconButton label="Remove" onClick={() => setConfirming(true)}>
+              <Icons.delete />
+            </IconButton>
+            <Segmented
+              layoutId={`mcp-${server.id}`}
+              ariaLabel={`${server.title} default`}
+              value={enabled ? 'on' : 'off'}
+              onChange={(value) => {
+                const next = value === 'on'
+                setEnabled(next)
+                onToggle(next)
+              }}
+              options={[
+                { id: 'off', label: 'Off' },
+                { id: 'on', label: 'On' },
+              ]}
+            />
+          </>
+        )}
       </div>
     </div>
   )
