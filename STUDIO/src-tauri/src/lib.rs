@@ -6,7 +6,6 @@ mod window;
 use harness::{HarnessEndpointView, HarnessStatus, HarnessSupervisor};
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri_plugin_store::StoreExt;
 
 /// Guards the one-shot suppression of the first `app_ready` show when the app
 /// was launched by the login item. See `app_ready`.
@@ -29,23 +28,44 @@ const WINDOW_PREFERENCES_KEY: &str = "studio.window";
 /// close button to end the app can have that, but it is the choice they make
 /// rather than the one they get by accident.
 ///
-/// Read from the store on each close rather than cached at startup, so the
-/// toggle takes effect the moment it is flipped instead of at the next
-/// launch. A close happens once in a while and this is a small JSON file
-/// already held open by the plugin.
+/// Read on each close rather than cached at startup, so the toggle takes
+/// effect the moment it is flipped instead of at the next launch. A close
+/// happens once in a while and this is a small JSON file.
 fn close_hides_to_tray(app: &AppHandle) -> bool {
-  // A store that will not open is not a reason to start destroying work: the
-  // default is what an absent preference means, and it means the same thing
-  // when the file cannot be read at all.
-  let Ok(store) = app.store(PREFERENCES_FILE) else {
+  // The file is read directly rather than through the store plugin.
+  //
+  // `StoreExt::store()` does not hand native code the instance the webview
+  // loaded: it answers with a fresh, empty one, so every read here came back
+  // as `None` and every close silently took the default. Measured, not
+  // assumed - the empty key list was logged from a running build.
+  //
+  // Reading the file is also the more honest dependency. This is a small
+  // JSON document the frontend owns and saves immediately on every change;
+  // native code only needs to look at it, and going through a plugin whose
+  // caching rules differ by caller is how the bug above happened.
+  //
+  // Any failure - no config directory, no file yet, unreadable, malformed -
+  // means the same thing as an absent preference. A file that cannot be read
+  // is not a reason to start destroying someone's work.
+  let Ok(directory) = app.path().app_config_dir() else {
     return CLOSE_TO_TRAY_DEFAULT;
   };
-  store
-    .get(WINDOW_PREFERENCES_KEY)
-    .and_then(|value| {
-      value
-        .get("closeToTray")
-        .and_then(serde_json::Value::as_bool)
+  let Ok(text) = std::fs::read_to_string(directory.join(PREFERENCES_FILE)) else {
+    return CLOSE_TO_TRAY_DEFAULT;
+  };
+  // A byte order mark is stripped before parsing. `serde_json` rejects one
+  // outright, and this file is meant to be hand-editable -- the appearance
+  // module chose a real file over browser storage precisely so a person could
+  // open it. On Windows, opening and saving it is very often how a BOM gets
+  // there, and a preference silently reverting because an editor added three
+  // invisible bytes is the worst kind of bug to be on the wrong end of.
+  serde_json::from_str::<serde_json::Value>(text.trim_start_matches('\u{feff}'))
+    .ok()
+    .and_then(|document| {
+      document
+        .get(WINDOW_PREFERENCES_KEY)?
+        .get("closeToTray")?
+        .as_bool()
     })
     .unwrap_or(CLOSE_TO_TRAY_DEFAULT)
 }

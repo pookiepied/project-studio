@@ -1,9 +1,17 @@
 import { Icons } from '@/components/icons'
-import { MenuItem, MenuLabel, Popover } from '@/components/primitives'
+import { MenuItem, MenuLabel, Popover, Segmented } from '@/components/primitives'
 import { PERMISSION_MODES, findPermissionMode } from '@/domain/permissions/modes'
 import { useWorkspace } from '@/stores/workspace'
 import { Pane, Row } from '@/features/settings/panes/Pane'
-import { useState } from 'react'
+import {
+  DEFAULT_WINDOW_PREFERENCES,
+  loadLaunchAtStartup,
+  loadWindowPreferences,
+  saveWindowPreferences,
+  setLaunchAtStartup as setLaunchAtStartupPreference,
+  type WindowPreferences,
+} from '@/platform/window-preferences'
+import { useEffect, useState } from 'react'
 
 /**
  * General.
@@ -19,8 +27,46 @@ export function GeneralPane() {
   const mode = findPermissionMode(settings.permission)
   const Glyph = mode.icon
 
+  // Both desktop settings are read once when the pane opens rather than held
+  // in app-wide state. Nothing else in the app renders them, and the login
+  // item in particular has to be re-read from the operating system anyway --
+  // a cached copy could disagree with the registry.
+  const [windowPreferences, setWindowPreferences] = useState(
+    DEFAULT_WINDOW_PREFERENCES,
+  )
+  const [launchAtStartup, setLaunchAtStartup] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    void loadWindowPreferences().then((stored) => {
+      if (live) setWindowPreferences(stored)
+    })
+    void loadLaunchAtStartup().then((enabled) => {
+      if (live) setLaunchAtStartup(enabled)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const updateWindow = async (change: Partial<WindowPreferences>) => {
+    const next = { ...windowPreferences, ...change }
+    setWindowPreferences(next)
+    await saveWindowPreferences(next)
+  }
+
+  // Set from what the operating system reports afterwards, not from what was
+  // asked for. A registry the app is not allowed to write must not leave a
+  // toggle showing a change that did not happen.
+  const updateStartup = async (enabled: boolean) => {
+    setLaunchAtStartup(await setLaunchAtStartupPreference(enabled))
+  }
+
   return (
-    <Pane title="General" description="Defaults for new conversations.">
+    <Pane
+      title="General"
+      description="Defaults for new conversations, and how Studio behaves as a desktop app."
+    >
       <Row label="Execution mode" hint={mode.detail}>
         <Popover
           open={open}
@@ -57,6 +103,46 @@ export function GeneralPane() {
             </MenuItem>
           ))}
         </Popover>
+      </Row>
+
+      <Row
+        label="When you close the window"
+        hint={
+          windowPreferences.closeToTray
+            ? 'Studio keeps running in the tray. Turns in progress carry on, and the tray icon brings the window back. Quit Studio from the tray menu.'
+            : 'Studio quits. Any turn still running is stopped.'
+        }
+      >
+        <Segmented
+          layoutId="settings-close-to-tray"
+          ariaLabel="When you close the window"
+          value={windowPreferences.closeToTray ? 'tray' : 'quit'}
+          onChange={(value) => void updateWindow({ closeToTray: value === 'tray' })}
+          options={[
+            { id: 'quit', label: 'Quit' },
+            { id: 'tray', label: 'Keep running' },
+          ]}
+        />
+      </Row>
+
+      <Row
+        label="Launch at startup"
+        hint={
+          launchAtStartup
+            ? 'Studio starts with your computer and waits in the tray, without opening a window.'
+            : 'Studio starts only when you open it.'
+        }
+      >
+        <Segmented
+          layoutId="settings-launch-at-startup"
+          ariaLabel="Launch at startup"
+          value={launchAtStartup ? 'on' : 'off'}
+          onChange={(value) => void updateStartup(value === 'on')}
+          options={[
+            { id: 'off', label: 'Off' },
+            { id: 'on', label: 'On' },
+          ]}
+        />
       </Row>
 
       <Row
