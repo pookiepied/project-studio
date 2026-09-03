@@ -102,6 +102,32 @@ export function detachedConversationId(): string | null {
 }
 
 /**
+ * Which diagnostic this window is, or null for an ordinary window.
+ *
+ * Read from the URL like `detachedConversationId`, and for the same reason:
+ * which window this is was settled before any React ran, so it is a fact
+ * rather than state.
+ */
+export function diagnosticKind(): string | null {
+  if (typeof window === 'undefined') return null
+  return new URLSearchParams(window.location.search).get('diagnostic')
+}
+
+/**
+ * Open the harness diagnostic in its own window.
+ *
+ * Falls back to a browser tab outside Tauri so the control still works under
+ * `pnpm dev`, where there is no native window to create.
+ */
+export async function openDiagnosticWindow(): Promise<void> {
+  if (!isTauri()) {
+    window.open('?diagnostic=harness', '_blank', 'noopener')
+    return
+  }
+  await invoke('open_diagnostic_window')
+}
+
+/**
  * Open one conversation in its own window.
  *
  * Falls back to a browser tab outside Tauri so the same menu item works under

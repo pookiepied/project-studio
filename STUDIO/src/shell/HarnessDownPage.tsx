@@ -1,20 +1,14 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 
 import { StudioMark } from '@/components/brand'
 import { Icons } from '@/components/icons'
-import { IconStateProvider } from '@/components/icons/Icon'
-import { Button, IconButton } from '@/components/primitives'
-import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
-import { copyText } from '@/lib/clipboard'
+import { Button } from '@/components/primitives'
+import { SHELL } from '@/design/tokens'
 import { harnessFailureReason } from '@/platform/harness'
-import { quitApp } from '@/platform/tauri'
+import { openDiagnosticWindow, quitApp } from '@/platform/tauri'
 import { describeHarnessFailure } from '@/shell/harness-failure'
 import { useWorkspace } from '@/stores/workspace'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
-
-/** How long "Copied" stands before the mark returns. Matches `CodeBlock`. */
-const COPIED_MS = 1600
 
 /**
  * The page that is the whole window while the harness is down.
@@ -45,14 +39,22 @@ const COPIED_MS = 1600
  * classified remedy explains what the harness is where explaining it is
  * actually useful — in the same breath as what to do about it.
  *
- * ---- Why the raw text is not the headline ----------------------------------
+ * ---- Why the raw text is not here at all -----------------------------------
  *
  * The supervisor writes for a log, and it should keep writing for a log: exit
  * statuses, stderr, `pnpm build`, the path it looked in. That text is the best
  * thing in the world to send to whoever maintains this, and the worst possible
- * greeting. So it stops being the first sentence and becomes the evidence
- * behind "See details" — verbatim, never paraphrased, with the copy button that
- * is the only thing anyone actually wants to do with it.
+ * greeting.
+ *
+ * It briefly lived here behind an inline disclosure, and that was wrong on the
+ * facts: the supervisor keeps up to fifty observed lines plus the child's whole
+ * stdout and stderr, so a crash is routinely dozens of lines rather than the
+ * handful the box was sized for. An inline block that size either grows and
+ * shoves these buttons around under the reader, or caps and scrolls, which puts
+ * a scrollbar inside a centred page. So the page keeps the code -- the one
+ * short thing worth quoting -- and the text itself gets a window
+ * (`DiagnosticWindow`), where it can be resized to, scrolled, and left open
+ * while the cause is fixed.
  */
 export function HarnessDownPage() {
   const { ensureStore } = useWorkspace()
@@ -122,11 +124,23 @@ export function HarnessDownPage() {
           {failure.remedy !== null ? (
             <p className="mt-3 text-ui text-muted-foreground">{failure.remedy}</p>
           ) : null}
+          {/* The code, under the prose, in the monospace face so it reads as an
+              identifier rather than as the end of the sentence above it. It is
+              the one thing on this page worth writing down, and the only part
+              of the failure that is stable enough to search for. */}
+          {reason !== null ? (
+            <p className="mt-3 font-mono text-code text-muted-foreground/70">{failure.code}</p>
+          ) : null}
         </div>
 
-        {/* Only when there is something real to show. A disclosure that opens
-            onto nothing is a worse answer than no disclosure. */}
-        {reason !== null ? <Details reason={reason} /> : null}
+        {/* Only offered when there is something to show. A control that opens a
+            window onto nothing is worse than no control. */}
+        {reason !== null ? (
+          <Button variant="ghost" size="sm" onClick={() => void openDiagnosticWindow()}>
+            <Icons.openExternal size="sm" />
+            See details
+          </Button>
+        ) : null}
 
         <div className="flex items-center gap-2">
           {/* "Try again", not "Restart the harness". Restart is a lie on the
@@ -147,77 +161,6 @@ export function HarnessDownPage() {
           </Button>
         </div>
       </div>
-    </div>
-  )
-}
-
-/**
- * The supervisor's own words, one press away.
- *
- * ---- Why a disclosure and not a second window ------------------------------
- *
- * Nine times out of ten this is four lines of text. A window to hold four lines
- * is a window to summon, position, read and dismiss, and it takes the person
- * off the page holding the button they came to press. Inline, the evidence sits
- * directly under the claim it supports, which is where evidence belongs.
- *
- * ---- Why there are no line numbers -----------------------------------------
- *
- * Line numbers exist so people can refer to a line: "the bug is on 42". Nobody
- * ever says that about a stderr dump. What people actually do with this text is
- * copy it — into a bug report, a search, a message to whoever maintains this —
- * and numbers actively obstruct that, because select-all either drags them into
- * the paste or forces the column-select nobody gets right. So: monospace,
- * because the alignment in a stack trace is meaning; whitespace preserved, for
- * the same reason; scrollable, because a stderr slab must not push the buttons
- * off screen; and a copy control, because copying is the verb.
- */
-function Details({ reason }: { reason: string }) {
-  const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    // Only on success. A control that says "Copied" when the write was refused
-    // is worse than one that does nothing.
-    if (!(await copyText(reason))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), COPIED_MS)
-  }
-
-  return (
-    <div className="flex w-full flex-col items-center" style={{ maxWidth: SHELL.measure }}>
-      <IconStateProvider state={open ? 'on' : 'rest'}>
-        <Button variant="ghost" size="sm" onClick={() => setOpen((was) => !was)}>
-          <Icons.disclosure size="sm" />
-          {open ? 'Hide details' : 'See details'}
-        </Button>
-      </IconStateProvider>
-
-      <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: DURATION.base, ease: EASE_OUT }}
-            className="w-full overflow-hidden"
-          >
-            <div className="relative mt-2 rounded-lg border bg-surface-sunken text-left">
-              <div className="absolute right-1.5 top-1.5">
-                <IconButton label={copied ? 'Copied' : 'Copy'} size="sm" onClick={() => void copy()}>
-                  {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
-                </IconButton>
-              </div>
-              {/* `pre`, not a paragraph. A stack trace's indentation is part of
-                  what it says, and the right padding clears the copy button so
-                  a long first line does not run underneath it. */}
-              <pre className="studio-scroll-inset max-h-48 overflow-auto px-3 py-2.5 pr-10 font-mono text-code whitespace-pre-wrap break-words text-muted-foreground">
-                {reason}
-              </pre>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   )
 }

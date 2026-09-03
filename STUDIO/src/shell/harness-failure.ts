@@ -48,6 +48,16 @@ export type HarnessFailureKind =
 
 export interface HarnessFailureCopy {
   readonly kind: HarnessFailureKind
+  /**
+   * A short stable name for this failure.
+   *
+   * The thing a person can search for, quote in a report, or read out loud --
+   * none of which the prose is any good for, because prose is written to be
+   * reassuring and a report needs to be exact. It is stable across rewordings
+   * of the headline on purpose: the sentence is for reading and the code is
+   * for referring to, and those two jobs pull in opposite directions.
+   */
+  readonly code: string
   /** The heading. Short: it is set in the display serif. */
   readonly headline: string
   /** What to do about it, or null when nothing honest can be said. */
@@ -110,14 +120,23 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
     case 'not-installed':
       return {
         kind,
-        headline: 'The harness is missing.',
+        code: 'HARNESS_NOT_FOUND',
+        headline: 'The harness could not be found.',
+        // Deliberately not "reinstall Studio". Studio ships the harness inside
+        // itself, so a copy that cannot find it is a copy that is incomplete --
+        // but the same message is what a development tree produces before the
+        // harness has ever been built, and telling that reader to reinstall is
+        // advice they cannot act on and would not need. Naming the condition
+        // and pointing at the path is true in both cases; the details say which
+        // one this is, because they carry the path that was searched.
         remedy:
-          'Studio ships with a local harness and could not find it on this machine. ' +
-          'Reinstalling Studio puts it back.',
+          'Studio ships with the harness, so this usually means the installation is ' +
+          'incomplete. The details name the path it looked in.',
       }
     case 'node-missing':
       return {
         kind,
+        code: 'HARNESS_NODE_MISSING',
         headline: 'Node.js could not be started.',
         remedy:
           'The harness runs on Node.js, and Studio could not launch it. It is either ' +
@@ -126,14 +145,16 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
     case 'crashed':
       return {
         kind,
+        code: 'HARNESS_EXITED',
         headline: 'The harness stopped while starting.',
         remedy:
           'It began and then exited before it was ready. Its last output is in the ' +
-          'details below, and that is the part worth sending on.',
+          'details, and that is the part worth sending on.',
       }
     case 'timed-out':
       return {
         kind,
+        code: 'HARNESS_TIMEOUT',
         headline: 'The harness did not finish starting.',
         remedy:
           'It began but never reported itself ready. A slow machine or a firewall ' +
@@ -142,6 +163,7 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
     case 'bad-handshake':
       return {
         kind,
+        code: 'HARNESS_BAD_HANDSHAKE',
         headline: 'The harness answered unexpectedly.',
         remedy:
           'It started, but what it said on the way up was not something this version ' +
@@ -150,6 +172,7 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
     case 'blocked':
       return {
         kind,
+        code: 'HARNESS_CONTAINMENT_REFUSED',
         headline: 'The system refused to contain the harness.',
         remedy:
           'Studio confines the harness and the tools it runs so nothing outlives it, ' +
@@ -158,12 +181,18 @@ export function describeHarnessFailure(reason: string | null): HarnessFailureCop
     case 'busy':
       return {
         kind,
+        code: 'HARNESS_BUSY',
         headline: 'The harness is already starting.',
         remedy: 'A start is in flight. Give it a moment before trying again.',
       }
     case 'unknown':
       // No remedy on purpose. There is nothing true to say about a cause
-      // nobody identified, and the details below carry its own words.
-      return { kind, headline: 'The harness is not running.', remedy: null }
+      // nobody identified, and the details carry its own words.
+      return {
+        kind,
+        code: 'HARNESS_UNKNOWN',
+        headline: 'The harness is not running.',
+        remedy: null,
+      }
   }
 }

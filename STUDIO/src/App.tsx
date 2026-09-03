@@ -2,8 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { AppearanceProvider, type Appearance } from '@/design/theme'
 import { EASE_OUT, SPLASH } from '@/design/tokens'
-import { detachedConversationId, signalAppReady, suppressWebviewChrome } from '@/platform/tauri'
+import {
+  detachedConversationId,
+  diagnosticKind,
+  signalAppReady,
+  suppressWebviewChrome,
+} from '@/platform/tauri'
 import { AppShell } from '@/shell/AppShell'
+import { DiagnosticWindow } from '@/shell/DiagnosticWindow'
 import { DetachedShell } from '@/shell/DetachedShell'
 import { SplashScreen } from '@/shell/SplashScreen'
 import { NavigationProvider } from '@/stores/navigation'
@@ -26,6 +32,7 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
   // Read once and never stored: the URL is fixed for the life of a window, so
   // this is a fact about which window this is, not state.
   const detached = detachedConversationId()
+  const diagnostic = diagnosticKind()
 
   useEffect(() => {
     // Startup contract: the native window stays hidden until the first paint,
@@ -37,6 +44,21 @@ export default function App({ initialAppearance }: { initialAppearance: Appearan
     void signalAppReady()
     return suppressWebviewChrome()
   }, [])
+
+  // The diagnostic window stops here, above the provider stack, because it
+  // needs nothing from it: it asks the supervisor one question over the Tauri
+  // seam and renders the answer. Mounting `WorkspaceProvider` around a window
+  // whose entire subject is that the harness is down would have it reaching
+  // for a store that by definition is not there.
+  if (diagnostic !== null) {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AppearanceProvider initial={initialAppearance}>
+          <DiagnosticWindow />
+        </AppearanceProvider>
+      </MotionConfig>
+    )
+  }
 
   return (
     /*

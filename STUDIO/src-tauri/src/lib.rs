@@ -117,6 +117,55 @@ fn quit_app(app: AppHandle) -> Result<(), String> {
   Ok(())
 }
 
+/// Open the harness diagnostic in its own window.
+///
+/// A window rather than a panel on the page, because the text it shows is a
+/// document: the supervisor keeps up to `DIAGNOSTIC_LINES` of what it saw plus
+/// the child's whole stdout and stderr, which for a crash is routinely dozens
+/// of lines. Inline, that either pushes the page's own controls around or gets
+/// squeezed into a box with its own scrollbar, and a scrollbar inside a
+/// centred page is the density this app is written to avoid. Given a window it
+/// can be resized, kept open beside the app while the cause is fixed, and
+/// scrolled without moving anything else.
+///
+/// Nothing is passed in. The window asks the supervisor for the current
+/// failure itself, through the same `get_harness_status` every other surface
+/// uses, so there is no copy of the text to go stale and no payload to smuggle
+/// a token through.
+#[tauri::command]
+async fn open_diagnostic_window(app: AppHandle) -> Result<(), String> {
+  let label = "diagnostic-harness";
+
+  // One at a time. A second press is someone looking for the window they
+  // already opened, not asking for a duplicate of it.
+  if let Some(existing) = app.get_webview_window(label) {
+    let _ = existing.unminimize();
+    let _ = existing.set_focus();
+    return Ok(());
+  }
+
+  let window = WebviewWindowBuilder::new(
+    &app,
+    label,
+    WebviewUrl::App("index.html?diagnostic=harness".into()),
+  )
+  .title("Harness diagnostic")
+  // Wider than it is tall: these are log lines, and the thing that makes them
+  // readable is not having to wrap.
+  .inner_size(860.0, 620.0)
+  .min_inner_size(480.0, 320.0)
+  .decorations(false)
+  .transparent(true)
+  .shadow(false)
+  .visible(false)
+  .resizable(true)
+  .build()
+  .map_err(|error| error.to_string())?;
+
+  window::apply_rounded_corners(&window);
+  Ok(())
+}
+
 /// Open one conversation in its own window.
 ///
 /// The same frontend bundle with a query parameter, not a second app. The
@@ -401,6 +450,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       app_ready,
       open_conversation_window,
+      open_diagnostic_window,
       quit_app,
       get_harness_endpoint,
       restart_harness,

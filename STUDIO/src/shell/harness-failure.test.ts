@@ -61,7 +61,10 @@ describe('what the person reads', () => {
     expect(copy.headline).not.toContain('dist/server.mjs')
     expect(copy.remedy).not.toContain('pnpm')
     expect(copy.remedy).not.toContain('dist/server.mjs')
-    expect(copy.remedy).toContain('Reinstalling Studio')
+    expect(copy.remedy).toContain('installation is incomplete')
+    // And it does not tell a development tree to reinstall, which is advice
+    // that reader cannot act on. The path in the details says which case it is.
+    expect(copy.remedy).toContain('path it looked in')
   })
 
   it('gives every recognised kind a remedy, and unknown none', () => {

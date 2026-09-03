@@ -23,6 +23,7 @@ import { HarnessDownPage } from './HarnessDownPage'
 
 const harnessFailureReason = vi.fn<() => Promise<string | null>>()
 const quitApp = vi.fn<() => Promise<void>>()
+const openDiagnosticWindow = vi.fn<() => Promise<void>>()
 
 vi.mock('@/platform/harness', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/platform/harness')>()
@@ -31,7 +32,11 @@ vi.mock('@/platform/harness', async (importOriginal) => {
 
 vi.mock('@/platform/tauri', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/platform/tauri')>()
-  return { ...actual, quitApp: () => quitApp() }
+  return {
+    ...actual,
+    quitApp: () => quitApp(),
+    openDiagnosticWindow: () => openDiagnosticWindow(),
+  }
 })
 
 const ensureStore = vi.fn<() => Promise<boolean>>()
@@ -81,8 +86,8 @@ describe('HarnessDownPage', () => {
     render(<HarnessDownPage />)
 
     // Classified, in the app's voice.
-    await waitFor(() => expect(screen.getByText('The harness is missing.')).toBeTruthy())
-    expect(screen.getByText(/Reinstalling Studio puts it back/)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('The harness could not be found.')).toBeTruthy())
+    expect(screen.getByText(/the installation is incomplete/)).toBeTruthy()
 
     // And the developer sentence is nowhere on it. `pnpm build` is an
     // instruction for whoever holds the repository; a person who installed
@@ -91,36 +96,27 @@ describe('HarnessDownPage', () => {
     expect(document.body.textContent).not.toContain('dist/server.mjs')
   })
 
-  it('gives the raw sentence up verbatim, but only when it is asked for', async () => {
+  it('shows the code, which is the one part worth writing down', async () => {
     harnessFailureReason.mockResolvedValue(RAW)
     render(<HarnessDownPage />)
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'See details' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: 'See details' }))
-
-    // Verbatim, never paraphrased: "what did it actually say" has to have a
-    // real answer, and this is it.
-    await waitFor(() => expect(screen.getByText(RAW)).toBeTruthy())
-    expect(screen.getByRole('button', { name: 'Hide details' })).toBeTruthy()
+    // Stable across rewordings of the prose, which is exactly what makes it
+    // the thing to quote in a report.
+    await waitFor(() => expect(screen.getByText('HARNESS_NOT_FOUND')).toBeTruthy())
   })
 
-  it('copies the raw sentence, because copying is what it is for', async () => {
-    const writeText = vi.fn(async () => {})
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText },
-      configurable: true,
-    })
+  it('hands the raw text to a window rather than growing the page', async () => {
     harnessFailureReason.mockResolvedValue(RAW)
     render(<HarnessDownPage />)
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'See details' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'See details' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
 
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(RAW))
-    // Confirmed in place, and only because the write succeeded.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy())
+    await waitFor(() => expect(openDiagnosticWindow).toHaveBeenCalledTimes(1))
+    // And the page stays exactly the size it was. The supervisor keeps up to
+    // fifty observed lines plus the whole of stdout and stderr, so anything
+    // that rendered it here would move these controls under the reader.
+    expect(document.body.textContent).not.toContain('pnpm build')
   })
 
   it('carries the sentence an eager start left with the supervisor, before anyone presses', async () => {

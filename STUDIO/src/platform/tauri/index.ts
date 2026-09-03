@@ -6,6 +6,8 @@ export {
   toggleMaximizeWindow,
   closeWindow,
   quitApp,
+  diagnosticKind,
+  openDiagnosticWindow,
   startWindowDrag,
   resetWindowSize,
   signalAppReady,
