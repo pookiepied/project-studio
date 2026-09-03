@@ -106,21 +106,21 @@ export function GeneralPane() {
       </Row>
 
       <Row
-        label="When you close the window"
+        label="Keep running when the window closes"
         hint={
           windowPreferences.closeToTray
-            ? 'Studio keeps running in the tray. Turns in progress carry on, and the tray icon brings the window back. Quit Studio from the tray menu.'
-            : 'Studio quits. Any turn still running is stopped.'
+            ? 'Turns in progress carry on, and the tray icon brings the window back. Quit Studio from the tray menu.'
+            : 'Closing the window quits Studio, stopping any turn still running.'
         }
       >
         <Segmented
           layoutId="settings-close-to-tray"
-          ariaLabel="When you close the window"
-          value={windowPreferences.closeToTray ? 'tray' : 'quit'}
-          onChange={(value) => void updateWindow({ closeToTray: value === 'tray' })}
+          ariaLabel="Keep running when the window closes"
+          value={windowPreferences.closeToTray ? 'on' : 'off'}
+          onChange={(value) => void updateWindow({ closeToTray: value === 'on' })}
           options={[
-            { id: 'quit', label: 'Quit' },
-            { id: 'tray', label: 'Keep running' },
+            { id: 'off', label: 'Off' },
+            { id: 'on', label: 'On' },
           ]}
         />
       </Row>

@@ -48,8 +48,14 @@ export function Segmented<T extends string | number>({
             aria-checked={selected}
             onClick={() => onChange(option.id)}
             className={cn(
+              // `flex-1` gives every option the width of the longest label,
+              // which is what makes this read as one control rather than a
+              // row of buttons. `whitespace-nowrap` is the other half of
+              // that bargain: without it a long label wraps to a second line
+              // and takes the whole control's height with it, which is how a
+              // two-word option once turned this into a two-line block.
               'relative flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5',
-              'text-ui transition-colors duration-fast',
+              'whitespace-nowrap text-ui transition-colors duration-fast',
               selected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >

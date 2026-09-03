@@ -29,7 +29,7 @@ import {
   Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
   CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
   GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
-  MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plug, Plus,
+  MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
   SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
@@ -38,6 +38,7 @@ import {
 } from 'lucide-react'
 import type { Variants } from 'framer-motion'
 import { fromLucide } from '@/components/icons/fromLucide'
+import { McpMark } from '@/components/icons/McpMark'
 import { PauseBars, PlayTriangle, SidebarToggle, StopSquare, VoiceWave } from '@/components/icons/drawn'
 
 /** The house curve for a mark reacting to the pointer. Short; this is feedback. */
@@ -131,8 +132,9 @@ const REGISTRY = {
   // this file forbids.
   reasoning: { mark: Gauge },
   // Where replies come from: a set of things to draw on, not a thing to plug
-  // in. `Plug` and `Cable` are already spoken for by MCP and connectors, and
-  // both of those describe reach rather than supply.
+  // in. `Cable` is spoken for by connectors, and MCP now carries its own
+  // published mark, so `Plug` is free again -- but it still describes reach
+  // rather than supply, which is why it is not the answer here either.
   providers: { mark: Boxes },
   permissionManual: { mark: Pause },
   permissionEdits: { mark: PenLine },
@@ -163,7 +165,8 @@ const REGISTRY = {
   // — Capabilities --------------------------------------------------------
   goal: { mark: Target },
   plan: { mark: ListChecks },
-  mcp: { mark: Plug },
+  // `mcp` is not here: MCP publishes its own mark, so it is merged in with
+  // the other drawn marks at the bottom of this file. See `McpMark`.
   connector: { mark: Cable },
   skill: { mark: WandSparkles },
   hook: { mark: Webhook },
@@ -264,6 +267,7 @@ export const Icons = {
     ]),
   ) as Record<keyof typeof REGISTRY, ReturnType<typeof fromLucide>>),
   sidebar: SidebarToggle,
+  mcp: McpMark,
   voice: VoiceWave,
   stop: StopSquare,
   play: PlayTriangle,
