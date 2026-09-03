@@ -19,20 +19,26 @@ const WINDOW_PREFERENCES_KEY: &str = "studio.window";
 
 /// Whether closing the main window should hide it rather than end the app.
 ///
-/// **Defaults to false, deliberately.** Today closing the window quits, and a
-/// person who has not been offered a choice should not discover that their
-/// app is still running because a release changed its mind. The tray exists
-/// either way; this only decides what the close button means. The settings
-/// toggle writes the key, and until something writes it the behaviour is
-/// exactly what it has always been.
+/// **Defaults to true.** Studio holds running turns, a Harness child and a
+/// conversation someone is in the middle of; closing the window is almost
+/// never a request to throw that away. The tray is what makes this safe
+/// rather than surprising: it carries `Quit Studio`, which is the way out,
+/// and the icon is present from launch so the app is visibly still there.
+///
+/// The settings toggle writes the key either way. Someone who wants the
+/// close button to end the app can have that, but it is the choice they make
+/// rather than the one they get by accident.
 ///
 /// Read from the store on each close rather than cached at startup, so the
 /// toggle takes effect the moment it is flipped instead of at the next
 /// launch. A close happens once in a while and this is a small JSON file
 /// already held open by the plugin.
 fn close_hides_to_tray(app: &AppHandle) -> bool {
+  // A store that will not open is not a reason to start destroying work: the
+  // default is what an absent preference means, and it means the same thing
+  // when the file cannot be read at all.
   let Ok(store) = app.store(PREFERENCES_FILE) else {
-    return false;
+    return CLOSE_TO_TRAY_DEFAULT;
   };
   store
     .get(WINDOW_PREFERENCES_KEY)
@@ -41,8 +47,10 @@ fn close_hides_to_tray(app: &AppHandle) -> bool {
         .get("closeToTray")
         .and_then(serde_json::Value::as_bool)
     })
-    .unwrap_or(false)
+    .unwrap_or(CLOSE_TO_TRAY_DEFAULT)
 }
+
+const CLOSE_TO_TRAY_DEFAULT: bool = true;
 
 /// The frontend invokes this once it has mounted and painted. Windows start
 /// hidden (`visible: false` in tauri.conf.json, and explicitly for detached
