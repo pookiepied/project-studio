@@ -57,9 +57,17 @@ export interface FlueJournalReader {
   /** The file that was opened, as given. */
   readonly path: string;
   /**
-   * The journal's own `flue_meta.schema_version`, verbatim, or null when the
-   * table or key is absent. Recorded in the export because the shapes that
-   * follow depend on it.
+   * The journal's own version, verbatim, or null when the table holds
+   * neither key. Recorded in the export because the shapes that follow
+   * depend on it.
+   *
+   * Two spellings, because the runtime changed the key under us: the beta
+   * line wrote `flue_meta.schema_version` (the `8` the 2.0 upgrade refuses
+   * anything below), and 2.0 writes `flue_meta.format_version` instead -
+   * measured as `1` on a journal this harness created. A 2.0 journal read
+   * with only the old key in hand reported "schema version unknown" in the
+   * export header, which is a rescue tool being vague about the thing it is
+   * rescuing. Both are read, newest key first.
    */
   readonly schemaVersion: string | null;
   listStreams(): readonly FlueJournalStreamRow[];
@@ -205,12 +213,17 @@ export function openFlueJournal(path: string): FlueJournalReader {
       });
     }
 
-    const metaRow = handle
-      .prepare("SELECT value FROM flue_meta WHERE key = 'schema_version'")
-      .get();
-    const schemaVersion = isRowWith(metaRow, ["value"])
-      ? textColumn(metaRow, "value", "flue_meta")
-      : null;
+    const readMeta = (key: string): string | null => {
+      const row = handle
+        .prepare("SELECT value FROM flue_meta WHERE key = ?")
+        .get(key);
+      return isRowWith(row, ["value"]) ? textColumn(row, "value", "flue_meta") : null;
+    };
+    const formatVersion = readMeta("format_version");
+    const schemaVersion =
+      formatVersion === null
+        ? readMeta("schema_version")
+        : `format ${formatVersion}`;
 
     const reader: FlueJournalReader = {
       path,

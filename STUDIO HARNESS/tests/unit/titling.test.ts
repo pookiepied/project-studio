@@ -6,6 +6,7 @@ import {
   ConversationTitler,
   titleFromReply,
 } from "../../src/conversations/titling.js";
+import type { LogFields, Logger } from "../../src/observability/logger.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 function openStore(): { db: StudioDatabase; store: ConversationStore } {
@@ -23,9 +24,13 @@ function envelope(index: number): Pick<FlueObservation, "v" | "eventIndex" | "ti
 }
 
 /**
- * A settled submission, as `observe()` delivers it: the runtime stamps the
- * envelope and the fields the orchestrator routes on. This is the event the
- * studio trigger and the title ladder both read.
+ * A settled submission, as `observe()` delivers it.
+ *
+ * Measured on a live 2.0 harness (Phase 7): a settlement carries its type,
+ * `submissionId`, `outcome`, `instanceId`, `agentName` and the envelope, and
+ * nothing else - no `conversationId`, no `session`, no `harness`, no
+ * `operationId`, whether the submission was direct or dispatched. The two
+ * fields the orchestrator routes on are exactly the two the runtime stamps.
  */
 function settled(
   fields: {
@@ -40,13 +45,22 @@ function settled(
     outcome: fields.outcome ?? "completed",
     agentName: fields.agentName ?? "studio",
     instanceId: fields.instanceId ?? "cnv_1",
-    ...envelope(0),
+    ...envelope(14),
   };
 }
 
 /**
  * The end of one agent run, as `observe()` delivers it: the run's messages
- * ride the event, which is where the title reply's text comes from.
+ * ride the event, which is where the title reply's text and the model that
+ * wrote it both come from.
+ *
+ * Measured on the same live trace, which caught this fixture in two guesses:
+ * an `agent_end` also carries `conversationId` (Flue's own
+ * `conv_<ulid>` for the durable stream, NOT the product's conversation id),
+ * `session`, `harness` and `operationId` beside the run identity - and the
+ * assistant message's `provider` is the pi provider id, which for the test
+ * source is `project-studio-test`, not `project-studio`. Neither field is
+ * routed on, but a fixture that claims to be the wire has to be the wire.
  */
 function agentEnd(
   fields: {
@@ -64,7 +78,7 @@ function agentEnd(
           { type: "text", text: fields.reply ?? '{"title":"A better name"}' },
         ],
         api: "project-studio-test",
-        provider: "project-studio",
+        provider: "project-studio-test",
         model: "default",
         usage: {
           input: 0,
@@ -78,15 +92,22 @@ function agentEnd(
         timestamp: 0,
       },
     ],
+    conversationId: "conv_01M1HW0KT16Q1E18JY5TWWM3D9",
+    session: "default",
+    harness: "default",
+    operationId: "op_01M1HW0KT99J5NMBNSWZAJH7W6",
     agentName: fields.agentName ?? "title",
     instanceId: fields.instanceId ?? "cnv_1",
-    ...envelope(1),
+    submissionId: "sub_1",
+    ...envelope(11),
   };
 }
 
 /**
  * One title run settling with a usable reply, in the order the runtime
- * emits it: the run's end first, then the submission's settlement.
+ * emits it: the run's end first, then the submission's settlement. That
+ * order is measured, not assumed - `agent_end` at eventIndex 11, the
+ * settlement at 14.
  */
 function titleReply(
   handlers: ((observation: FlueObservation) => void)[],
@@ -94,6 +115,23 @@ function titleReply(
 ): void {
   handlers[0]?.(agentEnd(fields));
   handlers[0]?.(settled({ agentName: "title", ...fields }));
+}
+
+/** A logger that keeps what it was told, so a log fact can be asserted. */
+function recordingLogger(
+  written: { message: string; fields: LogFields | undefined }[],
+): Logger {
+  const record = (message: string, fields?: LogFields): void => {
+    written.push({ message, fields });
+  };
+  const logger: Logger = {
+    debug: record,
+    info: record,
+    warn: record,
+    error: record,
+    child: () => logger,
+  };
+  return logger;
 }
 
 /** A titler with the event bus and dispatch replaced by test doubles. */
@@ -129,6 +167,23 @@ describe("titleFromReply", () => {
 
   it("refuses prose around the object", () => {
     expect(titleFromReply('Here you go: {"title":"X"}')).toBeUndefined();
+  });
+
+  it("accepts a reply that is nothing but a markdown code fence", () => {
+    // Measured in the real app: a live titling run on a free Gemma answered
+    // with exactly this shape, and the unfenced parse refused the whole
+    // reply. The cheapest models are the ones that fence, and the cheapest
+    // model is the one the ladder picks.
+    expect(titleFromReply('```json\n{"title": "Explain Bundler Module Duplication Impact"}\n```')).toBe(
+      "Explain Bundler Module Duplication Impact",
+    );
+    expect(titleFromReply('```\n{"title":"No language tag"}\n```')).toBe("No language tag");
+  });
+
+  it("still refuses a fence with anything outside it", () => {
+    expect(titleFromReply('Sure!\n```json\n{"title":"X"}\n```')).toBeUndefined();
+    expect(titleFromReply('```json\n{"title":"X"}\n```\nHope that helps.')).toBeUndefined();
+    expect(titleFromReply('```json\n{"title":"X"}\n``` ```json\n{"title":"Y"}\n```')).toBeUndefined();
   });
 
   it("refuses a bare string, a list, and a bare title", () => {
@@ -421,6 +476,38 @@ describe("ConversationTitler", () => {
       await Promise.resolve();
 
       expect(store.get("cnv_1")?.title).toBe("First words");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("names the model that wrote the title", () => {
+    const { db, store } = openStore();
+    try {
+      store.record({ id: "cnv_1", firstMessage: "First words" });
+      const handlers: ((observation: FlueObservation) => void)[] = [];
+      const written: { message: string; fields: LogFields | undefined }[] = [];
+      const logger = recordingLogger(written);
+      const titler = new ConversationTitler({
+        conversations: store,
+        logger,
+        subscribe: (handler) => {
+          handlers.push(handler);
+          return () => undefined;
+        },
+        dispatchJob: async () => undefined,
+      });
+      titler.start();
+
+      titler.firstAdmission("cnv_1", "First words");
+      handlers[0]?.(settled({}));
+      titleReply(handlers, { reply: '{"title":"A better name"}' });
+
+      // The one channel that still carries a model identity in 2.0 is the
+      // run's own `agent_end` message; this is the `title_model` log fact
+      // read back off it.
+      const titled = written.find((line) => line.message === "Conversation titled.");
+      expect(titled?.fields?.["title_model"]).toBe("project-studio-test/default");
     } finally {
       db.close();
     }

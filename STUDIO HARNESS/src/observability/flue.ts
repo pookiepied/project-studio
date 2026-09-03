@@ -117,6 +117,12 @@ function linksForFlue(
   const operationId =
     context.operationId ?? (operation.type === "agent" ? operation.operationId : undefined);
   return {
+    // 2.0 stamps both halves of the identity 1.0 carried as one, and both
+    // are linked: the instance is the product's conversation, the
+    // submission is the one piece of durable work. `agentName` is what
+    // separates a conversation's own turn from the titling run behind it.
+    ...(context.instanceId === undefined ? {} : { instanceId: context.instanceId }),
+    ...(context.agentName === undefined ? {} : { agentName: context.agentName }),
     ...(context.submissionId === undefined ? {} : { submissionId: context.submissionId }),
     ...(context.conversationId === undefined ? {} : { conversationId: context.conversationId }),
     ...(turnId === undefined ? {} : { turnId }),
@@ -134,7 +140,14 @@ function executionContextForFlue(
   const links = linksForFlue(operation, context);
   const parent = currentExecutionContext();
   if (parent !== undefined) return createChildExecutionContext(parent, { kind, flue: links });
-  const requestId = links.submissionId ?? links.conversationId;
+  // The submission first: one admitted piece of durable work is the tightest
+  // thing a request id can name. Then the INSTANCE, which is this product's
+  // conversation id and can be looked up by a person - ahead of Flue's own
+  // `conv_<ulid>` stream id, which correlates a log line to nothing anybody
+  // can see. Flue's id stays last rather than being dropped: a correlation
+  // that only Flue understands still beats no correlation at all.
+  const requestId =
+    links.submissionId ?? links.instanceId ?? links.conversationId;
 
   return createRootExecutionContext({
     kind,

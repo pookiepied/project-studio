@@ -51,6 +51,40 @@ Status: Accepted — steps 1-3 implemented; steps 4-5 open, see below
 > is now upstream and one option away. The decision is recorded with the
 > same wording at the harness client (`src/application/harness-client.ts`).
 
+> **Amended 2026-09-03 (Flue 2 migration, Phase 7): the identity 2.0 split,
+> and the half this ADR was missing.** Flue 1.0 had one run identity. 2.0
+> splits it, and both halves are now measured off live events rather than
+> read off a type:
+>
+> - **`instanceId`** is the agent instance - the thread the work belongs to,
+>   chosen by the caller. Here it IS the product's conversation id
+>   (`cnv_<uuid>` as the webview mints it, or `<conversation id>-t<N>` for a
+>   titling retry). Stable across every submission that thread runs.
+> - **`submissionId`** is one admitted piece of durable work on that instance
+>   (`sub_<ulid>`). 1.0's `dispatchId` is this: 2.0 gives direct and
+>   dispatched submissions the same field, and the queued/running events'
+>   `kind` (`"direct"` / `"dispatch"`) is what tells them apart.
+> - **`conversationId`** is Flue's own `conv_<ulid>`, the durable stream
+>   behind an instance, minted by the runtime. **It is not the product's
+>   conversation**, and the table below saying "Flue-defined" hid that: a log
+>   line correlated on it cannot be joined to anything a person can see.
+>
+> The event renames that go with it: `run_start`/`run_end` are
+> `agent_start`/`agent_end`, and the delivered envelope is `v: 3`.
+>
+> **What this changes here, and it is not a rename:** `ExecutionContext` (and
+> the structured logger) linked `submissionId` and Flue's `conversationId`
+> and nothing else, so the half of the split that names the product's
+> conversation was never linked at all. `FlueExecutionLinks` now carries
+> `instanceId` and `agentName` as well (`flue_instance_id`,
+> `flue_agent_name` in logs and span links) - the first because it is the
+> only Flue id a person's conversation can be found by, the second because
+> one instance runs two agents seconds apart (the conversation's turn, then
+> the background titling run) and without it the two are indistinguishable in
+> a trace. The `requestId` fallback for a Flue-rooted context prefers the
+> instance over Flue's stream id for the same reason. `submissionId`'s row in
+> the table below should be read as covering both kinds, not "direct" only.
+
 ## Context
 
 One user message can create a model turn, tool calls, MCP requests, hooks,
@@ -75,8 +109,10 @@ Use one linked execution graph rather than one universal identifier:
 | `attemptId` | Project Studio | New for each execution/retry attempt | Distinguishes retries without losing the root family |
 | `operationId` | Flue when present; Project Studio for non-Flue operations | One logical child operation | Identifies model, tool, MCP, hook, skill, compaction, provider, or subagent work |
 | `parentOperationId` | Project Studio correlation | Parent operation lifetime | Reconstructs the operation tree |
-| `submissionId` | Flue | Durable direct submission lifetime | Links to Flue admission and recovery |
-| `conversationId`, `turnId`, `taskId`, `toolCallId` | Flue | Flue-defined | Preserve Flue's canonical event semantics |
+| `instanceId` | Flue, chosen by the caller | The agent instance (here: the conversation) | The one Flue id a person's conversation can be found by |
+| `agentName` | Flue | One agent's identity | Separates a conversation's turn from a background run on the same instance |
+| `submissionId` | Flue | Durable submission lifetime, direct or dispatched | Links to Flue admission and recovery |
+| `conversationId`, `turnId`, `taskId`, `toolCallId` | Flue | Flue-defined | Preserve Flue's canonical event semantics. `conversationId` is Flue's own stream id (`conv_<ulid>`), NOT the product's conversation |
 | `traceId`, `spanId` | OpenTelemetry | Trace/span lifetime | Live telemetry and distributed instrumentation; not durable task identity |
 | `idempotencyKey` | Admission contract | Stable for one retryable admission | Prevents duplicate initial submissions; semantically distinct from telemetry IDs |
 
@@ -99,6 +135,8 @@ ExecutionContext {
   kind
   clientId
   sessionId
+  instanceId?
+  agentName?
   submissionId?
   conversationId?
   turnId?

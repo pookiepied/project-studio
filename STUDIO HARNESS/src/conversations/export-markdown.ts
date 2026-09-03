@@ -225,7 +225,7 @@ export function renderMarkdown(options: {
     "# Project Studio conversation export",
     "",
     `- Exported: ${options.exportedAt}`,
-    `- Source: ${options.databaseLabel} (Flue journal schema version ${options.flueSchemaVersion ?? "unknown"})`,
+    `- Source: ${options.databaseLabel} (Flue journal version ${options.flueSchemaVersion ?? "unknown"})`,
     `- Runtime: ${options.runtime}`,
     `- Export format: project-studio.conversation-export, version ${EXPORT_FORMAT_VERSION}`,
     `- Orphan policy: ${options.orphans}`,

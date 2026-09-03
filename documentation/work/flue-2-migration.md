@@ -587,6 +587,70 @@ the report.
 
 ### Phase 7 - Events, observability, and the stores
 
+**DONE, 2026-09-03.** Report:
+`report/PHASE-7-the-name-nobody-wrote-down.md`. What actually happened, in
+the order it matters:
+
+- **Titling was broken TWICE, in series, and only the real app could show
+  the second.** Bug one is below. Bug two: with the dispatch fixed, a live
+  titling run on `google/gemma-4-26b-a4b-it` (what the cost ladder picks
+  against the user's OpenRouter connection) returned exactly the object the
+  contract asks for wrapped in a ```json fence, and `titleFromReply`'s bare
+  `JSON.parse` refused the whole reply. The same model fences
+  NON-DETERMINISTICALLY - three measured runs, one unfenced and titled, two
+  fenced and refused - which is also why some pre-migration conversations
+  carry model titles and some do not. `titleFromReply` now unwraps a reply
+  that is a fence and only a fence; prose around it, a second field, a bare
+  string and a list all stay refusals. Forgiving it is not optional: the
+  model layer routes titling to the CHEAPEST reachable model, and fencing
+  JSON is what small instruction-tuned models do, so refusing a fence makes
+  the cost policy and the feature mutually exclusive.
+- **Titling's first bug was not in the titling code.** `@flue/vite@2.0.3`
+  generates its scanned `'use agent'` module by importing each agent file by
+  an absolute forward-slash path, while ordinary relative imports resolve on
+  Windows to the same path with backslashes. Rolldown keys modules by that
+  string, so the bundle carried **two copies of every agent module**, and
+  `dispatch()` - which resolves its target by FUNCTION VALUE - refused every
+  title job with "target agent is not registered in this built application".
+  Windows-only, invisible in source, and invisible to every unit test,
+  because unit tests load modules through Node's resolver rather than the
+  bundler's. Fixed with a resolver plugin in `vite.config.ts` that spells
+  every resolved id the platform's way (a no-op on POSIX); guarded by
+  `tests/unit/built-agent-modules.test.ts`, which reads the emitted
+  sourcemaps and was verified to fail without the fix. The studio agent had
+  survived the same split only because `createAgentRouter` falls back to the
+  `agentName` static rather than the function value.
+- **The routing was right.** Measured on a live trace: `agent_end` at
+  eventIndex 11, `submission_settled` at 14 - the ordering assumption holds.
+  `submission_settled` carries type, `submissionId`, `outcome`, `instanceId`,
+  `agentName` and the envelope and **nothing else**; direct and dispatched
+  submissions stamp identical fields, with only `kind`
+  (`"direct"`/`"dispatch"`) separating them. `instanceId` is the product's
+  conversation id; `conversationId` is Flue's own `conv_<ulid>` stream id and
+  is not the product's conversation.
+- **The renames were already done** by Phases 2-5: `runId`, `run_start`,
+  `run_end`, `dispatchId` appear nowhere in the workspace except one
+  deliberately beta-9 export fixture. What Phase 7 found instead was the
+  *consequence* of the `runId` split - `FlueExecutionLinks` kept the
+  `submissionId` half and dropped `instanceId`, so every Flue-rooted log line
+  named Flue's stream id, which joins to nothing a person can see.
+  `instanceId` and `agentName` are now linked and logged; ADR 0033 amended.
+- **`title_model` is restored**, off the `agent_end` assistant message the
+  titler already reads (`provider` and `model` are required fields on it).
+  Two further sources recorded but unused: the journal's
+  `assistant_message_started.modelInfo`, and `gen_ai.request.model` on the
+  telemetry spans.
+- **The contract suites were declined, with the item closed.** There is no
+  Studio stream store - `src/db.ts` is Flue's own `sqlite(path)`. The
+  integration suite already covers what we rely on the adapter for (restart
+  resume, SIGKILL recovery, attempt re-derivation, state separation, clean
+  WAL close). The real coupling nobody was covering is the opposite
+  direction: `storage/flue-journal.ts` reads Flue's private tables for the
+  export. That was run against a real 2.0 journal and works; one wart fixed
+  (2.0 replaced `flue_meta.schema_version` with `format_version`).
+
+Original scope below, for the record.
+
 `run_start`/`run_end` to `agent_start`/`agent_end`; `runId` to `instanceId`
 plus `submissionId`; `dispatchId` to `submissionId` across receipts, events
 and telemetry; envelope `v: 3`. `titling.ts` consumes the renamed events.
@@ -688,6 +752,32 @@ file move. **Confirmed twice more, 2026-09-03 (Phase 6):** two consecutive
 full runs landed on exactly those ten, nothing above them, with the retry
 tests' durations stable (the longest at 134s); the acceptance list stands
 verbatim.
+
+**Amended, 2026-09-03, by Phase 7:** three things this phase must carry.
+
+1. **The build now has a plugin under it, and the re-derived hunks are
+   anchored against a bundle that plugin helped produce.** Phase 7 added
+   `nativeModuleIdentity()` to `vite.config.ts` to collapse the two module
+   ids Windows was producing for one file. It changed the emitted chunk
+   layout: `dist/app.mjs` is now a small shim and the application chunk is
+   named `node-server-*.mjs` rather than `providers-*.mjs`. `dist/server.mjs`
+   is still the entry and the Tauri supervisor still starts exactly that,
+   unchanged - but any hunk anchored by chunk filename rather than content
+   will not match. Anchor on content.
+2. **One new test joins the suite floor's arithmetic.**
+   `tests/unit/built-agent-modules.test.ts` (2 tests) reads the built
+   sourcemaps and requires `dist/` to exist, so it passes only under
+   `pnpm test`, which builds first. It is unrelated to the retry regression
+   and must stay green.
+3. **The attempt record is now readable, which sharpens the retry hunk's
+   acceptance.** Phase 4/5 noted that under 2.0.3 a retry is invisible in
+   both channels at once. Phase 7 measured where the count actually lives:
+   `flue_agent_submissions.attempt_count` and `max_attempts` on the settled
+   row, with `max_attempts` written from the agent's `durability` static at
+   input-application time - NOT at admission, where the row still carries the
+   store default of 10. So the `submission_running` event's `maxAttempts` is
+   the default on every first attempt and is not a signal to build on; the
+   settled row is.
 
 ---
 

@@ -45,6 +45,8 @@ function correlationFields(): LogFields {
           operation_kind: execution.kind,
           ...(execution.clientId === undefined ? {} : { client_id: execution.clientId }),
           ...(execution.sessionId === undefined ? {} : { session_id: execution.sessionId }),
+          ...(execution.flueInstanceId === undefined ? {} : { flue_instance_id: execution.flueInstanceId }),
+          ...(execution.flueAgentName === undefined ? {} : { flue_agent_name: execution.flueAgentName }),
           ...(execution.flueSubmissionId === undefined ? {} : { flue_submission_id: execution.flueSubmissionId }),
           ...(execution.flueConversationId === undefined ? {} : { flue_conversation_id: execution.flueConversationId }),
           ...(execution.flueTurnId === undefined ? {} : { flue_turn_id: execution.flueTurnId }),

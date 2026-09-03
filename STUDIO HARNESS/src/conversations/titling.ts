@@ -60,6 +60,38 @@ function conversationIdOf(instanceId: string): string {
 const MAX_ATTEMPTS = 2;
 
 /**
+ * A whole reply that is one markdown code fence, and nothing else.
+ *
+ * The capture is the fenced body; an optional language tag on the opening
+ * line is dropped. Anchored at both ends on purpose - a fence with prose
+ * before or after it does not match, and stays a refusal.
+ */
+const FENCED_REPLY = /^```[A-Za-z0-9_-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/;
+
+/**
+ * The one formatting envelope the parse forgives.
+ *
+ * The prompt asks for a bare JSON object and says not to use markdown, and
+ * models fence it anyway - measured, in the real app: a live titling run on
+ * `google/gemma-4-26b-a4b-it` answered with exactly the object the contract
+ * asks for, wrapped in a ```json fence, and `JSON.parse` refused the whole
+ * thing. The derived title stood and the person saw eight words of their own
+ * message.
+ *
+ * That is worth forgiving rather than out-prompting, because the model layer
+ * deliberately sends titling to the CHEAPEST reachable model, and fencing
+ * JSON is exactly what small instruction-tuned models do. Refusing it makes
+ * the cost policy and the feature mutually exclusive.
+ *
+ * Nothing else is forgiven. Prose around the object, a fence with text
+ * outside it, a second field, a bare string - all still refusals.
+ */
+function unfenceReply(reply: string): string {
+  const fenced = FENCED_REPLY.exec(reply.trim());
+  return fenced?.[1] ?? reply;
+}
+
+/**
  * Parses a titling reply into a title, and refuses everything else.
  *
  * The contract with the agent is one JSON object with one string field -
@@ -67,14 +99,15 @@ const MAX_ATTEMPTS = 2;
  * string, adds a second field, or spills a list is a failure, and a failure
  * keeps the derived title. The same gate rejects a title that is empty, one
  * that carries a line break, or one long enough to stop being a session-list
- * row.
+ * row. A reply that is nothing but a markdown code fence is unwrapped first;
+ * see `unfenceReply` for why that one envelope is allowed and no other.
  *
  * Returns undefined for every refusal; the caller logs and moves on.
  */
 export function titleFromReply(reply: string): string | undefined {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(reply);
+    parsed = JSON.parse(unfenceReply(reply));
   } catch {
     return undefined;
   }
@@ -95,17 +128,38 @@ export function titleFromReply(reply: string): string | undefined {
 }
 
 /**
- * The final assistant text of a title run, read off its `agent_end` event.
+ * What one title run answered: the text to parse, and the model that wrote
+ * it.
+ */
+interface TitleReply {
+  readonly text: string;
+  /** `<provider>/<model>`, the `title_model` log fact. */
+  readonly model: string;
+}
+
+/**
+ * The final assistant reply of a title run, read off its `agent_end` event.
  *
  * Flue 2.0 observations carry the run's messages rather than a settled
  * result object, so the reply is the last assistant message's text content:
  * the one JSON object the prompt's contract asks for. Anything else - a
  * tool-call-only tail, an empty message - reads as no reply, and the caller
  * treats the settlement as unusable rather than guessing.
+ *
+ * The same message is where the model identity comes from, and it is the
+ * only channel that still carries one. 2.0 stamps no model into message
+ * metadata, the history projection drops it, and neither `message-started`
+ * nor `message-completed` carries it on the wire (Phase 6 measured all
+ * three). The observation's assistant message does: `provider` and `model`
+ * are required fields on it, with `responseModel` naming what actually
+ * answered when a router served something other than what was asked for.
+ * That is what restores `title_model` - which model spent the money on
+ * eight words is the whole reason the ladder exists, and a log line nobody
+ * can check is a policy nobody can audit.
  */
-function lastAssistantText(
+function lastAssistantReply(
   messages: Extract<FlueObservation, { type: "agent_end" }>["messages"],
-): string | undefined {
+): TitleReply | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message === undefined || message.role !== "assistant") continue;
@@ -113,7 +167,11 @@ function lastAssistantText(
       .filter((part) => part.type === "text")
       .map((part) => part.text);
     const text = parts.join("");
-    return text.trim() === "" ? undefined : text;
+    if (text.trim() === "") return undefined;
+    return {
+      text,
+      model: `${message.provider}/${message.responseModel ?? message.model}`,
+    };
   }
   return undefined;
 }
@@ -160,8 +218,8 @@ export interface ConversationTitlerOptions {
  *   `studio`). Admission is too early: a turn that is refused or dies would
  *   have spent a model call on an exchange that never happened. The settled
  *   submission is the runtime's stable contract for "this exchange
- *   finished". Phase 7 re-verifies the envelope fields against real events;
- *   the unit suite pins this routing meanwhile.
+ *   finished". Measured against a live 2.0 trace in Phase 7; the envelopes
+ *   are quoted at `#onObservation`.
  * - **The words** are captured at first admission, not read back out of any
  *   event: the turn-settings middleware reads the submission body on the way
  *   in (it already does, for the model settings) and hands the message here.
@@ -192,11 +250,11 @@ export class ConversationTitler implements ConversationTitlingPort {
    */
   readonly #inFlight = new Map<string, { message: string; attempts: number }>();
   /**
-   * Reply text captured off each title run's `agent_end`, keyed by the run's
+   * Replies captured off each title run's `agent_end`, keyed by the run's
    * instance id and consumed by that run's settlement. Bounded the same way
    * as `pending`: an entry lives only until its submission settles.
    */
-  readonly #titleReplies = new Map<string, string>();
+  readonly #titleReplies = new Map<string, TitleReply>();
   #unsubscribe: (() => void) | undefined;
 
   constructor(options: ConversationTitlerOptions) {
@@ -215,8 +273,19 @@ export class ConversationTitler implements ConversationTitlingPort {
           attempt === 0 ? conversationId : `${conversationId}-t${attempt}`;
         // Flue 2.0 dispatches by agent reference, not by name string, and
         // takes the message as a delivered input (a bare string is shorthand
-        // for a user message). The receipt's submissionId is what Phase 7
-        // keys telemetry on; nothing here needs it yet.
+        // for a user message). The receipt's submissionId is not read: the
+        // run's own events carry it, and this orchestrator routes on the
+        // instance id, which it already knows.
+        //
+        // `dispatch` resolves its target by FUNCTION VALUE, not by name, so
+        // this import has to be the same module object the build registered
+        // as the `title` agent. On Windows it was not, until Phase 7:
+        // `@flue/vite`'s scanned-agent module imported the file under a
+        // second spelling of its path, the bundle carried two copies, and
+        // every dispatch was refused with "target agent is not registered in
+        // this built application". The fix is a resolver plugin in
+        // `vite.config.ts`; the reason it belongs there rather than here is
+        // written next to it.
         await dispatch(Title, { id: instanceId, message });
       });
   }
@@ -280,10 +349,40 @@ export class ConversationTitler implements ConversationTitlingPort {
    *   the ladder (`submission_settled`), exactly as an errored operation
    *   did.
    *
-   * Phase 7 owns the verification of these envelope fields against REAL
-   * events (which fields the runtime stamps on direct submissions and on
-   * dispatched title runs); the unit suite pins this routing as the
-   * intended contract until then.
+   * ---- The envelopes, measured (Phase 7, live 2.0 harness) ---------------
+   *
+   * A direct submission on the studio agent and a dispatched title run stamp
+   * the SAME envelope fields; only `kind` on the queued/running events tells
+   * them apart (`"direct"` against `"dispatch"`). Verbatim:
+   *
+   * ```
+   * {"type":"submission_settled","submissionId":"sub_01M1HW0KKR456ZA82Y4H8HW2DH",
+   *  "outcome":"completed","instanceId":"cnv_2480bd27-...","agentName":"studio",
+   *  "v":3,"eventIndex":14,"timestamp":"2026-09-02T20:12:22.709Z"}
+   *
+   * {"type":"agent_end","messages":[...],"conversationId":"conv_01M1HW0KT16Q1E18JY5TWWM3D9",
+   *  "session":"default","operationId":"op_01M1HW0KT99J5NMBNSWZAJH7W6",
+   *  "harness":"default","instanceId":"cnv_2480bd27-...",
+   *  "submissionId":"sub_01M1HW0KST0CFMR1EZKB8RTHZZ","agentName":"title",
+   *  "v":3,"eventIndex":11,"timestamp":"2026-09-02T20:12:22.748Z"}
+   * ```
+   *
+   * Three things the trace settled, all of them assumptions until it ran:
+   *
+   * - **`agent_end` really does precede `submission_settled`** - eventIndex
+   *   11 against 14, with `operation`, `idle` and the settlement between
+   *   them. The stash is read after it is written, which is what this
+   *   routing depends on.
+   * - **`submission_settled` carries `instanceId` and `agentName` and
+   *   nothing else of the run** - no `conversationId`, no `session`, no
+   *   `harness`, no `operationId`. The two fields routed on here are exactly
+   *   the two that are there.
+   * - **`instanceId` is OUR id and `conversationId` is Flue's.** The
+   *   instance id is the conversation id the webview minted (`cnv_<uuid>`,
+   *   or `<id>-t<N>` for a title retry); `conversationId` is a
+   *   runtime-minted `conv_<ulid>` naming the durable stream, and it is not
+   *   the product's conversation. Routing on `conversationId` would name the
+   *   wrong thing.
    */
   #onObservation(observation: FlueObservation): void {
     const instanceId = observation.instanceId;
@@ -301,8 +400,8 @@ export class ConversationTitler implements ConversationTitlingPort {
     if (observation.agentName !== TITLE_AGENT_ID) return;
 
     if (observation.type === "agent_end") {
-      const text = lastAssistantText(observation.messages);
-      if (text !== undefined) this.#rememberTitleReply(instanceId, text);
+      const reply = lastAssistantReply(observation.messages);
+      if (reply !== undefined) this.#rememberTitleReply(instanceId, reply);
       return;
     }
     if (observation.type !== "submission_settled") return;
@@ -387,16 +486,16 @@ export class ConversationTitler implements ConversationTitlingPort {
     this.#dispatch(conversationId, job.message, job.attempts - 1);
   }
 
-  #rememberTitleReply(instanceId: string, text: string): void {
+  #rememberTitleReply(instanceId: string, reply: TitleReply): void {
     if (this.#titleReplies.size >= MAX_PENDING) {
       const oldest = this.#titleReplies.keys().next();
       if (!oldest.done) this.#titleReplies.delete(oldest.value);
     }
-    this.#titleReplies.set(instanceId, text);
+    this.#titleReplies.set(instanceId, reply);
   }
 
   /** Consumes one captured reply; a second read finds nothing. */
-  #takeTitleReply(instanceId: string): string | undefined {
+  #takeTitleReply(instanceId: string): TitleReply | undefined {
     const reply = this.#titleReplies.get(instanceId);
     this.#titleReplies.delete(instanceId);
     return reply;
@@ -406,15 +505,18 @@ export class ConversationTitler implements ConversationTitlingPort {
     this.#titleReplies.delete(instanceId);
   }
 
-  #titleReplySettled(instanceId: string, replyText: string): void {
+  #titleReplySettled(instanceId: string, reply: TitleReply): void {
     const conversationId = conversationIdOf(instanceId);
-    const title = titleFromReply(replyText);
+    const title = titleFromReply(reply.text);
     if (title === undefined) {
       // The model answered but not in the contract's shape. Stepping down
       // the ladder cannot fix a model that will not follow the prompt; the
-      // derived title stands.
+      // derived title stands. The model is named here too: a model that
+      // will not produce the one object the prompt asks for is a rung of
+      // the ladder worth knowing about.
       this.#logger?.warn("Conversation titling reply was not a usable title.", {
         conversation_id: conversationId,
+        title_model: reply.model,
       });
       this.#inFlight.delete(conversationId);
       return;
@@ -428,6 +530,7 @@ export class ConversationTitler implements ConversationTitlingPort {
     }
     this.#logger?.info("Conversation titled.", {
       conversation_id: conversationId,
+      title_model: reply.model,
     });
   }
 }
