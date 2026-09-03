@@ -12,7 +12,6 @@ export type ExecutionOperationKind =
   | "subagent"
   | "compaction"
   | "provider"
-  | "workflow"
   | "unknown";
 
 export type ExecutionRootSource = "project-studio" | "flue";

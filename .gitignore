@@ -65,6 +65,10 @@ desktop.ini
 Research/
 temp/
 temp-v2/
+# The opencode project (third-party AI development tool), checked out at the
+# repo root for reference. Not ours: not written by this project, not built
+# by it, and not to be committed, modified or deleted here.
+opencode/
 
 # ── Python bytecode cache ────────────────────────────────────
 __pycache__/

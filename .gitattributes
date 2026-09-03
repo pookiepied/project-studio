@@ -1,0 +1,28 @@
+# The repo standard is LF on every text file: TypeScript, Rust, JSON,
+# Markdown, YAML, TOML, CSS, HTML. This file is the answer to where CRLF kept
+# coming from: machines running git with core.autocrlf=true convert checked
+# out files to CRLF, and without this file nothing in the repository says
+# otherwise. Declared attributes take precedence over core.autocrlf, so this
+# pins the checkout and checkin endings for every machine that clones it.
+# The one-time cleanup of the files already committed with CRLF is a
+# renormalize pass, deliberately not done as part of the audit that found
+# them; see report/CLEANUP-what-seven-phases-left-behind.md for the measured
+# list.
+* text=auto eol=lf
+
+# Binaries, named rather than trusted to auto-detection.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.exe binary
+*.node binary
+*.wasm binary
+"STUDIO HARNESS/vendor/**" binary

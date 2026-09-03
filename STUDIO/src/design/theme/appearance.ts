@@ -88,7 +88,8 @@ export async function loadAppearance(): Promise<Appearance> {
     return DEFAULT_APPEARANCE
   }
 
-  return readLegacy() ? coerce(readLegacy()) : DEFAULT_APPEARANCE
+  const legacy = readLegacy()
+  return legacy ? coerce(legacy) : DEFAULT_APPEARANCE
 }
 
 export async function saveAppearance(appearance: Appearance): Promise<void> {
