@@ -17,8 +17,14 @@ import { cn } from '@/lib/cn'
  * of mark that should be copied rather than interpreted, so the original
  * geometry is kept and only the colour is ours.
  *
- * The stroke is the logo's own weight (12 on 195, about 6%) rather than the
- * set's. Thickening it to match would be the same redrawing by another route.
+ * **The stroke is 1.2, not the logo's own 12, and the difference is not a
+ * judgement call.** `.studio-icon` applies `vector-effect: non-scaling-stroke`
+ * so that every mark paints the same weight at every size, which means the
+ * number is read in DEVICE PIXELS and the viewBox scale stops applying to it.
+ * The logo's 12 is 12 units of 195; left as it was it painted a 12-PIXEL
+ * stroke into a 13-pixel icon, which floods the box solid -- the mark rendered
+ * as a filled square. 1.2 is what the rest of the set uses, so the geometry
+ * stays the logo's and only the ink weight joins the family.
  */
 export function McpMark({
   size = 'text',
@@ -36,7 +42,7 @@ export function McpMark({
       viewBox="0 0 195 195"
       fill="none"
       stroke="currentColor"
-      strokeWidth={12}
+      strokeWidth={1.2}
       strokeLinecap="round"
       className={cn('studio-icon shrink-0', className)}
       style={{ width: box, height: box, ...style }}
