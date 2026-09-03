@@ -7,6 +7,7 @@ import { afterEach, describe, expect } from "vitest";
 import { itContained } from "../contained.js";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
+import { projectScope } from "../../src/extend/selection.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
 import { openDatabase } from "../../src/storage/database.js";
@@ -123,7 +124,7 @@ describe("MCP application runtime", () => {
         env: {},
         auth: "none",
       }, AUTH_CONTEXT);
-      runtime.servers.setEnabled(runtime.projectId, "echo-server", true, AUTH_CONTEXT);
+      runtime.servers.setEnabled(projectScope(runtime.projectId), "echo-server", true, AUTH_CONTEXT);
       // Trust is not on the runtime's surface; the store owns it and this test
       // has the database, so it writes through the owner like any other caller.
       new WorkspaceTrustStore(database).set(projectRoot, true);
@@ -160,7 +161,7 @@ describe("MCP application runtime", () => {
       expect(resourceResult?.content.every((block) => block.type === "text")).toBe(true);
       expect(JSON.stringify(resourceResult?.content)).toContain("from a resource");
 
-      runtime.servers.setEnabled(runtime.projectId, "echo-server", false, AUTH_CONTEXT);
+      runtime.servers.setEnabled(projectScope(runtime.projectId), "echo-server", false, AUTH_CONTEXT);
       await runtime.reconcile();
       const retained = sandbox.tools?.(env, { subagents: {} }) ?? [];
       const unavailable = retained.find((tool) => tool.name === "mcp__11_echo-server__4_echo");

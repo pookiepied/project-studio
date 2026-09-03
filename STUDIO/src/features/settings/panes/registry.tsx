@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { AppearancePane } from '@/features/settings/panes/AppearancePane'
 import { ArchivePane } from '@/features/settings/panes/ArchivePane'
 import { GeneralPane } from '@/features/settings/panes/GeneralPane'
+import { McpPane } from '@/features/settings/mcp/McpPane'
 import { PlaceholderPane } from '@/features/settings/panes/Pane'
 import { ProvidersPane } from '@/features/settings/providers/ProvidersPane'
 import { PLACEHOLDERS } from '@/features/settings/panes/placeholders'
@@ -18,6 +19,7 @@ const BUILT: Readonly<Record<string, () => ReactNode>> = {
   appearance: AppearancePane,
   archive: ArchivePane,
   providers: ProvidersPane,
+  mcp: McpPane,
 }
 
 export function paneFor(sectionId: string): ReactNode {

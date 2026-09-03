@@ -6,7 +6,7 @@ import {
   planReconcile,
   type KindReconciler,
 } from "../../src/extend/reconcile.js";
-import { ExtensionSelectionStore } from "../../src/extend/selection.js";
+import { ExtensionSelectionStore, projectScope } from "../../src/extend/selection.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
 
 /**
@@ -77,7 +77,7 @@ describe("reconciling a project", () => {
       { id: "blender", title: "Blender", author: "third-party" },
       { id: "figma", title: "Figma", author: "third-party" },
     ]);
-    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
+    selection.set({ kind: "mcp", extensionId: "blender", scope: projectScope("p1") }, true);
 
     const mcp = spy();
     const reconciler = new ExtensionReconciler(inventory);
@@ -138,9 +138,9 @@ describe("reconciling a project", () => {
       { id: "blender", title: "Blender", author: "third-party" },
       { id: "figma", title: "Figma", author: "third-party" },
     ]);
-    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
-    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p2" }, false);
-    selection.set({ kind: "mcp", extensionId: "figma", projectId: "p2" }, true);
+    selection.set({ kind: "mcp", extensionId: "blender", scope: projectScope("p1") }, true);
+    selection.set({ kind: "mcp", extensionId: "blender", scope: projectScope("p2") }, false);
+    selection.set({ kind: "mcp", extensionId: "figma", scope: projectScope("p2") }, true);
 
     const mcp = spy();
     const reconciler = new ExtensionReconciler(inventory);
@@ -155,7 +155,7 @@ describe("reconciling a project", () => {
     inventory.register("mcp", () => [
       { id: "blender", title: "Blender", author: "third-party" },
     ]);
-    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
+    selection.set({ kind: "mcp", extensionId: "blender", scope: projectScope("p1") }, true);
 
     const mcp = spy();
     const reconciler = new ExtensionReconciler(inventory);
@@ -170,7 +170,7 @@ describe("reconciling a project", () => {
     inventory.register("mcp", () => [
       { id: "blender", title: "Blender", author: "third-party" },
     ]);
-    selection.set({ kind: "mcp", extensionId: "blender", projectId: "p1" }, true);
+    selection.set({ kind: "mcp", extensionId: "blender", scope: projectScope("p1") }, true);
 
     const mcp = spy();
     const reconciler = new ExtensionReconciler(inventory);

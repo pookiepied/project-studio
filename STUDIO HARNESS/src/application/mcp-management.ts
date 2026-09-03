@@ -4,7 +4,7 @@ import { ExtendError } from "../extend/errors.js";
 import type { ExtensionReconciler } from "../extend/reconcile.js";
 import { McpServerRegistry, type McpServerInput, type McpServerRecord } from "../extend/mcp/registry.js";
 import type { McpSupervisor } from "../extend/mcp/supervisor.js";
-import type { ExtensionSelectionStore } from "../extend/selection.js";
+import { GLOBAL_SCOPE, type ExtensionSelectionStore, type Scope } from "../extend/selection.js";
 import type { PermissionGrantStore } from "../permissions/grant-store.js";
 
 /**
@@ -27,6 +27,8 @@ export interface McpManagementOptions {
 /** A server as a caller sees it: what was configured, plus what it is doing. */
 export type McpServerView = McpServerRecord & {
   readonly status: ReturnType<McpSupervisor["status"]>;
+  /** Whether the user's default has this server on. Not per project. */
+  readonly enabledByDefault: boolean;
 };
 
 /**
@@ -42,7 +44,8 @@ export interface McpAdministration {
   get(id: string): McpServerView | undefined;
   save(input: McpServerInput, auth: AuthContext): McpServerView;
   remove(id: string, auth: AuthContext): Promise<boolean>;
-  setEnabled(projectId: string, id: string, enabled: boolean, auth: AuthContext): void;
+  /** `null` clears the decision at this scope, so the wider scope applies. */
+  setEnabled(scope: Scope, id: string, enabled: boolean | null, auth: AuthContext): void;
   setCredential(id: string, secret: string, auth: AuthContext): Promise<void>;
   deleteCredential(id: string, auth: AuthContext): Promise<boolean>;
 }
@@ -66,7 +69,22 @@ export class McpManagementService implements McpAdministration {
 
   /** Configuration joined with live status — the join belongs here, not in a route. */
   #view(record: McpServerRecord): McpServerView {
-    return { ...record, status: this.#supervisor.status(record.id) };
+    return {
+      ...record,
+      status: this.#supervisor.status(record.id),
+      // The user's DEFAULT, read at the global scope only. A settings screen
+      // showing this list is editing defaults, and it needs the stored answer
+      // rather than something inferred from whether a process happens to be
+      // running: a server can be on by default and not yet started, or running
+      // for a project that overrode the default to on. Inferring from `status`
+      // would show the wrong switch in both cases.
+      enabledByDefault:
+        this.#selection.decisionAt({
+          kind: "mcp",
+          extensionId: record.id,
+          scope: GLOBAL_SCOPE,
+        }) ?? false,
+    };
   }
 
   list(): readonly McpServerView[] {
@@ -110,14 +128,24 @@ export class McpManagementService implements McpAdministration {
     return true;
   }
 
+  /**
+   * Records a decision at one scope.
+   *
+   * `clear` rather than `set(false)` is how a project or conversation goes back
+   * to inheriting, which is a third answer the caller has to be able to
+   * express: on, off, and "no opinion here". Offering only the first two traps
+   * the user at the narrow scope with no way back to the default.
+   */
   setEnabled(
-    projectId: string,
+    scope: Scope,
     id: string,
-    enabled: boolean,
+    enabled: boolean | null,
     _auth: AuthContext,
   ): void {
     this.#requireServer(id);
-    this.#selection.set({ kind: "mcp", extensionId: id, projectId }, enabled);
+    const key = { kind: "mcp", extensionId: id, scope } as const;
+    if (enabled === null) this.#selection.clear(key);
+    else this.#selection.set(key, enabled);
     this.#extensions.changed();
   }
 

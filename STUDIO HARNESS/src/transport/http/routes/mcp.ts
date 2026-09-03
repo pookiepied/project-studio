@@ -7,6 +7,7 @@ import { assertSafeMcpPayload } from "../../../extend/mcp/input-security.js";
 import type { McpServerInput } from "../../../extend/mcp/registry.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { McpAdministration } from "../../../application/mcp-management.js";
+import { GLOBAL_SCOPE, projectScope } from "../../../extend/selection.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -146,22 +147,58 @@ export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> 
     }
   });
 
+  /**
+   * The decision body, for every scope.
+   *
+   * `enabled` is a boolean or `null`, and `null` is not a spelling of `false`:
+   * it clears the decision at this scope so the wider one applies again. A
+   * project that has been switched off inherits nothing; a project that has
+   * been CLEARED inherits the user's default. Only the caller knows which was
+   * meant, so both have to be sendable.
+   */
+  function decision(value: unknown): boolean | null {
+    if (!isRecord(value)) {
+      throw new ExtendError("internal", { message: "The body must be an object." });
+    }
+    const enabled = value["enabled"];
+    if (enabled === null || typeof enabled === "boolean") return enabled;
+    throw new ExtendError("internal", {
+      message: "enabled must be true, false, or null to inherit.",
+    });
+  }
+
+  // The user's default, inherited by every project and conversation that has
+  // not decided for itself. This is the only place the global scope can be
+  // written: a global change made from inside one project or one conversation
+  // is a change someone did not know they were making.
+  routes.put("/extensions/mcp/:id", async (context) => {
+    try {
+      const enabled = decision(await body(context));
+      servers.setEnabled(
+        GLOBAL_SCOPE,
+        context.req.param("id"),
+        enabled,
+        authContext(context),
+      );
+      return context.json({ enabled });
+    } catch (error) {
+      return context.json(failure(error), 400);
+    }
+  });
+
   routes.put(
     "/projects/:projectId/extensions/mcp/:id",
     requireAdmissionScope(ADMISSION_SCOPES.PROJECT),
     async (context) => {
       try {
-        const value = await body(context);
-        if (!isRecord(value) || typeof value["enabled"] !== "boolean") {
-          return context.json({ error: "enabled must be a boolean.", code: "extend.internal" }, 400);
-        }
+        const enabled = decision(await body(context));
         servers.setEnabled(
-          context.req.param("projectId"),
+          projectScope(context.req.param("projectId")),
           context.req.param("id"),
-          value["enabled"],
+          enabled,
           authContext(context),
         );
-        return context.json({ enabled: value["enabled"] });
+        return context.json({ enabled });
       } catch (error) {
         return context.json(failure(error), 400);
       }

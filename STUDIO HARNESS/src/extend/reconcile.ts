@@ -199,7 +199,7 @@ export class ExtensionReconciler {
       // would either leak a process or end one somebody was using.
       const desired = new Set<string>();
       for (const projectId of projects) {
-        for (const entry of this.#inventory.active(kind, projectId)) desired.add(entry.id);
+        for (const entry of this.#inventory.active(kind, { projectId })) desired.add(entry.id);
       }
 
       try {

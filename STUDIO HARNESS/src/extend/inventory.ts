@@ -1,5 +1,5 @@
 import { ExtendError } from "./errors.js";
-import type { ExtensionSelectionStore } from "./selection.js";
+import type { ExtensionSelectionStore, ResolutionContext, ScopeKind } from "./selection.js";
 
 /**
  * What exists on this machine, and which of it this project chose.
@@ -55,11 +55,20 @@ export interface ExtensionSummary {
 export interface ExtensionState extends ExtensionSummary {
   readonly kind: ExtensionKind;
   /**
-   * `on` was chosen for this project. `off` was not. There is no third stored
-   * value: an extension that is not installed simply does not appear, which is
-   * what "unlisted" meant, and a state you cannot render is not a state.
+   * The answer that applies in this context, after inheritance. There is no
+   * third rendered value: an extension that is not installed simply does not
+   * appear, which is what "unlisted" meant, and a state you cannot render is
+   * not a state.
    */
   readonly enabled: boolean;
+  /**
+   * Which scope produced `enabled`, absent when nothing had an opinion.
+   *
+   * A settings screen needs this to say why a row is on, and to tell the user
+   * whether switching it off here overrides something wider or simply records
+   * the first decision anyone has made about it.
+   */
+  readonly decidedAt?: ScopeKind;
 }
 
 /** What a kind provides: the things it has installed, in a stable order. */
@@ -95,29 +104,36 @@ export class ExtensionInventory {
   }
 
   /**
-   * Everything installed of one kind, with this project's answer attached.
+   * Everything installed of one kind, with the answer for this context.
    *
    * For a settings screen, which has to render what is switched off in order to
    * offer switching it on. A model never sees this.
+   *
+   * `decidedAt` rides along because a settings screen has to say more than on
+   * or off: a row that is on because the user's default says so reads
+   * differently from one that is on because this project asked for it, and
+   * turning the first off from a project screen means something different than
+   * turning the second off. Without provenance the screen cannot tell the user
+   * which of those they are about to do.
    */
-  list(kind: ExtensionKind, projectId: string): readonly ExtensionState[] {
+  list(kind: ExtensionKind, context: ResolutionContext): readonly ExtensionState[] {
     const provider = this.#providers.get(kind);
     if (!provider) return [];
 
-    return provider().map((summary) => ({
-      ...summary,
-      kind,
-      enabled: this.#selection.isEnabled({
+    return provider().map((summary) => {
+      const resolution = this.#selection.resolve(kind, summary.id, context);
+      return {
+        ...summary,
         kind,
-        extensionId: summary.id,
-        projectId,
-      }),
-    }));
+        enabled: resolution.enabled,
+        ...(resolution.decidedAt === undefined ? {} : { decidedAt: resolution.decidedAt }),
+      };
+    });
   }
 
   /** Everything installed, of every kind. */
-  listAll(projectId: string): readonly ExtensionState[] {
-    return EXTENSION_KINDS.flatMap((kind) => this.list(kind, projectId));
+  listAll(context: ResolutionContext): readonly ExtensionState[] {
+    return EXTENSION_KINDS.flatMap((kind) => this.list(kind, context));
   }
 
   /**
@@ -128,7 +144,7 @@ export class ExtensionInventory {
    * extension that has since been removed cannot bring back something that is
    * not there.
    */
-  active(kind: ExtensionKind, projectId: string): readonly ExtensionState[] {
-    return this.list(kind, projectId).filter((entry) => entry.enabled);
+  active(kind: ExtensionKind, context: ResolutionContext): readonly ExtensionState[] {
+    return this.list(kind, context).filter((entry) => entry.enabled);
   }
 }

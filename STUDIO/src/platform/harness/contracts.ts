@@ -1320,6 +1320,232 @@ export function parseWireStreamEvent(value: unknown): WireStreamEvent | null {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* MCP servers                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How a server is reached.
+ *
+ * Two, and there will not be a third. `sse` is the deprecated two-endpoint
+ * HTTP+SSE transport; the harness does not implement it and says so by name
+ * (`C-16`). `http` here means Streamable HTTP, one endpoint.
+ */
+export const MCP_TRANSPORTS = ['stdio', 'http'] as const
+export type McpTransport = (typeof MCP_TRANSPORTS)[number]
+
+/** How a remote endpoint proves who we are. */
+export const MCP_AUTH_KINDS = ['none', 'bearer', 'header'] as const
+export type McpAuthKind = (typeof MCP_AUTH_KINDS)[number]
+
+/**
+ * The lifecycle a running server is in.
+ *
+ * `given-up` is distinct from `failed`: failed will be retried, given-up will
+ * not, and a screen that showed them the same way would leave someone waiting
+ * for a retry that is never coming.
+ */
+export const MCP_STATES = [
+  'idle',
+  'starting',
+  'ready',
+  'stopping',
+  'failed',
+  'given-up',
+] as const
+export type McpState = (typeof MCP_STATES)[number]
+
+/**
+ * Which protocol revision a server turned out to speak.
+ *
+ * Detected, never configured. The harness probes `server/discover` first and
+ * falls back to `initialize`, so this is a fact to display rather than a
+ * choice to offer - and offering it would only give someone a way to be wrong
+ * about their own server.
+ */
+export const MCP_ERAS = ['modern', 'legacy'] as const
+export type McpEra = (typeof MCP_ERAS)[number]
+
+/**
+ * Which scope produced the answer for a row.
+ *
+ * The reason a settings screen can say "on, from your defaults" rather than
+ * just "on". Absent means nothing anywhere had an opinion, which resolves to
+ * off.
+ */
+export const SCOPE_KINDS = ['global', 'project', 'conversation'] as const
+export type ScopeKind = (typeof SCOPE_KINDS)[number]
+
+export interface McpServerStatus {
+  readonly state: McpState
+  /** Failed starts so far. Zero unless the state is failed or given-up. */
+  readonly attempts: number
+  readonly era?: McpEra
+  readonly protocolVersion?: string
+  /** Why the last attempt failed, in the words the failure used. */
+  readonly lastError?: string
+  /** The last of what the server wrote to stderr, when one is connected. */
+  readonly diagnostics: readonly string[]
+}
+
+/**
+ * A server as this app sees it.
+ *
+ * **No secret is here, and none can arrive.** A bearer token, or the value of
+ * the variable a local server reads its key from, lives in the OS credential
+ * store. The record carries the variable's NAME, which is configuration. The
+ * parse below rebuilds field by field for exactly this reason: a harness that
+ * one day returned a secret could not smuggle it through a spread.
+ */
+export interface McpServerRecord {
+  readonly id: string
+  readonly title: string
+  readonly transport: McpTransport
+  /** Absolute path to a real executable. `stdio` only. */
+  readonly command?: string
+  /** A real vector, never a string: nothing downstream may re-split it. */
+  readonly args: readonly string[]
+  /** Non-secret environment for the child. */
+  readonly env: Readonly<Record<string, string>>
+  /** `http` only. */
+  readonly url?: string
+  readonly auth: McpAuthKind
+  /** Header name when `auth` is `header`. Not a secret. */
+  readonly authHeader?: string
+  /** The variable a local server reads its secret from. Not the secret. */
+  readonly authEnvVar?: string
+  /** Whether a contained local server is given a network. `stdio` only. */
+  readonly needsNetwork: boolean
+  /**
+   * The user's default for this server, read at the global scope.
+   *
+   * Not "is it running", and not one project's answer. A server can be on by
+   * default and not yet started, or running because a project overrode the
+   * default - so this is stored state, never inferred from `status`.
+   */
+  readonly enabledByDefault: boolean
+  readonly status?: McpServerStatus
+}
+
+function stringMap(value: unknown): Readonly<Record<string, string>> | null {
+  if (value === undefined) return {}
+  if (!isRecord(value)) return null
+  const out: Record<string, string> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry !== 'string') return null
+    out[key] = entry
+  }
+  return out
+}
+
+function parseMcpStatus(value: unknown): McpServerStatus | null {
+  if (!isRecord(value)) return null
+  const state = oneOf(MCP_STATES, value['state'])
+  if (state === null) return null
+  const attempts = typeof value['attempts'] === 'number' ? value['attempts'] : 0
+  const era = oneOf(MCP_ERAS, value['era'])
+  const protocolVersion = optionalText(value['protocolVersion'])
+  const lastError = optionalText(value['lastError'])
+  const diagnostics = Array.isArray(value['diagnostics'])
+    ? value['diagnostics'].filter((entry): entry is string => typeof entry === 'string')
+    : []
+
+  if (!protocolVersion.ok || !lastError.ok) return null
+
+  return {
+    state,
+    attempts,
+    diagnostics,
+    ...(era === null ? {} : { era }),
+    ...(protocolVersion.value === undefined ? {} : { protocolVersion: protocolVersion.value }),
+    ...(lastError.value === undefined ? {} : { lastError: lastError.value }),
+  }
+}
+
+export function parseMcpServer(value: unknown): McpServerRecord | null {
+  if (!isRecord(value)) return null
+
+  const id = text(value['id'])
+  const title = text(value['title'])
+  const transport = oneOf(MCP_TRANSPORTS, value['transport'])
+  const auth = oneOf(MCP_AUTH_KINDS, value['auth'])
+  const command = optionalText(value['command'])
+  const url = optionalText(value['url'])
+  const authHeader = optionalText(value['authHeader'])
+  const authEnvVar = optionalText(value['authEnvVar'])
+  const env = stringMap(value['env'])
+  const args = Array.isArray(value['args'])
+    ? value['args'].every((entry) => typeof entry === 'string')
+      ? (value['args'] as readonly string[])
+      : null
+    : []
+
+  if (
+    id === null ||
+    title === null ||
+    transport === null ||
+    auth === null ||
+    args === null ||
+    env === null ||
+    !command.ok ||
+    !url.ok ||
+    !authHeader.ok ||
+    !authEnvVar.ok
+  ) {
+    return null
+  }
+
+  // `needsNetwork` defaults to true when absent, matching the harness: every
+  // already-installed server was granted a network before the field existed,
+  // and reading a missing field as `false` here would draw a boundary in the
+  // UI that the harness is not applying.
+  const needsNetwork = value['needsNetwork'] === undefined ? true : flag(value['needsNetwork'])
+  if (needsNetwork === null) return null
+
+  // Off when absent, matching the store: no decision anywhere resolves to off,
+  // and a missing field is exactly "nobody has decided".
+  const enabledByDefault =
+    value['enabledByDefault'] === undefined ? false : flag(value['enabledByDefault'])
+  if (enabledByDefault === null) return null
+
+  const status = value['status'] === undefined ? undefined : parseMcpStatus(value['status'])
+
+  // Rebuilt field by field, never spread from the response.
+  return {
+    id,
+    title,
+    transport,
+    auth,
+    args,
+    env,
+    needsNetwork,
+    enabledByDefault,
+    ...(command.value === undefined ? {} : { command: command.value }),
+    ...(url.value === undefined ? {} : { url: url.value }),
+    ...(authHeader.value === undefined ? {} : { authHeader: authHeader.value }),
+    ...(authEnvVar.value === undefined ? {} : { authEnvVar: authEnvVar.value }),
+    ...(status === undefined || status === null ? {} : { status }),
+  }
+}
+
+export function parseMcpServers(value: unknown): readonly McpServerRecord[] | null {
+  return listOf(parseMcpServer, value)
+}
+
+/**
+ * What is sent to install or replace a server.
+ *
+ * The record without the parts the harness owns: `status` is observed, not
+ * configured. It deliberately carries no secret field - the credential is a
+ * separate call, so a draft can be logged, echoed back in an error, or held
+ * in a form's state without ever being a thing that leaks a key.
+ */
+export type McpServerDraft = Omit<McpServerRecord, 'status' | 'args' | 'env' | 'needsNetwork' | 'enabledByDefault'> & {
+  readonly args?: readonly string[]
+  readonly env?: Readonly<Record<string, string>>
+  readonly needsNetwork?: boolean
+}
+
 export {
   absent,
   present,

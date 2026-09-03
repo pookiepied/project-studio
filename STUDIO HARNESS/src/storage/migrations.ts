@@ -798,6 +798,68 @@ export const MIGRATIONS: readonly Migration[] = [
       db.exec("ALTER TABLE conversation ADD COLUMN permission_mode TEXT");
     },
   },
+  {
+    version: 18,
+    name: "extension_scope",
+    up(db) {
+      // Selection gains two scopes: one above projects and one below them.
+      //
+      // Migration 6 keyed a decision by `(kind, extension_id, project_id)`,
+      // with `project_id` NOT NULL and inside the primary key. That shape can
+      // express exactly one question - "is this on for this project" - and two
+      // more now have to fit beside it:
+      //
+      //   global        the user's default, inherited by everything
+      //   conversation  an override for one conversation, project or not
+      //
+      // Resolution is narrowest-first: conversation, then project, then
+      // global. A quick conversation with no project inherits the global
+      // default and works with no setup, which is the case the product is
+      // built around; a project narrows or widens from there.
+      //
+      // **This changes the default that migration 6 recorded.** Its comment
+      // says "absence means off, which is the default for every kind". Absence
+      // at a scope still means "no decision here", but the ANSWER for a scope
+      // with no decision is now whatever the wider scope said, and only an
+      // absent global default is off. That was a deliberate decision: with a
+      // hundred extensions installed, on-by-default is unusable, and
+      // off-with-no-way-to-say-otherwise makes the fastest path in the product
+      // the one demanding the most setup.
+      //
+      // The scope is a pair - a kind and an id - rather than three nullable
+      // columns, because a nullable column inside a primary key is a shape
+      // SQLite will let you write and then quietly disagree with you about.
+      // `scope_id` is the empty string for the global scope, which has no id;
+      // that is a value the other two scopes can never produce, since project
+      // and conversation ids are always non-empty.
+      //
+      // The table is new rather than altered because the primary key changes,
+      // and the old rows are carried in as project-scope decisions so nobody
+      // loses a choice they made. The old table is dropped in the same
+      // migration: it has one reader, `ExtensionSelectionStore`, which moves
+      // to this table in the same change.
+      db.exec(`
+        CREATE TABLE extension_scope (
+          kind          TEXT NOT NULL,
+          extension_id  TEXT NOT NULL,
+          scope_kind    TEXT NOT NULL,
+          scope_id      TEXT NOT NULL,
+          enabled       INTEGER NOT NULL,
+          decided_at    INTEGER NOT NULL,
+          PRIMARY KEY (kind, extension_id, scope_kind, scope_id)
+        ) STRICT;
+      `);
+
+      db.exec(`
+        INSERT INTO extension_scope
+          (kind, extension_id, scope_kind, scope_id, enabled, decided_at)
+        SELECT kind, extension_id, 'project', project_id, enabled, decided_at
+          FROM extension_selection;
+      `);
+
+      db.exec("DROP TABLE extension_selection;");
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

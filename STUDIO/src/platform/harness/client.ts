@@ -29,6 +29,8 @@ import {
   parseConversationRecord,
   parseConversationRecords,
   parseLibraryProviders,
+  parseMcpServer,
+  parseMcpServers,
   parsePendingApprovals,
   parseProviderIcon,
   parseProbeResult,
@@ -47,6 +49,8 @@ import {
   type ConversationRecord,
   type DefaultSelection,
   type LibraryProvider,
+  type McpServerDraft,
+  type McpServerRecord,
   type ModelCapability,
   type PendingApprovalRecord,
   type ProbeResult,
@@ -163,6 +167,34 @@ export interface HarnessClient {
     patch: ProviderConnectionPatch,
   ): Promise<HarnessResult<ProviderConnection>>
   deleteConnection(id: string): Promise<HarnessResult<void>>
+
+  /* -- MCP servers -------------------------------------------------------- */
+
+  /** Every installed server, each with what it is currently doing. */
+  listMcpServers(): Promise<HarnessResult<readonly McpServerRecord[]>>
+  /** Installs a server, or replaces one with the same id. */
+  saveMcpServer(draft: McpServerDraft): Promise<HarnessResult<McpServerRecord>>
+  removeMcpServer(id: string): Promise<HarnessResult<void>>
+  /**
+   * Records a decision at one scope.
+   *
+   * `null` is not a spelling of `false`: it clears the decision so the wider
+   * scope applies again. Off overrides an inherited on; cleared returns to it.
+   */
+  setMcpServerEnabled(
+    id: string,
+    enabled: boolean | null,
+    scope?: { readonly projectId: string },
+  ): Promise<HarnessResult<void>>
+  /**
+   * Stores the server's secret in the OS credential store.
+   *
+   * The value passes through this call and is never held: nothing in STUDIO
+   * keeps it, and no read path can return it. Callers hand it over from the
+   * dialog's own state and forget it on unmount.
+   */
+  setMcpCredential(id: string, secret: string): Promise<HarnessResult<void>>
+  deleteMcpCredential(id: string): Promise<HarnessResult<void>>
   probeConnection(id: string): Promise<HarnessResult<ProbeResult>>
   listModels(filter?: ModelFilter): Promise<HarnessResult<readonly ProviderModel[]>>
   /** The user's chosen default models, per capability slot; absent slots are unset. */
@@ -252,6 +284,7 @@ export interface HarnessClient {
   removeProjectFolder(projectId: string, folderId: string): Promise<HarnessResult<ProjectRecord>>
 }
 
+const MCP_PATH = '/api/mcp'
 const PROVIDERS_PATH = '/api/providers'
 const CONVERSATIONS_PATH = '/api/conversations'
 const PROJECTS_PATH = '/api/projects'
@@ -513,6 +546,40 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     deleteConnection(id) {
       return empty('DELETE', connectionPath(id))
+    },
+
+    listMcpServers() {
+      return json('GET', `${MCP_PATH}/servers`, undefined, parseMcpServers)
+    },
+
+    saveMcpServer(draft) {
+      return json('POST', `${MCP_PATH}/servers`, draft, parseMcpServer)
+    },
+
+    removeMcpServer(id) {
+      return empty('DELETE', `${MCP_PATH}/servers/${encodeURIComponent(id)}`)
+    },
+
+    setMcpServerEnabled(id, enabled, scope) {
+      // The global default and a project's decision are different routes on
+      // purpose. A global change reachable from a project screen is a change
+      // someone did not know they were making, so the two cannot be one call
+      // with an optional field the caller might forget to set.
+      const path =
+        scope === undefined
+          ? `${MCP_PATH}/extensions/mcp/${encodeURIComponent(id)}`
+          : `${MCP_PATH}/projects/${encodeURIComponent(scope.projectId)}/extensions/mcp/${encodeURIComponent(id)}`
+      return empty('PUT', path, { enabled })
+    },
+
+    setMcpCredential(id, secret) {
+      return empty('PUT', `${MCP_PATH}/servers/${encodeURIComponent(id)}/credential`, {
+        secret,
+      })
+    },
+
+    deleteMcpCredential(id) {
+      return empty('DELETE', `${MCP_PATH}/servers/${encodeURIComponent(id)}/credential`)
     },
 
     probeConnection(id) {

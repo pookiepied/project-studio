@@ -5,7 +5,7 @@ import { McpManagementService } from "../../src/application/mcp-management.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
-import { ExtensionSelectionStore } from "../../src/extend/selection.js";
+import { ExtensionSelectionStore, projectScope } from "../../src/extend/selection.js";
 import type { McpSupervisor } from "../../src/extend/mcp/supervisor.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
 
@@ -101,7 +101,7 @@ describe("MCP management", () => {
 
   it("revokes, forgets selection, and stops on removal", async () => {
     management.save(server(), AUTH_CONTEXT);
-    selection.set({ kind: "mcp", extensionId: "example", projectId: "project" }, true);
+    selection.set({ kind: "mcp", extensionId: "example", scope: projectScope("project") }, true);
     grants.grant(
       { namespace: "mcp:example", name: "search" },
       SCOPE,
@@ -111,7 +111,18 @@ describe("MCP management", () => {
     expect(await management.remove("example", AUTH_CONTEXT)).toBe(true);
 
     expect(grants.find({ namespace: "mcp:example", name: "search" }, SCOPE)).toBeUndefined();
-    expect(selection.isEnabled({ kind: "mcp", extensionId: "example", projectId: "project" })).toBe(false);
+    // Undefined, not false. Removal FORGETS the decision rather than recording
+    // an off, and the two are now different answers: an off would override a
+    // wider scope, so a reinstall would find the server explicitly disabled
+    // here by a decision nobody made. This assertion got stronger when the
+    // store learned to tell "never decided" from "switched off".
+    expect(
+      selection.decisionAt({
+        kind: "mcp",
+        extensionId: "example",
+        scope: projectScope("project"),
+      }),
+    ).toBeUndefined();
     expect(stopped).toEqual(["example"]);
     expect(changed).toBe(2);
   });
@@ -124,10 +135,10 @@ describe("MCP management", () => {
       "always",
     );
 
-    management.setEnabled("project", "example", false, AUTH_CONTEXT);
+    management.setEnabled(projectScope("project"), "example", false, AUTH_CONTEXT);
 
     expect(grants.find({ namespace: "mcp:example", name: "search" }, SCOPE)).toBeDefined();
-    expect(selection.isEnabled({ kind: "mcp", extensionId: "example", projectId: "project" })).toBe(false);
+    expect(selection.decisionAt({ kind: "mcp", extensionId: "example", scope: projectScope("project") })).toBe(false);
     expect(changed).toBe(2);
     expect(stopped).toEqual([]);
   });

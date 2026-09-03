@@ -78,6 +78,16 @@ function stubClient(overrides: {
     addProjectFolder: () => refuse(),
     updateProjectFolder: () => refuse(),
     removeProjectFolder: () => refuse(),
+    // The MCP half of the client. This stub is the providers pane's, and it
+    // refuses everything it does not model rather than returning an empty
+    // success, so a provider test that started calling one of these would
+    // fail loudly instead of quietly reading nothing.
+    listMcpServers: () => refuse(),
+    saveMcpServer: () => refuse(),
+    removeMcpServer: () => refuse(),
+    setMcpServerEnabled: () => refuse(),
+    setMcpCredential: () => refuse(),
+    deleteMcpCredential: () => refuse(),
   }
 }
 

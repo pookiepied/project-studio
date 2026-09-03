@@ -32,16 +32,9 @@ export const PLACEHOLDERS: Readonly<Record<string, Placeholder>> = {
     description: 'Every shortcut, and how to change it.',
     items: ['Search and commands', 'New conversation', 'Toggle the sidebar', 'Send and stop'],
   },
-  mcp: {
-    title: 'MCP servers',
-    description: 'Servers that give Studio new tools.',
-    items: [
-      'Installed servers, each on or off per project',
-      'Whether a server needs a network',
-      'The tools a server exposes',
-      'Add a server by command or URL',
-    ],
-  },
+  // `mcp` is not here any more: the pane is built, and `registry.tsx` prefers
+  // a built pane over a placeholder. A placeholder for a section that renders
+  // is a description of the software that nothing can ever show.
   connectors: {
     title: 'Connectors',
     description: 'Accounts and services Studio can reach.',

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ExtendError } from "../../src/extend/errors.js";
 import { ExtensionInventory } from "../../src/extend/inventory.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
-import { ExtensionSelectionStore } from "../../src/extend/selection.js";
+import { ExtensionSelectionStore, projectScope } from "../../src/extend/selection.js";
 import { assertNoSecretColumns } from "../../src/storage/migrations.js";
 import {
   openDatabase,
@@ -296,17 +296,17 @@ describe("the MCP server registry", () => {
       const inventory = new ExtensionInventory(selection);
       inventory.register("mcp", () => registry.asExtensions());
 
-      expect(inventory.list("mcp", "project-a").map((e) => e.enabled)).toEqual([
+      expect(inventory.list("mcp", { projectId: "project-a" }).map((e) => e.enabled)).toEqual([
         false,
       ]);
-      expect(inventory.active("mcp", "project-a")).toEqual([]);
+      expect(inventory.active("mcp", { projectId: "project-a" })).toEqual([]);
 
       selection.set(
-        { kind: "mcp", extensionId: "notion", projectId: "project-a" },
+        { kind: "mcp", extensionId: "notion", scope: projectScope("project-a") },
         true,
       );
 
-      expect(inventory.active("mcp", "project-a").map((e) => e.id)).toEqual([
+      expect(inventory.active("mcp", { projectId: "project-a" }).map((e) => e.id)).toEqual([
         "notion",
       ]);
     });

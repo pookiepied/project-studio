@@ -348,12 +348,14 @@ export class StudioRuntime implements AgentHost {
     this.#catalog = new McpCapabilityCatalog({
       diagnostic: (message, serverId) =>
         this.#logger?.warn(message, { server_id: serverId }),
+      // Resolved rather than read at one scope: a server with no decision for
+      // this project inherits the user's global default, which is what makes a
+      // freshly created project useful without visiting a settings screen. The
+      // conversation scope exists in the store and is deliberately not asked
+      // here - see the note at the reconcile pass below.
       isServerEnabled: (serverId) =>
-        this.#selection.isEnabled({
-          kind: "mcp",
-          extensionId: serverId,
-          projectId: this.#projectId,
-        }),
+        this.#selection.resolve("mcp", serverId, { projectId: this.#projectId })
+          .enabled,
     });
     this.#supervisor = new McpSupervisor({
       launch: createMcpLauncher({
@@ -611,12 +613,10 @@ export class StudioRuntime implements AgentHost {
       // happens to stand is not that.
       const active = this.#registry
         .list()
-        .filter((record) =>
-          this.#selection.isEnabled({
-            kind: "mcp",
-            extensionId: record.id,
-            projectId: this.#projectId,
-          }),
+        .filter(
+          (record) =>
+            this.#selection.resolve("mcp", record.id, { projectId: this.#projectId })
+              .enabled,
         )
         .map((record) => record.id);
 
