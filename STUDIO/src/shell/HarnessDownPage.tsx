@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 
 import { StudioMark } from '@/components/brand'
 import { Icons } from '@/components/icons'
-import { Button } from '@/components/primitives'
-import { SHELL } from '@/design/tokens'
+import { IconStateProvider } from '@/components/icons/Icon'
+import { Button, IconButton } from '@/components/primitives'
+import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
+import { copyText } from '@/lib/clipboard'
 import { harnessFailureReason } from '@/platform/harness'
 import { quitApp } from '@/platform/tauri'
+import { describeHarnessFailure } from '@/shell/harness-failure'
 import { useWorkspace } from '@/stores/workspace'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
+
+/** How long "Copied" stands before the mark returns. Matches `CodeBlock`. */
+const COPIED_MS = 1600
 
 /**
  * The page that is the whole window while the harness is down.
@@ -22,29 +29,30 @@ import { TrafficLights } from '@/shell/chrome/TrafficLights'
  * is the window itself: the traffic lights remain, because close, minimize
  * and zoom belong to the window, not to the app that is missing its engine.
  *
- * ---- The shape of it -------------------------------------------------------
+ * ---- What it says ----------------------------------------------------------
  *
- * A 404 page is the honest genre here: the thing you asked for is not there,
- * the page says so in the typeface the app is own voice in, and gives you the
- * actions that still exist. So: the mark, arriving once and then still — the
- * statement in the display serif, one sentence of why, the supervisor's
- * verbatim reason where it has one, and two real actions. "Restart the
- * harness" because that is what the button does; the supervisor is
- * single-flight, so pressing it again joins a start already in flight. "Quit
- * Studio" because with close-to-tray enabled the window's own close button
- * means hide, and a page with no shell still owes a person a way out that
- * means out.
+ * The headline is the classified failure, not a fixed sentence, because the
+ * fixed one could only ever describe the absence and never the cause. Under it
+ * the remedy, and under that the raw supervisor text behind a disclosure.
  *
- * The mark does not breathe here. `busy` is the ripple that means work is in
- * flight, and nothing is in flight on this page — the harness is down and
- * stays down until someone presses. A mark pulsing over a stopped engine says
- * "still trying", which is the one thing this page must not imply. `entrance`
- * instead: the tiles assemble once on arrival and then hold.
+ * This page used to carry a line explaining that conversations live in the
+ * harness "so there is nothing to read and nowhere to send". It was written for
+ * someone who lost the harness mid-work, and that is not who arrives here: the
+ * eager start fails before any window exists, so the overwhelmingly common way
+ * to see this page is to open Studio and have it be the first thing there. To
+ * that person the sentence describes a loss they never experienced and implies
+ * they were reaching for something they had not asked for yet. It is gone. The
+ * classified remedy explains what the harness is where explaining it is
+ * actually useful — in the same breath as what to do about it.
  *
- * The reason is fetched on mount — an eager start fails before any window
- * exists, which is the common way to arrive here — and after every refused
- * press, verbatim and redacted at its source. "Why will it not start" is the
- * first question anyone asks, and the page was built to answer it.
+ * ---- Why the raw text is not the headline ----------------------------------
+ *
+ * The supervisor writes for a log, and it should keep writing for a log: exit
+ * statuses, stderr, `pnpm build`, the path it looked in. That text is the best
+ * thing in the world to send to whoever maintains this, and the worst possible
+ * greeting. So it stops being the first sentence and becomes the evidence
+ * behind "See details" — verbatim, never paraphrased, with the copy button that
+ * is the only thing anyone actually wants to do with it.
  */
 export function HarnessDownPage() {
   const { ensureStore } = useWorkspace()
@@ -80,6 +88,8 @@ export function HarnessDownPage() {
       })
   }
 
+  const failure = describeHarnessFailure(reason)
+
   return (
     <div
       className="relative flex h-full w-full flex-col overflow-hidden border border-hairline bg-surface"
@@ -100,51 +110,114 @@ export function HarnessDownPage() {
         className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center"
         style={{ paddingInline: SHELL.gutter }}
       >
+        {/* The mark does not breathe here. `busy` is the ripple that means work
+            is in flight, and nothing is in flight on this page — the harness is
+            down and stays down until someone presses. A mark pulsing over a
+            stopped engine reads as "still trying", which is the one thing this
+            page must not imply. `entrance` instead: assembles once, then holds. */}
         <StudioMark entrance size={44} className="text-foreground" />
 
         <div className="flex flex-col items-center" style={{ maxWidth: SHELL.measure }}>
-          <h1 className="studio-display text-foreground">The harness is not running.</h1>
-          <p className="mt-3 text-ui text-muted-foreground">
-            Conversations live in the harness, so there is nothing to read and
-            nowhere to send until it starts.
-          </p>
+          <h1 className="studio-display text-foreground">{failure.headline}</h1>
+          {failure.remedy !== null ? (
+            <p className="mt-3 text-ui text-muted-foreground">{failure.remedy}</p>
+          ) : null}
         </div>
 
-        {reason !== null ? (
-          <div
-            role="note"
-            className="flex w-full max-w-[60ch] items-start gap-2 rounded-lg border bg-surface-raised p-3 text-left text-caption text-muted-foreground"
-          >
-            <Icons.failed size="sm" className="mt-0.5 shrink-0" />
-            {/* Verbatim from the supervisor, redacted at its source. Long on
-                purpose: this text is the diagnostic, and trimming it here
-                would send the next reader to a log file. */}
-            <span className="max-h-40 overflow-y-auto break-words studio-scroll-inset">
-              {reason}
-            </span>
-          </div>
-        ) : null}
+        {/* Only when there is something real to show. A disclosure that opens
+            onto nothing is a worse answer than no disclosure. */}
+        {reason !== null ? <Details reason={reason} /> : null}
 
-        {/* `md`, not `lg`. Studio's window is small by design, and the large
-            size exists for a page that is mostly empty space — here the two
-            controls sat under a heading and a paragraph they then out-measured,
-            so the page read as a dialog with oversized buttons rather than as
-            a page. `md` is the size every other real action in the app is, and
-            these are not more important than those. */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            busy={starting}
-            onClick={restart}
-            icon={<Icons.reload />}
-          >
-            Restart the harness
+          {/* "Try again", not "Restart the harness". Restart is a lie on the
+              common path: the eager start already failed, so for almost
+              everyone who reads this button nothing has ever been running and
+              there is nothing to re-start. "Try again" is also true on the
+              second press, which "Start" would not be, and it says what the
+              person wants rather than naming the machinery — the word "harness"
+              is already in the headline and the remedy, where it is explained. */}
+          <Button variant="secondary" busy={starting} onClick={restart} icon={<Icons.reload />}>
+            Try again
           </Button>
+          {/* Quit stays. With close-to-tray on, the window's own close means
+              hide, so this is the one control on screen that means out — and
+              "Quit" is the verb the tray item already uses for it. */}
           <Button variant="ghost" onClick={() => void quitApp()}>
             Quit Studio
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The supervisor's own words, one press away.
+ *
+ * ---- Why a disclosure and not a second window ------------------------------
+ *
+ * Nine times out of ten this is four lines of text. A window to hold four lines
+ * is a window to summon, position, read and dismiss, and it takes the person
+ * off the page holding the button they came to press. Inline, the evidence sits
+ * directly under the claim it supports, which is where evidence belongs.
+ *
+ * ---- Why there are no line numbers -----------------------------------------
+ *
+ * Line numbers exist so people can refer to a line: "the bug is on 42". Nobody
+ * ever says that about a stderr dump. What people actually do with this text is
+ * copy it — into a bug report, a search, a message to whoever maintains this —
+ * and numbers actively obstruct that, because select-all either drags them into
+ * the paste or forces the column-select nobody gets right. So: monospace,
+ * because the alignment in a stack trace is meaning; whitespace preserved, for
+ * the same reason; scrollable, because a stderr slab must not push the buttons
+ * off screen; and a copy control, because copying is the verb.
+ */
+function Details({ reason }: { reason: string }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    // Only on success. A control that says "Copied" when the write was refused
+    // is worse than one that does nothing.
+    if (!(await copyText(reason))) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), COPIED_MS)
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center" style={{ maxWidth: SHELL.measure }}>
+      <IconStateProvider state={open ? 'on' : 'rest'}>
+        <Button variant="ghost" size="sm" onClick={() => setOpen((was) => !was)}>
+          <Icons.disclosure size="sm" />
+          {open ? 'Hide details' : 'See details'}
+        </Button>
+      </IconStateProvider>
+
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: DURATION.base, ease: EASE_OUT }}
+            className="w-full overflow-hidden"
+          >
+            <div className="relative mt-2 rounded-lg border bg-surface-sunken text-left">
+              <div className="absolute right-1.5 top-1.5">
+                <IconButton label={copied ? 'Copied' : 'Copy'} size="sm" onClick={() => void copy()}>
+                  {copied ? <Icons.check size="sm" /> : <Icons.copy size="sm" />}
+                </IconButton>
+              </div>
+              {/* `pre`, not a paragraph. A stack trace's indentation is part of
+                  what it says, and the right padding clears the copy button so
+                  a long first line does not run underneath it. */}
+              <pre className="studio-scroll-inset max-h-48 overflow-auto px-3 py-2.5 pr-10 font-mono text-code whitespace-pre-wrap break-words text-muted-foreground">
+                {reason}
+              </pre>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   )
 }

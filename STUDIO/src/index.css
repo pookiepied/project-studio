@@ -779,6 +779,20 @@
     letter-spacing: -0.003em;
   }
 
+  /* Monospaced text outside the transcript: a JSON view, a stderr dump, any
+     block where alignment carries meaning. `--code-size` already existed and
+     was reachable only from prose `code`, so every panel wanting it had to
+     invent something -- and two of them invented `.text-code`, which was not a
+     utility at all and therefore silently did nothing. Named for what those
+     panels already ask for, so the class they were reaching for now exists.
+
+     Size only. The font family stays with `font-mono` at the call site,
+     because a few places want the code size in the UI face. */
+  .text-code {
+    font-size: var(--code-size);
+    line-height: 1.55;
+  }
+
   /* Headings. The step where size alone finally is enough -- but it takes the
      weight and the tighter tracking to stop reading as merely bigger UI text. */
   .text-title {
