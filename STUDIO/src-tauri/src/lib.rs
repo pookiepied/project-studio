@@ -101,6 +101,22 @@ async fn app_ready(window: tauri::WebviewWindow) -> Result<(), String> {
   Ok(())
 }
 
+/// Quit the whole application — the same verb the tray's Quit item performs.
+///
+/// Exists for the harness-down page, which replaces the shell: with
+/// close-to-tray enabled (`CLOSE_TO_TRAY_DEFAULT`), the window's own close
+/// button hides rather than exits, so that page's Quit is the one visible way
+/// out that a person who has hidden the tray icon still has. `exit` rather
+/// than closing the window, for the same reason the tray item gives: the
+/// window's close is interceptable by the hide-to-tray preference, and an
+/// exit request runs the graceful stop (`shutdown_all` on `RunEvent::Exit`)
+/// instead of racing it.
+#[tauri::command]
+fn quit_app(app: AppHandle) -> Result<(), String> {
+  app.exit(0);
+  Ok(())
+}
+
 /// Open one conversation in its own window.
 ///
 /// The same frontend bundle with a query parameter, not a second app. The
@@ -385,6 +401,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       app_ready,
       open_conversation_window,
+      quit_app,
       get_harness_endpoint,
       restart_harness,
       get_harness_status,

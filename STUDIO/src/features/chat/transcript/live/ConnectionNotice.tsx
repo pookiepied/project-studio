@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/components/primitives'
-import { startHarness } from '@/platform/harness'
+import { harnessFailureReason, startHarness } from '@/platform/harness'
 import {
   classifyFailureKind,
   failureRemedy,
@@ -166,13 +166,18 @@ export function SendRefusal({
  * be followed.
  *
  * A start it refuses says so and stays put, rather than clearing itself: the
- * supervisor keeps the reason, `get_harness_status` reports it, and the phase
- * this notice renders will carry it on the next look. Pressing again is safe —
- * the supervisor is single-flight, so a second press joins the first start
- * rather than launching a second harness.
+ * supervisor keeps the reason, and the refused press fetches it through
+ * `harnessFailureReason` and prints it verbatim under the control. That fetch
+ * is what turned the promise the docblock below always made -- "the phase this
+ * notice renders will carry it on the next look" -- into something a person
+ * can actually read; before it, a refused start was visually identical to
+ * never having pressed. Pressing again is safe -- the supervisor is
+ * single-flight, so a second press joins the first start rather than launching
+ * a second harness.
  */
 function StartHarness({ onStarted }: { onStarted: () => void }) {
   const [starting, setStarting] = useState(false)
+  const [reason, setReason] = useState<string | null>(null)
 
   return (
     <div className="mt-0.5">
@@ -182,16 +187,32 @@ function StartHarness({ onStarted }: { onStarted: () => void }) {
         disabled={starting}
         onClick={() => {
           setStarting(true)
-          void startHarness().then((up) => {
-            setStarting(false)
-            // Only on success. Reattaching to a harness that did not come up
-            // would replace the reason with a generic reaching-out message.
-            if (up) onStarted()
-          })
+          setReason(null)
+          void startHarness()
+            .then((up) => {
+              // Only on success. Reattaching to a harness that did not come up
+              // would replace the reason with a generic reaching-out message.
+              if (up) {
+                onStarted()
+                return undefined
+              }
+              return harnessFailureReason().then((found) => {
+                setReason(found)
+              })
+            })
+            .finally(() => {
+              setStarting(false)
+            })
         }}
       >
         {starting ? 'Starting the harness…' : 'Start the harness'}
       </Button>
+      {reason !== null ? (
+        // Verbatim from the supervisor, redacted at its source.
+        <div className="mt-0.5 max-w-[60ch] break-words text-left text-caption text-muted-foreground/80">
+          {reason}
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -5,6 +5,7 @@ export {
   minimizeWindow,
   toggleMaximizeWindow,
   closeWindow,
+  quitApp,
   startWindowDrag,
   resetWindowSize,
   signalAppReady,

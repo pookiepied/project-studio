@@ -68,6 +68,8 @@ import type { HarnessAddress } from './client'
 interface HarnessStatusReport {
   readonly state: string
   readonly endpoint: { readonly url: string } | null
+  /** Present exactly when `state` is `failed`, redacted at its source. */
+  readonly error?: string | null
 }
 
 /**
@@ -159,6 +161,12 @@ export async function resolveHarnessAddress(): Promise<HarnessAddress | null> {
  * involved and never crosses — the command answers with the endpoint view,
  * which carries no bearer, and this reduces it to a yes or a no.
  *
+ * When the answer is no, the reason is not invented here and not lost either:
+ * the supervisor keeps the sentence it failed with (redacted at its source)
+ * and answers it again through `harnessFailureReason`. A start that was
+ * refused and a start that never happened are different screens, and the
+ * difference is that sentence.
+ *
  * Outside Tauri there is no supervisor and nothing to ask, so the answer is
  * no: a browser's harness is started by hand and configured by env var.
  */
@@ -168,8 +176,36 @@ export async function startHarness(): Promise<boolean> {
     const report = await invoke<{ readonly url?: unknown }>('restart_harness')
     return typeof report === 'object' && report !== null
   } catch {
-    // The supervisor's own sentence is already on screen through
-    // `get_harness_status`; a second one invented here would compete with it.
+    // The sentence stays with the supervisor, which `harnessFailureReason`
+    // reads; nothing is added to it here because nothing is known here.
     return false
   }
+}
+
+/**
+ * The supervisor's own sentence for why the harness is not running, if it
+ * keeps one.
+ *
+ * A failed start used to be invisible. The status command has always carried
+ * the reason — an eager start fails before any window exists, so the
+ * supervisor was built to hold the sentence for whoever asks later — but no
+ * surface ever asked, and the state a start refusal left on screen was
+ * identical to the state of never having tried. This is the ask.
+ *
+ * `null` when there is nothing to say: the harness is running, coming up, or
+ * was stopped on purpose — an absence with no failure behind it, which is the
+ * normal case and reads as one. Outside Tauri there is no supervisor to hold
+ * a sentence, so the answer is `null` too; the remedy there is configuration,
+ * not a start.
+ */
+export async function harnessFailureReason(): Promise<string | null> {
+  if (!isTauri()) return null
+  let report: HarnessStatusReport
+  try {
+    report = await invoke<HarnessStatusReport>('get_harness_status')
+  } catch {
+    return null
+  }
+  if (report.state !== 'failed') return null
+  return report.error ?? null
 }

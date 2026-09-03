@@ -7,10 +7,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConversationPhase } from '@/features/chat/useConversation'
 
 const startHarness = vi.fn<() => Promise<boolean>>()
+const harnessFailureReason = vi.fn<() => Promise<string | null>>()
 
 vi.mock('@/platform/harness', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/platform/harness')>()
-  return { ...actual, startHarness: () => startHarness() }
+  return {
+    ...actual,
+    startHarness: () => startHarness(),
+    harnessFailureReason: () => harnessFailureReason(),
+  }
 })
 
 const { ConnectionNotice } = await import('./ConnectionNotice')
@@ -30,6 +35,7 @@ const NO_HARNESS: ConversationPhase = { status: 'no-harness' }
 afterEach(() => {
   cleanup()
   startHarness.mockReset()
+  harnessFailureReason.mockReset()
 })
 
 describe('a conversation with no harness behind it', () => {
@@ -56,6 +62,7 @@ describe('a conversation with no harness behind it', () => {
     // own reason with a generic reaching-out message, which is the one thing
     // a person needs NOT to happen when a start fails.
     startHarness.mockResolvedValue(false)
+    harnessFailureReason.mockResolvedValue(null)
     const resumed = vi.fn()
     render(<ConnectionNotice phase={NO_HARNESS} onResume={resumed} refused={null} />)
 
@@ -65,6 +72,22 @@ describe('a conversation with no harness behind it', () => {
       expect(screen.getByRole('button', { name: 'Start the harness' })).toBeTruthy(),
     )
     expect(resumed).not.toHaveBeenCalled()
+  })
+
+  it('prints the reason the supervisor kept when the start failed', async () => {
+    // A refused press used to leave the notice exactly as it was, which made
+    // "it refused" and "nobody pressed" the same screen. The supervisor held
+    // the sentence the whole time; the notice asks for it now.
+    startHarness.mockResolvedValue(false)
+    harnessFailureReason.mockResolvedValue(
+      'Harness exited before readiness (status=exit code 1). stderr=StorageError: this build supports 17.',
+    )
+    render(<ConnectionNotice phase={NO_HARNESS} onResume={() => {}} refused={null} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start the harness' }))
+
+    await waitFor(() => expect(screen.getByText(/this build supports 17/)).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Start the harness' })).toBeTruthy()
   })
 
   it('cannot be pressed twice while a start is in flight', async () => {

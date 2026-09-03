@@ -32,6 +32,21 @@ export async function closeWindow(): Promise<void> {
 }
 
 /**
+ * Quits the whole application, not the window.
+ *
+ * The window's own close is interceptable: with close-to-tray enabled (the
+ * default) it hides, and an app whose every visible close button means "see
+ * you later" still owes the person one button that means "goodbye". This is
+ * that button, and it is the tray Quit's verb — an exit request, which runs
+ * the Rust side's graceful stop — rather than a window destroy that would
+ * race it.
+ */
+export async function quitApp(): Promise<void> {
+  if (!isTauri()) return
+  await invoke('quit_app')
+}
+
+/**
  * Move the window, and only move it.
  *
  * The declarative alternative, `data-tauri-drag-region`, does two things rather

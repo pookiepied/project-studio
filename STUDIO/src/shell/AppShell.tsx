@@ -9,6 +9,7 @@ import { SettingsPage } from '@/features/settings'
 import { VoiceModeProvider } from '@/features/voice'
 import { ActionsMenu } from '@/shell/ActionsMenu'
 import { SelectionMenu } from '@/shell/SelectionMenu'
+import { HarnessDownPage } from '@/shell/HarnessDownPage'
 import { TopStrip } from '@/shell/chrome/TopStrip'
 import { SideRail } from '@/features/rail'
 import { Sidebar } from '@/shell/sidebar/Sidebar'
@@ -37,7 +38,7 @@ export function AppShell() {
   const { route, move, sidebarOpen, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
     useNavigation()
   const compact = useCompactLayout()
-  const { conversations, projects } = useWorkspace()
+  const { conversations, projects, storePhase } = useWorkspace()
   const {
     open: railOpen,
     collapsed: railCollapsed,
@@ -107,6 +108,20 @@ export function AppShell() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome])
+
+  // The harness is the thing every page here runs on — the index, the
+  // catalog, every send — and when it is down none of this shell is worth
+  // rendering. The window becomes one page instead: the brand, the absence,
+  // the supervisor's reason, and the two actions that still exist. The shell
+  // comes back with the harness; nothing below is mounted to be missed.
+  //
+  // Deliberately after every hook in this component: an early return above
+  // the two effects would drop them from the no-harness render, and a render
+  // that calls fewer hooks than the one before it is the blank-window crash
+  // this page was written to prevent, not cause.
+  if (storePhase.status === 'no-harness') {
+    return <HarnessDownPage />
+  }
 
   return (
     <div

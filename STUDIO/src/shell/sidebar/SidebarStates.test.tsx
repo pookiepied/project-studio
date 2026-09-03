@@ -43,14 +43,17 @@ describe('SidebarSkeleton', () => {
 })
 
 describe('SidebarUnavailable', () => {
-  it('says the harness is absent and offers the control that starts it', async () => {
+  it('leaves the absent harness to the home surface and renders nothing here', () => {
     const onEnsure = vi.fn(async () => true)
     const phase: StorePhase = { status: 'no-harness', error: null }
     render(<SidebarUnavailable phase={phase} onEnsure={onEnsure} />)
 
-    expect(screen.getByText('The harness is not running.')).not.toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Start the harness' }))
-    await waitFor(() => expect(onEnsure).toHaveBeenCalledTimes(1))
+    // The sentence and the control moved to the status pill on home, which
+    // carries what this block never had: the supervisor's reason. The column
+    // keeps its local rows and says nothing it cannot be the first to know.
+    expect(screen.queryByText('The harness is not running.')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Start the harness' })).toBeNull()
+    expect(onEnsure).not.toHaveBeenCalled()
   })
 
   it("says the read failed and repeats the harness's own words", async () => {

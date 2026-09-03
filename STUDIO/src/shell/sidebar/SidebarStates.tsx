@@ -16,17 +16,21 @@ import type { SidebarOrganize } from '@/stores/navigation'
  * nothing -- a broken harness and an empty sidebar were one blank column, and
  * the store's own answer to that ambiguity was never shown.
  *
- * The states are drawn here, at the column, because the column is where the
- * absence is visible:
- *
  * - **loading** holds the rows' shape -- same padding, same rhythm, widths
  *   varied the way titles vary -- so the arrival of the real list is a change
  *   of fill, not a jump.
- * - **no-harness** and **failed** keep whatever local rows exist (the gallery
- *   is always among them) and say, above them, why the rest is not here, with
- *   the remedy the chat pane already offered. A column that renders nothing
- *   makes the app look empty; a column that says "the harness is not running"
- *   makes the app look like what it is.
+ * - **failed** keeps whatever local rows exist (the gallery is always among
+ *   them) and says, above them, why the rest is not here. A column that
+ *   renders nothing makes the app look empty; a column that names the read
+ *   that broke makes the app look like what it is.
+ *
+ * **no-harness** renders nothing here any more. It used to be a block between
+ * Search and the list it explained, which pushed the column's content around
+ * and filed an app-wide fact under the navigation. The absence now states
+ * itself once, in the home surface's status pill -- which also carries the
+ * supervisor's reason and the control that starts the harness -- so the column
+ * keeps whatever local rows exist and says nothing it cannot be the first to
+ * know.
  */
 
 /** Row widths, varied on purpose: a column of equal bars reads as a pattern. */
@@ -78,9 +82,10 @@ function SkeletonRow({ width, header = false }: { width: string; header?: boolea
  * The column's answer to a store it cannot read.
  *
  * `ensureStore` asks the supervisor to start the harness and re-reads when it
- * does -- the same remedy the chat pane's notice offers, offered here because
- * the absence is visible here first: the sidebar is on screen before any
- * conversation is.
+ * does. The absent-harness case is deliberately not rendered here -- that
+ * sentence lives in the home surface's status pill, which owns the reason and
+ * the remedy for the whole app -- so a phase of `no-harness` leaves the column
+ * to its local rows.
  */
 export function SidebarUnavailable({
   phase,
@@ -91,28 +96,7 @@ export function SidebarUnavailable({
 }) {
   const [asking, setAsking] = useState(false)
 
-  if (phase.status === 'no-harness') {
-    return (
-      <StateNote
-        className="px-1 py-3"
-        title="The harness is not running."
-        detail="Conversations live in the harness, so the list cannot be read until it starts."
-        action={
-          <Button
-            variant="secondary"
-            size="sm"
-            busy={asking}
-            onClick={() => {
-              setAsking(true)
-              void onEnsure().finally(() => setAsking(false))
-            }}
-          >
-            Start the harness
-          </Button>
-        }
-      />
-    )
-  }
+  if (phase.status === 'no-harness') return null
 
   return (
     <StateNote

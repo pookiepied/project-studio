@@ -746,7 +746,18 @@ impl HarnessSupervisor {
             guard.expected_exit = false;
         }
 
-        let endpoint = self.spawn_installed(true)?;
+        // The eager start's failure is logged by its caller in `lib.rs`; a
+        // manual restart refused has no caller that logs, and the webview that
+        // asked keeps the sentence to itself. Presses leaving no trace but the
+        // absence of a line here are how a refusal stayed visible only to
+        // whoever thought to look in this file.
+        let endpoint = match self.spawn_installed(true) {
+            Ok(endpoint) => endpoint,
+            Err(error) => {
+                log::error!("Harness supervisor: restart refused: {error}");
+                return Err(error);
+            }
+        };
         log::info!(
             "Harness supervisor: restarted harness pid={} port={} session={}",
             endpoint.pid,
