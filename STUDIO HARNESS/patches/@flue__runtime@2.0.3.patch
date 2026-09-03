@@ -1,0 +1,248 @@
+diff --git a/dist/conversation-stream-store-CXwRWonS.mjs b/dist/conversation-stream-store-CXwRWonS.mjs
+index 3fa342b27631ffcf2a05f0f8dcf571fc2236e2cd..88fa0cb5937385e6c70989af6d198cb069b3deb2 100644
+--- a/dist/conversation-stream-store-CXwRWonS.mjs
++++ b/dist/conversation-stream-store-CXwRWonS.mjs
+@@ -426,12 +426,32 @@
+-	pushSection(`Date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", {
+-		weekday: "short",
+-		year: "numeric",
+-		month: "short",
+-		day: "numeric"
+-	})}`);
+ 	if (env) {
+-		parts.push(`Working directory: ${env.cwd}`);
++		// [project-studio patch] The two lines removed here -- the `Date:` line
++		// and the bare `Working directory:` push -- restated facts the agent's
++		// own instructions already carry. The studio agent renders an
++		// `# Environment` block with today's date, the conversation workspace,
++		// the git fact, the shell statement and the machine; upstream re-added
++		// two of them at compose time in a second spelling, so every prompt
++		// carried two dates and two working directories. One authority per
++		// fact, and it is ours. What deliberately stays: the `## Available
++		// Agents` section above (load-bearing even with an empty roster -- the
++		// `task` tool is always registered and its description points the model
++		// at that section, so the do-not-call paragraph is the tool's other
++		// half) and the directory listing below (a fact ours does not carry;
++		// empty for a fresh conversation workspace, so it costs nothing today
++		// and serves a project-rooted conversation later). The title agent
++		// loses the Date line with this removal -- it renders no environment
++		// block, so the line was its only date -- and a title needs no date.
++		// Measured before deciding: the shipped line is day-granular
++		// (toLocaleDateString with weekday/month/day, no time) and sits at the
++		// prompt's tail, so it changed at midnight rather than per turn and
++		// never broke the cached head; the reason to remove it is duplication,
++		// not caching.
++		//
++		// If an upgrade renames this hash and the patch fails to apply,
++		// re-derive by finding `function composeSystemPrompt` and removing the
++		// unconditional `Date:` pushSection and the `Working directory:` push,
++		// keeping this section's two survivors. Anchor on the function and the
++		// `if (env)` block, never on the bundle filename.
+ 		if (env.directoryListing && env.directoryListing.length > 0) parts.push("", "Directory structure:", env.directoryListing.join("\n"));
+ 	}
+ 	return parts.join("\n");
+ }
+@@ -3999,20 +4019,77 @@ var Session = class {
+ 		}
+ 	}
+ 	async waitForTransientModelRetry(assistant, attempt) {
+-		if (attempt > MAX_TRANSIENT_MODEL_RETRIES) {
++		// [project-studio patch] The per-class retry budget lives OUTSIDE this
++		// bundle: src/reliability/model-retry-policy.ts is the one authority on
++		// this axis (documentation/architecture/retry.md) and publishes itself
++		// on globalThis.__projectStudioTransientModelRetryPolicy at harness
++		// bootstrap; each decision asks it what budget and wait THIS failure
++		// deserves. The bundle cannot import that module -- it executes from
++		// pnpm's virtual store and nothing compiles our TypeScript to a path it
++		// could reach -- so consultation, not import, is how the table stays out
++		// of the patch. The consultation defends itself: an absent, malformed
++		// or throwing policy falls back to the shipped constants, so a fault on
++		// our side degrades to yesterday's single budget rather than breaking
++		// the turn loop. What stays pi-ai's alone is whether the error is
++		// retryable at all (isRetryableModelError); this only decides patience.
++		const policy = globalThis.__projectStudioTransientModelRetryPolicy;
++		let maxRetries = MAX_TRANSIENT_MODEL_RETRIES;
++		let delayMs;
++		if (policy && typeof policy.decideTransientModelRetry === "function") {
++			try {
++				const grant = policy.decideTransientModelRetry({
++					attempt,
++					error: assistant.errorMessage
++				});
++				if (
++					grant
++					&& typeof grant.maxRetries === "number"
++					&& Number.isFinite(grant.maxRetries)
++					&& grant.maxRetries >= 0
++				) {
++					maxRetries = Math.floor(grant.maxRetries);
++					delayMs = typeof grant.delayMs === "number" && Number.isFinite(grant.delayMs) && grant.delayMs > 0
++						? Math.round(grant.delayMs)
++						: 0;
++				}
++			} catch {}
++		}
++		if (attempt > maxRetries) {
+ 			this.internalLog("warn", "[flue:model-retry] Transient model error retries exhausted", {
+ 				attempts: attempt - 1,
++				maxRetries,
+ 				error: assistant.errorMessage
+ 			});
+ 			await this.rebuildCanonicalContext();
+ 			return false;
+ 		}
+-		const delayMs = modelRetryDelayMs(attempt);
++		if (delayMs === void 0) delayMs = modelRetryDelayMs(attempt);
+ 		await this.rebuildCanonicalContext();
+ 		this.modelRetryAbortController = new AbortController();
++		// [project-studio patch] A retry the person cannot see is
++		// indistinguishable from a hang, so each scheduled retry is appended as
++		// a canonical record beside the log line that was its only witness.
++		// The record carries wire facts only -- which attempt, out of what
++		// budget, the delay, and the failed attempt's own error sentence -- and
++		// no policy; encodeRecord (dispatch-*.mjs) projects it into a
++		// `submission-retrying` chunk for clients. The attempt number is the
++		// same derived count this method was called with, read back from the
++		// persisted path, so a resume re-derives it instead of remembering it.
++		// The exhausted branch deliberately emits nothing: there is no wait to
++		// announce, and the settlement already carries the failure. maxRetries
++		// is the budget in force for this attempt -- the injected policy's for
++		// its class when one is installed, the shipped constant otherwise.
++		await this.appendCanonical([{
++			...this.canonicalEnvelope("submission_retry_scheduled"),
++			type: "submission_retry_scheduled",
++			attempt,
++			maxRetries,
++			delayMs,
++			...(assistant.errorMessage ? { error: assistant.errorMessage } : {})
++		}]);
+ 		this.internalLog("warn", "[flue:model-retry] Retrying transient model error", {
+ 			attempt,
+-			maxRetries: MAX_TRANSIENT_MODEL_RETRIES,
++			maxRetries,
+ 			delayMs,
+ 			error: assistant.errorMessage
+ 		});
+diff --git a/dist/dispatch-nU3cIlT-.mjs b/dist/dispatch-nU3cIlT-.mjs
+index c661b214b2c1e0e33c5fe696e23f44e3ac96a474..21a2b9531f229b3d260ae552a8d8968b53d22e88 100644
+--- a/dist/dispatch-nU3cIlT-.mjs
++++ b/dist/dispatch-nU3cIlT-.mjs
+@@ -1,7 +1,7 @@
+ import { B as configureErrorRendering, D as StreamOffsetGoneError, E as StreamNotFoundError, G as parseJsonBody, Q as generateEntryId, Y as deriveKeyedSubmissionId, a as AttachmentNotAvailableError, at as generateRecordId, c as ConversationRecordInvariantError, dt as extractTraceCarrier, m as MethodNotAllowedError, o as AttachmentNotFoundError, ot as generateSubmissionId, p as InvalidRequestError, q as toHttpResponse, v as RouteNotFoundError } from "./errors-CsDcT_C4.mjs";
+ import { n as getRuntimeModels } from "./providers-B1VyW-aH.mjs";
+ import { n as isValibotSchema } from "./schema-DIDpvZZa.mjs";
+-import { isContextOverflow } from "@earendil-works/pi-ai";
++import { isContextOverflow, isRetryableAssistantError } from "@earendil-works/pi-ai";
+ import * as v from "valibot";
+ import { Hono } from "hono";
+ //#region src/conversation-records.ts
+@@ -1705,7 +1705,30 @@ function findTrailingPartialToolBatch(following) {
+ function isRetryableModelError(message) {
+ 	if (message.stopReason !== "error" || !message.errorMessage) return false;
+ 	if (message.errorMessage.includes("(retryable_interruption)")) return true;
+-	return /overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|network.?error|connection.?(?:reset|refused|lost)|socket hang up|fetch failed|timed? out|timeout|terminated|provider finish_reason:\s*error(?![-\w])/i.test(message.errorMessage);
++	// [project-studio patch] Delegate the HEURISTIC half of this classifier to
++	// @earendil-works/pi-ai's isRetryableAssistantError instead of the inline
++	// regex this bundle shipped. The shipped pattern was too narrow (it missed,
++	// among others, OpenRouter's "Provider returned error" wrapper, so real
++	// transient failures were never retried) and had no non-retryable guard
++	// (OpenAI returns insufficient_quota as HTTP 429, so billing exhaustion
++	// burned the full retry budget before reaching the person). Pi's version
++	// checks its quota/billing exclusions FIRST, so a sentence matching both
++	// lists is not retried; its retryable list is otherwise a superset. The
++	// policy therefore tracks pi-ai's semver range instead of a copied regex
++	// that rots.
++	//
++	// The two lines ABOVE are upstream's and are deliberately left in front of
++	// the delegation. `stopReason`/`errorMessage` is the same precondition pi
++	// applies. The `(retryable_interruption)` marker is new in 2.0.3 and is
++	// Flue's own PROOF that a throw site was a transient interruption; proof
++	// outranks a text heuristic, and a quota refusal never carries the marker,
++	// so checking it first neither weakens the billing guard nor loses the
++	// behaviour the marker exists to provide.
++	//
++	// If an upgrade renames this hash and the patch fails to apply, re-derive
++	// it from this comment -- do not restore the narrower regex, and do not
++	// drop the marker check while doing it.
++	return isRetryableAssistantError(message);
+ }
+ function isCompletedAssistantResponse(message) {
+ 	return message.stopReason === "stop" || message.stopReason === "length";
+@@ -1801,15 +1824,43 @@ function projectConversationUi(conversation, streamOffset) {
+ 		const projected = projectCompletedMessage(entry);
+ 		if (projected) {
+ 			if (projected.role === "assistant" && projected.submissionId) {
++				// [project-studio patch] A FAILED attempt is its own message, not
++				// a continuation of the response that replaced it.
++				//
++				// 2.0.3 introduced the one-message-per-response shape: every
++				// assistant step of a submission folds into the first step's
++				// bubble, which is right for a tool loop -- those steps really
++				// are one answer arriving in pieces. It is wrong for a transient
++				// retry. There, each step is a whole attempt that FAILED and was
++				// thrown away, and folding it into the surviving answer erases
++				// it: the person is shown one clean response with no sign that
++				// three model calls were spent, and `submission-retrying` on the
++				// updates channel becomes the only witness. Under Phase 2 the
++				// retry was invisible in BOTH channels at once, which is what
++				// made a retrying turn indistinguishable from a hung one.
++				//
++				// An errored step therefore keeps its own message and does not
++				// become (or stay) the open response, so the next attempt starts
++				// a fresh one. Response metadata and anchored data parts stay
++				// with the non-errored response, which is the only step that has
++				// any. A submission with no failures folds exactly as upstream
++				// folds it -- this branch never runs.
++				//
++				// Anchor on `projectConversationUi` and the `responseBySubmission`
++				// merge, never on a bundle filename or a line number.
++				const failedAttempt = entry.message.role === "assistant" && entry.message.stopReason === "error";
+ 				const open = responseBySubmission.get(projected.submissionId);
+-				if (open) {
++				if (open && !failedAttempt) {
+ 					mergeAssistantContinuation(open, projected);
+ 					appendAnchoredDataParts(open, conversation, projected.submissionId, projected.id);
+ 					continue;
+ 				}
+-				responseBySubmission.set(projected.submissionId, projected);
+-				appendAnchoredDataParts(projected, conversation, projected.submissionId, projected.id);
+-				applyResponseMetadata(projected, conversation);
++				if (failedAttempt) responseBySubmission.delete(projected.submissionId);
++				else {
++					responseBySubmission.set(projected.submissionId, projected);
++					appendAnchoredDataParts(projected, conversation, projected.submissionId, projected.id);
++					applyResponseMetadata(projected, conversation);
++				}
+ 			}
+ 			messages.push(projected);
+ 			byId.set(projected.id, projected);
+@@ -2208,6 +2259,29 @@ function encodeRecord(record, conversationId, state, responseIds) {
+ 			if (assistant?.type !== "message" || assistant.message.role !== "assistant") return [];
+ 			return assistant.message.content.flatMap((block) => block.type === "toolCall" ? encodeToolResultEntry(conversation, record.assistantMessageId, block.id, conversationId) : []);
+ 		}
++		// [project-studio patch] Project the record the transient-retry site
++		// appends (submission_retry_scheduled, in the conversation-stream-store
++		// bundle) into a chunk. Unknown record types project to nothing by
++		// design -- the `default: return []` below is what drops them -- so this
++		// case exists so the one record Studio itself adds is not dropped along
++		// with them. Wire facts only: which attempt, out of what budget, the
++		// wait, and the failed attempt's own error sentence.
++		//
++		// If an upgrade renames this hash and the patch fails to apply,
++		// re-derive by finding `function encodeRecord` and adding this case
++		// beside the other submission_* cases. Anchor on the switch, never on
++		// the bundle filename: 2.0.3 moved this function out of flue-app-*.mjs
++		// into dispatch-*.mjs, and the beta.9 patch's filename anchor is
++		// exactly what stopped applying.
++		case "submission_retry_scheduled": return [{
++			type: "submission-retrying",
++			conversationId,
++			...record.submissionId ? { submissionId: record.submissionId } : {},
++			attempt: record.attempt,
++			maxRetries: record.maxRetries,
++			delayMs: record.delayMs,
++			...record.error === void 0 ? {} : { error: record.error }
++		}];
+ 		case "submission_settled": {
+ 			const answeredBy = typeof record.attemptId === "string" ? assistantSubmissionByAttempt(state).get(record.attemptId) : void 0;
+ 			return [{

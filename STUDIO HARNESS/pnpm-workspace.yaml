@@ -16,52 +16,71 @@ allowBuilds:
 # bind and the readiness frame - are ordinary code in src/server.ts now, and
 # its build/dev roles moved to `vite build` + @flue/vite.
 #
-# @flue/runtime — two changes, one rule: a retry budget may only be lengthened
-#   once the retry is visible, and invisible retry must stay short.
+# @flue/runtime@2.0.3 - five hunks, one rule: a retry budget may only be
+#   lengthened once the retry is visible, and invisible retry must stay
+#   short. Phase 8 re-derived the runtime patch against the 2.0.3 bundles
+#   (the beta.9 hunks were anchored to beta.9 bundle content and failed the
+#   install loudly, by design). The entry lives here, where the beta.9
+#   entries lived; pnpm fails the whole install if a hunk stops applying,
+#   which is the point.
 #
-#   1. conversation-projections-*.mjs — replaces the transient-model-error
-#      classifier inline in the bundle with a delegation to pi-ai's
-#      isRetryableAssistantError. The shipped regex missed genuinely transient
-#      wordings (OpenRouter's "Provider returned error" among them), which then
-#      were never retried, and had no quota/billing guard, so OpenAI's
-#      insufficient_quota (an HTTP 429) burned three retries before the person
-#      saw the one sentence that could help.
+#   1. conversation-stream-store-*.mjs, waitForTransientModelRetry - each
+#      scheduled transient retry appends a `submission_retry_scheduled`
+#      record carrying wire facts only (attempt, maxRetries, delayMs, the
+#      failed attempt's error sentence), which hunk 4 projects into a
+#      `submission-retrying` chunk. The budget and the wait for each attempt
+#      come from src/reliability/model-retry-policy.ts - rate-limit 8
+#      retries, transport 2, everything else 3 - consulted on
+#      globalThis.__projectStudioTransientModelRetryPolicy, because this
+#      bundle executes from pnpm's virtual store and cannot import our
+#      source. An absent, malformed or throwing policy falls back to the
+#      shipped constants of three and upstream's own delay curve, so the
+#      fallback path is exactly the pre-Task-30 behaviour. The exhausted
+#      branch still emits nothing - there is no wait to announce, and the
+#      settlement carries the failure.
 #
-#   2. conversation-stream-store-*.mjs + flue-app-*.mjs — makes each scheduled
-#      transient retry VISIBLE and its budget PER-CLASS. waitForTransientModelRetry
-#      used to write only an internal log line under one shipped budget; since
-#      Task 29 it also appends a submission_retry_scheduled record carrying wire
-#      facts only (attempt, maxRetries, delayMs, the failed attempt's error
-#      sentence), which encodeRecord projects into a `submission-retrying`
-#      chunk. Since Task 30 the budget and wait for each attempt come from
-#      src/reliability/model-retry-policy.ts — rate-limit 8 retries, transport
-#      2, everything else 3 — consulted on
-#      globalThis.__projectStudioTransientModelRetryPolicy, because this bundle
-#      cannot import our source from pnpm's virtual store. An absent,
-#      malformed or throwing policy falls back to the shipped constants, so
-#      the fallback path is exactly the pre-Task-30 behaviour. The exhausted
-#      branch still emits nothing — there is no wait to announce, and the
-#      settlement carries the failure. The bundle filenames carry content
-#      hashes, so an upgrade fails this patch loudly rather than silently;
-#      the patch file itself says how to re-derive each hunk, and
-#      documentation/architecture/retry.md holds the map this belongs to.
-# Runtime patch state after Phase 2 (the Flue 2.0 pins): the hunks in
-# patches/@flue__runtime@1.0.0-beta.9.patch are anchored to beta.9 bundle
-# hashes and CANNOT apply to @flue/runtime@2.0.3 - pnpm fails the install
-# with ERR_PNPM_PATCH_FAILED, which is the loud, designed failure the
-# migration plan asked for. The patch file is kept on disk for Phase 8 to
-# re-derive against the 2.0.3 bundles.
+#   2. dispatch-*.mjs, isRetryableModelError - the heuristic half of the
+#      transient-model-error classifier is delegated to pi-ai's
+#      isRetryableAssistantError instead of the inline regex, which missed
+#      genuinely transient wordings (OpenRouter's "Provider returned error"
+#      among them) and had no quota/billing guard, so OpenAI's
+#      insufficient_quota (an HTTP 429) burned three retries before the
+#      person saw the one sentence that could help. Upstream's
+#      stopReason/errorMessage precondition and its (retryable_interruption)
+#      marker check stay in front of the delegation.
 #
-# Until Phase 8 lands, this is a REAL, NAMED REGRESSION, accepted on purpose:
-#   - transient-model-error classification is upstream's regex again (no
-#     delegation to pi-ai's isRetryableAssistantError, no quota/billing guard,
-#     so OpenAI's insufficient_quota burns retries);
-#   - scheduled transient retries are INVISIBLE again (internal log only, no
-#     submission_retry_scheduled record) with ONE shipped budget of 3 and
-#     upstream's own delay curve - src/reliability/model-retry-policy.ts is
-#     installed on globalThis but nothing reads it;
-#   - composeSystemPrompt re-adds its unstable `Date:` line, cwd, directory
-#     listing and the `## Available Agents` section (Phase 8 decides).
+#   3. dispatch-*.mjs, projectConversationUi - an errored assistant attempt
+#      keeps its own message in the history projection instead of folding
+#      into the response that replaced it. Without this a retry is
+#      invisible in BOTH channels at once: no `submission-retrying` chunk
+#      and no failed attempt to look at, which is what made a retrying turn
+#      indistinguishable from a hung one.
 #
-# Do not re-add the entry before Phase 8 re-derives the hunks: an install
-# that cannot complete is not a tree anyone can build from.
+#   4. dispatch-*.mjs, encodeRecord - projects `submission_retry_scheduled`
+#      into a `submission-retrying` chunk. Unknown record types project to
+#      nothing by design, so the one record Studio itself adds needs its own
+#      case beside the other submission_* cases.
+#
+#   5. conversation-stream-store-*.mjs, composeSystemPrompt - removes the
+#      compose-time `Date:` line and the bare `Working directory:` line,
+#      which duplicated facts the studio agent's own `# Environment` block
+#      already carries (one authority per fact; the block is ours). The
+#      `## Available Agents` section and the directory listing stay: the
+#      `task` tool is always registered and its description points the model
+#      at that section, and the listing is a fact ours does not carry.
+#      Measured before deciding: the shipped `Date:` line is day-granular
+#      and tail-positioned, so it never actually defeated per-turn prompt
+#      caching - the reason for removal is duplication, not caching.
+#
+#   How to re-derive at the next upgrade: every hunk carries its own recipe
+#   in a `[project-studio patch]` comment, and every recipe says to anchor
+#   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of
+#   flue-app-*.mjs into dispatch-*.mjs, and a filename anchor is exactly
+#   what died with beta.9. Read the failed hunks against the new tarball,
+#   re-anchor on the named functions and structures, and re-read
+#   documentation/architecture/retry.md, whose row 1 is the map this patch
+#   belongs to. The retry behaviours in tests/integration/harness.test.ts
+#   pin all of it end to end; they ran red for the whole 2.0.3 window and
+#   came back green the day this patch landed.
+patchedDependencies:
+  '@flue/runtime@2.0.3': patches/@flue__runtime@2.0.3.patch

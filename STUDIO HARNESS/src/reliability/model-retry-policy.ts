@@ -2,7 +2,7 @@
  * The per-class retry budget for Flue's transient model errors.
  *
  * The retry LOOP lives in `@flue/runtime` (patched, see
- * `patches/@flue__runtime@1.0.0-beta.9.patch`); the budget lives here. That
+ * `patches/@flue__runtime@2.0.3.patch`); the budget lives here. That
  * split is the one-authority-per-axis rule from
  * `documentation/architecture/retry.md` applied to the last axis that still
  * carried a private number: the patched bundle cannot import this module

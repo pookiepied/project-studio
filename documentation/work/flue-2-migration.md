@@ -13,6 +13,39 @@ written about a tree that no longer exists.
 
 ---
 
+## CLOSED, 2026-09-03
+
+All eight phases are done. What shipped, in the order it was built: the
+conversation export that made the store reset survivable (1); the Flue 2.0
+pins and the Vite build with our own `src/server.ts` entry owning the fd-4
+bootstrap, the loopback bind, the readiness frame and the graceful stop -
+the `@flue/cli` patch deleted rather than re-derived (2, 3); both agents as
+`'use agent'` modules with the gated sandbox factory and the scope vocabulary
+fixed (4); providers on `createProvider` + `setProvider` with pi-ai deduped
+to one 0.84.4 and the OpenRouter reasoning fix landed (5); the composer
+sending the 2.0 envelope with the stream path, abort scope and dedup
+decision written down (6); events, telemetry links, titling end to end, and
+the Windows double-module fix (7); and the runtime patch re-derived - five
+hunks, retries visible in both channels, per-class budgets, the quota guard,
+and the system prompt read by a person (8). Final counts: harness suite
+1507 passed / 0 failed (run 1's single failure was the named mcp-flue
+intermittent, green alone and in run 2), frontend 471/471, Rust 65 tests
+with the WAL test's environmental collision recorded in the Phase 8 report,
+clippy clean.
+
+Still outside this migration, deliberately: everything in section 7 below
+(remote MCP, parallel tool calling, delete and archive), plus the settings
+UI for the tray and startup toggles, the MCP settings pane, and the
+architecture audit that is scheduled after those features. Section 7 was
+re-checked at closure and stands as written - none of the three items
+shipped early, and none became moot.
+
+Every machine taking this migration still needs the one-time steps recorded
+in Phases 1-2: the export, and the journal rename (`~/.studio/data/flue.db*`
+to `*.beta9-journal`) before a 2.0 harness will start.
+
+---
+
 ## 1. What we are moving from and to
 
 We are pinned to `@flue/runtime@1.0.0-beta.9`, published 2026-06-30. That
@@ -708,6 +741,58 @@ submission id, so only receipt-backed ids).
 
 ### Phase 8 - The patches, last
 
+**DONE, 2026-09-03. Report:**
+`report/PHASE-8-the-patches-last.md`. The migration is closed.
+
+- **Five hunks, not two.** The brief's hunk one is the classifier
+  delegation (patch hunk 2), its hunk two is three physical hunks
+  (waitForTransientModelRetry's record + policy consultation, the errored
+  attempt kept in the history projection, and the `encodeRecord` case),
+  and the Part 4 decision became the fifth hunk. Every hunk carries its own
+  re-derivation recipe anchored on content, never a filename; the entry
+  lives in `pnpm-workspace.yaml` where the beta.9 entries lived, and the
+  workspace comment now describes the patches instead of the regression.
+- **The system prompt decision: re-patch, narrowly.** Hunk 5 removes the
+  compose-time `Date:` line and the bare `Working directory:` line and
+  keeps the `## Available Agents` section (the always-registered `task`
+  tool's description points the model at it) and the directory listing (a
+  fact ours does not carry). Decided on a real captured prompt, not the
+  brief's premise: the captured `Date:` line is day-granular and
+  tail-positioned, so it never actually defeated per-turn prompt caching -
+  the reason for removal is duplication, one authority per fact. The beta.9
+  patch file is deleted; it was kept only for this re-derivation.
+- **The found state this phase inherited:** the working tree already
+  carried an uncommitted hunks-1-4 patch, a `package.json` entry and a lock
+  update from a prior session, unverified. Verified first (10/10 in the
+  containing file), then completed.
+- **The ten acceptance tests:** green on the hunks alone, nothing else
+  moved, no test touched - first 26/26 in `harness.test.ts` alone, then
+  green inside both full runs. Full suite twice: **1506 passed / 1 failed**
+  (the named mcp-flue intermittent, "No approval arrived"; passes alone in
+  16.5s) and **1507 passed / 0 failed**. Frontend `tsc -b` clean, suite 49
+  files / 471 tests green. `cargo clippy --all-targets` zero warnings;
+  `cargo test` 64/65 at reporting time - the one failure is the WAL test
+  colliding with the user's live Studio instance holding the real
+  `~/.studio/data/studio.db` (environmental; the app was not killed;
+  re-run with Studio closed).
+- **The exit, in the real app:** a turn on `openrouter/minimax/
+  minimax-m3:free` failed through OpenRouter's `Provider returned error`
+  wrapper (the exact sentence the old regex never retried). The app showed
+  "Attempt 2 of 4 failed - waiting 4s before trying again" with the
+  provider's sentence, then a visible "This turn failed" settlement. Four
+  model attempts; the journal carries exactly three
+  `submission_retry_scheduled` records (1572ms, 3708ms, 7324ms - the
+  doubling curve; maxRetries 3, the generic-transient budget) and the
+  exhausted branch announced nothing. Under unpatched 2.0.3 the same turn
+  would have failed on attempt one, invisibly, with the failed attempt
+  erased from the transcript besides.
+- One finding left for a later task: the MiniMax M3 free catalog row
+  promises max output 943,718 but the backend rejects over 524,288, so
+  every turn on that model fails through this wrapper and spends the
+  generic budget before failing visibly.
+
+Original scope below, for the record.
+
 Re-point `pnpm-workspace.yaml` to 2.0.3. Delete two hunks. Re-derive the retry
 classification and the visible-retry budget, the latter now owning the delay
 curve too. Then the `composeSystemPrompt` decision, made with a fresh prompt
@@ -727,13 +812,21 @@ REMOVED - the 2.0.3 install failed loudly on the beta-anchored patch
 retries, one budget, no quota guard, unstable `Date:`) is live NOW and
 documented in `pnpm-workspace.yaml` and the Phase 2/3 report. The
 `VALID_THINKING_LEVELS` hunk has nothing to re-derive against (confirmed: the
-constant does not exist in 2.0.3). The `composeSystemPrompt` facts to read
+constant does not exist in 2.0.3). **Corrected, 2026-09-03, by Phase 8: the
+constant exists** - `dispatch-nU3cIlT-.mjs`, same object-map shape, already
+carrying `max` (and `minimal`, `xhigh`). The verdict (delete the hunk) was
+right for the wrong reason: the change is already upstream, not "nothing to
+re-derive against". The `composeSystemPrompt` facts to read
 the diff against: 2.0.3 re-adds `Date:` at compose time, cwd, the directory
 listing, and an always-present `## Available Agents` section whose
 empty-roster paragraph is in the bundle at
 `conversation-stream-store-*.mjs` ("None. No subagents are currently
 declared, so the `task` tool has no valid `agent` value - do not call it
-unless an agent is introduced later in the conversation.").
+unless an agent is introduced later in the conversation."). **Phase 8's
+measured correction: the `Date:` line is day-granular and tail-positioned;
+it never defeated per-turn prompt caching - the cache argument in this
+plan and in the Phase 8 brief was wrong on that point, and the duplication
+argument is the one that held.**
 
 **Amended, 2026-09-02, by Phases 4/5:** the regression's cost is now
 COUNTED: ten harness tests are red on exactly this regression (enumerated in
@@ -859,12 +952,14 @@ Recorded because a plan that hides its unknowns is a plan that gets believed.
    evaluates before the entry body, so the bootstrap read had to become a
    module imported by both the entry and `app.ts`); see the Phase 2/3
    report, item 2.
-3. What is in 2.0.3's empty-roster `## Available Agents` paragraph, in full,
-   and do we want the model reading it? (Phase 8) **Answered early,
-   2026-09-01, from the bundle:** "None. No subagents are currently
-   declared, so the `task` tool has no valid `agent` value - do not call it
-   unless an agent is introduced later in the conversation." Whether the
-   model should read it stays Phase 8's decision.
+3. ~~What is in 2.0.3's empty-roster `## Available Agents` paragraph, in full,
+   and do we want the model reading it? (Phase 8)~~ **Answered, 2026-09-03,
+   by Phase 8:** the paragraph is quoted in the Phase 4/5 amendment above,
+   and yes - it stays. The `task` tool is always registered and its own
+   description points the model at the Available Agents section, so the
+   empty-roster paragraph is that tool's other half; it is also static text,
+   so it caches. The duplicate `Date:` and `Working directory:` lines beside
+   it are the pieces that went.
 4. Does anything depend on `storeResponses` or the removed telemetry
    overrides? (Phase 5)
 5. How many of the orphaned Flue transcripts are real history? (Phase 1)
