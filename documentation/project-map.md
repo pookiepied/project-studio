@@ -31,6 +31,7 @@ Project Studio/                ONE git repository. No submodules.
 │   ├── architecture/           DURABLE. How the system is shaped.
 │   ├── decisions/              DURABLE. ADRs; the index is the count.
 │   ├── phases/                 DURABLE. What each phase delivered.
+│   ├── audits/                 DURABLE. Read-only passes, dated.
 │   └── archive/                Superseded, banner-marked.
 │
 ├── STUDIO HARNESS/            THE RUNTIME. 250 tracked files. Primary codebase.

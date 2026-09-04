@@ -22,11 +22,12 @@ documentation/
 ├── architecture/      DURABLE. How the system is shaped.
 ├── decisions/         DURABLE. ADRs — why a rule exists.
 ├── phases/            DURABLE. What each phase was meant to deliver.
+├── audits/            DURABLE. Read-only passes, dated, never amended.
 │
 └── archive/           Superseded. Kept for provenance, not for reading.
 ```
 
-Five folders. Three root files. That is the whole system, and it is deliberately
+Six folders. Three root files. That is the whole system, and it is deliberately
 smaller than the categories the work naturally falls into — see §7 for why the
 obvious extra folders are not here.
 
