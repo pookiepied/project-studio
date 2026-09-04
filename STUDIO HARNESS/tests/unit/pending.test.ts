@@ -310,3 +310,60 @@ describe("pending requests", () => {
     });
   });
 });
+
+/**
+ * Several MCP calls in flight at once.
+ *
+ * A model may return several tool calls in one assistant message, and when
+ * more than one of them belongs to the same MCP server they travel one
+ * connection - one pipe, one process, several questions outstanding. The only
+ * thing keeping those answers apart is the request id, because a server is
+ * free to answer them in whatever order it finishes.
+ *
+ * The failure this guards against is the quiet one. Correlate wrongly and
+ * every call still resolves, so the batch looks like it worked; one tool
+ * simply receives another tool's answer. That is worse than an error, because
+ * the model reads the result as its own and carries on.
+ */
+describe("several requests outstanding at once", () => {
+  it("gives each caller its own answer when the server replies out of order", () => {
+    const pending = new PendingRequests();
+    const first = pending.nextId();
+    const second = pending.nextId();
+    const third = pending.nextId();
+
+    const waiting = [
+      pending.register(first),
+      pending.register(second),
+      pending.register(third),
+    ];
+    expect(pending.size).toBe(3);
+
+    // Answered back to front, which a server is entitled to do: the third
+    // call may be a fast read while the first is a slow search.
+    pending.resolve(third, "third");
+    pending.resolve(first, "first");
+    pending.resolve(second, "second");
+
+    expect(pending.size).toBe(0);
+    return expect(Promise.all(waiting)).resolves.toEqual(["first", "second", "third"]);
+  });
+
+  it("fails one outstanding request without disturbing the others", async () => {
+    const pending = new PendingRequests();
+    const failing = pending.nextId();
+    const fine = pending.nextId();
+
+    const failingPromise = pending.register(failing);
+    const finePromise = pending.register(fine);
+
+    pending.reject(failing, new Error("server said no"));
+    pending.resolve(fine, "ok");
+
+    // One tool call in a batch failing is ordinary. It must not take its
+    // siblings down with it, or a single bad call would lose every answer
+    // that shared its connection.
+    await expect(failingPromise).rejects.toThrow("server said no");
+    await expect(finePromise).resolves.toBe("ok");
+  });
+});

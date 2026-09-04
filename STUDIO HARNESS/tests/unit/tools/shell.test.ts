@@ -403,3 +403,86 @@ describe("bad input", () => {
     await expect(run(gate(), { command: 42 })).rejects.toBeInstanceOf(ToolError);
   });
 });
+
+/**
+ * Command lines arriving in the same batch.
+ *
+ * A model that decides to run the tests and the linter together returns both
+ * calls in one assistant message, and they are dispatched together. The shell
+ * has no per-path lock and cannot have one - what a command line touches is
+ * not knowable from the line - so what is asserted here is the property that
+ * is true: two commands are two independent child processes, and neither
+ * waits on the other.
+ *
+ * The boundary is stated rather than hidden. Two shell calls writing the same
+ * file are not serialized, and nothing here pretends otherwise: `write` and
+ * `edit` are serialized because their path is declared, and a command line's
+ * is not. Flue documents the same limit for its own `bash`.
+ */
+describe("command lines running together", () => {
+  itContained("runs two command lines at once rather than one after the other", async () => {
+    const instance = gate();
+    const sleeper = (label: string) => ({
+      command: `${NODEQ} -e "setTimeout(() => console.log('${label}'), 600)"`,
+      timeout: 20,
+    });
+
+    // Warmed first. The very first contained spawn pays for setup the later
+    // ones do not, and timing it as the baseline inflates the baseline enough
+    // that a serialized pair still fits under the threshold - which is how an
+    // earlier version of this test passed with the gate deliberately
+    // serialized, measuring nothing at all.
+    await run(instance, sleeper("warm"));
+
+    // Calibrated against this machine rather than against a constant. Starting
+    // a contained child is not free and costs more on some hosts than the
+    // sleep does, so a fixed ceiling measures the host instead of the
+    // behaviour.
+    const aloneStarted = Date.now();
+    await run(instance, sleeper("alone"));
+    const alone = Date.now() - aloneStarted;
+
+    const bothStarted = Date.now();
+    const [first, second] = await Promise.all([
+      run(instance, sleeper("one")),
+      run(instance, sleeper("two")),
+    ]);
+    const both = Date.now() - bothStarted;
+
+    expect(String(first)).toContain("one");
+    expect(String(second)).toContain("two");
+    // Overlapping, two calls cost about what one costs. Serialized they cost
+    // twice. The threshold sits between those, well clear of both.
+    expect(both).toBeLessThan(alone * 1.7);
+  });
+
+  itContained("keeps each command line's output to itself", async () => {
+    const instance = gate();
+
+    const [first, second] = await Promise.all([
+      run(instance, { command: `${NODEQ} -e "console.log('alpha')"` }),
+      run(instance, { command: `${NODEQ} -e "console.log('beta')"` }),
+    ]);
+
+    // Separate children, separate pipes. Shared buffering would show up here
+    // as one call carrying the other's line.
+    expect(String(first)).toContain("alpha");
+    expect(String(first)).not.toContain("beta");
+    expect(String(second)).toContain("beta");
+    expect(String(second)).not.toContain("alpha");
+  });
+
+  itContained("reports one command line's failure without touching the other", async () => {
+    const instance = gate();
+
+    const [failing, fine] = await Promise.all([
+      run(instance, { command: `${NODEQ} -e "process.exit(3)"` }),
+      run(instance, { command: `${NODEQ} -e "console.log('unaffected')"` }),
+    ]);
+
+    // A non-zero exit is a result, not a thrown failure, so a batch does not
+    // lose its other answers to one command that did not work.
+    expect(String(failing)).toContain("exit code 3");
+    expect(String(fine)).toContain("unaffected");
+  });
+});
