@@ -16,7 +16,9 @@ import {
 } from "./admission/verifier.js";
 import { createAdmissionSession } from "./admission/verifier.js";
 import { PermissionApprovalBroker } from "./application/approval-broker.js";
+import { QuestionBroker } from "./application/question-broker.js";
 import { PendingApprovalStore } from "./permissions/pending-approvals.js";
+import { PendingQuestionStore } from "./questions/pending-questions.js";
 import {
   configureStudioRuntime,
   StudioRuntime,
@@ -151,15 +153,22 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     bootLog("step 6: admission session completed");
 
     // Durable: an unanswered question survives a restart and is asked again
-    // rather than disappearing with the process (ADR 0036).
+    // rather than disappearing with the process (ADR 0036). Two channels, two
+    // stores, on purpose: a permission question can never take a default or a
+    // deadline, and a product question can - sharing rows would put the first
+    // bug that confuses them one auto-approval away.
     bootLog("step 7: PermissionApprovalBroker and StudioRuntime entering");
     const approvals = new PermissionApprovalBroker({
       store: new PendingApprovalStore(database),
+    });
+    const questions = new QuestionBroker({
+      store: new PendingQuestionStore(database),
     });
     const runtime = new StudioRuntime({
       database,
       logger: observability.logger,
       approver: approvals,
+      questions,
       clientId: admission.context.clientId,
       sessionId: admission.context.sessionId,
     });
@@ -268,6 +277,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       retrieval,
       media,
       approvals,
+      questions,
       conversations,
       projects,
       database,

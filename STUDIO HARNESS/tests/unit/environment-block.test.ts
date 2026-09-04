@@ -7,6 +7,7 @@ import {
   localDate,
 } from "../../src/context/environment.js";
 import { resolveInterpreter } from "../../src/process/interpreter.js";
+import { ISOLATION_ENFORCED } from "../../src/sandbox/isolation/registry.js";
 
 /**
  * The block the model is actually given.
@@ -59,6 +60,27 @@ describe("the environment block", () => {
     const block = environmentBlock({ workspace: "/w", git: false, today: "2026-08-30" });
 
     expect(block).toContain("Today is 2026-08-30.");
+  });
+
+  it("says commands are contained, where containment is enforced", () => {
+    // An evaluation run read the boundary as a broken machine: `tasklist` was
+    // refused, and with nothing saying there was a container the only
+    // available explanation was a defect. The block has to state it, or every
+    // run pays to rediscover it.
+    const block = environmentBlock({ workspace: "/w", git: false, today: "2026-08-30" });
+
+    if (ISOLATION_ENFORCED) {
+      expect(block).toContain("Commands you run are contained.");
+      // The two refusals that were misread, both named.
+      expect(block).toContain("listing");
+      expect(block).toContain("processes");
+      expect(block).toMatch(/Python/);
+      // And the instruction that keeps a refusal from becoming a diagnosis.
+      expect(block).toContain("boundary doing");
+    } else {
+      // A host with no backend must not claim a boundary it does not have.
+      expect(block).not.toContain("Commands you run are contained.");
+    }
   });
 });
 

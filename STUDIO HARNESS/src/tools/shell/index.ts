@@ -309,6 +309,22 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
           ? context.sandbox.policy.workspaceRoot
           : context.sandbox.resolveRead(input.cwd);
 
+      // Checked here, by name, because the alternative is a sentence with no
+      // subject. A cwd that does not exist used to surface as "The command
+      // could not be started in cmd." - true, and useless: it names neither
+      // the path nor the reason. In an evaluation run that message cost two
+      // false diagnoses, first that the cwd parameter was broken and then that
+      // a directory was somehow invisible, when the real cause was a typo in
+      // the directory name. An error that does not name what it could not find
+      // sends the reader looking for the fault somewhere else.
+      if (!(await context.sandbox.exists(cwd))) {
+        throw new ToolError("invalid_input", {
+          message:
+            `The working directory does not exist: ${cwd}. Check the path, ` +
+            "or create it before running the command.",
+        });
+      }
+
       // A contained interpreter finds its programs by walking the PATH the
       // policy granted, and can only find one in a directory the container
       // may read. The shell resolves every name the line runs through that

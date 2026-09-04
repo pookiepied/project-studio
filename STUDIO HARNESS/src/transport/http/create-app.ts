@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { AdmissionVerifier } from "../../admission/verifier.js";
 import { ADMISSION_SCOPES } from "../../admission/scopes.js";
 import type { PermissionApprovalBroker } from "../../application/approval-broker.js";
+import type { QuestionBroker } from "../../application/question-broker.js";
 import type { McpAdministration } from "../../application/mcp-management.js";
 import type { ProviderAdministration } from "../../providers/management.js";
 import type { RetrievalAdministration } from "../../application/retrieval-management.js";
@@ -20,6 +21,7 @@ import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMediaRoutes } from "./routes/media.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
+import { createQuestionRoutes } from "./routes/questions.js";
 import { createProjectRoutes } from "./routes/projects.js";
 import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
@@ -40,6 +42,14 @@ export interface CreateHttpAppOptions {
    */
   readonly media: MediaAdministration;
   readonly approvals: PermissionApprovalBroker;
+  /**
+   * The ask-a-question channel, beside - never inside - the approval one. The
+   * two surfaces answer the same kind of silence from the person and are kept
+   * apart so neither grows the other's semantics. Optional the way `titling`
+   * is: absent means no question routes exist, which a composition that offers
+   * no ask tool also wants, and production must not be.
+   */
+  readonly questions?: QuestionBroker;
   /** The conversation index: rows, never transcript content. */
   readonly conversations: ConversationStore;
   /**
@@ -93,6 +103,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/providers/retrieval", createRetrievalRoutes(options.retrieval));
   app.route("/api/media", createMediaRoutes(options.media));
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
+  if (options.questions !== undefined) {
+    app.route("/api/questions", createQuestionRoutes(options.questions));
+  }
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));
   app.route("/api", createLifecycleRoutes({ requestShutdown: options.requestShutdown }));

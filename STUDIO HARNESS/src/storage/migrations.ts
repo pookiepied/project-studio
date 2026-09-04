@@ -860,6 +860,47 @@ export const MIGRATIONS: readonly Migration[] = [
       db.exec("DROP TABLE extension_selection;");
     },
   },
+  {
+    version: 19,
+    name: "pending_question",
+    up(db) {
+      // The ask-a-question tool's own table, deliberately not a second use of
+      // `pending_approval` (migration 9). A permission question has no
+      // timeout and no default, because for a permission the absence of an
+      // answer must never become consent; a product question has both, and
+      // one table for the two would let the first bug that confuses them
+      // turn a permission prompt into an auto-approval. ADR 0036's durability
+      // holds here too: the row survives the process that asked it.
+      //
+      // `payload` is the JSON the UI renders - a question sentence, its
+      // header, its options, and which option a timeout may take. It
+      // describes the question and carries no credential.
+      //
+      // `outcome` is null while the question waits, and one of
+      // answered / deferred / stopped / timed_out once settled. `answer`
+      // records what was chosen the moment it was chosen, so the answer
+      // itself is durable (ADR 0036) rather than living only in the parked
+      // call's result. Settled rows are kept, not deleted: the queue reads
+      // `outcome IS NULL`, and the settled row is the record of a decision.
+      // Which rows one tool call asked is the parked call's own knowledge -
+      // a call is resolved by its waiter in one process - so no column
+      // records it, and none would have a reader after a restart.
+      db.exec(`
+        CREATE TABLE pending_question (
+          id              TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL,
+          payload         TEXT NOT NULL,
+          asked_at        INTEGER NOT NULL,
+          expires_at      INTEGER,
+          outcome         TEXT,
+          answer          TEXT
+        ) STRICT;
+
+        CREATE INDEX pending_question_queue
+          ON pending_question (conversation_id, asked_at);
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

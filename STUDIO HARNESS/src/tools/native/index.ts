@@ -7,6 +7,7 @@ import { ConnectionStore } from "../../providers/connection-store.js";
 import { ModelCatalog } from "../../providers/model-catalog.js";
 import type { CallGate } from "../gate.js";
 import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
+import { registerAskTools, type AskToolRegistration } from "../ask/index.js";
 import { registerGitTools } from "../git/index.js";
 import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
@@ -34,6 +35,14 @@ export interface NativeToolRegistrationOptions {
    * turn.
    */
   readonly accessLog?: FileAccessLog;
+  /**
+   * The ask family's channel and closing-turn state.
+   *
+   * Optional because it needs a broker to ask through: a composition that
+   * omits it offers no question tool rather than one nobody can answer. The
+   * closing state is per-run and dies with the run that created it.
+   */
+  readonly ask?: AskToolRegistration;
 }
 
 /** Registers every shipped capability through the one application CallGate. */
@@ -52,6 +61,9 @@ export function registerNativeTools(
   registerSearchTools(gate);
   registerGitTools(gate);
   registerShellTools(gate);
+  if (options.ask !== undefined) {
+    registerAskTools(gate, options.ask);
+  }
   registerWebTools(
     gate,
     new RetrievalService({

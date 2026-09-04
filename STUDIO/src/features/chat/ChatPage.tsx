@@ -12,6 +12,8 @@ import { useConversationTranscript } from '@/features/chat/useConversationTransc
 import { isTurnRunning } from '@/features/chat/useConversation'
 import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
 import { usePendingApprovals } from '@/features/chat/permissions/usePendingApprovals'
+import { QuestionPrompt } from '@/features/chat/questions/QuestionPrompt'
+import { usePendingQuestions } from '@/features/chat/questions/usePendingQuestions'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { turnSettingsToWire } from '@/platform/harness'
@@ -68,6 +70,13 @@ export function ChatPage({
   // a person gives here. Inactive on the gallery: nothing there is real
   // enough to need consent.
   const approvals = usePendingApprovals(conversation.id, {
+    enabled: !gallery,
+    active: isTurnRunning(live.phase),
+  })
+
+  // The questions a run raises to get a decision - the other kind of stop,
+  // and the other channel. Inactive on the gallery for the same reason.
+  const questions = usePendingQuestions(conversation.id, {
     enabled: !gallery,
     active: isTurnRunning(live.phase),
   })
@@ -138,12 +147,14 @@ export function ChatPage({
    * cancels the pending approvals on the harness side - the kernel hands the
    * run's abort signal to the approver - but the withdrawal here is what
    * guarantees nothing is left waiting when the signal is not heard, and a
-   * cancel on an already-cleared row is an honest 404.
+   * cancel on an already-cleared row is an honest 404. The ask channel has
+   * no signal held by the kernel, so this withdrawal is its cleanup too.
    */
   const stopTurn = useCallback(() => {
     approvals.cancelAll()
+    questions.cancelAll()
     void live.abort()
-  }, [approvals, live])
+  }, [approvals, questions, live])
 
   return (
     <div className="relative flex h-full flex-col">
@@ -276,6 +287,20 @@ export function ChatPage({
                   />
                 </div>
               ) : null}
+              {questions.rows.length > 0 ? (
+                <div className="mb-3">
+                  <QuestionPrompt
+                    // Keyed the same way, and for the same reason: a
+                    // selection made for one question must never be found
+                    // still holding when the next one is on screen.
+                    key={questions.rows[0]?.id}
+                    rows={questions.rows}
+                    answeringId={questions.answeringId}
+                    onAnswer={questions.answer}
+                    onStop={questions.stop}
+                  />
+                </div>
+              ) : null}
             </>
           ) : null}
 
@@ -285,7 +310,9 @@ export function ChatPage({
             // message: the turn is stopped, and what the page is waiting for
             // is the answer above, not more words.
             placeholder={
-              approvals.questions.length > 0 ? 'Waiting for your answer above' : 'Reply'
+              approvals.questions.length > 0 || questions.rows.length > 0
+                ? 'Waiting for your answer above'
+                : 'Reply'
             }
             {...(gallery
               ? {}

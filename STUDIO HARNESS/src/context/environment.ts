@@ -3,6 +3,7 @@ import { platform, release } from "node:os";
 import { join } from "node:path";
 
 import { interpreterStatement } from "../process/interpreter.js";
+import { ISOLATION_ENFORCED } from "../sandbox/isolation/registry.js";
 
 /**
  * The environment block.
@@ -119,6 +120,49 @@ export function environmentFacts(workspace: string, now: Date): EnvironmentFacts
  * interpreter could be found, that is stated rather than omitted: silence
  * reads as "any syntax works".
  */
+/**
+ * What containment means for the commands this conversation runs.
+ *
+ * Added because an evaluation run read the boundary as a broken machine. A
+ * model ran `tasklist`, got "The user name or password is incorrect", and
+ * filed process enumeration as a defect to fix. It found no Python and listed
+ * it as a missing dependency. Both were the container working exactly as
+ * designed, and nothing in this block had told it there was a container - so
+ * every refusal had to be explained as breakage, because that was the only
+ * explanation available.
+ *
+ * That is a cost paid twice: the run wastes calls diagnosing the floor it is
+ * standing on, and the report that comes back proposes weakening the boundary.
+ * Naming it costs four lines.
+ *
+ * Derived from `ISOLATION_ENFORCED` rather than the platform, so this cannot
+ * claim containment on a host that has none - the constant is itself derived
+ * from the backend registry, so registering a backend turns this sentence on
+ * by construction. Deliberately NOT `hostIsolation()`: that probe creates and
+ * deletes a real AppContainer profile, and building a prose block is not a
+ * reason to touch the machine's security state.
+ *
+ * It says what a model can act on - which failures are the boundary and not a
+ * bug - and not how containment is implemented, which is ours to change.
+ */
+function containmentStatement(): readonly string[] {
+  if (!ISOLATION_ENFORCED) return [];
+  return [
+    "Commands you run are contained. They can read and write your working",
+    "directory and read the programs they need, and nothing else: another",
+    "project, the rest of the home directory, and the machine's own",
+    "installations are refused. Queries about the machine as a whole - listing",
+    "processes is the usual one - are refused too.",
+    "",
+    "So an access denied outside your working directory is the boundary doing",
+    "its job, not a broken machine, and not something to work around. A",
+    "program that reads its own installation while it runs, rather than only",
+    "linking system libraries, may fail for the same reason; Python is the one",
+    "to expect. Say so and move on rather than diagnosing it.",
+    "",
+  ];
+}
+
 export function environmentBlock(facts: EnvironmentFacts): string {
   const shell = interpreterStatement();
   return [
@@ -140,6 +184,8 @@ export function environmentBlock(facts: EnvironmentFacts): string {
           "run anything here.",
         ]
       : shell),
+    "",
+    ...containmentStatement(),
     `Machine: ${MACHINE}`,
   ].join("\n");
 }

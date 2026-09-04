@@ -396,11 +396,38 @@ export function readCommandPrograms(
       }
       if (isAssignment(token)) continue;
       if (RESERVED_WORDS.has(token)) continue;
-      if (token.startsWith("-")) {
+      // An option prefix is per interpreter, and getting it wrong is not
+      // cosmetic. `cmd` writes switches as `/d`, and a reader that only knew
+      // `-` took `for /d %d in (*) do echo %d` and answered with the programs
+      // `d`, `*` and `echo`: a switch, a wildcard, and the only real name in
+      // the line. It did not refuse - it asked a person to approve `shell:d`
+      // and `shell:*` for a command that runs none of them.
+      //
+      // `/` cannot open a program on cmd: a Windows path starts with a drive
+      // letter or a UNC prefix. On POSIX it always can - `/usr/bin/node` - so
+      // this is asked of the interpreter rather than applied everywhere, the
+      // same way separators are.
+      const optionPrefix = interpreter.kind === "cmd" ? /^[-/]/ : /^-/;
+      if (optionPrefix.test(token)) {
         throw new ToolError("invalid_input", {
           message:
             `"${token}" opens a command in this line but is an option, not a ` +
             "program, so there is nothing to approve. The command was not run.",
+        });
+      }
+
+      // A wildcard is a set of filenames, not a program. Reaching here means
+      // the line put one where a program goes, which on cmd is what the body
+      // of a `for` looks like after this reader has split on its parentheses.
+      // Refused rather than named, because `shell:*` is a permission resource
+      // whose name is a wildcard - a grant nobody would knowingly write, and
+      // one that reads as "everything" to anything that ever globs.
+      if (token.includes("*") || token.includes("?")) {
+        throw new ToolError("invalid_input", {
+          message:
+            `"${token}" opens a command in this line but is a filename ` +
+            "pattern, not a program, so there is nothing to approve. Name " +
+            "the program directly. The command was not run.",
         });
       }
       if (token.startsWith("$") || token.startsWith("%")) {
@@ -431,11 +458,33 @@ export function readCommandPrograms(
             "The command was not run.",
         });
       }
+      // Parentheses are named when the line has them, because that is very
+      // nearly always the reason a segment came out empty, and the generic
+      // sentence sent a reader looking for a missing program instead.
+      //
+      // The reader splits on `(` and `)` in every interpreter - they open a
+      // subshell in bash and a block in PowerShell, and either way what
+      // follows is a command slot. In cmd they are neither: `for /d %d in (*)
+      // do ...` is one builtin, and splitting it produces slots with nothing
+      // runnable in them. The whole construct is then refused, which is safe
+      // and correct - we cannot read what it runs - but a refusal that does
+      // not say which character caused it reads as a bug in the tool.
+      //
+      // This is the message, not the fix. Reading cmd's grouping constructs is
+      // its own task; naming the cause is what lets a model write the command
+      // another way in the meantime.
+      const grouped = command.includes("(") || command.includes(")");
       throw new ToolError("invalid_input", {
-        message:
-          "Part of this command names no program - an operator with nothing " +
-          "runnable on one side of it - so there is nothing to approve. " +
-          "The command was not run.",
+        message: grouped
+          ? "This line uses parentheses, which are read as grouping that " +
+            "starts a new command, and one of the parts they make names no " +
+            "program - so there is nothing to approve and the command was " +
+            "not run. A shell builtin that takes a parenthesised body, such " +
+            "as cmd's for loop, cannot be read this way. Write it without " +
+            "parentheses, or put it in a script file and run that."
+          : "Part of this command names no program - an operator with " +
+            "nothing runnable on one side of it - so there is nothing to " +
+            "approve. The command was not run.",
       });
     }
 

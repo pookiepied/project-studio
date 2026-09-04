@@ -29,6 +29,7 @@ import {
   type HarnessFailure,
   type HarnessResult,
   type PendingApprovalRecord,
+  type PendingQuestionRecord,
   type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
@@ -207,6 +208,21 @@ interface WorkspaceValue {
     list: () => Promise<HarnessResult<readonly PendingApprovalRecord[]>>
     answer: (id: string, answer: ApprovalAnswer) => Promise<HarnessResult<void>>
     cancel: (id: string) => Promise<HarnessResult<void>>
+  }
+  /**
+   * The questions the runs are asking for a decision - the ask-a-question
+   * channel beside the approval one, same credential, different rows, and a
+   * stop that ends a run's questions wholesale. Bound to the store's client
+   * for the same restart reason `approvals` is.
+   */
+  readonly questions: {
+    list: () => Promise<HarnessResult<readonly PendingQuestionRecord[]>>
+    answer: (
+      id: string,
+      answer: { optionIds?: readonly string[]; text?: string; deferred?: boolean },
+    ) => Promise<HarnessResult<void>>
+    cancel: (id: string) => Promise<HarnessResult<void>>
+    stop: (conversationId: string) => Promise<HarnessResult<void>>
   }
 
   createProject: (input: NewProjectInput) => Project
@@ -626,6 +642,55 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const questions = useMemo(
+    () => ({
+      list: () =>
+        clientRef.current?.listPendingQuestions() ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so there is nothing to ask it.',
+          },
+        }),
+      answer: (
+        id: string,
+        answer: { optionIds?: readonly string[]; text?: string; deferred?: boolean },
+      ) =>
+        clientRef.current?.answerQuestion(id, answer) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the answer went nowhere.',
+          },
+        }),
+      cancel: (id: string) =>
+        clientRef.current?.cancelQuestion(id) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the question could not be withdrawn.',
+          },
+        }),
+      stop: (conversationId: string) =>
+        clientRef.current?.stopQuestions(conversationId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the questions could not be stopped.',
+          },
+        }),
+    }),
+    [],
+  )
+
   const beginConversation = useCallback(
     (input: {
       id: string
@@ -981,6 +1046,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setConversationSettings,
       setConversationPermission,
       approvals,
+      questions,
       createProject,
       removeProject,
       setBranch,
@@ -1009,6 +1075,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ensureStore,
       markRunning,
       orphanTrees,
+      questions,
       refreshOrphanTrees,
       sweepOrphanTrees,
       remoteProjects,

@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { Button, Segmented } from '@/components/primitives'
-import { COMPOSER } from '@/design/tokens'
+import { CardShell } from '@/features/chat/questions/CardShell'
 import type { PermissionQuestion, QuestionTextPart } from '@/domain/permissions/question'
 import type { ApprovalAnswer, GrantDuration } from '@/platform/harness'
 
@@ -35,6 +35,17 @@ import type { ApprovalAnswer, GrantDuration } from '@/platform/harness'
  * the call named its resources - one question per program on a command line -
  * so the oldest is the active one and the rest are named beneath it, answered
  * one at a time in the order the run will consume them.
+ *
+ * ---- What moved, and what did not ------------------------------------------
+ *
+ * The rendering lives on the shared card shell now, because a question about
+ * a decision and a question about consent stop the same run in the same
+ * place and must not drift into two different-looking things. What the shell
+ * can reach is presentation only: the framing, the sentence, the control row,
+ * the footnotes, and the Enter key. The broker, the kernel, the verdict and
+ * duration vocabulary, and the preselected narrowest duration are untouched -
+ * and the shell takes no deadline from this caller, because a permission
+ * question cannot time out and has no default, ever.
  */
 export function ApprovalPrompt({
   questions,
@@ -72,72 +83,75 @@ export function ApprovalPrompt({
   }
 
   return (
-    <div
-      // The composer's own multiline radius, so the card and the field it sits
-      // above read as one family of objects resting on the same surface.
-      style={{ borderRadius: COMPOSER.multilineRadius }}
-      className="bg-surface-raised p-3 shadow-raised"
-    >
-      <p className="max-w-[60ch] text-body font-medium">
-        {question.sentence.map(renderPart)}
-      </p>
-
-      {question.reason !== null ? (
-        <p className="mt-1 max-w-[60ch] text-caption text-muted-foreground">{question.reason}</p>
-      ) : null}
-
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-        <Segmented
-          layoutId="approval-duration"
-          ariaLabel="How long this answer lasts"
-          value={duration}
-          onChange={setDuration}
-          options={[
-            { id: 'once' as const, label: 'Just once' },
-            { id: 'conversation' as const, label: 'This conversation' },
-            { id: 'always' as const, label: 'Always' },
-          ]}
-        />
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={answering}
-            busy={answering && verdictInFlight === 'deny'}
-            onClick={() => respond('deny')}
-          >
-            Deny
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={answering}
-            busy={answering && verdictInFlight === 'allow'}
-            onClick={() => respond('allow')}
-          >
-            Allow
-          </Button>
-        </div>
-      </div>
-
-      {duration === 'once' ? null : (
-        <p className="mt-1.5 max-w-[60ch] text-caption text-muted-foreground">
-          {consequence(duration, scopeId !== undefined)}
-        </p>
-      )}
-
-      {waiting.length > 0 ? (
-        <p className="mt-1.5 max-w-[60ch] text-caption text-muted-foreground">
-          Also waiting, one at a time:{' '}
-          {waiting.map((item, at) => (
-            <span key={item.id}>
-              {at > 0 ? ', ' : ''}
-              {item.sentence.map(renderPart)}
-            </span>
-          ))}
-        </p>
-      ) : null}
-    </div>
+    <CardShell
+      header="Permission"
+      sentence={question.sentence.map(renderPart)}
+      detail={question.reason}
+      // No deadline is not a missing argument here; it is the whole rule.
+      // The shell draws no countdown without one, and this caller has none
+      // to give: a permission question cannot time out and has no default.
+      deadline={null}
+      controls={
+        <>
+          <Segmented
+            layoutId="approval-duration"
+            ariaLabel="How long this answer lasts"
+            value={duration}
+            onChange={setDuration}
+            options={[
+              { id: 'once' as const, label: 'Just once' },
+              { id: 'conversation' as const, label: 'This conversation' },
+              { id: 'always' as const, label: 'Always' },
+            ]}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={answering}
+              busy={answering && verdictInFlight === 'deny'}
+              onClick={() => respond('deny')}
+            >
+              Deny
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={answering}
+              busy={answering && verdictInFlight === 'allow'}
+              onClick={() => respond('allow')}
+            >
+              Allow
+            </Button>
+          </div>
+        </>
+      }
+      canSubmit={!answering}
+      // Enter allows, at the preselected narrowest duration: the same answer
+      // the controls' default state is already holding.
+      onSubmit={() => respond('allow')}
+      answering={answering}
+      footnotes={
+        <>
+          {duration === 'once' ? null : (
+            <p className="max-w-[60ch] text-caption text-muted-foreground">
+              {consequence(duration, scopeId !== undefined)}
+            </p>
+          )}
+          {waiting.length > 0 ? (
+            <p className="max-w-[60ch] text-caption text-muted-foreground">
+              Also waiting, one at a time:{' '}
+              {waiting.map((item, at) => (
+                <span key={item.id}>
+                  {at > 0 ? ', ' : ''}
+                  {item.sentence.map(renderPart)}
+                </span>
+              ))}
+            </p>
+          ) : null}
+        </>
+      }
+    />
   )
 }
 
@@ -167,7 +181,7 @@ function consequence(duration: GrantDuration, folder: boolean): string {
  * the transcript, so "a thing named exactly as it is on disk" looks the same
  * wherever it is said.
  */
-function renderPart(part: QuestionTextPart, at: number) {
+function renderPart(part: QuestionTextPart, at: number): ReactNode {
   if (part.kind === 'code') {
     return (
       <code

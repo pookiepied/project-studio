@@ -29,6 +29,7 @@ import type { ExecutionMode } from "../permissions/mode.js";
 import { posture, WorkspaceTrustStore } from "../permissions/trust.js";
 import { createErrorReporter } from "../observability/error-reporter.js";
 import type { Logger } from "../observability/logger.js";
+import type { QuestionBroker } from "./question-broker.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
@@ -44,6 +45,7 @@ import { TurnSnapshots } from "../snapshots/turn.js";
 import type { StudioDatabase } from "../storage/database.js";
 import { CallGate } from "../tools/gate.js";
 import { ToolError } from "../tools/errors.js";
+import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog } from "../tools/filesystem/index.js";
 import { ConversationStore } from "../conversations/store.js";
@@ -60,6 +62,14 @@ export interface StudioRuntimeOptions {
   readonly database: StudioDatabase;
   readonly logger?: Logger;
   readonly approver?: PermissionApprover;
+  /**
+   * The channel the ask-a-question tool asks through.
+   *
+   * Optional the same way the approver is: the composition root always
+   * supplies one, and a composition without it does not offer the tool at
+   * all, because a question with nowhere to be answered is not a capability.
+   */
+  readonly questions?: QuestionBroker;
   readonly credentials?: SecureCredentialStore;
   readonly projectRoot?: string;
   readonly clientId?: string;
@@ -131,6 +141,12 @@ type ModelToolResult = {
   readonly content: ModelToolContent[];
   readonly details: unknown;
   readonly isError?: boolean;
+  /**
+   * Ends the agent's turn once the tool batch settles, and only when every
+   * result in the batch says so - Flue's own loop-ending contract, reached
+   * for exactly once: to hold a stopped run to one closing message.
+   */
+  readonly terminate?: boolean;
 };
 
 function isSupportedContent(value: unknown): value is ModelToolContent {
@@ -269,6 +285,7 @@ export class StudioRuntime implements AgentHost {
 
   readonly #logger: Logger | undefined;
   readonly #approver: PermissionApprover | undefined;
+  readonly #questions: QuestionBroker | undefined;
   readonly #credentials: SecureCredentialStore;
   readonly #projectRoot: string;
   readonly #projectId: string;
@@ -331,6 +348,7 @@ export class StudioRuntime implements AgentHost {
   constructor(options: StudioRuntimeOptions) {
     this.#logger = options.logger;
     this.#approver = options.approver;
+    this.#questions = options.questions;
     this.#credentials = options.credentials ?? new KeyringCredentialStore();
     this.#projectRoot = resolve(options.projectRoot ?? process.cwd());
     this.#projectId = projectKey(this.#projectRoot);
@@ -588,11 +606,25 @@ export class StudioRuntime implements AgentHost {
           { capability: event.capability, switch: event.switchName },
         ),
     });
+    // One per run, beside the gate it governs. When the person stops a run
+    // through the question card, this is what holds the run to one closing
+    // turn; dying with the run is what keeps the stop from outliving it.
+    const closing = new ClosingTurns();
+    const questionBroker = this.#questions;
     registerNativeTools(gate, {
       database: this.#db,
       credentials: this.#credentials,
       acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
       accessLog: this.#accessLogFor(options.conversationId),
+      ...(questionBroker === undefined
+        ? {}
+        : {
+            ask: {
+              ask: (conversationId, payloads, timeoutMs, signal) =>
+                questionBroker.ask(conversationId, payloads, timeoutMs, signal),
+              closing,
+            },
+          }),
     });
 
     const registeredMcp = new Map<string, McpTool>();
@@ -678,6 +710,22 @@ export class StudioRuntime implements AgentHost {
               input: unknown,
               signal?: AbortSignal,
             ): Promise<ModelToolResult> => {
+              // A stop through the question card holds the door here. Past it
+              // the run's calls are answered rather than run, and every answer
+              // terminates its batch, so the loop ends after the model's one
+              // closing message whatever the model tries to do.
+              if (closing.isArmed(scope.conversationId)) {
+                return {
+                  content: [
+                    {
+                      type: "text",
+                      text: `${descriptor.title} did not run: the person stopped this run. Write your closing message now.`,
+                    },
+                  ],
+                  details: { stopped: true },
+                  terminate: true,
+                };
+              }
               try {
                 const result = await gate.call({
                   name: capabilityKey(descriptor.id),

@@ -179,6 +179,19 @@ describe("running a command line", () => {
     ).rejects.toBeInstanceOf(SandboxError);
   });
 
+  it("names the working directory it could not find", async () => {
+    // This used to surface as "The command could not be started in cmd." - a
+    // sentence with no subject. It cost an evaluation run two false diagnoses
+    // (the cwd parameter is broken; a directory is invisible) when the real
+    // cause was a typo in the directory name.
+    await expect(
+      run(gate(), { command: `${NODEQ} -e "0"`, cwd: "msite" }),
+    ).rejects.toThrow(/does not exist/i);
+    await expect(
+      run(gate(), { command: `${NODEQ} -e "0"`, cwd: "msite" }),
+    ).rejects.toThrow(/msite/);
+  });
+
   itContained("stops a command that outlives its time limit", async () => {
     const output = await run(gate(), {
       command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
@@ -438,6 +451,52 @@ describe("the command reader", () => {
     expect(() => readCommandPrograms("if [ -f x ]; then npm test; fi", BASH_LIKE)).toThrow(
       /names no program/i,
     );
+  });
+
+  it("refuses a cmd switch instead of naming it as a program", () => {
+    // Measured before the fix: this returned ["d", "*", "echo"]. It did not
+    // refuse - it asked a person to approve `shell:d` and `shell:*` for a
+    // command that runs none of them. A resource named `*` is a grant nobody
+    // would knowingly write.
+    expect(() => readCommandPrograms("for /d %d in (*) do echo %d", CMD_LIKE)).toThrow(
+      /"\/d".*option, not a program/is,
+    );
+    expect(() =>
+      readCommandPrograms('for /f "tokens=1" %a in (list.txt) do echo %a', CMD_LIKE),
+    ).toThrow(/"\/f".*option, not a program/is);
+  });
+
+  it("still reads an absolute POSIX path as the program it is", () => {
+    // The negative control for the rule above: `/` opens an option on cmd and
+    // a program everywhere else, so the rule is asked of the interpreter. If
+    // it were applied everywhere, this would refuse.
+    expect(readCommandPrograms("/usr/bin/node app.js", BASH_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms("/bin/ls -la", BASH_LIKE)).toEqual(["ls"]);
+  });
+
+  it("refuses a filename pattern where a program belongs", () => {
+    expect(() => readCommandPrograms("*.sh", BASH_LIKE)).toThrow(/pattern, not a program/i);
+  });
+
+  it("names parentheses as the cause when they are what split the line", () => {
+    // Parentheses are read as grouping in every interpreter, so a cmd line
+    // that uses them for a builtin body comes apart. Refusing is right;
+    // refusing without naming the character sent an evaluation run looking for
+    // a missing program that was never missing.
+    const refusal = () => readCommandPrograms("(echo a & echo b)", CMD_LIKE);
+
+    expect(refusal).toThrow(/parentheses/i);
+    // And it says what to do instead, so the refusal is a next move.
+    expect(refusal).toThrow(/script file/i);
+  });
+
+  it("keeps the plain refusal when no parenthesis is involved", () => {
+    // The parenthesis sentence must not be attached to every empty segment, or
+    // it becomes a wrong explanation offered confidently.
+    expect(() => readCommandPrograms("npm && ; node", BASH_LIKE)).toThrow(
+      /operator with nothing runnable/i,
+    );
+    expect(() => readCommandPrograms("npm && ; node", BASH_LIKE)).not.toThrow(/parentheses/i);
   });
 
   it("honours the separators its own kind was measured to honour", () => {

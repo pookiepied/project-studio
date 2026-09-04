@@ -32,6 +32,7 @@ import {
   parseMcpServer,
   parseMcpServers,
   parsePendingApprovals,
+  parsePendingQuestions,
   parseProviderIcon,
   parseProbeResult,
   parseProjectRecord,
@@ -55,6 +56,7 @@ import {
   type McpServerRecord,
   type ModelCapability,
   type PendingApprovalRecord,
+  type PendingQuestionRecord,
   type OrphanSweepOutcome,
   type OrphanTrees,
   type ProbeResult,
@@ -279,6 +281,23 @@ export interface HarnessClient {
   /** Withdraws one question without answering it; 204 or a 404 for a row already gone. */
   cancelApproval(id: string): Promise<HarnessResult<void>>
 
+  /**
+   * The questions the harness's runs are asking for a decision, under the
+   * same approval credential but never the same rows: a permission question
+   * cannot time out and has no default, and this channel is the one with
+   * both. The list is harness-wide and each row names its conversation.
+   */
+  listPendingQuestions(): Promise<HarnessResult<readonly PendingQuestionRecord[]>>
+  /** Settles one question: chosen options, written text, or a deferral. */
+  answerQuestion(
+    id: string,
+    answer: { optionIds?: readonly string[]; text?: string; deferred?: boolean },
+  ): Promise<HarnessResult<void>>
+  /** Withdraws one question without an outcome; 204 or a 404 for a row already gone. */
+  cancelQuestion(id: string): Promise<HarnessResult<void>>
+  /** Stops every question one conversation is asking: the person is ending the run. */
+  stopQuestions(conversationId: string): Promise<HarnessResult<void>>
+
   listProjects(): Promise<HarnessResult<readonly ProjectRecord[]>>
   createProject(draft: ProjectCreateDraft): Promise<HarnessResult<ProjectRecord>>
   updateProject(id: string, patch: ProjectPatch): Promise<HarnessResult<ProjectRecord>>
@@ -301,6 +320,8 @@ const CONVERSATIONS_PATH = '/api/conversations'
 const PROJECTS_PATH = '/api/projects'
 const MEDIA_PATH = '/api/media'
 const PENDING_APPROVALS_PATH = '/api/permissions/pending'
+const PENDING_QUESTIONS_PATH = '/api/questions/pending'
+const QUESTION_STOP_PATH = '/api/questions/stop'
 
 /** The media routes' answers, parsed with the same skepticism as every other. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -725,6 +746,29 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     cancelApproval(id) {
       return empty('DELETE', `${PENDING_APPROVALS_PATH}/${encodeURIComponent(id)}`)
+    },
+
+    listPendingQuestions() {
+      return json('GET', PENDING_QUESTIONS_PATH, undefined, parsePendingQuestions)
+    },
+
+    answerQuestion(id, answer) {
+      // Only what was chosen travels: a body with nothing in it is refused by
+      // the harness, and a false `deferred` field would be a second way to
+      // say "answered".
+      const body: Record<string, unknown> = {}
+      if (answer.optionIds !== undefined) body.optionIds = [...answer.optionIds]
+      if (answer.text !== undefined) body.text = answer.text
+      if (answer.deferred === true) body.deferred = true
+      return empty('POST', `${PENDING_QUESTIONS_PATH}/${encodeURIComponent(id)}`, body)
+    },
+
+    cancelQuestion(id) {
+      return empty('DELETE', `${PENDING_QUESTIONS_PATH}/${encodeURIComponent(id)}`)
+    },
+
+    stopQuestions(conversationId) {
+      return empty('POST', QUESTION_STOP_PATH, { conversationId })
     },
 
     listProjects() {
