@@ -39,6 +39,18 @@ the text beside it. Two deliberate exceptions, both opting in via the utilities
 layer: a mark on a filled chip (unreadable otherwise) and a destructive menu
 row (the glyph is the warning).
 
+**A menu note names a consequence, never the verb.** A `note` on a `MenuItem`
+adds a second line, so an item that carries one is twice the height of the
+items around it. That weight is worth spending on something the reader cannot
+see and would be wrong about -- what happens to their data, and whether it can
+be undone: "Keeps the folder on disk. Conversations stay.", "Kept
+indefinitely. Settings has the archive." It is not worth spending to define
+the label. Fork carried "A new conversation carrying everything said here.",
+which is a longer way of saying Fork, and it made the one item in a six-item
+menu that needed no explanation the tallest thing in it. If the note would
+still be true with the verb removed from it, it is a definition, and the label
+should carry its own meaning instead.
+
 **The button does not move.** A control that scales under the cursor is a touch
 affordance. Under a desktop pointer it reads as the layout being unstable.
 

@@ -157,7 +157,6 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
       >
         <MenuItem
           icon={<Icons.fork />}
-          note="A new conversation carrying everything said here."
           onSelect={() => {
             setMenuOpen(false)
             // The fork opens its own conversation on success; a refusal is a
