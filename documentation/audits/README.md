@@ -22,3 +22,4 @@ other read-only against the tree.
 These files lived under a second `docs/` root until 2026-09-05, which
 contradicted this project's own rule that there is one documentation root. They
 were moved here and `docs/` was removed.
+
