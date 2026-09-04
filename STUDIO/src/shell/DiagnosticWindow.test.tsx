@@ -86,7 +86,11 @@ describe('DiagnosticWindow', () => {
   })
 
   it('copies the text and leaves the numbers behind', async () => {
-    const writeText = vi.fn(async () => {})
+    // Typed with the parameter it actually receives. Declared as `async
+    // () => {}` the mock's call tuple is empty, so reading `calls[0][0]`
+    // below is a type error -- which `tsc -b` catches and `tsc -p` on the
+    // solution file does not, because that file holds only references.
+    const writeText = vi.fn(async (_text: string) => {})
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     harnessFailureReason.mockResolvedValue(CRASH)
     render(<DiagnosticWindow />)
