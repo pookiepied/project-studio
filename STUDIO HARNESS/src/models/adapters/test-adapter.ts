@@ -351,6 +351,43 @@ export function stream(
         return;
       }
 
+      // Two tool calls in one assistant message, which is what a model does
+      // when the work is independent - and what the whole stack under it has
+      // to survive. Both are `native/glob`, so both travel the real path: the
+      // gate authorizes each, the tools run together, and two outcomes come
+      // back against one assistant message. `harness.test.ts` drives this.
+      if (
+        userText.toLowerCase().includes("parallel") &&
+        !hasToolResult(context)
+      ) {
+        const calls = [
+          {
+            type: "toolCall" as const,
+            id: "parallel-glob-1",
+            name: "glob",
+            arguments: { pattern: "**/*" },
+          },
+          {
+            type: "toolCall" as const,
+            id: "parallel-glob-2",
+            name: "glob",
+            arguments: { pattern: "*" },
+          },
+        ];
+        const message = createMessage(model, calls);
+        message.stopReason = "toolUse";
+        for (const [index, toolCall] of calls.entries()) {
+          events.push({
+            type: "toolcall_start",
+            contentIndex: index,
+            partial: index === 0 ? initial : message,
+          });
+          events.push({ type: "toolcall_end", contentIndex: index, toolCall, partial: message });
+        }
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+
       if (
         userText.toLowerCase().includes("workspace") &&
         !hasToolResult(context)

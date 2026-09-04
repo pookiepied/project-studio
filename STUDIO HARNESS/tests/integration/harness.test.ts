@@ -503,6 +503,46 @@ describe.sequential("Flue harness vertical slice", () => {
   );
 
   it(
+    "runs two tool calls from one assistant message and records both",
+    async () => {
+      // Parallel tool calling, end to end. The model returns two calls in one
+      // message; Flue dispatches them together; both land in Studio's own
+      // gate as `native/glob`, are authorized separately, and come back as two
+      // outcomes against the one assistant message.
+      //
+      // What this guards is the whole path rather than any one piece of it. A
+      // regression anywhere along it - a dispatcher that only ever ran the
+      // first call, a gate that could not be entered twice at once, a
+      // transcript that recorded one outcome over the other - shows up here as
+      // a missing tool part, and nowhere else until someone watches a model
+      // silently skip half its work.
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      const run = await client.send("parallel-tools", "parallel please");
+      await client.wait(run);
+
+      const history = await client.history("parallel-tools");
+      const parts = history.messages.flatMap((message) => message.parts);
+      // Narrowed in the condition rather than by a cast: `filter` does not
+      // narrow a union, and the part type is a union of very different shapes.
+      const globs: { id: string; state: string }[] = [];
+      for (const part of parts) {
+        if (part.type === "dynamic-tool" && part.toolName === "glob") {
+          globs.push({ id: part.toolCallId, state: part.state });
+        }
+      }
+
+      // Two calls, two distinct ids, both answered. Asserting the ids as well
+      // as the count is what stops one call recorded twice from passing.
+      expect(globs).toHaveLength(2);
+      expect(globs.every((part) => part.state === "output-available")).toBe(true);
+      expect(new Set(globs.map((part) => part.id)).size).toBe(2);
+    },
+    30_000,
+  );
+
+  it(
     "cancels accepted work with a durable aborted outcome",
     async () => {
       const running = await startHarness(await createDatabasePath());

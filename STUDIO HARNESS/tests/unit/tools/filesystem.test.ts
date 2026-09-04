@@ -622,3 +622,72 @@ describe("every tool goes through the gate", () => {
     await expect(read({ path: "src/app.ts", offset: 0 })).rejects.toThrow(ToolError);
   });
 });
+
+/**
+ * What a batch of tool calls does to one file.
+ *
+ * A model returns several tool calls in one assistant message and they are
+ * dispatched together, so two of them can be inside `edit` on the same file at
+ * the same instant. Edit is read-modify-write, which is the classic shape of a
+ * lost update: both read the original, both write, and the second overwrites
+ * the first while the model is told that both succeeded.
+ *
+ * `PathLocks` is the answer and has its own tests in `path-locks.test.ts`.
+ * These are the tools using it - the property stated where a person would look
+ * for it, through the gate, on a real file.
+ */
+describe("tool calls arriving together", () => {
+  it("keeps both edits to one file, rather than losing the first", async () => {
+    // Edit refuses a file this conversation has not read - the guard in
+    // `FileAccessLog` - so the read that a model would have made first is
+    // made here too.
+    await read({ path: "src/app.ts" });
+
+    // Started together, never awaited in turn: this is a batch, not a
+    // sequence. Both calls see `src/app.ts` as it was.
+    const [first, second] = await Promise.all([
+      edit({ path: "src/app.ts", oldString: "const a = 1;", newString: "const a = 11;", replaceAll: false }),
+      edit({ path: "src/app.ts", oldString: "const b = 2;", newString: "const b = 22;", replaceAll: false }),
+    ]);
+
+    expect(first).toBeTypeOf("string");
+    expect(second).toBeTypeOf("string");
+
+    // Both landed. Without the per-path lock the second edit would have been
+    // applied to the content the first had already replaced, and one of these
+    // two lines would still hold its original value.
+    const content = readFileSync(join(workspace, "src", "app.ts"), "utf8");
+    expect(content).toContain("const a = 11;");
+    expect(content).toContain("const b = 22;");
+  });
+
+  it("refuses the second edit when the first removed what it was looking for", async () => {
+    await read({ path: "src/app.ts" });
+
+    // The honest failure, and the reason serializing is not the same as
+    // pretending there was no conflict: the second call is measured against
+    // the file as the first one left it, so a genuine conflict is a refusal
+    // the model can react to rather than a silently discarded write.
+    const results = await Promise.allSettled([
+      edit({ path: "src/app.ts", oldString: "const a = 1;", newString: "gone", replaceAll: false }),
+      edit({ path: "src/app.ts", oldString: "const a = 1;", newString: "also gone", replaceAll: false }),
+    ]);
+
+    const kinds = results.map((result) => result.status).sort();
+    expect(kinds).toEqual(["fulfilled", "rejected"]);
+
+    const content = readFileSync(join(workspace, "src", "app.ts"), "utf8");
+    expect(content).toContain("gone");
+    expect(content).not.toContain("also gone");
+  });
+
+  it("writes different files at the same time without interfering", async () => {
+    await Promise.all([
+      write({ path: "one.txt", content: "first" }),
+      write({ path: "two.txt", content: "second" }),
+    ]);
+
+    expect(readFileSync(join(workspace, "one.txt"), "utf8")).toBe("first");
+    expect(readFileSync(join(workspace, "two.txt"), "utf8")).toBe("second");
+  });
+});
