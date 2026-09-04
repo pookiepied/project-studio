@@ -65,7 +65,15 @@ export const GREP_DESCRIPTOR: CapabilityDescriptor = {
     properties: {
       pattern: { type: "string", minLength: 1 },
       path: { type: "string" },
-      outputMode: { enum: ["files", "content", "count"] },
+      // The default is declared here as well as in the description above,
+      // because this is the one parameter whose default changes the KIND of
+      // answer rather than how much of it comes back. A model that does not
+      // know `limit` defaults to 100 gets fewer results than it wanted; one
+      // that does not know this defaults to `files` asks for the lines and
+      // is handed a list of paths, which reads as the tool having failed to
+      // do what it plainly says. The schema is where the argument is being
+      // written, so it is where the default is worth repeating.
+      outputMode: { enum: ["files", "content", "count"], default: "files" },
       glob: { type: "string" },
       type: { type: "string" },
       caseInsensitive: { type: "boolean" },

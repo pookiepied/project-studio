@@ -13,6 +13,7 @@ import { createSandboxPolicy } from "../../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
+import { GREP_DESCRIPTOR } from "../../../src/tools/search/grep.js";
 import {
   DEFAULT_EXCLUDES,
   buildFilesArgs,
@@ -369,5 +370,44 @@ describe("the tools themselves", () => {
 
   it.runIf(HAS_RIPGREP)("stays quiet about ordering when it kept its promise", async () => {
     expect(await glob({ pattern: "src/*" })).not.toMatch(/sorted by name/i);
+  });
+
+  it.runIf(HAS_RIPGREP)("returns file paths when the mode is left out", async () => {
+    // The declared default, exercised rather than read: no `outputMode`, so
+    // no matching lines - just the files that hold them.
+    const output = await grep({ pattern: "needle" });
+
+    expect(output).toContain("src/app.ts");
+    expect(output).not.toContain("const needle = 1;");
+  });
+});
+
+/**
+ * The default a model is told about, against the default it actually gets.
+ *
+ * `outputMode` is the one grep parameter whose default changes the kind of
+ * answer rather than how much of it: ask for lines without setting it and a
+ * list of file paths comes back, which reads as the tool ignoring the request.
+ * It is stated twice for that reason - in the description and in the schema,
+ * where the argument is being written - and two statements of one fact can
+ * disagree.
+ *
+ * This is the test that stops them. If the parser's fallback is ever changed
+ * without the schema, the model is being told something untrue at exactly the
+ * moment it is deciding what to send.
+ */
+describe("grep's declared default", () => {
+  it("declares the mode it actually falls back to", () => {
+    const properties = (GREP_DESCRIPTOR.inputSchema as {
+      properties: { outputMode: { default?: unknown } };
+    }).properties;
+
+    expect(properties.outputMode.default).toBe("files");
+  });
+
+  it("says in its description what the default is", () => {
+    // The schema is not the only place a model reads. A default declared in
+    // one and contradicted in the other is worse than declaring neither.
+    expect(GREP_DESCRIPTOR.description).toContain("file paths by default");
   });
 });
