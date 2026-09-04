@@ -1253,7 +1253,7 @@ export interface PendingApprovalRecord {
   readonly capabilityTitle: string
   /** What the call touches - a resolved path, or `shell:npm`. Null when the call is not narrowable. */
   readonly resource: string | null
-  /** `conversation:<id>`, the conversation whose run raised the question. */
+  /** The conversation whose run raised the question, bare: `cnv_x`, not `conversation:cnv_x`. */
   readonly conversationId: string | null
   /** The scope ladder, narrowest first, exactly as the kernel offered it. */
   readonly scopes: readonly ApprovalScopeOption[]

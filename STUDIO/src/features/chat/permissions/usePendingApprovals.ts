@@ -84,7 +84,7 @@ export function usePendingApprovals(
   // an inherited question with no run anywhere, and that is exactly when the
   // poll must keep going.
   const questionCount = records.filter(
-    (record) => record.conversationId === `conversation:${conversationId}`,
+    (record) => record.conversationId === conversationId,
   ).length
   const busy = active || questionCount > 0
 
@@ -130,15 +130,22 @@ export function usePendingApprovals(
 
   const cancelAll = useCallback(() => {
     for (const record of records) {
-      if (record.conversationId === `conversation:${conversationId}`) {
+      if (record.conversationId === conversationId) {
         void approvals.cancel(record.id)
       }
     }
   }, [approvals, conversationId, records])
 
   const questions = useMemo(() => {
+    // Compared bare. The scope's conversation id was `conversation:<id>` under
+    // Flue 1.0 and this filter was written against that; 2.0 made the agent
+    // instance id the conversation id and dropped the prefix, and because the
+    // mismatch has no error in it - the poll succeeds, the list is simply
+    // empty - the prompt stopped rendering and every run needing an approval
+    // parked forever with nothing on screen. Anything that changes the shape
+    // of this id has to change it here too.
     const own = records.filter(
-      (record) => record.conversationId === `conversation:${conversationId}`,
+      (record) => record.conversationId === conversationId,
     )
     // Oldest first, the order the harness raised them in: the gate parks per
     // resource in the order the call names them, so the queue's order is the

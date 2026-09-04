@@ -388,6 +388,29 @@ export function stream(
         return;
       }
 
+      // A call that has to ask before it runs. `glob` and `read` are allowed
+      // without a question, so neither can drive the approval path; `write`
+      // parks on the permission kernel, which is what a test needs to see the
+      // pending question on the wire and to check the shape the webview
+      // filters it by.
+      if (
+        userText.toLowerCase().includes("askme") &&
+        !hasToolResult(context)
+      ) {
+        const toolCall = {
+          type: "toolCall" as const,
+          id: "askme-write-1",
+          name: "write",
+          arguments: { path: "probe.txt", content: "hello" },
+        };
+        const message = createMessage(model, [toolCall]);
+        message.stopReason = "toolUse";
+        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+        events.push({ type: "done", reason: "toolUse", message });
+        return;
+      }
+
       if (
         userText.toLowerCase().includes("workspace") &&
         !hasToolResult(context)

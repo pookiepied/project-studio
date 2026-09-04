@@ -543,6 +543,48 @@ describe.sequential("Flue harness vertical slice", () => {
   );
 
   it(
+    "parks a permission question carrying the bare conversation id",
+    async () => {
+      // The wire shape the prompt filters on, pinned end to end.
+      //
+      // Under Flue 1.0 the scope's conversation id was `conversation:<id>`.
+      // 2.0 made the agent instance id the conversation id and dropped the
+      // prefix, and the webview went on filtering the pending list for the
+      // prefixed form - so it matched nothing, the prompt never rendered, and
+      // every run that needed an approval parked with nothing on screen. The
+      // model looked like it had hung.
+      //
+      // Nothing failed loudly, because a filter that matches nothing looks
+      // exactly like a queue that is empty. This test is the difference: it
+      // reads the id off the wire rather than trusting either side's idea of
+      // what shape it is.
+      const running = await startHarness(await createDatabasePath());
+      const client = new FlueHarnessClient({ baseUrl: running.baseUrl, token: running.token });
+
+      // Not awaited: the run parks on the approval and only settles once the
+      // question is answered, which is the state being inspected.
+      void client.send("cnv_askperm", "askme please");
+
+      let pending: unknown[] = [];
+      for (let attempt = 0; attempt < 40 && pending.length === 0; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const response = await fetch(`${running.baseUrl}/api/permissions/pending`, {
+          headers: { Authorization: `Bearer ${running.token}` },
+        });
+        pending = (await response.json()) as unknown[];
+      }
+
+      expect(pending).toHaveLength(1);
+      const first = pending[0] as { request: { scope: { conversationId: string } } };
+      // Bare. A prefix reappearing here is a webview that stops showing
+      // prompts, so the assertion is on the exact string rather than on a
+      // "contains the id" that both shapes would satisfy.
+      expect(first.request.scope.conversationId).toBe("cnv_askperm");
+    },
+    60_000,
+  );
+
+  it(
     "cancels accepted work with a durable aborted outcome",
     async () => {
       const running = await startHarness(await createDatabasePath());
