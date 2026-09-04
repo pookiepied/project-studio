@@ -40,6 +40,21 @@ export type InterpreterKind = "pwsh" | "bash" | "powershell" | "cmd" | "sh";
 /** How a command line is handed to an interpreter, as the launcher joins it. */
 export type LineJoin = "argv" | "command-line";
 
+/**
+ * A token that ends one command and starts another, for the interpreter that
+ * honours it.
+ *
+ * Not every interpreter honours all four, and the differences are not
+ * cosmetic - they decide which programs a line actually starts. `cmd.exe`
+ * treats `;` as an argument delimiter, so `git status; git push` is one
+ * command run with a stray argument, not two commands. Windows PowerShell 5.1
+ * has no `&&` or `||` at all, and its `&` is the call operator rather than a
+ * separator. A reader that assumed the union would name programs the line
+ * never runs and approve them under their own names, which is the opposite of
+ * what asking is for.
+ */
+export type CommandSeparator = ";" | "&" | "&&" | "||";
+
 export interface Interpreter {
   /** Absolute path to a real executable, as `runProcess` requires. */
   readonly path: string;
@@ -66,6 +81,21 @@ export interface Interpreter {
    * and not in a branch inside the launcher.
    */
   readonly takes: LineJoin;
+  /**
+   * Which separators this interpreter actually honours, measured.
+   *
+   * The command reader splits a line into the commands it starts, and it can
+   * only be right about that per interpreter. Carried here, beside `args` and
+   * `takes`, because this is already the module that answers "what is the
+   * shell on this machine" - a second table of separator behaviour somewhere
+   * else is a second answer that drifts.
+   *
+   * Measured on Windows 11 Home for `cmd` and `powershell`; the POSIX rows
+   * are the standard. The `pwsh` row is from PowerShell 7's documented
+   * pipeline chain operators and is NOT measured here, because PowerShell 7
+   * is not installed on the machine this was built on.
+   */
+  readonly separators: readonly CommandSeparator[];
   /**
    * How the environment block states the choice, as lines to splice in.
    *
@@ -240,6 +270,7 @@ function measure(): readonly Interpreter[] {
         kind: "pwsh",
         args: PWSH_ARGS,
         takes: "argv",
+        separators: [";", "&&", "||"],
         statement: [
           "Commands run through PowerShell 7 (pwsh). Pipes, &&, quotes, and",
           "redirection are interpreted by the shell. A quoted absolute path",
@@ -256,6 +287,7 @@ function measure(): readonly Interpreter[] {
         kind: "bash",
         args: BASH_ARGS,
         takes: "argv",
+        separators: [";", "&", "&&", "||"],
         statement: [
           "Commands run through bash. Pipes, &&, quotes, and redirection are",
           "interpreted by the shell.",
@@ -271,9 +303,12 @@ function measure(): readonly Interpreter[] {
         kind: "cmd",
         args: CMD_ARGS,
         takes: "command-line",
+        separators: ["&", "&&", "||"],
         statement: [
-          "Commands run through cmd.exe. Pipes, &&, double quotes, and",
-          "redirection are interpreted by the shell.",
+          "Commands run through cmd.exe. Pipes, &, &&, ||, double quotes, and",
+          "redirection are interpreted by the shell. A semicolon does not",
+          "separate commands here - cmd.exe passes it through as an argument -",
+          "so chain with && or run the commands one per call.",
         ],
       });
     }
@@ -288,9 +323,11 @@ function measure(): readonly Interpreter[] {
         kind: "powershell",
         args: POWERSHELL_ARGS,
         takes: "argv",
+        separators: [";"],
         statement: [
           "Commands run through Windows PowerShell 5.1. Pipes, quotes, and",
-          "redirection are interpreted, but && is not supported: separate",
+          "redirection are interpreted, but neither && nor || is supported,",
+          "and & is the call operator rather than a separator: separate",
           "commands with ; or run them one per call. A quoted absolute path",
           'needs the call operator in front of it: & "C:\\path\\tool.exe" args.',
         ],
@@ -311,6 +348,7 @@ function measure(): readonly Interpreter[] {
         kind: label === "bash" ? "bash" : "sh",
         args: BASH_ARGS,
         takes: "argv",
+        separators: [";", "&", "&&", "||"],
         statement: [
           `Commands run through ${label}. Pipes, &&, quotes, and redirection`,
           "are interpreted by the shell.",

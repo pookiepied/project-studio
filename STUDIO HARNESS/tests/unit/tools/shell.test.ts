@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ExecutionScope } from "../../../src/contracts/capabilities.js";
 import { requiresUndoPoint } from "../../../src/contracts/effects.js";
-import { resolveInterpreter } from "../../../src/process/interpreter.js";
+import {
+  resolveInterpreter,
+  type CommandSeparator,
+  type Interpreter,
+  type InterpreterKind,
+} from "../../../src/process/interpreter.js";
 import { PermissionGrantStore } from "../../../src/permissions/grant-store.js";
 import { PermissionKernel } from "../../../src/permissions/kernel.js";
 import type { PermissionRequest } from "../../../src/permissions/policy.js";
@@ -293,53 +298,163 @@ describe("every program a line names is authorized", () => {
   });
 });
 
+/**
+ * Interpreters the reader is tested against, spelled out rather than resolved.
+ *
+ * The separator behaviour under test is per interpreter, so a test that used
+ * whichever shell the test machine happens to have would assert one row of the
+ * table on Windows and a different one in CI, and neither deliberately.
+ */
+const BASH_LIKE: Interpreter = {
+  path: "/bin/bash",
+  label: "bash",
+  kind: "bash",
+  args: ["-c"],
+  takes: "argv",
+  separators: [";", "&", "&&", "||"],
+  statement: ["Commands run through bash."],
+};
+
+const CMD_LIKE: Interpreter = {
+  path: "C:\\Windows\\System32\\cmd.exe",
+  label: "cmd",
+  kind: "cmd",
+  args: ["/d", "/s", "/c"],
+  takes: "command-line",
+  separators: ["&", "&&", "||"],
+  statement: ["Commands run through cmd.exe."],
+};
+
+const POWERSHELL_LIKE: Interpreter = {
+  path: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+  label: "powershell",
+  kind: "powershell",
+  args: ["-NoProfile", "-NonInteractive", "-Command"],
+  takes: "argv",
+  separators: [";"],
+  statement: ["Commands run through Windows PowerShell 5.1."],
+};
+
 describe("the command reader", () => {
   it("names every program a chain runs", () => {
-    expect(readCommandPrograms("npm run build && node check.js")).toEqual(["npm", "node"]);
-    expect(readCommandPrograms("a | b | c")).toEqual(["a", "b", "c"]);
-    expect(readCommandPrograms("git status; git push")).toEqual(["git", "git"]);
+    expect(readCommandPrograms("npm run build && node check.js", BASH_LIKE)).toEqual([
+      "npm",
+      "node",
+    ]);
+    expect(readCommandPrograms("a | b | c", BASH_LIKE)).toEqual(["a", "b", "c"]);
+    expect(readCommandPrograms("git status; git push", BASH_LIKE)).toEqual(["git", "git"]);
+  });
+
+  it("splits on the separators the interpreter honours, and only those", () => {
+    // The bug this closes: read with the union of every shell's separators,
+    // `git status; git push` named two programs on cmd.exe, which honours no
+    // semicolon. The user approved a push that could never run.
+    expect(() => readCommandPrograms("git status; git push", CMD_LIKE)).toThrow(/";"/);
+    expect(() => readCommandPrograms("git status; git push", CMD_LIKE)).toThrow(/cmd/);
+
+    // Windows PowerShell 5.1 has neither, and a line using them is a syntax
+    // error the user must not be asked to approve first.
+    expect(() => readCommandPrograms("npm test && npm run build", POWERSHELL_LIKE)).toThrow(
+      /"&&"/,
+    );
+    expect(() => readCommandPrograms("npm test || npm run build", POWERSHELL_LIKE)).toThrow(
+      /"\|\|"/,
+    );
+
+    // And each honours what it does honour.
+    expect(readCommandPrograms("npm test && node check.js", CMD_LIKE)).toEqual(["npm", "node"]);
+    expect(readCommandPrograms("git status; git push", POWERSHELL_LIKE)).toEqual(["git", "git"]);
+  });
+
+  it("says which separator to write instead", () => {
+    // A refusal that does not name the alternative buys another attempt at the
+    // same shape.
+    expect(() => readCommandPrograms("git status; git push", CMD_LIKE)).toThrow(/&&/);
+    expect(() => readCommandPrograms("npm test && npm run build", POWERSHELL_LIKE)).toThrow(/;/);
+  });
+
+  it("treats a separator inside quotes as content, never as a split", () => {
+    // Quoting is resolved before any separator branch, so a semicolon in an
+    // argument is not a cmd refusal and not a second command anywhere.
+    expect(readCommandPrograms('node -e "a;b"', CMD_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms("node -e 'a && b'", POWERSHELL_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms('grep "a;b" file', BASH_LIKE)).toEqual(["grep"]);
   });
 
   it("sees through quoting, assignments, redirects, and a call operator", () => {
-    expect(readCommandPrograms("FOO=1 npm test")).toEqual(["npm"]);
-    expect(readCommandPrograms(`"${NODE}" -e "console.log(1)" > out.txt`)).toEqual(["node"]);
-    expect(readCommandPrograms("& 'C:\\Program Files\\tool.exe' --flag")).toEqual(["tool"]);
-    expect(readCommandPrograms("npm run build &> log.txt")).toEqual(["npm"]);
-    expect(readCommandPrograms("node script.js 2>&1")).toEqual(["node"]);
-    expect(readCommandPrograms("> preface.txt node script.js")).toEqual(["node"]);
-    expect(readCommandPrograms("~/.local/bin/tool --flag")).toEqual(["tool"]);
+    expect(readCommandPrograms("FOO=1 npm test", BASH_LIKE)).toEqual(["npm"]);
+    expect(readCommandPrograms(`"${NODE}" -e "console.log(1)" > out.txt`, BASH_LIKE)).toEqual([
+      "node",
+    ]);
+    // The call operator is PowerShell's, and 5.1 is exactly the interpreter
+    // that does not honour `&` as a separator - so this is also the check that
+    // the call-operator branch is reached before the separator question.
+    expect(readCommandPrograms("& 'C:\\Program Files\\tool.exe' --flag", POWERSHELL_LIKE)).toEqual(
+      ["tool"],
+    );
+    expect(readCommandPrograms("& 'C:\\Program Files\\tool.exe' --flag", BASH_LIKE)).toEqual([
+      "tool",
+    ]);
+    expect(readCommandPrograms("npm run build &> log.txt", BASH_LIKE)).toEqual(["npm"]);
+    expect(readCommandPrograms("node script.js 2>&1", BASH_LIKE)).toEqual(["node"]);
+    // Redirect glue stays a token whatever the interpreter honours, so `&`
+    // beside a `>` is never mistaken for a separator to refuse.
+    expect(readCommandPrograms("node script.js 2>&1", POWERSHELL_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms("> preface.txt node script.js", BASH_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms("~/.local/bin/tool --flag", BASH_LIKE)).toEqual(["tool"]);
   });
 
   it("names what a wrapper runs, not the wrapper", () => {
     // `env node build.js` runs node. Naming `env` in the approval would put a
     // name in front of the user that is not the name that executes.
-    expect(readCommandPrograms("env node build.js")).toEqual(["node"]);
-    expect(readCommandPrograms("env FOO=1 npm test")).toEqual(["npm"]);
-    expect(readCommandPrograms("nohup node server.js")).toEqual(["node"]);
+    expect(readCommandPrograms("env node build.js", BASH_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms("env FOO=1 npm test", BASH_LIKE)).toEqual(["npm"]);
+    expect(readCommandPrograms("nohup node server.js", BASH_LIKE)).toEqual(["node"]);
   });
 
   it("strips the script extension a Windows shim is named by", () => {
     // npm.cmd, node.exe and gen.ps1 are one program each as far as a person
     // approving them is concerned.
-    expect(readCommandPrograms("npm.cmd --version")).toEqual(["npm"]);
-    expect(readCommandPrograms("node.exe --version")).toEqual(["node"]);
-    expect(readCommandPrograms("C:\\tools\\gen.ps1 -Name x")).toEqual(["gen"]);
+    expect(readCommandPrograms("npm.cmd --version", CMD_LIKE)).toEqual(["npm"]);
+    expect(readCommandPrograms("node.exe --version", CMD_LIKE)).toEqual(["node"]);
+    expect(readCommandPrograms("C:\\tools\\gen.ps1 -Name x", POWERSHELL_LIKE)).toEqual(["gen"]);
   });
 
   it("refuses what it cannot see, with the reason", () => {
-    expect(() => readCommandPrograms("npm run $(whoami)")).toThrow(/substitution/i);
-    expect(() => readCommandPrograms("npm run `whoami`")).toThrow(/substitution/i);
-    expect(() => readCommandPrograms("grep x <(sort y)")).toThrow(/substitution/i);
-    expect(() => readCommandPrograms("npm test << EOF")).toThrow(/substitution/i);
-    expect(() => readCommandPrograms("$TOOL build")).toThrow(/variable/i);
-    expect(() => readCommandPrograms("%TOOL% build")).toThrow(/variable/i);
-    expect(() => readCommandPrograms('npm test "unterminated')).toThrow(/unterminated quote/i);
-    expect(() => readCommandPrograms("npm && ; node")).toThrow(/names no program/i);
-    expect(() => readCommandPrograms("; npm test")).toThrow(/names no program/i);
-    expect(() => readCommandPrograms("--version")).toThrow(/option, not a/i);
+    expect(() => readCommandPrograms("npm run $(whoami)", BASH_LIKE)).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("npm run `whoami`", BASH_LIKE)).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("grep x <(sort y)", BASH_LIKE)).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("npm test << EOF", BASH_LIKE)).toThrow(/substitution/i);
+    expect(() => readCommandPrograms("$TOOL build", BASH_LIKE)).toThrow(/variable/i);
+    expect(() => readCommandPrograms("%TOOL% build", BASH_LIKE)).toThrow(/variable/i);
+    expect(() => readCommandPrograms('npm test "unterminated', BASH_LIKE)).toThrow(
+      /unterminated quote/i,
+    );
+    expect(() => readCommandPrograms("npm && ; node", BASH_LIKE)).toThrow(/names no program/i);
+    expect(() => readCommandPrograms("; npm test", BASH_LIKE)).toThrow(/names no program/i);
+    expect(() => readCommandPrograms("--version", BASH_LIKE)).toThrow(/option, not a/i);
     // Control flow whose body opens with a test bracket: nothing there is a
     // program the reader can name.
-    expect(() => readCommandPrograms("if [ -f x ]; then npm test; fi")).toThrow(/names no program/i);
+    expect(() => readCommandPrograms("if [ -f x ]; then npm test; fi", BASH_LIKE)).toThrow(
+      /names no program/i,
+    );
+  });
+
+  it("honours the separators its own kind was measured to honour", () => {
+    // Binds the live table to this machine's resolved interpreter, so breaking
+    // a row in `interpreter.ts` fails here. The fixtures above cannot catch
+    // that - they carry their own copies of the values.
+    const expected: Record<InterpreterKind, readonly CommandSeparator[]> = {
+      bash: [";", "&", "&&", "||"],
+      sh: [";", "&", "&&", "||"],
+      pwsh: [";", "&&", "||"],
+      cmd: ["&", "&&", "||"],
+      powershell: [";"],
+    };
+
+    const interpreter = resolveInterpreter();
+    expect(interpreter).toBeDefined();
+    expect(interpreter?.separators).toEqual(expected[interpreter?.kind ?? "sh"]);
   });
 
   it("refuses at parse time, so an unparsable line is never approved", async () => {

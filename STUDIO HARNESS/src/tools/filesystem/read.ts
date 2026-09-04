@@ -77,8 +77,17 @@ export interface ReadToolOptions {
 export const READ_DESCRIPTOR: CapabilityDescriptor = {
   id: { namespace: "native", name: "read" },
   title: "Read file",
+  // The limits are stated rather than discovered. A model that does not know
+  // the default window is 2000 lines reads a 5000-line file, is handed the
+  // first 2000, and answers about the file - the footer says a fragment was
+  // shown, but only after the answer has already been shaped by it. Saying the
+  // numbers up front is what lets a model ask for the right window on the
+  // first call instead of the second.
   description:
-    "Reads a file from the project, returning numbered lines. Use offset and limit to page through a long file. " +
+    "Reads a file from the project, returning numbered lines. Reads the first " +
+    "2000 lines by default; use offset and limit to page through a longer " +
+    "file. A line longer than 2000 characters is truncated, and a file larger " +
+    "than 1 MB is refused - search it instead. " +
     "Images (PNG, JPEG, GIF, WebP) come back as attachments when the model accepts image input.",
   inputSchema: {
     type: "object",
@@ -105,11 +114,30 @@ function positiveInteger(value: unknown, name: string, fallback: number): number
   return value;
 }
 
+export interface FormatNumberedOptions {
+  /**
+   * Whether to append the "read again with offset N" footer.
+   *
+   * True for a read, where the window is a page of a file the model may want
+   * the rest of. False for a caller showing a deliberately bounded excerpt -
+   * `edit` reporting the region it changed - where the footer would invite a
+   * page-through nobody asked for and describe the excerpt as a truncated
+   * file. Defaults to true, so the read tool's behaviour is unchanged by the
+   * option existing.
+   */
+  readonly paging?: boolean;
+}
+
 /**
  * Formats content the way `cat -n` does, so a line number in the output means
  * the same thing as a line number in an editor.
  */
-export function formatNumbered(content: string, offset: number, limit: number): string {
+export function formatNumbered(
+  content: string,
+  offset: number,
+  limit: number,
+  options: FormatNumberedOptions = {},
+): string {
   if (content === "") return "(this file is empty)";
 
   const lines = content.split(/\r?\n/);
@@ -138,7 +166,7 @@ export function formatNumbered(content: string, offset: number, limit: number): 
   });
 
   const shown = start + window.length;
-  if (shown < lines.length) {
+  if (shown < lines.length && options.paging !== false) {
     // Stated rather than silent: a model that does not know it saw a fragment
     // will answer as though it saw the whole file.
     numbered.push(

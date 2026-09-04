@@ -75,29 +75,123 @@ export interface ShellInput {
   readonly interpreter: Interpreter;
 }
 
-export const SHELL_DESCRIPTOR: CapabilityDescriptor = {
-  id: { namespace: "native", name: "shell" },
-  title: "Run a command line",
-  description:
-    "Runs one command line through this machine's shell, for example " +
-    '"npm test" or "npm run build && node check.js". The shell interprets ' +
-    "pipes, chaining, quotes, and redirection. A line that names several " +
-    "programs - as a chain does - is approved for each of them.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      command: { type: "string", minLength: 1 },
-      cwd: { type: "string" },
-      timeoutMs: { type: "number", minimum: 1000, maximum: 600000 },
-    },
-    required: ["command"],
-    additionalProperties: false,
+/**
+ * What the tool says about itself before the machine is consulted.
+ *
+ * Deliberately does not name a shell or a separator. Which shell this is
+ * differs per machine, and a description that names the wrong one is worse
+ * than one that names none: the model writes for what it was told.
+ */
+const SHELL_DESCRIPTION =
+  "Runs one command line through this machine's shell, for example " +
+  '"npm test". The shell interprets pipes, quotes, and redirection. A line ' +
+  "that names several programs - as a chain does - is approved for each of " +
+  "them.";
+
+const SHELL_SCHEMA = {
+  type: "object",
+  properties: {
+    command: { type: "string", minLength: 1 },
+    cwd: { type: "string" },
+    timeoutMs: { type: "number", minimum: 1000, maximum: 600000 },
   },
-  effects: ["execute"],
-  provenance: NATIVE_PROVENANCE,
-  // Running a command twice does whatever it does twice.
-  idempotent: false,
-};
+  required: ["command"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * The descriptor, told which interpreter this machine actually has.
+ *
+ * The description used to offer `npm run build && node check.js` as its
+ * example on every machine. On the two Windows fallbacks that line does not
+ * run: `cmd.exe` honours `&&` but not `;`, and Windows PowerShell 5.1 honours
+ * `;` but neither `&&` nor `||`. The tool was teaching a syntax the shell it
+ * had chosen would reject, and then refusing the result - so the description
+ * names the interpreter and splices in the same statement the environment
+ * block uses, rather than a second copy that can disagree with it.
+ *
+ * An undefined interpreter is a real state - a machine with no shell at all -
+ * and it gets the interpreter-independent description rather than a guess.
+ */
+export function shellDescriptor(interpreter: Interpreter | undefined): CapabilityDescriptor {
+  const description =
+    interpreter === undefined
+      ? SHELL_DESCRIPTION
+      : [
+          SHELL_DESCRIPTION,
+          "",
+          ...interpreter.statement,
+          "",
+          `Separate commands with ${interpreter.separators.join(" or ")}. Any other ` +
+            "separator is refused rather than run, because this shell would not " +
+            "honour it.",
+        ].join("\n");
+
+  return {
+    id: { namespace: "native", name: "shell" },
+    title: "Run a command line",
+    description,
+    inputSchema: SHELL_SCHEMA,
+    effects: ["execute"],
+    provenance: NATIVE_PROVENANCE,
+    // Running a command twice does whatever it does twice.
+    idempotent: false,
+  };
+}
+
+/**
+ * The interpreter-independent descriptor: identity, effects, and schema, which
+ * is what the permission tables and the effect rules are about. Callers that
+ * want the sentence a model reads build it with {@link shellDescriptor}.
+ */
+export const SHELL_DESCRIPTOR: CapabilityDescriptor = shellDescriptor(undefined);
+
+/**
+ * Whether a demotion invalidates the approval that was already given.
+ *
+ * The retry after `STATUS_DLL_INIT_FAILED` reuses the authorization from the
+ * first attempt, which is right only while the second interpreter would start
+ * the same programs as the first. It does not always. The line was read with
+ * bash's separators, bash could not be contained, and the fallback is
+ * `cmd.exe` - which does not honour `;`. So `git status; git push` was read as
+ * two commands, approved as two, and then handed to a shell that runs one of
+ * them with a stray argument. The user approved a push that never happened,
+ * which is the quieter half of the same bug: an approval that does not
+ * describe what ran is not an approval of it.
+ *
+ * Returns the sentence to refuse with, or undefined when the retry is safe -
+ * which it is whenever the separators the line actually uses are honoured by
+ * both. Re-reading rather than comparing separator lists, because the only
+ * question that matters is what this line does, and most lines use none.
+ */
+export function demotionRefusal(
+  input: ShellInput,
+  from: Interpreter,
+  to: Interpreter,
+): string | undefined {
+  let programs: readonly string[];
+  try {
+    programs = readCommandPrograms(input.command, to);
+  } catch {
+    return (
+      `The command could not be started in ${from.label}, and this machine's ` +
+      `next shell is ${to.label}, which reads this line differently. It was ` +
+      `not retried. Rewrite the command for ${to.label} and call again.`
+    );
+  }
+
+  const same =
+    programs.length === input.programs.length &&
+    programs.every((program, index) => program === input.programs[index]);
+  if (same) return undefined;
+
+  return (
+    `The command could not be started in ${from.label}, and in ${to.label} the ` +
+    `same line runs ${programs.join(", ")} rather than ${input.programs.join(", ")}. ` +
+    `Only the first was approved, so nothing was run. Rewrite the command for ` +
+    `${to.label} and call again.`
+  );
+}
 
 function clip(output: string): string {
   const lines = output.split("\n");
@@ -136,7 +230,9 @@ function report(
 
 export function createShellTool(): ToolDefinition<ShellInput, string> {
   return defineStudioTool({
-    descriptor: SHELL_DESCRIPTOR,
+    // Built from the interpreter this machine resolved, so the sentence the
+    // model reads names the shell that will actually run its line.
+    descriptor: shellDescriptor(resolveInterpreter()),
     // The gate's default is two minutes, which is not a deadline for a build -
     // it is a guarantee the build fails. Declared here so the tool's own
     // ceiling and the gate's agree, instead of the shorter one winning
@@ -173,17 +269,20 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         timeoutMs = Math.min(Math.max(value.timeoutMs, 1_000), MAX_TIMEOUT_MS);
       }
 
-      // Read before authorization, for the same reason the program used to be
-      // resolved there: a line the reader refuses is one the user is never
-      // shown for approval.
-      const programs = readCommandPrograms(value.command);
-
+      // The interpreter first, because the reader needs it: which separators
+      // split this line is a property of the shell that will run it, and
+      // reading without knowing names programs that never run.
       const interpreter = resolveInterpreter();
       if (interpreter === undefined) {
         throw new ToolError("unavailable", {
           message: "This machine has no command interpreter the shell tool can run.",
         });
       }
+
+      // Read before authorization, for the same reason the program used to be
+      // resolved there: a line the reader refuses is one the user is never
+      // shown for approval.
+      const programs = readCommandPrograms(value.command, interpreter);
 
       return {
         command: value.command,
@@ -267,6 +366,11 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         if (result.exitCode === STATUS_DLL_INIT_FAILED && demoteInterpreter(interpreter)) {
           const next = resolveInterpreter();
           if (next !== undefined && next !== interpreter) {
+            // The approval was given for what this line runs under the first
+            // interpreter. Reusing it under the second is only honest while
+            // the second starts the same programs.
+            const refusal = demotionRefusal(input, interpreter, next);
+            if (refusal !== undefined) return refusal;
             interpreter = next;
             result = await spawn();
           }

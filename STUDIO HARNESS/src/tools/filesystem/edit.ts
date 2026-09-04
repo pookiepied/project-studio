@@ -5,6 +5,7 @@ import {
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { hashContent, type FileAccessLog } from "./access-log.js";
+import { formatNumbered } from "./read.js";
 import { currentState } from "./write.js";
 
 /**
@@ -100,6 +101,139 @@ function usesCarriageReturns(content: string): boolean {
 
 function toCarriageReturns(text: string): string {
   return text.replace(/\r?\n/g, "\r\n");
+}
+
+/**
+ * Showing the model what its edit produced, instead of making it read the file
+ * back.
+ *
+ * `Edited path` is true and useless. An edit is a blind write - the model
+ * composed `newString` against text it remembers, and the one thing it cannot
+ * see is how that text sits in the file now: whether the indentation matches
+ * its neighbours, whether the brace it closed was the one it meant, whether a
+ * CRLF conversion moved anything. So every edit was followed by a read of the
+ * same file, which is a second call, the whole file's worth of tokens, and a
+ * round trip, to learn something the edit already had in hand.
+ *
+ * The changed region is what it had in hand. Three lines of context on each
+ * side is enough to see the seam and not enough to be a file dump.
+ */
+const CONTEXT_LINES = 3;
+
+/**
+ * At most this many regions are shown for a `replaceAll`.
+ *
+ * A rename across forty call sites is a legitimate edit and forty excerpts is
+ * a wall. Past this the count is the answer, and the model can read the file
+ * if it wants the rest.
+ */
+const MAX_REGIONS = 3;
+
+/**
+ * A ceiling on the whole excerpt, in lines.
+ *
+ * `MAX_REGIONS` alone does not bound it. Changes spaced closer than twice the
+ * context merge into one region by design - printing a line twice is worse
+ * than merging - and thirty changes seven lines apart merge into a single
+ * region covering the file. That is one region, under the cap, and still the
+ * dump this is meant not to be. So the budget is counted in lines, and past
+ * it the count is the answer.
+ */
+const MAX_REPORT_LINES = 40;
+
+/** A window of the updated file, as 1-based inclusive line numbers. */
+interface ChangedRegion {
+  readonly from: number;
+  readonly to: number;
+}
+
+/** The 1-based line a character index falls on. */
+function lineOfIndex(content: string, index: number): number {
+  let line = 1;
+  for (let at = 0; at < index && at < content.length; at += 1) {
+    if (content[at] === "\n") line += 1;
+  }
+  return line;
+}
+
+function lineCount(content: string): number {
+  const lines = content.split(/\r?\n/);
+  // A trailing newline produces a final empty element that is not a line, the
+  // same way `formatNumbered` counts them - the two must agree or a region
+  // will be clamped to a line the reader will not print.
+  if (lines.at(-1) === "") lines.pop();
+  return Math.max(lines.length, 1);
+}
+
+/**
+ * Where the replacements landed in the updated content.
+ *
+ * Positions are derived rather than searched for. Searching the updated file
+ * for `newString` finds occurrences that were already there before the edit,
+ * which would report untouched text as changed. Each match's position in the
+ * original is known, and every earlier replacement shifted what follows it by
+ * a fixed amount, so the arithmetic is exact.
+ */
+function changedRegions(
+  original: string,
+  updated: string,
+  oldString: string,
+  newString: string,
+  replaceAll: boolean,
+): readonly ChangedRegion[] {
+  const drift = newString.length - oldString.length;
+  const total = lineCount(updated);
+  const regions: ChangedRegion[] = [];
+
+  let index = original.indexOf(oldString);
+  let replaced = 0;
+  while (index !== -1) {
+    const start = index + replaced * drift;
+    // `newString` may be empty - a deletion - and then the region is the one
+    // line the removed text used to start on, which is the seam worth seeing.
+    const end = start + Math.max(newString.length - 1, 0);
+
+    const from = Math.max(lineOfIndex(updated, start) - CONTEXT_LINES, 1);
+    const to = Math.min(lineOfIndex(updated, end) + CONTEXT_LINES, total);
+
+    const previous = regions.at(-1);
+    if (previous !== undefined && from <= previous.to + 1) {
+      // Two edits close enough that their context windows touch are one
+      // excerpt, not two overlapping ones that print the same lines twice.
+      regions[regions.length - 1] = { from: previous.from, to: Math.max(previous.to, to) };
+    } else {
+      regions.push({ from, to });
+    }
+
+    replaced += 1;
+    if (!replaceAll) break;
+    index = original.indexOf(oldString, index + oldString.length);
+  }
+
+  return regions;
+}
+
+/** The excerpt the model is shown, or undefined when there is nothing to show. */
+function changedRegionReport(regions: readonly ChangedRegion[], updated: string): string | undefined {
+  if (regions.length === 0) return undefined;
+
+  const shown = regions.slice(0, MAX_REGIONS);
+  const lines = shown.reduce((total, region) => total + (region.to - region.from + 1), 0);
+  if (lines > MAX_REPORT_LINES) {
+    return `[the changed lines span more than ${MAX_REPORT_LINES} lines; read the file to see them]`;
+  }
+
+  const excerpts = shown.map((region) =>
+    // Paging off: this is a bounded excerpt of a file the model is not being
+    // invited to page through, and the read tool's footer would describe it as
+    // a truncated file.
+    formatNumbered(updated, region.from, region.to - region.from + 1, { paging: false }),
+  );
+
+  if (regions.length > shown.length) {
+    excerpts.push(`[${regions.length - shown.length} more changed regions not shown]`);
+  }
+  return excerpts.join("\n\n");
 }
 
 function countOccurrences(haystack: string, needle: string): number {
@@ -215,9 +349,16 @@ export function createEditTool(log: FileAccessLog): ToolDefinition<EditInput, st
           contentHash: hashContent(updated),
         });
 
-        return occurrences === 1
-          ? `Edited ${input.path}`
-          : `Edited ${input.path} (${occurrences} occurrences)`;
+        const headline =
+          occurrences === 1
+            ? `Edited ${input.path}`
+            : `Edited ${input.path} (${occurrences} occurrences)`;
+
+        const excerpt = changedRegionReport(
+          changedRegions(content, updated, oldString, newString, input.replaceAll),
+          updated,
+        );
+        return excerpt === undefined ? headline : `${headline}\n\n${excerpt}`;
       }),
   });
 }

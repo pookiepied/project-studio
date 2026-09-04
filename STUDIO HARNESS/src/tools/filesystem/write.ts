@@ -1,3 +1,5 @@
+import { dirname } from "node:path";
+
 import {
   NATIVE_PROVENANCE,
   type CapabilityDescriptor,
@@ -67,6 +69,48 @@ export async function currentState(
   };
 }
 
+/**
+ * Which parent directories this write will bring into existence.
+ *
+ * The write creates them silently, which is the right behaviour and the wrong
+ * report. A model that mistypes `src/componets/Button.tsx` is told
+ * `Created src/componets/Button.tsx` - a success - and the typo becomes a
+ * directory that exists, so nothing downstream contradicts it either. Naming
+ * the directories that were not there a moment ago is the one cheap moment
+ * where a person or a model can notice.
+ *
+ * Asked before the write rather than diffed after it, because afterwards the
+ * directories exist and the question has no answer. Nearest-first while
+ * walking up, reversed on return, so the result reads outermost-first the way
+ * a path does.
+ */
+async function directoriesToCreate(
+  sandbox: { exists: (path: string) => Promise<boolean> },
+  path: string,
+): Promise<readonly string[]> {
+  const missing: string[] = [];
+
+  let directory = dirname(path);
+  // `dirname` is a fixed point at a root and at `.`, which is the only stop
+  // condition that does not depend on how the path was spelled.
+  while (directory !== "" && directory !== "." && directory !== dirname(directory)) {
+    // A path outside the sandbox throws rather than answering, and that is the
+    // resolver's refusal to make, not this reporter's. Reporting nothing lets
+    // the write itself produce the real error a moment later.
+    let exists: boolean;
+    try {
+      exists = await sandbox.exists(directory);
+    } catch {
+      return [];
+    }
+    if (exists) break;
+    missing.push(directory);
+    directory = dirname(directory);
+  }
+
+  return missing.reverse();
+}
+
 export function createWriteTool(log: FileAccessLog): ToolDefinition<WriteInput, string> {
   return defineStudioTool({
     descriptor: WRITE_DESCRIPTOR,
@@ -106,6 +150,9 @@ export function createWriteTool(log: FileAccessLog): ToolDefinition<WriteInput, 
 
         log.assertSafeToModify(context.scope, absolute, state);
 
+        // Before the write, while the answer still exists.
+        const created = await directoriesToCreate(context.sandbox, input.path);
+
         try {
           await context.sandbox.writeFile(input.path, input.content);
         } catch (error) {
@@ -126,7 +173,11 @@ export function createWriteTool(log: FileAccessLog): ToolDefinition<WriteInput, 
           contentHash: hashContent(input.content),
         });
 
-        return state.exists ? `Replaced ${input.path}` : `Created ${input.path}`;
+        const headline = state.exists ? `Replaced ${input.path}` : `Created ${input.path}`;
+        if (created.length === 0) return headline;
+        return `${headline}\nCreated ${
+          created.length === 1 ? "directory" : "directories"
+        } ${created.join(", ")}, which did not exist.`;
       }),
   });
 }

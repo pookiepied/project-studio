@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 
+import type { CommandSeparator, Interpreter } from "../../process/interpreter.js";
 import { ToolError } from "../errors.js";
 
 /**
@@ -40,6 +41,27 @@ import { ToolError } from "../errors.js";
  * where a program would (`then npm test` checks `npm`). A construct whose
  * body opens with anything but a program - `if [ -f x ]; then …`, where the
  * test bracket is not a program either - is refused, not half-read.
+ *
+ * **Which separators split a line is a property of the interpreter, not of
+ * this reader**, so the interpreter is an argument rather than an assumption.
+ * Reading the union of every shell's separators was wrong in both directions
+ * at once. On `cmd.exe`, `git status; git push` is *one* command - cmd passes
+ * the semicolon through as an argument - so the reader named two programs,
+ * asked the user to approve `git` twice, and the second one never ran. On
+ * Windows PowerShell 5.1, `npm test && npm run build` is not a chain at all;
+ * 5.1 has no `&&`, and the line is a syntax error the user was asked to
+ * approve first. Approving a program that does not run teaches nothing, and
+ * the reverse of it - a separator honoured but not split on - would run a
+ * program nobody was asked about.
+ *
+ * A separator the current interpreter does not honour is refused at parse
+ * time rather than folded into the token beside it. Folding is the guess
+ * again: a `;` inside a cmd line may be an argument the user meant, or a
+ * chain the model wrote for a shell it does not have, and the two are not
+ * distinguishable from here. The refusal names the interpreter and what to
+ * write instead, which is a turn the model can act on. A separator inside
+ * quotes is content and is never examined - quoting is resolved before any
+ * separator branch is reached.
  */
 
 /** Extensions Windows treats as programs that are really scripts for a shell. */
@@ -74,20 +96,45 @@ const RESERVED_WORDS = new Set([
   "}",
 ]);
 
-/** Characters that end one command and start another, outside quotes. */
-function isOperator(character: string, next: string | undefined, current: string): boolean {
-  if (character === "|" || character === ";" || character === "(" || character === ")") {
-    return true;
-  }
-  if (character === "\n" || character === "\r") return true;
-  // `&` on its own (cmd and bash background) and the head of `&&`. The pair is
-  // handled by consuming two characters at the call site; a lone `&` separates.
-  // Not a separator when it is redirect glue: `2>&1` is one token, so `&` with
-  // a `>` behind it (`&>`) or in front of it (`2>&`) stays inside the token for
-  // the redirect check to see.
-  if (character !== "&") return false;
-  if (next === "&" || next === ">") return false;
-  return !current.endsWith(">");
+/**
+ * Characters that end one command and start another in every interpreter this
+ * reader reads for, so no interpreter has to be consulted about them.
+ *
+ * A pipe chains in bash, cmd and both PowerShells alike; parentheses group a
+ * subshell or a scriptblock, and either way what follows is a command slot;
+ * a newline ends a statement everywhere. `;`, `&`, `&&` and `||` are *not*
+ * here, because those are exactly the ones the interpreters disagree about.
+ */
+function isUniversalOperator(character: string): boolean {
+  return (
+    character === "|" ||
+    character === "(" ||
+    character === ")" ||
+    character === "\n" ||
+    character === "\r"
+  );
+}
+
+/**
+ * Refuses a line whose separator this machine's interpreter will not honour.
+ *
+ * Names the interpreter, because the model did not choose it and cannot see
+ * it from the line it wrote, and names the separator that does work, because
+ * a refusal that does not say what to write instead buys another attempt at
+ * the same shape.
+ */
+function refuseSeparator(separator: CommandSeparator, interpreter: Interpreter): never {
+  const honoured = interpreter.separators.filter((candidate) => candidate !== "&");
+  const alternative =
+    honoured.length === 0
+      ? "Run each command in its own call."
+      : `Chain with ${honoured.join(" or ")}, or run each command in its own call.`;
+  throw new ToolError("invalid_input", {
+    message:
+      `This line separates commands with "${separator}", which ${interpreter.label} ` +
+      `does not honour, so it would not run as written and there is nothing ` +
+      `to approve. ${alternative}`,
+  });
 }
 
 /** True for a token that redirects output or input rather than naming a program. */
@@ -157,7 +204,10 @@ interface Segment {
  * misparsed). An escape inside double quotes never closes the quote, which is
  * true in bash and close enough in PowerShell to keep the grouping honest.
  */
-function segmentsOf(command: string): readonly Segment[] {
+function segmentsOf(command: string, interpreter: Interpreter): readonly Segment[] {
+  const honours = (separator: CommandSeparator): boolean =>
+    interpreter.separators.includes(separator);
+
   const segments: Segment[] = [];
   let tokens: string[] = [];
   let current = "";
@@ -230,22 +280,45 @@ function segmentsOf(command: string): readonly Segment[] {
       continue;
     }
     if (character === "&" && next === "&") {
+      if (!honours("&&")) refuseSeparator("&&", interpreter);
       endSegment();
       index += 1;
       continue;
     }
     if (character === "|" && next === "|") {
+      if (!honours("||")) refuseSeparator("||", interpreter);
       endSegment();
       index += 1;
       continue;
     }
-    if (isOperator(character, next, current)) {
-      if (character === "&" && current === "" && tokens.length === 0 && !callOperator) {
+    if (isUniversalOperator(character)) {
+      endSegment();
+      continue;
+    }
+    if (character === ";") {
+      if (!honours(";")) refuseSeparator(";", interpreter);
+      endSegment();
+      continue;
+    }
+    if (character === "&") {
+      // Redirect glue before anything else: `2>&1` and `&>log` are one token,
+      // so a `&` with a `>` on either side stays in the token for the redirect
+      // check to see, whatever the interpreter honours.
+      if (next === ">" || current.endsWith(">")) {
+        current += character;
+        continue;
+      }
+      if (current === "" && tokens.length === 0 && !callOperator) {
         // A leading `&` is PowerShell's call operator, not a separator: the
-        // segment it opens names the program to run.
+        // segment it opens names the program to run. Checked before the
+        // interpreter is consulted, because the interpreter that uses `&` this
+        // way - Windows PowerShell 5.1 - is exactly the one that does not
+        // honour it as a separator, and consulting first would refuse the
+        // only syntax 5.1 has for running a quoted absolute path.
         callOperator = true;
         continue;
       }
+      if (!honours("&")) refuseSeparator("&", interpreter);
       endSegment();
       continue;
     }
@@ -272,8 +345,15 @@ function segmentsOf(command: string): readonly Segment[] {
  * Throws a {@link ToolError} rather than returning a partial answer: the
  * caller either gets the full list to authorize, or a refusal naming what the
  * reader could not see.
+ *
+ * The interpreter is required rather than defaulted, because a default is a
+ * silent assumption about which separators split the line, and being wrong
+ * about that is how a program gets approved under a name that never runs.
  */
-export function readCommandPrograms(command: string): readonly string[] {
+export function readCommandPrograms(
+  command: string,
+  interpreter: Interpreter,
+): readonly string[] {
   if (command.includes("\0")) {
     throw new ToolError("invalid_input", {
       message: "A command may not contain a null character.",
@@ -299,7 +379,7 @@ export function readCommandPrograms(command: string): readonly string[] {
   }
 
   const names: string[] = [];
-  for (const segment of segmentsOf(command)) {
+  for (const segment of segmentsOf(command, interpreter)) {
     const tokens = [...segment.tokens];
 
     let program: string | undefined;

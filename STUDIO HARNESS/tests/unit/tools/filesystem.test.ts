@@ -427,6 +427,138 @@ describe("edit", () => {
   });
 });
 
+describe("an edit shows what it produced", () => {
+  beforeEach(async () => {
+    writeFileSync(
+      join(workspace, "long.ts"),
+      Array.from({ length: 30 }, (_, index) => `line ${index + 1}`).join("\n") + "\n",
+    );
+    await read({ path: "long.ts" });
+  });
+
+  it("returns the changed region with its line numbers, so no re-read is needed", async () => {
+    const result = await edit({
+      path: "long.ts",
+      oldString: "line 15",
+      newString: "line fifteen",
+    });
+
+    expect(result).toContain("Edited long.ts");
+    expect(result).toContain("line fifteen");
+    // Three lines of context on each side, numbered as the file numbers them.
+    expect(result).toMatch(/\s12\tline 12/);
+    expect(result).toMatch(/\s18\tline 18/);
+    // And not the whole file.
+    expect(result).not.toContain("line 5");
+    expect(result).not.toContain("line 25");
+  });
+
+  it("does not invite a page-through of a file it only excerpted", async () => {
+    const result = await edit({
+      path: "long.ts",
+      oldString: "line 15",
+      newString: "line fifteen",
+    });
+
+    // The read tool's footer belongs to a read. Here it would describe a
+    // deliberately bounded excerpt as a truncated file.
+    expect(result).not.toContain("read again with offset");
+  });
+
+  it("merges regions whose context windows touch, rather than printing lines twice", async () => {
+    writeFileSync(join(workspace, "near.ts"), "a\nx\nb\nc\nx\nd\n");
+    await read({ path: "near.ts" });
+
+    const result = await edit({
+      path: "near.ts",
+      oldString: "x",
+      newString: "y",
+      replaceAll: true,
+    });
+
+    // Both changes sit inside one window, so line 3 is printed once.
+    expect(result.match(/\s3\tb/g)).toHaveLength(1);
+  });
+
+  it("counts the rest rather than printing a wall of separate regions", async () => {
+    // Twelve lines apart, so the context windows do not touch and each change
+    // is its own region.
+    const spaced = Array.from(
+      { length: 10 },
+      (_, index) => `x\n${Array.from({ length: 11 }, (_, pad) => `pad ${index}.${pad}`).join("\n")}`,
+    );
+    writeFileSync(join(workspace, "wide.ts"), spaced.join("\n") + "\n");
+    await read({ path: "wide.ts" });
+
+    const result = await edit({
+      path: "wide.ts",
+      oldString: "x",
+      newString: "y",
+      replaceAll: true,
+    });
+
+    expect(result).toMatch(/7 more changed regions not shown/);
+  });
+
+  it("gives a count rather than a dump when merged regions cover the file", async () => {
+    // Seven lines apart: each window touches the next, so they merge into one
+    // region that is under the region cap and still the whole file.
+    const dense = Array.from(
+      { length: 30 },
+      (_, index) => `x\n${Array.from({ length: 6 }, (_, pad) => `pad ${index}.${pad}`).join("\n")}`,
+    );
+    writeFileSync(join(workspace, "dense.ts"), dense.join("\n") + "\n");
+    await read({ path: "dense.ts" });
+
+    const result = await edit({
+      path: "dense.ts",
+      oldString: "x",
+      newString: "y",
+      replaceAll: true,
+    });
+
+    expect(result).toContain("Edited dense.ts (30 occurrences)");
+    expect(result).toMatch(/span more than 40 lines; read the file/);
+    expect(result).not.toContain("pad 20.");
+  });
+});
+
+describe("a write says which directories it brought into existence", () => {
+  it("names a parent directory that did not exist", async () => {
+    const result = await write({ path: "fresh/deep/file.ts", content: "x\n" });
+
+    expect(result).toContain("Created fresh/deep/file.ts");
+    // The typo case this exists for: `src/componets/Button.tsx` reported as a
+    // plain success is a mistake nothing downstream contradicts.
+    expect(result).toMatch(/directories .*fresh/);
+    expect(result).toContain("deep");
+  });
+
+  it("says nothing extra when every parent was already there", async () => {
+    const result = await write({ path: "src/other.ts", content: "x\n" });
+
+    expect(result).toBe("Created src/other.ts");
+  });
+
+  it("says nothing extra for a file at the workspace root", async () => {
+    const result = await write({ path: "root.ts", content: "x\n" });
+
+    expect(result).toBe("Created root.ts");
+  });
+});
+
+describe("read states its own limits", () => {
+  it("names the line window, the line length, and the file size in its description", () => {
+    const descriptor = gate
+      .list()
+      .find((candidate) => candidate.id.name === "read");
+
+    expect(descriptor?.description).toContain("2000 lines");
+    expect(descriptor?.description).toContain("2000 characters");
+    expect(descriptor?.description).toContain("1 MB");
+  });
+});
+
 describe("the three tools share one record of what was read", () => {
   it("lets an edit follow a write with no re-read", async () => {
     // A file the model just wrote is a file it knows the contents of.
