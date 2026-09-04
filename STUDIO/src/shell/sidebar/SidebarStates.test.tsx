@@ -21,7 +21,7 @@ afterEach(cleanup)
 
 describe('SidebarSkeleton', () => {
   it('announces itself as loading, not as an empty column', () => {
-    render(<SidebarSkeleton organize="list" />)
+    render(<SidebarSkeleton />)
     expect(screen.getByRole('status', { name: 'Loading conversations' })).not.toBeNull()
     // The one thing it must never be mistaken for is the truth: no row here
     // claims a title, and no "no conversations" sentence appears either.
@@ -29,16 +29,12 @@ describe('SidebarSkeleton', () => {
   })
 
   it('holds the shape of the grouping it will be replaced by', () => {
-    const grouped = render(<SidebarSkeleton organize="project" />)
+    const { container } = render(<SidebarSkeleton />)
     // Two groups: header rows at the left edge, conversation rows indented
     // under them -- the shape `ProjectSection` renders when the real data
     // arrives.
-    const indented = grouped.container.querySelectorAll('.ml-3 span[aria-hidden]')
+    const indented = container.querySelectorAll('.ml-3 span[aria-hidden]')
     expect(indented.length).toBe(5)
-    grouped.unmount()
-
-    const flat = render(<SidebarSkeleton organize="list" />)
-    expect(flat.container.querySelectorAll('span[aria-hidden]').length).toBe(8)
   })
 })
 

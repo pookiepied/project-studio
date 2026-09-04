@@ -23,6 +23,16 @@ once is what made a hovered icon the highest-contrast pixel on screen.
 | press | the chip deepens | the button must not scale |
 | active | the chip stays (`--selected`) | the glyph must not darken |
 
+**Focus is answered by register, not by one treatment.** A control answers
+with an edge — its border deepens and a 2px bloom at `--field-ring` confirms
+it, quiet because monochrome cannot borrow hue to say "focus rather than
+warning". A surface answers with elevation: the composer lifts one step of the
+shadow scale and draws nothing. The keyboard outline is the third and loudest
+register (`--ring`, 45%) and is keyboard-only — `:focus-visible` is what makes
+an assertive ring polite. One token never serves two registers; when the
+fields consumed `--ring` they inherited the outline's 45% and every click read
+as an error state.
+
 **A mark is always `--muted-foreground`.** In every state, in every row, on
 every surface. `.studio-icon` enforces it; nothing inherits `currentColor` from
 the text beside it. Two deliberate exceptions, both opting in via the utilities

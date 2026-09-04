@@ -13,10 +13,16 @@ import { cn } from '@/lib/cn'
 /**
  * One conversation in the sidebar.
  *
- * The overflow menu appears on hover or while it is open, and holds every verb
- * that is about the conversation as a record rather than as a place: fork,
- * pin, rename, archive, delete, open elsewhere. Keeping them here rather than
- * in a toolbar is what lets the row be a plain title the rest of the time.
+ * The row's trailing slot has two occupants, never both. While the
+ * conversation is working the dot-matrix mark holds it; otherwise an archive
+ * button holds it, appearing on hover only. A running conversation never
+ * offers archive under the pointer that is watching it finish — when the work
+ * ends the mark swaps back out for the button.
+ *
+ * Everything else about the conversation as a record — fork, pin, rename,
+ * open elsewhere, archive, delete — lives in the menu, and the menu opens on
+ * right-click of the row. Keeping the verbs there rather than in a toolbar is
+ * what lets the row be a plain title the rest of the time.
  *
  * ---- The selection is a sliding chip ---------------------------------------
  *
@@ -45,6 +51,12 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
     setEditing(false)
   }
 
+  const archive = () => {
+    setArchived(conversation.id, true)
+    setMenuOpen(false)
+    if (active) goHome()
+  }
+
   if (editing) {
     return (
       <input
@@ -63,6 +75,16 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
 
   return (
     <div
+      onContextMenu={(event) => {
+        // The row owns right-click: the conversation menu opens here, and the
+        // app-wide actions menu must not open beside it. React handles this at
+        // the root container, which runs before the document listener the
+        // actions menu uses — stopping propagation keeps that listener from
+        // ever firing.
+        event.preventDefault()
+        event.stopPropagation()
+        setMenuOpen(true)
+      }}
       className={cn(
         'group/row relative flex items-center gap-1 rounded-md pr-0.5 transition-colors duration-fast',
         // The selected row keeps its own chip and takes no hover tint: the chip
@@ -95,17 +117,6 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
       >
         {conversation.pinned ? <Icons.pin /> : null}
         <span className="min-w-0 truncate">{conversation.title ?? 'Untitled'}</span>
-
-        {/* After the title, not before it.
-            Leading, it would push every title in the column right the moment
-            any one of them started working, and the list would twitch each
-            time a reply began or ended. Trailing, it occupies the slack the
-            truncation already leaves. */}
-        {working ? (
-          <span className="ml-auto shrink-0 pl-1">
-            <ActivityMark />
-          </span>
-        ) : null}
       </button>
 
       <Popover
@@ -114,24 +125,34 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         side="bottom"
         align="end"
         trigger={
-          <button
-            type="button"
-            aria-label="Conversation options"
-            onClick={() => setMenuOpen((open) => !open)}
-            className={cn(
-              // `relative` keeps this button above the selection chip: the chip
-              // is positioned, and a positioned element paints over anything
-              // static beside it -- the menu would vanish under its own row.
-              'relative flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-fast',
-              'text-muted-foreground hover:bg-tint',
-              // A working row keeps its mark visible until the pointer
-              // arrives; the menu button then takes the slot, because the two
-              // want the same corner and the one you reached for wins.
-              menuOpen ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+          // One box, always the same size, so the menu anchors to the same
+          // corner and the row never shifts as the occupants swap.
+          <span className="relative flex size-5 shrink-0 items-center justify-center">
+            {working ? (
+              // After the title, not before it. Leading, it would push every
+              // title in the column right the moment any one of them started
+              // working, and the list would twitch each time a reply began or
+              // ended. Trailing, it occupies the slack the truncation already
+              // leaves.
+              <ActivityMark />
+            ) : (
+              <button
+                type="button"
+                aria-label={`Archive ${conversation.title ?? 'Untitled'}`}
+                onClick={archive}
+                className={cn(
+                  // `relative` keeps this button above the selection chip: the
+                  // chip is positioned, and a positioned element paints over
+                  // anything static beside it.
+                  'relative flex size-5 items-center justify-center rounded-full transition-all duration-fast',
+                  'text-muted-foreground hover:bg-tint hover:text-foreground',
+                  'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
+                )}
+              >
+                <Icons.archive />
+              </button>
             )}
-          >
-            <Icons.more />
-          </button>
+          </span>
         }
       >
         <MenuItem
@@ -178,11 +199,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         <MenuSeparator />
         <MenuItem
           icon={<Icons.archive />}
-          onSelect={() => {
-            setArchived(conversation.id, true)
-            setMenuOpen(false)
-            if (active) goHome()
-          }}
+          onSelect={archive}
         >
           Archive
         </MenuItem>

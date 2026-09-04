@@ -9,6 +9,14 @@ import { cn } from '@/lib/cn'
  * that made clicking a field look like an error state. A monochrome ring has to
  * stay quiet, because unlike a blue one it cannot rely on hue to say "this is
  * focus rather than a warning".
+ *
+ * The ring reads `--field-ring`, not `--ring`. `--ring` is also the keyboard
+ * outline's token, at 45% — right for a ring that only appears on Tab and sits
+ * outside the control, far too heavy for one that blooms on every click. This
+ * field consumed `--ring` from birth while the paragraph above said 14%, so
+ * the halo the paragraph was written against shipped anyway; the split token
+ * is what makes the prose and the paint agree. The dark value sits below the
+ * light one on purpose — see the token comment in `index.css`.
  */
 
 const BASE = [
@@ -21,7 +29,7 @@ const BASE = [
   'w-full min-w-0 rounded-md border bg-surface px-2.5 py-1.5 text-ui text-foreground',
   'placeholder:text-muted-foreground/70',
   'transition-[border-color,box-shadow] duration-fast outline-none',
-  'focus:border-foreground/20 focus:shadow-[0_0_0_2px_var(--ring)]',
+  'focus:border-foreground/20 focus:shadow-[0_0_0_2px_var(--field-ring)]',
   // The app's global `:focus-visible` outline would stack on top of this
   // field's own ring — two rings, and the outer one floats 4px off the field,
   // where its ends bulge past the field's own shape on a short control and it

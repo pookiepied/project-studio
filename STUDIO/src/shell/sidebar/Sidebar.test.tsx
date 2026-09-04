@@ -44,10 +44,6 @@ const navigation = {
   openSettings: vi.fn(),
   leaveSettings: vi.fn(),
   setPaletteOpen: vi.fn(),
-  sidebarOrganize: 'project' as const,
-  sidebarSort: 'priority' as const,
-  setSidebarOrganize: vi.fn(),
-  setSidebarSort: vi.fn(),
 }
 
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => navigation }))

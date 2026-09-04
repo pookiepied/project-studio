@@ -14,12 +14,6 @@ type Route =
   | { readonly kind: 'project'; readonly projectId: string }
   | { readonly kind: 'settings'; readonly sectionId: string }
 
-/** How the sidebar groups conversations: under their projects, or in one flat list. */
-export type SidebarOrganize = 'project' | 'list'
-
-/** The order conversations are listed in, inside whatever grouping is active. */
-export type SidebarSort = 'priority' | 'updated' | 'manual'
-
 /**
  * How one route hands over to the next, along the app's own hierarchy: home
  * sits under nothing, a project under home, a conversation under its project,
@@ -59,8 +53,6 @@ interface NavigationValue {
   readonly move: NavigationMove
   readonly sidebarOpen: boolean
   readonly paletteOpen: boolean
-  readonly sidebarOrganize: SidebarOrganize
-  readonly sidebarSort: SidebarSort
   go: (route: Route) => void
   goHome: () => void
   openChat: (conversationId: string) => void
@@ -69,8 +61,6 @@ interface NavigationValue {
   leaveSettings: () => void
   toggleSidebar: () => void
   setPaletteOpen: (open: boolean) => void
-  setSidebarOrganize: (organize: SidebarOrganize) => void
-  setSidebarSort: (sort: SidebarSort) => void
 }
 
 const NavigationContext = createContext<NavigationValue | null>(null)
@@ -82,11 +72,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [move, setMove] = useState<NavigationMove>('push')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  // Presentation of the sidebar rather than navigation proper, but it lives
-  // here with `sidebarOpen`: the workspace store is the data, and how the
-  // sidebar shows that data is chrome state, not content.
-  const [sidebarOrganize, setSidebarOrganize] = useState<SidebarOrganize>('project')
-  const [sidebarSort, setSidebarSort] = useState<SidebarSort>('priority')
 
   // ---- The Settings visit ---------------------------------------------------
   //
@@ -151,8 +136,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       move,
       sidebarOpen,
       paletteOpen,
-      sidebarOrganize,
-      sidebarSort,
       go,
       goHome: () => go(HOME),
       openChat: (conversationId) => go({ kind: 'chat', conversationId }),
@@ -166,10 +149,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         setSidebarOpen((open) => !open)
       },
       setPaletteOpen,
-      setSidebarOrganize,
-      setSidebarSort,
     }),
-    [route, move, sidebarOpen, paletteOpen, sidebarOrganize, sidebarSort, go, openSettings, leaveSettings],
+    [route, move, sidebarOpen, paletteOpen, go, openSettings, leaveSettings],
   )
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>

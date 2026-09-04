@@ -3,7 +3,6 @@ import { Button } from '@/components/primitives'
 import { PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'
 import type { StorePhase } from '@/stores/workspace'
-import type { SidebarOrganize } from '@/stores/navigation'
 
 /**
  * What the conversation column shows when the index it lists is not a list.
@@ -34,36 +33,26 @@ import type { SidebarOrganize } from '@/stores/navigation'
  */
 
 /** Row widths, varied on purpose: a column of equal bars reads as a pattern. */
-const LIST_WIDTHS = ['58%', '41%', '66%', '37%', '55%', '48%', '63%', '44%'] as const
-
 const GROUP_WIDTHS = [
   ['42%', '61%', '38%', '55%'],
   ['36%', '52%', '44%'],
 ] as const
 
-export function SidebarSkeleton({ organize }: { organize: SidebarOrganize }) {
+export function SidebarSkeleton() {
   return (
     <div role="status" aria-label="Loading conversations" className="pt-1.5">
-      {organize === 'list' ? (
-        <div className="flex flex-col gap-1">
-          {LIST_WIDTHS.map((width) => (
-            <SkeletonRow key={width} width={width} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {GROUP_WIDTHS.map((rows, group) => (
-            <div key={group} className="flex flex-col">
-              <SkeletonRow width={rows[0]} header />
-              <div className="ml-3 flex flex-col gap-1">
-                {rows.slice(1).map((width) => (
-                  <SkeletonRow key={width} width={width} />
-                ))}
-              </div>
+      <div className="flex flex-col gap-3">
+        {GROUP_WIDTHS.map((rows, group) => (
+          <div key={group} className="flex flex-col">
+            <SkeletonRow width={rows[0]} header />
+            <div className="ml-3 flex flex-col gap-1">
+              {rows.slice(1).map((width) => (
+                <SkeletonRow key={width} width={width} />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

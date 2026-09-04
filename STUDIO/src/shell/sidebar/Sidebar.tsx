@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { COLLAPSE, DURATION, EASE_OUT, SHELL, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { StudioMark } from '@/components/brand'
-import { IconButton, MenuItem, MenuLabel, MenuSeparator, Popover, Tooltip } from '@/components/primitives'
+import { IconButton, Tooltip } from '@/components/primitives'
 import { ConversationRow } from '@/shell/sidebar/ConversationRow'
 import { ProjectSection } from '@/shell/sidebar/ProjectSection'
 import { SettingsTree } from '@/shell/sidebar/SettingsTree'
@@ -70,26 +70,18 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
     openSettings,
     leaveSettings,
     setPaletteOpen,
-    sidebarOrganize,
-    sidebarSort,
-    setSidebarOrganize,
-    setSidebarSort,
   } = useNavigation()
   const { projects, conversations, storePhase, ensureStore } = useWorkspace()
   const [sectionOpen, setSectionOpen] = useState(true)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   const inSettings = route.kind === 'settings'
   const activeSection = inSettings ? route.sectionId : ''
 
-  const flat = sidebarOrganize === 'list'
   const live = conversations.filter((conversation) => !conversation.archived)
   const sorted = [...live].sort((a, b) => {
-    // Manual order is the order the data was given in, untouched. Priority
-    // keeps pinned conversations ahead of everything else; last updated is
-    // recency alone and lets a pin lose to a fresher chat.
-    if (sidebarSort === 'manual') return 0
-    if (sidebarSort === 'priority' && a.pinned !== b.pinned) return a.pinned ? -1 : 1
+    // Pinned conversations stay ahead of everything else; the rest is
+    // recency, most recently updated first.
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
     return b.updatedAt - a.updatedAt
   })
   const loose = sorted.filter((conversation) => conversation.projectId === null)
@@ -261,91 +253,21 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                       arrows exist to express. A disclosure belongs to the tree, not
                       to the label it happens to sit next to. */}
                   <Icons.disclosure state={sectionOpen ? 'on' : 'rest'} size="sm" />
-                  {flat ? 'Conversations' : 'Projects'}
+                  Projects
                 </button>
 
-                {flat ? null : (
-                  <Tooltip label="New project">
-                    <button
-                      type="button"
-                      aria-label="New project"
-                      onClick={onNewProject}
-                      className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
-                    >
-                      <Icons.projectNew />
-                    </button>
-                  </Tooltip>
-                )}
-
-                <Popover
-                  open={menuOpen}
-                  onOpenChange={setMenuOpen}
-                  side="bottom"
-                  align="end"
-                  trigger={
-                    <button
-                      type="button"
-                      aria-label="Sidebar options"
-                      onClick={() => setMenuOpen((value) => !value)}
-                      className={cn(
-                        'flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-tint',
-                        menuOpen ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100',
-                      )}
-                    >
-                      <Icons.more />
-                    </button>
-                  }
-                >
-                  <MenuLabel>Organize sidebar by</MenuLabel>
-                  <MenuItem
-                    selected={sidebarOrganize === 'project'}
-                    onSelect={() => {
-                      setSidebarOrganize('project')
-                      setMenuOpen(false)
-                    }}
+                {/* The row's last control, at its far end: the only action the
+                    header carries now that the options menu is gone. */}
+                <Tooltip label="New project">
+                  <button
+                    type="button"
+                    aria-label="New project"
+                    onClick={onNewProject}
+                    className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-fast hover:bg-tint"
                   >
-                    Project
-                  </MenuItem>
-                  <MenuItem
-                    selected={sidebarOrganize === 'list'}
-                    onSelect={() => {
-                      setSidebarOrganize('list')
-                      setMenuOpen(false)
-                    }}
-                  >
-                    In a list
-                  </MenuItem>
-
-                  <MenuSeparator />
-                  <MenuLabel>Sort chats by</MenuLabel>
-                  <MenuItem
-                    selected={sidebarSort === 'priority'}
-                    onSelect={() => {
-                      setSidebarSort('priority')
-                      setMenuOpen(false)
-                    }}
-                  >
-                    Priority
-                  </MenuItem>
-                  <MenuItem
-                    selected={sidebarSort === 'updated'}
-                    onSelect={() => {
-                      setSidebarSort('updated')
-                      setMenuOpen(false)
-                    }}
-                  >
-                    Last updated
-                  </MenuItem>
-                  <MenuItem
-                    selected={sidebarSort === 'manual'}
-                    onSelect={() => {
-                      setSidebarSort('manual')
-                      setMenuOpen(false)
-                    }}
-                  >
-                    Manual order
-                  </MenuItem>
-                </Popover>
+                    <Icons.projectNew />
+                  </button>
+                </Tooltip>
               </div>
 
               <AnimatePresence initial={false}>
@@ -356,13 +278,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                       // header would be a state claiming to be the column; in
                       // here it is only the list holding its own place.
                       <div className="pt-1">
-                        <SidebarSkeleton organize={sidebarOrganize} />
-                      </div>
-                    ) : flat ? (
-                      <div className="flex flex-col gap-1">
-                        {sorted.map((conversation) => (
-                          <ConversationRow key={conversation.id} conversation={conversation} />
-                        ))}
+                        <SidebarSkeleton />
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3">
@@ -381,7 +297,7 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
                 ) : null}
               </AnimatePresence>
 
-              {!flat && loose.length > 0 ? (
+              {loose.length > 0 ? (
                 <>
                   <p className="px-1.5 pt-5 pb-1.5 text-micro text-muted-foreground/80 uppercase">
                     Conversations
