@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConversationRow } from './ConversationRow'
@@ -192,5 +192,51 @@ describe('the right-click menu', () => {
     // which is different from archiving it by brushing past the corner.
     expect(screen.getByText('Archive')).toBeTruthy()
     expect(screen.getByText('Delete')).toBeTruthy()
+  })
+})
+
+describe('deleting from the row', () => {
+  function openDelete() {
+    render(<ConversationRow conversation={CONVERSATION} />)
+    fireEvent.contextMenu(screen.getByRole('button', { name: TITLE }))
+    fireEvent.click(screen.getByText('Delete'))
+  }
+
+  it('asks first, naming what the delete destroys', () => {
+    openDelete()
+
+    expect(remove).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Delete conversation' })).toBeTruthy()
+    expect(screen.getByText(/its files and its transcript/)).toBeTruthy()
+    expect(screen.getByText(/This cannot be undone/)).toBeTruthy()
+  })
+
+  it('deletes on confirm and leaves the conversation it was reading', async () => {
+    navigation.route = { kind: 'chat', conversationId: CONVERSATION.id }
+    remove.mockResolvedValue(null)
+    openDelete()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(CONVERSATION.id))
+    // The open conversation is gone, so the row sends the reader home rather
+    // than leaving them on a record that no longer exists.
+    expect(goHome).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays put and says why when the harness refuses the delete', async () => {
+    remove.mockResolvedValue({
+      kind: 'harness-error',
+      status: 409,
+      code: 'storage.conflict',
+      message: 'Conversation "cnv_1" has a turn in flight.',
+    })
+    openDelete()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+    expect(screen.getByRole('alert').textContent).toContain('has a turn in flight')
+    // A refusal deletes nothing, so the reader stays where they are.
+    expect(goHome).not.toHaveBeenCalled()
+    expect(remove).toHaveBeenCalledWith(CONVERSATION.id)
   })
 })

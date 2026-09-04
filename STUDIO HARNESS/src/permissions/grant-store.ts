@@ -296,6 +296,22 @@ export class PermissionGrantStore {
     return Number(result.changes);
   }
 
+  /**
+   * Destroys every grant scoped to one conversation, for permanent deletion.
+   *
+   * Distinct from `revokeConversation`, which marks rows so the audit trail
+   * survives a user changing their mind. A deleted conversation has no trail
+   * to keep: a revoked row would still be keyed to an id nothing addresses,
+   * and the purge proof is that no row keyed to the id exists anywhere
+   * afterwards. Called only from `conversations/purge.ts`, after the journal.
+   */
+  deleteConversation(conversationId: string): number {
+    const result = this.#db
+      .prepare("DELETE FROM permission_grant WHERE conversation_id = ?")
+      .run(conversationId);
+    return Number(result.changes);
+  }
+
   #findExact(grant: GrantRow): GrantRow | undefined {
     const row = this.#db
       .prepare(

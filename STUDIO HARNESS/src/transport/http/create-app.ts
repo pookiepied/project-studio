@@ -11,6 +11,7 @@ import type { RetrievalAdministration } from "../../application/retrieval-manage
 import type { MediaAdministration } from "../../media/service.js";
 import type { ConversationStore } from "../../conversations/store.js";
 import type { ProjectStore } from "../../projects/store.js";
+import type { StudioDatabase } from "../../storage/database.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createTurnSettingsMiddleware } from "./middleware/turn-settings.js";
 import type { ConversationTitlingPort } from "../../conversations/titling.js";
@@ -41,6 +42,12 @@ export interface CreateHttpAppOptions {
   readonly approvals: PermissionApprovalBroker;
   /** The conversation index: rows, never transcript content. */
   readonly conversations: ConversationStore;
+  /**
+   * The application database. The conversation routes own the purge of
+   * conversation-scoped rows through it; everything else keeps reaching only
+   * its own store.
+   */
+  readonly database: StudioDatabase;
   /**
    * The automatic titling port, when a titler was composed. The turn-settings
    * middleware hands it every first admission's message; absent means no

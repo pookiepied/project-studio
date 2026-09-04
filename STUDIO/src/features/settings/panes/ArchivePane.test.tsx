@@ -29,7 +29,10 @@ const workspace = vi.hoisted(() => {
     storePhase: { status: 'loading', error: null } as StorePhase,
     ensureStore: vi.fn(async () => true),
     setArchived: (_conversationId: string, _archived: boolean) => {},
-    removeMany: (_conversationIds: readonly string[]) => {},
+    removeMany: vi.fn(async (_conversationIds: readonly string[]) => ({})),
+    orphanTrees: [] as readonly string[],
+    refreshOrphanTrees: vi.fn(async () => {}),
+    sweepOrphanTrees: vi.fn(async () => ({ ok: true as const, value: {} })),
   }
 })
 
@@ -83,5 +86,64 @@ describe('ArchivePane', () => {
     expect(screen.getByText('read failed')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(workspace.ensureStore).toHaveBeenCalledTimes(1))
+  })
+
+  it('states what deleting destroys before anything is selected', () => {
+    ready()
+    workspace.conversations = [archivedConversation('cnv_1', 'An archived read')]
+    render(<ArchivePane />)
+    expect(
+      screen.getByText(/Deleting removes the conversation, its files and its transcript/),
+    ).not.toBeNull()
+  })
+
+  it('purges the whole archive when asked', async () => {
+    ready()
+    workspace.conversations = [
+      archivedConversation('cnv_1', 'First'),
+      archivedConversation('cnv_2', 'Second'),
+    ]
+    workspace.removeMany = vi.fn(async () => ({}))
+    render(<ArchivePane />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear archive' }))
+    await waitFor(() =>
+      expect(workspace.removeMany).toHaveBeenCalledWith(['cnv_1', 'cnv_2']),
+    )
+  })
+
+  it('keeps a refused conversation listed and says why, verbatim', async () => {
+    ready()
+    workspace.conversations = [archivedConversation('cnv_live', 'Still working')]
+    workspace.removeMany = vi.fn(async () => ({
+      cnv_live: 'Conversation "cnv_live" has a turn in flight.',
+    }))
+    render(<ArchivePane />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear archive' }))
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).not.toBeNull(),
+    )
+    expect(screen.getByRole('alert').textContent).toContain('has a turn in flight')
+  })
+
+  it('offers the leftover folders with what removing them means', () => {
+    ready()
+    workspace.conversations = []
+    workspace.orphanTrees = ['cnv_1j04nco6']
+    render(<ArchivePane />)
+    expect(screen.getByText(/One leftover folder/)).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Remove leftover folders' })).not.toBeNull()
+  })
+
+  it('sweeps the leftover folders when asked', async () => {
+    ready()
+    workspace.conversations = []
+    workspace.orphanTrees = ['cnv_1j04nco6']
+    workspace.sweepOrphanTrees = vi.fn(async () => ({ ok: true as const, value: {} }))
+    render(<ArchivePane />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove leftover folders' }))
+    await waitFor(() => expect(workspace.sweepOrphanTrees).toHaveBeenCalledTimes(1))
   })
 })

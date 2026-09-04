@@ -6,14 +6,25 @@ import {
   conversationCreateSchema,
   conversationPatchSchema,
 } from "../../../contracts/conversations.js";
+import { ExtensionSelectionStore } from "../../../extend/selection.js";
+import { PermissionGrantStore } from "../../../permissions/grant-store.js";
 import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
-import { purgeConversations } from "../../../conversations/purge.js";
+import {
+  listOrphanConversationTrees,
+  purgeConversations,
+  sweepOrphanConversationTrees,
+} from "../../../conversations/purge.js";
 import type { ConversationStore } from "../../../conversations/store.js";
+import type { StudioDatabase } from "../../../storage/database.js";
+import { StorageError } from "../../../storage/errors.js";
+import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
 import { failure, invalidBody, statusOf } from "./error-status.js";
 
 export interface ConversationRoutesOptions {
   /** The index of conversations that exist, and the one owner of its rows. */
   readonly conversations: ConversationStore;
+  /** The application database, for the conversation-scoped purge writes. */
+  readonly database: StudioDatabase;
 }
 
 /**
@@ -60,6 +71,8 @@ export function createConversationRoutes(
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.PROJECT));
   const store = options.conversations;
+  const grants = new PermissionGrantStore(options.database);
+  const selection = new ExtensionSelectionStore(options.database);
 
   routes.get("/", (context) => {
     try {
@@ -101,21 +114,77 @@ export function createConversationRoutes(
     }
   });
 
-  // Permanent destruction of one conversation. It removes the index row and
-  // the conversation's own tree; what it cannot remove, and why, is written
-  // in `conversations/purge.ts` rather than claimed here.
-  routes.delete("/:id", async (context) => {
+  // The trees a previous partial delete left behind: no index row addresses
+  // them, so the purge cannot target them and this listing is what reaches
+  // them instead. Read-only; the sweep below is the part that deletes.
+  routes.get("/orphan-trees", async (context) => {
     try {
-      return context.json(await purgeConversations(store, [context.req.param("id")]));
+      return context.json(
+        await listOrphanConversationTrees(store, resolveFlueJournalPath()),
+      );
     } catch (error) {
       return context.json(failure(error), statusOf(error));
     }
   });
 
-  // Permanent destruction over a selection — or all of the archive at once.
+  // Removes the orphaned trees, one by one, at a person's request. Never run
+  // on a timer and never as part of another call: nothing in Studio deletes
+  // on its own.
+  routes.post("/orphan-trees/sweep", async (context) => {
+    try {
+      return context.json(
+        await sweepOrphanConversationTrees(store, resolveFlueJournalPath()),
+      );
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  // Permanent destruction of one conversation: its journal rows, its scoped
+  // rows, its index row, and its own tree - see `conversations/purge.ts` for
+  // the order and what each step owns. A conversation with a turn in flight
+  // is refused with 409 rather than reported inside a 200: the delete did
+  // not happen at all, and an outcome shaped like a partial success would
+  // say otherwise.
+  routes.delete("/:id", async (context) => {
+    try {
+      const id = context.req.param("id");
+      const outcome = await purgeConversations(
+        {
+          conversations: store,
+          grants,
+          selection,
+          flueJournalPath: resolveFlueJournalPath(),
+        },
+        [id],
+      );
+      const detail = outcome.details[id];
+      if (!outcome.removed.includes(id) && detail?.errorCode === "storage.conflict") {
+        throw new StorageError("conflict", {
+          message: detail.error ?? `Conversation "${id}" cannot be deleted right now.`,
+        });
+      }
+      return context.json(outcome);
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  // Permanent destruction over a selection - or all of the archive at once.
+  // Always answers 200 with the per-id outcome: over many ids a refusal for
+  // one running conversation must not fail the others, so each id reports
+  // what was destroyed and what was not.
   routes.post("/purge", async (context) => {
     try {
-      const outcome = await purgeConversations(store, idsForPurge(await body(context)));
+      const outcome = await purgeConversations(
+        {
+          conversations: store,
+          grants,
+          selection,
+          flueJournalPath: resolveFlueJournalPath(),
+        },
+        idsForPurge(await body(context)),
+      );
       return context.json(outcome);
     } catch (error) {
       return context.json(failure(error), statusOf(error));

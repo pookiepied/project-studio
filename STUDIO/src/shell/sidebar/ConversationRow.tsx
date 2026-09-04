@@ -4,6 +4,7 @@ import { SPRING_SNAPPY } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuSeparator, Popover } from '@/components/primitives'
 import { ActivityMark } from '@/shell/sidebar/ActivityMark'
+import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { useForkConversation } from '@/features/chat/fork'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
@@ -19,10 +20,14 @@ import { cn } from '@/lib/cn'
  * offers archive under the pointer that is watching it finish — when the work
  * ends the mark swaps back out for the button.
  *
- * Everything else about the conversation as a record — fork, pin, rename,
- * open elsewhere, archive, delete — lives in the menu, and the menu opens on
- * right-click of the row. Keeping the verbs there rather than in a toolbar is
- * what lets the row be a plain title the rest of the time.
+  * Everything else about the conversation as a record — fork, pin, rename,
+  * open elsewhere, archive, delete — lives in the menu, and the menu opens on
+  * right-click of the row. Keeping the verbs there rather than in a toolbar is
+  * what lets the row be a plain title the rest of the time.
+  *
+  * Archive and delete are two meanings, not two names for one. Archive files
+  * the conversation away and destroys nothing; delete asks first, names what
+  * it destroys, and cannot be undone.
  *
  * ---- The selection is a sliding chip ---------------------------------------
  *
@@ -40,6 +45,7 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
   const detach = useDetachConversation()
   const { forkWhole } = useForkConversation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(conversation.title ?? '')
 
@@ -205,15 +211,27 @@ export function ConversationRow({ conversation }: { conversation: Conversation }
         <MenuItem
           icon={<Icons.delete />}
           destructive
+          note="The conversation, its files and its transcript. Cannot be undone."
           onSelect={() => {
             setMenuOpen(false)
-            if (active) goHome()
-            remove(conversation.id)
+            setConfirmingDelete(true)
           }}
         >
           Delete
         </MenuItem>
       </Popover>
+      <DeleteConversationDialog
+        conversation={confirmingDelete ? conversation : null}
+        onClose={() => setConfirmingDelete(false)}
+        onDelete={async (id) => {
+          const error = await remove(id)
+          // Deleting the open conversation empties the page behind it, so
+          // the row sends the reader home - but only when the delete really
+          // happened. A refusal leaves the conversation where it is.
+          if (error === null && active) goHome()
+          return error
+        }}
+      />
     </div>
   )
 }

@@ -223,6 +223,23 @@ export class ExtensionSelectionStore {
     return Number(result.changes);
   }
 
+  /**
+   * Destroys every conversation-scoped decision for one conversation, for
+   * permanent deletion. A narrower `clear` would hand the conversation back
+   * to its project scope, but a deleted conversation inherits nothing - its
+   * overrides go with it. Called only from `conversations/purge.ts`, after
+   * the journal.
+   */
+  clearConversation(conversationId: string): number {
+    const result = this.#db
+      .prepare(
+        `DELETE FROM extension_scope WHERE scope_kind = 'conversation' AND scope_id = ?`,
+      )
+      .run(conversationId);
+
+    return Number(result.changes);
+  }
+
   /** Narrowest first, skipping whichever scopes this context does not have. */
   #chain(context: ResolutionContext): readonly Scope[] {
     const scopes: Scope[] = [];

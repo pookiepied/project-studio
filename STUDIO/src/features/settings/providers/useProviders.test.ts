@@ -68,6 +68,8 @@ function stubClient(overrides: {
     updateConversation: () => refuse(),
     deleteConversation: () => refuse(),
     purgeConversations: () => refuse(),
+    listOrphanTrees: () => refuse(),
+    sweepOrphanTrees: () => refuse(),
     listPendingApprovals: () => refuse(),
     answerApproval: () => refuse(),
     cancelApproval: () => refuse(),

@@ -1058,26 +1058,97 @@ export interface ConversationPatch {
 }
 
 /**
- * The answer to permanent destruction over one id or many. `cleanupFailures`
- * is present precisely so a tree that could not be fully removed is said out
- * loud rather than silently absorbed.
+ * The answer to permanent destruction over one id or many. `removed` holds
+ * only ids that are fully gone - journal, scoped rows, index row, and tree.
+ * Anything less is not called removed: `cleanupFailures` carries one
+ * sentence per id that did not fully purge, and `details` says per id what
+ * was destroyed and what was not, so a partial failure is legible instead
+ * of being flattened into "removed".
  */
+export interface PurgeDetail {
+  readonly indexRow: boolean
+  readonly tree: boolean
+  readonly journal: boolean
+  readonly scoped: boolean
+  readonly errorCode?: string
+  readonly error?: string
+}
+
 export interface PurgeOutcome {
   readonly removed: readonly string[]
   readonly cleanupFailures: Readonly<Record<string, string>>
+  readonly details: Readonly<Record<string, PurgeDetail>>
+}
+
+function parsePurgeDetail(value: unknown): PurgeDetail | null {
+  if (!isRecord(value)) return null
+  const indexRow = flag(value['indexRow'])
+  const tree = flag(value['tree'])
+  const journal = flag(value['journal'])
+  const scoped = flag(value['scoped'])
+  if (indexRow === null || tree === null || journal === null || scoped === null) return null
+  const errorCode = value['errorCode']
+  const error = value['error']
+  if (errorCode !== undefined && typeof errorCode !== 'string') return null
+  if (error !== undefined && typeof error !== 'string') return null
+  return {
+    indexRow,
+    tree,
+    journal,
+    scoped,
+    ...(errorCode === undefined ? {} : { errorCode }),
+    ...(error === undefined ? {} : { error }),
+  }
 }
 
 export function parsePurgeOutcome(value: unknown): PurgeOutcome | null {
   if (!isRecord(value)) return null
   const removed = listOf(parseId, value['removed'])
-  if (!isRecord(value['cleanupFailures']) || removed === null) return null
+  if (!isRecord(value['cleanupFailures']) || !isRecord(value['details']) || removed === null)
+    return null
 
   const failures: Record<string, string> = {}
   for (const [key, message] of Object.entries(value['cleanupFailures'])) {
     if (typeof message !== 'string') return null
     failures[key] = message
   }
-  return { removed, cleanupFailures: failures }
+  const details: Record<string, PurgeDetail> = {}
+  for (const [key, detail] of Object.entries(value['details'])) {
+    const parsed = parsePurgeDetail(detail)
+    if (parsed === null) return null
+    details[key] = parsed
+  }
+  return { removed, cleanupFailures: failures, details }
+}
+
+/** Trees no index row addresses, listed for a person's sweep - never swept by the app. */
+export interface OrphanTrees {
+  readonly orphans: readonly string[]
+}
+
+export function parseOrphanTrees(value: unknown): OrphanTrees | null {
+  if (!isRecord(value)) return null
+  const orphans = listOf(parseId, value['orphans'])
+  if (orphans === null) return null
+  return { orphans }
+}
+
+/** What a person's orphan sweep removed, and what it could not. */
+export interface OrphanSweepOutcome {
+  readonly removed: readonly string[]
+  readonly failures: Readonly<Record<string, string>>
+}
+
+export function parseOrphanSweepOutcome(value: unknown): OrphanSweepOutcome | null {
+  if (!isRecord(value)) return null
+  const removed = listOf(parseId, value['removed'])
+  if (!isRecord(value['failures']) || removed === null) return null
+  const failures: Record<string, string> = {}
+  for (const [key, message] of Object.entries(value['failures'])) {
+    if (typeof message !== 'string') return null
+    failures[key] = message
+  }
+  return { removed, failures }
 }
 
 function parseId(value: unknown): string | null {

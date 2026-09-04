@@ -242,10 +242,37 @@ interface WorkspaceValue {
   setProject: (conversationId: string, projectId: string | null) => void
   togglePin: (conversationId: string) => void
   setArchived: (conversationId: string, archived: boolean) => void
-  /** Deletes by archiving; the archive pane owns destruction. */
-  remove: (conversationId: string) => void
-  /** Permanent destruction over a selection or all of the archive. */
-  removeMany: (conversationIds: readonly string[]) => void
+  /**
+   * Permanent destruction of one conversation: journal, scoped rows, index
+   * row, and tree. Resolves to the failure to show, or null when it is gone.
+   * A running conversation is refused and stays exactly where it is.
+   */
+  remove: (conversationId: string) => Promise<HarnessFailure | null>
+  /**
+   * Permanent destruction over a selection or all of the archive. Resolves
+   * to one sentence per conversation that did not fully purge, keyed by id -
+   * an empty record means everything requested is gone. A request that never
+   * completed reloads the list and resolves empty: the rows are back, which
+   * is the honest signal.
+   */
+  removeMany: (
+    conversationIds: readonly string[],
+  ) => Promise<Readonly<Record<string, string>>>
+  /**
+   * Directory names under the conversations folder that no index row
+   * addresses and no journal stream owns - trees earlier partial deletes
+   * left behind. Read so the Archived pane can offer them; never swept by
+   * the app.
+   */
+  readonly orphanTrees: readonly string[]
+  /** Re-reads the orphan list. Best effort: a failure keeps the last answer. */
+  refreshOrphanTrees: () => Promise<void>
+  /**
+   * Removes the orphaned trees, at the person's request. The failures record
+   * holds one sentence per tree that could not be removed; empty means the
+   * list is now empty.
+   */
+  sweepOrphanTrees: () => Promise<HarnessResult<Readonly<Record<string, string>>>>
   /**
    * Asks the supervisor to start the harness and re-reads when it does. The
    * remedy Task 34's notice names, reachable from anywhere that can see this
@@ -727,29 +754,97 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [mutateIndex],
   )
 
-  // Deleting archives: the archive is the recovery window, so removing a
-  // conversation from anywhere except Settings lands it there.
+  // Deleting removes the conversation everywhere it exists - the journal,
+  // the scoped rows, the index row, and the tree - so the local copies leave
+  // only once the harness says what actually went. A refusal (a turn in
+  // flight) keeps the row; a partial destruction reloads, so the list shows
+  // the truth rather than the request.
   const remove = useCallback(
-    (conversationId: string) => {
-      setArchived(conversationId, true)
-    },
-    [setArchived],
-  )
-
-  const removeMany = useCallback(
-    (conversationIds: readonly string[]) => {
-      const doomed = new Set(conversationIds)
-      setRemoteConversations((current) =>
-        current.filter((item) => !doomed.has(item.id)),
-      )
+    async (conversationId: string): Promise<HarnessFailure | null> => {
       const client = clientRef.current
-      if (client === null || doomed.size === 0) return
-      void client.purgeConversations([...doomed]).then(async (result) => {
-        if (liveRef.current && !result.ok) await load()
-      })
+      if (client === null) {
+        return {
+          kind: 'not-reachable',
+          timedOut: false,
+          message: 'The harness is not running, so the conversation was not deleted.',
+        }
+      }
+      const result = await client.deleteConversation(conversationId)
+      if (!liveRef.current) return result.ok ? null : result.error
+      if (!result.ok) {
+        void load()
+        return result.error
+      }
+      const outcome = result.value
+      if (outcome.removed.includes(conversationId)) {
+        const doomed = conversationId
+        setRemoteConversations((current) => current.filter((item) => item.id !== doomed))
+        setLocalConversations((current) => current.filter((item) => item.id !== doomed))
+        return null
+      }
+      await load()
+      const detail = outcome.details[conversationId]
+      const message = detail?.error ?? 'The conversation could not be deleted.'
+      return {
+        kind: 'harness-error',
+        status: detail?.errorCode === 'storage.conflict' ? 409 : 500,
+        message,
+        ...(detail?.errorCode === undefined ? {} : { code: detail.errorCode }),
+      }
     },
     [load],
   )
+
+  const removeMany = useCallback(
+    async (conversationIds: readonly string[]): Promise<Readonly<Record<string, string>>> => {
+      const doomed = new Set(conversationIds)
+      setRemoteConversations((current) => current.filter((item) => !doomed.has(item.id)))
+      const client = clientRef.current
+      if (client === null || doomed.size === 0) return {}
+      const result = await client.purgeConversations([...doomed])
+      if (!liveRef.current) return {}
+      if (!result.ok) {
+        await load()
+        return {}
+      }
+      // Rows the purge refused or only half-destroyed are back after the
+      // reload; the per-id sentences say which ones and why.
+      if ([...doomed].some((id) => !result.value.removed.includes(id))) await load()
+      return result.value.cleanupFailures
+    },
+    [load],
+  )
+
+  const [orphanTrees, setOrphanTrees] = useState<readonly string[]>([])
+
+  const refreshOrphanTrees = useCallback(async (): Promise<void> => {
+    const client = clientRef.current
+    if (client === null) return
+    const result = await client.listOrphanTrees()
+    if (!liveRef.current || !result.ok) return
+    setOrphanTrees(result.value.orphans)
+  }, [])
+
+  const sweepOrphanTrees = useCallback(async (): Promise<
+    HarnessResult<Readonly<Record<string, string>>>
+  > => {
+    const client = clientRef.current
+    if (client === null) {
+      return {
+        ok: false,
+        error: {
+          kind: 'not-reachable',
+          timedOut: false,
+          message: 'The harness is not running, so the leftover folders were not removed.',
+        },
+      }
+    }
+    const result = await client.sweepOrphanTrees()
+    if (!result.ok) return result
+    if (!liveRef.current) return { ok: true, value: {} }
+    await refreshOrphanTrees()
+    return { ok: true, value: result.value.failures }
+  }, [refreshOrphanTrees])
 
   /* ------------------------------ projects -------------------------------- */
 
@@ -900,6 +995,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setArchived,
       remove,
       removeMany,
+      orphanTrees,
+      refreshOrphanTrees,
+      sweepOrphanTrees,
       ensureStore,
     }),
     [
@@ -910,6 +1008,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       createProject,
       ensureStore,
       markRunning,
+      orphanTrees,
+      refreshOrphanTrees,
+      sweepOrphanTrees,
       remoteProjects,
       remove,
       removeMany,

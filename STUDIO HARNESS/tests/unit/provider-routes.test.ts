@@ -86,6 +86,7 @@ beforeEach(() => {
     approvals: { list: () => [] } as unknown as PermissionApprovalBroker,
     conversations: new ConversationStore(db),
     projects: new ProjectStore(db),
+    database: db,
     admission: session.verifier,
     // No submission in this suite carries turn settings; "nothing is served"
     // is the honest answer for the one check the middleware makes.

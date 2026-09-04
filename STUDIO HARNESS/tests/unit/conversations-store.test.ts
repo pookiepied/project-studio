@@ -1,12 +1,15 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ConversationStore } from "../../src/conversations/store.js";
 import { deriveTitle } from "../../src/conversations/title.js";
 import { purgeConversations } from "../../src/conversations/purge.js";
+import { ExtensionSelectionStore } from "../../src/extend/selection.js";
+import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import {
   conversationWorkspaceDirectory,
@@ -295,6 +298,36 @@ describe("the conversation index", () => {
 });
 
 describe("emptying the archive", () => {
+  function purgeDependencies(store: ConversationStore): {
+    conversations: ConversationStore;
+    grants: PermissionGrantStore;
+    selection: ExtensionSelectionStore;
+    flueJournalPath: string;
+  } {
+    // A journal with the required tables and no rows: the purge's journal
+    // step succeeds with zero counts, so these tests keep proving what they
+    // always proved about rows and trees.
+    const flueJournalPath = join(workspace, "flue.db");
+    const journal = new DatabaseSync(flueJournalPath);
+    try {
+      journal.exec(
+        "CREATE TABLE flue_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);" +
+          "CREATE TABLE flue_conversation_streams (path TEXT PRIMARY KEY, identity_json TEXT NOT NULL, next_offset INTEGER NOT NULL DEFAULT 0);" +
+          "CREATE TABLE flue_conversation_stream_batches (path TEXT NOT NULL, seq INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (path, seq));" +
+          "CREATE TABLE flue_agent_submissions (submission_id TEXT NOT NULL UNIQUE, session_key TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL);",
+      );
+      journal.prepare("INSERT INTO flue_meta (key, value) VALUES ('format_version', '1')").run();
+    } finally {
+      journal.close();
+    }
+    return {
+      conversations: store,
+      grants: new PermissionGrantStore(db),
+      selection: new ExtensionSelectionStore(db),
+      flueJournalPath,
+    };
+  }
+
   it("destroys rows and each conversation's own tree, over a selection", async () => {
     const store = new ConversationStore(db);
     store.record({ id: "cnv_keep", firstMessage: "Keep", createdAt: 5 });
@@ -307,7 +340,10 @@ describe("emptying the archive", () => {
       writeFileSync(written, "a note the model wrote", "utf8");
     }
 
-    const outcome = await purgeConversations(store, ["cnv_doomed_1", "cnv_doomed_2"]);
+    const outcome = await purgeConversations(purgeDependencies(store), [
+      "cnv_doomed_1",
+      "cnv_doomed_2",
+    ]);
 
     expect([...outcome.removed].sort()).toEqual(["cnv_doomed_1", "cnv_doomed_2"]);
     expect(Object.keys(outcome.cleanupFailures)).toEqual([]);
@@ -322,7 +358,7 @@ describe("emptying the archive", () => {
     const store = new ConversationStore(db);
     store.record({ id: "cnv_empty", firstMessage: "Nothing written yet" });
 
-    const outcome = await purgeConversations(store, ["cnv_empty"]);
+    const outcome = await purgeConversations(purgeDependencies(store), ["cnv_empty"]);
     expect(outcome.removed).toEqual(["cnv_empty"]);
     expect(Object.keys(outcome.cleanupFailures)).toEqual([]);
   });

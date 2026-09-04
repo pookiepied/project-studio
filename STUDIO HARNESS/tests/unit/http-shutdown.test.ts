@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { createAdmissionSession } from "../../src/admission/verifier.js";
 import type { PermissionApprovalBroker } from "../../src/application/approval-broker.js";
@@ -6,6 +6,7 @@ import type { McpAdministration } from "../../src/application/mcp-management.js"
 import type { ProviderAdministration } from "../../src/providers/management.js";
 import type { ConversationStore } from "../../src/conversations/store.js";
 import type { ProjectStore } from "../../src/projects/store.js";
+import { openDatabase } from "../../src/storage/database.js";
 import { createHttpApp } from "../../src/transport/http/create-app.js";
 
 /**
@@ -17,6 +18,15 @@ function probeAgent(): string {
   return "shutdown probe";
 }
 probeAgent.agentName = "shutdown-probe";
+
+// The conversation routes build their purge stores over this connection at
+// composition time. This suite never purges, so one shared in-memory
+// database holds still for the whole file.
+const database = openDatabase({ path: ":memory:" });
+
+afterAll(() => {
+  database.close();
+});
 
 /**
  * Composes the real app the way `src/app.ts` does, minus everything the
@@ -64,6 +74,7 @@ function composeApp(clientType: "studio-host" | "studio-client") {
     projects: {
       list: () => [],
     } as unknown as ProjectStore,
+    database,
     admission: session.verifier,
     // No submission in this suite carries turn settings; "nothing is served"
     // is the honest answer for the one check the middleware makes.

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/primitives'
 import { Placeholder, PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'
+import type { HarnessFailure } from '@/platform/harness'
 import { useWorkspace } from '@/stores/workspace'
 import { Pane } from '@/features/settings/panes/Pane'
 import { cn } from '@/lib/cn'
@@ -20,13 +21,20 @@ import { cn } from '@/lib/cn'
  *
  * ---- What the buttons actually destroy -------------------------------------
  *
- * `removeMany` asks the harness to purge: the index row and that
- * conversation's own tree under `~/.studio/data/conversations/` go; the
- * canonical transcript inside Flue's journal has no supported deletion
- * surface, so nothing pretends otherwise — see
- * `STUDIO HARNESS/src/conversations/purge.ts`. The rows are removed first,
- * which means there is no half-deleted state in the sidebar afterwards even
- * when files were locked mid-turn and reported back as unremovable.
+ * `removeMany` asks the harness to purge: the journal rows in Flue's journal,
+ * the conversation-scoped rows, the index row, and that conversation's own
+ * tree under `~/.studio/data/conversations/` go, content first and the row
+ * last so a crash stays deletable - see
+ * `STUDIO HARNESS/src/conversations/purge.ts`. A conversation with a turn in
+ * flight is refused and stays listed, with the harness's sentence beside it
+ * rather than a paraphrase.
+ *
+ * ---- What the leftover folders are -----------------------------------------
+ *
+ * Trees an earlier partial delete left behind: the index row is gone, so the
+ * purge cannot target them, and no journal stream owns them either. They are
+ * listed for a person's sweep and never swept by the app - nothing here
+ * deletes on its own.
  *
  * ---- Why the empty sentence is gated on ready ------------------------------
  *
@@ -36,13 +44,31 @@ import { cn } from '@/lib/cn'
  * arriving is indistinguishable from one that lost the archive.
  */
 export function ArchivePane() {
-  const { conversations, storePhase, ensureStore, setArchived, removeMany } = useWorkspace()
+  const {
+    conversations,
+    storePhase,
+    ensureStore,
+    setArchived,
+    removeMany,
+    orphanTrees,
+    refreshOrphanTrees,
+    sweepOrphanTrees,
+  } = useWorkspace()
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [asking, setAsking] = useState(false)
+  const [purging, setPurging] = useState(false)
+  const [purgeFailures, setPurgeFailures] = useState<Readonly<Record<string, string>>>({})
+  const [sweeping, setSweeping] = useState(false)
+  const [sweepFailure, setSweepFailure] = useState<HarnessFailure | null>(null)
+  const [sweepFailures, setSweepFailures] = useState<Readonly<Record<string, string>>>({})
 
   const archived = conversations
     .filter((conversation) => conversation.archived)
     .sort((a, b) => b.updatedAt - a.updatedAt)
+
+  useEffect(() => {
+    if (storePhase.status === 'ready') void refreshOrphanTrees()
+  }, [storePhase.status, refreshOrphanTrees])
 
   const toggle = (id: string) => {
     setSelected((current) => {
@@ -51,6 +77,35 @@ export function ArchivePane() {
       else next.add(id)
       return next
     })
+  }
+
+  const purge = async (ids: readonly string[]) => {
+    if (purging) return
+    setPurging(true)
+    setPurgeFailures({})
+    try {
+      const failures = await removeMany(ids)
+      setPurgeFailures(failures)
+      setSelected(new Set())
+      // A tree the purge could not fully remove is the sweep's shape now.
+      await refreshOrphanTrees()
+    } finally {
+      setPurging(false)
+    }
+  }
+
+  const sweep = async () => {
+    if (sweeping) return
+    setSweeping(true)
+    setSweepFailure(null)
+    setSweepFailures({})
+    try {
+      const outcome = await sweepOrphanTrees()
+      if (!outcome.ok) setSweepFailure(outcome.error)
+      else setSweepFailures(outcome.value)
+    } finally {
+      setSweeping(false)
+    }
   }
 
   const retry = (
@@ -99,11 +154,9 @@ export function ArchivePane() {
                 <Button
                   variant="danger"
                   size="sm"
+                  busy={purging}
                   icon={<Icons.delete />}
-                  onClick={() => {
-                    removeMany([...selected])
-                    setSelected(new Set())
-                  }}
+                  onClick={() => void purge([...selected])}
                 >
                   Delete selected
                 </Button>
@@ -111,16 +164,25 @@ export function ArchivePane() {
               <Button
                 variant="danger"
                 size="sm"
+                busy={purging}
                 icon={<Icons.clear />}
-                onClick={() => {
-                  removeMany(archived.map((conversation) => conversation.id))
-                  setSelected(new Set())
-                }}
+                onClick={() => void purge(archived.map((conversation) => conversation.id))}
               >
                 Clear archive
               </Button>
             </div>
           </div>
+
+          <p className="text-micro text-muted-foreground">
+            Deleting removes the conversation, its files and its transcript. It cannot be
+            undone.
+          </p>
+
+          {Object.entries(purgeFailures).map(([id, message]) => (
+            <p key={id} role="alert" className="pt-1 text-caption text-danger">
+              {message}
+            </p>
+          ))}
 
           <div className="flex flex-col divide-y">
             {archived.map((conversation) => {
@@ -156,6 +218,36 @@ export function ArchivePane() {
           </div>
         </>
       )}
+
+      {storePhase.status === 'ready' && orphanTrees.length > 0 ? (
+        <div className="flex flex-col gap-2 border-t py-2.5">
+          <p className="text-caption text-muted-foreground">
+            {/* The pronoun belongs to the branch that set the number. Written
+                as a shared tail it said "One leftover folder ... Removing
+                them", which is the sentence a person reads when they have
+                exactly one. */}
+            {orphanTrees.length === 1
+              ? 'One leftover folder from a conversation that is already gone. Removing it deletes the files.'
+              : `${orphanTrees.length} leftover folders from conversations that are already gone. Removing them deletes the files.`}{' '}
+            This cannot be undone.
+          </p>
+          <div>
+            <Button variant="danger" size="sm" busy={sweeping} onClick={() => void sweep()}>
+              Remove leftover folders
+            </Button>
+          </div>
+          {sweepFailure ? (
+            <p role="alert" className="text-caption text-danger">
+              {sweepFailure.message}
+            </p>
+          ) : null}
+          {Object.entries(sweepFailures).map(([name, message]) => (
+            <p key={name} role="alert" className="text-caption text-danger">
+              {message}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </Pane>
   )
 }

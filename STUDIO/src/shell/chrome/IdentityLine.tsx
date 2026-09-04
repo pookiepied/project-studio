@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FADE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
+import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
@@ -33,6 +34,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
   const detach = useDetachConversation()
   const { openProject, goHome } = useNavigation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [branchOpen, setBranchOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -46,6 +48,7 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
   useEffect(() => {
     setEditing(false)
     setMenuOpen(false)
+    setConfirmingDelete(false)
     setBranchOpen(false)
   }, [conversation.id])
 
@@ -179,15 +182,27 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
         <MenuItem
           icon={<Icons.delete />}
           destructive
+          note="The conversation, its files and its transcript. Cannot be undone."
           onSelect={() => {
             setMenuOpen(false)
-            goHome()
-            remove(conversation.id)
+            setConfirmingDelete(true)
           }}
         >
           Delete
         </MenuItem>
       </Popover>
+      <DeleteConversationDialog
+        conversation={confirmingDelete ? conversation : null}
+        onClose={() => setConfirmingDelete(false)}
+        onDelete={async (id) => {
+          const error = await remove(id)
+          // The reader is standing in the conversation being deleted: when
+          // the delete really happened the page behind it is gone, so go
+          // home. A refusal leaves everything where it is.
+          if (error === null) goHome()
+          return error
+        }}
+      />
 
       {project?.branch ? (
         <>

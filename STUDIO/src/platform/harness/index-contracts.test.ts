@@ -5,6 +5,8 @@ import {
   parseConversationRecords,
   parseProjectRecord,
   parsePurgeOutcome,
+  parseOrphanSweepOutcome,
+  parseOrphanTrees,
 } from './contracts'
 
 /**
@@ -143,22 +145,91 @@ describe('parseProjectRecord', () => {
 })
 
 describe('parsePurgeOutcome', () => {
+  const DETAIL = { indexRow: true, tree: true, journal: true, scoped: true }
+
   it('accepts removed ids with no cleanup failures', () => {
-    expect(parsePurgeOutcome({ removed: ['cnv_1'], cleanupFailures: {} })).toEqual({
+    expect(
+      parsePurgeOutcome({ removed: ['cnv_1'], cleanupFailures: {}, details: { cnv_1: DETAIL } }),
+    ).toEqual({
       removed: ['cnv_1'],
       cleanupFailures: {},
+      details: { cnv_1: DETAIL },
     })
   })
 
   it('carries a partial cleanup through as data, not as an error', () => {
     const parsed = parsePurgeOutcome({
-      removed: ['cnv_locked'],
+      removed: [],
       cleanupFailures: { cnv_locked: 'a file was still open' },
+      details: {
+        cnv_locked: {
+          indexRow: true,
+          tree: false,
+          journal: true,
+          scoped: true,
+          error: 'a file was still open',
+        },
+      },
     })
     expect(parsed?.cleanupFailures['cnv_locked']).toContain('still open')
+    expect(parsed?.details['cnv_locked']).toMatchObject({ tree: false, indexRow: true })
+  })
+
+  it('carries a running refusal with its code', () => {
+    const parsed = parsePurgeOutcome({
+      removed: [],
+      cleanupFailures: { cnv_live: 'Conversation "cnv_live" has a turn in flight' },
+      details: {
+        cnv_live: {
+          indexRow: false,
+          tree: false,
+          journal: false,
+          scoped: false,
+          errorCode: 'storage.conflict',
+          error: 'Conversation "cnv_live" has a turn in flight',
+        },
+      },
+    })
+    expect(parsed?.details['cnv_live']?.errorCode).toBe('storage.conflict')
   })
 
   it('refuses a failure message that is not text', () => {
-    expect(parsePurgeOutcome({ removed: [], cleanupFailures: { cnv_x: 7 } })).toBeNull()
+    expect(
+      parsePurgeOutcome({ removed: [], cleanupFailures: { cnv_x: 7 }, details: {} }),
+    ).toBeNull()
+  })
+
+  it('refuses a detail that does not say what happened', () => {
+    expect(
+      parsePurgeOutcome({
+        removed: [],
+        cleanupFailures: {},
+        details: { cnv_x: { indexRow: true } },
+      }),
+    ).toBeNull()
+  })
+})
+
+describe('parseOrphanTrees', () => {
+  it('accepts a list of orphaned directory names', () => {
+    expect(parseOrphanTrees({ orphans: ['agent', 'cnv_1j04nco6'] })).toEqual({
+      orphans: ['agent', 'cnv_1j04nco6'],
+    })
+  })
+
+  it('refuses names that are not text', () => {
+    expect(parseOrphanTrees({ orphans: [7] })).toBeNull()
+  })
+})
+
+describe('parseOrphanSweepOutcome', () => {
+  it('accepts removed names with failures as data', () => {
+    expect(
+      parseOrphanSweepOutcome({ removed: ['agent'], failures: { beta: 'a file was still open' } }),
+    ).toEqual({ removed: ['agent'], failures: { beta: 'a file was still open' } })
+  })
+
+  it('refuses a failure message that is not text', () => {
+    expect(parseOrphanSweepOutcome({ removed: [], failures: { beta: 7 } })).toBeNull()
   })
 })

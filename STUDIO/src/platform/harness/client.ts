@@ -42,6 +42,8 @@ import {
   parseProviderModel,
   parseProviderModels,
   parsePurgeOutcome,
+  parseOrphanSweepOutcome,
+  parseOrphanTrees,
   type ApprovalAnswer,
   type CapabilitySlot,
   type ConversationCreateDraft,
@@ -53,6 +55,8 @@ import {
   type McpServerRecord,
   type ModelCapability,
   type PendingApprovalRecord,
+  type OrphanSweepOutcome,
+  type OrphanTrees,
   type ProbeResult,
   type ProjectCreateDraft,
   type ProjectPatch,
@@ -249,9 +253,16 @@ export interface HarnessClient {
     id: string,
     patch: ConversationPatch,
   ): Promise<HarnessResult<ConversationRecord>>
-  /** Permanent destruction of one conversation: index row plus its own tree. */
+  /** Permanent destruction of one conversation: journal, scoped rows, index row, tree. */
   deleteConversation(id: string): Promise<HarnessResult<PurgeOutcome>>
   purgeConversations(ids: readonly string[]): Promise<HarnessResult<PurgeOutcome>>
+  /**
+   * Trees no index row addresses, from earlier partial deletes. Read-only;
+   * nothing here deletes on its own.
+   */
+  listOrphanTrees(): Promise<HarnessResult<OrphanTrees>>
+  /** Removes the orphaned trees, at a person's request. */
+  sweepOrphanTrees(): Promise<HarnessResult<OrphanSweepOutcome>>
 
   /**
    * The permission questions the kernel has raised and nobody has answered.
@@ -689,6 +700,19 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     purgeConversations(ids) {
       return json('POST', `${CONVERSATIONS_PATH}/purge`, { ids: [...ids] }, parsePurgeOutcome)
+    },
+
+    listOrphanTrees() {
+      return json('GET', `${CONVERSATIONS_PATH}/orphan-trees`, undefined, parseOrphanTrees)
+    },
+
+    sweepOrphanTrees() {
+      return json(
+        'POST',
+        `${CONVERSATIONS_PATH}/orphan-trees/sweep`,
+        undefined,
+        parseOrphanSweepOutcome,
+      )
     },
 
     listPendingApprovals() {

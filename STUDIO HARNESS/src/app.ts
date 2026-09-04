@@ -270,6 +270,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       approvals,
       conversations,
       projects,
+      database,
       titling,
       admission: admission.verifier,
       // The same list the model picker is filled from: a submission's model
