@@ -61,17 +61,17 @@ index on it.
 - `extension_scope` where `scope_kind = 'conversation'` and `scope_id` is the
   id - which extensions that conversation had on.
 
-**`data/snapshots/` is project-keyed, not conversation-keyed** - 39 entries,
+**`~/.studio/data/snapshots/` is project-keyed, not conversation-keyed** - 39 entries,
 all `project-<hash>`. It is out of scope here. Say so if you find otherwise.
 
-**Four orphaned trees exist on disk right now**: `data/conversations/agent`,
+**Four orphaned trees exist on disk right now**: `~/.studio/data/conversations/agent`,
 `alpha`, `beta`, and `cnv_1j04nco6`. Their index rows are gone, so
 `purgeConversations` can never target them - it only removes trees for ids
 `removeMany` actually deleted a row for. They are unreachable by design of the
 current code.
 
 **There is already one sanctioned direct reader of `flue.db`**:
-`src/storage/flue-journal.ts`, opened with SQLite's read-only flag, written
+`STUDIO HARNESS/src/storage/flue-journal.ts`, opened with SQLite's read-only flag, written
 against the tables above rather than against a migration guide. It is the
 precedent for this work and the file whose docblock explains why the
 precedent was set carefully. Read it before you write anything.
@@ -107,7 +107,7 @@ reasonable once there is.
 
 ## Part 2 - The journal writer
 
-A new module beside the reader: `src/storage/flue-journal-delete.ts`, or a
+A new module beside the reader: `STUDIO HARNESS/src/storage/flue-journal-delete.ts`, or a
 write half of the existing one. It is the only place in the codebase that may
 write to `flue.db`, and its docblock must say so and say why.
 
@@ -144,7 +144,7 @@ the ones to break on purpose.
 
 ## Part 3 - Purge becomes complete
 
-`purgeConversations` in `src/conversations/purge.ts` gains the journal and the
+`purgeConversations` in `STUDIO HARNESS/src/conversations/purge.ts` gains the journal and the
 two scoped tables. Its docblock currently argues for leaving the transcript;
 rewrite that argument rather than deleting it, so the file records that the
 position changed and why.
@@ -160,11 +160,16 @@ conversation that can be deleted again, never one that is unreachable. That is
 exactly the bug that produced the four orphans on disk today.
 
 **Also give the harness a way to sweep those orphans.** A tree under
-`data/conversations/` whose id has no index row and no journal stream is
+`~/.studio/data/conversations/` whose id has no index row and no journal stream is
 garbage from a previous partial delete. It must be reachable by something -
 whether that is a startup sweep or a control in the Archived pane is your
-call, but "unreachable forever" is not an acceptable end state, and the four
-trees named in Part 0 are the acceptance test.
+call, but "unreachable forever" is not an acceptable end state.
+
+Reproduce the condition rather than borrowing it: under your throwaway home,
+create conversations, remove their index rows directly, and leave the trees.
+That is the state the four orphans in the user's home are in, and it is the
+acceptance test. Do not run the sweep against the user's home - when the
+feature works, say so in the report and leave those four for the user.
 
 ---
 
@@ -183,7 +188,7 @@ stop implying anything softer.
 
 **The copy states the consequence.** A menu note earns its second line when
 it names something the reader cannot see and would be wrong about - the rule
-is in `src/design/RULES.md` and it was written for exactly this kind of item.
+is in `STUDIO/src/design/RULES.md` and it was written for exactly this kind of item.
 Delete qualifies. Say what goes, plainly, in the app's voice: no "poof", no
 "gone forever!", no reassurance that is not true.
 
@@ -210,11 +215,11 @@ deletes on its own**, and this task must not be the thing that starts.
 - Harness suites **one at a time**. `STUDIO` vitest green: 542 tests across
   55 files today, and none may be weakened to pass.
 - `cargo clippy --all-targets`, zero warnings.
-- **Measured proof, against a real database, in the report.** Create a
-  conversation, send a turn so it has a real transcript, count the rows it
-  produced in all eight `flue.db` tables, delete it, count again. Both
-  numbers in the report. A green unit test is not the evidence here; the row
-  counts are.
+- **Measured proof, against a real database, in the report.** Under a
+  throwaway `PROJECT_STUDIO_HOME` - never the user's - create a conversation,
+  send a turn so it has a real transcript, count the rows it produced in all
+  eight `flue.db` tables, delete it, count again. Both numbers in the report.
+  A green unit test is not the evidence here; the row counts are.
 - **A negative control, reported.** Break the path match so it targets only
   `agents/studio/<id>`, confirm a test fails on the surviving `agents/title`
   stream, restore it. Say what you broke and what you saw.
@@ -226,19 +231,29 @@ deletes on its own**, and this task must not be the thing that starts.
   `report/shots/`.
 
 The proof this worked: after deleting one conversation, no row keyed to its
-id exists in either database, no tree exists on disk, and the four orphans
-named in Part 0 are reachable. Show the queries.
+id exists in either database, and no tree exists on disk. Show the queries.
+Separately, show that a tree whose index row was removed behind the app's
+back is reachable by the sweep - that is the shape the user's four orphans
+are in.
 
 ---
 
 ## Rules
 
-**`~/.studio/` is the user's real data.** Do not delete, move, or rewrite
-anything under it except through the code you are writing, exercised
-deliberately on conversations you created for the test. Do not touch
+**Never run a destructive test against `~/.studio/`.** `studioHome()` reads
+`PROJECT_STUDIO_HOME`, so every write test, every row count and every manual
+run of this feature happens under a throwaway home you created:
+
+    PROJECT_STUDIO_HOME=/some/scratch/studio-home
+
+That is not a suggestion. This task's whole purpose is code that destroys
+data permanently, and the first version of it will be wrong. The user's real
+home is read-only to you for the entire task: you may open it with SQLite's
+read-only flag to confirm the Part 0 numbers, and nothing else. Do not touch
 `*.beta9-journal`, the exports in the user's home folder, or `opencode/`.
-Back up `flue.db` before the first write test and say in the report where you
-put the copy.
+
+Say in the report which home you used, and paste the `PROJECT_STUDIO_HOME`
+you set.
 
 Applied migrations are never rewritten; append only. Migration 18 is frozen -
 it has been applied to the user's real database. Anything schema-side needs
