@@ -81,6 +81,14 @@ export interface EnvironmentFacts {
   readonly git: boolean;
   /** Today, as the machine reckons it. */
   readonly today: string;
+  /**
+   * The extra roots this conversation may reach beyond its workspace.
+   *
+   * Paths only, no explanation of how they got there. A run that knows it can
+   * write `~/.cargo` does not spend a call discovering it. Kept short - the
+   * block is paid for on every conversation.
+   */
+  readonly extraRoots?: readonly string[];
 }
 
 /**
@@ -121,12 +129,14 @@ export function environmentFacts(
   workspace: string,
   now: Date,
   kind: WorkspaceKind = "conversation",
+  extraRoots?: readonly string[],
 ): EnvironmentFacts {
   return {
     workspace,
     kind,
     git: isGitRepository(workspace),
     today: localDate(now),
+    ...(extraRoots === undefined || extraRoots.length === 0 ? {} : { extraRoots }),
   };
 }
 
@@ -259,6 +269,17 @@ function containmentStatement(): readonly string[] {
   ];
 }
 
+function extraRootsStatement(extraRoots: readonly string[] | undefined): readonly string[] {
+  if (extraRoots === undefined || extraRoots.length === 0) return [];
+  // Paths only, no explanation of how they got there. The block is paid for on
+  // every conversation, so this stays one line per root rather than a story.
+  return [
+    "Beyond your working directory you may also reach:",
+    ...extraRoots.map((root) => `- ${root}`),
+    "",
+  ];
+}
+
 export function environmentBlock(facts: EnvironmentFacts): string {
   const shell = interpreterStatement();
   return [
@@ -275,6 +296,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
       : "It is not a git repository.",
     "",
     ...workspaceStatement(facts.kind),
+    ...extraRootsStatement(facts.extraRoots),
     ...(shell === undefined
       ? [
           "This machine has no command interpreter, so the shell tool cannot",

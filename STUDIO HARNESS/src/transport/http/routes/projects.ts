@@ -14,6 +14,8 @@ import { failure, invalidBody, statusOf } from "./error-status.js";
 export interface ProjectRoutesOptions {
   /** The owner of `project` and `project_folder`. */
   readonly projects: ProjectStore;
+  /** The owner of `sandbox_scope`, cleared when its project goes. */
+  readonly scopes?: import("../../../sandbox/scope-store.js").SandboxScopeStore;
 }
 
 function parseBody<T>(schema: v.GenericSchema<T>, value: unknown): T {
@@ -69,10 +71,13 @@ export function createProjectRoutes(options: ProjectRoutesOptions): Hono<Admissi
 
   // Removing a project detaches its conversations rather than deleting them:
   // `ON DELETE SET NULL` is what makes that structural. Folder rows cascade;
-  // a folder shared with another project keeps that other row.
+  // a folder shared with another project keeps that other row. Scope rows do
+  // not cascade - a machine-wide row has no parent - so the scope store clears
+  // the project's own rows here, where the project goes.
   routes.delete("/:id", (context) => {
     try {
       store.remove(context.req.param("id"));
+      options.scopes?.clearProject(context.req.param("id"));
       return context.body(null, 204);
     } catch (error) {
       return context.json(failure(error), statusOf(error));

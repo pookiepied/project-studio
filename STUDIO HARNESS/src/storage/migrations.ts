@@ -936,6 +936,46 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 21,
+    name: "sandbox_scope",
+    up(db) {
+      // The doors the person opened in the wall: which paths a project may
+      // reach beyond its own folder, and whether the project is contained at
+      // all. Scope is additive, per path, each one a decision the person made
+      // and can unmake; level is the escape hatch for the walk-up class and
+      // for Docker, and lives on the project rather than here.
+      //
+      // `project_id` is the empty string for a machine-wide grant rather than
+      // a second table: the two are the same decision at different scopes, and
+      // one reader that takes both is simpler than two that must be kept in
+      // step. A conversation with no project reads the machine-wide rows only.
+      //
+      // `source` earns its column. A person looking at this list needs to tell
+      // "I ticked Rust in settings" from "I said yes to a question mid-run" -
+      // the second is the one they may not remember making, and the one they
+      // are most likely to want to revoke.
+      //
+      // `sandbox_level` defaults to `contained`, so nothing about an existing
+      // project changes. No foreign key from `sandbox_scope` to `project`: a
+      // machine-wide row has no parent, and a project row must survive nothing
+      // - its cleanup is the scope store's `clearProject`, called when the
+      // project goes, rather than a constraint that cannot express the empty
+      // scope.
+      db.exec(`
+        CREATE TABLE sandbox_scope (
+          project_id   TEXT NOT NULL,
+          path         TEXT NOT NULL,
+          mode         TEXT NOT NULL,
+          source       TEXT NOT NULL,
+          preset_id    TEXT,
+          granted_at   INTEGER NOT NULL,
+          PRIMARY KEY (project_id, path)
+        ) STRICT;
+      `);
+      db.exec("ALTER TABLE project ADD COLUMN sandbox_level TEXT NOT NULL DEFAULT 'contained'");
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

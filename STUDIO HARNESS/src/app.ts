@@ -55,6 +55,7 @@ import { RetrievalSettingsStore } from "./retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
 import { ConversationTitler } from "./conversations/titling.js";
 import { ProjectStore } from "./projects/store.js";
+import { SandboxScopeStore } from "./sandbox/scope-store.js";
 
 interface HarnessApplication {
   readonly app: ReturnType<typeof createHttpApp>;
@@ -248,6 +249,10 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     bootLog("step 10: conversation and project stores entering");
     const conversations = new ConversationStore(database);
     const projects = new ProjectStore(database);
+    // The doors the person opened in the wall: one table, one owner, read
+    // where the policy is built and written from the settings pane and from
+    // a scope question's answer.
+    const scopes = new SandboxScopeStore(database);
     // The automatic titling pass: watches the runtime for a conversation's
     // first exchange settling and writes the title agent's answer into the
     // index, once, while the row is still unnamed by a person. Subscribes
@@ -288,6 +293,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       plans,
       conversations,
       projects,
+      scopes,
       database,
       titling,
       admission: admission.verifier,

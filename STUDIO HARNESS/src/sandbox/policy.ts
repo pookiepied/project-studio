@@ -44,6 +44,15 @@ export interface SandboxPolicy {
   readonly allowExec: boolean;
   /** Whether outbound network access is intended. */
   readonly allowNetwork: boolean;
+  /**
+   * Whether this project is trusted, and containment is removed for it.
+   *
+   * The escape hatch for the walk-up class, and for Docker. Contained is the
+   * default; trusted means the project's own files are no longer the
+   * boundary, stated in plain words where the person chooses it. A trusted
+   * policy resolves any absolute path and runs any command uncontained.
+   */
+  readonly trusted: boolean;
 }
 
 export interface SandboxPolicyInput {
@@ -53,6 +62,7 @@ export interface SandboxPolicyInput {
   readonly environment?: Readonly<Record<string, string>>;
   readonly allowExec?: boolean;
   readonly allowNetwork?: boolean;
+  readonly trusted?: boolean;
 }
 
 /**
@@ -149,6 +159,7 @@ export function createSandboxPolicy(input: SandboxPolicyInput): SandboxPolicy {
         "PROJECT_STUDIO_ALLOW_NETWORK",
         DEFAULT_CAPABILITY_SWITCHES.allowNetwork,
       ),
+    trusted: input.trusted ?? false,
   };
 }
 

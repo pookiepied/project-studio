@@ -1,6 +1,7 @@
 import type { ProjectCreateInput } from "../contracts/conversations.js";
 import type { ProjectIcon } from "../contracts/conversations.js";
 import { createStudioUuid } from "../identity/uuid.js";
+import { readSandboxLevel, type SandboxLevel } from "../sandbox/scope.js";
 import { StorageError, storageErrorFrom } from "../storage/errors.js";
 import type { StudioDatabase } from "../storage/database.js";
 
@@ -35,6 +36,15 @@ export interface ProjectRecord {
   readonly description: string;
   readonly folders: readonly ProjectFolderRecord[];
   readonly createdAt: number;
+  /**
+   * Whether this project is contained at all.
+   *
+   * `contained` (the default) holds the wall; `trusted` removes it for this
+   * project's conversations. The escape hatch for the walk-up class, and for
+   * Docker - a contained process that can reach the Docker daemon can mount
+   * any path, so Docker is a level choice rather than a scope preset.
+   */
+  readonly sandboxLevel: SandboxLevel;
 }
 
 interface ProjectRow {
@@ -43,6 +53,7 @@ interface ProjectRow {
   icon: string;
   description: string;
   created_at: number;
+  sandbox_level?: string | null;
 }
 
 interface FolderRow {
@@ -82,6 +93,9 @@ function toProject(row: ProjectRow, folders: readonly FolderRow[]): ProjectRecor
       position: folder.position,
     })),
     createdAt: row.created_at,
+    // Rows written before migration 21 have no column value; the absence of a
+    // stored answer is contained, which is also what the column defaults to.
+    sandboxLevel: readSandboxLevel(row.sandbox_level ?? null),
   };
 }
 
@@ -215,6 +229,54 @@ export class ProjectStore {
           this.#db
             .prepare("UPDATE project SET " + assignments.join(", ") + " WHERE id = ?")
             .run(...values, id).changes === 0
+        ) {
+          throw new StorageError("not_found", { message: `No project "${id}" exists.` });
+        }
+      });
+    } catch (error) {
+      if (error instanceof StorageError) throw error;
+      throw storageErrorFrom(error);
+    }
+  }
+
+  /**
+   * The level this project is held with.
+   *
+   * Read beside the policy build, where the sandbox for one conversation is
+   * made. An untouched project is contained, which is also what the column
+   * defaults to - so a row written before migration 21 reads the same way as
+   * one written after it.
+   */
+  sandboxLevelOf(id: string): SandboxLevel {
+    try {
+      const row = this.#db.prepare("SELECT sandbox_level FROM project WHERE id = ?").get(id) as
+        | { sandbox_level?: string | null }
+        | undefined;
+      if (row === undefined) {
+        throw new StorageError("not_found", { message: `No project "${id}" exists.` });
+      }
+      return readSandboxLevel(row.sandbox_level ?? null);
+    } catch (error) {
+      if (error instanceof StorageError) throw error;
+      throw storageErrorFrom(error);
+    }
+  }
+
+  /**
+   * Sets whether this project is contained at all.
+   *
+   * A decision with its consequence next to it: trusted means the project's
+   * own files are no longer the boundary. Not a toggle buried in a row.
+   */
+  setSandboxLevel(id: string, level: SandboxLevel): void {
+    if (level !== "contained" && level !== "trusted") {
+      throw new StorageError("invalid", { message: "A sandbox level is contained or trusted." });
+    }
+    try {
+      this.#db.transaction(() => {
+        if (
+          this.#db.prepare("UPDATE project SET sandbox_level = ? WHERE id = ?").run(level, id)
+            .changes === 0
         ) {
           throw new StorageError("not_found", { message: `No project "${id}" exists.` });
         }

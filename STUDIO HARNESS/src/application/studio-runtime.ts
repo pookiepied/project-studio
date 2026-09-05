@@ -20,6 +20,9 @@ import { McpSupervisor } from "../extend/mcp/supervisor.js";
 import { ExtensionSelectionStore } from "../extend/selection.js";
 import { McpManagementService, type McpAdministration } from "./mcp-management.js";
 import { modelToolName } from "./tool-name.js";
+import { ProjectStore } from "../projects/store.js";
+import { SandboxScopeStore } from "../sandbox/scope-store.js";
+import { ScopeDeclines } from "../sandbox/scope-questions.js";
 import { PermissionGrantStore } from "../permissions/grant-store.js";
 import {
   PermissionKernel,
@@ -269,6 +272,14 @@ export interface AgentHost {
     readonly modelId: string | null;
     readonly reasoningLevel: string | null;
   };
+  /**
+   * The extra roots one conversation may reach beyond its workspace.
+   *
+   * Read once per render, synchronously, for the environment block. A run
+   * that knows it can write `~/.cargo` does not spend a call discovering it.
+   * Optional so a test double that predates scope still satisfies the host.
+   */
+  conversationExtraRoots?(conversationId: string): readonly string[];
 }
 
 /**
@@ -283,6 +294,9 @@ export interface AgentHost {
 export class StudioRuntime implements AgentHost {
   readonly #db: StudioDatabase;
   readonly #conversations: ConversationStore;
+  readonly #projects: ProjectStore;
+  readonly #scopes: SandboxScopeStore;
+  readonly #declines: ScopeDeclines;
   readonly #grants: PermissionGrantStore;
   readonly #trust: WorkspaceTrustStore;
   readonly #selection: ExtensionSelectionStore;
@@ -369,6 +383,9 @@ export class StudioRuntime implements AgentHost {
 
     this.#db = options.database;
     this.#conversations = new ConversationStore(this.#db);
+    this.#projects = new ProjectStore(this.#db);
+    this.#scopes = new SandboxScopeStore(this.#db);
+    this.#declines = new ScopeDeclines();
     this.#grants = new PermissionGrantStore(this.#db);
     this.#trust = new WorkspaceTrustStore(this.#db);
     this.#selection = new ExtensionSelectionStore(this.#db);
@@ -444,6 +461,50 @@ export class StudioRuntime implements AgentHost {
       modelId: record?.modelId ?? null,
       reasoningLevel: record?.reasoningLevel ?? null,
     };
+  }
+
+  /**
+   * The project one conversation is filed under, when it is filed anywhere.
+   *
+   * The conversation index owns the filing; the sandbox factory owns the
+   * workspace. A conversation with no project reads the machine-wide scope
+   * rows only, and is never trusted - there is no project to trust it.
+   */
+  #conversationProject(conversationId: string): string | undefined {
+    const record = this.#conversations.get(conversationId);
+    return record?.projectId ?? undefined;
+  }
+
+  conversationExtraRoots(conversationId: string): readonly string[] {
+    const projectId = this.#conversationProject(conversationId);
+    const roots = this.#scopes.resolveRoots(projectId);
+    return [...roots.readRoots, ...roots.writeRoots.filter((root) => !roots.readRoots.includes(root))];
+  }
+
+  /** Whether one conversation runs uncontained. Trusted is per project. */
+  #conversationTrusted(projectId: string | undefined): boolean {
+    if (projectId === undefined) return false;
+    try {
+      return this.#projects.sandboxLevelOf(projectId) === "trusted";
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Whether one conversation has declined one resolved path.
+   *
+   * A declined path is not asked twice in that conversation. The record lives
+   * here, beside the access logs, because it is conversation-scoped runtime
+   * state rather than a durable row - the next conversation asks again.
+   */
+  scopeDeclined(conversationId: string, resolvedPath: string): boolean {
+    return this.#declines.isDeclined(conversationId, resolvedPath);
+  }
+
+  /** Records that one conversation declined one resolved path. */
+  markScopeDeclined(conversationId: string, resolvedPath: string): void {
+    this.#declines.markDeclined(conversationId, resolvedPath);
   }
 
   /**
@@ -539,7 +600,8 @@ export class StudioRuntime implements AgentHost {
 
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory {
     const projectRoot = resolve(options.projectRoot ?? this.#projectRoot);
-    const projectId = options.projectId ?? projectKey(projectRoot);
+    const conversationProject = this.#conversationProject(options.conversationId);
+    const projectId = conversationProject ?? options.projectId ?? projectKey(projectRoot);
     const scope: ExecutionScope = {
       clientId: this.#clientId,
       sessionId: this.#sessionId,
@@ -547,8 +609,18 @@ export class StudioRuntime implements AgentHost {
       conversationId: options.conversationId,
       projectId,
     };
+    // Read where the policy is built. A conversation with no project reads the
+    // machine-wide rows only; a filed conversation reads both. The level lives
+    // on the project: trusted removes containment for that project's
+    // conversations, and contained is what an untouched project still gets.
+    const scopeProject = conversationProject ?? (options.projectId === undefined ? undefined : projectId);
+    const roots = this.#scopes.resolveRoots(scopeProject);
+    const trusted = this.#conversationTrusted(conversationProject ?? options.projectId);
     const policy = createSandboxPolicy({
       workspaceRoot: projectRoot,
+      ...(roots.readRoots.length === 0 ? {} : { readRoots: roots.readRoots }),
+      ...(roots.writeRoots.length === 0 ? {} : { writeRoots: roots.writeRoots }),
+      ...(trusted ? { trusted: true } : {}),
       // PATH is the one grant a command line needs beyond the workspace: a
       // shell's job is finding programs, and with the policy environment
       // empty its children inherited nothing and could resolve no tool at

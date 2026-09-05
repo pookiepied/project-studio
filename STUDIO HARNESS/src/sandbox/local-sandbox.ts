@@ -1,5 +1,5 @@
 import { readdir, readFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
 import { runProcess, type ProcessResult } from "../process/exec.js";
@@ -189,6 +189,10 @@ export class LocalSandbox {
         });
       }
 
+      // Trusted removes containment for that project's conversations, so the
+      // isolation question is not asked here. The switches above still apply.
+      if (this.#policy.trusted) continue;
+
       // The shortfall is decided in one place now, and it is a decision rather
       // than a fall-through. This branch used to be an `if … continue` followed
       // by a comment explaining why nothing happened — true, and inert, and
@@ -223,10 +227,15 @@ export class LocalSandbox {
    */
   async run(kind: ChildKind, options: SandboxRunOptions): Promise<ProcessResult> {
     const required = isolationForKind(kind);
-    // The same refusal `assertSupports` raises, asked again at the moment of
-    // truth. A capability list built minutes ago is a description; this is the
-    // spawn, and it is worth re-asking on the path that actually starts code.
-    assertIsolationAvailable(required, this.#isolationSupport);
+    // Trusted runs uncontained: the project's own files are no longer the
+    // boundary, so the isolation question is not asked and the command is not
+    // wrapped. The environment is still built from policy alone.
+    if (!this.#policy.trusted) {
+      // The same refusal `assertSupports` raises, asked again at the moment of
+      // truth. A capability list built minutes ago is a description; this is the
+      // spawn, and it is worth re-asking on the path that actually starts code.
+      assertIsolationAvailable(required, this.#isolationSupport);
+    }
 
     const command = await this.plan(kind, {
       executable: options.executable,
@@ -274,6 +283,9 @@ export class LocalSandbox {
       readonly network?: boolean;
     },
   ): Promise<ContainedCommand> {
+    if (this.#policy.trusted) {
+      return { executable: command.executable, args: command.args };
+    }
     return containCommand(
       kind,
       {
@@ -304,6 +316,9 @@ export class LocalSandbox {
 
   /** Resolves a path the agent may read, or refuses. */
   resolveRead(path: string): string {
+    if (this.#policy.trusted) {
+      return resolveTrustedPath(this.#policy.workspaceRoot, path);
+    }
     return resolveContainedPath(
       this.#policy.workspaceRoot,
       path,
@@ -313,6 +328,9 @@ export class LocalSandbox {
 
   /** Resolves a path the agent may modify, or refuses. */
   resolveWrite(path: string): string {
+    if (this.#policy.trusted) {
+      return resolveTrustedPath(this.#policy.workspaceRoot, path);
+    }
     return resolveContainedPath(
       this.#policy.workspaceRoot,
       path,
@@ -401,4 +419,21 @@ export class LocalSandbox {
 
     await rm(target, { recursive: true, force: true });
   }
+}
+
+/**
+ * Resolves any path for a trusted project, without a boundary.
+ *
+ * Trusted removes containment: the project's own files are no longer the
+ * boundary. Relative paths still resolve against the workspace, so a bare
+ * name keeps meaning the same file; absolute paths resolve to themselves.
+ */
+function resolveTrustedPath(workspaceRoot: string, requested: string): string {
+  if (typeof requested !== "string" || requested.trim() === "") {
+    throw new SandboxError("path_escape", {
+      message: "A file path is required.",
+    });
+  }
+  if (isAbsolute(requested)) return resolve(requested);
+  return resolve(workspaceRoot, requested);
 }

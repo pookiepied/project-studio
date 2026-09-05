@@ -28,6 +28,7 @@ import {
   parseHarnessErrorBody,
   parseConversationRecord,
   parseConversationRecords,
+  parseDetectedPresets,
   parseLibraryProviders,
   parseMcpServer,
   parseMcpServers,
@@ -46,12 +47,14 @@ import {
   parsePurgeOutcome,
   parseOrphanSweepOutcome,
   parseOrphanTrees,
+  parseSandboxScopeInfo,
   type ApprovalAnswer,
   type CapabilitySlot,
   type ConversationCreateDraft,
   type ConversationPatch,
   type ConversationRecord,
   type DefaultSelection,
+  type DetectedPreset,
   type LibraryProvider,
   type McpServerDraft,
   type McpServerRecord,
@@ -74,6 +77,10 @@ import {
   type ProviderModel,
   type PurgeOutcome,
   type ReasoningLevel,
+  type SandboxLevel,
+  type SandboxScopeInfo,
+  type SandboxScopeMode,
+  type SandboxScopeSource,
 } from './contracts'
 import { harnessTransport } from './transport'
 
@@ -327,6 +334,28 @@ export interface HarnessClient {
     change: { name?: string; path?: string },
   ): Promise<HarnessResult<ProjectRecord>>
   removeProjectFolder(projectId: string, folderId: string): Promise<HarnessResult<ProjectRecord>>
+
+  /**
+   * The wall the user can move: scope rows for one project beside the
+   * machine-wide rows, and the level the project is held with. `projectId`
+   * absent reads the machine-wide rows with a contained level, which is what
+   * a conversation with no project gets.
+   */
+  getScope(projectId?: string): Promise<HarnessResult<SandboxScopeInfo>>
+  /** Grants one path, for one project or - with an empty id - everywhere. */
+  grantScope(input: {
+    readonly projectId?: string
+    readonly path: string
+    readonly mode: SandboxScopeMode
+    readonly source?: SandboxScopeSource
+    readonly presetId?: string
+  }): Promise<HarnessResult<void>>
+  /** Takes one grant back. */
+  revokeScope(projectId: string, path: string): Promise<HarnessResult<void>>
+  /** The toolchains actually on this machine, with the paths found. */
+  listPresets(): Promise<HarnessResult<readonly DetectedPreset[]>>
+  /** Sets whether one project is contained at all. */
+  setSandboxLevel(projectId: string, level: SandboxLevel): Promise<HarnessResult<void>>
 }
 
 const MCP_PATH = '/api/mcp'
@@ -338,6 +367,7 @@ const PENDING_APPROVALS_PATH = '/api/permissions/pending'
 const PENDING_QUESTIONS_PATH = '/api/questions/pending'
 const QUESTION_STOP_PATH = '/api/questions/stop'
 const PLANS_PATH = '/api/plans'
+const SANDBOX_PATH = '/api/sandbox'
 
 /** The media routes' answers, parsed with the same skepticism as every other. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -848,6 +878,40 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     removeProjectFolder(projectId, folderId) {
       return json('DELETE', folderPath(projectId, folderId), undefined, parseProjectRecord)
+    },
+
+    getScope(projectId) {
+      const query = projectId === undefined || projectId === '' ? '' : `?projectId=${encodeURIComponent(projectId)}`
+      return json('GET', `${SANDBOX_PATH}/scope${query}`, undefined, parseSandboxScopeInfo)
+    },
+
+    grantScope(input) {
+      // The route answers 201 with the row; the pane only needs to know it
+      // landed, and `empty` reports any 2xx as success without reading a body.
+      return empty('POST', `${SANDBOX_PATH}/scope`, {
+        ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+        path: input.path,
+        mode: input.mode,
+        ...(input.source === undefined ? {} : { source: input.source }),
+        ...(input.presetId === undefined ? {} : { presetId: input.presetId }),
+      })
+    },
+
+    revokeScope(projectId, path) {
+      return empty(
+        'DELETE',
+        `${SANDBOX_PATH}/scope?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(path)}`,
+      )
+    },
+
+    listPresets() {
+      return json('GET', `${SANDBOX_PATH}/presets`, undefined, parseDetectedPresets)
+    },
+
+    setSandboxLevel(projectId, level) {
+      return empty('PUT', `${SANDBOX_PATH}/projects/${encodeURIComponent(projectId)}/level`, {
+        level,
+      })
     },
   }
 }

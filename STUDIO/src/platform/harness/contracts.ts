@@ -1836,3 +1836,103 @@ export {
   type TurnOutcome,
   type UsageFacts,
 } from './conversation-chunks'
+
+/* -------------------------------------------------------------------------- */
+/* Sandbox scope                                                               */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Mirrored from `GET /api/sandbox/scope`: the doors the person opened in the
+ * wall. Scope is which paths a project may reach beyond its own folder;
+ * level is whether the project is contained at all. The two are kept apart
+ * here the same way they are kept apart in the pane.
+ */
+
+export const SANDBOX_LEVELS = ['contained', 'trusted'] as const
+export type SandboxLevel = (typeof SANDBOX_LEVELS)[number]
+
+export const SANDBOX_SCOPE_MODES = ['read', 'write'] as const
+export type SandboxScopeMode = (typeof SANDBOX_SCOPE_MODES)[number]
+
+export const SANDBOX_SCOPE_SOURCES = ['preset', 'custom', 'question'] as const
+export type SandboxScopeSource = (typeof SANDBOX_SCOPE_SOURCES)[number]
+
+export interface SandboxScopeRow {
+  readonly projectId: string
+  readonly path: string
+  readonly mode: SandboxScopeMode
+  readonly source: SandboxScopeSource
+  readonly presetId: string | null
+  readonly grantedAt: number
+}
+
+export interface SandboxScopeInfo {
+  readonly project: readonly SandboxScopeRow[]
+  readonly machineWide: readonly SandboxScopeRow[]
+  readonly level: SandboxLevel
+}
+
+export interface DetectedPresetPath {
+  readonly path: string
+  readonly mode: SandboxScopeMode
+}
+
+export interface DetectedPreset {
+  readonly id: string
+  readonly title: string
+  readonly description: string
+  readonly paths: readonly DetectedPresetPath[]
+}
+
+function nullablePresetId(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === null) return { ok: true, value: null }
+  const parsed = text(value)
+  return parsed === null ? { ok: false } : { ok: true, value: parsed }
+}
+
+export function parseSandboxScopeRow(value: unknown): SandboxScopeRow | null {
+  if (!isRecord(value)) return null
+  const projectId = typeof value['projectId'] === 'string' ? value['projectId'] : null
+  const path = text(value['path'])
+  const mode = oneOf(SANDBOX_SCOPE_MODES, value['mode'])
+  const source = oneOf(SANDBOX_SCOPE_SOURCES, value['source'])
+  const presetId = nullablePresetId(value['presetId'])
+  const grantedAt = finiteNumber(value['grantedAt'])
+  if (projectId === null || path === null || mode === null || source === null || !presetId.ok || grantedAt === null) {
+    return null
+  }
+  return { projectId, path, mode, source, presetId: presetId.value, grantedAt }
+}
+
+export function parseSandboxScopeRows(value: unknown): readonly SandboxScopeRow[] | null {
+  return listOf(parseSandboxScopeRow, value)
+}
+
+export function parseSandboxScopeInfo(value: unknown): SandboxScopeInfo | null {
+  if (!isRecord(value)) return null
+  const project = listOf(parseSandboxScopeRow, value['project'])
+  const machineWide = listOf(parseSandboxScopeRow, value['machineWide'])
+  const level = oneOf(SANDBOX_LEVELS, value['level'])
+  if (project === null || machineWide === null || level === null) return null
+  return { project, machineWide, level }
+}
+
+export function parseDetectedPreset(value: unknown): DetectedPreset | null {
+  if (!isRecord(value)) return null
+  const id = text(value['id'])
+  const title = text(value['title'])
+  const description = typeof value['description'] === 'string' ? value['description'] : null
+  const paths = listOf((entry: unknown) => {
+    if (!isRecord(entry)) return null
+    const path = text(entry['path'])
+    const mode = oneOf(SANDBOX_SCOPE_MODES, entry['mode'])
+    if (path === null || mode === null) return null
+    return { path, mode }
+  }, value['paths'])
+  if (id === null || title === null || description === null || paths === null) return null
+  return { id, title, description, paths }
+}
+
+export function parseDetectedPresets(value: unknown): readonly DetectedPreset[] | null {
+  return listOf(parseDetectedPreset, value)
+}

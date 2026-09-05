@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { AppearancePane } from '@/features/settings/panes/AppearancePane'
 import { ArchivePane } from '@/features/settings/panes/ArchivePane'
+import { EnvironmentsPane } from '@/features/settings/environments/EnvironmentsPane'
 import { GeneralPane } from '@/features/settings/panes/GeneralPane'
 import { McpPane } from '@/features/settings/mcp/McpPane'
 import { PlaceholderPane } from '@/features/settings/panes/Pane'
@@ -20,6 +21,7 @@ const BUILT: Readonly<Record<string, () => ReactNode>> = {
   archive: ArchivePane,
   providers: ProvidersPane,
   mcp: McpPane,
+  environments: EnvironmentsPane,
 }
 
 export function paneFor(sectionId: string): ReactNode {

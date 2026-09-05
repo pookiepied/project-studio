@@ -2,7 +2,7 @@ import { Icons } from '@/components/icons'
 import { usePlan } from '@/features/plans/usePlan'
 import { cn } from '@/lib/cn'
 import type { ArtifactStatus } from '@/domain/artifacts/types'
-import type { PlanItemRecord, PlanSnapshot } from '@/platform/harness'
+import type { PlanItemRecord } from '@/platform/harness'
 
 /**
  * The plan panel: the conversation's items in position order, each with its

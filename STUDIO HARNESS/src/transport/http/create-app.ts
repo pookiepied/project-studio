@@ -27,6 +27,7 @@ import { createPlanRoutes } from "./routes/plans.js";
 import { createProjectRoutes } from "./routes/projects.js";
 import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
+import { createSandboxRoutes } from "./routes/sandbox.js";
 
 export interface CreateHttpAppOptions {
   /** The MCP administration surface — a port, not the runtime (ADR 0035 §2). */
@@ -75,6 +76,12 @@ export interface CreateHttpAppOptions {
   readonly titling?: ConversationTitlingPort;
   /** Projects and their folders over the same database. */
   readonly projects: ProjectStore;
+  /**
+   * The sandbox scope store, over the same database. Optional the way `plans`
+   * is: absent means no sandbox routes exist, which a composition without the
+   * scope table also wants, and production must not be.
+   */
+  readonly scopes?: import("../../sandbox/scope-store.js").SandboxScopeStore;
   readonly admission: AdmissionVerifier;
   /**
    * Answers whether the catalog currently serves a model reference. Settling a
@@ -120,6 +127,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   }
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));
+  if (options.scopes !== undefined) {
+    app.route("/api/sandbox", createSandboxRoutes({ scopes: options.scopes, projects: options.projects }));
+  }
   app.route("/api", createLifecycleRoutes({ requestShutdown: options.requestShutdown }));
 
   const agentRoutes = new Hono<AdmissionEnv>();

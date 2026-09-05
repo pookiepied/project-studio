@@ -65,9 +65,4 @@ export const PLACEHOLDERS: Readonly<Record<string, Placeholder>> = {
     description: 'Isolated checkouts for parallel work.',
     items: ['Existing worktrees', 'Where new ones are created', 'Cleaning up unchanged worktrees'],
   },
-  environments: {
-    title: 'Environments',
-    description: 'Where commands actually run.',
-    items: ['Local, container, or remote', 'Environment variables per project', 'Sandbox profile'],
-  },
 }

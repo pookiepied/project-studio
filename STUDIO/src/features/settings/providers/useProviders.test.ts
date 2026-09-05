@@ -94,6 +94,17 @@ function stubClient(overrides: {
     setMcpServerEnabled: () => refuse(),
     setMcpCredential: () => refuse(),
     deleteMcpCredential: () => refuse(),
+    // The environments half of the client. This stub is the providers pane's,
+    // and it refuses everything it does not model rather than returning an
+    // empty success, for the same reason as the MCP half above.
+    getScope: () => refuse(),
+    grantScope: () => refuse(),
+    revokeScope: () => refuse(),
+    listPresets: () => refuse(),
+    setSandboxLevel: () => refuse(),
+    getPlan: () => refuse(),
+    tickPlanItem: () => refuse(),
+    clearPlan: () => refuse(),
   }
 }
 

@@ -133,8 +133,14 @@ export function Studio({ id }: AgentProps) {
   // is the truth. When the override lands, the comparison starts answering
   // "project" on its own, with nothing here to remember to change.
   const kind = workspace === conversationWorkspaceDirectory(id) ? "conversation" : "project";
+  const extraRoots = runtime.conversationExtraRoots?.(id) ?? [];
   return `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
-    environmentFacts(workspace, new Date(), kind),
+    environmentFacts(
+      workspace,
+      new Date(),
+      kind,
+      extraRoots.length === 0 ? undefined : extraRoots,
+    ),
   )}`;
 }
 
