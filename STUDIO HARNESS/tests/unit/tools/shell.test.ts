@@ -394,6 +394,52 @@ describe("the command reader", () => {
     expect(readCommandPrograms('grep "a;b" file', BASH_LIKE)).toEqual(["grep"]);
   });
 
+  it("reads a PowerShell assignment as an assignment, not a program to run", () => {
+    // PowerShell writes an assignment as three tokens - `$name`, `=`, value -
+    // so the `FOO=1` shape never appears and the head of one was being read as
+    // a program named by a variable. An evaluation session was refused
+    // `$ProgressPreference = 'SilentlyContinue'; Expand-Archive ...` with
+    // "this line runs a program named by the variable $ProgressPreference",
+    // which is not what that line does: nothing was named by the variable, the
+    // variable was being written to.
+    expect(
+      readCommandPrograms(
+        "$ProgressPreference = 'SilentlyContinue'; Expand-Archive -Path a.zip -DestinationPath b",
+        POWERSHELL_LIKE,
+      ),
+    ).toEqual(["Expand-Archive"]);
+
+    expect(
+      readCommandPrograms("$env:NODE_ENV = 'test'; node build.js", POWERSHELL_LIKE),
+    ).toEqual(["node"]);
+
+    // A line that is *only* an assignment still ends with no program, and the
+    // existing "a command is required" guard catches it. That is the right
+    // answer rather than an oversight: each shell call is its own process, so
+    // a variable set and never used dies microseconds later, and a model that
+    // wrote one has made a mistake worth being told about. What matters is
+    // that it is refused for naming no program, not for naming a bad one.
+    expect(() => readCommandPrograms("$count = 5", POWERSHELL_LIKE)).toThrow(
+      /command is required/i,
+    );
+  });
+
+  it("still names the program on the right of an assignment that runs one", () => {
+    // The reason the two tokens are stepped over rather than the whole segment
+    // skipped. PowerShell's `$x = Get-Date` runs Get-Date and stores what it
+    // returned, so the program is still there to be approved; skipping the
+    // segment would hide it.
+    expect(readCommandPrograms("$now = Get-Date", POWERSHELL_LIKE)).toEqual(["Get-Date"]);
+    expect(readCommandPrograms("$out = node build.js", POWERSHELL_LIKE)).toEqual(["node"]);
+  });
+
+  it("still refuses a variable that really does name the program", () => {
+    // The narrowing must not reach the case the refusal was written for: a
+    // bare variable in program position, with no assignment under it.
+    expect(() => readCommandPrograms("$TOOL build", POWERSHELL_LIKE)).toThrow(/variable/i);
+    expect(() => readCommandPrograms("& $TOOL build", POWERSHELL_LIKE)).toThrow(/variable/i);
+  });
+
   it("sees through quoting, assignments, redirects, and a call operator", () => {
     expect(readCommandPrograms("FOO=1 npm test", BASH_LIKE)).toEqual(["npm"]);
     expect(readCommandPrograms(`"${NODE}" -e "console.log(1)" > out.txt`, BASH_LIKE)).toEqual([

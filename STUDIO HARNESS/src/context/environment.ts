@@ -53,9 +53,30 @@ import { ISOLATION_ENFORCED } from "../sandbox/isolation/registry.js";
  */
 const MACHINE = `${platform()} ${release()}`;
 
+/**
+ * Which of the two kinds of place this conversation is standing in.
+ *
+ * `conversation` - the directory belongs to this conversation and nothing
+ * else. It starts empty, nobody else reads it, and it is the right place to
+ * put working files.
+ *
+ * `project` - the directory is the person's own project, opened deliberately.
+ * The files in it are theirs, they existed before this conversation, and they
+ * outlive it.
+ *
+ * The difference decides how freely the model may write, so it is stated
+ * rather than left to be inferred from a path. A model that cannot tell the
+ * two apart has to treat every directory as precious, which is why an
+ * evaluation run reported having no scratch space while standing in a
+ * directory that was exactly that.
+ */
+export type WorkspaceKind = "conversation" | "project";
+
 export interface EnvironmentFacts {
   /** The conversation's working directory, absolute. */
   readonly workspace: string;
+  /** Whose directory it is, and therefore what may be written in it. */
+  readonly kind: WorkspaceKind;
   /** Whether that directory is inside a git repository. */
   readonly git: boolean;
   /** Today, as the machine reckons it. */
@@ -96,9 +117,14 @@ export function isGitRepository(directory: string): boolean {
   }
 }
 
-export function environmentFacts(workspace: string, now: Date): EnvironmentFacts {
+export function environmentFacts(
+  workspace: string,
+  now: Date,
+  kind: WorkspaceKind = "conversation",
+): EnvironmentFacts {
   return {
     workspace,
+    kind,
     git: isGitRepository(workspace),
     today: localDate(now),
   };
@@ -145,6 +171,50 @@ export function environmentFacts(workspace: string, now: Date): EnvironmentFacts
  * It says what a model can act on - which failures are the boundary and not a
  * bug - and not how containment is implemented, which is ours to change.
  */
+/**
+ * Whose directory this is, and what that permits.
+ *
+ * Added because an evaluation run reported that the harness had no scratch
+ * space, while standing in a directory that is exactly that and nobody
+ * else's. It was a fair reading of what it had been told: the block named a
+ * path, the prompt's file guidance is written about the person's project
+ * files - look before you change, do not write through the shell - and
+ * nothing anywhere said which of those two it was standing in. Told only to
+ * be careful, it was careful, and paid for an interpreter it could have put
+ * anywhere.
+ *
+ * The wrong fix is a scratchpad tool. The directory is already private, it
+ * already persists across turns, and `write` already writes to it. What was
+ * missing was one sentence saying so.
+ *
+ * The two cases say opposite things on purpose. In a conversation the
+ * instruction is "this is yours, use it"; in a project it is "these are
+ * theirs, and a working file goes somewhere you were asked to put it".
+ * Collapsing them into one careful paragraph would restore the original
+ * problem, which was a model that could not tell which it was in.
+ */
+function workspaceStatement(kind: WorkspaceKind): readonly string[] {
+  if (kind === "project") {
+    return [
+      "This directory is the person's project, opened deliberately. The files",
+      "in it are theirs and existed before this conversation, so change them",
+      "only as the task asks, and do not scatter working files through the",
+      "tree. If you need somewhere to put intermediate output, ask where it",
+      "should go, or use a path the person named.",
+      "",
+    ];
+  }
+  return [
+    "This directory belongs to this conversation and to nothing else. It",
+    "started empty, no other conversation reads it, and it persists between",
+    "turns and across restarts. It is yours to work in: write intermediate",
+    "files, notes, scripts and downloads here as freely as you need, and read",
+    "them back later. Nothing here is the person's own work unless they put",
+    "it here, so you are not disturbing anything by using it.",
+    "",
+  ];
+}
+
 function containmentStatement(): readonly string[] {
   if (!ISOLATION_ENFORCED) return [];
   return [
@@ -159,6 +229,14 @@ function containmentStatement(): readonly string[] {
     "program that reads its own installation while it runs, rather than only",
     "linking system libraries, may fail for the same reason; Python is the one",
     "to expect. Say so and move on rather than diagnosing it.",
+    "",
+    "One measured limitation, so you do not spend a timeout finding it. A",
+    "program you run may itself run another program, but if it captures that",
+    "program's output through a pipe, the call hangs until it times out and",
+    "you see nothing. Writing to a file works, and so does letting the inner",
+    "program inherit the outer one's output. So prefer running each program",
+    "directly with its own call; when one really must launch another, have",
+    "the inner one write to a file and read the file afterwards.",
     "",
   ];
 }
@@ -178,6 +256,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
       ? "It is inside a git repository, so the git tools will work here."
       : "It is not a git repository.",
     "",
+    ...workspaceStatement(facts.kind),
     ...(shell === undefined
       ? [
           "This machine has no command interpreter, so the shell tool cannot",

@@ -127,8 +127,14 @@ export function Studio({ id }: AgentProps) {
       projectRoot: workspace,
     }),
   );
+  // Derived by comparing the two, not assumed from which branch built the
+  // path. Today they are always equal - a project conversation does not yet
+  // override the roots - so this reports "conversation" for every run, which
+  // is the truth. When the override lands, the comparison starts answering
+  // "project" on its own, with nothing here to remember to change.
+  const kind = workspace === conversationWorkspaceDirectory(id) ? "conversation" : "project";
   return `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
-    environmentFacts(workspace, new Date()),
+    environmentFacts(workspace, new Date(), kind),
   )}`;
 }
 

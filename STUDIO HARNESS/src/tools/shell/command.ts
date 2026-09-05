@@ -171,6 +171,34 @@ function isAssignment(token: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || /^\$env:[A-Za-z0-9_]+=/.test(token);
 }
 
+/** PowerShell and pwsh, which share a variable syntax the others do not have. */
+function isPowerShellFamily(interpreter: Interpreter): boolean {
+  return interpreter.kind === "pwsh" || interpreter.kind === "powershell";
+}
+
+/**
+ * A PowerShell variable name, as the head of an assignment.
+ *
+ * `$ProgressPreference`, `$env:PATH`, `$script:count`. Not `$(`, which is
+ * substitution and is refused long before this, and not a bare `$`.
+ */
+function isVariableToken(token: string): boolean {
+  return /^\$[A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z_][A-Za-z0-9_]*)?$/.test(token);
+}
+
+/**
+ * A token that is a value rather than a program: a quoted string or a number.
+ *
+ * Only consulted just after an assignment's `=`, where PowerShell itself makes
+ * the distinction. `$x = 'quiet'` stores a string and runs nothing; `$x =
+ * Get-Date` runs `Get-Date` and stores what it returned. The reader has to
+ * make the same split, because refusing the first would refuse an assignment
+ * and naming the second's program is the whole job.
+ */
+function isLiteralValue(token: string, wasQuoted: boolean): boolean {
+  return wasQuoted || /^-?[0-9]/.test(token) || /^\$(true|false|null)$/i.test(token);
+}
+
 /**
  * The permission name a program token carries.
  *
@@ -190,6 +218,17 @@ export function programName(token: string): string {
 
 interface Segment {
   readonly tokens: readonly string[];
+  /**
+   * Whether each token had a quote in it, positionally.
+   *
+   * Quotes are consumed while tokenizing, so by the time a token is examined
+   * `'SilentlyContinue'` and `Get-Date` look the same. That difference is
+   * usually irrelevant - a quoted program name is still a program name, which
+   * is why `"C:\Program Files\tool.exe"` works - but on the right of a
+   * PowerShell assignment it is the whole question: a quoted value is a
+   * string being stored, and a bare word is a command being run.
+   */
+  readonly quoted: readonly boolean[];
   /** A PowerShell call operator was consumed at the head of this segment. */
   readonly callOperator: boolean;
 }
@@ -210,21 +249,31 @@ function segmentsOf(command: string, interpreter: Interpreter): readonly Segment
 
   const segments: Segment[] = [];
   let tokens: string[] = [];
+  let quoted: boolean[] = [];
   let current = "";
+  let currentQuoted = false;
   let inDouble = false;
   let inSingle = false;
   let callOperator = false;
 
-  const endSegment = (): void => {
-    if (current !== "") tokens.push(current);
+  const endToken = (): void => {
+    if (current === "") return;
+    tokens.push(current);
+    quoted.push(currentQuoted);
     current = "";
+    currentQuoted = false;
+  };
+
+  const endSegment = (): void => {
+    endToken();
     // An empty segment is pushed too, not skipped: `a && ; b` hides a command
     // slot with nothing in it, and the caller refuses that rather than letting
     // it mean "a, then b". The one empty segment that never materialises is
     // the trailing one - `a &&` at end of line is the interpreter's syntax
     // error to make, and nothing here was skipped past.
-    segments.push({ tokens, callOperator });
+    segments.push({ tokens, quoted, callOperator });
     tokens = [];
+    quoted = [];
     callOperator = false;
   };
 
@@ -257,10 +306,12 @@ function segmentsOf(command: string, interpreter: Interpreter): readonly Segment
 
     if (character === '"') {
       inDouble = true;
+      currentQuoted = true;
       continue;
     }
     if (character === "'") {
       inSingle = true;
+      currentQuoted = true;
       continue;
     }
     if (character === "\\" && next === "\n") {
@@ -275,8 +326,7 @@ function segmentsOf(command: string, interpreter: Interpreter): readonly Segment
       continue;
     }
     if (character === " " || character === "\t") {
-      if (current !== "") tokens.push(current);
-      current = "";
+      endToken();
       continue;
     }
     if (character === "&" && next === "&") {
@@ -332,9 +382,9 @@ function segmentsOf(command: string, interpreter: Interpreter): readonly Segment
         "reliably. It was not run.",
     });
   }
-  if (current !== "") tokens.push(current);
+  endToken();
   if (tokens.length > 0 || callOperator) {
-    segments.push({ tokens, callOperator });
+    segments.push({ tokens, quoted, callOperator });
   }
   return segments;
 }
@@ -383,6 +433,15 @@ export function readCommandPrograms(
     const tokens = [...segment.tokens];
 
     let program: string | undefined;
+    /**
+     * Set when the segment is an assignment that stores a value.
+     *
+     * Such a segment legitimately runs nothing - `$count = 5` is a whole,
+     * legal statement - so it must not fall into the "names no program"
+     * refusal below, which exists for an operator with an empty slot beside
+     * it. The two look identical by the time the loop ends, hence the flag.
+     */
+    let storesValue = false;
     for (let index = 0; index < tokens.length; index += 1) {
       const token = tokens[index];
       if (token === undefined) break;
@@ -395,6 +454,32 @@ export function readCommandPrograms(
         continue;
       }
       if (isAssignment(token)) continue;
+      // PowerShell writes an assignment as three tokens - `$name`, `=`, and
+      // the value - so the shape the other branch matches never appears, and
+      // the variable branch below read the head of one as a program to run.
+      // An evaluation session hit exactly this: `$ProgressPreference =
+      // 'SilentlyContinue'; Expand-Archive ...` was refused with "this line
+      // runs a program named by the variable $ProgressPreference", which is
+      // not what that line does. Nothing was named by the variable; the
+      // variable was being written to.
+      //
+      // The two tokens are stepped over rather than the segment skipped,
+      // because what follows an `=` may well be a command: `$x = Get-Date`
+      // runs `Get-Date` and stores the result, and that program still has to
+      // be named. Only a literal ends the segment with no program in it.
+      if (
+        isPowerShellFamily(interpreter) &&
+        isVariableToken(token) &&
+        tokens[index + 1] === "="
+      ) {
+        const value = tokens[index + 2];
+        if (value === undefined || isLiteralValue(value, segment.quoted[index + 2] === true)) {
+          storesValue = true;
+          break;
+        }
+        index += 1;
+        continue;
+      }
       if (RESERVED_WORDS.has(token)) continue;
       // An option prefix is per interpreter, and getting it wrong is not
       // cosmetic. `cmd` writes switches as `/d`, and a reader that only knew
@@ -451,6 +536,7 @@ export function readCommandPrograms(
     }
 
     if (program === undefined) {
+      if (storesValue) continue;
       if (segment.callOperator && tokens.length === 0) {
         throw new ToolError("invalid_input", {
           message:
