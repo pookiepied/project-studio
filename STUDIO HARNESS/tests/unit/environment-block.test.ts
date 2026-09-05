@@ -79,6 +79,9 @@ describe("the environment block", () => {
     expect(own).toMatch(/yours to work in/);
     // The instruction that makes it usable, not just permitted.
     expect(own).toMatch(/intermediate/);
+    // And the one real limit of a private workspace: it is empty, so the
+    // person's existing code is somewhere else.
+    expect(own).toMatch(/open it as a project/);
 
     const theirs = environmentBlock({
       workspace: "/w",
@@ -123,6 +126,14 @@ describe("the environment block", () => {
       expect(block).toMatch(/pipe/);
       expect(block).toMatch(/hangs/);
       expect(block).toMatch(/write to a file/);
+      // And the correction to the reading that produced the last report: the
+      // toolchains are reachable, so "not recognized" for a bare name is not
+      // evidence that a tool is absent. Measured under containment on this
+      // machine: node, npm, git, python and dotnet all run.
+      expect(block).toMatch(/name programs directly/);
+      expect(block).toMatch(/node, npm/);
+      // Network is a stated decision, not a gap something slipped through.
+      expect(block).toMatch(/Outbound network is on/);
     } else {
       // A host with no backend must not claim a boundary it does not have.
       expect(block).not.toContain("Commands you run are contained.");
