@@ -1,86 +1,25 @@
-packages:
-  - .
+# Where pnpm 11 reads settings that pnpm 10 read from package.json.
+#
+# The `pnpm` field in package.json is no longer read, so `overrides` moved
+# here. `patchedDependencies` is declared here too: it had never been written
+# in a manifest at all, and survived only because the lockfile remembered it -
+# one clean reinstall away from the Flue runtime patch silently not applying.
+overrides:
+  '@earendil-works/pi-ai': ^0.84.0
 
+patchedDependencies:
+  '@flue/runtime@2.0.3': patches/@flue__runtime@2.0.3.patch
+
+# Every dependency that ships an install script, answered explicitly.
+#
+# pnpm 10 printed an unanswered list as a warning; pnpm 11 fails the command
+# on it, so silence is no longer an option. `false` for all six keeps exactly
+# the behavior this project has always run and tested under - none of these
+# scripts has ever executed here. Flip one to `true` only with a reason.
 allowBuilds:
   '@google/genai': false
   '@mongodb-js/zstd': false
-  esbuild: true
+  core-js-pure: false
+  esbuild: false
   node-liblzma: false
   protobufjs: false
-  sharp: false
-  workerd: true
-
-# The @flue/runtime and @flue/sdk idempotency patches were removed under
-# meta-task #12. The @flue/cli patch died with the Flue 2.0 pins (Phases 2
-# and 3): its three behaviours - the fd admission bootstrap, the loopback
-# bind and the readiness frame - are ordinary code in src/server.ts now, and
-# its build/dev roles moved to `vite build` + @flue/vite.
-#
-# @flue/runtime@2.0.3 - five hunks, one rule: a retry budget may only be
-#   lengthened once the retry is visible, and invisible retry must stay
-#   short. Phase 8 re-derived the runtime patch against the 2.0.3 bundles
-#   (the beta.9 hunks were anchored to beta.9 bundle content and failed the
-#   install loudly, by design). The entry lives here, where the beta.9
-#   entries lived; pnpm fails the whole install if a hunk stops applying,
-#   which is the point.
-#
-#   1. conversation-stream-store-*.mjs, waitForTransientModelRetry - each
-#      scheduled transient retry appends a `submission_retry_scheduled`
-#      record carrying wire facts only (attempt, maxRetries, delayMs, the
-#      failed attempt's error sentence), which hunk 4 projects into a
-#      `submission-retrying` chunk. The budget and the wait for each attempt
-#      come from src/reliability/model-retry-policy.ts - rate-limit 8
-#      retries, transport 2, everything else 3 - consulted on
-#      globalThis.__projectStudioTransientModelRetryPolicy, because this
-#      bundle executes from pnpm's virtual store and cannot import our
-#      source. An absent, malformed or throwing policy falls back to the
-#      shipped constants of three and upstream's own delay curve, so the
-#      fallback path is exactly the pre-Task-30 behaviour. The exhausted
-#      branch still emits nothing - there is no wait to announce, and the
-#      settlement carries the failure.
-#
-#   2. dispatch-*.mjs, isRetryableModelError - the heuristic half of the
-#      transient-model-error classifier is delegated to pi-ai's
-#      isRetryableAssistantError instead of the inline regex, which missed
-#      genuinely transient wordings (OpenRouter's "Provider returned error"
-#      among them) and had no quota/billing guard, so OpenAI's
-#      insufficient_quota (an HTTP 429) burned three retries before the
-#      person saw the one sentence that could help. Upstream's
-#      stopReason/errorMessage precondition and its (retryable_interruption)
-#      marker check stay in front of the delegation.
-#
-#   3. dispatch-*.mjs, projectConversationUi - an errored assistant attempt
-#      keeps its own message in the history projection instead of folding
-#      into the response that replaced it. Without this a retry is
-#      invisible in BOTH channels at once: no `submission-retrying` chunk
-#      and no failed attempt to look at, which is what made a retrying turn
-#      indistinguishable from a hung one.
-#
-#   4. dispatch-*.mjs, encodeRecord - projects `submission_retry_scheduled`
-#      into a `submission-retrying` chunk. Unknown record types project to
-#      nothing by design, so the one record Studio itself adds needs its own
-#      case beside the other submission_* cases.
-#
-#   5. conversation-stream-store-*.mjs, composeSystemPrompt - removes the
-#      compose-time `Date:` line and the bare `Working directory:` line,
-#      which duplicated facts the studio agent's own `# Environment` block
-#      already carries (one authority per fact; the block is ours). The
-#      `## Available Agents` section and the directory listing stay: the
-#      `task` tool is always registered and its description points the model
-#      at that section, and the listing is a fact ours does not carry.
-#      Measured before deciding: the shipped `Date:` line is day-granular
-#      and tail-positioned, so it never actually defeated per-turn prompt
-#      caching - the reason for removal is duplication, not caching.
-#
-#   How to re-derive at the next upgrade: every hunk carries its own recipe
-#   in a `[project-studio patch]` comment, and every recipe says to anchor
-#   on content, never on a bundle filename - 2.0.3 moved encodeRecord out of
-#   flue-app-*.mjs into dispatch-*.mjs, and a filename anchor is exactly
-#   what died with beta.9. Read the failed hunks against the new tarball,
-#   re-anchor on the named functions and structures, and re-read
-#   documentation/architecture/retry.md, whose row 1 is the map this patch
-#   belongs to. The retry behaviours in tests/integration/harness.test.ts
-#   pin all of it end to end; they ran red for the whole 2.0.3 window and
-#   came back green the day this patch landed.
-patchedDependencies:
-  '@flue/runtime@2.0.3': patches/@flue__runtime@2.0.3.patch
