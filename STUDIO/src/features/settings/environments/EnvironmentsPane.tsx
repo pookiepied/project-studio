@@ -13,10 +13,18 @@ const CUSTOM_PATH_PLACEHOLDER = 'C:\\Tools\\data'
 /**
  * Environments.
  *
- * Where commands actually run. Three parts, in this order: this project's
- * level, the detected toolchains, and everything granted with where it came
- * from. Scope and level are kept apart here the same way they are kept apart
- * everywhere else: granting a path never changes a level.
+ * Where commands actually run. Four parts, in this order: this project's
+ * level, the scope the next grant will take, the detected toolchains, and
+ * everything granted with where it came from. Scope and level are kept apart
+ * here the same way they are kept apart everywhere else: granting a path
+ * never changes a level.
+ *
+ * Grants can be written at both scopes the harness keeps - for the selected
+ * project, or machine-wide (every project and conversations with no project).
+ * The choice is a control on the surface, and every grant button names the
+ * scope it is writing at the moment of the click. With no project on the
+ * machine only machine-wide is available, so the controls stay usable rather
+ * than disappearing behind a project that does not exist.
  */
 export function EnvironmentsPane() {
   const environments = useEnvironments()
@@ -80,10 +88,46 @@ function Body({
   const [customPath, setCustomPath] = useState('')
   const [customMode, setCustomMode] = useState<'read' | 'write'>('read')
   const [customError, setCustomError] = useState<string | null>(null)
+  // The scope the next grant click will write. A machine-wide grant applies
+  // to every project and to conversations with no project, which is more
+  // than most people mean by "allow this", so the choice stays on the
+  // surface and every button names the one it is doing. With no project on
+  // the machine there is nothing to choose: grants can only be machine-wide.
+  const [grantScope, setGrantScope] = useState<'project' | 'everywhere'>('project')
+  const grantEverywhere = projectId === null || grantScope === 'everywhere'
 
-  const grantedFor = (path: string): boolean =>
-    scope.project.some((row) => row.path.toLowerCase() === path.toLowerCase()) ||
-    scope.machineWide.some((row) => row.path.toLowerCase() === path.toLowerCase())
+  const covers = (rows: readonly { readonly path: string }[], path: string): boolean =>
+    rows.some((row) => row.path.toLowerCase() === path.toLowerCase())
+
+  const grantedHere = (path: string): boolean =>
+    projectId !== null && covers(scope.project, path)
+  const grantedEverywhere = (path: string): boolean => covers(scope.machineWide, path)
+
+  const revokeCovering = (path: string): void => {
+    // The label says where a path is granted; the click takes up exactly
+    // what it named, wherever the covering rows are.
+    if (projectId !== null && grantedHere(path)) onRevoke(projectId, path)
+    if (grantedEverywhere(path)) onRevoke('', path)
+  }
+
+  const presetButtonLabel = (path: string): string => {
+    const here = grantedHere(path)
+    const wide = grantedEverywhere(path)
+    if (here && wide) return 'Granted here and everywhere (revoke)'
+    if (here) return 'Granted for this project (revoke)'
+    if (wide) return 'Granted everywhere (revoke)'
+    return grantEverywhere ? 'Grant everywhere' : 'Grant for this project'
+  }
+
+  const pressPresetButton = (presetId: string, path: string, mode: 'read' | 'write'): void => {
+    if (grantedHere(path) || grantedEverywhere(path)) {
+      revokeCovering(path)
+      return
+    }
+    // `projectId ?? ''` only ever falls through when the grant is
+    // machine-wide by construction, where the id is the empty string anyway.
+    onGrantPreset(grantEverywhere ? '' : (projectId ?? ''), presetId, path, mode)
+  }
 
   return (
     <div>
@@ -117,7 +161,10 @@ function Body({
       ) : null}
 
       {projectId === null ? (
-        <Row label="No project selected" hint="Create a project to hold a level and per-project grants. What is below is the machine-wide list." />
+        <Row
+          label="No project selected"
+          hint="Create a project to hold a level and per-project grants. Until then the grants below are machine-wide: they apply to every project and to conversations with no project."
+        />
       ) : (
         <Row
           label="This project's level"
@@ -147,6 +194,24 @@ function Body({
         />
       ) : null}
 
+      {projectId !== null ? (
+        <Row
+          label="Grants below apply to"
+          hint="Everywhere means every project and conversations with no project, which is more than most people mean by allowing a path. This project means only the project selected above."
+        >
+          <Segmented
+            layoutId="settings-grant-scope"
+            ariaLabel="Grants below apply to"
+            value={grantScope}
+            onChange={(value) => setGrantScope(value)}
+            options={[
+              { id: 'project', label: 'This project' },
+              { id: 'everywhere', label: 'Everywhere' },
+            ]}
+          />
+        </Row>
+      ) : null}
+
       {lastError === null ? null : (
         <StateNote title="The harness refused that change" detail={lastError} />
       )}
@@ -154,7 +219,7 @@ function Body({
       <div className="py-3.5">
         <p className="text-ui text-foreground">Detected toolchains</p>
         <p className="mt-0.5 text-caption text-muted-foreground">
-          Only what is actually on this machine, with the path found. A preset that is not detected is not shown. Tick one to grant it for this project.
+          Only what is actually on this machine, with the path found. A preset that is not detected is not shown. Grant one to the scope chosen above, or machine-wide when no project is selected.
         </p>
         {presets.length === 0 ? (
           <p className="mt-2 text-caption text-muted-foreground">
@@ -165,29 +230,21 @@ function Body({
           <div key={preset.id} className="mt-3 rounded-md border p-3">
             <p className="text-ui text-foreground">{preset.title}</p>
             <p className="text-caption text-muted-foreground">{preset.description}</p>
-            {preset.paths.map((entry) => {
-              const on = projectId !== null && grantedFor(entry.path)
-              return (
-                <div key={entry.path} className="mt-2 flex items-start justify-between gap-6">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-caption text-foreground">{entry.path}</p>
-                    <p className="text-caption text-muted-foreground">{entry.mode}</p>
-                  </div>
-                  {projectId === null ? null : (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        if (on) onRevoke(projectId, entry.path)
-                        else onGrantPreset(projectId, preset.id, entry.path, entry.mode)
-                      }}
-                    >
-                      {on ? 'Granted — revoke' : 'Grant for this project'}
-                    </Button>
-                  )}
+            {preset.paths.map((entry) => (
+              <div key={entry.path} className="mt-2 flex items-start justify-between gap-6">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-caption text-foreground">{entry.path}</p>
+                  <p className="text-caption text-muted-foreground">{entry.mode}</p>
                 </div>
-              )
-            })}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => pressPresetButton(preset.id, entry.path, entry.mode)}
+                >
+                  {presetButtonLabel(entry.path)}
+                </Button>
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -231,51 +288,51 @@ function Body({
         ))}
       </div>
 
-      {projectId === null ? null : (
-        <div className="py-3.5">
-          <p className="text-ui text-foreground">Custom path</p>
-          <p className="mt-0.5 text-caption text-muted-foreground">
-            An absolute path that exists. Volume roots and system directories are refused — a grant there is the end of containment, and the project that wants that wants trusted instead.
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              aria-label="Absolute path"
-              value={customPath}
-              onChange={(event) => {
-                setCustomPath(event.target.value)
-                setCustomError(null)
-              }}
-              placeholder={CUSTOM_PATH_PLACEHOLDER}
-              className="h-7 min-w-0 flex-1 rounded-md border bg-surface px-2 text-ui text-foreground"
-            />
-            <Segmented
-              layoutId="settings-scope-mode"
-              ariaLabel="Mode"
-              value={customMode}
-              onChange={(value) => setCustomMode(value)}
-              options={[
-                { id: 'read', label: 'Read' },
-                { id: 'write', label: 'Write' },
-              ]}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                if (customPath.trim() === '') {
-                  setCustomError('A scope path is required.')
-                  return
-                }
-                onGrantCustom(projectId, customPath.trim(), customMode)
-                setCustomPath('')
-              }}
-            >
-              Grant
-            </Button>
-          </div>
-          {customError ? <p className="mt-1 text-caption text-red-500">{customError}</p> : null}
+      <div className="py-3.5">
+        <p className="text-ui text-foreground">Custom path</p>
+        <p className="mt-0.5 text-caption text-muted-foreground">
+          An absolute path that exists. Volume roots and system directories are refused — a grant there is the end of containment, and the project that wants that wants trusted instead.
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            aria-label="Absolute path"
+            value={customPath}
+            onChange={(event) => {
+              setCustomPath(event.target.value)
+              setCustomError(null)
+            }}
+            placeholder={CUSTOM_PATH_PLACEHOLDER}
+            className="h-7 min-w-0 flex-1 rounded-md border bg-surface px-2 text-ui text-foreground"
+          />
+          <Segmented
+            layoutId="settings-scope-mode"
+            ariaLabel="Mode"
+            value={customMode}
+            onChange={(value) => setCustomMode(value)}
+            options={[
+              { id: 'read', label: 'Read' },
+              { id: 'write', label: 'Write' },
+            ]}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              if (customPath.trim() === '') {
+                setCustomError('A scope path is required.')
+                return
+              }
+              // The empty project id is the machine-wide scope; the harness
+              // takes it and the store keeps the row beside the project ones.
+              onGrantCustom(grantEverywhere ? '' : (projectId ?? ''), customPath.trim(), customMode)
+              setCustomPath('')
+            }}
+          >
+            {grantEverywhere ? 'Grant everywhere' : 'Grant for this project'}
+          </Button>
         </div>
-      )}
+        {customError ? <p className="mt-1 text-caption text-red-500">{customError}</p> : null}
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { isAbsolute, normalize, resolve, sep } from "node:path";
 
 import { StorageError } from "../storage/errors.js";
@@ -148,6 +148,59 @@ function defaultExists(path: string): boolean {
     return existsSync(path);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Validates a project folder path before it is stored.
+ *
+ * A folder row is what a turn binds sandbox roots from, so the same bar a
+ * scope path clears applies here: absolute, real on this machine, and not a
+ * volume root or system directory. This is a sibling of
+ * `validateCustomScopePath` rather than a call into it for two reasons: a
+ * folder must be a *directory*, which the scope check does not ask, and its
+ * refusals should speak of folders, not scopes. The one rule that must not
+ * drift - which paths are the end of containment - stays shared, through
+ * `systemScopeRefusal`.
+ *
+ * Returns the normalized absolute form, which is what the store keeps.
+ */
+export function validateFolderPath(
+  path: string,
+  stat: (path: string) => { isDirectory(): boolean } | undefined = defaultStat,
+): string {
+  if (typeof path !== "string" || path.trim() === "") {
+    throw new StorageError("invalid", { message: "A project folder path is required." });
+  }
+  if (!isAbsolute(path)) {
+    throw new StorageError("invalid", {
+      message: `That path is not absolute (${path}). A project folder names an absolute directory.`,
+    });
+  }
+  const absolute = normalizeScopePath(path);
+  const refusal = systemScopeRefusal(absolute);
+  if (refusal !== undefined) {
+    throw new StorageError("invalid", { message: refusal });
+  }
+  const found = stat(absolute);
+  if (found === undefined) {
+    throw new StorageError("invalid", {
+      message: `That path does not exist (${absolute}). A project folder names a directory that is there.`,
+    });
+  }
+  if (!found.isDirectory()) {
+    throw new StorageError("invalid", {
+      message: `That path is not a directory (${absolute}). A project folder names a directory.`,
+    });
+  }
+  return absolute;
+}
+
+function defaultStat(path: string): { isDirectory(): boolean } | undefined {
+  try {
+    return statSync(path);
+  } catch {
+    return undefined;
   }
 }
 

@@ -89,6 +89,14 @@ export interface EnvironmentFacts {
    * block is paid for on every conversation.
    */
   readonly extraRoots?: readonly string[];
+  /**
+   * The folders of the person's project, in the order they arranged them.
+   *
+   * Present only for a project conversation, and the first entry is the
+   * working directory. Named in the block so the model learns the shape of
+   * the thing it was opened into without running a command to look.
+   */
+  readonly projectFolders?: readonly string[];
 }
 
 /**
@@ -130,6 +138,7 @@ export function environmentFacts(
   now: Date,
   kind: WorkspaceKind = "conversation",
   extraRoots?: readonly string[],
+  projectFolders?: readonly string[],
 ): EnvironmentFacts {
   return {
     workspace,
@@ -137,6 +146,7 @@ export function environmentFacts(
     git: isGitRepository(workspace),
     today: localDate(now),
     ...(extraRoots === undefined || extraRoots.length === 0 ? {} : { extraRoots }),
+    ...(projectFolders === undefined || projectFolders.length === 0 ? {} : { projectFolders }),
   };
 }
 
@@ -269,6 +279,30 @@ function containmentStatement(): readonly string[] {
   ];
 }
 
+/**
+ * The person's folders, named.
+ *
+ * Added when a project conversation began running in the project's own
+ * folders for the first time. With several roots, "your working directory"
+ * is a choice someone made rather than the only place there is, so the list
+ * says which one it is; and a model that can see the whole shape of what it
+ * was opened into does not spend calls discovering it. One line per folder,
+ * the same way the extra roots are listed. It belongs to the project branch
+ * of the block and renders for no other kind.
+ */
+function projectFoldersStatement(facts: EnvironmentFacts): readonly string[] {
+  if (facts.kind !== "project") return [];
+  const folders = facts.projectFolders ?? [];
+  if (folders.length === 0) return [];
+  return [
+    "The project was opened with these folders:",
+    ...folders.map((folder, index) =>
+      index === 0 ? `- ${folder} (your working directory)` : `- ${folder}`,
+    ),
+    "",
+  ];
+}
+
 function extraRootsStatement(extraRoots: readonly string[] | undefined): readonly string[] {
   if (extraRoots === undefined || extraRoots.length === 0) return [];
   // Paths only, no explanation of how they got there. The block is paid for on
@@ -296,6 +330,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
       : "It is not a git repository.",
     "",
     ...workspaceStatement(facts.kind),
+    ...projectFoldersStatement(facts),
     ...extraRootsStatement(facts.extraRoots),
     ...(shell === undefined
       ? [

@@ -1,7 +1,7 @@
 import type { ProjectCreateInput } from "../contracts/conversations.js";
 import type { ProjectIcon } from "../contracts/conversations.js";
 import { createStudioUuid } from "../identity/uuid.js";
-import { readSandboxLevel, type SandboxLevel } from "../sandbox/scope.js";
+import { readSandboxLevel, validateFolderPath, type SandboxLevel } from "../sandbox/scope.js";
 import { StorageError, storageErrorFrom } from "../storage/errors.js";
 import type { StudioDatabase } from "../storage/database.js";
 
@@ -79,6 +79,15 @@ function asIcon(value: string): ProjectIcon {
   return DEFAULT_ICONS.has(value) ? (value as ProjectIcon) : "arc";
 }
 
+/**
+ * A folder row is decoration no longer: a turn binds its sandbox roots from
+ * these rows, so a path that is relative, absent, a file, a volume root, or a
+ * system directory is refused on write (`validateFolderPath`) rather than
+ * discovered by a run standing in nothing. Validation is on write only - rows
+ * written before this existed are read as they are, and a bad one is caught by
+ * the turn refusal at the moment it would matter, not by a migration.
+ */
+
 function toProject(row: ProjectRow, folders: readonly FolderRow[]): ProjectRecord {
   const ordered = [...folders].sort((left, right) => left.position - right.position);
   return {
@@ -151,10 +160,16 @@ export class ProjectStore {
     if (this.get(id) !== undefined) {
       throw new StorageError("conflict", { message: `A project named id "${id}" exists.` });
     }
-    const folders = input.folders ?? [];
+    // Validated, and the normalized absolute form is what is stored, before
+    // the transaction opens - so a bad path refuses the whole create instead
+    // of surfacing as a driver error from inside it.
+    const folders = (input.folders ?? []).map((folder) => ({
+      ...folder,
+      path: validateFolderPath(folder.path),
+    }));
     const seen = new Set<string>();
     for (const folder of folders) {
-      const key = folder.path.trim().toLowerCase();
+      const key = folder.path.toLowerCase();
       if (seen.has(key)) {
         throw new StorageError("conflict", {
           message: `A project cannot attach the same folder twice.`,
@@ -313,6 +328,8 @@ export class ProjectStore {
     projectId: string,
     folder: { name: string; path: string },
   ): ProjectRecord | undefined {
+    // Validated before the transaction opens, the same as in `create`.
+    const path = validateFolderPath(folder.path);
     try {
       this.#db.transaction(() => {        // An absent project must not become a folder without a parent; the
         // foreign key refuses it below either way, but saying why here turns
@@ -334,7 +351,7 @@ export class ProjectStore {
             `INSERT INTO project_folder (id, project_id, path, name, position, created_at)
              VALUES (?, ?, ?, ?, ?, ?)`,
           )
-          .run(createStudioUuid(), projectId, folder.path, folder.name, current.next, Date.now());
+          .run(createStudioUuid(), projectId, path, folder.name, current.next, Date.now());
       });
     } catch (error) {
       if (error instanceof StorageError) throw error;
@@ -349,15 +366,19 @@ export class ProjectStore {
     folderId: string,
     change: { name?: string | undefined; path?: string | undefined },
   ): boolean {
+    // A relocation is a write like any other: the new path must be a real
+    // directory. The row it replaces may point somewhere that no longer
+    // exists - that is why the person is relocating it.
+    const path = change.path === undefined ? undefined : validateFolderPath(change.path);
     const assignments: string[] = [];
     const values: string[] = [];
     if (change.name !== undefined) {
       assignments.push("name = ?");
       values.push(change.name);
     }
-    if (change.path !== undefined) {
+    if (path !== undefined) {
       assignments.push("path = ?");
-      values.push(change.path);
+      values.push(path);
     }
     if (assignments.length === 0) return false;
     try {

@@ -141,6 +141,77 @@ describe("the environment block", () => {
   });
 });
 
+describe("the project's folders", () => {
+  it("names every folder and says which one is the working directory", () => {
+    // With several roots, "your working directory" is a choice someone made
+    // rather than the only place there is, so the list marks the choice; and
+    // the model learns the shape of what it was opened into without running
+    // a command to look.
+    const block = environmentBlock({
+      workspace: "D:/Work/site",
+      kind: "project",
+      git: false,
+      today: "2026-08-30",
+      projectFolders: ["D:/Work/site", "D:/Work/assets", "D:/Work/notes"],
+    });
+
+    expect(block).toContain("- D:/Work/site (your working directory)");
+    expect(block).toContain("- D:/Work/assets");
+    expect(block).toContain("- D:/Work/notes");
+  });
+
+  it("renders no folder list for a conversation's own tree", () => {
+    const block = environmentBlock({
+      workspace: "/w",
+      kind: "conversation",
+      git: false,
+      today: "2026-08-30",
+    });
+
+    expect(block).not.toContain("(your working directory)");
+    expect(block).not.toContain("folders");
+  });
+
+  it("renders no folder list for a project that is only a label", () => {
+    const block = environmentBlock({
+      workspace: "/w",
+      kind: "project",
+      git: false,
+      today: "2026-08-30",
+    });
+
+    expect(block).not.toContain("folders");
+  });
+
+  it("keeps the folder list out of the conversation kind even when the facts carry it", () => {
+    // The statement belongs to the project branch. The render cannot produce
+    // folders for a conversation run, and the block does not render them if
+    // a caller ever does.
+    const block = environmentBlock({
+      workspace: "/w",
+      kind: "conversation",
+      git: false,
+      today: "2026-08-30",
+      projectFolders: ["/somewhere/else"],
+    });
+
+    expect(block).not.toContain("/somewhere/else");
+  });
+
+  it("assembles project facts with the folders", () => {
+    const facts = environmentFacts(
+      "D:/Work/site",
+      new Date(2026, 7, 30, 12, 0, 0),
+      "project",
+      undefined,
+      ["D:/Work/site", "D:/Work/assets"],
+    );
+
+    expect(facts.kind).toBe("project");
+    expect(facts.projectFolders).toEqual(["D:/Work/site", "D:/Work/assets"]);
+  });
+});
+
 describe("the facts behind it", () => {
   it("reads the local date, not UTC", () => {
     // Late evening local time is already tomorrow in UTC. The person reading

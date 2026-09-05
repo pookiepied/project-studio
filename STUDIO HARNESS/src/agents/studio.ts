@@ -74,9 +74,11 @@ export function studioThinkingLevel(
  * submission: a send the harness refuses never reaches a render, and
  * creates nothing.
  *
- * A conversation belonging to a project will pass its project's roots here
- * rather than take this tree; the shape is ready for that -
- * `createAgentSandbox` already accepts both arguments per call.
+ * A conversation belonging to a project with folders stands in the project's
+ * first folder rather than this tree, and the project's other folders join
+ * the sandbox's roots in `createAgentSandbox`; both render and factory read
+ * the folders from the host's `conversationProjectFolders`, so one run cannot
+ * disagree with itself about where it is.
  *
  * ---- Where the model comes from -------------------------------------------
  *
@@ -112,7 +114,12 @@ export function Studio({ id }: AgentProps) {
   useModel(studioModelSpecifier(settings), {
     thinkingLevel: studioThinkingLevel(settings),
   });
-  const workspace = conversationWorkspaceDirectory(id);
+  // The project's folders, in the order the person arranged them. The first
+  // is where a turn stands; the rest reach the model as roots beside it. An
+  // empty list - no project, or a project that is only a label - leaves the
+  // conversation standing in the tree of its own.
+  const folders = runtime.conversationProjectFolders?.(id) ?? [];
+  const workspace = folders[0] ?? conversationWorkspaceDirectory(id);
   useSandbox(
     runtime.createAgentSandbox({
       // `id` is the agent *instance* - one per conversation thread, measured
@@ -122,16 +129,17 @@ export function Studio({ id }: AgentProps) {
       conversationId: id,
       // Per conversation, always. Passing these explicitly is the whole
       // reason this conversation cannot read the host's build directory by
-      // default; a project conversation overrides them from its project
-      // record later.
+      // default; a project conversation's root comes from its project record
+      // instead of this tree.
       projectRoot: workspace,
     }),
   );
   // Derived by comparing the two, not assumed from which branch built the
-  // path. Today they are always equal - a project conversation does not yet
-  // override the roots - so this reports "conversation" for every run, which
-  // is the truth. When the override lands, the comparison starts answering
-  // "project" on its own, with nothing here to remember to change.
+  // path. They are equal for a conversation with no project, and for a
+  // project with no folders, and that reports "conversation", which is the
+  // truth for both. A project with folders stands in its first folder, and
+  // the comparison answers "project" on its own, with nothing here to
+  // remember to change.
   const kind = workspace === conversationWorkspaceDirectory(id) ? "conversation" : "project";
   const extraRoots = runtime.conversationExtraRoots?.(id) ?? [];
   return `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
@@ -140,6 +148,7 @@ export function Studio({ id }: AgentProps) {
       new Date(),
       kind,
       extraRoots.length === 0 ? undefined : extraRoots,
+      folders.length === 0 ? undefined : folders,
     ),
   )}`;
 }

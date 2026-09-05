@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import type { Sandbox, SandboxFactory } from "@flue/runtime";
@@ -243,6 +243,60 @@ function sessionEnvironment(sandbox: LocalSandbox): Sandbox {
 }
 
 /**
+ * The refusal for a project folder that is not a directory when a turn starts.
+ *
+ * One message naming the project and saying what is wrong, with the two
+ * remedies beside it. Checked at turn start rather than at the render because
+ * the two are not the same moment: the folder can be removed, or its row
+ * written, in between. `unavailable` rather than a permission kind - the
+ * sandbox genuinely cannot start here, and after the person creates the
+ * folder, resending can succeed.
+ */
+async function missingFolderRefusal(
+  folder: string,
+  projectName: string,
+): Promise<SandboxError | undefined> {
+  let found;
+  try {
+    found = await stat(folder);
+  } catch {
+    return new SandboxError("unavailable", {
+      message:
+        `The project "${projectName}" is missing its folder ${folder}. ` +
+        "Create that folder, or point the project at a directory that exists, and send again.",
+    });
+  }
+  if (!found.isDirectory()) {
+    return new SandboxError("unavailable", {
+      message:
+        `The project "${projectName}" has a file where its folder should be (${folder}). ` +
+        "Point the project at a directory that exists, and send again.",
+    });
+  }
+  return undefined;
+}
+
+/**
+ * One entry per root, case-insensitively on the platform that is.
+ *
+ * A project folder can also carry a scope grant, and then the same directory
+ * arrives from two stores. Containment reads duplicates harmlessly, but the
+ * policy should say each root once, and the comparison in `paths.ts` is
+ * case-insensitive on Windows for the same reason this is.
+ */
+function withoutDuplicateRoots(paths: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const path of paths) {
+    const key = process.platform === "win32" ? path.toLowerCase() : path;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(path);
+  }
+  return kept;
+}
+
+/**
  * What the Flue agent module needs from the runtime.
  *
  * `agents/studio.ts` is loaded by Flue's own module resolution, so there is no
@@ -280,6 +334,19 @@ export interface AgentHost {
    * Optional so a test double that predates scope still satisfies the host.
    */
   conversationExtraRoots?(conversationId: string): readonly string[];
+  /**
+   * The folders of the project one conversation is filed under, in the order
+   * the person arranged them, and empty when the conversation has no project
+   * or the project has none.
+   *
+   * Read once per render, synchronously, like `conversationTurnSettings`. The
+   * render derives where the conversation stands - the first folder, or the
+   * conversation's own tree when this comes back empty - and the factory
+   * derives the same list for the policy's roots, so both sides of one run
+   * read one source. Optional so a test double that predates folders still
+   * satisfies the host.
+   */
+  conversationProjectFolders?(conversationId: string): readonly string[];
 }
 
 /**
@@ -481,6 +548,18 @@ export class StudioRuntime implements AgentHost {
     return [...roots.readRoots, ...roots.writeRoots.filter((root) => !roots.readRoots.includes(root))];
   }
 
+  /**
+   * The project folders one conversation stands to work in, by position.
+   *
+   * The store returns them ordered; this maps to bare paths for the render
+   * and the policy build, which are the two readers.
+   */
+  conversationProjectFolders(conversationId: string): readonly string[] {
+    const projectId = this.#conversationProject(conversationId);
+    if (projectId === undefined) return [];
+    return (this.#projects.get(projectId)?.folders ?? []).map((folder) => folder.path);
+  }
+
   /** Whether one conversation runs uncontained. Trusted is per project. */
   #conversationTrusted(projectId: string | undefined): boolean {
     if (projectId === undefined) return false;
@@ -599,8 +678,16 @@ export class StudioRuntime implements AgentHost {
   }
 
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory {
-    const projectRoot = resolve(options.projectRoot ?? this.#projectRoot);
     const conversationProject = this.#conversationProject(options.conversationId);
+    // The conversation's project record, read where the sandbox is built. A
+    // conversation filed under a project with folders stands in the project's
+    // first folder and reaches the others as roots; a project with no folders
+    // is a label, and its conversations keep the tree of their own.
+    const projectRecord =
+      conversationProject === undefined ? undefined : this.#projects.get(conversationProject);
+    const projectFolders = (projectRecord?.folders ?? []).map((folder) => folder.path);
+    const firstFolder = projectFolders[0];
+    const projectRoot = resolve(firstFolder ?? options.projectRoot ?? this.#projectRoot);
     const projectId = conversationProject ?? options.projectId ?? projectKey(projectRoot);
     const scope: ExecutionScope = {
       clientId: this.#clientId,
@@ -616,10 +703,17 @@ export class StudioRuntime implements AgentHost {
     const scopeProject = conversationProject ?? (options.projectId === undefined ? undefined : projectId);
     const roots = this.#scopes.resolveRoots(scopeProject);
     const trusted = this.#conversationTrusted(conversationProject ?? options.projectId);
+    // The roots one project conversation stands to work with: the person's
+    // other folders join the scope rows, and the workspace root leads the
+    // write roots explicitly. It has to be named, because the policy replaces
+    // its default write set with whatever arrives here - a scope grant
+    // arriving alone used to take the conversation's own directory out of the
+    // writable set, which is the opposite of what a grant means.
+    const otherFolders = projectFolders.slice(1);
     const policy = createSandboxPolicy({
       workspaceRoot: projectRoot,
-      ...(roots.readRoots.length === 0 ? {} : { readRoots: roots.readRoots }),
-      ...(roots.writeRoots.length === 0 ? {} : { writeRoots: roots.writeRoots }),
+      readRoots: withoutDuplicateRoots([...otherFolders, ...roots.readRoots]),
+      writeRoots: withoutDuplicateRoots([projectRoot, ...otherFolders, ...roots.writeRoots]),
       ...(trusted ? { trusted: true } : {}),
       // PATH is the one grant a command line needs beyond the workspace: a
       // shell's job is finding programs, and with the policy environment
@@ -768,6 +862,19 @@ export class StudioRuntime implements AgentHost {
       createSandbox: async (_options) => {
         await this.start();
         await this.reconcile();
+        // A project folder is the person's, and one that is not there is a
+        // mistake to report, never a directory to make: a model told it is in
+        // a project, writing into an empty directory it believes is a
+        // repository, is worse than a refusal. The conversation's own tree is
+        // ours and starts empty, so it is still created below - only the
+        // sandbox root's meaning changed, not who owns what.
+        if (firstFolder !== undefined) {
+          const refusal = await missingFolderRefusal(
+            firstFolder,
+            projectRecord?.name ?? conversationProject ?? "",
+          );
+          if (refusal !== undefined) throw refusal;
+        }
         // Admission of the first prompt is when a conversation comes into
         // existence on disk. The render computed this conversation's roots
         // and passed them in; creating the tree here rather than in the
