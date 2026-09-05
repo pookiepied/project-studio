@@ -521,6 +521,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .then((off) => {
         if (disposed) off()
         else unlisten = off
+        // A catch-up read, because a Tauri event is not replayed to a
+        // subscriber that arrived after it was emitted.
+        //
+        // The supervisor starts the harness eagerly at launch and announces
+        // `harness-started` the moment it is ready. Subscribing is async and
+        // so is the `load()` above, and both begin at mount: on a cold start
+        // the harness can come up in the gap between that load reading
+        // `starting` - which resolves to no address at all - and this
+        // subscription existing. The event is then emitted to nobody, and
+        // nothing reads again, so the window says the harness is not running
+        // while it is up and serving. Measured on this machine at about two
+        // seconds between the app starting and the harness being ready, which
+        // a webview booting from a cold file cache loses easily.
+        //
+        // Reading once here closes the window by construction: anything that
+        // could have been missed happened before this point, and this happens
+        // after it. Only when there is no client - a store that already
+        // resolved an address has nothing to catch up on, and re-reading
+        // would refetch the whole index for nothing.
+        if (!disposed && liveRef.current && clientRef.current === null) {
+          void load().then(() => undefined)
+        }
       })
       // Subscribing is best effort. Outside the desktop shell there is no
       // event bridge to subscribe to, and the rejection has to be swallowed
