@@ -233,6 +233,25 @@ export function catalogBaseUrlFor(catalogProvider: string): string | undefined {
  * was accepted. `modelCount` stays absent for them — reporting 0 would claim
  * a count nobody can make.
  */
+/**
+ * Joins a version segment to a base that may already carry it.
+ *
+ * Two kinds of base URL arrive here and they disagree about where the API
+ * version lives. Anthropic's catalog base is a bare origin, so the version
+ * belongs to the path this file appends. Google's catalog base is
+ * `https://generativelanguage.googleapis.com/v1beta` - the version is already
+ * in it - and appending a second `/v1beta` produced a doubled path that the
+ * vendor answers 404, which reached the user as "has no model list at the
+ * configured address" for a connection whose key and address were both fine.
+ *
+ * Matching the last segment rather than a substring keeps a base that merely
+ * contains the word (a proxy at `/v1beta-mirror`) from being mistaken for one
+ * that ends in the version.
+ */
+function withVersion(origin: string, version: string): string {
+  return origin.endsWith(`/${version}`) ? origin : `${origin}/${version}`;
+}
+
 function probeTarget(
   connection: ProviderConnection,
   apiKey: string | undefined,
@@ -274,7 +293,7 @@ function probeTarget(
       };
     case "anthropic-messages":
       return {
-        url: `${origin}/v1/models`,
+        url: `${withVersion(origin, "v1")}/models`,
         headers: {
           ...headers,
           ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
@@ -283,7 +302,7 @@ function probeTarget(
       };
     case "google-generative-ai":
       return {
-        url: `${origin}/v1beta/models`,
+        url: `${withVersion(origin, "v1beta")}/models`,
         headers: {
           ...headers,
           ...(apiKey === undefined ? {} : { "x-goog-api-key": apiKey }),

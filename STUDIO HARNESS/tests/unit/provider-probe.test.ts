@@ -323,6 +323,48 @@ describe("provider probe", () => {
     expect(target.requests[0]?.headers["x-goog-api-key"]).toBe(SECRET);
   });
 
+  it("does not repeat a version segment the base URL already carries", async () => {
+    // Google's catalog base ends in `/v1beta`, so a probe that appended the
+    // version unconditionally asked for `/v1beta/v1beta/models` and was
+    // answered 404. The user saw "has no model list at the configured
+    // address" for a connection whose key and address were both correct.
+    const target = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ models: [{ name: "models/gemini-x" }] }));
+    });
+
+    const probe = await probeProviderConnection(
+      languageConnection(
+        `http://127.0.0.1:${target.port}/v1beta`,
+        "google-generative-ai",
+      ),
+      SECRET,
+    );
+
+    expect(probe.ok).toBe(true);
+    expect(target.requests[0]?.url).toBe("/v1beta/models");
+  });
+
+  it("still appends the version to a base that only looks like it carries one", async () => {
+    // A proxy at `/v1beta-mirror` ends with the word but not the segment, and
+    // must still be asked for the versioned path.
+    const target = await serve((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ models: [{ name: "models/gemini-x" }] }));
+    });
+
+    const probe = await probeProviderConnection(
+      languageConnection(
+        `http://127.0.0.1:${target.port}/v1beta-mirror`,
+        "google-generative-ai",
+      ),
+      SECRET,
+    );
+
+    expect(probe.ok).toBe(true);
+    expect(target.requests[0]?.url).toBe("/v1beta-mirror/v1beta/models");
+  });
+
   it("probes a retrieval connection for reachability without a model count", async () => {
     const target = await serve((_request, response) => {
       response.writeHead(200, { "content-type": "application/json" });

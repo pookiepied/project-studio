@@ -517,6 +517,13 @@ impl HarnessSupervisor {
             return;
         };
 
+        // Logged as well as emitted. The event reaches whichever webview is
+        // listening at that instant and is gone; the log is the only record
+        // that survives to be read afterwards, and a crash is the one moment
+        // where somebody will come looking for one. The message is already
+        // redacted at its source, so it is safe to write down.
+        log::error!("Harness supervisor: harness exited unexpectedly: {crash}");
+
         self.emit(LifecycleEvent::Failed(crash));
 
         let eligible = {
@@ -529,7 +536,13 @@ impl HarnessSupervisor {
         };
         if !eligible {
             // Already reported `failed`; the second chance is spent, and a
-            // person decides what happens next.
+            // person decides what happens next. Worth a line of its own: this
+            // is the state the application sits in with no harness and no
+            // attempt to get one back.
+            log::warn!(
+                "Harness supervisor: second crash within {}s, not restarting again",
+                RESTART_WINDOW.as_secs()
+            );
             return;
         }
 
