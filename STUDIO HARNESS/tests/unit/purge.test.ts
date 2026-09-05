@@ -15,6 +15,7 @@ import {
 import { conversationScope, ExtensionSelectionStore } from "../../src/extend/selection.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { PlanItemStore } from "../../src/plan/plan-items.js";
+import { PendingQuestionStore } from "../../src/questions/pending-questions.js";
 import {
   conversationWorkspaceDirectory,
   conversationsDirectory,
@@ -74,6 +75,7 @@ function dependencies(
     grants: new PermissionGrantStore(db),
     selection: new ExtensionSelectionStore(db),
     plans: new PlanItemStore(db),
+    questions: new PendingQuestionStore(db),
     flueJournalPath,
   };
 }
@@ -310,6 +312,55 @@ describe("a complete purge", () => {
     expect(outcome.removed).toEqual(["cnv_planned"]);
     expect(plans.list("cnv_planned").items).toEqual([]);
     expect(plans.list("cnv_other").items).not.toEqual([]);
+  });
+
+  it("removes the conversation's questions with the rest of it, settled ones too", async () => {
+    // A settled question is kept for the life of the conversation because it
+    // is the record of a decision - but a deleted conversation has no
+    // decisions to keep, and the question is a sentence the person was shown.
+    // The unanswered one matters as much: a card the queue still hands out
+    // after its conversation is gone has nowhere to send the answer.
+    const store = new ConversationStore(db);
+    const flueJournalPath = journalFile();
+    store.record({ id: "cnv_asked", firstMessage: "Asked" });
+    store.record({ id: "cnv_other", firstMessage: "Other" });
+    seedJournal(flueJournalPath, "cnv_asked");
+    const questions = new PendingQuestionStore(db);
+    const asked = (id: string, conversationId: string, outcome?: "answered"): void => {
+      questions.add({
+        id,
+        conversationId,
+        payload: {
+          question: "Which database should this use?",
+          header: "Storage",
+          options: [
+            { id: "sqlite", label: "SQLite", description: "One file, no setup." },
+            { id: "postgres", label: "Postgres", description: "A server to run." },
+          ],
+          multiSelect: false,
+        },
+        askedAt: 1_000,
+        expiresAt: null,
+        outcome: undefined,
+        answer: undefined,
+      });
+      if (outcome !== undefined) {
+        questions.settle(id, outcome, { optionIds: ["sqlite"] });
+      }
+    };
+    asked("q_open", "cnv_asked");
+    asked("q_settled", "cnv_asked", "answered");
+    asked("q_elsewhere", "cnv_other");
+
+    const outcome = await purgeConversations(dependencies(store, flueJournalPath), [
+      "cnv_asked",
+    ]);
+
+    expect(outcome.removed).toEqual(["cnv_asked"]);
+    expect(questions.get("q_open")).toBeUndefined();
+    expect(questions.get("q_settled")).toBeUndefined();
+    // Another conversation's question is untouched, answered or not.
+    expect(questions.get("q_elsewhere")).toBeDefined();
   });
 });
 

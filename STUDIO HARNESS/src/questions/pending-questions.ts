@@ -97,6 +97,24 @@ export class PendingQuestionStore {
     this.#db.prepare("DELETE FROM pending_question WHERE id = ?").run(id);
   }
 
+  /**
+   * Removes every question row for one conversation, settled ones included.
+   * What a purge calls.
+   *
+   * Settled rows are kept for the life of the conversation because they are
+   * the record of a decision - but a deleted conversation has no decisions to
+   * keep, and a question is a sentence the person was shown. Leaving the rows
+   * would leave a deleted conversation's questions readable by whatever asks
+   * next, which is the same objection that deletes its grants.
+   */
+  clearConversation(conversationId: string): number {
+    return Number(
+      this.#db
+        .prepare("DELETE FROM pending_question WHERE conversation_id = ?")
+        .run(conversationId).changes,
+    );
+  }
+
   get(id: string): StoredQuestion | undefined {
     const row = this.#db
       .prepare(

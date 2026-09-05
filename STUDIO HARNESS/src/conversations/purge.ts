@@ -5,6 +5,7 @@ import { relative, resolve } from "node:path";
 import { PermissionGrantStore } from "../permissions/grant-store.js";
 import { ExtensionSelectionStore } from "../extend/selection.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
+import type { PendingQuestionStore } from "../questions/pending-questions.js";
 import {
   conversationDirectory,
   conversationsDirectory,
@@ -43,10 +44,13 @@ import type { ConversationStore } from "./store.js";
  *   docblock records the decision and the serialization. The old argument is
  *   kept here rather than deleted so the file records that the position
  *   changed and why.
- * - **The conversation-scoped rows** in the application database go next:
- *   its permission grants and its conversation-scoped extension choices. A
- *   deleted conversation's grants stayed live and kept matching, which is a
- *   consent outliving the conversation it was given to.
+ * - **The conversation-scoped rows** in the application database go next: its
+ *   permission grants, its conversation-scoped extension choices, its plan,
+ *   and the questions it put to the person. A deleted conversation's grants
+ *   stayed live and kept matching, which is a consent outliving the
+ *   conversation it was given to; the same argument reaches every table keyed
+ *   by a conversation id, so a new one of those belongs in this list rather
+ *   than in a comment saying it does not.
  * - **The index row** goes after the content. The row is what makes a
  *   conversation addressable, so a crash between steps leaves a conversation
  *   that can be deleted again, never one that is unreachable. That ordering
@@ -75,6 +79,8 @@ export interface PurgeDependencies {
   readonly selection: ExtensionSelectionStore;
   /** The one owner of `plan_item`. */
   readonly plans: PlanItemStore;
+  /** The one owner of `pending_question`. */
+  readonly questions: PendingQuestionStore;
   /**
    * The journal file to delete from. Resolved per call from the same rule
    * Flue itself follows when unset, so tests point it at a fixture.
@@ -150,7 +156,8 @@ export async function purgeConversations(
   dependencies: PurgeDependencies,
   ids: readonly string[],
 ): Promise<PurgeOutcome> {
-  const { conversations, grants, selection, plans, flueJournalPath } = dependencies;
+  const { conversations, grants, selection, plans, questions, flueJournalPath } =
+    dependencies;
   const removed: string[] = [];
   const cleanupFailures: Record<string, string> = {};
   const details: Record<string, PurgeDetail> = {};
@@ -192,12 +199,13 @@ export async function purgeConversations(
       try {
         grants.deleteConversation(id);
         selection.clearConversation(id);
-        // The plan is conversation state like the grants: a deleted
-        // conversation leaving plan rows behind would let the next
-        // conversation to reuse a workflow read a stranger's plan. The
-        // `pending_question` table has no delete here yet, and that is a
-        // known residue of the ask task, not a precedent.
+        // The plan and the questions are conversation state like the grants:
+        // a deleted conversation leaving either behind would let the next
+        // conversation to reuse a workflow read a stranger's plan, or leave a
+        // question the person was asked standing after the conversation that
+        // asked it is gone.
         plans.clearConversation(id);
+        questions.clearConversation(id);
         scoped = true;
       } catch (unknown) {
         const failure = failureOf(unknown);
