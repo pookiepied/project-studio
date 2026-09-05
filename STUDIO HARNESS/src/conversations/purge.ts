@@ -4,6 +4,7 @@ import { relative, resolve } from "node:path";
 
 import { PermissionGrantStore } from "../permissions/grant-store.js";
 import { ExtensionSelectionStore } from "../extend/selection.js";
+import type { PlanItemStore } from "../plan/plan-items.js";
 import {
   conversationDirectory,
   conversationsDirectory,
@@ -72,6 +73,8 @@ export interface PurgeDependencies {
   readonly grants: PermissionGrantStore;
   /** The one owner of `extension_scope`. */
   readonly selection: ExtensionSelectionStore;
+  /** The one owner of `plan_item`. */
+  readonly plans: PlanItemStore;
   /**
    * The journal file to delete from. Resolved per call from the same rule
    * Flue itself follows when unset, so tests point it at a fixture.
@@ -147,7 +150,7 @@ export async function purgeConversations(
   dependencies: PurgeDependencies,
   ids: readonly string[],
 ): Promise<PurgeOutcome> {
-  const { conversations, grants, selection, flueJournalPath } = dependencies;
+  const { conversations, grants, selection, plans, flueJournalPath } = dependencies;
   const removed: string[] = [];
   const cleanupFailures: Record<string, string> = {};
   const details: Record<string, PurgeDetail> = {};
@@ -189,6 +192,12 @@ export async function purgeConversations(
       try {
         grants.deleteConversation(id);
         selection.clearConversation(id);
+        // The plan is conversation state like the grants: a deleted
+        // conversation leaving plan rows behind would let the next
+        // conversation to reuse a workflow read a stranger's plan. The
+        // `pending_question` table has no delete here yet, and that is a
+        // known residue of the ask task, not a precedent.
+        plans.clearConversation(id);
         scoped = true;
       } catch (unknown) {
         const failure = failureOf(unknown);

@@ -12,6 +12,7 @@ import type { RetrievalAdministration } from "../../application/retrieval-manage
 import type { MediaAdministration } from "../../media/service.js";
 import type { ConversationStore } from "../../conversations/store.js";
 import type { ProjectStore } from "../../projects/store.js";
+import type { PlanItemStore } from "../../plan/plan-items.js";
 import type { StudioDatabase } from "../../storage/database.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createTurnSettingsMiddleware } from "./middleware/turn-settings.js";
@@ -22,6 +23,7 @@ import { createMediaRoutes } from "./routes/media.js";
 import { createMcpRoutes } from "./routes/mcp.js";
 import { createApprovalRoutes } from "./routes/permissions.js";
 import { createQuestionRoutes } from "./routes/questions.js";
+import { createPlanRoutes } from "./routes/plans.js";
 import { createProjectRoutes } from "./routes/projects.js";
 import { createProviderRoutes } from "./routes/providers.js";
 import { createRetrievalRoutes } from "./routes/retrieval.js";
@@ -50,6 +52,13 @@ export interface CreateHttpAppOptions {
    * no ask tool also wants, and production must not be.
    */
   readonly questions?: QuestionBroker;
+  /**
+   * The plan store, for the routes the panel and the pill read and tick
+   * through. Optional the way `questions` is: absent means no plan routes
+   * exist, which a composition that offers no plan tool also wants, and
+   * production must not be.
+   */
+  readonly plans?: PlanItemStore;
   /** The conversation index: rows, never transcript content. */
   readonly conversations: ConversationStore;
   /**
@@ -105,6 +114,9 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/permissions", createApprovalRoutes(options.approvals));
   if (options.questions !== undefined) {
     app.route("/api/questions", createQuestionRoutes(options.questions));
+  }
+  if (options.plans !== undefined) {
+    app.route("/api/plans", createPlanRoutes(options.plans));
   }
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));

@@ -23,14 +23,40 @@ import type { Artifact } from '@/domain/artifacts/types'
  * rail is a workbench, not an archive.
  */
 
-export interface RailEntry {
-  /** The artifact's own id, which is also what makes opening idempotent. */
-  readonly id: string
-  readonly artifact: Artifact
-  /** Which conversation produced it. The grouping key. */
-  readonly conversationId: string
-  readonly conversationTitle: string
-  readonly openedAt: number
+/**
+ * What the rail holds.
+ *
+ * An artifact entry is a thing the model produced out of the transcript. A
+ * plan entry is the conversation's standing plan - one per conversation,
+ * addressed by the conversation, exempt from the cap (a conversation has one
+ * plan, and evicting it to make room for a search result is a bug that only
+ * shows up in long sessions). The rail is where both live because both are
+ * "too big for the reading column", not because they are the same kind of
+ * thing; the union says they are not.
+ */
+export type RailEntry =
+  | {
+      readonly kind: 'artifact'
+      /** The artifact's own id, which is also what makes opening idempotent. */
+      readonly id: string
+      readonly artifact: Artifact
+      /** Which conversation produced it. The grouping key. */
+      readonly conversationId: string
+      readonly conversationTitle: string
+      readonly openedAt: number
+    }
+  | {
+      readonly kind: 'plan'
+      /** `plan:<conversation id>` - one per conversation, keyed by it. */
+      readonly id: string
+      readonly conversationId: string
+      readonly conversationTitle: string
+      readonly openedAt: number
+    }
+
+/** The id of a conversation's plan entry. One plan per conversation, so the conversation keys it. */
+export function planEntryId(conversationId: string): string {
+  return `plan:${conversationId}`
 }
 
 /**
@@ -50,6 +76,25 @@ export interface RailEntry {
 
 /** Beyond this the strip stops being scannable, so the oldest entry goes. */
 const MAX_ENTRIES = 12
+
+/**
+ * The cap, applied to a strip that has just grown by one.
+ *
+ * Two rules at once, and they are not the same rule. The cap governs the whole
+ * strip, because scannability is a property of how many tabs there are, not of
+ * what kind they are. But the entry it drops is always the oldest artifact: a
+ * conversation has one plan, and evicting it to make room for a search result
+ * is the bug that only shows up in long sessions.
+ *
+ * Shared by both openers rather than living in the artifact one, because the
+ * cap has to hold whichever order the strip filled in. Applying it only when
+ * an artifact arrives left twelve artifacts plus a plan sitting at thirteen.
+ */
+function capped(grown: readonly RailEntry[]): readonly RailEntry[] {
+  if (grown.length <= MAX_ENTRIES) return grown
+  const oldest = grown.find((entry) => entry.kind === 'artifact')
+  return oldest === undefined ? grown : grown.filter((entry) => entry !== oldest)
+}
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 760
@@ -74,6 +119,8 @@ interface RailValue {
   readonly width: number
 
   openArtifact: (artifact: Artifact, conversationId: string, conversationTitle: string) => void
+  /** Opens - or focuses - the conversation's plan entry. Idempotent, like openArtifact. */
+  openPlan: (conversationId: string, conversationTitle: string) => void
   focus: (id: string) => void
   close: (id: string) => void
   closeAll: () => void
@@ -108,6 +155,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
         }
 
         const next: RailEntry = {
+          kind: 'artifact',
           id: artifact.id,
           artifact,
           conversationId,
@@ -115,8 +163,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
           openedAt: Date.now(),
         }
 
-        const grown = [...current, next]
-        return grown.length > MAX_ENTRIES ? grown.slice(grown.length - MAX_ENTRIES) : grown
+        return capped([...current, next])
       })
 
       setActiveId(artifact.id)
@@ -126,6 +173,28 @@ export function RailProvider({ children }: { children: ReactNode }) {
     },
     [],
   )
+
+  const openPlan = useCallback((conversationId: string, conversationTitle: string) => {
+    const id = planEntryId(conversationId)
+    setEntries((current) => {
+      const existing = current.find((entry) => entry.id === id)
+      if (existing) {
+        // Focused, not duplicated - the same rule as openArtifact, and it
+        // falls out of the keying: the conversation is the key, so a second
+        // open finds the one entry and re-titles it in place.
+        return current.map((entry) =>
+          entry.id === id && entry.kind === 'plan' ? { ...entry, conversationTitle } : entry,
+        )
+      }
+      return capped([
+        ...current,
+        { kind: 'plan', id, conversationId, conversationTitle, openedAt: Date.now() },
+      ])
+    })
+
+    setActiveId(id)
+    setCollapsed(false)
+  }, [])
 
   const close = useCallback((id: string) => {
     setEntries((current) => {
@@ -163,6 +232,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
       activeId,
       width,
       openArtifact,
+      openPlan,
       focus: setActiveId,
       close,
       closeAll,
@@ -170,7 +240,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
       expand: () => setCollapsed(false),
       setWidth,
     }),
-    [entries, activeId, width, collapsed, openArtifact, close, closeAll, setWidth],
+    [entries, activeId, width, collapsed, openArtifact, openPlan, close, closeAll, setWidth],
   )
 
   return <RailContext.Provider value={value}>{children}</RailContext.Provider>

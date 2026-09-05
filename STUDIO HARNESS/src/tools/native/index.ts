@@ -8,6 +8,7 @@ import { ModelCatalog } from "../../providers/model-catalog.js";
 import type { CallGate } from "../gate.js";
 import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
 import { registerAskTools, type AskToolRegistration } from "../ask/index.js";
+import { registerPlanTools, type PlanToolRegistration } from "../plan/index.js";
 import { registerGitTools } from "../git/index.js";
 import { registerSearchTools } from "../search/index.js";
 import { registerShellTools } from "../shell/index.js";
@@ -43,6 +44,15 @@ export interface NativeToolRegistrationOptions {
    * closing state is per-run and dies with the run that created it.
    */
   readonly ask?: AskToolRegistration;
+  /**
+   * The plan family's merge-and-read.
+   *
+   * Optional because it needs the plan store to write into: a composition
+   * that omits it offers no plan tool rather than one that writes nowhere.
+   * Unlike `ask` this holds no waiting channel - a plan neither parks nor
+   * expires - so the dependency is the merge itself.
+   */
+  readonly plan?: PlanToolRegistration;
 }
 
 /** Registers every shipped capability through the one application CallGate. */
@@ -63,6 +73,9 @@ export function registerNativeTools(
   registerShellTools(gate);
   if (options.ask !== undefined) {
     registerAskTools(gate, options.ask);
+  }
+  if (options.plan !== undefined) {
+    registerPlanTools(gate, options.plan);
   }
   registerWebTools(
     gate,

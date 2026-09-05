@@ -19,6 +19,7 @@ import { PermissionApprovalBroker } from "./application/approval-broker.js";
 import { QuestionBroker } from "./application/question-broker.js";
 import { PendingApprovalStore } from "./permissions/pending-approvals.js";
 import { PendingQuestionStore } from "./questions/pending-questions.js";
+import { PlanItemStore } from "./plan/plan-items.js";
 import {
   configureStudioRuntime,
   StudioRuntime,
@@ -164,11 +165,17 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     const questions = new QuestionBroker({
       store: new PendingQuestionStore(database),
     });
+    // The plan is the third durable surface over the same database, and the
+    // one that belongs to the conversation rather than to a run or a pending
+    // decision: it neither parks nor expires, so a store - not a broker -
+    // is all the channel it needs.
+    const plans = new PlanItemStore(database);
     const runtime = new StudioRuntime({
       database,
       logger: observability.logger,
       approver: approvals,
       questions,
+      plans,
       clientId: admission.context.clientId,
       sessionId: admission.context.sessionId,
     });
@@ -278,6 +285,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       media,
       approvals,
       questions,
+      plans,
       conversations,
       projects,
       database,

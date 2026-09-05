@@ -30,6 +30,7 @@ import {
   type HarnessResult,
   type PendingApprovalRecord,
   type PendingQuestionRecord,
+  type PlanSnapshot,
   type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
@@ -223,6 +224,22 @@ interface WorkspaceValue {
     ) => Promise<HarnessResult<void>>
     cancel: (id: string) => Promise<HarnessResult<void>>
     stop: (conversationId: string) => Promise<HarnessResult<void>>
+  }
+  /**
+   * The conversation plans the model writes and the person ticks. Read per
+   * conversation - the plan belongs to the conversation, not to a run - and
+   * carried with its damaged state, because an unreadable plan is a fact the
+   * panel renders rather than a failure it swallows. Bound to the store's
+   * client for the same restart reason `questions` is.
+   */
+  readonly plans: {
+    get: (conversationId: string) => Promise<HarnessResult<PlanSnapshot>>
+    tick: (
+      conversationId: string,
+      itemId: string,
+      status: 'done' | 'pending',
+    ) => Promise<HarnessResult<void>>
+    clear: (conversationId: string) => Promise<HarnessResult<void>>
   }
 
   createProject: (input: NewProjectInput) => Project
@@ -691,6 +708,42 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const plans = useMemo(
+    () => ({
+      get: (conversationId: string) =>
+        clientRef.current?.getPlan(conversationId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so there is no plan to read.',
+          },
+        }),
+      tick: (conversationId: string, itemId: string, status: 'done' | 'pending') =>
+        clientRef.current?.tickPlanItem(conversationId, itemId, status) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the tick went nowhere.',
+          },
+        }),
+      clear: (conversationId: string) =>
+        clientRef.current?.clearPlan(conversationId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so the plan could not be cleared.',
+          },
+        }),
+    }),
+    [],
+  )
+
   const beginConversation = useCallback(
     (input: {
       id: string
@@ -1047,6 +1100,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setConversationPermission,
       approvals,
       questions,
+      plans,
       createProject,
       removeProject,
       setBranch,
@@ -1075,6 +1129,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ensureStore,
       markRunning,
       orphanTrees,
+      plans,
       questions,
       refreshOrphanTrees,
       sweepOrphanTrees,

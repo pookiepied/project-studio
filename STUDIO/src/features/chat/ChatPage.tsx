@@ -14,6 +14,9 @@ import { ApprovalPrompt } from '@/features/chat/permissions/ApprovalPrompt'
 import { usePendingApprovals } from '@/features/chat/permissions/usePendingApprovals'
 import { QuestionPrompt } from '@/features/chat/questions/QuestionPrompt'
 import { usePendingQuestions } from '@/features/chat/questions/usePendingQuestions'
+import { PlanPill } from '@/features/plans/PlanPill'
+import { usePlan } from '@/features/plans/usePlan'
+import { planEntryId, useRail } from '@/stores/rail'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { turnSettingsToWire } from '@/platform/harness'
@@ -77,6 +80,14 @@ export function ChatPage({
   // The questions a run raises to get a decision - the other kind of stop,
   // and the other channel. Inactive on the gallery for the same reason.
   const questions = usePendingQuestions(conversation.id, {
+    enabled: !gallery,
+    active: isTurnRunning(live.phase),
+  })
+
+  // The conversation's plan: what the run says it is doing, which the person
+  // can read and tick. It blocks nothing, so it mounts beside the blocking
+  // cards rather than over them, and survives the turn that wrote it.
+  const plan = usePlan(conversation.id, {
     enabled: !gallery,
     active: isTurnRunning(live.phase),
   })
@@ -155,6 +166,20 @@ export function ChatPage({
     questions.cancelAll()
     void live.abort()
   }, [approvals, questions, live])
+
+  // The pill is a disclosure control and nothing else: open when the rail is
+  // showing this conversation's plan, and a second click takes it back down.
+  // A plan entry that exists but is not on screen comes forward rather than
+  // being opened twice - the rail keys it to the conversation either way.
+  const { open: railOpen, activeId: railActiveId, openPlan, close: closeRailEntry } = useRail()
+  const planEntryVisible = railOpen && railActiveId === planEntryId(conversation.id)
+  const togglePlanPanel = useCallback(() => {
+    if (planEntryVisible) {
+      closeRailEntry(planEntryId(conversation.id))
+      return
+    }
+    openPlan(conversation.id, conversation.title ?? 'Conversation')
+  }, [planEntryVisible, closeRailEntry, openPlan, conversation.id, conversation.title])
 
   return (
     <div className="relative flex h-full flex-col">
@@ -298,6 +323,19 @@ export function ChatPage({
                     answeringId={questions.answeringId}
                     onAnswer={questions.answer}
                     onStop={questions.stop}
+                  />
+                </div>
+              ) : null}
+              {plan.snapshot !== null && plan.hasPlan ? (
+                // Last in the row, deliberately: the approval and the question
+                // block the run, the pill only describes it, and the order on
+                // screen says so.
+                <div className="mb-3 flex justify-center">
+                  <PlanPill
+                    snapshot={plan.snapshot}
+                    items={plan.items}
+                    open={planEntryVisible}
+                    onToggle={togglePlanPanel}
                   />
                 </div>
               ) : null}

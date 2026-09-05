@@ -49,6 +49,7 @@ import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog } from "../tools/filesystem/index.js";
 import { ConversationStore } from "../conversations/store.js";
+import type { PlanItemStore } from "../plan/plan-items.js";
 
 export interface StudioRuntimeOptions {
   /**
@@ -70,6 +71,15 @@ export interface StudioRuntimeOptions {
    * all, because a question with nowhere to be answered is not a capability.
    */
   readonly questions?: QuestionBroker;
+  /**
+   * The plan the runs write and the person ticks.
+   *
+   * Optional the same way: a composition without it does not offer the plan
+   * tool, rather than offering one that writes nowhere. It is a store, not a
+   * broker - nothing about a plan parks, so there is no waiting channel to
+   * hold.
+   */
+  readonly plans?: PlanItemStore;
   readonly credentials?: SecureCredentialStore;
   readonly projectRoot?: string;
   readonly clientId?: string;
@@ -286,6 +296,7 @@ export class StudioRuntime implements AgentHost {
   readonly #logger: Logger | undefined;
   readonly #approver: PermissionApprover | undefined;
   readonly #questions: QuestionBroker | undefined;
+  readonly #plans: PlanItemStore | undefined;
   readonly #credentials: SecureCredentialStore;
   readonly #projectRoot: string;
   readonly #projectId: string;
@@ -349,6 +360,7 @@ export class StudioRuntime implements AgentHost {
     this.#logger = options.logger;
     this.#approver = options.approver;
     this.#questions = options.questions;
+    this.#plans = options.plans;
     this.#credentials = options.credentials ?? new KeyringCredentialStore();
     this.#projectRoot = resolve(options.projectRoot ?? process.cwd());
     this.#projectId = projectKey(this.#projectRoot);
@@ -611,6 +623,7 @@ export class StudioRuntime implements AgentHost {
     // turn; dying with the run is what keeps the stop from outliving it.
     const closing = new ClosingTurns();
     const questionBroker = this.#questions;
+    const planStore = this.#plans;
     registerNativeTools(gate, {
       database: this.#db,
       credentials: this.#credentials,
@@ -623,6 +636,15 @@ export class StudioRuntime implements AgentHost {
               ask: (conversationId, payloads, timeoutMs, signal) =>
                 questionBroker.ask(conversationId, payloads, timeoutMs, signal),
               closing,
+            },
+          }),
+      ...(planStore === undefined
+        ? {}
+        : {
+            plan: {
+              // Writes through the tool are the model's, always; the person's
+              // tick path is the HTTP route, which names itself.
+              merge: (conversationId, items) => planStore.merge(conversationId, items, "model"),
             },
           }),
     });

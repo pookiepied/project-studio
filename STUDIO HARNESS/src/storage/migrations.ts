@@ -901,6 +901,41 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 20,
+    name: "plan_item",
+    up(db) {
+      // The plan tool's rows: a run's stated intention, which the person can
+      // see and tick. The plan belongs to the conversation, not to the run
+      // that wrote it - a second run continues the same list - so there is no
+      // run id, no turn id, no expiry, and no archived flag. Those absences
+      // are the requirement, not omissions.
+      //
+      // The primary key is (conversation_id, id) because `id` is the model's
+      // own slug for the item, unique per conversation rather than globally:
+      // writes merge by id, so an id the model has used before addresses the
+      // same item and a call that leaves an item out leaves that item's state
+      // - including a tick the person gave it - exactly as it stands.
+      //
+      // `position` is first-seen order, assigned once and never recomputed,
+      // which is what keeps the panel from jumping under the reader every
+      // time an item completes. `updated_by` records who last touched the
+      // row, so the model can read "the person did this one already" instead
+      // of guessing.
+      db.exec(`
+        CREATE TABLE plan_item (
+          conversation_id TEXT NOT NULL,
+          id              TEXT NOT NULL,
+          text            TEXT NOT NULL,
+          status          TEXT NOT NULL,
+          position        INTEGER NOT NULL,
+          updated_by      TEXT NOT NULL,
+          updated_at      INTEGER NOT NULL,
+          PRIMARY KEY (conversation_id, id)
+        ) STRICT;
+      `);
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

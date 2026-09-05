@@ -38,6 +38,10 @@ export function RailTabs() {
 
           {group.entries.map((entry) => {
             const active = entry.id === activeId
+            // The plan is a different kind of thing in the same list: its own
+            // mark, its own name, and a title that does not come from an
+            // artifact the entry does not have.
+            const title = entry.kind === 'artifact' ? entry.artifact.title : 'Plan'
             return (
               <div
                 key={entry.id}
@@ -54,7 +58,7 @@ export function RailTabs() {
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   <span className="shrink-0">
-                    <Icons.artifact />
+                    {entry.kind === 'artifact' ? <Icons.artifact /> : <Icons.plan />}
                   </span>
                   <span
                     className={cn(
@@ -62,7 +66,7 @@ export function RailTabs() {
                       active ? 'text-foreground' : 'text-muted-foreground',
                     )}
                   >
-                    {entry.artifact.title}
+                    {title}
                   </span>
                 </button>
 
@@ -71,7 +75,7 @@ export function RailTabs() {
                 <button
                   type="button"
                   onClick={() => close(entry.id)}
-                  aria-label={`Close ${entry.artifact.title}`}
+                  aria-label={`Close ${title}`}
                   className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-fast group-hover/tab:opacity-100 hover:bg-tint hover:text-foreground focus-visible:opacity-100"
                 >
                   <Icons.close />

@@ -10,6 +10,7 @@ import { deriveTitle } from "../../src/conversations/title.js";
 import { purgeConversations } from "../../src/conversations/purge.js";
 import { ExtensionSelectionStore } from "../../src/extend/selection.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
+import { PlanItemStore } from "../../src/plan/plan-items.js";
 import { ProjectStore } from "../../src/projects/store.js";
 import {
   conversationWorkspaceDirectory,
@@ -302,6 +303,7 @@ describe("emptying the archive", () => {
     conversations: ConversationStore;
     grants: PermissionGrantStore;
     selection: ExtensionSelectionStore;
+    plans: PlanItemStore;
     flueJournalPath: string;
   } {
     // A journal with the required tables and no rows: the purge's journal
@@ -324,6 +326,7 @@ describe("emptying the archive", () => {
       conversations: store,
       grants: new PermissionGrantStore(db),
       selection: new ExtensionSelectionStore(db),
+      plans: new PlanItemStore(db),
       flueJournalPath,
     };
   }

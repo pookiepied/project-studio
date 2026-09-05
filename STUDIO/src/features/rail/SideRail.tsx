@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_PANEL } from '@/design/tokens'
+import { FADE, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
+import { PlanPanel } from '@/features/plans/PlanPanel'
 import { RailTabs } from '@/features/rail/RailTabs'
-import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail } from '@/stores/rail'
+import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, type RailEntry } from '@/stores/rail'
+import { cn } from '@/lib/cn'
 
 /**
  * The narrowest the conversation may become.
@@ -16,6 +18,11 @@ import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail } from '@/stores/rail'
  * ceiling.
  */
 const MIN_PAGE_WIDTH = 520
+
+/** What the header calls the active entry, per kind. */
+function entryTitle(entry: RailEntry): string {
+  return entry.kind === 'artifact' ? entry.artifact.title : 'Plan'
+}
 
 
 /**
@@ -83,11 +90,19 @@ export function SideRail() {
           // Width animates, and nothing else. Sliding the rail in from off
           // screen would push the conversation sideways for the length of the
           // animation, and the conversation is what the reader is looking at.
+          //
+          // Each half rides its own vocabulary: the width is a resize the
+          // person caused, so it takes the panel spring; the opacity is a
+          // thing appearing, so it takes the house fade. One spring pacing
+          // both made the fade mushy at the end - the spring's long settle
+          // dragging a fade that should have been over. The same two
+          // transitions serve enter and exit, so collapse and expand are one
+          // motion played backwards, not two.
           ref={frame}
           initial={{ width: 0, opacity: 0 }}
           animate={{ width: effective, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
-          transition={SPRING_PANEL}
+          transition={{ width: SPRING_PANEL, opacity: FADE.transition }}
           // Square, flush, and sunken — the mirror of the sidebar, for the
           // reason spelled out in `AppShell`: the radius belongs to the centre,
           // not to the column beside it.
@@ -109,7 +124,7 @@ export function SideRail() {
 
           <header className="flex h-11 shrink-0 items-center gap-1 pr-1.5 pl-3">
             <span className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">
-              {active?.artifact.title ?? 'Side rail'}
+              {active === undefined ? 'Side rail' : entryTitle(active)}
             </span>
 
             <IconButton label="Close the rail" size="sm" onClick={closeAll}>
@@ -121,21 +136,32 @@ export function SideRail() {
 
           {/* Keyed by the entry, so switching plays the view transition rather
               than swapping content inside a frame that never acknowledges it
-              changed. A pure crossfade, like every other lateral move between
-              same-depth views: this one used to add a small rise, the vertical
-              motion that makes a horizontal handover look like a fault. */}
-          <div className="studio-scroll-inset min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-            {active ? (
-              <motion.div
-                key={active.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: DURATION.base, ease: EASE_OUT }}
-                className="studio-prose min-w-0"
-              >
-                {renderArtifact(active.artifact)}
-              </motion.div>
-            ) : null}
+              changed.
+
+              `popLayout` is what makes that claim true: the outgoing view fades
+              while the incoming one fades in, without either pushing the other
+              down the scroll. Without a mode at all both stay in the flow and
+              the panel jumps; with `wait` the outgoing view vanishes first and
+              the handover dips through empty - which is exactly what this block
+              did for its first year, calling itself a crossfade. A pure
+              crossfade, like every other lateral move between same-depth views:
+              this one used to add a small rise, the vertical motion that makes a
+              horizontal handover look like a fault.
+
+              The scroll body is `relative` so the popped-out view overlays it
+              rather than the whole rail. */}
+          <div className="studio-scroll-inset relative min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+            <AnimatePresence initial={false} mode="popLayout">
+              {active !== undefined ? (
+                <motion.div {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
+                  {active.kind === 'artifact' ? (
+                    renderArtifact(active.artifact)
+                  ) : (
+                    <PlanPanel conversationId={active.conversationId} />
+                  )}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
         </motion.aside>
       ) : null}

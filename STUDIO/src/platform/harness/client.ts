@@ -33,6 +33,7 @@ import {
   parseMcpServers,
   parsePendingApprovals,
   parsePendingQuestions,
+  parsePlanSnapshot,
   parseProviderIcon,
   parseProbeResult,
   parseProjectRecord,
@@ -59,6 +60,7 @@ import {
   type PendingQuestionRecord,
   type OrphanSweepOutcome,
   type OrphanTrees,
+  type PlanSnapshot,
   type ProbeResult,
   type ProjectCreateDraft,
   type ProjectPatch,
@@ -298,6 +300,19 @@ export interface HarnessClient {
   /** Stops every question one conversation is asking: the person is ending the run. */
   stopQuestions(conversationId: string): Promise<HarnessResult<void>>
 
+  /**
+   * One conversation's plan: the rows the model writes and the person ticks.
+   * Unlike the question and approval lists this read is per conversation,
+   * because the plan belongs to the conversation rather than to a run, and
+   * the read is the only place the damaged state can be told from an empty
+   * one - the client carries it as data, never as an error.
+   */
+  getPlan(conversationId: string): Promise<HarnessResult<PlanSnapshot>>
+  /** The person's tick. Only done and pending are offered, and only to the person. */
+  tickPlanItem(conversationId: string, itemId: string, status: 'done' | 'pending'): Promise<HarnessResult<void>>
+  /** Clears the conversation's plan: the panel's remedy for a damaged read. */
+  clearPlan(conversationId: string): Promise<HarnessResult<void>>
+
   listProjects(): Promise<HarnessResult<readonly ProjectRecord[]>>
   createProject(draft: ProjectCreateDraft): Promise<HarnessResult<ProjectRecord>>
   updateProject(id: string, patch: ProjectPatch): Promise<HarnessResult<ProjectRecord>>
@@ -322,6 +337,7 @@ const MEDIA_PATH = '/api/media'
 const PENDING_APPROVALS_PATH = '/api/permissions/pending'
 const PENDING_QUESTIONS_PATH = '/api/questions/pending'
 const QUESTION_STOP_PATH = '/api/questions/stop'
+const PLANS_PATH = '/api/plans'
 
 /** The media routes' answers, parsed with the same skepticism as every other. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -540,6 +556,10 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
   function folderPath(projectId: string, folderId: string): string {
     return `${foldersPath(projectId)}/${encodeURIComponent(folderId)}`
+  }
+
+  function planItemPath(conversationId: string, itemId: string): string {
+    return `${PLANS_PATH}/${encodeURIComponent(conversationId)}/items/${encodeURIComponent(itemId)}`
   }
 
   return {
@@ -769,6 +789,21 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     stopQuestions(conversationId) {
       return empty('POST', QUESTION_STOP_PATH, { conversationId })
+    },
+
+    getPlan(conversationId) {
+      return json('GET', `${PLANS_PATH}/${encodeURIComponent(conversationId)}`, undefined, parsePlanSnapshot)
+    },
+
+    tickPlanItem(conversationId, itemId, status) {
+      // The body names the status rather than a bare boolean: the vocabulary
+      // is the same five the model writes, narrowed for the person, and a
+      // word reads truer at the seam than a flag.
+      return empty('POST', planItemPath(conversationId, itemId), { status })
+    },
+
+    clearPlan(conversationId) {
+      return empty('DELETE', `${PLANS_PATH}/${encodeURIComponent(conversationId)}`)
     },
 
     listProjects() {

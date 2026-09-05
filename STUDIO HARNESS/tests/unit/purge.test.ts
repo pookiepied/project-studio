@@ -14,6 +14,7 @@ import {
 } from "../../src/conversations/purge.js";
 import { conversationScope, ExtensionSelectionStore } from "../../src/extend/selection.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
+import { PlanItemStore } from "../../src/plan/plan-items.js";
 import {
   conversationWorkspaceDirectory,
   conversationsDirectory,
@@ -72,6 +73,7 @@ function dependencies(
     conversations: store,
     grants: new PermissionGrantStore(db),
     selection: new ExtensionSelectionStore(db),
+    plans: new PlanItemStore(db),
     flueJournalPath,
   };
 }
@@ -282,6 +284,32 @@ describe("a complete purge", () => {
     expect(outcome.removed).toEqual([]);
     expect(outcome.cleanupFailures).toEqual({});
     expect(outcome.details["cnv_ghost"]).toBeUndefined();
+  });
+
+  it("removes the conversation's plan rows with the rest of it", async () => {
+    // The plan is conversation state like the grants: a purge that left it
+    // behind would hand the workflow to whatever reads the id next.
+    const store = new ConversationStore(db);
+    const flueJournalPath = journalFile();
+    store.record({ id: "cnv_planned", firstMessage: "Planned" });
+    store.record({ id: "cnv_other", firstMessage: "Other" });
+    seedJournal(flueJournalPath, "cnv_planned");
+    const plans = new PlanItemStore(db);
+    plans.merge("cnv_planned", [
+      { id: "read-schema", text: "Read the existing schema", status: "done" },
+      { id: "write-migration", text: "Write migration 20", status: "running" },
+    ], "model");
+    plans.merge("cnv_other", [
+      { id: "read-schema", text: "Read the existing schema", status: "pending" },
+    ], "model");
+
+    const outcome = await purgeConversations(dependencies(store, flueJournalPath), [
+      "cnv_planned",
+    ]);
+
+    expect(outcome.removed).toEqual(["cnv_planned"]);
+    expect(plans.list("cnv_planned").items).toEqual([]);
+    expect(plans.list("cnv_other").items).not.toEqual([]);
   });
 });
 
