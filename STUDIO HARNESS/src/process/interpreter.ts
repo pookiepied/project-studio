@@ -214,9 +214,48 @@ const CMD_ARGS = ["/d", "/s", "/c"] as const;
 let candidates: readonly Interpreter[] | undefined;
 let chosen = 0;
 
+/**
+ * Interpreters measured to start under containment on this machine.
+ *
+ * `STATUS_DLL_INIT_FAILED` arrives as the *interpreter's* exit code, but an
+ * interpreter reports its child's exit code as its own - so a child that dies
+ * in its own loader is indistinguishable, from the code alone, from the shell
+ * failing to start. `tar` is the case that proved it: under `cmd` on this
+ * machine `tar --version` exits with exactly that status, cmd passes it up,
+ * and the shell tool concluded cmd could not run.
+ *
+ * That conclusion is permanent and process-wide, so one `tar` demoted every
+ * later command in the harness to Windows PowerShell 5.1 - where npm, npx and
+ * pnpm are all refused by the execution policy. An evaluation session lost
+ * most of its run to exactly that, reporting a wall of "AuthorizationManager
+ * check failed" for tooling that works fine one interpreter up.
+ *
+ * So the answer is measured rather than inferred: once an interpreter has
+ * started anything at all, it can start, and every later failure with that
+ * status belongs to the child. One success is proof for the life of the
+ * process, because whether a shell's own libraries are readable does not
+ * change while it runs.
+ */
+const started = new Set<string>();
+
 export function resolveInterpreter(): Interpreter | undefined {
   candidates ??= measure();
   return candidates[chosen];
+}
+
+/**
+ * Records that this interpreter ran something.
+ *
+ * Called for every result that is not `STATUS_DLL_INIT_FAILED` - including
+ * failures, because a command that ran and exited 1 is a shell that started.
+ */
+export function markInterpreterStarted(interpreter: Interpreter): void {
+  started.add(interpreter.path);
+}
+
+/** Whether this interpreter is already known to start on this machine. */
+export function interpreterStarted(interpreter: Interpreter): boolean {
+  return started.has(interpreter.path);
 }
 
 /**

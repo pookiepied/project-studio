@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ExecutionScope } from "../../../src/contracts/capabilities.js";
 import { requiresUndoPoint } from "../../../src/contracts/effects.js";
 import {
+  interpreterStarted,
+  markInterpreterStarted,
   resolveInterpreter,
   type CommandSeparator,
   type Interpreter,
@@ -23,6 +25,7 @@ import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
 import { readCommandPrograms } from "../../../src/tools/shell/command.js";
 import {
+  interpreterCanStart,
   registerShellTools,
   shellResource,
   SHELL_DESCRIPTOR,
@@ -255,6 +258,74 @@ describe("the interpreter is chosen once, by the machine", () => {
     // recognized` on every contained line this machine ran.
     const interpreter = resolveInterpreter();
     expect(interpreter?.takes).toBe(interpreter?.kind === "cmd" ? "command-line" : "argv");
+  });
+});
+
+describe("whose loader failed", () => {
+  it("does not demote an interpreter that has already started something", () => {
+    // The bug this replaces. `STATUS_DLL_INIT_FAILED` arrives as the
+    // interpreter's exit code, but an interpreter reports its child's exit
+    // code as its own - and on this machine `tar --version` under cmd exits
+    // with exactly it. Read as a broken cmd, that demoted the whole process,
+    // permanently, to Windows PowerShell 5.1, where npm, npx and pnpm are all
+    // refused by the execution policy. One `tar` cost every later command in
+    // the harness its package manager.
+    // A shell this process has never run, so the answer cannot depend on what
+    // an earlier test in this file happened to execute.
+    const unproven: Interpreter = { ...POWERSHELL_LIKE, path: "/nowhere/unproven" };
+
+    expect(interpreterStarted(unproven)).toBe(false);
+    markInterpreterStarted(unproven);
+    expect(interpreterStarted(unproven)).toBe(true);
+  });
+
+  it("treats a command that ran and failed as the shell having started", () => {
+    // A shell that runs a program and reports exit 3 started perfectly well,
+    // so what is recorded is "it ran", not "it worked". Asserted on the
+    // vocabulary rather than through the gate, because the flag is module
+    // state shared with every other test in this file and an assertion about
+    // its value after a call would pass for the wrong reason.
+    const ran: Interpreter = { ...POWERSHELL_LIKE, path: "/nowhere/ran-and-failed" };
+    markInterpreterStarted(ran);
+    expect(interpreterStarted(ran)).toBe(true);
+  });
+
+  itContained("asks the shell itself, and gets a straight answer", async () => {
+    // The probe that decides a demotion when the interpreter has never run
+    // anything. `exit 0` reaches no program in any of these shells, so the
+    // only thing that can fail it is the shell's own loader - which is the
+    // question being asked. Without this the probe is unreachable in this
+    // suite, because an earlier test has already proved the interpreter and
+    // the fast path skips it.
+    const interpreter = resolveInterpreter();
+    if (interpreter === undefined) return;
+    const sandbox = new LocalSandbox(
+      createSandboxPolicy({
+        workspaceRoot: workspace,
+        environment: {
+          PATH: process.env.PATH ?? "",
+          ...(process.env.PATHEXT === undefined ? {} : { PATHEXT: process.env.PATHEXT }),
+        },
+      }),
+    );
+
+    expect(await interpreterCanStart(sandbox, interpreter, workspace)).toBe(true);
+  });
+
+  it("keeps the interpreter when a child exits with the loader status", async () => {
+    // The regression, end to end through the tool. 0xC0000142 is written as
+    // its signed form because that is what `process.exit` takes; Windows
+    // reports it back unsigned, which is the value the tool compares.
+    //
+    // Before the fix this demoted the process permanently. `resolveInterpreter`
+    // is module state shared by every conversation in the harness, so the
+    // assertion is simply that it is the same interpreter afterwards.
+    const before = resolveInterpreter();
+    expect(before).toBeDefined();
+
+    await run(gate(), { command: `${NODEQ} -e "process.exit(-1073741502)"` });
+
+    expect(resolveInterpreter()).toBe(before);
   });
 });
 

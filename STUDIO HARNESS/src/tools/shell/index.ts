@@ -4,10 +4,13 @@ import {
 } from "../../contracts/capabilities.js";
 import {
   demoteInterpreter,
+  interpreterStarted,
+  markInterpreterStarted,
   resolveInterpreter,
   type Interpreter,
 } from "../../process/interpreter.js";
 import { ProcessError } from "../../process/errors.js";
+import type { LocalSandbox } from "../../sandbox/local-sandbox.js";
 import { SandboxError } from "../../sandbox/errors.js";
 import { ToolError } from "../errors.js";
 import type { CallGate } from "../gate.js";
@@ -56,6 +59,8 @@ const MAX_TIMEOUT_MS = 600_000;
  */
 const STATUS_DLL_INIT_FAILED = 3_221_225_794;
 const DEFAULT_TIMEOUT_MS = 120_000;
+/** Long enough for a shell to start and exit, short enough not to stall a turn. */
+const PROBE_TIMEOUT_MS = 15_000;
 
 export interface ShellInput {
   /** A full command line, for the machine's interpreter. */
@@ -191,6 +196,42 @@ export function demotionRefusal(
     `Only the first was approved, so nothing was run. Rewrite the command for ` +
     `${to.label} and call again.`
   );
+}
+
+/**
+ * Whether the interpreter itself can start under containment.
+ *
+ * `exit 0` reaches no program in any of the shells this harness uses, so the
+ * only thing that can fail it is the shell's own loader - which is exactly
+ * the question. No program roots are granted, for the same reason: anything
+ * granted would widen what the probe proves.
+ *
+ * A success is recorded, so this runs at most once per interpreter per
+ * process. Any error is read as "it started" rather than "it did not": the
+ * probe exists to *withhold* a permanent, process-wide demotion, and a
+ * demotion taken because a probe timed out would be the original bug with an
+ * extra step.
+ */
+export async function interpreterCanStart(
+  sandbox: LocalSandbox,
+  interpreter: Interpreter,
+  cwd: string,
+): Promise<boolean> {
+  try {
+    const probe = await sandbox.run("shell", {
+      executable: interpreter.path,
+      args: [...interpreter.args, "exit 0"],
+      cwd,
+      lineJoin: interpreter.takes,
+      programRoots: [],
+      timeoutMs: PROBE_TIMEOUT_MS,
+    });
+    const ok = probe.exitCode !== STATUS_DLL_INIT_FAILED;
+    if (ok) markInterpreterStarted(interpreter);
+    return ok;
+  } catch {
+    return true;
+  }
 }
 
 function clip(output: string): string {
@@ -379,7 +420,31 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         // Windows without PowerShell 7 the choice is Git's `bash.exe`, which
         // cannot run inside a container, and the answer is to use an
         // interpreter that does not need what it cannot read.
-        if (result.exitCode === STATUS_DLL_INIT_FAILED && demoteInterpreter(interpreter)) {
+        if (result.exitCode !== STATUS_DLL_INIT_FAILED) {
+          // It ran. Exit code 1 is still a shell that started, and that is the
+          // fact worth keeping: it makes every later failure with the loader
+          // status attributable to the child instead of to the shell.
+          markInterpreterStarted(interpreter);
+        }
+
+        // Whose loader actually failed. An interpreter reports its child's
+        // exit code as its own, so this status alone cannot tell "the shell
+        // could not start" from "the shell started and the program it ran
+        // could not". On this machine `tar --version` under cmd exits with
+        // exactly it - and demotion is permanent and process-wide, so reading
+        // that as a broken cmd moved every later command to PowerShell 5.1,
+        // where npm, npx and pnpm are all refused by the execution policy.
+        //
+        // Measured rather than inferred: if the interpreter is known to have
+        // started, the child owns the failure and nothing is demoted. If it
+        // has never started, it is asked to run a line that reaches no
+        // program at all, which only its own loader can fail.
+        const shellItself =
+          result.exitCode === STATUS_DLL_INIT_FAILED && !interpreterStarted(interpreter)
+            ? !(await interpreterCanStart(context.sandbox, interpreter, cwd))
+            : false;
+
+        if (shellItself && demoteInterpreter(interpreter)) {
           const next = resolveInterpreter();
           if (next !== undefined && next !== interpreter) {
             // The approval was given for what this line runs under the first
