@@ -25,7 +25,7 @@ export function RetryWait({ retrying }: { retrying: RetryWaitFacts }) {
         </span>
       </div>
       {retrying.detail !== null ? (
-        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+        <p className="max-w-[60ch] break-words pl-(--row-label-inset) text-caption text-muted-foreground/80">
           {retrying.detail}
         </p>
       ) : null}

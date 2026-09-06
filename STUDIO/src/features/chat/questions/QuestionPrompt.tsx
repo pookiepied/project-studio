@@ -158,37 +158,37 @@ export function QuestionPrompt({
             selected={selectedId === otherId}
             onSelect={() => choose(otherId)}
             disabled={advancing || answering}
-            input={
-              <input
-                ref={inputRef}
-                value={text}
-                onChange={(event) => {
-                  setText(event.target.value)
-                  // Typing is itself the choice: the written answer is the
-                  // one being composed, whatever else was selected.
-                  setSelectedId(otherId)
-                }}
-                placeholder="Something else..."
-                aria-label="Your own answer"
-                className="mt-1 w-full rounded-md border bg-surface px-2 py-1 text-ui outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            }
+              input={
+                <input
+                  ref={inputRef}
+                  value={text}
+                  onChange={(event) => {
+                    setText(event.target.value)
+                    // Typing is itself the choice: the written answer is the
+                    // one being composed, whatever else was selected.
+                    setSelectedId(otherId)
+                  }}
+                  placeholder="Something else..."
+                  aria-label="Your own answer"
+                  className="mt-0.5 w-full rounded-xs text-ui outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              }
           />
         </>
       }
       controls={
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* Two labelled controls, never one ambiguous dismissal. */}
-            <Button variant="ghost" size="sm" disabled={answering} onClick={defer}>
+            <Button variant="ghost" size="xs" disabled={answering} onClick={defer}>
               You decide
             </Button>
-            <Button variant="danger" size="sm" disabled={answering} onClick={onStop}>
+            <Button variant="danger" size="xs" disabled={answering} onClick={onStop}>
               Stop
             </Button>
           </div>
           {needsContinue ? (
-            <Button variant="primary" size="sm" busy={answering} onClick={submit}>
+            <Button variant="primary" size="xs" busy={answering} onClick={submit}>
               {rows.length > 1 ? 'Continue' : 'Submit'}
             </Button>
           ) : null}

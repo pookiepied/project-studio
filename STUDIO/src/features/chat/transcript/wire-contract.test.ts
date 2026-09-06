@@ -109,8 +109,8 @@ describe('a real tool-calling turn', () => {
     const tools = issuing.segments.find((segment) => segment.kind === 'tools')
     if (tools?.kind !== 'tools') throw new Error('no tools segment')
     expect(tools.groups).toHaveLength(1)
-    expect(tools.groups[0]?.toolName).toBe('workspace_summary')
     expect(tools.groups[0]?.calls).toHaveLength(1)
+    expect(tools.groups[0]?.calls[0]?.toolName).toBe('workspace_summary')
   })
 
   it('lands the answer on its call even though the issuing message already completed', () => {

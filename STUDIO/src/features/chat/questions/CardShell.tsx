@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 
-import { COMPOSER, EASE_OUT } from '@/design/tokens'
+import { DURATION, EASE_OUT } from '@/design/tokens'
+import { Icons } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /**
@@ -15,6 +16,17 @@ import { cn } from '@/lib/cn'
  * and the keyboard behaviour. `ApprovalPrompt` renders through it, and the
  * ask-a-question card renders through it, so the person is never looking at
  * two different-looking things that do the same job.
+ *
+ * ---- The shape -------------------------------------------------------------
+ *
+ * The card's own arrangement is borrowed from the approval cards of the
+ * agent-UI component library, restated in this theme: a head row that names
+ * the kind of question beside the ask mark, the sentence beneath it, the
+ * choices as compact keyed rows, and the verdicts as small pills at the foot.
+ * The order is the fix that mattered -- the label used to sit *under* the
+ * sentence as a muted caption, so the card opened with a sentence whose kind
+ * you learned only after reading it. Everything the card wears comes from the
+ * theme's own tokens, so dark mode is not a second stylesheet to drift.
  *
  * ---- What the shell does not know ------------------------------------------
  *
@@ -45,7 +57,7 @@ export function CardShell({
   onSubmit,
   answering = false,
 }: {
-  /** The compact label chip: what kind of question this is. */
+  /** The head row's name for what kind of question this is. */
   readonly header: string
   /** The main line: the question being asked of the person. */
   readonly sentence: ReactNode
@@ -81,30 +93,44 @@ export function CardShell({
   }
 
   return (
-    <div
+    <motion.div
       onKeyDown={onKeyDown}
-      // The composer's own multiline radius, so the card and the field it sits
-      // above read as one family of objects resting on the same surface.
-      style={{ borderRadius: COMPOSER.multilineRadius }}
-      className="bg-surface-raised p-3 shadow-raised"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DURATION.slow, ease: EASE_OUT }}
+      // The block-inner radius: a card that holds inset, inset-radius rows
+      // inside it. It sat at the composer's own radius once, which made it
+      // read as a second composer rather than as the question card it is.
+      //
+      // `text-foreground` is load-bearing, not decoration: nothing in this
+      // app sets a default text colour, so an uncoloured surface inherits
+      // the browser's black -- which in dark mode is a card full of invisible
+      // sentences. The transcript's prose sets its colour the same way.
+      className="rounded-md bg-surface-raised p-3 text-foreground shadow-raised"
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="max-w-[60ch] text-body font-medium">{sentence}</p>
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="flex size-6 shrink-0 items-center justify-center rounded-xs bg-muted"
+        >
+          <Icons.ask size="sm" />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-ui font-medium">{header}</span>
         {deadline !== null ? <CardCountdown expiresAt={deadline} /> : null}
       </div>
 
-      <p className="mt-1 max-w-[60ch] text-caption text-muted-foreground">{header}</p>
+      <p className="mt-2 max-w-[60ch] text-body font-medium">{sentence}</p>
 
       {detail !== null ? (
         <p className="mt-1 max-w-[60ch] text-caption text-muted-foreground">{detail}</p>
       ) : null}
 
-      {body !== null ? <div className="mt-2.5 flex flex-col gap-1">{body}</div> : null}
+      {body !== null ? <div className="mt-2.5 flex flex-col gap-1.5">{body}</div> : null}
 
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">{controls}</div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">{controls}</div>
 
       {footnotes !== null ? <div className="mt-1.5">{footnotes}</div> : null}
-    </div>
+    </motion.div>
   )
 }
 
@@ -116,6 +142,11 @@ export function CardShell({
  * the options are keyed by, the label, and the description that says what
  * happens if it is chosen - a choice made without its consequence is a guess
  * the person was tricked into.
+ *
+ * The rest state is a hairline-bordered row; the chosen one lifts -- the
+ * border drops, the card's own ground shows through, and the key chip fills
+ * -- so the selection reads as one object being raised rather than one of
+ * several being painted.
  */
 export function OptionRow({
   letter,
@@ -155,17 +186,19 @@ export function OptionRow({
       }}
       onClick={onSelect}
       className={cn(
-        'flex cursor-pointer items-start gap-2 rounded-lg p-2 text-left transition-colors duration-fast',
-        selected ? 'bg-tint' : 'hover:bg-tint',
+        'flex cursor-pointer items-start gap-2 rounded-xs border p-1.5 text-left transition-colors duration-fast',
+        selected
+          ? 'border-transparent bg-surface-raised shadow-chip'
+          : 'border-border hover:bg-tint',
         disabled && 'pointer-events-none opacity-45',
       )}
     >
       <span
         className={cn(
-          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border text-caption',
+          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-xs text-caption',
           selected
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-border text-muted-foreground',
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-tint text-muted-foreground',
         )}
         aria-hidden
       >
@@ -206,7 +239,7 @@ function CardCountdown({ expiresAt }: { readonly expiresAt: number }) {
       data-countdown
       aria-live="polite"
       aria-label={`${minutes} minutes ${seconds} seconds remaining`}
-      className="flex shrink-0 items-center rounded-md bg-muted px-1.5 py-0.5 text-caption tabular-nums"
+      className="flex shrink-0 items-center rounded-xs bg-muted px-1.5 py-0.5 text-caption tabular-nums"
     >
       {label.split('').map((character, at) =>
         character === ':' ? (

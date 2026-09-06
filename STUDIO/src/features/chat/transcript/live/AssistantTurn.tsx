@@ -43,6 +43,7 @@ import type {
 export function AssistantTurn({
   item,
   live,
+  turnInFlight = false,
   onBranch,
 }: {
   item: Extract<TranscriptItem, { kind: 'assistant' }>
@@ -53,6 +54,17 @@ export function AssistantTurn({
    * the caret and the ending below both depend on the narrower reading.
    */
   live: boolean
+  /**
+   * The submission this message belongs to is still in flight. A message can
+   * be complete while its run is not — parked on a question the person has
+   * not answered, a permission the kernel wants, more content still owed —
+   * and the action row must not surface in that window: copy under a run
+   * still owing its next word offers an answer that has not finished
+   * arriving, and the row below the tools read as stray furniture exactly
+   * there. Settles with the submission, so everything said before it keeps
+   * its verbs.
+   */
+  turnInFlight?: boolean
   /** Forks the conversation with everything up to and including this answer. */
   onBranch?: () => void
 }) {
@@ -91,7 +103,7 @@ export function AssistantTurn({
           the log carried, and no reading of "live" may swallow one. */}
       {live && item.end.state === 'stopped' ? null : <EndLine end={item.end} />}
       <MessageActions
-        visible={hovered && !live}
+        visible={hovered && !live && !turnInFlight}
         copyPayload={written}
         actions={
           onBranch === undefined
@@ -140,7 +152,7 @@ function Segment({
     case 'text':
       return <TextSegment segment={segment} growing={growing} />
     case 'tools':
-      return <ToolGroups groups={segment.groups} />
+      return <ToolGroups groups={segment.groups} live={live} />
   }
 }
 
@@ -199,19 +211,22 @@ function EndLine({ end }: { end: MessageEnd }) {
     <div className="mt-1 flex flex-col items-start gap-0.5">
       <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
         {end.state === 'failed' ? (
-          <copy.icon size="sm" className="text-destructive" />
+          <copy.icon size="sm" className="text-danger" />
         ) : (
           <copy.icon size="sm" />
         )}
         <span>{copy.text}</span>
       </div>
       {reason !== null ? (
-        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+        // Under the row's label, not its mark: the inset is the row's own
+        // arithmetic (one `sm` mark across, plus its gap), stated once as
+        // `--row-label-inset` rather than restated here.
+        <p className="max-w-[60ch] break-words pl-(--row-label-inset) text-caption text-muted-foreground/80">
           {reason}
         </p>
       ) : null}
       {remedy !== null ? (
-        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+        <p className="max-w-[60ch] break-words pl-(--row-label-inset) text-caption text-muted-foreground/80">
           {remedy}
         </p>
       ) : null}

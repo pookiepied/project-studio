@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { COLLAPSE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
-import { StudioMark } from '@/components/brand'
 import { cn } from '@/lib/cn'
+import { DisclosureRow } from './DisclosureRow'
 
 /**
  * The reasoning trace.
@@ -47,9 +45,18 @@ import { cn } from '@/lib/cn'
  * says only "Thought", because this window did not watch it and cannot report
  * its length.
  *
- * The mark is the brand mark, not a glyph: the same StudioMark that assembles
- * on the splash ripples here while the model works. "Studio is thinking" is
- * said by Studio itself, which no generic spinner can say.
+ * The row is a `DisclosureRow` — the shape every secondary row of a reply
+ * shares — so the trace opens at the same content boundary the prose does,
+ * and the geometry lives there rather than here.
+ *
+ * The mark is the thinking concept's own glyph, a lightbulb: an idea
+ * arriving, which is what a reasoning run is. It is deliberately still. While
+ * the run is live the label shimmers — a valley of lower opacity sweeping
+ * the words, the Thinking + Reasoning component of aicss.dev adapted into
+ * this theme's own colour — and that sweep is the one thing moving. The
+ * brand mark that used to sit here rippled to say the same thing, and one
+ * state on one channel is the rule that retired it: two indicators for one
+ * fact, and the vaguer one wins no argument by being the brand.
  */
 export function ThinkingBlock({
   text,
@@ -70,75 +77,34 @@ export function ThinkingBlock({
   useTick(live && span.kind === 'measured')
   const seconds = spanSeconds(span, live)
 
+  // Plain text, changing in place. These words used to cross-fade, back when
+  // the row could switch between two different claims about what it was
+  // watching; there is one claim now, and the only change left is "Thinking
+  // for 7s" becoming "Thought for 7s" as the run ends. Fading between two
+  // strings that differ by a tense reads as a flicker, and the shimmer
+  // sweeping them stops at exactly that moment, which is the beat the
+  // transition was for.
+  const shown = (
+    <span className={cn('inline-block whitespace-nowrap', live && 'studio-shimmer')}>
+      {label(live, seconds)}
+    </span>
+  )
+
   return (
-    <div className="mb-2.5">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        // Not merely unstyled-as-disabled: a row with no trace behind it is
-        // not a control, and leaving it focusable would put a tab stop on the
-        // page that does nothing when activated.
-        disabled={trace === null}
-        className={cn(
-          'group/thinking inline-flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 pl-1',
-          'text-caption text-muted-foreground transition-colors duration-fast',
-          trace === null ? 'cursor-default' : 'hover:text-foreground',
-        )}
-      >
-        <StudioMark busy={live} size={12} className="text-current" />
-
-        {/* Plain text, changing in place. These words used to cross-fade,
-            back when the row could switch between two different claims about
-            what it was watching; there is one claim now, and the only change
-            left is "Thinking for 7s" becoming "Thought for 7s" as the run
-            ends. Fading between two strings that differ by a tense reads as a
-            flicker, and the mark beside it already stops rippling at exactly
-            that moment, which is the beat the transition was for. */}
-        <span className="inline-block whitespace-nowrap">{label(live, seconds)}</span>
-
-        {/* Not at rest. The row's whole job when nobody is looking at it is to
-            say "thought for four seconds" in as few marks as possible, and a
-            permanent chevron beside every reply is a control advertising
-            itself in a place the reader is trying to read past. It appears on
-            hover and on keyboard focus, and stays while the trace is open,
-            which is exactly when it is telling you something you cannot see
-            from the row itself.
-
-            Absent entirely with no trace, rather than hidden: it sits at the
-            end of the row, so it can appear later without moving the mark or
-            the words to its left. */}
-        {trace === null ? null : (
-          <Icons.disclosure
-            state={open ? 'on' : 'rest'}
-            className={cn(
-              'transition-opacity duration-fast',
-              open
-                ? 'opacity-100'
-                : 'opacity-0 group-hover/thinking:opacity-100 group-focus-visible/thinking:opacity-100',
-            )}
-          />
-        )}
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open && trace !== null ? (
-          <motion.div {...COLLAPSE} className="overflow-hidden">
-            <div
-              className={cn(
-                // Indented behind a rule rather than boxed: a bordered card
-                // would give the working-out the same visual weight as the
-                // answer sitting under it.
-                'studio-selectable mt-1.5 ml-1.5 border-l-2 pl-3',
-                'text-caption whitespace-pre-wrap text-muted-foreground',
-              )}
-            >
-              {trace}
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
+    <DisclosureRow
+      className="mb-2.5"
+      leading={<Icons.thinking />}
+      open={open}
+      onToggle={() => setOpen((value) => !value)}
+      disabled={trace === null}
+      chevron="hover"
+      entering={live}
+      label={shown}
+    >
+      <div className="studio-selectable text-caption whitespace-pre-wrap text-muted-foreground">
+        {trace}
+      </div>
+    </DisclosureRow>
   )
 }
 

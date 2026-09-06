@@ -142,7 +142,7 @@ export function SendRefusal({
 }) {
   return (
     <Notice>
-      <span className="text-destructive">{refusalCopy(failure)}</span>
+      <span className="text-danger">{refusalCopy(failure)}</span>
       {onDismiss !== undefined ? (
         <div className="mt-0.5">
           <Button variant="ghost" size="sm" onClick={onDismiss}>

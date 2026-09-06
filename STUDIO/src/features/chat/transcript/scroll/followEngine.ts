@@ -53,9 +53,24 @@ const TELEPORT_SCREENS = 3
 
 export interface Follower {
   /** Drive one frame. Returns the position written, or null if nothing to do. */
-  step(element: HTMLElement, deltaSeconds: number): number | null
+  step(element: HTMLElement, deltaSeconds: number, options?: StepOptions): number | null
   /** Abandon the chase, so the next start does not inherit stale motion. */
   stop(): void
+}
+
+/**
+ * Per-step options. Everything defaults to the streaming follow's own
+ * behaviour; callers pass things only when a step means something else.
+ */
+export interface StepOptions {
+  /**
+   * Take a navigation-sized distance instantly rather than gliding through
+   * it. True by default -- a jump this large mid-stream is disorientation
+   * the reader did not ask for. The one caller that passes false is the
+   * open: arriving in a conversation is a journey the reader is meant to
+   * watch, fast at the start, settling as it lands.
+   */
+  readonly teleport?: boolean
 }
 
 export function createFollower(): Follower {
@@ -70,7 +85,7 @@ export function createFollower(): Follower {
       position = null
     },
 
-    step(element, deltaSeconds) {
+    step(element, deltaSeconds, options) {
       const target = element.scrollHeight - element.clientHeight
       if (target <= 0) return null
 
@@ -86,7 +101,7 @@ export function createFollower(): Follower {
         return null
       }
 
-      if (distance > element.clientHeight * TELEPORT_SCREENS) {
+      if ((options?.teleport ?? true) && distance > element.clientHeight * TELEPORT_SCREENS) {
         position = target
         element.scrollTop = target
         return target

@@ -35,14 +35,16 @@ afterEach(() => {
 })
 
 /**
- * The chevron is the row's only icon-set mark — the brand mark beside it is a
- * StudioMark, not an `Icons.*` — so `studio-icon` identifies it without a test
- * hook. Lucide marks wrap in a span and the class lands there, not on the svg.
+ * The classes the disclosure mark's wrapper carries. It is the row's second
+ * icon-set mark — the thinking mark before the words is one too, since the
+ * row left the brand mark — so `studio-icon` no longer identifies it on its
+ * own. Lucide names the concept on the svg itself; the state classes the row
+ * drives live on the wrapper span around it.
  */
 function disclosureClasses(container: HTMLElement): string {
-  const marks = container.querySelectorAll('button span.studio-icon')
-  if (marks.length !== 1) throw new Error(`expected one chevron, saw ${marks.length}`)
-  return marks[0].getAttribute('class') ?? ''
+  const svg = container.querySelector('button svg.lucide-chevron-right')
+  if (svg === null) throw new Error('expected a disclosure mark in the row')
+  return svg.parentElement?.getAttribute('class') ?? ''
 }
 
 describe('what the row says about a finished run', () => {
@@ -169,7 +171,7 @@ describe('a run that has opened but delivered nothing', () => {
   it('carries no disclosure, because there is nothing behind it', () => {
     const { container } = render(<ThinkingBlock text="" span={measured(OPENED, null)} live />)
 
-    expect(container.querySelectorAll('button span.studio-icon')).toHaveLength(0)
+    expect(container.querySelector('button svg.lucide-chevron-right')).toBeNull()
   })
 
   it('is not a control: no tab stop, and nothing opens', () => {
@@ -185,5 +187,58 @@ describe('a run that has opened but delivered nothing', () => {
   it('says only that the model is thinking when there is no start to count from', () => {
     render(<ThinkingBlock text="" span={measured(null, null)} live />)
     expect(screen.getByText('Thinking')).toBeTruthy()
+  })
+})
+
+/**
+ * The row's mark. It used to be the brand mark, which said "Studio is
+ * thinking" by rippling; it is the thinking concept's own glyph now, and
+ * still — the shimmer on the label is the one thing moving while the run is
+ * live, because one state travels on one channel.
+ */
+describe('the thinking mark', () => {
+  it('is the lightbulb, at rest and while live', () => {
+    const { container: finished } = render(
+      <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
+    )
+    expect(finished.querySelector('button svg.lucide-lightbulb')).not.toBeNull()
+
+    const { container: live } = render(
+      <ThinkingBlock text="half a thought" span={measured(OPENED, null)} live />,
+    )
+    expect(live.querySelector('button svg.lucide-lightbulb')).not.toBeNull()
+  })
+
+  it('is not the brand mark', () => {
+    // The StudioMark draws on a 96x128 canvas; nothing else in the app does,
+    // so its viewBox is the fingerprint of the mark this row had to leave.
+    const { container } = render(
+      <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 4_000)} live={false} />,
+    )
+    expect(container.querySelector('svg[viewBox="0 0 96 128"]')).toBeNull()
+  })
+})
+
+/**
+ * The liveness signal the Thinking + Reasoning component contributes: the
+ * words themselves carry the motion, a valley sweeping the label while the
+ * run is producing, gone the moment it ends — which is the same beat the
+ * label changes tense on.
+ */
+describe('the shimmer on a live label', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(OPENED + 3_000)
+  })
+
+  it('sweeps the label only while the run is live', () => {
+    const view = render(<ThinkingBlock text="half a thought" span={measured(OPENED, null)} live />)
+    const live = screen.getByText('Thinking for 3s')
+    expect(live.className).toContain('studio-shimmer')
+
+    view.rerender(
+      <ThinkingBlock text="working it out" span={measured(OPENED, OPENED + 7_000)} live={false} />,
+    )
+    expect(screen.getByText(/Thought for 7s/).className).not.toContain('studio-shimmer')
   })
 })

@@ -66,6 +66,36 @@ describe('the shared card shell', () => {
     expect(container.querySelector('[data-countdown]')).toBeNull()
     expect(screen.getByText('Allow')).toBeTruthy()
   })
+
+  it('names the kind of question above the sentence, beside the ask mark', () => {
+    // The head row is the card's arrangement: what kind of question this is
+    // is read first, the sentence second -- the reverse of the old order,
+    // where the kind arrived as a muted caption after the sentence it named.
+    const { container } = render(
+      <ApprovalPrompt
+        questions={[approvalQuestion]}
+        answeringId={null}
+        onAnswer={vi.fn()}
+      />,
+    )
+
+    const text = container.textContent ?? ''
+    expect(text.indexOf('Permission')).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf('Permission')).toBeLessThan(text.indexOf('Write '))
+    expect(container.querySelector('svg.lucide-message-circle-question-mark')).not.toBeNull()
+  })
+
+  it('arrives on the house entrance rather than popping in', () => {
+    const { container } = render(
+      <ApprovalPrompt
+        questions={[approvalQuestion]}
+        answeringId={null}
+        onAnswer={vi.fn()}
+      />,
+    )
+    const root = container.firstElementChild as HTMLElement
+    expect(root.style.opacity).toBe('0')
+  })
 })
 
 describe('the ask card', () => {

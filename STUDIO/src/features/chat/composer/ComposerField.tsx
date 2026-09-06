@@ -84,6 +84,7 @@ export function ComposerField({
   onChange,
   onSubmit,
   onMultilineChange,
+  onPaste,
   multiline,
   placeholder,
   handleRef,
@@ -92,6 +93,13 @@ export function ComposerField({
   onChange: (value: string) => void
   onSubmit: () => void
   onMultilineChange: (multiline: boolean) => void
+  /**
+   * What to do with a paste that carries files -- a screenshot on the
+   * clipboard arrives as one. Text pastes never reach this: the field is a
+   * text field first, and only a paste with files in it is an attachment
+   * event.
+   */
+  onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
   /**
    * Whether the frame currently holds the footer arrangement. The field is
    * wider there than beside the controls, and the decision has to stay
@@ -213,6 +221,7 @@ export function ComposerField({
       placeholder={placeholder}
       style={{ transition: HEIGHT_TRANSITION }}
       onChange={(event) => onChange(event.target.value)}
+      onPaste={onPaste}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
         event.preventDefault()

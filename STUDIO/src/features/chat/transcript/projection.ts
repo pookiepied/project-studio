@@ -10,12 +10,14 @@
  *
  * ---- Grouping is structural, never inferred -------------------------------
  *
- * The unit is ONE ASSISTANT MESSAGE'S tool calls, bucketed by tool kind —
- * both halves are facts already in the log (the message id on every
- * `tool-input`, the tool name beside it). No semantic labels exist here and
+ * The unit is ONE ASSISTANT MESSAGE'S tool calls, arranged into rows: a row
+ * per maximal same-file run of mutating calls, a row per call otherwise --
+ * both halves are facts already in the log (the message id, the tool name,
+ * and the path in the call's own input). No semantic labels exist here and
  * none may be added: a label the model did not emit is a guess wearing a
- * fact's clothes. Buckets render as counts ("Read 3"), expandable to the
- * calls, which expand to their input and output.
+ * fact's clothes. A run's row renders once and mutates as its calls arrive,
+ * which is why the row's id is derived, not minted -- a replay's walk must
+ * build the same ids the live turn grew.
  *
  * ---- Thinking blocks are segments, not a mutable block --------------------
  *
@@ -88,13 +90,78 @@ export interface ToolCallView {
 }
 
 /**
- * One bucket of same-named tool calls within one tools segment. The identity
- * is message, segment, and tool name together, so it survives a replay
- * unchanged.
+ * One rendered row of a tools segment.
+ *
+ * A row is either a RUN -- a maximal line of consecutive, file-mutating calls
+ * against the same file, the unit a reader watches tick while the model
+ * churns on one file -- or a single call standing alone. Read-only calls
+ * never join a run and never break one (the retry pattern re-reads the file
+ * mid-edit; one flaky edit must not fragment into three rows), but they do
+ * stand between runs as rows of their own, so the wire's order stays
+ * readable. A mutating call against a different file closes the run it
+ * follows, and nothing merges across it -- the interruption happened, and
+ * chronology is the value of the event log. A run for one file can therefore
+ * appear several times in one segment, and that is correct.
+ *
+ * Grouping is per segment, and a segment is per message: text written
+ * between tool calls starts a new segment, which starts fresh rows -- the
+ * same rule the flat chips lived under.
  */
 export interface ToolGroupView {
-  readonly toolName: string
+  /** Stable within the segment; a replay's walk produces the same ids. */
+  readonly id: string
   readonly calls: readonly ToolCallView[]
+  /** The run's file, when this row is a same-file mutating run. */
+  readonly file: string | null
+}
+
+/** The tools whose effect is mutating the file their path names. */
+const FILE_MUTATING: ReadonlySet<string> = new Set(['edit', 'write'])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** The path a mutating call acts on, or null -- read by field name, never guessed. */
+function fileOf(toolName: string, input: Present<unknown> | null): string | null {
+  if (!FILE_MUTATING.has(toolName)) return null
+  return pathFrom(input)
+}
+
+/** The path a read names, or null -- the other half of the transparency question. */
+function readPathOf(toolName: string, input: Present<unknown> | null): string | null {
+  if (toolName !== 'read') return null
+  return pathFrom(input)
+}
+
+function pathFrom(input: Present<unknown> | null): string | null {
+  if (input === null || !input.present) return null
+  const value: unknown = input.value
+  if (!isRecord(value)) return null
+  for (const key of ['path', 'file_path']) {
+    const candidate = value[key]
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate
+  }
+  return null
+}
+
+/**
+ * Opens a new row for one call in a segment's list. Merging is not this
+ * function's business any more: a call that continues a run merges into the
+ * row the run's own memory points at, wherever that row sits; a call that
+ * breaks one starts here, at the end of the story.
+ */
+function pushCall(
+  rows: readonly ToolGroupView[],
+  segmentId: string,
+  call: ToolCallView,
+): { readonly rows: readonly ToolGroupView[]; readonly row: number; readonly call: number } {
+  const row: ToolGroupView = {
+    id: `${segmentId}#row-${rows.length}`,
+    calls: [call],
+    file: fileOf(call.toolName, call.input),
+  }
+  return { rows: [...rows, row], row: rows.length, call: 0 }
 }
 
 export type AssistantSegment =
@@ -240,8 +307,22 @@ export interface TranscriptProjection {
   readonly applied: ChunkPosition | null
   readonly openRuns: ReadonlyMap<string, OpenRun>
   readonly callSites: ReadonlyMap<string, CallSite>
+  /**
+   * The file run a message still has open: where its row lives and what file
+   * it holds. This is the walk's own memory, not rendering state -- a run
+   * stays open across written narration and a re-read of its own file, and
+   * closes the moment anything else happens.
+   */
+  readonly openFileRuns: ReadonlyMap<string, OpenFileRun>
   /** Sent, not yet echoed. Always newer than every item; see the type. */
   readonly pending: PendingSubmission | null
+}
+
+/** Where a message's open file run lives, and what it is a run of. */
+export interface OpenFileRun {
+  readonly segmentIndex: number
+  readonly groupIndex: number
+  readonly file: string
 }
 
 /* -------------------------------------------------------------------------- */
@@ -260,6 +341,7 @@ interface Draft {
   /** Assistant item index by message id. */
   assistants: Map<string, number>
   openRuns: Map<string, OpenRun>
+  openFileRuns: Map<string, OpenFileRun>
   callSites: Map<string, CallSite>
   pending: PendingSubmission | null
 }
@@ -270,6 +352,7 @@ function draftOf(projection: TranscriptProjection): Draft {
     applied: projection.applied,
     assistants: assistantsOf(projection.items),
     openRuns: new Map(projection.openRuns),
+    openFileRuns: new Map(projection.openFileRuns),
     callSites: new Map(projection.callSites),
     pending: projection.pending,
   }
@@ -304,6 +387,7 @@ function settle(draft: Draft): TranscriptProjection {
     items: draft.items,
     applied: draft.applied,
     openRuns: draft.openRuns,
+    openFileRuns: draft.openFileRuns,
     callSites: draft.callSites,
     pending,
   }
@@ -363,6 +447,12 @@ function appendDelta(
   const item = assistantAt(draft, messageId)
   if (item === null) return
 
+  // Written narration keeps a file run open -- the words describe the events
+  // around them, and "Edit 2 of 4" must not orphan "Edit 1 of 4". Thinking is
+  // the opposite kind of sentence: work the model went away and did, and the
+  // events on either side of it happened apart.
+  if (kind === 'thinking') draft.openFileRuns.delete(messageId)
+
   const segments = [...item.segments]
   const open = draft.openRuns.get(messageId)
   if (open !== undefined && open.kind === kind) {
@@ -402,9 +492,16 @@ function appendDelta(
 }
 
 /**
- * Adds a tool call to the message's OPEN tools segment, or opens a new one
- * after whatever was being written — the interleaving is the story of the
- * turn, and grouping must not flatten it away.
+ * Adds one tool call at its place in the message's story.
+ *
+ * The shape of the rule, in order: a mutating call that continues the
+ * message's open file run joins that run's row, wherever the row sits --
+ * written narration may have landed since, and it renders after the events
+ * it describes. Anything else -- a different file, a search, a read of some
+ * other file, the model going away to think -- closed the run on arrival,
+ * and this call takes a new row at the end of the story. A read of the run's
+ * own file is the one tool that closes nothing: the verify-then-fix loop is
+ * one act, and its row stands between the calls it sits between.
  */
 function appendToolCall(
   draft: Draft,
@@ -418,6 +515,45 @@ function appendToolCall(
 
   draft.openRuns.delete(messageId)
 
+  const open = draft.openFileRuns.get(messageId) ?? null
+  const file = fileOf(toolName, input)
+
+  // Continue the open run, across whatever narration landed on top of it.
+  if (file !== null && open !== null && file === open.file) {
+    const home = item.segments[open.segmentIndex]
+    if (home !== undefined && home.kind === 'tools') {
+      const group = home.groups[open.groupIndex]
+      if (group !== undefined) {
+        const merged: ToolGroupView = {
+          ...group,
+          calls: [...group.calls, { toolCallId, toolName, input, output: null, errorText: null }],
+        }
+        const groups = [...home.groups]
+        groups[open.groupIndex] = merged
+        const segments = [...item.segments]
+        segments[open.segmentIndex] = { ...home, groups }
+        draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
+        draft.callSites.set(toolCallId, {
+          itemIndex: draft.assistants.get(messageId) ?? -1,
+          segmentIndex: open.segmentIndex,
+          groupIndex: open.groupIndex,
+          callIndex: merged.calls.length - 1,
+        })
+        return
+      }
+    }
+  }
+
+  // A non-mutating call keeps the run only when it is a read of the run's
+  // own file; anything else that happened closed it before this row opened.
+  if (file === null) {
+    const path = readPathOf(toolName, input)
+    const transparent = open !== null && path !== null && path === open.file
+    if (!transparent) draft.openFileRuns.delete(messageId)
+  } else {
+    draft.openFileRuns.delete(messageId)
+  }
+
   const segments = [...item.segments]
   let segmentIndex = segments.length - 1
   let segment = segments[segmentIndex]
@@ -426,29 +562,31 @@ function appendToolCall(
     segments.push(segment)
     segmentIndex = segments.length - 1
   }
-  if (segment.kind !== 'tools') return
 
-  const groups = [...segment.groups]
-  let groupIndex = groups.findIndex((group) => group.toolName === toolName)
-  if (groupIndex === -1) {
-    groups.push({ toolName, calls: [] })
-    groupIndex = groups.length - 1
-  }
-  const group = groups[groupIndex]
-  const calls: ToolCallView[] = [
-    ...group.calls,
-    { toolCallId, toolName, input, output: null, errorText: null },
-  ]
-  groups[groupIndex] = { ...group, calls }
-
-  segments[segmentIndex] = { ...segment, groups }
+  const pushed = pushCall(segment.groups, segment.id, {
+    toolCallId,
+    toolName,
+    input,
+    output: null,
+    errorText: null,
+  })
+  segments[segmentIndex] = { ...segment, groups: pushed.rows }
   draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
   draft.callSites.set(toolCallId, {
     itemIndex: draft.assistants.get(messageId) ?? -1,
     segmentIndex,
-    groupIndex,
-    callIndex: calls.length - 1,
+    groupIndex: pushed.row,
+    callIndex: pushed.call,
   })
+
+  const opened = pushed.rows[pushed.row]
+  if (opened !== undefined && opened.file !== null) {
+    draft.openFileRuns.set(messageId, {
+      segmentIndex,
+      groupIndex: pushed.row,
+      file: opened.file,
+    })
+  }
 }
 
 /** Delivers an answer to the call it belongs to, wherever that call landed. */
@@ -634,6 +772,9 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
     const segments: AssistantSegment[] = []
     let textRuns = 0
     let thinkingRuns = 0
+    // The live walk's memory, mirrored part for part: the file run this
+    // message still has open, and where its row lives.
+    let openFileRun: { segmentIndex: number; groupIndex: number; file: string } | null = null
 
     for (const part of message.parts) {
       if (part.kind === 'text') {
@@ -654,38 +795,74 @@ export function seededFrom(snapshot: ConversationSnapshotFacts): TranscriptItem[
           updatedAt: null,
         })
         thinkingRuns += 1
+        // Thinking is the one sentence that closes a file run: the events on
+        // either side of it happened apart, and the replay must say so.
+        openFileRun = null
       } else if (part.kind === 'tool') {
-        // Consecutive tool parts share one segment; a run interrupted by
-        // written text starts another, preserving the interleaving.
-        const last = segments[segments.length - 1]
-        const segment =
-          last !== undefined && last.kind === 'tools'
-            ? last
-            : ({ kind: 'tools', id: `${message.id}#tools-${segments.length}`, groups: [] } as const)
-        if (segment.kind !== 'tools') continue
-        const groups = [...segment.groups]
-        const groupIndex = groups.findIndex((group) => group.toolName === part.toolName)
-        const group =
-          groupIndex === -1 ? { toolName: part.toolName, calls: [] } : groups[groupIndex]
-        const nextGroupIndex = groupIndex === -1 ? groups.length : groupIndex
-        groups[nextGroupIndex] = {
-          ...group,
-          calls: [
-            ...group.calls,
-            {
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              input: part.input ?? null,
-              output: part.output ?? null,
-              errorText: part.errorText ?? null,
-            },
-          ],
+        // The live walk's rules, mirrored exactly, so ids and shapes match a
+        // replay to the character: a mutating call continues the open run
+        // wherever its row sits -- written narration may have fallen since --
+        // and a read of the run's own file keeps it; everything else closed
+        // it on arrival and opens a row at the end of the story.
+        const input = part.input ?? null
+        const file = fileOf(part.toolName, input)
+        if (file !== null && openFileRun !== null && file === openFileRun.file) {
+          const home = segments[openFileRun.segmentIndex]
+          if (home !== undefined && home.kind === 'tools') {
+            const group = home.groups[openFileRun.groupIndex]
+            if (group !== undefined) {
+              const merged: ToolGroupView = {
+                ...group,
+                calls: [
+                  ...group.calls,
+                  {
+                    toolCallId: part.toolCallId,
+                    toolName: part.toolName,
+                    input,
+                    output: part.output ?? null,
+                    errorText: part.errorText ?? null,
+                  },
+                ],
+              }
+              const groups = [...home.groups]
+              groups[openFileRun.groupIndex] = merged
+              segments[openFileRun.segmentIndex] = { ...home, groups }
+              continue
+            }
+          }
         }
-        const nextSegment = { ...segment, groups }
-        if (last !== undefined && last.kind === 'tools') {
+        if (file === null) {
+          const path = readPathOf(part.toolName, input)
+          const transparent = openFileRun !== null && path !== null && path === openFileRun.file
+          if (!transparent) openFileRun = null
+        } else {
+          openFileRun = null
+        }
+        const last = segments[segments.length - 1]
+        const existing = last !== undefined && last.kind === 'tools' ? last : undefined
+        const segment =
+          existing ??
+          ({ kind: 'tools', id: `${message.id}#tools-${segments.length}`, groups: [] } as const)
+        const pushed = pushCall(segment.groups, segment.id, {
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          input,
+          output: part.output ?? null,
+          errorText: part.errorText ?? null,
+        })
+        const nextSegment = { ...segment, groups: pushed.rows }
+        if (existing !== undefined) {
           segments[segments.length - 1] = nextSegment
         } else {
           segments.push(nextSegment)
+        }
+        const opened = pushed.rows[pushed.row]
+        if (opened !== undefined && opened.file !== null) {
+          openFileRun = {
+            segmentIndex: segments.length - 1,
+            groupIndex: pushed.row,
+            file: opened.file,
+          }
         }
       }
     }
@@ -757,6 +934,7 @@ export function emptyProjection(): TranscriptProjection {
     items: [],
     applied: null,
     openRuns: new Map(),
+    openFileRuns: new Map(),
     callSites: new Map(),
     pending: null,
   }
@@ -866,9 +1044,49 @@ export function seededProjection(snapshot: ConversationSnapshotFacts): Transcrip
     items,
     applied: null,
     openRuns: openRunsOf(items),
+    openFileRuns: openFileRunsOf(items),
     callSites: callSitesOf(items),
     pending: null,
   }
+}
+
+/**
+ * Derives each message's open file run from the built shape, so a live call
+ * that continues after a seed merges into the row history built.
+ *
+ * The rule is the walk's own, read back off the final segments: the last
+ * mutating call's row is the open run, written text between keeps it, a
+ * thinking segment closes it, and a transparent row keeps it only when it is
+ * a read of the run's own file. The seed and the live walk must agree here,
+ * and the replay tests pin that they do.
+ */
+function openFileRunsOf(items: readonly TranscriptItem[]): Map<string, OpenFileRun> {
+  const runs = new Map<string, OpenFileRun>()
+  items.forEach((item) => {
+    if (item.kind !== 'assistant') return
+    let open: OpenFileRun | null = null
+    item.segments.forEach((segment, segmentIndex) => {
+      if (segment.kind === 'thinking') {
+        open = null
+        return
+      }
+      if (segment.kind !== 'tools') return
+      segment.groups.forEach((group, groupIndex) => {
+        const call = group.calls[0]
+        if (call === undefined) return
+        if (group.file !== null) {
+          open = { segmentIndex, groupIndex, file: group.file }
+          return
+        }
+        if (open !== null) {
+          const path = readPathOf(call.toolName, call.input)
+          if (path === null || path !== open.file) open = null
+        }
+      })
+    })
+    if (open !== null) runs.set(item.id, open)
+  })
+  return runs
 }
 
 /**

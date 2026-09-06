@@ -6,9 +6,6 @@ import { IconButton } from '@/components/primitives'
 import { copyText } from '@/lib/clipboard'
 import { BlockFrame } from '@/features/chat/markdown/blocks/BlockFrame'
 
-/** The preview cap, in px. Roughly a dozen lines of prose. */
-const PREVIEW_HEIGHT = 260
-
 const COPIED_MS = 2000
 
 /**
@@ -21,9 +18,12 @@ const COPIED_MS = 2000
  * where the actual draft starts and stops — and then select it by hand and
  * get the sentence before it as well.
  *
- * So a draft gets the same treatment code gets: a frame, a name, a copy
- * button, and an edge. It is the identical `BlockFrame` deliberately, because
- * "here is a thing you can take" is one idea and should look like one.
+ * So a draft gets the same container code gets: the artifact box, a name, a
+ * copy button. It is the identical `BlockFrame` deliberately, because "here
+ * is a thing you can take" is one idea and should look like one. What it
+ * does not carry is code's furniture -- no file-type mark and no line count:
+ * it is text, and the frame's job here is only to say "this much, as one
+ * thing, copyable in one go".
  *
  * Where code is monospaced and unwrapped, this is body text at reading measure
  * — the point is to judge how it *reads*, so it has to be set the way it will
@@ -42,8 +42,6 @@ export const TEXT_FENCES: Readonly<Record<string, string>> = {
 export function TextBlock({ text, fence }: { text: string; fence: string }) {
   const [copied, setCopied] = useState(false)
 
-  const words = text.trim().split(/\s+/).filter(Boolean).length
-
   const copy = async () => {
     if (!(await copyText(text))) return
     setCopied(true)
@@ -53,8 +51,6 @@ export function TextBlock({ text, fence }: { text: string; fence: string }) {
   return (
     <BlockFrame
       label={TEXT_FENCES[fence] ?? 'Text'}
-      meta={`${words} ${words === 1 ? 'word' : 'words'}`}
-      previewHeight={PREVIEW_HEIGHT}
       actions={
         <IconButton label={copied ? 'Copied' : 'Copy text'} size="sm" onClick={() => void copy()}>
           <AnimatePresence mode="wait" initial={false}>
@@ -75,7 +71,7 @@ export function TextBlock({ text, fence }: { text: string; fence: string }) {
       {/* `whitespace-pre-wrap`, not markdown. A draft is literal: if the model
           wrote an asterisk, the asterisk is part of the text you asked for and
           rendering it as emphasis would hand back something you cannot paste. */}
-      <p className="studio-selectable px-4 text-body whitespace-pre-wrap text-foreground">
+      <p className="studio-selectable px-4 py-3.5 text-body whitespace-pre-wrap text-foreground">
         {text}
       </p>
     </BlockFrame>

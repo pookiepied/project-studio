@@ -35,11 +35,50 @@ import { CodeBlock, TEXT_FENCES, TextBlock } from '@/features/chat/markdown/bloc
  * conversation.
  */
 
+/**
+ * The SVG the reply is allowed to draw.
+ *
+ * `rehype-raw` parses an inline `<svg>` and the sanitiser then removed it
+ * whole -- `svg` is not in the default schema's tag list, so an illustration
+ * the model wrote simply vanished from the page, which is why SVG looked
+ * broken. The default refuses SVG because SVG can carry scripts; the honest
+ * fix is a curated allowlist, not letting the whole vocabulary through:
+ * drawing shapes and painting them, plus the gradients and clips that real
+ * illustrations use. No `script`, no `foreignObject`, no event handlers, no
+ * `href` -- nothing in the list can execute or point outward.
+ *
+ * Both spellings are listed because the HTML parser lowercases element names
+ * (`<linearGradient>` arrives as `lineargradient`) while attribute matching
+ * is by property name and stays camel-cased (`viewBox`).
+ */
+const SVG_TAGS = [
+  'svg', 'g', 'defs', 'title', 'desc',
+  'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
+  // The gradient/clip names in both spellings: the HTML parser lowercases
+  // element names, while some upstream tooling keeps the SVG camel case.
+  'lineargradient', 'linearGradient', 'radialgradient', 'radialGradient',
+  'stop', 'clippath', 'clipPath', 'mask', 'text', 'tspan',
+] as const
+
+const SVG_ATTRIBUTES = [
+  'd', 'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width',
+  'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-opacity',
+  'opacity', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
+  'width', 'height', 'points', 'transform', 'viewBox', 'preserveAspectRatio',
+  'xmlns', 'version', 'offset', 'stop-color', 'stop-opacity',
+  'gradientUnits', 'gradientTransform', 'patternUnits', 'clip-rule',
+  'text-anchor', 'dominant-baseline', 'font-size', 'font-family',
+  'font-weight', 'role', 'aria-hidden', 'aria-label',
+] as const
+
 const SCHEMA = {
   ...defaultSchema,
-  tagNames: (defaultSchema.tagNames ?? []).filter(
-    (tag) => tag !== 'iframe' && tag !== 'object' && tag !== 'embed' && tag !== 'form',
-  ),
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []).filter(
+      (tag) => tag !== 'iframe' && tag !== 'object' && tag !== 'embed' && tag !== 'form',
+    ),
+    ...SVG_TAGS,
+  ],
   attributes: {
     ...defaultSchema.attributes,
     // `remark-math` marks a formula by putting `math-inline` or `math-display`
@@ -54,7 +93,52 @@ const SCHEMA = {
     // scripting one.
     span: [...(defaultSchema.attributes?.span ?? []), ['className', 'math-inline', 'math-display']],
     div: [...(defaultSchema.attributes?.div ?? []), ['className', 'math-inline', 'math-display']],
+    ...Object.fromEntries(
+      SVG_TAGS.map((tag) => [tag, [...SVG_ATTRIBUTES, ['className', 'math-inline', 'math-display']]]),
+    ),
   },
+}
+
+/**
+ * The slice of the markdown tree the fence reader walks, stated structurally.
+ * `hast` is react-markdown's own dependency, not this app's, so its types are
+ * not importable from here -- and the reader needs exactly five fields.
+ */
+interface FenceNode {
+  readonly type: string
+  readonly tagName?: string
+  readonly value?: string
+  readonly children?: readonly FenceNode[]
+  readonly properties?: Readonly<Record<string, unknown>>
+}
+
+/** The fence info and the raw text of a fenced block, read off the tree. */
+function fenceOf(node: FenceNode | undefined): { fence: string | undefined; text: string } {
+  const code = node?.children?.find(
+    (child): child is FenceNode => child.type === 'element' && child.tagName === 'code',
+  )
+  if (code === undefined) return { fence: undefined, text: '' }
+  const className: unknown = code.properties?.className
+  const classes = Array.isArray(className)
+    ? className.filter((entry): entry is string => typeof entry === 'string')
+    : typeof className === 'string'
+      ? className.split(/\s+/)
+      : []
+  // Not `\w+`. The info string may carry a path after the language —
+  // ```ts:src/utils/get-diff.ts — and `\w` stops dead at the colon, which
+  // silently threw the filename away and left the block captioned
+  // "TypeScript" like every other one.
+  const fence = /language-([^\s"']+)/.exec(classes.join(' '))?.[1]
+  return { fence, text: textOf(code) }
+}
+
+function textOf(node: FenceNode): string {
+  let text = ''
+  for (const child of node.children ?? []) {
+    if (child.type === 'text') text += child.value
+    else if (child.type === 'element') text += textOf(child)
+  }
+  return text.replace(/\n$/, '')
 }
 
 const COMPONENTS: Components = {
@@ -67,66 +151,70 @@ const COMPONENTS: Components = {
    * - `artifact` fences and tables are *embedded* — they sit on the sunken
    *   ground the integrations use, because they are the reply talking about
    *   something that happened elsewhere.
-   * - code and writing-as-an-object fences are *previews* — a `BlockFrame`
-   *   with a cap and a copy button, because they are things the reader takes
-   *   away rather than reads in place.
+   * - code and writing-as-an-object fences are *blocks* — the artifact
+   *   container with the whole content shown and a copy button, because they
+   *   are things the reader takes away or works in rather than reads past.
    * - everything else is prose and stays inline.
    *
    * Images and videos never pass through here; they are artifacts and render
    * independent of the text, at their own measure.
    *
-   * `react-markdown` wraps a fence in a `<pre>`, so `pre` below unwraps it —
-   * otherwise the block's own frame would nest inside a second one and inherit
-   * the prose `<pre>` styling on top of its own.
+   * ---- Why fences are routed at `pre`, not at `code` -----------------------
+   *
+   * react-markdown wraps every fence in a `<pre>` and marks the language with
+   * a class on the inner `<code>` -- and an UNLABELED fence carries no class
+   * at all, which is exactly how a plain ``` block reached the inline-code
+   * chip styling and rendered as a grey pill the width of the column, or
+   * seemed not to render as a block at all depending on what the model wrote.
+   * Reading the fence off the hast node here means every fence has exactly
+   * one fate, named or not, and the `code` component below is left with only
+   * the inline case it can actually tell apart.
    */
-  code({ className, children, ...rest }) {
-    // Not `\w+`. The info string may carry a path after the language —
-    // ```ts:src/utils/get-diff.ts — and `\w` stops dead at the colon, which
-    // silently threw the filename away and left the block captioned
-    // "TypeScript" like every other one.
-    const fence = /language-([^\s"']+)/.exec(className ?? '')?.[1]
-    const text = String(children).replace(/\n$/, '')
+  pre({ node }) {
+    const { fence, text } = fenceOf(node)
 
-    if (fence === undefined) {
-      return (
-        <code className={className} {...rest}>
-          {children}
-        </code>
-      )
-    }
-
-    // A fence carries three different intentions and they are three different
-    // objects. `artifact` is structured output the model produced — a search,
-    // an image, an issue — and is rendered as a thing rather than as its JSON.
+    // `artifact` is structured output the model produced — a search, an
+    // image, an issue — and is rendered as a thing rather than as its JSON.
     if (fence === 'artifact') return <ArtifactBlock source={text} />
 
-    // Code, or a piece of writing made for you. See `TextBlock` for why a
-    // rewrite should not be set as monospace.
-    if (fence in TEXT_FENCES) return <TextBlock text={text} fence={fence} />
+    // Writing made for you -- named with one of the prose fences or, in the
+    // common case, named with nothing at all. A fence that does not claim a
+    // language is not claiming code either.
+    if (fence === undefined || fence in TEXT_FENCES) {
+      return <TextBlock text={text} fence={fence ?? 'text'} />
+    }
 
     return <CodeBlock code={text} fence={fence} />
   },
 
-  pre({ children }) {
-    return <>{children}</>
+  /** Inline code, and nothing else -- every fence was routed at `pre`. */
+  code({ className, children, ...rest }) {
+    return (
+      <code className={className} {...rest}>
+        {children}
+      </code>
+    )
   },
 
   /**
    * A table is embedded content, not a produced object.
    *
-   * It rides on the same sunken ground the integrations use — `ArtifactShell`'s
-   * container, verbatim — rather than in the code block's raised card, because
-   * a table is the reply *about* something, the way a search result set is, and
-   * not a thing you take away and use, the way code is. One rule for which
-   * content gets which treatment; see "The content hierarchy" in `RULES.md`.
+   * It rides on the same sunken ground the artifacts use — `ArtifactShell`'s
+   * container, verbatim — and, as in the aicss data table, the table fills
+   * that ground edge to edge: the header band touches the frame's own
+   * corners instead of floating inset inside padding, which is what made it
+   * read as a centred bar that was never scaled to the box around it. The
+   * inset belongs to the cells, not to the container.
    *
    * A wide table is still the one thing after prose that can stretch the
    * column, so it scrolls inside itself on x — the scroller is the ground's
-   * own, and the cell fills carry the shape.
+   * own, and the header band carries the shape (the per-cell radius rules in
+   * the stylesheet paint the corners, since a rounded wrapper clipping a
+   * fill shears them on the pixel grid).
    */
   table({ children }) {
     return (
-      <div className="studio-scroll-x my-5 w-full min-w-0 overflow-x-auto rounded-xl bg-surface-sunken p-3">
+      <div className="studio-scroll-frame my-5 w-full min-w-0 overflow-x-auto rounded-xl bg-surface-sunken">
         <table>{children}</table>
       </div>
     )

@@ -49,6 +49,21 @@ export const FADE = {
 } as const
 
 /**
+ * A row arriving into a reading column -- the house fade given a breath of
+ * rise. Opacity alone made an arriving tool row read as a flicker: there and
+ * fully there in one frame's worth of attention. The small displacement is
+ * what the eye reads as an event settling into place, and the surface clock
+ * (`slow`) is the pace, because this is content arriving, not a control
+ * answering. Spread on the row itself; replayed rows set `initial={false}`
+ * and so play nothing.
+ */
+export const ENTER = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: DURATION.slow, ease: EASE_OUT },
+} as const
+
+/**
  * How one surface hands over to the next.
  *
  * ---- Why direction, and why these distances -------------------------------

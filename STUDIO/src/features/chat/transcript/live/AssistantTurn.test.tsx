@@ -120,4 +120,22 @@ describe('the action row under a finished answer', () => {
     expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Branch from here' })).toBeNull()
   })
+
+  it('stays down while the submission it belongs to is still in flight', () => {
+    // A message can be complete while its run is not -- parked on a question
+    // or a permission -- and a copy row under a run still owing its next
+    // word is stray furniture, not an offer. Hovered or not.
+    const { container } = render(<AssistantTurn item={finished()} live={false} turnInFlight />)
+    fireEvent.pointerEnter(container.firstElementChild ?? container)
+    const row = screen.getByRole('button', { name: 'Copy' }).closest('[class*="mb-4"]')
+    expect(row?.className).toContain('pointer-events-none')
+  })
+
+  it('answers to hover once the submission has settled', () => {
+    const { container } = render(<AssistantTurn item={finished()} live={false} />)
+    const row = screen.getByRole('button', { name: 'Copy' }).closest('[class*="mb-4"]')
+    expect(row?.className).toContain('pointer-events-none')
+    fireEvent.pointerEnter(container.firstElementChild ?? container)
+    expect(row?.className).not.toContain('pointer-events-none')
+  })
 })

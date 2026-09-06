@@ -25,18 +25,18 @@ export function SubmissionFailed({ item }: { item: FailedItem }) {
   return (
     <div className="flex flex-col items-start gap-0.5">
       <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
-        <Icons.failed size="sm" className="text-destructive" />
+        <Icons.failed size="sm" className="text-danger" />
         <span>{headline}</span>
       </div>
       <p
-        className={`max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption ${
+        className={`max-w-[60ch] break-words pl-(--row-label-inset) text-caption ${
           item.reason === null ? 'italic text-muted-foreground/60' : 'text-muted-foreground/80'
         }`}
       >
         {item.reason ?? 'No reason arrived with the failure.'}
       </p>
       {remedy !== null ? (
-        <p className="max-w-[60ch] break-words pl-[calc(0.375rem+0.875rem)] text-caption text-muted-foreground/80">
+        <p className="max-w-[60ch] break-words pl-(--row-label-inset) text-caption text-muted-foreground/80">
           {remedy}
         </p>
       ) : null}

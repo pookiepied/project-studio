@@ -230,6 +230,22 @@ export function Composer({
     setImages((current) => current.filter((_, at) => at !== index))
   }, [])
 
+  /**
+   * Whatever the clipboard or a drag carries lands in the strip through the
+   * same rules the picker uses -- judged, read, refused by name. Gated on the
+   * live transport, as the picker is: the demo turn carries only words, so
+   * there is nothing for a dropped file to ride on. Text pastes never reach
+   * here -- a clipboard with files in it is an attachment event; a clipboard
+   * of words is the field doing its job.
+   */
+  const ingestFiles = useCallback(
+    (files: readonly File[]) => {
+      if (!live || files.length === 0) return
+      addImages(files)
+    },
+    [live, addImages],
+  )
+
   const submit = () => {
     if (!canSend) return
     if (live && onSend !== undefined) {
@@ -286,6 +302,20 @@ export function Composer({
       onBlurCapture={(event) => {
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
         setFocused(false)
+      }}
+      // A dropped file is an attachment, not a navigation. The dragover
+      // refusal is what makes the drop event fire at all; without it the
+      // webview would open the file over the app. A drop carrying no files
+      // (dragged words, a dragged selection) is left to the field's default,
+      // which inserts the text where the caret is.
+      onDragOver={(event) => {
+        if (live) event.preventDefault()
+      }}
+      onDrop={(event) => {
+        const files = Array.from(event.dataTransfer.files)
+        if (!live || files.length === 0) return
+        event.preventDefault()
+        ingestFiles(files)
       }}
       // The radius is a real style with a CSS transition, not a Framer
       // `animate`. A Framer value is only applied once the animation loop
@@ -478,6 +508,14 @@ export function Composer({
                   onChange={setText}
                   onSubmit={submit}
                   onMultilineChange={setMultiline}
+                  onPaste={(event) => {
+                    const files = Array.from(event.clipboardData.files)
+                    if (files.length === 0) return
+                    // The paste becomes the strip, not text in the field: a
+                    // screenshot on the clipboard has no words to insert.
+                    event.preventDefault()
+                    ingestFiles(files)
+                  }}
                   multiline={multiline}
                   placeholder={placeholder}
                 />

@@ -1,55 +1,47 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 /**
- * The preview frame: a thing the reader takes away, shown inside a reply.
+ * The block frame: code, or writing-as-an-object, set inside a reply.
  *
- * Code and writing-as-an-object live here — tier three of the content
- * hierarchy (see `RULES.md`). Their shared contract is *preview*: the content
- * is shown to be recognised and copied, not to be worked in, so past
- * `previewHeight` it is held at the cap behind a fade and that is the whole of
- * the interaction. There is no expansion to bring back and no scroller to
- * wander into. The full text is one copy away, and the transcript keeps
- * moving.
+ * ---- What replaced what, and why -----------------------------------------
  *
- * Two boxes, not one. An outer card carries the shadow and the padding, and an
- * inner panel carries the content on a surface of its own. The caption sits
- * between the inner panel's bottom edge and the card's, on the card's
- * background, with no rule between them — the gap is the separation.
+ * The previous frame was a preview: content past a cap was held behind a
+ * gradient fade and the full text was "one copy away". In a real coding
+ * session that is backwards -- the code is not a thing to recognise, it is
+ * the thing being worked on, and a reader who cannot see line forty does not
+ * feel served by a clipboard. So the cap and the fade are gone and the body
+ * scrolls inside itself instead: everything is on the page, reachable, and
+ * the transcript still does not hand a two-thousand-line dump the run of the
+ * column.
  *
- * ---- Why the nesting is the whole design ---------------------------------
+ * ---- The container is the artifact container ------------------------------
  *
- * It looks like decoration and it is doing three jobs.
+ * The frame is the artifact shell's box, verbatim in kind: sunken ground, one
+ * radius, no border, no shadow. Code, a draft, a search result -- all objects
+ * the reply is carrying rather than prose it is saying -- sit in the same
+ * container, and the reply reads as one surface with objects in it instead of
+ * a stack of panels. (The old frame was a raised card with a drop shadow,
+ * which is the construction the artifact system explicitly grew out of.)
  *
- * It says what kind of thing this is. An inset panel on a card is the same
- * construction the media artifacts use for an image, and code is the same sort
- * of object: a thing produced, sitting in a holder, with a caption under it.
- *
- * It gives the caption somewhere to live that is not a bar. A header or a
- * footer strip needs a border to separate it, and a border across a block this
- * size is a heavy line for a small job. Set on the card *outside* the panel,
- * the caption is separated by whitespace, which costs nothing.
- *
- * And it fixes the corners. A single box has to clip its content to keep its
- * radius, and `overflow: hidden` against a rounded corner is where the harsh,
- * chewed edge comes from — the browser clips on a pixel grid while the border
- * radius is antialiased, so the fill ends a fraction inside the curve and the
- * corner reads as cut rather than turned. With two boxes the inner panel's
- * *background* is the rounded shape, and its padding means text never reaches
- * the corner in the first place. Nothing is clipped, so nothing is chewed —
- * which is also why the clip only switches on while the preview cap is holding.
+ * The head sits on that same ground behind a hairline -- an internal divider,
+ * not an edge -- because a frame with controls needs somewhere for them to
+ * live that is not floating over the code.
  */
 export function BlockFrame({
+  glyph,
   label,
   meta,
   actions,
-  previewHeight,
-  flush = false,
+  scrollHeight = 'max-h-96',
+  bodyClassName,
   children,
 }: {
-  /** What this block is: a path for code, a name for prose. Left of the caption. */
+  /** The mark before the label, if the block has one -- a file-type glyph. */
+  glyph?: ReactNode
+  /** What this block is: a path for code, a name for prose. */
   label: ReactNode
-  /** Secondary detail — a line range, a word count. Right of the caption. */
+  /** Secondary detail -- a line count. Left of the controls. */
   meta?: ReactNode
   /**
    * Controls. Always visible.
@@ -62,76 +54,37 @@ export function BlockFrame({
    */
   actions?: ReactNode
   /**
-   * The preview cap, in px. Content taller than this is held at the cap and
-   * faded; shorter content is untouched. Omitted, the block never caps.
+   * How tall the body may get before it scrolls inside itself. A cap is not a
+   * preview -- everything below it is still on the page, one scroll away --
+   * but a block without one hands the column to whatever the model emitted.
    */
-  previewHeight?: number
-  /**
-   * The child paints to the panel's edges and supplies its own padding.
-   *
-   * Needed by anything that fills the panel — the highlighter pads itself, and
-   * a padded child inside the frame's padding is twice the gutter.
-   */
-  flush?: boolean
+  scrollHeight?: string
+  /** Extra classes for the body, for content that pads or scrolls itself. */
+  bodyClassName?: string
   children: ReactNode
 }) {
-  const body = useRef<HTMLDivElement>(null)
-  const [full, setFull] = useState(0)
-
-  // Measured before paint, so a block that caps is capped on its very first
-  // frame. In an effect instead, every long block would render at full height
-  // and then visibly clamp.
-  useLayoutEffect(() => {
-    const element = body.current
-    if (!element || previewHeight === undefined) return
-
-    const measure = () => setFull(element.scrollHeight)
-    measure()
-
-    // Height is a function of width, and this column changes width without the
-    // content changing: the sidebar animates, the window resizes.
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [previewHeight, children])
-
-  const capped = previewHeight !== undefined && full > previewHeight + 24
-
   return (
-    <div className="my-5 w-full min-w-0 rounded-block bg-surface-raised p-2 shadow-lifted">
-      <div
-        className="relative min-w-0 rounded-block-inner bg-code-surface"
-        style={{
-          maxHeight: capped ? previewHeight : undefined,
-          // Only while capped. Left on permanently it would clip the corners of
-          // the very panel whose corners this construction exists to protect.
-          overflow: capped ? 'hidden' : undefined,
-          ...(capped
-            ? {
-                maskImage: 'linear-gradient(to bottom, #000 calc(100% - 4.5rem), transparent)',
-                WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 4.5rem), transparent)',
-              }
-            : null),
-        }}
-      >
-        <div ref={body} className={cn('min-w-0', flush ? undefined : 'py-3')}>
-          {children}
-        </div>
-      </div>
-
-      {/* On the card, outside the panel. No border: the gap is the separation. */}
-      <div className="flex h-8 items-center gap-2 px-2">
-        <span className="min-w-0 truncate text-micro text-muted-foreground">{label}</span>
+    <div className="my-5 w-full min-w-0 overflow-hidden rounded-xl bg-surface-sunken">
+      <div className="flex items-center gap-2 border-b border-hairline py-1.5 pl-3 pr-2">
+        {glyph}
+        <span className="min-w-0 truncate text-caption font-medium text-foreground">{label}</span>
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          {actions}
-
           {meta ? (
-            <span className="shrink-0 pl-0.5 text-micro text-muted-foreground/70 tabular-nums">
+            <span className="shrink-0 pr-0.5 text-caption tabular-nums text-muted-foreground">
               {meta}
             </span>
           ) : null}
+          {actions}
         </div>
+      </div>
+
+      {/* The frame's own scroller: the thumb is held back by the frame's
+          radius on each axis, so it stops before the curve instead of
+          running into it -- the same courtesy the app's page scroller and
+          the bounded menus get. */}
+      <div className={cn('studio-scroll-frame min-w-0', scrollHeight, 'overflow-auto', bodyClassName)}>
+        {children}
       </div>
     </div>
   )

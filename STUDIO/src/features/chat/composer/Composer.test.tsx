@@ -211,3 +211,73 @@ describe('the images a turn carries', () => {
     expect(field()).toBe('')
   })
 })
+
+/**
+ * The clipboard and the drop: a screenshot on the clipboard, or a file
+ * dragged onto the field, joins the strip through the same rules the picker
+ * uses -- judged, read, refused by name. Text pastes are the field's own
+ * job and never become attachments.
+ */
+describe('paste and drop', () => {
+  const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 6, 7, 8])
+
+  it('turns a pasted screenshot into a pending image', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    const { container } = renderComposer(onSend)
+
+    const field = screen.getByRole('textbox')
+    fireEvent.paste(field, {
+      clipboardData: {
+        files: [new File([pngBytes], 'pasted.png', { type: 'image/png' })],
+      },
+    })
+
+    await waitFor(() => expect(screen.getByAltText('pasted.png')).toBeTruthy())
+    // The words are untouched: nothing was inserted into the field.
+    expect(container.querySelector('textarea')?.value).toBe('')
+  })
+
+  it('lands a dropped image in the strip, and names a refused file', async () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    const composer = screen.getByRole('textbox').closest('div')?.parentElement
+    if (composer === null || composer === undefined) throw new Error('no composer frame')
+    fireEvent.dragOver(composer)
+    fireEvent.drop(composer, {
+      dataTransfer: {
+        files: [
+          new File([pngBytes], 'dropped.png', { type: 'image/png' }),
+          new File([new Uint8Array([9])], 'table.csv', { type: 'text/csv' }),
+        ],
+      },
+    })
+
+    await waitFor(() => expect(screen.getByAltText('dropped.png')).toBeTruthy())
+    expect(screen.getByText(/table\.csv — Images only/)).toBeTruthy()
+  })
+
+  it('leaves a text-only paste to the field', () => {
+    const onSend = vi.fn(async () => ({ ok: true }))
+    renderComposer(onSend)
+
+    fireEvent.paste(screen.getByRole('textbox'), {
+      clipboardData: { files: [] },
+    })
+    expect(screen.queryByRole('img')).toBeNull()
+  })
+
+  it('takes nothing on the demo transport, where images have no ride', () => {
+    render(
+      <VoiceModeProvider>
+        <Composer conversationId="cnv_1" placeholder="Reply" />
+      </VoiceModeProvider>,
+    )
+    fireEvent.paste(screen.getByRole('textbox'), {
+      clipboardData: {
+        files: [new File([pngBytes], 'pasted.png', { type: 'image/png' })],
+      },
+    })
+    expect(screen.queryByAltText('pasted.png')).toBeNull()
+  })
+})

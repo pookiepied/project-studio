@@ -7,6 +7,7 @@ import { Composer } from '@/features/chat/composer'
 import { useForkConversation } from '@/features/chat/fork'
 import { Transcript, useAutoScroll } from '@/features/chat/transcript'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
+import { TurnStatus } from '@/features/chat/transcript/live/TurnStatus'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/useConversation'
@@ -108,7 +109,7 @@ export function ChatPage({
     markRunning(conversation.id, isTurnRunning(live.phase))
   }, [gallery, conversation.id, live.phase.status, markRunning])
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
-    useAutoScroll(gallery ? conversation.messages : live.items)
+    useAutoScroll(gallery ? conversation.messages : live.items, conversation.id)
 
   // Branch from one answer: everything up to and including it becomes the
   // first message of a new conversation, named for its source.
@@ -339,6 +340,13 @@ export function ChatPage({
                   />
                 </div>
               ) : null}
+
+              {/* The turn's status: sent, working, done. It holds through the
+                  whole run and leaves on its own beat after a completion --
+                  see TurnStatus, which owns the state machine and the
+                  animation. Live conversations only: the gallery's demo turn
+                  is a local fixture with no run to report. */}
+              {!gallery ? <TurnStatus phase={live.phase} items={live.items} /> : null}
             </>
           ) : null}
 

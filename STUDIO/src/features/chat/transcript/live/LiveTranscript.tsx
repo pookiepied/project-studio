@@ -79,6 +79,11 @@ export function LiveTranscript({
   const turnRunning = isTurnRunning(phase)
   const generating = phase.status === 'streaming'
   const retrying = phase.status === 'streaming' ? phase.retrying : null
+  // The submission a run in flight still owes its ending. Messages that carry
+  // this id keep their action row down — see `AssistantTurn` — while
+  // everything said before the run keeps its verbs.
+  const inFlightSubmission =
+    phase.status === 'submitted' || phase.status === 'streaming' ? phase.submissionId : null
 
   const { visible, hasOlder, loading, sentinel } = useTranscriptWindow(items, viewport)
 
@@ -112,6 +117,11 @@ export function LiveTranscript({
                 newest: item.id === lastAssistantId,
                 turnRunning: generating,
               })
+            }
+            turnInFlight={
+              inFlightSubmission !== null &&
+              item.submissionId !== null &&
+              item.submissionId === inFlightSubmission
             }
             {...(onBranch === undefined ? {} : { onBranch: () => onBranch(item.id) })}
           />

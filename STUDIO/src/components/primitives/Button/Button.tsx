@@ -35,7 +35,7 @@ import { DURATION, EASE_OUT } from '@/design/tokens'
  */
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
-type Size = 'sm' | 'md' | 'lg'
+type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 /**
  * Every variant states its own border, so none of them inherits one.
@@ -56,8 +56,14 @@ const VARIANT: Record<Variant, string> = {
 /**
  * Heights are the same scale the rest of the app measures controls on, so a
  * button sits level with a text field or a segmented control beside it.
+ *
+ * `xs` is the card step: the compact pill a stopped-run card offers its
+ * verdicts in. At the `sm` height a card carrying four of them spends more
+ * pixels on its buttons than on the question they answer, which is the
+ * specific complaint that put this step on the scale.
  */
 const SIZE: Record<Size, string> = {
+  xs: 'h-6 gap-1 rounded-full px-2.5 text-caption',
   sm: 'h-7 gap-1.5 rounded-md px-2.5 text-caption',
   md: 'h-8 gap-2 rounded-lg px-3 text-ui',
   lg: 'h-10 gap-2 rounded-lg px-4 text-ui',
@@ -121,7 +127,7 @@ export function Button({
           Swapping the text for a spinner resizes the button mid-action, which
           moves every control beside it at the one moment the user is watching
           to see whether the click registered. */}
-      <span className={cn('inline-flex items-center', SIZE[size].includes('gap-1.5') ? 'gap-1.5' : 'gap-2', busy && 'opacity-0')}>
+      <span className={cn('inline-flex items-center', SIZE[size].includes('gap-1') ? 'gap-1' : 'gap-2', busy && 'opacity-0')}>
         {icon}
         {children}
       </span>

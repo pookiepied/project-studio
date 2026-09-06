@@ -26,12 +26,12 @@
  * glyph inside it rather than the glyph having its own small hitbox.
  */
 import {
-  Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
-  CircleUser, Code, Command, Copy, Eraser, ExternalLink, Folder, FolderOpen, FolderPlus, Gauge,
-  GitBranch, GitFork, Globe, Image, Keyboard, ListChecks, MessageSquare, Mic, Monitor,
-  MoreHorizontal, Moon, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
+  Archive, ArrowDown, ArrowLeft, ArrowUp, Ban, BookOpen, Box, Boxes, Cable, Check, ChevronDown, ChevronRight,
+  CircleUser, Code, CodeXml, Command, Copy, Database, Eraser, ExternalLink, FileCog, FilePlus, Folder, FolderOpen, FolderPlus, Gauge,
+  GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor,
+  MoreHorizontal, Moon, MessageCircleQuestionMark, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
-  SquarePen, Sun, Target, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
+  SquarePen, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
   Link2, Maximize2, Sparkles,
   type LucideIcon,
@@ -106,6 +106,12 @@ const REGISTRY = {
   // — Conversation --------------------------------------------------------
   newChat: { mark: SquarePen },
   chat: { mark: MessageSquare },
+  // The stopped-run question: a permission the kernel wants or a question the
+  // model asked. A speech bubble carrying a question mark -- a conversation
+  // that has turned and is waiting on you -- and deliberately not the mode
+  // marks, which say how far ahead the app may run rather than that it has
+  // stopped.
+  ask: { mark: MessageCircleQuestionMark },
   more: { mark: MoreHorizontal },
   openExternal: { mark: ExternalLink },
   jumpToLatest: { mark: ArrowDown, motion: { rest: { y: 0 }, hover: { y: 1.5, transition: SNAP } } },
@@ -126,6 +132,12 @@ const REGISTRY = {
   // you. Pause, then write, then run on. Anyone who has used a media player can
   // read it.
 
+  // A bulb reads as an idea arriving, which is what a reasoning run is: the
+  // live event the families above reserve "thinking" for. The gauge beside it
+  // is a level picked in settings, and the two must never swap jobs — a mark
+  // that meant both "reasoning is happening now" and "how hard to reason"
+  // would leave neither reading safe.
+  thinking: { mark: Lightbulb },
   // The dial, and only the dial. Settings' Providers section used to carry it
   // too, which put the app's one picture of "how hard to think" on a row about
   // which vendors are connected — the exact collision the note at the top of
@@ -149,9 +161,33 @@ const REGISTRY = {
 
   // — Message actions -----------------------------------------------------
   copy: { mark: Copy },
+  // The pencil is the edit verb wherever it is performed. The message action
+  // here and the transcript's file-editing tool chip are the same concept --
+  // an edit -- so they share the mark rather than splitting it by surface.
   edit: { mark: Pencil },
   fork: { mark: Split },
   readAloud: { mark: Volume2 },
+
+  // — Tool actions ----------------------------------------------------------
+  // What a tool call does: one mark per action the transcript's tool chips
+  // name. Filed beside the others rather than beside the chips, so the next
+  // surface that has to say "a file was written" reaches for the same mark
+  // instead of growing a private one. The other verbs reuse marks already in
+  // this file on purpose: the palette's `search` is a search, and a directory
+  // listing is `projectOpen`'s open folder -- the shape's concept, "the
+  // contents of a directory", is the same in both places.
+  fileRead: { mark: BookOpen },
+  fileWrite: { mark: FilePlus },
+  run: { mark: Terminal },
+
+  // — File formats ---------------------------------------------------------
+  // Three formats no brand speaks for: SQL, XML and YAML are standards, not
+  // companies, so the brand-mark set has nothing to borrow for them. The
+  // concept's own mark stands in, by the same one-mark-one-concept rule as
+  // everything in this file.
+  database: { mark: Database },
+  codeXml: { mark: CodeXml },
+  fileCog: { mark: FileCog },
 
   // — Composer ------------------------------------------------------------
   add: { mark: Plus, motion: CROSS },

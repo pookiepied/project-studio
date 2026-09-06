@@ -104,10 +104,10 @@ export function ApprovalPrompt({
               { id: 'always' as const, label: 'Always' },
             ]}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
               disabled={answering}
               busy={answering && verdictInFlight === 'deny'}
               onClick={() => respond('deny')}
@@ -116,7 +116,7 @@ export function ApprovalPrompt({
             </Button>
             <Button
               variant="primary"
-              size="sm"
+              size="xs"
               disabled={answering}
               busy={answering && verdictInFlight === 'allow'}
               onClick={() => respond('allow')}
@@ -187,7 +187,11 @@ function renderPart(part: QuestionTextPart, at: number): ReactNode {
       <code
         key={at}
         style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--code-size)' }}
-        className="rounded-sm bg-code-surface px-1"
+        // The transcript's own inline-code chip -- muted, not the code-panel
+        // ground. The panel colour is the one that darkens in dark mode (a
+        // code block is inset "further from the light"), which turned this
+        // chip into a black patch on the raised card.
+        className="rounded-xs bg-muted px-1"
       >
         {part.text}
       </code>
