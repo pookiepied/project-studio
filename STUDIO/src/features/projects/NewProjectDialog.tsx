@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { Button, Dialog, IconButton, TextArea, TextField } from '@/components/primitives'
+import { StateNote } from '@/components/state/StateNote'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { DEFAULT_PROJECT_ICON, PROJECT_ICONS, type ProjectIcon } from '@/domain/projects/types'
+import { isTauri, pickDirectory } from '@/platform/tauri'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/cn'
@@ -15,11 +17,40 @@ import { cn } from '@/lib/cn'
  * something the agent can actually work in, and the form says so by refusing to
  * submit without at least one.
  *
- * The picker is demo-only in this build — it appends a plausible path rather
- * than opening the OS dialog, because the real one is a Tauri capability that
- * belongs with the harness work. The shape of what it produces is real, so
- * swapping it is one function.
+ * A folder is a directory the person actually picked: `Add folder` opens the
+ * OS directory dialog and names the row after the directory's own last
+ * segment, because the point of a picker is that they chose something.
+ * Cancelling appends nothing and raises nothing, and a directory already
+ * picked is refused here, before the round trip. What makes a path *valid*
+ * is the harness's alone - `validateFolderPath` refuses volumes, system
+ * directories and absent paths on write - so this dialog does not pre-judge
+ * any of that; it only carries the refusal's sentence back verbatim when the
+ * store says no. Outside the desktop app there is no picker, and the control
+ * says so rather than inventing a path: a fabricated path that reaches the
+ * store is the bug this dialog used to be.
  */
+
+/**
+ * The folder's display name, from the directory the person picked.
+ *
+ * The last segment of the path, with any trailing separators stripped first
+ * so `D:\Work\alpha\` names `alpha` and not the empty string. A volume root
+ * (`C:\`) names itself, which is fine to show: the harness refuses that path
+ * on write with a sentence that says why, and this dialog's job is to carry
+ * the sentence, not to pre-judge the path.
+ */
+function nameFromPath(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '')
+  const last = trimmed.split(/[\\/]/).pop()
+  if (last === undefined || last === '') return path
+  return last
+}
+
+/** What the dialog owes the person that is not a folder row. */
+type Notice =
+  | { readonly kind: 'note'; readonly text: string }
+  | { readonly kind: 'refusal'; readonly text: string }
+
 export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { createProject } = useWorkspace()
   const { openProject } = useNavigation()
@@ -28,6 +59,15 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
   const [icon, setIcon] = useState<ProjectIcon>(DEFAULT_PROJECT_ICON)
   const [description, setDescription] = useState('')
   const [folders, setFolders] = useState<{ name: string; path: string }[]>([])
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Whether the dialog is still open when the write's verdict arrives. The
+  // submit button waits for the harness before closing, but Escape and the
+  // overlay do not, and a verdict landing after the person gave up must not
+  // navigate them into a project they walked away from.
+  const openRef = useRef(open)
+  openRef.current = open
 
   const valid = name.trim().length > 0 && folders.length > 0
 
@@ -36,6 +76,8 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
     setIcon(DEFAULT_PROJECT_ICON)
     setDescription('')
     setFolders([])
+    setNotice(null)
+    setSubmitting(false)
   }
 
   const close = () => {
@@ -43,21 +85,43 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
     onClose()
   }
 
-  const addFolder = () => {
-    const index = folders.length + 1
-    const slug = name.trim().toLowerCase().replace(/\s+/g, '-') || 'project'
-    setFolders((current) => [
-      ...current,
-      { name: index === 1 ? slug : `${slug}-${index}`, path: `D:/Work/${slug}${index === 1 ? '' : `-${index}`}` },
-    ])
+  const addFolder = async () => {
+    if (!isTauri()) {
+      setNotice({ kind: 'note', text: 'The folder picker needs the desktop app.' })
+      return
+    }
+    setNotice(null)
+    const picked = await pickDirectory()
+    // Cancelled: the most common outcome of opening a picker, and not a
+    // failure - nothing appended, nothing raised.
+    if (picked === null) return
+    if (folders.some((folder) => folder.path.toLowerCase() === picked.toLowerCase())) {
+      setNotice({ kind: 'note', text: 'A project cannot attach the same folder twice.' })
+      return
+    }
+    setFolders((current) => [...current, { name: nameFromPath(picked), path: picked }])
   }
 
   const submit = () => {
-    if (!valid) return
-    const project = createProject({ name, icon, description, folders })
-    reset()
-    onClose()
-    openProject(project.id)
+    if (!valid || submitting) return
+    setSubmitting(true)
+    const { project, written } = createProject({ name, icon, description, folders })
+    void written.then((refusal) => {
+      // The person closed the dialog while the write was in flight: the
+      // verdict is no longer theirs to see, and the project's row settles
+      // with the store on its own.
+      if (!openRef.current) return
+      setSubmitting(false)
+      if (refusal !== null) {
+        // The harness's own sentence, verbatim: a refused system directory
+        // names `trusted`, and paraphrasing it here would lose the remedy.
+        setNotice({ kind: 'refusal', text: refusal.message })
+        return
+      }
+      reset()
+      onClose()
+      openProject(project.id)
+    })
   }
 
   return (
@@ -68,10 +132,10 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
       width="28rem"
       footer={
         <>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="ghost" onClick={close} disabled={submitting}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!valid} onClick={submit}>
+          <Button variant="primary" disabled={!valid || submitting} onClick={submit}>
             Create project
           </Button>
         </>
@@ -137,12 +201,19 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
 
             <button
               type="button"
-              onClick={addFolder}
+              aria-label="Add folder"
+              onClick={() => void addFolder()}
               className="flex items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-ui text-muted-foreground transition-colors duration-fast hover:bg-tint hover:text-foreground"
             >
               <Icons.add />
               Add folder
             </button>
+
+            {notice?.kind === 'refusal' ? (
+              <StateNote title="The harness refused that folder." detail={notice.text} />
+            ) : notice !== null ? (
+              <p className="text-caption text-muted-foreground">{notice.text}</p>
+            ) : null}
 
             {folders.length === 0 ? (
               <p className="text-micro text-muted-foreground/80">

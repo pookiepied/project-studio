@@ -384,6 +384,11 @@ pub fn run() {
     // `resetWindowSize` in the frontend is the way back to the default.
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_store::Builder::default().build())
+    // The directory picker (`pickDirectory` in the frontend's window boundary):
+    // the only dialog the app opens, so the capability grants only
+    // `dialog:allow-open` - the same enumerated-grant rule the store entry
+    // follows, because a capability nothing needs is a standing invitation.
+    .plugin(tauri_plugin_dialog::init())
     // Must be registered before anything that could take time: the whole
     // point is for the losing process to hand over and exit quickly, and the
     // callback below runs in the process that already owns the app.

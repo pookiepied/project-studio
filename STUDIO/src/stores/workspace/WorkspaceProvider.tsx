@@ -83,6 +83,21 @@ interface NewProjectInput {
   readonly folders: readonly { name: string; path: string }[]
 }
 
+/**
+ * What creating a project hands back: the optimistic row, and the write's
+ * verdict.
+ *
+ * `written` resolves to the harness's own refusal sentence, verbatim, when the
+ * store refused the create - a folder that is not a directory, a volume root,
+ * the same path twice - or to null once the write landed. A caller that closes
+ * on the call itself rather than on this promise lands the person in a project
+ * the harness is about to erase.
+ */
+interface CreatedProject {
+  readonly project: Project
+  readonly written: Promise<HarnessFailure | null>
+}
+
 /** How loading the index itself went. Distinct from any single record. */
 export interface StorePhase {
   readonly status: 'loading' | 'ready' | 'no-harness' | 'failed'
@@ -242,7 +257,7 @@ interface WorkspaceValue {
     clear: (conversationId: string) => Promise<HarnessResult<void>>
   }
 
-  createProject: (input: NewProjectInput) => Project
+  createProject: (input: NewProjectInput) => CreatedProject
   removeProject: (projectId: string) => void
   setBranch: (projectId: string, branch: string) => void
 
@@ -988,62 +1003,65 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   /* ------------------------------ projects -------------------------------- */
 
-  const createProject = useCallback(
-    (input: NewProjectInput): Project => {
-      const created: Project = {
-        id: newId('prj'),
-        name: input.name.trim(),
-        icon: input.icon,
-        description: input.description.trim(),
-        folders: input.folders.map((folder) => ({ id: newId('src'), ...folder })),
-        branch: input.folders.length > 0 ? 'main' : null,
-        branches: input.folders.length > 0 ? ['main'] : [],
-        createdAt: Date.now(),
-      }
-      setRemoteProjects((current) => [...current, created])
+  const createProject = useCallback((input: NewProjectInput): CreatedProject => {
+    const created: Project = {
+      id: newId('prj'),
+      name: input.name.trim(),
+      icon: input.icon,
+      description: input.description.trim(),
+      folders: input.folders.map((folder) => ({ id: newId('src'), ...folder })),
+      branch: input.folders.length > 0 ? 'main' : null,
+      branches: input.folders.length > 0 ? ['main'] : [],
+      createdAt: Date.now(),
+    }
+    setRemoteProjects((current) => [...current, created])
 
-      const client = clientRef.current
-      if (client !== null) {
-        void client
-          .createProject({
-            id: created.id,
-            name: created.name,
-            icon: created.icon,
-            ...(created.description === '' ? {} : { description: created.description }),
-            folders: created.folders.map((folder) => ({
-              name: folder.name,
-              path: folder.path,
-            })),
-          })
-          .then(async (result) => {
-            if (!liveRef.current) return
-            if (!result.ok) {
-              await load()
-              return
-            }
-            // Folder ids come back server-minted; adopt them so later calls
-            // (relocate, remove) address real rows.
-            const stored = result.value
-            setRemoteProjects((current) =>
-              current.map((project) =>
-                project.id === stored.id
-                  ? {
-                      ...project,
-                      folders: stored.folders.map((folder) => ({
-                        id: folder.id,
-                        name: folder.name,
-                        path: folder.path,
-                      })),
-                    }
-                  : project,
-              ),
-            )
-          })
+    const client = clientRef.current
+    if (client === null) {
+      return { project: created, written: Promise.resolve(null) }
+    }
+
+    const request = client.createProject({
+      id: created.id,
+      name: created.name,
+      icon: created.icon,
+      ...(created.description === '' ? {} : { description: created.description }),
+      folders: created.folders.map((folder) => ({
+        name: folder.name,
+        path: folder.path,
+      })),
+    })
+    // The row's truth, unchanged: server-minted folder ids are adopted when
+    // the write lands, and a refusal reloads, which is what drops the
+    // optimistic row. The dialog reads the same promise through `written`,
+    // for the verdict that decides whether it closes at all.
+    void request.then(async (result) => {
+      if (!liveRef.current) return
+      if (!result.ok) {
+        await load()
+        return
       }
-      return created
-    },
-    [load],
-  )
+      const stored = result.value
+      setRemoteProjects((current) =>
+        current.map((project) =>
+          project.id === stored.id
+            ? {
+                ...project,
+                folders: stored.folders.map((folder) => ({
+                  id: folder.id,
+                  name: folder.name,
+                  path: folder.path,
+                })),
+              }
+            : project,
+        ),
+      )
+    })
+    return {
+      project: created,
+      written: request.then((result) => (result.ok ? null : result.error)),
+    }
+  }, [load])
 
   const removeProject = useCallback(
     (projectId: string) => {

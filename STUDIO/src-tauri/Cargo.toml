@@ -47,6 +47,13 @@ tauri-plugin-autostart = "2"
 # up and deleted.
 tauri-plugin-store = "2"
 
+# The OS directory picker behind `Add folder` in the new-project dialog. One
+# dialog, one operation: the capability grants only `dialog:allow-open` (see
+# capabilities/default.json), and the version is pinned to match the npm side
+# exactly because a picker whose two halves disagree is a picker that fails
+# differently depending on which half answers first.
+tauri-plugin-dialog = "=2.7.3"
+
 # The HTTP client behind `service_fetch` (`services.rs`): harness traffic
 # issued from Rust, carrying the bearer the supervisor minted. Plain HTTP to
 # one loopback address, so no TLS backend is linked in -- a scheme this client

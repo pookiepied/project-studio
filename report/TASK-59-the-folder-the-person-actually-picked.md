@@ -6,14 +6,17 @@ directory picker - the Tauri dialog plugin added on both sides, registered,
 granted exactly the one operation the feature uses, and `addFolder`'s body
 replaced with the call, doing nothing at all on cancel.
 
-**Status of this report.** The formal task above is **not implemented yet**.
-It was always sequenced second: the instruction for this stretch of work was
-that TASK-59 would be completed and reported *after* a body of user-requested
-interface work landed first. That work grew long enough to be worth its own
-record - components, sources, decisions and all - so this report was written
-early, at the person's request, with the additional work captured in full
-while it is still fresh. The formal task's own sections will be filled in
-when it lands; nothing below claims it.
+**Status of this report.** The formal task is implemented and verified;
+section 1 is its record. It was sequenced second: the instruction for this
+stretch of work was that TASK-59 would be completed and reported *after* a
+body of user-requested interface work landed first. That work grew long
+enough to be worth its own record - components, sources, decisions and all -
+so this report was opened early, with the additional work captured while it
+was still fresh, and section 1 was written when the task itself landed.
+
+(This paragraph said the task was not implemented yet, which was true when
+it was written and stopped being true further down the same file. Corrected
+during verification rather than left to contradict section 1.)
 
 ---
 
@@ -579,18 +582,174 @@ the bottom.
 
 ## 1. Files changed (formal task)
 
-Not yet implemented. The brief's parts (dialog plugin both sides, the single
-permission, `addFolder`'s real call, cancel means nothing) will be reported
-here when the task lands.
+Implemented and verified. One premise of the brief resolved differently from
+its Part 2 contingency: **Task 58 has landed** on the harness side —
+`ProjectStore` (`STUDIO HARNESS/src/projects/store.ts`) validates every folder
+path on write through `validateFolderPath`
+(`STUDIO HARNESS/src/sandbox/scope.ts`), refuses volume roots and system
+directories with the `trusted`-naming sentences, and throws `conflict` on the
+same path twice. So the brief's "if Task 58 has not landed" branch was not
+taken, and the frontend owed exactly what Part 2 says it owes when the store
+exists: the refusal's own sentence, verbatim.
+
+**Versions chosen: `2.7.3`, both sides.** The npm package
+(`@tauri-apps/plugin-dialog`) and the crate (`tauri-plugin-dialog`) release in
+lockstep, so the versions match natively; both are pinned exactly — npm
+`"2.7.3"` with no caret, crate `"=2.7.3"` (`=` is Cargo's exact-pin syntax;
+the crate line carries a comment saying why it is pinned while its
+neighbours say `"2"`).
+
+The files, in dependency order:
+
+- `STUDIO/package.json` — `@tauri-apps/plugin-dialog` at exact `2.7.3`
+  (`pnpm-lock.yaml` follows; Vite picked the plugin up as a dev dependency
+  optimizer entry on the running app).
+- `STUDIO/src-tauri/Cargo.toml` — `tauri-plugin-dialog = "=2.7.3"`
+  (`Cargo.lock` follows).
+- `STUDIO/src-tauri/src/lib.rs` — `.plugin(tauri_plugin_dialog::init())`,
+  registered beside the store plugin, with a comment naming the narrow grant
+  it is paired with.
+- `STUDIO/src-tauri/capabilities/default.json` — **`dialog:allow-open` only**,
+  plus a `//dialog` comment in the file's house style: `dialog:default`
+  expands to five grants (open, save, ask, confirm, message) and the app opens
+  exactly one dialog, which only returns the path the person chose. The
+  window list needed nothing new — the picker is opened from `main`, which is
+  already listed.
+- `STUDIO/src/platform/tauri/window.ts` — `pickDirectory()`, a new verb on
+  the window boundary that owns every Tauri API call: `open({
+  directory: true, multiple: false })`, guarded by `isTauri()` like its
+  neighbours. Its docblock states the one-caller rule (the capability behind
+  it is scoped to this dialog, so a second caller is a decision about the
+  grant) and why cancel and out-of-Tauri are the same quiet null while the
+  caller that needs the distinction asks `isTauri()` first. Exported from
+  `src/platform/tauri/index.ts`.
+- `STUDIO/src/stores/workspace/WorkspaceProvider.tsx` — `createProject` now
+  returns `CreatedProject`: the optimistic row, plus `written`, the promise
+  resolving to the harness's refusal (`HarnessFailure`) verbatim, or null
+  once the write lands. The adoption/reload chain is unchanged and reads the
+  same request promise. No client (browser, harness down) resolves `written`
+  to null immediately, which is the pre-existing local-only create.
+- `STUDIO/src/features/projects/NewProjectDialog.tsx` — the swap. `addFolder`
+  opens the OS directory picker, appends nothing and raises nothing on
+  cancel, names the row after the picked directory's own last segment
+  (`nameFromPath`, trailing separators stripped; a volume root names itself
+  and is left for the harness to refuse), and refuses a directory already
+  picked in this dialog before any round trip (case-insensitive, the same
+  fold the store uses). Submit now waits for `written`: a refusal renders the
+  harness's sentence verbatim in a `StateNote` — the Environments pane's
+  `lastError` shape — and the dialog stays open; success closes and
+  navigates, only once the write has actually landed. Outside Tauri the
+  control says "The folder picker needs the desktop app." and appends
+  nothing; the fabricated path is gone, not a fallback. A `submitting` state
+  disables both footer buttons for the round trip. The demo-only header
+  paragraph is replaced by an honest one.
+- `STUDIO/src/features/projects/NewProjectDialog.test.tsx` — new, 7 tests.
+
+**What the vitest suite pins** (claims from the brief, plus two):
+
+1. Cancelling the picker appends nothing and raises nothing.
+2. A picked directory becomes a folder named after its own last segment,
+   including through a trailing separator.
+3. A directory already picked is refused before the request
+   (case-insensitive), with no call made.
+4. Outside Tauri the control explains itself, never calls the picker, and
+   appends nothing.
+5. A store refusal renders the harness's sentence verbatim (`StateNote`
+   title "The harness refused that folder."), and the dialog stays open:
+   `onClose` and `openProject` untouched.
+6. *(added, not from the brief)* The happy path: close, then navigate to the
+   project, only after `written` resolves null.
+7. *(added, not from the brief)* A verdict arriving after the person closed
+   the dialog navigates nowhere — Escape does not wait for the harness, and
+   a write settling into a closed dialog must not yank anyone into a
+   project.
+
+**Negative controls, each named, watched failing, and restored** (suite back
+to green after each restore; no control markers remain in source):
+
+- The duplicate pre-flight disabled → claim 3's test alone failed.
+- The refusal branch disabled (`if (false && refusal !== null)`) → claim 5's
+  test alone failed.
+- The cancel guard disabled (cancel appends a stand-in folder) → claim 1's
+  test alone failed. This one caught a weak test: the first draft of claim
+  1's test passed under the control because its `waitFor` resolved on the
+  first poll, before the wrongly-appended row could displace the empty hint.
+  The test now lets the picker's answer settle for one macrotask before
+  judging, and the control then failed it as intended. The strengthened test
+  is what stays.
+
+**Verified by hand in the running desktop app** (the two the brief reserves
+for the real surface, with what was seen):
+
+- **The dialog actually opens and the pick becomes a folder.** With the app
+  started by `start.bat` and the Rust side rebuilt by its watcher
+  (`tauri-plugin-dialog v2.7.3` and `rfd` compiled, `studio.exe` restarted),
+  the sidebar's New project button opened the dialog, `Add folder` opened a
+  real Windows "Select Folder" dialog, and picking the throwaway directory
+  `C:\Users\pooki\AppData\Local\Temp\studio-task59-throwaway` produced a row
+  named `studio-task59-throwaway` with that full path. "Create project"
+  closed the dialog, landed on the new project's page, and the sidebar held
+  "Throwaway 59" with the folder row and path — the harness accepted the
+  write (a refusal would have kept the dialog open with the sentence and
+  dropped the row). The project was still in the sidebar after the next
+  rebuild's fresh app start, so the row is the harness's, not a leftover
+  optimistic one. The test project was then removed via its options menu
+  ("Remove from Studio", which keeps the folder on disk) and the throwaway
+  directory was deleted; nothing was written to D:.
+- **The capability grant is the narrow one — the negative control on the
+  permission.** With everything else identical, `dialog:allow-open` was
+  removed from `capabilities/default.json`; `tauri dev` rebuilt and
+  restarted the app; the same `Add folder` click opened nothing — no native
+  dialog, no folder, no error (the IPC invoke is refused by the ACL). The
+  grant was put back, the app rebuilt again, and the dialog was verified
+  opening twice more (once to close the loop after the restore, once to
+  cancel out). The one-variable change is what makes the narrow grant the
+  load-bearing piece: an over-broad grant passes every test a narrow one
+  passes, but this control fails the moment the grant is gone.
+- **Cancel by hand**: the native dialog's Cancel returned to the New project
+  dialog with nothing appended, no error, and "Create project" still
+  disabled.
+
+**Reported honestly, things the brief did not ask for that were done anyway:**
+
+- `aria-label="Add folder"` on the Add folder control. The `Field` component
+  wraps its content in a `<label>`, and the accessible-name algorithm gave
+  the button the enclosing label's whole text ("Source folders A project
+  needs at least one folder to work in.") as its name — a screen reader
+  announcing the button would read that. The explicit label fixes both the
+  announced name and the test query.
+- The `submitting` flag and the close-during-write guard (`openRef`) exist
+  because submit now awaits the write; a fast double-click must not create
+  two projects, and Escape must not turn a later verdict into a navigation.
+
+**Found, judged, and left as it was:**
+
+- The `Field`-as-`<label>` markup is fine for the Name and Description
+  fields (it names the inputs) and only mis-names free buttons inside it;
+  the explicit `aria-label` on the one button in that field is the minimal
+  repair. Restructuring `Field` was judged out of this task's scope.
+- The harness's `ProjectStore.addFolder` had a pre-existing oddity in its
+  comment placement (a comment glued inside the `transaction(() => {` line),
+  untouched: `STUDIO HARNESS` is read-only for this task.
 
 ---
 
 ## 2. Git
 
-No commands that moved HEAD or the index across this whole stretch; no
-commits, no stashes. All of the above is in the working tree. `Backend/`,
-`documentation/` and `prompts/` were not touched; the only file written
-outside code is this report.
+The sections above the formal task (A through S) were committed at the
+user's request at the end of the previous stretch, in four commits mapped to
+the report: `febb78a` (the checkpoint: grouping rework, scroll boarding +
+glide, marks, composer paste/drop, code-text setting, report), `eeab19d`
+(memoized transcript rows), `0c23721` (sidebar reflow-light), `2d55e0b`
+(report R and S). Earlier still, `1025f13` and `15576f1` had restored
+`pnpm-workspace.yaml` and written the pnpm arrangement down.
+
+The formal task itself left its work in the working tree on purpose: its
+prompt rules say no git commands that move HEAD or the index — no checkout,
+switch, stash, reset, clean, commit, rebase. The task's whole footprint is
+the ten modified files and one new file listed in section 1, plus this
+report. `Backend/`, `documentation/`, `prompts/` and `opencode/` were not
+touched; the only file written outside code is this report.
 
 ---
 

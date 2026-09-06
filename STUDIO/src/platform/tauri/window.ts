@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 
 /**
  * The single boundary between the UI and the native window.
@@ -142,4 +143,25 @@ export async function openConversationWindow(
     return
   }
   await invoke('open_conversation_window', { conversationId, title })
+}
+
+/**
+ * The OS directory picker, as a verb on this boundary like the window verbs
+ * above.
+ *
+ * Resolves to the path the person chose, or null when they cancelled. The
+ * null is deliberately the only "no": outside Tauri there is no picker to
+ * open and this resolves null too, but a caller that needs to tell those two
+ * apart asks `isTauri()` first -- the caller that has a picker owes the
+ * person a quiet nothing on cancel, because changing your mind after opening
+ * a dialog is the most common outcome it has, not a failure.
+ *
+ * One dialog, one caller: the new-project dialog's `Add folder`. The
+ * capability behind it grants only `dialog:allow-open` (see
+ * `capabilities/default.json`), so a second caller is a decision about the
+ * grant, not just an import.
+ */
+export async function pickDirectory(): Promise<string | null> {
+  if (!isTauri()) return null
+  return open({ directory: true, multiple: false })
 }

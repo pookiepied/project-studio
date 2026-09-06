@@ -3,6 +3,7 @@ export {
   openConversationWindow,
   isTauri,
   minimizeWindow,
+  pickDirectory,
   toggleMaximizeWindow,
   closeWindow,
   quitApp,
