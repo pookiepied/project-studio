@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
 import { ReadAloud } from '@/features/voice/ReadAloud'
@@ -17,7 +17,7 @@ import type { Message } from '@/domain/session/types'
  * Above, it is a header you read before every answer; below, it is available
  * the moment you think to ask which model said this — which is afterwards.
  */
-export function AssistantMessage({
+export const AssistantMessage = memo(function AssistantMessage({
   message,
   streaming,
   onFork,
@@ -25,7 +25,7 @@ export function AssistantMessage({
   message: Message
   /** This is the message currently being written. */
   streaming: boolean
-  onFork: () => void
+  onFork: (messageId: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const shown = useSmoothText(message.text, streaming)
@@ -35,7 +35,7 @@ export function AssistantMessage({
     <div
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
-      className="flex min-w-0 flex-col"
+      className="studio-message flex min-w-0 flex-col"
     >
       {message.thinking ? (
         <ThinkingBlock
@@ -86,7 +86,7 @@ export function AssistantMessage({
           visible={hovered && !streaming && !revealing}
           copyPayload={message.text}
           actions={[
-            { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: onFork },
+            { id: 'fork', label: 'Branch from here', icon: Icons.fork, run: () => onFork(message.id) },
           ]}
           after={message.text.trim() === '' ? null : <ReadAloud text={message.text} />}
           // No model name: this component now renders only the gallery's
@@ -96,7 +96,7 @@ export function AssistantMessage({
         />
     </div>
   )
-}
+})
 
 /**
  * The caret that trails streaming text.

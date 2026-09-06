@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Icons } from '@/components/icons'
 import type { RetryWaitFacts } from '@/features/chat/useConversation'
 
@@ -13,10 +14,10 @@ import type { RetryWaitFacts } from '@/features/chat/useConversation'
  * because a guess about the wait would be exactly the invention the wire
  * signal exists to replace.
  */
-export function RetryWait({ retrying }: { retrying: RetryWaitFacts }) {
+export const RetryWait = memo(function RetryWait({ retrying }: { retrying: RetryWaitFacts }) {
   const seconds = Math.max(1, Math.round(retrying.delayMs / 1000))
   return (
-    <div className="flex flex-col items-start gap-0.5" role="status">
+    <div className="studio-message flex flex-col items-start gap-0.5" role="status">
       <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
         <Icons.failed size="sm" className="animate-pulse" />
         <span>
@@ -31,4 +32,4 @@ export function RetryWait({ retrying }: { retrying: RetryWaitFacts }) {
       ) : null}
     </div>
   )
-}
+})

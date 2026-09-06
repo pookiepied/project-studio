@@ -45,7 +45,9 @@ export function Transcript({
             key={message.id}
             message={message}
             streaming={status !== 'idle' && message.id === lastId}
-            onFork={() => onFork(message.id)}
+            // The raw callback: the message is memoized, and a fresh closure
+            // per render would un-memoize every row. It carries the id.
+            onFork={onFork}
           />
         ),
       )}

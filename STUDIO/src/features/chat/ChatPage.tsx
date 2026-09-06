@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DURATION, EASE_OUT, SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { visionRefusal } from '@/domain/attachments/images'
@@ -115,10 +115,23 @@ export function ChatPage({
   // first message of a new conversation, named for its source.
   const { branchFrom } = useForkConversation()
 
-  const forkFrom = (messageId: string) => {
-    const created = fork(conversation.id, messageId)
-    if (created) (onForked ?? openChat)(created)
+  // Both row callbacks are held identity-stable on purpose: the transcript
+  // rows are memoized, and a fresh closure per render would un-memoize the
+  // whole window on every streamed delta. The branch needs the current
+  // items, so it reads them through a ref that always holds the latest.
+  const branchRef = useRef<(messageId: string) => void>(() => {})
+  branchRef.current = (messageId: string) => {
+    void branchFrom(conversation, live.items, messageId)
   }
+  const onBranch = useCallback((messageId: string) => branchRef.current(messageId), [])
+
+  const forkFrom = useCallback(
+    (messageId: string) => {
+      const created = fork(conversation.id, messageId)
+      if (created) (onForked ?? openChat)(created)
+    },
+    [fork, conversation.id, onForked, openChat],
+  )
 
   /**
    * A refusal the send path raises before the POST: the turn is addressed to
@@ -216,7 +229,7 @@ export function ChatPage({
               pending={live.pending}
               phase={live.phase}
               viewport={viewport}
-              onBranch={(messageId) => void branchFrom(conversation, live.items, messageId)}
+              onBranch={onBranch}
             />
           )}
         </div>

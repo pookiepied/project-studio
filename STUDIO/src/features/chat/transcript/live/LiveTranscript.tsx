@@ -123,7 +123,7 @@ export function LiveTranscript({
               item.submissionId !== null &&
               item.submissionId === inFlightSubmission
             }
-            {...(onBranch === undefined ? {} : { onBranch: () => onBranch(item.id) })}
+            {...(onBranch === undefined ? {} : { onBranch })}
           />
         ),
       )}

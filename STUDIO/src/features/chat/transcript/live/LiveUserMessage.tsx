@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
@@ -14,7 +14,7 @@ import type { TranscriptItem } from '@/features/chat/transcript/projection'
  * can be rewritten would be a control that lies — and copy is the one thing
  * a message of yours owes a reader.
  */
-export function LiveUserMessage({
+export const LiveUserMessage = memo(function LiveUserMessage({
   item,
 }: {
   item: Extract<TranscriptItem, { kind: 'user' }>
@@ -48,4 +48,4 @@ export function LiveUserMessage({
       <MessageActions visible={hovered} align="end" copyPayload={item.text} actions={[]} />
     </motion.div>
   )
-}
+})

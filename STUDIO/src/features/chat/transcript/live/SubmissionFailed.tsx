@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Icons } from '@/components/icons'
 import {
   classifyFailureKind,
@@ -18,12 +19,12 @@ type FailedItem = Extract<TranscriptItem, { kind: 'submission-failed' }>
  * reason line says so rather than inventing a cause; a failure with no
  * sentence is still a failure.
  */
-export function SubmissionFailed({ item }: { item: FailedItem }) {
+export const SubmissionFailed = memo(function SubmissionFailed({ item }: { item: FailedItem }) {
   const headline =
     item.outcome === 'aborted' ? 'This turn was aborted' : 'This turn failed'
   const remedy = failureRemedy(classifyFailureKind(item.reason))
   return (
-    <div className="flex flex-col items-start gap-0.5">
+    <div className="studio-message flex flex-col items-start gap-0.5">
       <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
         <Icons.failed size="sm" className="text-danger" />
         <span>{headline}</span>
@@ -42,5 +43,4 @@ export function SubmissionFailed({ item }: { item: FailedItem }) {
       ) : null}
     </div>
   )
-}
-
+})

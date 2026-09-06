@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DURATION, EASE_OUT } from '@/design/tokens'
 import { CollapsibleText } from '@/features/chat/transcript/CollapsibleText'
@@ -23,7 +23,7 @@ import type { Message } from '@/domain/session/types'
  * when "here" is something they wrote. It lives on every assistant message,
  * where the question it answers is the one people actually have.
  */
-export function UserMessage({ message }: { message: Message }) {
+export const UserMessage = memo(function UserMessage({ message }: { message: Message }) {
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -33,7 +33,7 @@ export function UserMessage({ message }: { message: Message }) {
       transition={{ duration: DURATION.base, ease: EASE_OUT }}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
-      className="flex flex-col items-end"
+      className="studio-message flex flex-col items-end"
     >
       <div className="max-w-[85%] rounded-2xl rounded-br-md bg-selected px-3.5 py-2.5 text-foreground">
         <CollapsibleText text={message.text} />
@@ -42,4 +42,4 @@ export function UserMessage({ message }: { message: Message }) {
       <MessageActions visible={hovered} align="end" copyPayload={message.text} actions={[]} />
     </motion.div>
   )
-}
+})

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
+import { memo, useEffect, useCallback } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -137,5 +138,72 @@ describe('the action row under a finished answer', () => {
     expect(row?.className).toContain('pointer-events-none')
     fireEvent.pointerEnter(container.firstElementChild ?? container)
     expect(row?.className).not.toContain('pointer-events-none')
+  })
+})
+
+/** The renders each Profiler saw, in order. */
+const renders: string[] = []
+
+/**
+ * The memo boundary, measured where it matters: one message changing must
+ * not re-render its neighbours. Every streamed delta used to walk the whole
+ * window, and the thinking clock -- a one-second tick that can only show a
+ * new number on a paint -- starved among the renders it caused, counting
+ * 1, 2, 3, 4 and then jumping to 7.
+ */
+describe('the memo boundary', () => {
+  /**
+   * Marks its message id after every COMMITTED render of the boundary chain.
+   * The watcher is itself memoized with stable marks, so the only thing that
+   * can move it is the thing under test moving: an unchanged neighbour
+   * sitting still while a sibling's delta lands.
+   */
+  const Watched = memo(function Watched({
+    item,
+    mark,
+  }: {
+    item: Extract<TranscriptItem, { kind: 'assistant' }>
+    mark: (id: string) => void
+  }) {
+    useEffect(() => {
+      mark(item.id)
+    })
+    return <AssistantTurn item={item} live={false} />
+  })
+
+  function Pair({ a, b }: { a: Extract<TranscriptItem, { kind: 'assistant' }>; b: Extract<TranscriptItem, { kind: 'assistant' }> }) {
+    const markA = useCallback(() => renders.push('msg_1'), [])
+    const markB = useCallback(() => renders.push('msg_2'), [])
+    return (
+      <>
+        <Watched item={a} mark={markA} />
+        <Watched item={b} mark={markB} />
+      </>
+    )
+  }
+
+  it('renders a row only when its own item changes', () => {
+    const first = assistant({ state: 'complete' })
+    const second: Extract<TranscriptItem, { kind: 'assistant' }> = {
+      ...assistant({ state: 'complete' }),
+      id: 'msg_2',
+    }
+    const view = render(<Pair a={first} b={second} />)
+    renders.length = 0
+
+    // A delta lands on the SECOND message: a new item object for it, the
+    // first message's object untouched. The neighbour must sit still; the
+    // changed row commits (its smooth reveal may commit twice, which is the
+    // reveal's own beat and not the memo's business).
+    const grown: TranscriptItem = {
+      ...second,
+      segments: [
+        { kind: 'text', id: 'run_1', text: 'half a sentence so far, and more' },
+      ],
+    }
+    view.rerender(<Pair a={first} b={grown} />)
+
+    expect(renders).not.toContain('msg_1')
+    expect(renders.filter((id) => id === 'msg_2').length).toBeGreaterThan(0)
   })
 })

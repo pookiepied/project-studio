@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Icons } from '@/components/icons'
 import { StreamedMarkdown, useSmoothText } from '@/features/chat/streaming'
 import { ReadAloud } from '@/features/voice/ReadAloud'
@@ -40,7 +40,7 @@ import type {
  * in, and withheld from the message still being written — an unfinished
  * answer is not yet a thing to act on.
  */
-export function AssistantTurn({
+export const AssistantTurn = memo(function AssistantTurn({
   item,
   live,
   turnInFlight = false,
@@ -66,7 +66,7 @@ export function AssistantTurn({
    */
   turnInFlight?: boolean
   /** Forks the conversation with everything up to and including this answer. */
-  onBranch?: () => void
+  onBranch?: (messageId: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const written = writtenRuns(item)
@@ -79,7 +79,7 @@ export function AssistantTurn({
     <div
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
-      className="flex min-w-0 flex-col"
+      className="studio-message flex min-w-0 flex-col"
     >
       {item.segments.map((segment, index) => (
         <Segment
@@ -108,13 +108,13 @@ export function AssistantTurn({
         actions={
           onBranch === undefined
             ? []
-            : [{ id: 'branch', label: 'Branch from here', icon: Icons.fork, run: onBranch }]
+            : [{ id: 'branch', label: 'Branch from here', icon: Icons.fork, run: () => onBranch(item.id) }]
         }
         after={written.trim() === '' ? null : <ReadAloud text={written} />}
       />
     </div>
   )
-}
+})
 
 /** The turn's written runs in wire order — what copy and the voice both carry. */
 function writtenRuns(item: Extract<TranscriptItem, { kind: 'assistant' }>): string {
