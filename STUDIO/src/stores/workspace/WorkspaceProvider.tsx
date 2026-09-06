@@ -1111,6 +1111,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   })
   const cancel = useCallback(() => {
     turns.cancel()
+    // The method, not the object: `turns` is rebuilt every render and only
+    // `cancel` is called through this callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turns.cancel])
 
   const stop = useCallback(() => {

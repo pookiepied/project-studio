@@ -80,7 +80,10 @@ interface Stub {
 function stubFetch(reply: (url: string) => Response): Stub {
   const calls: Recorded[] = []
   const fetch: typeof globalThis.fetch = async (input, init) => {
-    const url = input instanceof URL ? input.toString() : String(input)
+    // A `Request` stringifies to "[object Request]"; its url is the thing
+    // every assertion here is actually about.
+    const url =
+      input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
     const headers = new Headers(init?.headers)
     calls.push({
       url,

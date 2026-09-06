@@ -630,7 +630,9 @@ function subjectOf(call: ToolCallView): string | null {
 function askSubject(input: Record<string, unknown>): string | null {
   const questions = input['questions']
   if (!Array.isArray(questions) || questions.length === 0) return null
-  const first = questions[0]
+  // `Array.isArray` narrows an unknown to `any[]`, so the element is named
+  // as unknown before `isRecord` is asked about it.
+  const first: unknown = questions[0]
   if (!isRecord(first)) return null
   const header = first['header']
   if (typeof header !== 'string' || header.length === 0) return null

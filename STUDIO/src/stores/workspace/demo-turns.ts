@@ -42,17 +42,25 @@ export function useDemoTurns(options: {
   const { status, modelId, markRunning, findConversation, upsertLocal } = options
   const demo = useDemoTurn()
 
+  // The method, not the object it hangs off: `demo` is rebuilt every render
+  // and only `run` is ever called through this, so depending on the whole
+  // thing would rebuild these callbacks for nothing.
   const run = useCallback(
     (conversationId: string, turnOptions: TurnRun) => {
       if (conversationId !== GALLERY_CONVERSATION_ID) return
       demo.run(turnOptions)
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [demo.run],
   )
 
-  const cancel = useCallback(() => {
-    demo.cancel()
-  }, [demo.cancel])
+  const cancel = useCallback(
+    () => {
+      demo.cancel()
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [demo.cancel],
+  )
 
   const patch = useCallback(
     (id: string, change: (conversation: Conversation) => Conversation) => {

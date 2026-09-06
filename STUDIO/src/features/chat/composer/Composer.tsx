@@ -300,7 +300,7 @@ export function Composer({
     <div
       onFocusCapture={() => setFocused(true)}
       onBlurCapture={(event) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+        if (event.currentTarget.contains(event.relatedTarget)) return
         setFocused(false)
       }}
       // A dropped file is an attachment, not a navigation. The dragover

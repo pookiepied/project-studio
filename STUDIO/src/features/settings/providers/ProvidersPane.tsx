@@ -119,11 +119,17 @@ function ProviderListSkeleton() {
 
 function ProviderList({ providers }: { providers: Providers }) {
   const { view } = providers
-  if (view.status !== 'ready') return null
-
+  // The state comes first, ahead of the guard, the way `ConnectionRow` below
+  // already does it. Hooks after a conditional return are only safe while the
+  // condition never changes under a mounted component: today the pane renders
+  // this one only once the view is ready, so the guard never fires and the
+  // hooks always run. That is a fact about the caller, not about this
+  // component, and the day it stops being true React counts a different
+  // number of hooks between two renders and takes the tree down with it.
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<ProviderConnection | null>(null)
   const [addingModel, setAddingModel] = useState<ProviderConnection | null>(null)
+  if (view.status !== 'ready') return null
 
   return (
     <>

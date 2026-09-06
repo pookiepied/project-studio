@@ -44,6 +44,11 @@ export function ActionsMenu() {
 
   const close = () => setPosition(null)
 
+  // The listeners are wired once. `close` is rebuilt every render and used to
+  // sit in this effect's dependency list, which tore down and re-added three
+  // document listeners on every render of the app's outermost menu. Inside
+  // the effect the dismissal calls `setPosition` directly -- a setter React
+  // guarantees is stable -- so there is nothing left in here that changes.
   useEffect(() => {
     const onContextMenu = (event: MouseEvent) => {
       event.preventDefault()
@@ -58,13 +63,13 @@ export function ActionsMenu() {
     const onPointerDown = (event: PointerEvent) => {
       // Clicking elsewhere dismisses; clicking the menu itself does not.
       if (menuRef.current?.contains(event.target as Node)) return
-      close()
+      setPosition(null)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        close()
+        setPosition(null)
       }
     }
 
@@ -76,7 +81,7 @@ export function ActionsMenu() {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [menuRef, close])
+  }, [])
 
   return (
     <AnimatePresence>

@@ -72,7 +72,7 @@ export function MessageActions({
       transition={{ duration: DURATION.fast, ease: EASE_OUT }}
       onFocusCapture={() => setFocusWithin(true)}
       onBlurCapture={(event) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+        if (event.currentTarget.contains(event.relatedTarget)) return
         setFocusWithin(false)
       }}
       className={cn(

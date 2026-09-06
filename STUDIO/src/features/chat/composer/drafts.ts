@@ -190,8 +190,11 @@ function coerce(stored: unknown): DraftMap {
   if (typeof stored !== 'object' || stored === null) return {}
   const out: DraftMap = {}
   for (const [key, value] of Object.entries(stored)) {
-    if (typeof value !== 'object' || value === null) continue
-    const record: Record<string, unknown> = { ...value }
+    // `Object.entries` on an `object` hands back `any` values, so the guard
+    // below narrows nothing until the value is named as unknown first.
+    const source: unknown = value
+    if (typeof source !== 'object' || source === null) continue
+    const record: Record<string, unknown> = { ...source }
     const text = record.text
     const at = record.at
     if (typeof text !== 'string' || text.length === 0) continue

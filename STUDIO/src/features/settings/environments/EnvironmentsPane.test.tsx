@@ -19,6 +19,11 @@ import type { SandboxScopeRow } from '@/platform/harness'
 
 const environments = vi.hoisted(() => {
   return {
+    // The assertion widens this seed to the whole view union, so the `view`
+    // field accepts the ready shapes the tests assign later. The rule reads
+    // the expression alone and calls it unnecessary; removing it fails the
+    // typecheck, which is the evidence that settles it.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     view: { status: 'loading' } as EnvironmentsView,
     refreshing: false,
     lastError: null as string | null,

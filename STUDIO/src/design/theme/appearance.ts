@@ -123,7 +123,7 @@ export async function forgetAppearance(): Promise<void> {
   clearLegacy()
 }
 
-function readLegacy(): unknown | null {
+function readLegacy(): unknown {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null

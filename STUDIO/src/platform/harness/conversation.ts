@@ -449,7 +449,7 @@ export function createConversationClient(options: ConversationClientOptions): Co
     try {
       parsed = parseHarnessErrorBody(JSON.parse(bodyText))
     } catch {
-      parsed = null
+      // Not JSON, or not the shape: the null it was declared with stands.
     }
     return {
       kind: 'refused',

@@ -93,7 +93,9 @@ export function useVoiceSession(active: boolean) {
   const beginThinking = useCallback(() => {
     clearRun()
     setStage('thinking')
-    const words = REPLIES[turn % REPLIES.length]!.split(' ')
+    // The modulo cannot leave the array, and the first line is a truthful
+    // stand-in if it ever somehow did -- neither of which an assertion says.
+    const words = (REPLIES[turn % REPLIES.length] ?? REPLIES[0] ?? '').split(' ')
     schedule(() => {
       setStage('speaking')
       // The words arrive on a cadence, not in a batch: this is the pace a

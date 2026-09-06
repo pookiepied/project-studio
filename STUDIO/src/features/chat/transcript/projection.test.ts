@@ -799,7 +799,7 @@ describe('a failed submission must not look like a completed one', () => {
     // The emptiness rule must never trip on the honest case: a model that
     // answers with nothing, successfully. Under a COMPLETED settlement
     // nothing is withdrawn and nothing is marked.
-    let projection = applyChunks(
+    const projection = applyChunks(
       emptyProjection(),
       chunksOf(
         resetChunk(),

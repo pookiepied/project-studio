@@ -30,7 +30,6 @@ export function PendingImages({
           key={`${image.filename ?? ''}-${index}`}
           className="group relative size-16 shrink-0"
         >
-          {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
           <img
             src={`data:${image.mimeType};base64,${image.data}`}
             alt={image.filename ?? 'Attached image'}

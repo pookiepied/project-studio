@@ -56,7 +56,10 @@ function defaultRoute(url: string, method: string): Response {
 function stubFetch(route: Route = defaultRoute): Call[] {
   const calls: Call[] = []
   const fetch: typeof globalThis.fetch = async (input, init) => {
-    const url = input instanceof URL ? input.toString() : String(input)
+    // A `Request` stringifies to "[object Request]"; its url is what these
+    // assertions are about.
+    const url =
+      input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
     const method = init?.method ?? 'GET'
     calls.push({ url, method, body: typeof init?.body === 'string' ? init.body : null })
     return route(url, method)

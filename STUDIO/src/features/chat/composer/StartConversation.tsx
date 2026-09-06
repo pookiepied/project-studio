@@ -76,6 +76,9 @@ export function StartConversation({
       setAttachRefusal(null)
       return firstTurn.start(text, images)
     },
+    // The method, not the object: only `start` is called, and `firstTurn`
+    // is new each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [catalog.models, firstTurn.start, settings],
   )
 

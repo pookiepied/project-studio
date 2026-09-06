@@ -35,7 +35,10 @@ export class LevelHistory {
 
   /** Index 0 is the oldest sample, `size - 1` the newest. */
   get(index: number): number {
-    return this.buffer[(this.head + index) % this.size]!
+    // `?? 0` rather than an assertion: the modulo keeps the index inside
+    // the array, and a slot that somehow is not there reads as silence,
+    // which is the right answer for a level history.
+    return this.buffer[(this.head + index) % this.size] ?? 0
   }
 
   clear(): void {

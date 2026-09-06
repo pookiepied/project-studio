@@ -63,7 +63,10 @@ function LevelBars({ onFrame }: { onFrame: (listener: MicFrameListener) => () =>
       for (let i = 0; i < BAR_COUNT; i++) {
         const bar = bars.current[i]
         if (!bar) continue
-        bar.style.transform = `scaleY(${(BAR_MIN + (1 - BAR_MIN) * history[i]!).toFixed(3)})`
+        // Silence for a slot that is not there; `i` is bounded by the
+        // array's own length, so this is the compiler's doubt, not a real one.
+        const level = history[i] ?? 0
+        bar.style.transform = `scaleY(${(BAR_MIN + (1 - BAR_MIN) * level).toFixed(3)})`
       }
     })
   }, [onFrame])

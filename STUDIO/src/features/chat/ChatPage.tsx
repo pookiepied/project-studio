@@ -107,6 +107,10 @@ export function ChatPage({
   useEffect(() => {
     if (gallery) return
     markRunning(conversation.id, isTurnRunning(live.phase))
+    // The status is the whole question here, and `live.phase` is a fresh
+    // object on every update: depending on it would re-mark the sidebar on
+    // every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gallery, conversation.id, live.phase.status, markRunning])
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(gallery ? conversation.messages : live.items, conversation.id)
@@ -164,6 +168,9 @@ export function ChatPage({
       if (sent.ok) touch(conversation.id)
       return sent
     },
+    // The method, not the object it hangs off: `live` is rebuilt every
+    // render and only `submit` is called here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [conversation, catalog.models, live.submit, settings, touch],
   )
 

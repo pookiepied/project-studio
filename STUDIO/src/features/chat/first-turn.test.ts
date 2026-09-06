@@ -41,7 +41,7 @@ function harness(mode: 'admits' | 'refuses' | 'absent'): Attempt {
     const init = args?.['init']
     const body =
       typeof init === 'object' && init !== null && 'body' in init ? init['body'] : undefined
-    bodies.push(String(body ?? ''))
+    bodies.push(typeof body === 'string' ? body : '')
     if (mode === 'refuses') {
       return { status: 403, headers: [], body: JSON.stringify({ error: 'admission denied' }) }
     }

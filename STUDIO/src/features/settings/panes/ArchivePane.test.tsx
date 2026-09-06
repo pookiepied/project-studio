@@ -26,6 +26,10 @@ const workspace = vi.hoisted(() => {
       readonly archived: boolean
       readonly updatedAt: number
     }[],
+    // Widened to the whole phase union, so the failed shape the tests assign
+    // later is assignable. The rule reads the expression alone; removing this
+    // fails the typecheck.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     storePhase: { status: 'loading', error: null } as StorePhase,
     ensureStore: vi.fn(async () => true),
     setArchived: (_conversationId: string, _archived: boolean) => {},

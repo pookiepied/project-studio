@@ -166,7 +166,9 @@ export function useMicInput() {
         analyser.getByteTimeDomainData(timeDomain)
         let sum = 0
         for (let i = 0; i < timeDomain.length; i++) {
-          const centred = (timeDomain[i]! - 128) / 128
+          // 128 is the byte-domain midpoint, so a missing sample centres
+          // to zero -- silence -- rather than needing an assertion.
+          const centred = ((timeDomain[i] ?? 128) - 128) / 128
           sum += centred * centred
         }
         const rms = Math.sqrt(sum / timeDomain.length)
