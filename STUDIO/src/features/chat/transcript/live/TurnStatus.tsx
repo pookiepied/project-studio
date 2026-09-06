@@ -65,9 +65,24 @@ export function TurnStatus({ phase, items }: { phase: ConversationPhase; items: 
     witnessed.current = false
     if (phase.status !== 'idle') return
     setDoneBeat(true)
+  }, [running, phase])
+
+  // The beat's clock belongs to the beat, not to the phase.
+  //
+  // It lived in the effect above until it was measured doing the opposite of
+  // its job. `phase` is rebuilt as a fresh object on every update, so any
+  // later render - a second idle from the stream, a phase that moves on
+  // without a run - re-ran that effect, and React's cleanup cancelled the
+  // pending timer first. The re-run then found the witness already spent and
+  // returned early, starting no replacement, so the pill sat on "Done" for
+  // the rest of the conversation. Keyed on `doneBeat` the timer is started
+  // by the beat and cancelled only when the beat itself ends - which is also
+  // what a new run does, by setting it false above.
+  useEffect(() => {
+    if (!doneBeat) return
     const timer = window.setTimeout(() => setDoneBeat(false), DONE_HOLD_MS)
     return () => window.clearTimeout(timer)
-  }, [running, phase])
+  }, [doneBeat])
 
   const waiting = running && !hasVisibleReply(items)
   // The beat is derived, not just timed: a run arriving under it retakes the

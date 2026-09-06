@@ -66,11 +66,20 @@ export function netOf(calls: readonly ToolCallView[]): LineDiff | null {
       continue
     }
     if (call.toolName !== 'edit') return null
+    // `replaceAll` changes every occurrence in the file, and the run's
+    // reconstruction can only see the span it has rebuilt so far. Occurrences
+    // outside that span are real changes this walk cannot count, so the net
+    // would come out short while wearing the net's name. Unprovable, and so
+    // null, like every other shape this module refuses to guess at.
+    if (fields.replaceAll === true) return null
     // The harness's own field names are the camelCase pair; the snake_case
     // spellings stand for other harnesses whose edit is shaped the same way.
     const oldText = firstString(fields, ['oldString', 'old_string', 'old_str', 'original'])
     const newText = firstString(fields, ['newString', 'new_string', 'new_str', 'replacement'])
-    if (oldText === null || newText === null) return null
+    // An empty `newString` is a deletion, which is an edit like any other.
+    // An empty `oldString` is not an edit at all -- the harness refuses it,
+    // and `indexOf("")` would answer 0 and splice text in at the top.
+    if (oldText === null || oldText === '' || newText === null) return null
     if (base === null) {
       if (replaced) return null
       // The run's opening state is the first edit's own anchor: a region of
@@ -101,10 +110,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * Emptiness is a fact here, not an absence -- the same rule the chips' own
+ * reader follows, and for the same reason. A write of an empty file and an
+ * edit that deletes carry `""`, and treating that as a missing field dropped
+ * the net for both, silently, in favour of the churn fallback. Only a missing
+ * or non-string field counts as nothing; where a particular field may not be
+ * empty, the caller says so where the rule lives.
+ */
 function firstString(input: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = input[key]
-    if (typeof value === 'string' && value.length > 0) return value
+    if (typeof value === 'string') return value
   }
   return null
 }

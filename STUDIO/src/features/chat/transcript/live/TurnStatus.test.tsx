@@ -138,6 +138,27 @@ describe('the done beat', () => {
     expect(screen.queryByText('Done')).toBeNull()
   })
 
+  it('still ends the beat when an unrelated phase update lands under it', async () => {
+    // The phase is rebuilt as a fresh object on every update, so a render
+    // that has nothing to do with this beat still changes its identity. The
+    // beat's clock must belong to the beat: an effect keyed on the phase
+    // clears the pending timer on such a render and, having already spent
+    // the witness, starts no replacement -- and the pill sits on "Done"
+    // forever.
+    vi.useFakeTimers()
+    const view = render(<TurnStatus phase={STREAMING} items={[user('hello'), assistant(['lines'])]} />)
+
+    view.rerender(<TurnStatus phase={{ status: 'idle' }} items={[user('hello'), assistant(['lines'])]} />)
+    expect(screen.getByText('Done')).toBeTruthy()
+
+    // Same status, new object: what a second idle update from the stream is.
+    view.rerender(<TurnStatus phase={{ status: 'idle' }} items={[user('hello'), assistant(['lines'])]} />)
+
+    vi.advanceTimersByTime(3000)
+    vi.useRealTimers()
+    await waitFor(() => expect(screen.queryByText('Done')).toBeNull())
+  })
+
   it('cuts the beat short when a new run starts under it', () => {
     vi.useFakeTimers()
     const view = render(<TurnStatus phase={IDLE} items={[user('hello'), assistant(['lines'])]} />)

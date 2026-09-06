@@ -105,3 +105,78 @@ describe('netOf', () => {
     expect(netOf([edit('e1', '', '')])).toBeNull()
   })
 })
+
+describe('netOf on the shapes the wire really carries', () => {
+  function call(
+    id: string,
+    toolName: string,
+    input: Record<string, unknown>,
+    output = 'Edited f.ts',
+  ): ToolCallView {
+    return {
+      toolCallId: id,
+      toolName,
+      input: present(input),
+      output: present(output),
+      errorText: null,
+    }
+  }
+
+  it('refuses a net for a replaceAll edit', () => {
+    // `replaceAll` changes every occurrence in the file. The walk can only
+    // see the span it has rebuilt, so occurrences elsewhere are real changes
+    // it cannot count -- and a short number wearing the net's name is the one
+    // thing this module exists not to print. The header falls back to churn.
+    const run = [
+      call('w1', 'write', { path: 'f.ts', content: 'x\nx\nx' }, 'Created f.ts'),
+      call('e1', 'edit', { path: 'f.ts', oldString: 'x', newString: 'y', replaceAll: true }),
+    ]
+    expect(netOf(run)).toBeNull()
+  })
+
+  it('still nets a single-occurrence edit that says replaceAll is false', () => {
+    // The flag is only disqualifying when it is actually set.
+    const run = [
+      call('w1', 'write', { path: 'f.ts', content: 'a\nb' }, 'Created f.ts'),
+      call('e1', 'edit', { path: 'f.ts', oldString: 'b', newString: 'c', replaceAll: false }),
+    ]
+    const net = netOf(run)
+    expect(net).not.toBeNull()
+    expect(net?.added).toBe(2)
+  })
+
+  it('nets an edit that deletes, where the new string is empty', () => {
+    // A deletion carries `newString: ""`. Reading that as a missing field
+    // dropped the net for every deletion in the app.
+    const run = [
+      call('w1', 'write', { path: 'f.ts', content: 'a\nb\n' }, 'Created f.ts'),
+      call('e1', 'edit', { path: 'f.ts', oldString: 'b\n', newString: '' }),
+    ]
+    const net = netOf(run)
+    expect(net).not.toBeNull()
+    expect(net?.added).toBe(1)
+    expect(net?.removed).toBe(0)
+  })
+
+  it('nets a write that empties the file', () => {
+    const run = [
+      call('w1', 'write', { path: 'f.ts', content: 'a\nb' }, 'Created f.ts'),
+      call('w2', 'write', { path: 'f.ts', content: '' }, 'Replaced f.ts'),
+    ]
+    const net = netOf(run)
+    expect(net).not.toBeNull()
+    expect(net?.added).toBe(0)
+    expect(net?.removed).toBe(0)
+  })
+
+  it('refuses an edit whose old string is empty', () => {
+    // The harness refuses this input outright, and `indexOf("")` answers 0 --
+    // which would splice the new text in at the top of the file and call the
+    // result a net.
+    const run = [
+      call('w1', 'write', { path: 'f.ts', content: 'a\nb' }, 'Created f.ts'),
+      call('e1', 'edit', { path: 'f.ts', oldString: '', newString: 'c' }),
+    ]
+    expect(netOf(run)).toBeNull()
+  })
+})
