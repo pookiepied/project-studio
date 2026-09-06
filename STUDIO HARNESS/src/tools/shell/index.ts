@@ -327,7 +327,7 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
 
       return {
         command: value.command,
-        cwd: value.cwd as string | undefined,
+        cwd: value.cwd,
         timeoutMs,
         programs,
         interpreter,

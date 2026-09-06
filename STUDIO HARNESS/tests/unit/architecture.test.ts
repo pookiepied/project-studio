@@ -611,7 +611,7 @@ describe("modular monolith — 008.3 gate", () => {
         runtimeSource.indexOf("export class StudioRuntime"),
       );
       const publicBags = [
-        ...classBody.matchAll(/^  readonly ([a-z][A-Za-z]*):/gm),
+        ...classBody.matchAll(/^ {2}readonly ([a-z][A-Za-z]*):/gm),
       ].map((match) => match[1] as string);
 
       // Empty. All ten repositories are private; what the outside needs is

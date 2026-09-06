@@ -158,7 +158,7 @@ function executeTool(calls: string[]): ToolDefinition<Record<string, never>, str
   return defineStudioTool({
     descriptor: capability("run", ["execute"]),
     resourceKind: "command",
-    parse: () => ({}) as Record<string, never>,
+    parse: () => ({}),
     resource: () => "shell:node",
     execute: async () => {
       calls.push("run");
@@ -172,7 +172,7 @@ function hangingTool(): ToolDefinition<Record<string, never>, string> {
   return defineStudioTool({
     descriptor: capability("hang", ["read"]),
     resourceKind: "path",
-    parse: () => ({}) as Record<string, never>,
+    parse: () => ({}),
     resource: () => undefined,
     execute: () => new Promise<string>(() => undefined),
   });
@@ -622,7 +622,7 @@ describe("a tool states its own deadline", () => {
       ...readTool(calls),
       descriptor,
       deadlineMs: 600_000,
-    } as unknown as ToolDefinition<{ path: string }, string>);
+    });
 
     expect(instance.deadlineFor(descriptor)).toBe(600_000);
   });
@@ -636,7 +636,7 @@ describe("a tool states its own deadline", () => {
       ...readTool(calls),
       descriptor,
       deadlineMs: 600_000,
-    } as unknown as ToolDefinition<{ path: string }, string>);
+    });
 
     expect(instance.deadlineFor(descriptor)).toBe(5_000);
   });
@@ -739,15 +739,12 @@ describe("a tool can be taken away again", () => {
       ...readTool(calls),
       descriptor,
       deadlineMs: 600_000,
-    } as unknown as ToolDefinition<{ path: string }, string>);
+    });
 
     expect(instance.deadlineFor(descriptor)).toBe(600_000);
 
     instance.unregister(descriptor.id);
-    instance.register({ ...readTool(calls), descriptor } as unknown as ToolDefinition<
-      { path: string },
-      string
-    >);
+    instance.register({ ...readTool(calls), descriptor });
 
     expect(instance.deadlineFor(descriptor)).not.toBe(600_000);
   });

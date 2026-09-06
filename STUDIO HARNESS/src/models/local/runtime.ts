@@ -121,7 +121,7 @@ function customProviderModels(
   return config.models.map((id) => ({
     id,
     name: id,
-    api: config.api as Api,
+    api: config.api,
     provider: config.id,
     baseUrl: config.baseUrl,
     // Unknown for a user-declared endpoint. Claiming reasoning or vision here
@@ -221,7 +221,7 @@ export function createModelsCollection(options: {
     const extraModels: readonly Model<Api>[] = group.models.map((model) => ({
       id: model.id,
       name: model.name,
-      api: group.api as Api,
+      api: group.api,
       provider: group.provider,
       baseUrl: group.baseUrl,
       // The user's own word about reasoning; the levels they chose are what

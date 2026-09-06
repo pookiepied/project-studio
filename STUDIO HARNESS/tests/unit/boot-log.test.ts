@@ -9,7 +9,7 @@ describe("the boot log", () => {
     process.stderr.write = ((chunk: string | Uint8Array) => {
       written.push(String(chunk));
       return true;
-    }) as typeof process.stderr.write;
+    });
 
     try {
       bootLog("probe phase");

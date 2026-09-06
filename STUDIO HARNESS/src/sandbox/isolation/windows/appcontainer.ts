@@ -13,7 +13,6 @@ import {
   invokeLauncher,
   launcherInstalled,
   launcherPath,
-  type LauncherJoin,
 } from "./launcher.js";
 import {
   forgetProfile,
@@ -238,7 +237,7 @@ class WindowsAppContainerBackend implements IsolationBackend {
         args: request.args,
         ...(request.lineJoin === undefined || request.lineJoin === "argv"
           ? {}
-          : { join: request.lineJoin as LauncherJoin }),
+          : { join: request.lineJoin }),
         // Named holes in the wall, and only the one asked for. `internetClient`
         // is outbound internet and nothing else — measured, not read: loopback
         // and the LAN stay refused with it granted, and loopback stays refused

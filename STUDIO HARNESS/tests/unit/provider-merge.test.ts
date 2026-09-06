@@ -291,7 +291,7 @@ describe("migration 16 carries the old store forward", () => {
     legacy
       .prepare(
         `INSERT INTO custom_provider (id, name, base_url, api, models, context_window, max_tokens, created_at, updated_at)
-         VALUES ('openrouter-test', 'OpenRouter (test models)', 'https://openrouter.ai/api/v1', 'openai-completions', '[\"stealth/ox-alpha\"]', 128000, 4096, 1, 1)`,
+         VALUES ('openrouter-test', 'OpenRouter (test models)', 'https://openrouter.ai/api/v1', 'openai-completions', '["stealth/ox-alpha"]', 128000, 4096, 1, 1)`,
       )
       .run();
     for (const providerId of ["openrouter", "google", "openrouter-test"]) {

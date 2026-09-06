@@ -74,7 +74,10 @@ describe("the classifier behind the patched retry decision", () => {
 
   it("ignores messages whose stop reason is not an error", () => {
     const completed = refusedWith("429 rate limit exceeded");
-    const { errorMessage, ...finished } = { ...completed, stopReason: "stop" as const };
+    const { errorMessage: _errorMessage, ...finished } = {
+      ...completed,
+      stopReason: "stop" as const,
+    };
     expect(isRetryableAssistantError(finished)).toBe(false);
   });
 });

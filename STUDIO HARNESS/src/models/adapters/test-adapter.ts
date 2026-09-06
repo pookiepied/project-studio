@@ -255,6 +255,10 @@ async function waitForDelay(
       "abort",
       () => {
         clearTimeout(timer);
+        // An abort's reason is whatever the aborter passed, and propagating
+        // it verbatim is the point: replacing it with an Error of our own
+        // would lose the identity the caller aborted with.
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         reject(signal.reason);
       },
       { once: true },

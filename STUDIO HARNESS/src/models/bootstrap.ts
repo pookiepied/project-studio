@@ -27,6 +27,7 @@ import { readStoredConnections } from "../providers/connection-store.js";
 import { catalogBaseUrlFor } from "../providers/connection-probe.js";
 import { languageCatalogModels } from "../providers/library/language-catalog.js";
 import { ModelEdits } from "../providers/model-edits.js";
+import type { ProviderModel } from "../contracts/providers.js";
 import { readDefaultSelectionRow } from "../providers/model-catalog.js";
 import { supportedCustomApis } from "./local/apis.js";
 import { connectionCredentialKey } from "../providers/connection-credentials.js";
@@ -146,7 +147,10 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
       // A self-hosted endpoint: the runtime builds a provider for it, and its
       // declared models are exactly the hand-entered rows.
       if (!loadable.has(connection.protocol) || connection.baseUrl === undefined) continue;
-      const models = manuals.get(connection.id) ?? new Map();
+      // Typed: an untyped `new Map()` is `Map<any, any>`, and the `any`
+      // travelled out of this fallback into every field read off the models
+      // below.
+      const models = manuals.get(connection.id) ?? new Map<string, ProviderModel>();
       const contextWindow = firstNumber([...models.values()].map((m) => m.capability.contextWindow));
       const maxTokens = firstNumber([...models.values()].map((m) => m.capability.maxOutputTokens));
       custom.push({
@@ -163,7 +167,7 @@ function resolveLocalModelConfigFromSettings(database: StudioDatabase): LocalMod
 
     // A catalog-backed connection: hand-entered models the vendor's own
     // catalog does not name become extras on that vendor's runtime provider.
-    const manualModels = manuals.get(connection.id) ?? new Map();
+    const manualModels = manuals.get(connection.id) ?? new Map<string, ProviderModel>();
     const known = new Set(languageCatalogModels(connection.catalogProvider).map((m) => m.id));
     const extra = [...manualModels.values()].filter((model) => !known.has(model.modelId));
     if (extra.length === 0) continue;

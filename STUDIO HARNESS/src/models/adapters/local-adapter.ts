@@ -127,10 +127,11 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
    * second registration with the same id replaces the first.
    */
   register(): void {
-    const adapter = this;
+    // No `this` alias: these are arrow functions, so they close over the
+    // instance already, and the alias only hid that they do.
     const aliasApi: ProviderStreams = {
-      stream: (model, context, options) => adapter.#streamAlias(model, context, options),
-      streamSimple: (model, context, options) => adapter.#streamAlias(model, context, options),
+      stream: (model, context, options) => this.#streamAlias(model, context, options),
+      streamSimple: (model, context, options) => this.#streamAlias(model, context, options),
     };
     setProvider(
       createProvider({

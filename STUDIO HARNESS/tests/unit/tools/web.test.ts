@@ -134,7 +134,7 @@ describe("the web tools", () => {
           provider: "firecrawl",
           fellBackFrom: { provider: "jina", reason: "the site refused the request" },
         }),
-      } as Partial<RetrievalService>),
+      }),
     );
 
     const output = await fetchPage({ url: "https://example.com/doc" });

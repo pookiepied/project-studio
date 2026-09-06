@@ -650,7 +650,9 @@ function unknownCapability(): ModelCapability {
 }
 
 function putModel(map: ModelMap, model: ProviderModel): void {
-  const connectionModels = map.get(model.connectionId) ?? new Map();
+  // Typed: an untyped `new Map()` is `Map<any, any>`, and that `any` leaves
+  // through this function into everything the catalog hands out.
+  const connectionModels = map.get(model.connectionId) ?? new Map<string, ProviderModel>();
   connectionModels.set(model.modelId, model);
   map.set(model.connectionId, connectionModels);
 }

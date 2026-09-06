@@ -29,7 +29,11 @@ const SECRET = "sk-do-not-leak-0123456789";
 
 const servers: Server[] = [];
 const directories: string[] = [];
-const closers: (() => void)[] = [];
+// Some of these stop a supervisor, which is asynchronous. Typed as `void`
+// they were called and dropped, so a test could finish while the servers it
+// started were still shutting down - the race the supervisor's own
+// `stopAll` comment describes.
+const closers: (() => void | Promise<void>)[] = [];
 
 async function workspace(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "studio-mcp-launch-"));
@@ -159,7 +163,7 @@ function record(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
 }
 
 afterEach(async () => {
-  while (closers.length > 0) closers.pop()?.();
+  while (closers.length > 0) await closers.pop()?.();
   while (servers.length > 0) {
     const server = servers.pop();
     if (server === undefined) continue;
@@ -563,7 +567,7 @@ describe("createMcpLauncher", () => {
       // Uninstalling, editing, and switching off all mean the server — never
       // "the copy rooted in one particular folder". A sibling left running is a
       // server the user believes is gone.
-      supervisor.stop("probe");
+      await supervisor.stop("probe");
 
       expect(supervisor.statuses()).toHaveLength(0);
       expect(one.closed).toBe(true);

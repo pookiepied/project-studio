@@ -114,7 +114,10 @@ export function titleFromReply(reply: string): string | undefined {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return undefined;
   }
-  const entries = Object.entries(parsed);
+  // Typed at the source: `Object.entries` hands back `any` values, and a
+  // pair destructured from that carries the `any` no matter what the
+  // destructuring says it is.
+  const entries: [string, unknown][] = Object.entries(parsed);
   if (entries.length !== 1) return undefined;
   const field = entries[0];
   if (field === undefined) return undefined;

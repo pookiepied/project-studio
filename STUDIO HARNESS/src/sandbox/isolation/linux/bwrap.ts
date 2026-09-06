@@ -347,8 +347,11 @@ class LinuxBwrapBackend implements IsolationBackend {
     // is the machine, which is how the boundary got wider than the Windows one.
     // With it, the parent is a namespace that reaches the internet and not the
     // user's own machine.
+    // The head is named rather than indexed back out: it is the executable,
+    // this function put it there, and a `[0]!` says none of that.
+    const executable = bwrapPath();
     const contained = [
-      bwrapPath(),
+      executable,
       ...bwrapArgs({
         cwd: request.cwd,
         executable: request.executable,
@@ -363,12 +366,16 @@ class LinuxBwrapBackend implements IsolationBackend {
     if (!request.network) {
       // An empty namespace is already the strictest answer available, so the
       // network-off path never depends on `pasta` being installed.
-      return { executable: contained[0]!, args: contained.slice(1) };
+      return { executable, args: contained.slice(1) };
     }
 
     const stack = this.#networkPath();
-    const wrapped = withNarrowedNetwork(stack, SHELL_PATH, contained);
-    return { executable: wrapped[0]!, args: wrapped.slice(1) };
+    const [wrappedExecutable, ...wrappedArgs] = withNarrowedNetwork(
+      stack,
+      SHELL_PATH,
+      contained,
+    );
+    return { executable: wrappedExecutable, args: wrappedArgs };
   }
 
   /**

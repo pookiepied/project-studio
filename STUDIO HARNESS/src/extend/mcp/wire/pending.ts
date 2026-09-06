@@ -81,6 +81,9 @@ export class PendingRequests {
     // immediately need to be removed — reject right away and keep the map
     // empty, which is the invariant every terminal path must preserve.
     if (options.signal?.aborted) {
+      // The abort's own reason, propagated verbatim; `cancelled()` covers
+      // an abort that carried none.
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
       return Promise.reject(options.signal.reason ?? cancelled());
     }
 

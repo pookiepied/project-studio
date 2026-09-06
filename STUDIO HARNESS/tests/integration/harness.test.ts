@@ -927,8 +927,14 @@ describe.sequential("Flue harness vertical slice", () => {
       expect(retries.map((chunk) => chunk.attempt)).toEqual([1, 2]);
       expect(retries.map((chunk) => chunk.maxRetries)).toEqual([3, 8]);
       // Each signal carries the sentence of the failure that earned it.
-      expect(String(retries[0]?.error ?? "")).toContain("503");
-      expect(String(retries[1]?.error ?? "")).toContain("429");
+      // Read as a string only when it is one: `String()` on an object would
+      // have compared "[object Object]" and reported a mismatch as a missing
+      // status code.
+      const reasons = retries.map((chunk) =>
+        typeof chunk.error === "string" ? chunk.error : "",
+      );
+      expect(reasons[0]).toContain("503");
+      expect(reasons[1]).toContain("429");
     },
     30_000,
   );

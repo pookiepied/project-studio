@@ -30,10 +30,18 @@ function optionalString(value: unknown, field: string): string | undefined {
 
 function stringList(value: unknown, field: string): readonly string[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+  if (!Array.isArray(value)) {
     throw new ExtendError("internal", { message: `${field} must be a list of text.` });
   }
-  return value;
+  // Filtered rather than asserted: the refusal below fires on exactly the
+  // same input the `some` check used to refuse, and what is returned is
+  // provably a list of strings rather than an `any[]` that was checked once.
+  const entries: unknown[] = value;
+  const strings = entries.filter((entry): entry is string => typeof entry === "string");
+  if (strings.length !== entries.length) {
+    throw new ExtendError("internal", { message: `${field} must be a list of text.` });
+  }
+  return strings;
 }
 
 function stringMap(value: unknown, field: string): Readonly<Record<string, string>> {

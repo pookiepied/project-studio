@@ -103,7 +103,7 @@ export function createMcpReconciler(options: McpReconcilerOptions): KindReconcil
         let connection: McpConnection;
         try {
           connection = await supervisor.ensure(record);
-        } catch (error) {
+        } catch (_error) {
           // Deliberately swallowed. The supervisor holds the reason, the last
           // thing the server said, and the retry; raising here would replace a
           // recoverable failure with a pass that stopped half way. Saying it

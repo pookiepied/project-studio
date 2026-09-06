@@ -96,7 +96,10 @@ async function readToolEntries(
       });
     }
 
-    entries.push(...result["tools"]);
+    // `Array.isArray` narrows an unknown to `any[]`; naming it keeps the
+    // server's answer unknown until something checks it.
+    const tools: unknown[] = result["tools"];
+    entries.push(...tools);
     const nextCursor = result["nextCursor"];
     if (nextCursor === undefined || nextCursor === null) return entries;
     if (typeof nextCursor !== "string" || nextCursor === cursor) {
@@ -138,7 +141,10 @@ function normalizeCallResult(value: unknown): McpCallResult {
     };
   }
 
-  const content = [...value["content"]];
+  // Named before it is spread: `Array.isArray` narrowed this to `any[]`,
+  // and spreading it would carry that into the new array.
+  const answered: unknown[] = value["content"];
+  const content: unknown[] = [...answered];
   const structuredContent = value["structuredContent"];
   const hasText = content.some(
     (part) => isRecord(part) && part["type"] === "text" && typeof part["text"] === "string",
@@ -280,8 +286,12 @@ export class McpCapabilityCatalog {
       try {
         await this.refresh(record, connection);
       } catch (error) {
+        // The reason travels with the sentence. It was dropped here, so a
+        // server that had started failing said only that it was still using
+        // the old definitions, and never why.
+        const reason = error instanceof Error ? error.message : String(error);
         this.#diagnostic(
-          `${record.title} could not refresh its tool list; keeping the last known definitions.`,
+          `${record.title} could not refresh its tool list, so the last known definitions stand: ${reason}`,
           record.id,
         );
       }

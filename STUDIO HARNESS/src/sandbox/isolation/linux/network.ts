@@ -168,7 +168,10 @@ export function withNarrowedNetwork(
   pastaPath: string,
   shellPath: string,
   command: readonly string[],
-): readonly string[] {
+  // A non-empty tuple, because the caller's first job is to split the head
+  // off as the executable: saying so here is what lets it do that without an
+  // assertion about a value this function always supplies.
+): readonly [string, ...string[]] {
   return [pastaPath, ...PASTA_ARGUMENTS, "--", shellPath, "-c", NETWORK_SETUP, "sh", ...command];
 }
 

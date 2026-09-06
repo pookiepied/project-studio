@@ -71,7 +71,7 @@ export function createWebSearchTool(
 
       return {
         query: value.query.trim(),
-        limit: (value.limit as number | undefined) ?? DEFAULT_LIMIT,
+        limit: (value.limit) ?? DEFAULT_LIMIT,
       };
     },
 

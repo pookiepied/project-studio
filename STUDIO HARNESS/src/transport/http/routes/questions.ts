@@ -24,7 +24,7 @@ export function createQuestionRoutes(broker: QuestionBroker): Hono<AdmissionEnv>
 
   routes.post("/pending/:id", async (context) => {
     try {
-      const value = await context.req.json();
+      const value: unknown = await context.req.json();
       const accepted = broker.answer(
         context.req.param("id"),
         reply(value),
@@ -46,8 +46,12 @@ export function createQuestionRoutes(broker: QuestionBroker): Hono<AdmissionEnv>
 
   routes.post("/stop", async (context) => {
     try {
-      const value = await context.req.json();
-      const conversationId = value["conversationId"];
+      const value: unknown = await context.req.json();
+      // Guarded rather than indexed. The body reached here as `any` and was
+      // indexed straight away, so a posted string or null answered with
+      // whatever TypeError the index threw, caught below and reported as a
+      // bare 400. The check the file already owns says what was wrong.
+      const conversationId = isRecord(value) ? value["conversationId"] : undefined;
       if (typeof conversationId !== "string" || conversationId.trim() === "") {
         throw new ExtendError("internal", {
           message: "A stop names the conversation whose questions end.",

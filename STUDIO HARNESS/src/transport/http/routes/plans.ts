@@ -30,7 +30,7 @@ export function createPlanRoutes(store: PlanItemStore): Hono<AdmissionEnv> {
   // full vocabulary stays the model's.
   routes.post("/:conversationId/items/:itemId", async (context) => {
     try {
-      const value = await context.req.json();
+      const value: unknown = await context.req.json();
       const status = personStatus(value);
       const changed = store.update(
         context.req.param("conversationId"),

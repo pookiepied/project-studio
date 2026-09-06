@@ -91,8 +91,11 @@ beforeEach(() => {
   reconcile = createMcpReconciler({ registry, supervisor });
 });
 
-afterEach(() => {
-  supervisor.stopAll();
+afterEach(async () => {
+  // Awaited before the database closes: `stopAll` is asynchronous, and a
+  // server still shutting down while its database goes away is the failure
+  // the supervisor made this awaitable for.
+  await supervisor.stopAll();
   db.close();
 });
 

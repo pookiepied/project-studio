@@ -174,7 +174,7 @@ describe("Pi credential bridge", () => {
     const { store } = bridge();
     await store.modify("openai", async () => ({ type: "api_key", key: "0" }));
 
-    let observed: string[] = [];
+    const observed: string[] = [];
     const bump = () =>
       store.modify("openai", async (current) => {
         const value = Number((current as { key?: string }).key ?? "0");

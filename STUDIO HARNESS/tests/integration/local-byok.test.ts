@@ -251,7 +251,7 @@ describe("local BYOK source", () => {
     const reasoning: LocalRuntime = {
       models: runtime.models,
       target: () => target,
-      listModels: runtime.listModels,
+      listModels: runtime.listModels.bind(runtime),
     };
     const reasoningAdapter = new LocalModelProviderAdapter({
       config: buildAdapter().config,
@@ -315,7 +315,7 @@ describe("local BYOK source", () => {
     const reasoning: LocalRuntime = {
       models: runtime.models,
       target: () => target,
-      listModels: runtime.listModels,
+      listModels: runtime.listModels.bind(runtime),
     };
     const reasoningAdapter = new LocalModelProviderAdapter({
       config: buildAdapter().config,
@@ -348,7 +348,7 @@ describe("local BYOK source", () => {
     const reasoning: LocalRuntime = {
       models: runtime.models,
       target: () => target,
-      listModels: runtime.listModels,
+      listModels: runtime.listModels.bind(runtime),
     };
     const reasoningAdapter = new LocalModelProviderAdapter({
       config: buildAdapter().config,

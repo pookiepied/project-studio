@@ -129,7 +129,11 @@ describe("the scope store", () => {
     // end of containment however it was written.
     const scopes = new SandboxScopeStore(db);
     const guarded =
-      process.platform === "win32" ? (process.env.SystemRoot ?? "C:\Windows") : "/etc";
+      // The backslash is escaped. Written singly it was not an escape at all
+      // and the fallback read as `C:Windows`, which is not a system directory
+      // -- so on a machine with no SystemRoot this asserted the opposite of
+      // what it says.
+      process.platform === "win32" ? (process.env.SystemRoot ?? "C:\\Windows") : "/etc";
     for (const source of ["preset", "question"] as const) {
       expect(() =>
         scopes.grant({ projectId: "prj_a", path: guarded, mode: "read", source }),

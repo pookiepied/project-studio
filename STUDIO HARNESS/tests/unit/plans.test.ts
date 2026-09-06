@@ -34,7 +34,7 @@ import { Hono } from "hono";
 const CONVERSATION = "cnv_plan";
 
 let db: StudioDatabase;
-let workspaces: string[] = [];
+const workspaces: string[] = [];
 
 function open(): StudioDatabase {
   return openDatabase({ path: ":memory:" });

@@ -206,7 +206,7 @@ function editDistanceWithin(a: string, b: string, limit: number): number | undef
     previous = current;
   }
   const distance = previous[b.length];
-  return (distance as number) <= limit ? (distance as number) : undefined;
+  return (distance as number) <= limit ? (distance) : undefined;
 }
 
 const stem = (name: string): string => name.replace(/\.[^.]+$/, "");

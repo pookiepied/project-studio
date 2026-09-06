@@ -141,7 +141,7 @@ export function createGlobTool(): ToolDefinition<GlobInput, string> {
 
       return {
         pattern: value.pattern,
-        path: value.path as string | undefined,
+        path: value.path,
         limit: (value.limit as number | undefined) ?? DEFAULT_LIMIT,
         offset: (value.offset as number | undefined) ?? 0,
         includeIgnored: value.includeIgnored === true,

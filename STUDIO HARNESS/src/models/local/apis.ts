@@ -17,17 +17,17 @@ import type { ProviderStreams } from "@earendil-works/pi-ai";
  */
 export const API_LOADERS: Record<string, () => Promise<ProviderStreams>> = {
   "openai-completions": () =>
-    import("@earendil-works/pi-ai/api/openai-completions") as Promise<ProviderStreams>,
+    import("@earendil-works/pi-ai/api/openai-completions"),
   "openai-responses": () =>
-    import("@earendil-works/pi-ai/api/openai-responses") as Promise<ProviderStreams>,
+    import("@earendil-works/pi-ai/api/openai-responses"),
   "anthropic-messages": () =>
-    import("@earendil-works/pi-ai/api/anthropic-messages") as Promise<ProviderStreams>,
+    import("@earendil-works/pi-ai/api/anthropic-messages"),
   "google-generative-ai": () =>
-    import("@earendil-works/pi-ai/api/google-generative-ai") as Promise<ProviderStreams>,
+    import("@earendil-works/pi-ai/api/google-generative-ai"),
   "mistral-conversations": () =>
-    import("@earendil-works/pi-ai/api/mistral-conversations") as Promise<ProviderStreams>,
+    import("@earendil-works/pi-ai/api/mistral-conversations"),
   "azure-openai-responses": () =>
-    import("@earendil-works/pi-ai/api/azure-openai-responses") as Promise<ProviderStreams>,
+    import("@earendil-works/pi-ai/api/azure-openai-responses"),
 };
 
 export const DEFAULT_CUSTOM_API = "openai-completions";

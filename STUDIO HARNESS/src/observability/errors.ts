@@ -137,5 +137,10 @@ export function safeSerializeValue(value: unknown, depth = 0): unknown {
     return result;
   }
 
+  // The last resort of a function whose contract is to never throw. What
+  // reaches here is a symbol, a function, or an object with no useful
+  // stringification, and "[object Object]" is a truthful answer for the
+  // third: this is a diagnostic serializer, not a formatter.
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   return String(value);
 }

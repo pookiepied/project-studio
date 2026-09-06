@@ -237,7 +237,10 @@ export class ShadowRepository {
       let existing: string | undefined;
       try {
         existing = readFileSync(excludePath, "utf8");
-      } catch {}
+      } catch {
+        // No exclude file yet, which is the ordinary case for a fresh shadow
+        // repository: `existing` stays undefined and the floor is written.
+      }
       if (existing !== EXCLUDE_FLOOR) {
         writeFileSync(excludePath, EXCLUDE_FLOOR, "utf8");
       }

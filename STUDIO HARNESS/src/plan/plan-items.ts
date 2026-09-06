@@ -122,7 +122,11 @@ export class PlanItemStore {
   update(
     conversationId: string,
     itemId: string,
-    status: PlanStatus,
+    // `string`, not `PlanStatus`: the guard below is the whole point of this
+    // parameter, and it can only be reached by a value that has not been
+    // checked yet. Declaring the narrow type made the check dead code as far
+    // as the compiler was concerned while a test proved it still fires.
+    status: string,
     writer: PlanWriter,
   ): boolean {
     if (!isStatus(status)) {

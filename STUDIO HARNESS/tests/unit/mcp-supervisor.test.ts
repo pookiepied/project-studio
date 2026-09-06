@@ -370,7 +370,7 @@ describe("supervising MCP servers", () => {
       const supervisor = scriptedSupervisor({ launch: async () => channel });
 
       const connection = await supervisor.ensure(RECORD);
-      supervisor.stop("blender");
+      await supervisor.stop("blender");
 
       expect(connection.closed).toBe(true);
       expect(channel.closed).toBe(true);
@@ -392,7 +392,7 @@ describe("supervising MCP servers", () => {
       expect(supervisor.status("blender")?.state).toBe("given-up");
       expect(supervisor.status("blender")?.attempts).toBe(1);
 
-      supervisor.stop("blender");
+      await supervisor.stop("blender");
       const connection = await supervisor.ensure(RECORD);
 
       expect(connection.closed).toBe(false);
@@ -410,7 +410,7 @@ describe("supervising MCP servers", () => {
       });
 
       await expect(supervisor.ensure(RECORD)).rejects.toThrow();
-      supervisor.stop("blender");
+      await supervisor.stop("blender");
       await settle();
 
       expect(launches).toBe(1);
@@ -432,7 +432,7 @@ describe("supervising MCP servers", () => {
 
       const starting = supervisor.ensure(RECORD);
       await settle(1);
-      supervisor.stop("blender");
+      await supervisor.stop("blender");
       release?.();
 
       await expect(starting).rejects.toThrow(/switched off while it was starting/);
@@ -454,7 +454,7 @@ describe("supervising MCP servers", () => {
       await supervisor.ensure({ ...RECORD, id: "other", title: "Other" });
       expect(supervisor.statuses()).toHaveLength(2);
 
-      supervisor.stopAll();
+      await supervisor.stopAll();
 
       expect(channels.every((channel) => channel.closed)).toBe(true);
       expect(supervisor.statuses()).toEqual([]);

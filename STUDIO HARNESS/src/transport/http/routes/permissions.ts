@@ -52,7 +52,7 @@ export function createApprovalRoutes(
   );
   routes.post("/pending/:id", async (context) => {
     try {
-      const value = await context.req.json();
+      const value: unknown = await context.req.json();
       const accepted = broker.answer(
         context.req.param("id"),
         answer(value),

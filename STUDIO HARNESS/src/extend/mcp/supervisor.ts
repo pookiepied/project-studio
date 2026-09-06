@@ -240,9 +240,13 @@ export class McpSupervisor {
    * Safe from every state, including part-way through starting.
    */
   stop(id: string): Promise<void> {
-    const exits: (Promise<void> | undefined)[] = [];
+    const exits: Promise<void>[] = [];
     for (const entry of [...this.#entries.values()]) {
-      if (entry.record.id === id) exits.push(this.#stopEntry(entry));
+      // `#stopEntry` answers undefined for an entry with nothing left to
+      // wait on. Dropping those here keeps the aggregate below a list of
+      // promises rather than a list that mostly is.
+      const exit = entry.record.id === id ? this.#stopEntry(entry) : undefined;
+      if (exit !== undefined) exits.push(exit);
     }
     // Awaitable for the same reason `stopAll` is: a stdio server runs in the
     // project directory, and a caller that disables one and then removes that
@@ -295,7 +299,11 @@ export class McpSupervisor {
    * orphan nobody noticed.
    */
   async stopAll(): Promise<void> {
-    const exits = [...this.#entries.values()].map((entry) => this.#stopEntry(entry));
+    const exits = [...this.#entries.values()]
+      .map((entry) => this.#stopEntry(entry))
+      // Same as `stop`: an entry with nothing left to wait on answers
+      // undefined, and it does not belong in the aggregate.
+      .filter((exit): exit is Promise<void> => exit !== undefined);
     await Promise.all(exits);
   }
 

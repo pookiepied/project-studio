@@ -77,7 +77,10 @@ for (const [signal, exitCode] of [
  */
 const server = serve(
   {
-    fetch: application.fetch,
+    // Bound: the value is handed to another module to call later, and
+    // whether the application's `fetch` needs its receiver is the
+    // application's business, not ours to assume.
+    fetch: application.fetch.bind(application),
     // 0 lets the OS assign; the readiness frame reports what was bound. The
     // Host sets PORT deliberately, after clearing the environment.
     port: Number.parseInt(process.env.PORT || "3000", 10),
