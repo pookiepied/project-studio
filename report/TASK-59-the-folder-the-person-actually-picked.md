@@ -687,15 +687,32 @@ on top of the existing run rules, all still green. Negative controls,
 each watched failing by name and restored: the thinking break removed,
 the search break removed, the open-run merge removed.
 
-Diagnosed this session, fixes queued next (named so they are not lost):
-the sidebar toggle's midway lag - the panel springs its WIDTH, so the
-whole page subtree re-lays-out per frame and the spring's peak velocity is
-peak reflow cost; the plan is transition-scoped `content-visibility` on
-message rows for the length of the spring. And the thinking timer's
-stall-then-jump - the clock is honest (`Date.now()` at render) but the
-display can only change on a paint, and un-memoized message rows let every
-streaming delta re-render the whole window, starving the one-second tick;
-the plan is `React.memo` on the message rows with stable callbacks.
+Diagnosed this session, then fixed:
+
+- **The thinking timer's stall-then-jump.** The clock was always honest --
+  `Date.now()` read at render -- but a number can only change on a paint,
+  and every streamed delta re-rendered every row in the window, starving
+  the one-second tick among them: 1, 2, 3, 4, silence, 7. Every transcript
+  row is `React.memo`'d now (both live paths and the gallery's), and the
+  two row callbacks hold identity stable -- the branch through a
+  latest-ref, the fork through `useCallback` -- so a delta re-renders only
+  the row it landed on. Pinned by a boundary test: a sibling's item
+  changing commits nothing on an unchanged row (watched by a memoized
+  counter with stable marks; the negative control removes the memo chain
+  and watches the neighbour commit).
+- **The sidebar toggle's midway lag.** The panel springs its WIDTH, so the
+  page re-lays-out every frame of the move, and the transcript is the
+  heaviest thing in it -- peak spring velocity is peak reflow cost, which
+  is why it went smooth, laggy, smooth. For the length of the spring only
+  (AppShell holds a class fed by the sidebar's own animation callbacks),
+  every message row steps out of layout with `content-visibility: auto`
+  and a remembered intrinsic size; when the spring lands the class leaves
+  and everything lays out for real. Scoped to the move deliberately: an
+  always-on rule would hand the paging window estimated heights for rows
+  nobody has rendered, and the hold-still correction there measures real
+  heights. This one is CSS on a moving page -- jsdom cannot measure
+  layout, so it is untested by unit and verified by the reader's eye.
 
 - 761 -> 766 passing across 73 files; `tsc -b` clean; production build
-  clean.
+  clean. (767 after the memo boundary test landed with the work above;
+  final gate for this section: 767 / 73, `tsc -b` clean, build clean.)
