@@ -221,7 +221,7 @@ export function AddModelDialog({
                     className={`rounded-full border px-2.5 py-0.5 text-caption transition-colors duration-fast ${
                       selected
                         ? 'border-foreground/40 bg-selected text-foreground'
-                        : 'border-line text-muted-foreground hover:bg-tint'
+                        : 'text-muted-foreground hover:bg-tint'
                     }`}
                   >
                     {level}

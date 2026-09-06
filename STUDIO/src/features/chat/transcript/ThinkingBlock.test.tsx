@@ -181,7 +181,10 @@ describe('a run that has opened but delivered nothing', () => {
     expect(row.hasAttribute('disabled')).toBe(true)
 
     fireEvent.click(row)
-    expect(row.getAttribute('aria-expanded')).toBe('false')
+    // And it claims no region at all, rather than announcing a collapsed one
+    // that no keystroke can open. This asserted `'false'` while the row was
+    // still advertising itself as a closed disclosure.
+    expect(row.getAttribute('aria-expanded')).toBeNull()
   })
 
   it('says only that the model is thinking when there is no start to count from', () => {

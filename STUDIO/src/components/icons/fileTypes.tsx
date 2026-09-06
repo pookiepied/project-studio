@@ -196,9 +196,23 @@ export function fileTypeOf(path: string): MarkName | null {
   const name = splitFilePath(path).name
   const byBasename = BY_BASENAME[name.toLowerCase()]
   if (byBasename !== undefined) return byBasename
+  const extension = extensionOf(name)
+  return extension === null ? null : (BY_EXTENSION[extension] ?? null)
+}
+
+/**
+ * A file name's extension, lowercased, or null when it has none.
+ *
+ * The leading dot of a dotfile is not an extension separator: `.gitignore` is
+ * a whole name, and reading `gitignore` off it as though it were a suffix is
+ * how a dotfile ends up wearing another language's glyph. Named once because
+ * the mark lookup and the format fallback both need it and had drifted into
+ * two different answers -- one testing `dot <= 0`, the other `dot > -1`.
+ */
+function extensionOf(name: string): string | null {
   const dot = name.lastIndexOf('.')
-  if (dot <= 0) return null
-  return BY_EXTENSION[name.slice(dot + 1).toLowerCase()] ?? null
+  if (dot <= 0 || dot === name.length - 1) return null
+  return name.slice(dot + 1).toLowerCase()
 }
 
 /**
@@ -267,9 +281,8 @@ export function FileTypeMark({
 }) {
   const mark = fileTypeOf(path)
   if (mark !== null) return <Mark mark={mark} size={size} className={className} />
-  const extensionDot = splitFilePath(path).name.lastIndexOf('.')
-  const format =
-    extensionDot > -1 ? formatOfExtension(splitFilePath(path).name.slice(extensionDot + 1)) : null
+  const extension = extensionOf(splitFilePath(path).name)
+  const format = extension === null ? null : formatOfExtension(extension)
   if (format !== null) return <FormatGlyph format={format} size={size} className={className} />
   return <Icons.file size={size} className={className} />
 }

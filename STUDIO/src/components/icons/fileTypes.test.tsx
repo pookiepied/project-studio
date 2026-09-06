@@ -144,3 +144,46 @@ describe('FileTypeMark', () => {
     expect(container.querySelector('svg.lucide-file-text')).not.toBeNull()
   })
 })
+
+/**
+ * A dotfile is a whole name, not a suffix. Both the mark lookup and the
+ * format fallback read the extension, and they disagreed about where one
+ * begins -- so `.gitignore` could reach the fallback as though `gitignore`
+ * were its extension.
+ */
+describe('what counts as an extension', () => {
+  it('reads no extension off a dotfile', () => {
+    expect(fileTypeOf('.gitignore')).toBeNull()
+    expect(fileTypeOf('src/.npmrc')).toBeNull()
+  })
+
+  it('reads a dotfile as a whole name even when its tail is a known extension', () => {
+    // The discriminating case: `.ts` is a dotfile called ts, not a
+    // TypeScript file with an empty name. A rule that only checks for the
+    // presence of a dot cannot tell the two apart, and every name here that
+    // is not this one passes under either rule.
+    expect(fileTypeOf('.ts')).toBeNull()
+    expect(fileTypeOf('src/.json')).toBeNull()
+  })
+
+  it('reads no extension off a name that only ends in a dot', () => {
+    expect(fileTypeOf('archive.')).toBeNull()
+  })
+
+  it('still reads a real extension under a dotted directory', () => {
+    expect(fileTypeOf('.config/app.ts')).toBe('typescript')
+  })
+
+  it('draws the generic file for a dotfile rather than a guessed glyph', () => {
+    const { container } = render(<FileTypeMark path=".gitignore" />)
+    expect(container.querySelector('svg.lucide-file-text')).not.toBeNull()
+  })
+
+  it('does not let the format fallback read a dotfile as an extension either', () => {
+    // The mark lookup and this fallback disagreed about where an extension
+    // begins, so a dotfile could miss the first and still be glyphed by the
+    // second. `.md` is the shape that separates the two rules.
+    const { container } = render(<FileTypeMark path=".md" />)
+    expect(container.querySelector('svg.lucide-file-text')).not.toBeNull()
+  })
+})

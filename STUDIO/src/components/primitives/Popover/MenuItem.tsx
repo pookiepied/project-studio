@@ -48,7 +48,7 @@ export function MenuItem({
         // like every other row until you have finished reading it. This is the
         // one place a glyph carries meaning by colour, so it opts out of the
         // muted default rather than the rule being softened for everyone.
-        destructive && '[&_.studio-icon]:text-red-500/80 hover:[&_.studio-icon]:text-red-500',
+        destructive && '[&_.studio-icon]:text-danger/80 hover:[&_.studio-icon]:text-danger',
       )}
     >
       {/* The icon column is exactly one line tall, and the mark is centred in

@@ -157,7 +157,11 @@ describe('a row that is a statement, not a control', () => {
 
     fireEvent.click(button)
 
-    expect(button.getAttribute('aria-expanded')).toBe('false')
+    // No `aria-expanded` at all, which is this row's own rule stated in the
+    // one place a screen reader reads: a statement "carries no promise of an
+    // opening". It used to assert `'false'` here, which promised a collapsed
+    // region that no keystroke could ever open.
+    expect(button.getAttribute('aria-expanded')).toBeNull()
     expect(screen.queryByText('the working-out')).toBeNull()
   })
 
@@ -184,5 +188,33 @@ describe('the entrance', () => {
     const { container } = render(<Controlled />)
     const root = container.firstElementChild as HTMLElement
     expect(root.style.opacity).not.toBe('0')
+  })
+})
+
+/**
+ * The disclosure pattern's own wiring. A control that expands a region says
+ * so and names it, or a screen reader is told a button was pressed and
+ * nothing else.
+ */
+describe('the control and the region it opens', () => {
+  it('names the region it expands, and the region carries that name', () => {
+    render(<Controlled>the body</Controlled>)
+    const button = screen.getByRole('button')
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(button)
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    const controls = button.getAttribute('aria-controls')
+    expect(controls).toBeTruthy()
+    expect(document.getElementById(controls ?? '')?.textContent).toBe('the body')
+  })
+
+  it('claims neither when the row expands nothing', () => {
+    // A disabled row has no body and no chevron. Announcing a collapsed
+    // region that cannot be opened invites a keystroke that does nothing.
+    render(<Controlled disabled>the body</Controlled>)
+    const button = screen.getByRole('button')
+    expect(button.getAttribute('aria-expanded')).toBeNull()
+    expect(button.getAttribute('aria-controls')).toBeNull()
   })
 })

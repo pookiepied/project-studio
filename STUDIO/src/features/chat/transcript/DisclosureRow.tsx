@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COLLAPSE, ENTER } from '@/design/tokens'
 import { Icons } from '@/components/icons'
@@ -82,6 +82,13 @@ export function DisclosureRow({
   /** What opens beneath the row, drawn behind the rule. */
   children?: ReactNode
 }) {
+  // The disclosure pattern's own wiring: the control says what it expands and
+  // names the region it expands, so a screen reader announces the state and
+  // can move to the body. A disabled row expands nothing and claims neither -
+  // advertising a collapsed region that cannot be opened is worse than saying
+  // nothing, because it invites a keystroke that does not work.
+  const bodyId = useId()
+
   return (
     <motion.div
       className={className}
@@ -92,7 +99,7 @@ export function DisclosureRow({
       <button
         type="button"
         onClick={onToggle}
-        aria-expanded={open}
+        {...(disabled ? {} : { 'aria-expanded': open, 'aria-controls': bodyId })}
         disabled={disabled}
         className={cn(
           'group/disclosure inline-flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-left',
@@ -121,7 +128,7 @@ export function DisclosureRow({
 
       <AnimatePresence initial={false}>
         {open ? (
-          <motion.div {...COLLAPSE} className="overflow-hidden">
+          <motion.div {...COLLAPSE} id={bodyId} className="overflow-hidden">
             {/* Indented behind a rule rather than boxed: a bordered card would
                 give the working-out the same visual weight as the answer it
                 sits under. One step of air between the row and the rule, the

@@ -331,7 +331,7 @@ function Body({
             {grantEverywhere ? 'Grant everywhere' : 'Grant for this project'}
           </Button>
         </div>
-        {customError ? <p className="mt-1 text-caption text-red-500">{customError}</p> : null}
+        {customError ? <p className="mt-1 text-caption text-danger">{customError}</p> : null}
       </div>
     </div>
   )

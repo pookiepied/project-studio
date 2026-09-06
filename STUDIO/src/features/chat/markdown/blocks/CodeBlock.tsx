@@ -31,6 +31,18 @@ function Glyph({ fence }: { fence: string }) {
 }
 
 /**
+ * Lines of text in a block, with a closing newline read as a terminator
+ * rather than as an empty last line -- the same rule the diff builder's own
+ * splitter follows, and the reason a four-line fence no longer says five.
+ */
+function countLines(code: string): number {
+  if (code === '') return 0
+  const parts = code.split('\n')
+  if (parts[parts.length - 1] === '') parts.pop()
+  return parts.length
+}
+
+/**
  * Fenced code, in the artifact container, shown in full.
  *
  * ---- The containment problem ---------------------------------------------
@@ -57,7 +69,10 @@ export function CodeBlock({ code, fence }: { code: string; fence: string }) {
   const [language, ...rest] = fence.split(':')
   const path = rest.join(':') || undefined
 
-  const lines = code.split('\n').length
+  // A trailing newline closes the last line; it does not open an empty one.
+  // Counting the split's parts called a four-line block five lines whenever
+  // the fence's content ended in a break, which is most of the time.
+  const lines = countLines(code)
 
   const copy = async () => {
     if (!(await copyText(code))) return

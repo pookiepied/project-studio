@@ -18,7 +18,10 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      include: ['src/**/*.test.{ts,tsx}'],
+      // `tests/` holds the checks that read the tree from outside it -- a
+      // source scan cannot import what it is scanning through the plugins
+      // that transform it.
+      include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
       restoreMocks: true,
     },
     resolve: {

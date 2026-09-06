@@ -23,6 +23,18 @@ afterEach(() => {
  * scroller instead of a fade, the language's own mark, the count, the copy.
  */
 describe('CodeBlock', () => {
+  it('counts a closing newline as a terminator, not a fourth line', () => {
+    // A fence's content usually ends in a break. Counting the split's parts
+    // called every such block one line longer than it is.
+    render(<CodeBlock code={['a', 'b', 'c', ''].join('\n')} fence="ts" />)
+    expect(screen.getByText('3 lines')).toBeTruthy()
+  })
+
+  it('says one line for a single line with no break at all', () => {
+    render(<CodeBlock code={'only'} fence="ts" />)
+    expect(screen.getByText('1 line')).toBeTruthy()
+  })
+
   it('names the file, counts the lines, and carries the language mark', () => {
     const { container } = render(<CodeBlock code={'const a = 1\nconst b = 2\nconst c = 3'} fence="ts:src/x.ts" />)
     expect(screen.getByText('src/x.ts')).toBeTruthy()

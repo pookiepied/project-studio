@@ -417,14 +417,25 @@ function emptyAssistant(message: ConversationMessageFacts): Extract<
   }
 }
 
-function assistantAt(draft: Draft, messageId: string): Extract<
-  TranscriptItem,
-  { kind: 'assistant' }
-> | null {
+/**
+ * The assistant item a message id names, with the index it sits at.
+ *
+ * The index comes back beside the item because every caller writes the item
+ * back afterwards and needs the place to put it. It used to be looked up a
+ * second time at each write, under `?? -1` -- a fallback that could never be
+ * reached, since the item had already been found through the same map, but
+ * one that would have written a property named `-1` onto the array rather
+ * than failing if it ever were. Resolved once, there is nothing left to
+ * default.
+ */
+function assistantAt(
+  draft: Draft,
+  messageId: string,
+): { readonly index: number; readonly item: Extract<TranscriptItem, { kind: 'assistant' }> } | null {
   const index = draft.assistants.get(messageId)
   if (index === undefined) return null
   const item = draft.items[index]
-  return item !== undefined && item.kind === 'assistant' ? item : null
+  return item !== undefined && item.kind === 'assistant' ? { index, item } : null
 }
 
 /**
@@ -444,8 +455,9 @@ function appendDelta(
   text: string,
   arrivedAt: number | null,
 ): void {
-  const item = assistantAt(draft, messageId)
-  if (item === null) return
+  const found = assistantAt(draft, messageId)
+  if (found === null) return
+  const { index: itemIndex, item } = found
 
   // Written narration keeps a file run open -- the words describe the events
   // around them, and "Edit 2 of 4" must not orphan "Edit 1 of 4". Thinking is
@@ -468,7 +480,7 @@ function appendDelta(
               updatedAt: arrivedAt ?? segment.updatedAt,
             }
           : { ...segment, text: segment.text + text }
-      draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
+      draft.items[itemIndex] = { ...item, segments }
       return
     }
   }
@@ -488,7 +500,7 @@ function appendDelta(
         },
   )
   draft.openRuns.set(messageId, { kind, index: segments.length - 1 })
-  draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
+  draft.items[itemIndex] = { ...item, segments }
 }
 
 /**
@@ -510,8 +522,9 @@ function appendToolCall(
   toolName: string,
   input: Present<unknown> | null,
 ): void {
-  const item = assistantAt(draft, messageId)
-  if (item === null) return
+  const found = assistantAt(draft, messageId)
+  if (found === null) return
+  const { index: itemIndex, item } = found
 
   draft.openRuns.delete(messageId)
 
@@ -532,9 +545,9 @@ function appendToolCall(
         groups[open.groupIndex] = merged
         const segments = [...item.segments]
         segments[open.segmentIndex] = { ...home, groups }
-        draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
+        draft.items[itemIndex] = { ...item, segments }
         draft.callSites.set(toolCallId, {
-          itemIndex: draft.assistants.get(messageId) ?? -1,
+          itemIndex,
           segmentIndex: open.segmentIndex,
           groupIndex: open.groupIndex,
           callIndex: merged.calls.length - 1,
@@ -571,9 +584,9 @@ function appendToolCall(
     errorText: null,
   })
   segments[segmentIndex] = { ...segment, groups: pushed.rows }
-  draft.items[draft.assistants.get(messageId) ?? -1] = { ...item, segments }
+  draft.items[itemIndex] = { ...item, segments }
   draft.callSites.set(toolCallId, {
-    itemIndex: draft.assistants.get(messageId) ?? -1,
+    itemIndex,
     segmentIndex,
     groupIndex: pushed.row,
     callIndex: pushed.call,
