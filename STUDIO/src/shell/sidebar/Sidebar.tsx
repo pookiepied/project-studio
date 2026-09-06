@@ -60,7 +60,17 @@ import { cn } from '@/lib/cn'
  * expensive kind of layout work. Fixed inside a clipping parent means the
  * column is simply revealed, and nothing inside it is asked to re-measure.
  */
-export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
+export function Sidebar({
+  onNewProject,
+  onReflow,
+}: {
+  onNewProject: () => void
+  /**
+   * Called as the width spring starts and ends, so the page can spend the
+   * move in cheap layout -- see `AppShell`, which holds the class.
+   */
+  onReflow?: (moving: boolean) => void
+}) {
   const compact = useCompactLayout()
   const {
     route,
@@ -120,6 +130,8 @@ export function Sidebar({ onNewProject }: { onNewProject: () => void }) {
             : { x: 0, width: sidebarOpen ? SHELL.sidebar.expandedWidth : 0 }
         }
         transition={SPRING_PANEL}
+        onAnimationStart={() => onReflow?.(true)}
+        onAnimationComplete={() => onReflow?.(false)}
         // The border goes with the width when it collapses: left on, a closed
         // sidebar leaves a 1px rule down the edge of the window — the ghost of
         // a panel that is supposed to be gone. Floating, it always has an edge,

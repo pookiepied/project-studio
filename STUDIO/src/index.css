@@ -923,6 +923,28 @@
 }
 
 /* ---------------------------------------------------------------------------
+   The sidebar's spring, paid for in cheap layout
+
+   The sidebar animates its WIDTH, which means the page re-lays-out on every
+   frame of the spring -- and the transcript is the heaviest thing in it. At
+   the spring's peak velocity the whole document rewrapped per frame, and the
+   move stuttered exactly in its middle: smooth leaving, laggy at the turn,
+   smooth landing. While `studio-reflow-light` is on the page (AppShell holds
+   it for the length of the spring, fed by the sidebar's own animation
+   callbacks), every message row steps out of layout and remembers the size
+   it last rendered, so a frame costs only the rows on screen. When the
+   spring lands the class leaves, and everything is laid out for real again.
+   Scoped to the move on purpose: an always-on rule would hand the paging
+   window estimated heights for rows nobody has rendered yet, and the
+   hold-still correction there measures real heights.
+ */
+
+.studio-reflow-light .studio-message {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* ---------------------------------------------------------------------------
    Scrollbars
 
    Thin, thumb-only, tinted from the foreground so one rule works in both

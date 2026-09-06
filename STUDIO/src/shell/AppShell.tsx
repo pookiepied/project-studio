@@ -38,6 +38,15 @@ export function AppShell() {
   const { route, move, sidebarOpen, paletteOpen, setPaletteOpen, toggleSidebar, openSettings, goHome } =
     useNavigation()
   const compact = useCompactLayout()
+  /**
+   * True while the sidebar's width spring is moving. The page re-lays-out on
+   * every frame of that spring, and the transcript is the heaviest thing in
+   * it -- mid-flight, at the spring's peak velocity, the whole document
+   * rewrapped per frame and the move stuttered exactly in its middle. While
+   * this is true the transcript's off-screen rows step out of layout (see
+   * `studio-reflow-light` in index.css), and step back in when it lands.
+   */
+  const [reflowLight, setReflowLight] = useState(false)
   const { conversations, projects, storePhase } = useWorkspace()
   const {
     open: railOpen,
@@ -160,7 +169,10 @@ export function AppShell() {
           and cannot paint outside it. It is the last child for the same
           reason: the stage covers the sidebar and the page on purpose. */}
       <VoiceModeProvider>
-        <Sidebar onNewProject={() => setNewProjectOpen(true)} />
+        <Sidebar
+          onNewProject={() => setNewProjectOpen(true)}
+          onReflow={setReflowLight}
+        />
 
       {/* The page is a panel resting on the sidebar, and only while the sidebar
           is there to rest on.
@@ -183,7 +195,7 @@ export function AppShell() {
           the "why is this cut off" look. Closed, the page is simply the window
           again. */}
       <div
-        className="relative min-w-0 flex-1 overflow-hidden bg-surface transition-[border-radius] duration-base ease-out"
+        className={`relative min-w-0 flex-1 overflow-hidden bg-surface transition-[border-radius] duration-base ease-out ${reflowLight ? 'studio-reflow-light' : ''}`}
         // Inline rather than `rounded-l-xl`, so the radius comes from the same
         // token the window's own corner does and the two cannot drift apart.
         // A utility would work equally well; this just keeps one source.
