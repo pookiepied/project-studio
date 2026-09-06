@@ -1,8 +1,12 @@
 import { Icons, ProviderMark } from '@/components/icons'
 import { StepSlider } from '@/components/primitives'
-import { reasoningChoiceNote, type CatalogModel } from '@/domain/models/catalog'
+import type { CatalogModel } from '@/domain/models/catalog'
 import { familyName } from '@/domain/models/families'
-import { REASONING_LEVEL_NOTES, type ReasoningChoice } from '@/domain/models/types'
+import {
+  REASONING_LEVEL_NOTES,
+  restingReasoningLevel,
+  type ReasoningChoice,
+} from '@/domain/models/types'
 import { contextFull, priceFull } from './format'
 import { cn } from '@/lib/cn'
 
@@ -37,7 +41,7 @@ export function ModelDetail({
   model: CatalogModel
   /** Where the back row returns to, named rather than labelled "Back". */
   backLabel: string
-  reasoningLevel: ReasoningChoice
+  reasoningLevel: ReasoningChoice | null
   onReasoning: (level: ReasoningChoice) => void
   onBack: () => void
 }) {
@@ -45,6 +49,10 @@ export function ModelDetail({
     const note = REASONING_LEVEL_NOTES.find((entry) => entry.id === level)
     return { id: level, name: note?.name ?? capital(level), note: note?.note }
   })
+  const resting = restingReasoningLevel(model.reasoningLevels)
+  const shown = reasoningLevel !== null && levels.some((step) => step.id === reasoningLevel)
+    ? reasoningLevel
+    : resting
 
   return (
     <div className="flex flex-col gap-5 py-1">
@@ -104,14 +112,7 @@ export function ModelDetail({
       {levels.length > 0 ? (
         <section className="px-2">
           <p className="pb-1 text-micro text-muted-foreground">Reasoning effort</p>
-          <StepSlider
-            steps={[
-              { id: 'default' as const, name: 'Default', note: reasoningChoiceNote('default') },
-              ...levels,
-            ]}
-            value={reasoningLevel}
-            onChange={onReasoning}
-          />
+          <StepSlider steps={levels} value={shown} onChange={onReasoning} />
         </section>
       ) : null}
 

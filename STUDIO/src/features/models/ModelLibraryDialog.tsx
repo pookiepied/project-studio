@@ -70,7 +70,7 @@ export function ModelLibraryDialog({
   open: boolean
   onClose: () => void
   catalog: CatalogState
-  onUse: (modelId: string, reasoningLevel: ReasoningChoice) => void
+  onUse: (modelId: string, reasoningLevel: ReasoningChoice | null) => void
   onOpenSettings: () => void
   /** Re-reads the store the catalog rides on; the failure states' remedy. */
   onEnsure: () => Promise<boolean>
@@ -78,7 +78,7 @@ export function ModelLibraryDialog({
   const [query, setQuery] = useState('')
   const [familyAuthor, setFamilyAuthor] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
-  const [reasoningLevel, setReasoningLevel] = useState<ReasoningChoice>('default')
+  const [reasoningLevel, setReasoningLevel] = useState<ReasoningChoice | null>(null)
   const [move, setMove] = useState<SurfaceMove>('push')
 
   // Reopening starts over: a library that remembers a query from last time
@@ -88,7 +88,7 @@ export function ModelLibraryDialog({
       setQuery('')
       setFamilyAuthor(null)
       setDetailId(null)
-      setReasoningLevel('default')
+      setReasoningLevel(null)
       setMove('push')
     }
   }, [open])
@@ -141,7 +141,7 @@ export function ModelLibraryDialog({
   const openModel = (id: string) => {
     go(modelView(id))
     setDetailId(id)
-    setReasoningLevel('default')
+    setReasoningLevel(null)
   }
   const back = () => {
     go(viewOf('', null, familyAuthor))

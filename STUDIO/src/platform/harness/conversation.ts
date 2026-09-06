@@ -199,8 +199,9 @@ export interface SubmittedTurn {
  * turn-settings middleware reads and settles them into the conversation index
  * before the run's render does; the runtime strips them from the payload it
  * stores. `modelId` is the runtime reference in `<provider>/<model>` form, or
- * null for the stable default; the reasoning choice is "default" or a level,
- * never folded into a synonym.
+ * null for the stable default; the reasoning level is one of the model's
+ * levels, or null when the user has not picked one - the harness then rests
+ * the turn on medium rather than the window writing a level nobody chose.
  *
  * `permissionMode` is the execution mode the turn is sent under, in the
  * harness's own vocabulary (`manual` / `auto-edit` / `full-auto`). Absent
@@ -210,7 +211,7 @@ export interface SubmittedTurn {
  */
 export interface TurnSettingsWire {
   readonly modelId: string | null
-  readonly reasoningLevel: string
+  readonly reasoningLevel: string | null
   readonly permissionMode?: ExecutionModeWire
 }
 
@@ -222,7 +223,7 @@ export interface TurnSettingsWire {
  */
 export interface EffectiveTurnSettings {
   readonly modelId: string | null
-  readonly reasoningLevel: string
+  readonly reasoningLevel: string | null
   /** The frontend's word for the mode; the wire builder does the translation. */
   readonly permission: PermissionMode
 }
@@ -482,10 +483,13 @@ export function createConversationClient(options: ConversationClientOptions): Co
       // (`modelId`, `reasoningLevel`, `permissionMode`): the turn-settings
       // middleware reads them there, and Flue strips them from the stored
       // payload. Null modelId is omitted: absent means the conversation's
-      // settled state stands. Images ride under `attachments`, Flue's own
-      // payload field (1.0's `images` key is gone and would be stripped) -
-      // empty means the key is absent, which is what a text-only turn sends.
-      const wire = settings ?? { modelId: null, reasoningLevel: 'default' }
+      // settled state stands. A null reasoning level rides as null and the
+      // harness rests it on medium, which is why the fallback below keeps
+      // the choice absent rather than writing a level nobody picked. Images
+      // ride under `attachments`, Flue's own payload field (1.0's `images`
+      // key is gone and would be stripped) - empty means the key is absent,
+      // which is what a text-only turn sends.
+      const wire = settings ?? { modelId: null, reasoningLevel: null }
       const carried = images ?? []
       const sent = await request('POST', agentsPath(), JSON.stringify({
         kind: 'user',

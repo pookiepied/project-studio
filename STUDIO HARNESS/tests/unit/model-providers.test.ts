@@ -584,6 +584,7 @@ describe("the Flue provider mount", () => {
         models: collection,
         target: () => undefined,
         listModels: () => collection.getModels(),
+        supportedReasoningLevels: () => [],
       },
     });
     adapter.register();

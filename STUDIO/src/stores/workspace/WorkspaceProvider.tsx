@@ -65,14 +65,16 @@ import { newId } from '@/lib/id'
  */
 /**
  * The resting turn settings. Null modelId is the harness's own default - the
- * stable alias - which is why there is no model id here to invent, and
- * "default" is the reasoning state of somebody who has not chosen a level.
- * A second notion of "the default model" living in the webview is the same
- * duplication Task 37 removed from titles.
+ * stable alias - which is why there is no model id here to invent, and null
+ * is the reasoning state of somebody who has not chosen a level: the window
+ * does not know the model's levels here, so it keeps the choice absent and
+ * the harness rests the turn on medium rather than the window writing a
+ * level the user did not pick. A second notion of "the default model" living
+ * in the webview is the same duplication Task 37 removed from titles.
  */
 const DEFAULT_TURN_SETTINGS: TurnSettings = {
   modelId: null,
-  reasoningLevel: 'default',
+  reasoningLevel: null,
   permission: DEFAULT_PERMISSION_MODE,
 }
 
@@ -131,6 +133,17 @@ const EMPTY_CATALOG: ModelCatalogState = {
   defaults: {},
 }
 
+function isReasoningLevel(value: string | null): value is ReasoningChoice {
+  return (
+    value === 'minimal' ||
+    value === 'low' ||
+    value === 'medium' ||
+    value === 'high' ||
+    value === 'xhigh' ||
+    value === 'max'
+  )
+}
+
 function mapRecord(record: ConversationRecordLike): Conversation {
   return {
     id: record.id,
@@ -142,7 +155,9 @@ function mapRecord(record: ConversationRecordLike): Conversation {
     pinned: record.pinned,
     archived: record.archived,
     modelId: record.modelId,
-    reasoningLevel: record.reasoningLevel,
+    // Rows written before the dial lost its Default step still carry
+    // "default"; they read as absent and the harness rests them on medium.
+    reasoningLevel: isReasoningLevel(record.reasoningLevel) ? record.reasoningLevel : null,
     // The wire vocabulary becomes the picker's here, once, at the store.
     permissionMode: executionModeFromWire(record.permissionMode),
   }
@@ -157,7 +172,7 @@ interface ConversationRecordLike {
   readonly archived: boolean
   readonly lastTurnAt: number
   readonly modelId: string | null
-  readonly reasoningLevel: ReasoningChoice | null
+  readonly reasoningLevel: string | null
   readonly permissionMode: ExecutionModeWire
 }
 
@@ -203,7 +218,7 @@ interface WorkspaceValue {
    */
   setConversationSettings: (
     conversationId: string,
-    settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice },
+    settings: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice | null },
   ) => void
   /**
    * Settles the execution mode a conversation is held with, in the index -
@@ -275,7 +290,7 @@ interface WorkspaceValue {
     readonly projectId: string | null
     readonly settings: {
       readonly modelId: string | null
-      readonly reasoningLevel: ReasoningChoice
+      readonly reasoningLevel: ReasoningChoice | null
       readonly permission: PermissionMode
     }
     readonly title?: string
@@ -628,7 +643,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const setConversationSettings = useCallback(
     (
       conversationId: string,
-      choice: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice },
+      choice: { readonly modelId: string | null; readonly reasoningLevel: ReasoningChoice | null },
     ) => {
       setSettingsState((current) => ({ ...current, ...choice }))
       void mutateIndex(
@@ -788,7 +803,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       projectId: string | null
       settings: {
         readonly modelId: string | null
-        readonly reasoningLevel: ReasoningChoice
+        readonly reasoningLevel: ReasoningChoice | null
         readonly permission: PermissionMode
       }
       /** A title the caller already knows - a fork's " (Fork)" name. Absent starts untitled. */

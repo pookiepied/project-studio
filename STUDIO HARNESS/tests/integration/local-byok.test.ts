@@ -252,6 +252,7 @@ describe("local BYOK source", () => {
       models: runtime.models,
       target: () => target,
       listModels: runtime.listModels.bind(runtime),
+      supportedReasoningLevels: runtime.supportedReasoningLevels.bind(runtime),
     };
     const reasoningAdapter = new LocalModelProviderAdapter({
       config: buildAdapter().config,
@@ -303,30 +304,19 @@ describe("local BYOK source", () => {
   });
 
   /**
-   * "default" is the provider's own behaviour, not medium. The run expresses
-   * it as Pi's "no explicit effort", which OpenAI-style endpoints render as an
-   * ABSENT reasoning_effort - so the absence itself is what the wire must
-   * show. Flue substitutes "medium" for an unset level, which is exactly the
-   * synonym this guards against.
+   * A model that does not reason keeps sending no reasoning parameter. The
+   * run expresses a non-reasoning turn as no explicit effort, which
+   * OpenAI-style endpoints render as an ABSENT reasoning_effort - so the
+   * absence itself is what the wire must show. Reasoning models now always
+   * carry an explicit level through the resting rule instead.
    */
-  it("sends no reasoning_effort at all when no level is asked for", async () => {
-    const { adapter, runtime } = buildAdapter();
-    const target = { ...adapter.assertTargetResolvable(), reasoning: true };
-    const reasoning: LocalRuntime = {
-      models: runtime.models,
-      target: () => target,
-      listModels: runtime.listModels.bind(runtime),
-    };
-    const reasoningAdapter = new LocalModelProviderAdapter({
-      config: buildAdapter().config,
-      runtime: reasoning,
-    });
+  it("sends no reasoning_effort at all for a model that does not reason", async () => {
+    const { adapter } = buildAdapter();
 
     await collectText(
-      reasoningAdapter.stream(
-        aliasPlaceholder(),
-        { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] },
-      ),
+      adapter.stream(aliasPlaceholder(), {
+        messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+      }),
     );
 
     expect(mock.requests[0]?.body?.reasoning_effort).toBeUndefined();
@@ -349,6 +339,7 @@ describe("local BYOK source", () => {
       models: runtime.models,
       target: () => target,
       listModels: runtime.listModels.bind(runtime),
+      supportedReasoningLevels: runtime.supportedReasoningLevels.bind(runtime),
     };
     const reasoningAdapter = new LocalModelProviderAdapter({
       config: buildAdapter().config,

@@ -129,8 +129,7 @@ export function findCatalogModel(
   return models.find((model) => model.id === id)
 }
 
-/** Display copy for a reasoning choice, "default" included. */
+/** Display copy for a reasoning level. */
 export function reasoningChoiceNote(choice: ReasoningChoice): string {
-  if (choice === 'default') return "The provider's own default"
   return REASONING_LEVEL_NOTES.find((level) => level.id === choice)?.note ?? choice
 }

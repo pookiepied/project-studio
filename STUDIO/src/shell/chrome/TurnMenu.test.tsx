@@ -325,14 +325,14 @@ describe('the model picker', () => {
     await openLibrary()
     await openFamilyInLibrary(/Anthropic/)
     // Opening a model's page writes nothing: the facts appear, the dial rests
-    // on Default, and the index is untouched until the button.
+    // on medium, and the index is untouched until the button.
     fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
     await screen.findByText('Reasoning effort')
     expect(
       calls.filter((call) => call.method === 'PATCH' && call.url.endsWith('/api/conversations/cnv_1')),
     ).toEqual([])
     const slider = screen.getByRole('slider', { name: 'Reasoning effort' })
-    expect(slider.getAttribute('aria-valuetext')).toBe('Default')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Medium')
 
     fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
     await waitFor(() => {
@@ -341,10 +341,11 @@ describe('the model picker', () => {
       )
       expect(patch).toBeDefined()
       // The body is the harness contract's own vocabulary: the runtime
-      // reference and the reasoning choice, never a synonym for either.
+      // reference and the reasoning choice, never a synonym for either. An
+      // untouched dial stays absent and the harness rests it on medium.
       expect(JSON.parse(patch?.body ?? '{}')).toEqual({
         modelId: 'anthropic/claude-sonnet-4.5',
-        reasoningLevel: 'default',
+        reasoningLevel: null,
       })
     })
 
@@ -396,7 +397,7 @@ describe('the model picker', () => {
         .at(-1)
       expect(JSON.parse(patch?.body ?? '{}')).toEqual({
         modelId: 'anthropic/kappa-mini',
-        reasoningLevel: 'default',
+        reasoningLevel: null,
       })
     })
   })
@@ -440,7 +441,7 @@ describe('the model picker', () => {
     expect(screen.queryByText('Recent')).toBeNull()
   })
 
-  it('offers Default first and the model levels as steps of one dial', async () => {
+  it('offers only the model levels as steps of one dial, resting on medium', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([REASONING_MODEL]))
     mountPicker()
@@ -449,18 +450,19 @@ describe('the model picker', () => {
     await openFamilyInLibrary(/Anthropic/)
     fireEvent.click(await screen.findByRole('button', { name: /claude-sonnet-4\.5/ }))
 
-    // One dial in the details pane, whose steps are Default then the model's
-    // own levels: seven stops for this model, resting on Default.
+    // One dial in the details pane, whose steps are the model's own levels:
+    // six stops for this model, resting on medium, with no Default step.
     const slider = screen.getByRole('slider', { name: 'Reasoning effort' })
-    expect(slider.getAttribute('max')).toBe('6')
-    expect(slider.getAttribute('aria-valuetext')).toBe('Default')
-    expect(screen.getByText("The provider's own default")).toBeTruthy()
+    expect(slider.getAttribute('max')).toBe('5')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Medium')
+    expect(screen.getByText('The everyday balance.')).toBeTruthy()
+    expect(screen.queryByText("The provider's own default")).toBeNull()
 
     // Dragging to the top end names Max; one below it names X-high - the
     // level the old vocabulary was missing entirely.
-    fireEvent.change(slider, { target: { value: '6' } })
-    expect(screen.getByText('Max')).toBeTruthy()
     fireEvent.change(slider, { target: { value: '5' } })
+    expect(screen.getByText('Max')).toBeTruthy()
+    fireEvent.change(slider, { target: { value: '4' } })
     expect(screen.getByText('X-high')).toBeTruthy()
 
     // The dial is part of the pick: applying carries the dragged level out.

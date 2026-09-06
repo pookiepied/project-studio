@@ -63,6 +63,7 @@ const host: AgentHost = {
     }
     return { modelId: null, reasoningLevel: null };
   },
+  supportedReasoningLevels: () => ["minimal", "low", "medium", "high"],
 };
 
 describe("the studio agent's identity and model contracts", () => {
@@ -96,15 +97,35 @@ describe("the studio agent's identity and model contracts", () => {
     );
   });
 
-  it("maps the reasoning choice so 'default' stays no explicit effort", () => {
-    // "default" and unset both mean the provider's own behaviour; the
-    // runtime would otherwise substitute its own medium for an unset level.
-    expect(studioThinkingLevel({ reasoningLevel: null })).toBe("off");
-    expect(studioThinkingLevel({ reasoningLevel: "default" })).toBe("off");
-    expect(studioThinkingLevel({ reasoningLevel: "high" })).toBe("high");
-    // An unknown stored value degrades to the provider's default rather
-    // than crashing the render.
-    expect(studioThinkingLevel({ reasoningLevel: "nonsense" })).toBe("off");
+  it("rests a stored default on medium rather than on silence", () => {
+    // "default" and unset both rest on medium for a model that has it; an
+    // explicit level rides verbatim. Silence ("off") is only for a model that
+    // does not reason at all.
+    const supported = ["minimal", "low", "medium", "high"] as const;
+    expect(studioThinkingLevel({ modelId: null, reasoningLevel: null }, [...supported])).toBe(
+      "medium",
+    );
+    expect(
+      studioThinkingLevel({ modelId: null, reasoningLevel: "default" }, [...supported]),
+    ).toBe("medium");
+    expect(
+      studioThinkingLevel(
+        { modelId: "openrouter/anthropic/claude-sonnet-4.5", reasoningLevel: "high" },
+        [...supported],
+      ),
+    ).toBe("high");
+    // An unknown stored value degrades to the resting level rather than
+    // crashing the render.
+    expect(
+      studioThinkingLevel({ modelId: null, reasoningLevel: "nonsense" }, [...supported]),
+    ).toBe("medium");
+    // A model with no levels stays silent, whatever the row holds.
+    expect(studioThinkingLevel({ modelId: "ollama/llama3", reasoningLevel: "default" }, [])).toBe(
+      "off",
+    );
+    expect(studioThinkingLevel({ modelId: "ollama/llama3", reasoningLevel: "high" }, [])).toBe(
+      "off",
+    );
   });
 
   it("turns a conversation's settled settings into the specifier the render sends", () => {
@@ -117,7 +138,9 @@ describe("the studio agent's identity and model contracts", () => {
     expect(studioModelSpecifier(settings)).toBe(
       "project-studio/openrouter/anthropic/claude-sonnet-4.5",
     );
-    expect(studioThinkingLevel(settings)).toBe("high");
+    expect(studioThinkingLevel(settings, host.supportedReasoningLevels(settings.modelId))).toBe(
+      "high",
+    );
     // The unset conversation stays on the alias.
     expect(studioModelSpecifier(host.conversationTurnSettings("cnv_fresh"))).toBe(
       STUDIO_MODEL_ID,

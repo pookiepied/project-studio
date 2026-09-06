@@ -23,7 +23,7 @@ export function effectiveTurnSettings(
   settings: TurnSettings,
 ): {
   readonly modelId: string | null
-  readonly reasoningLevel: ReasoningChoice
+  readonly reasoningLevel: ReasoningChoice | null
   readonly permission: PermissionMode
 } {
   return {

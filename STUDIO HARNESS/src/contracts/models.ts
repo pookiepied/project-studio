@@ -61,31 +61,80 @@ export const reasoningChoiceSchema = v.union([
 export type ReasoningChoice = v.InferOutput<typeof reasoningChoiceSchema>;
 
 /**
+ * The resting reasoning level for a model's supported levels.
+ *
+ * Medium when the model supports it. Otherwise the nearest supported level in
+ * `REASONING_LEVELS` order, preferring the lower one on a tie. The anchor is
+ * medium itself, not the midpoint of the model's own list: a model exposing
+ * `xhigh` and `max` would otherwise rest at high, quietly more expensive than
+ * the everyday balance medium names. An empty list means the model does not
+ * reason at all, and the answer is "off".
+ */
+export function restingReasoningLevel(
+  supported: readonly ReasoningLevel[],
+): ReasoningLevel | "off" {
+  if (supported.length === 0) return "off";
+  if (supported.includes("medium")) return "medium";
+  const order = REASONING_LEVELS;
+  const mediumIndex = order.indexOf("medium");
+  let best = supported[0];
+  // The length check above makes this access safe without asserting.
+  if (best === undefined) return "off";
+  let bestDistance = Math.abs(order.indexOf(best) - mediumIndex);
+  for (const candidate of supported) {
+    const distance = Math.abs(order.indexOf(candidate) - mediumIndex);
+    const candidateIndex = order.indexOf(candidate);
+    const bestIndex = order.indexOf(best);
+    if (distance < bestDistance || (distance === bestDistance && candidateIndex < bestIndex)) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/**
  * Maps a stored choice onto the `thinkingLevel` the agent render passes.
  *
- * "default" maps to "off", which is how this runtime says "no explicit effort
- * requested": the agent loop drops "off" before any request is built, so the
- * protocol layer receives an absent reasoning option and renders that absence
- * per protocol. The rendering differs by protocol and is the reason this
- * mapping is explicit rather than left unset - Flue would substitute "medium"
- * for an unset thinkingLevel, and a default that arrived as medium would be
- * exactly the synonym this contract refuses:
+ * A stored "default" resolves to the resting level from `restingReasoningLevel`,
+ * never to absence. Absence was the previous spelling - "default" mapped to
+ * "off", which the agent loop drops before any request is built so the
+ * protocol layer receives no reasoning option. That absence is abandoned
+ * because what each adapter does with it is not one thing:
  *
- * - OpenAI-style endpoints omit the reasoning parameter entirely, which is
- *   literally the provider's own default.
- * - OpenRouter format would inject `reasoning: { effort: "none" }` for a
- *   reasoning model - turning reasoning OFF - so the local catalog maps every
- *   OpenRouter reasoning model's `off` to null (`models/local/runtime.ts`),
- *   which is pi-ai's spelling of "send nothing".
- * - Anthropic sends `thinkingEnabled: false`.
+ * - Omits the parameter, as intended: OpenAI Responses, Azure Responses, Codex
+ *   Responses, OpenAI Completions (plain), Bedrock, Mistral, `ant-ling`.
+ * - Sends an explicit "off", but checks `model.thinkingLevelMap?.off !== null`
+ *   first, so a catalog entry can opt out: Anthropic, DeepSeek, OpenRouter,
+ *   `string-thinking`. The harness uses this escape for OpenRouter in
+ *   `applyOpenRouterDefaultReasoning` (`src/models/local/runtime.ts`).
+ * - Sends an explicit "off" with no escape hatch at all: Google Generative AI,
+ *   Google Vertex, `zai`, `qwen`, `qwen-chat-template`, `together`.
  *
- * A default is never medium anywhere, and after the OpenRouter mapping it is
- * never an explicit "none" either; it is "the provider decides".
+ * That last group is why absence had to go. On Google, no reasoning option
+ * sends `thinking: { enabled: false }`, which becomes `thinkingBudget: 0` on
+ * Gemini 2.x and the lowest available level on Gemini 3, which cannot be
+ * disabled at all, while Gemini's own default is thinking on. "Default" was
+ * quietly turning thinking down, and because `includeThoughts` is only set on
+ * the enabled branch, no thinking was ever shown either.
+ *
+ * Every one of these produces a valid request and no provider requires the
+ * parameter, which is why the silence went unnoticed. Resting on medium keeps
+ * every request on the explicit-level path all eleven adapters are built and
+ * tested for, with no vendored patch and no per-model table to maintain.
+ *
+ * "off" survives as one thing only: the value for a model that does not
+ * reason, which is an empty supported list. A non-reasoning model still sends
+ * no reasoning parameter, exactly as before.
  */
 export function runThinkingLevelForChoice(
   choice: ReasoningChoice | null | undefined,
+  supported: readonly ReasoningLevel[],
 ): ReasoningLevel | "off" {
-  if (choice === null || choice === undefined || choice === "default") return "off";
+  if (supported.length === 0) return "off";
+  if (choice === null || choice === undefined || choice === "default") {
+    return restingReasoningLevel(supported);
+  }
   return choice;
 }
 
@@ -207,6 +256,18 @@ export interface ModelProviderAdapter {
   register(): void;
   resolve(reference: ModelReference): ModelDescriptor;
   listModels(): readonly ModelDescriptor[];
+  /**
+   * The reasoning levels one stored reference supports, in Pi's order, empty
+   * for a model that does not reason.
+   *
+   * Synchronous because the agent render is synchronous and the Pi catalog it
+   * reads is composed synchronously in `models/local/runtime.ts`. The render
+   * feeds this into `runThinkingLevelForChoice` so a stored "default" rests on
+   * medium rather than on silence. Unknown references answer medium, which
+   * keeps the request on the explicit path; only a known non-reasoning model
+   * answers empty.
+   */
+  supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
   /**
    * The model a background job may run on, as a specifier this source can
    * resolve at run time, or undefined when the source cannot name one.

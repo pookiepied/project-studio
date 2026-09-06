@@ -20,6 +20,7 @@ import {
   type ModelDescriptor,
   type ModelProviderAdapter,
   type ModelReference,
+  type ReasoningLevel,
 } from "../../contracts/models.js";
 
 const api = "project-studio-test";
@@ -548,6 +549,10 @@ export class TestModelProviderAdapter implements ModelProviderAdapter {
 
   listModels(): readonly ModelDescriptor[] {
     return [this.resolve(defaultModelReference(this.source))];
+  }
+
+  supportedReasoningLevels(_modelId: string | null): readonly ReasoningLevel[] {
+    return [];
   }
 
   async backgroundModel(skip = 0): Promise<string | undefined> {

@@ -1,5 +1,6 @@
 import {
   createProvider,
+  getSupportedThinkingLevels,
   lazyApi,
   type Api,
   type ApiKeyAuth,
@@ -11,6 +12,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
+import { REASONING_LEVELS, type ReasoningLevel } from "../../contracts/models.js";
 import { API_LOADERS } from "./apis.js";
 import type {
   CustomProviderConfig,
@@ -139,6 +141,32 @@ export interface LocalRuntime {
   /** The model the stable alias routes to, or undefined when misconfigured. */
   target(): Model<Api> | undefined;
   listModels(): readonly Model<Api>[];
+  /**
+   * The reasoning levels one stored reference supports, in Pi's order, empty
+   * for a model that does not reason.
+   *
+   * Synchronous because the agent render is synchronous: it reads the same Pi
+   * collection `applyOpenRouterDefaultReasoning` mutates, so the answer agrees
+   * with the request path. Null is the stable alias and resolves through the
+   * configured target. An unknown reference answers medium, which keeps the
+   * request on the explicit path; only a known non-reasoning model answers
+   * empty.
+   */
+  supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
+}
+
+/**
+ * The reasoning levels one Pi model supports, in this contract's vocabulary.
+ *
+ * Pi's own `getSupportedThinkingLevels` minus "off", filtered to the levels
+ * this contract names. A model that cannot reason answers empty, so the dial
+ * can be absent rather than present and inert.
+ */
+function reasoningLevelsForPiModel(model: Model<Api>): readonly ReasoningLevel[] {
+  const known = new Set<string>(REASONING_LEVELS);
+  return getSupportedThinkingLevels(model).filter(
+    (level): level is ReasoningLevel => level !== "off" && known.has(level),
+  );
 }
 
 export interface CreateLocalRuntimeOptions {
@@ -164,21 +192,55 @@ export function createLocalRuntime(
     credentials: options.credentials,
   });
 
+  const targetFor = (): Model<Api> | undefined =>
+    options.config.defaultProvider === undefined ||
+    options.config.defaultModel === undefined
+      ? undefined
+      : models.getModel(options.config.defaultProvider, options.config.defaultModel);
+
   return {
     models,
     // An unselected default is a state, not a fault: `undefined` here is what
     // makes the alias descriptor report unconfigured and the settings UI's
     // fix-it path reachable, instead of the harness refusing to start.
-    target: () =>
-      options.config.defaultProvider === undefined ||
-      options.config.defaultModel === undefined
-        ? undefined
-        : models.getModel(
-            options.config.defaultProvider,
-            options.config.defaultModel,
-          ),
+    target: targetFor,
     listModels: () => models.getModels(),
+    supportedReasoningLevels: (modelId) => supportedLevelsForReference(models, targetFor, modelId),
   };
+}
+
+/**
+ * Resolves one stored reference to its supported levels without touching the
+ * keychain or the network.
+ *
+ * The reference is in the local runtime's own `<provider>/<model>` vocabulary;
+ * model ids themselves may contain slashes, so the split is on the first one
+ * only. Unknown references answer medium rather than empty: empty would send
+ * silence, which is the behaviour this task removes, while medium keeps the
+ * request on the explicit path Pi clamps per model.
+ */
+function supportedLevelsForReference(
+  models: MutableModels,
+  target: () => Model<Api> | undefined,
+  modelId: string | null,
+): readonly ReasoningLevel[] {
+  if (modelId === null) {
+    const resolved = target();
+    // The alias resolves to nothing when no default is configured, and also
+    // when a configured default names a model the collection no longer has.
+    // Both are "this reference is unknown", not "this model does not reason",
+    // and answering empty here would send the silence this task removed. Only
+    // a model that resolved and reports no levels answers empty.
+    if (resolved === undefined) return ["medium"];
+    return reasoningLevelsForPiModel(resolved);
+  }
+  const separator = modelId.indexOf("/");
+  if (separator <= 0 || separator === modelId.length - 1) return ["medium"];
+  const provider = modelId.slice(0, separator);
+  const id = modelId.slice(separator + 1);
+  const model = models.getModel(provider, id);
+  if (model === undefined) return ["medium"];
+  return reasoningLevelsForPiModel(model);
 }
 
 /**

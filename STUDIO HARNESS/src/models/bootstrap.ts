@@ -4,6 +4,7 @@ import {
   type ModelDescriptor,
   type ModelProviderAdapter,
   type ModelSource,
+  type ReasoningLevel,
 } from "../contracts/models.js";
 import type { ProviderConfig } from "./provider-config.js";
 import { ModelRegistry } from "./model-registry.js";
@@ -318,6 +319,27 @@ export function bootstrapModelProviders(
  */
 export function bootstrappedModelRegistry(): ModelRegistry | undefined {
   return productionCoordinator.current?.registry;
+}
+
+/**
+ * The reasoning levels one stored reference supports, from the bootstrapped
+ * source, synchronously.
+ *
+ * The agent render cannot await, so it reads here rather than through the
+ * async `ModelCatalog`. Before the bootstrap ran there is no catalog to read,
+ * and the honest fallback is medium itself: the resting level for the common
+ * case, which keeps the request on the explicit path rather than on silence.
+ */
+export function bootstrappedSupportedReasoningLevels(
+  modelId: string | null,
+): readonly ReasoningLevel[] {
+  const registry = productionCoordinator.current?.registry;
+  if (registry === undefined) return ["medium"];
+  const local = registry.getAdapter("local");
+  if (local !== undefined) return local.supportedReasoningLevels(modelId);
+  const test = registry.getAdapter("test");
+  if (test !== undefined) return test.supportedReasoningLevels(modelId);
+  return ["medium"];
 }
 
 function firstNumber(values: readonly (number | "unknown")[]): number | undefined {

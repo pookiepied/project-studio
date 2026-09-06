@@ -6,8 +6,15 @@ import type { Sandbox, SandboxFactory } from "@flue/runtime";
 import { KeyringCredentialStore } from "../credentials/keyring-store.js";
 import type { SecureCredentialStore } from "../credentials/credential-store.js";
 import { capabilityKey, type ExecutionScope } from "../contracts/capabilities.js";
-import { DEFAULT_MODEL_NAME, DEFAULT_MODEL_PROVIDER } from "../contracts/models.js";
-import { bootstrappedModelRegistry } from "../models/bootstrap.js";
+import {
+  DEFAULT_MODEL_NAME,
+  DEFAULT_MODEL_PROVIDER,
+  type ReasoningLevel,
+} from "../contracts/models.js";
+import {
+  bootstrappedModelRegistry,
+  bootstrappedSupportedReasoningLevels,
+} from "../models/bootstrap.js";
 import { ExtendError } from "../extend/errors.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
@@ -327,6 +334,17 @@ export interface AgentHost {
     readonly reasoningLevel: string | null;
   };
   /**
+   * The reasoning levels one stored reference supports, in Pi's order, empty
+   * for a model that does not reason.
+   *
+   * Read once per render, synchronously, beside `conversationTurnSettings`.
+   * The Pi catalog it reads is composed synchronously where
+   * `applyOpenRouterDefaultReasoning` mutates it, so this never awaits the
+   * async `ModelCatalog`. The render feeds the answer into
+   * `runThinkingLevelForChoice` so a stored "default" rests on medium.
+   */
+  supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[];
+  /**
    * The extra roots one conversation may reach beyond its workspace.
    *
    * Read once per render, synchronously, for the environment block. A run
@@ -528,6 +546,10 @@ export class StudioRuntime implements AgentHost {
       modelId: record?.modelId ?? null,
       reasoningLevel: record?.reasoningLevel ?? null,
     };
+  }
+
+  supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[] {
+    return bootstrappedSupportedReasoningLevels(modelId);
   }
 
   /**

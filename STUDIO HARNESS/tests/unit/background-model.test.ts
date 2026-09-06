@@ -81,6 +81,7 @@ function adapterOver(models: MutableModels): LocalModelProviderAdapter {
       models,
       target: () => undefined,
       listModels: () => models.getModels(),
+      supportedReasoningLevels: () => [],
     },
   });
 }

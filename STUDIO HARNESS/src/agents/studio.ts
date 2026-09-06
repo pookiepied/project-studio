@@ -12,6 +12,7 @@ import {
   reasoningChoiceOr,
   runThinkingLevelForChoice,
   STUDIO_MODEL_ID,
+  type ReasoningLevel,
 } from "../contracts/models.js";
 
 /**
@@ -38,17 +39,21 @@ export function studioModelSpecifier(settings: {
 }
 
 /**
- * The thinking level a conversation runs with, from its settled turn settings.
+ * The thinking level a conversation runs with, from its settled turn settings
+ * and the model's supported levels.
  *
  * Exported beside the specifier for the same reason: the mapping is the
- * contract, and it is the one place that keeps "default" meaning "no explicit
- * effort requested" rather than letting the runtime substitute its own medium
- * for an unset level.
+ * contract, and it is the one place that keeps a stored "default" resting on
+ * medium rather than on silence. The supported levels come from the local
+ * runtime's synchronous lookup, which the render reads beside the settings;
+ * the resolver then answers medium for a model that has it, the nearest level
+ * otherwise, and "off" only for a model that does not reason.
  */
 export function studioThinkingLevel(
-  settings: { readonly reasoningLevel: string | null },
+  settings: { readonly modelId: string | null; readonly reasoningLevel: string | null },
+  supported: readonly ReasoningLevel[],
 ): ReturnType<typeof runThinkingLevelForChoice> {
-  return runThinkingLevelForChoice(reasoningChoiceOr(settings.reasoningLevel));
+  return runThinkingLevelForChoice(reasoningChoiceOr(settings.reasoningLevel), supported);
 }
 
 /**
@@ -111,8 +116,9 @@ export function studioThinkingLevel(
 export function Studio({ id }: AgentProps) {
   const runtime = getStudioRuntime();
   const settings = runtime.conversationTurnSettings(id);
+  const supported = runtime.supportedReasoningLevels(settings.modelId);
   useModel(studioModelSpecifier(settings), {
-    thinkingLevel: studioThinkingLevel(settings),
+    thinkingLevel: studioThinkingLevel(settings, supported),
   });
   // The project's folders, in the order the person arranged them. The first
   // is where a turn stands; the rest reach the model as roots beside it. An

@@ -18,6 +18,7 @@ import {
   type ModelDescriptor,
   type ModelProviderAdapter,
   type ModelReference,
+  type ReasoningLevel,
 } from "../../contracts/models.js";
 import {
   defaultAliasDescriptor,
@@ -265,6 +266,10 @@ export class LocalModelProviderAdapter implements ModelProviderAdapter {
       defaultAliasDescriptor(this.#runtime.target()),
       ...this.#runtime.listModels().map(descriptorFromPiModel),
     ];
+  }
+
+  supportedReasoningLevels(modelId: string | null): readonly ReasoningLevel[] {
+    return this.#runtime.supportedReasoningLevels(modelId);
   }
 
   /**

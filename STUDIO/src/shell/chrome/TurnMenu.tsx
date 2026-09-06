@@ -8,12 +8,12 @@ import {
   StepSlider,
   Tooltip,
 } from '@/components/primitives'
+import { findCatalogModel, type CatalogModel } from '@/domain/models/catalog'
 import {
-  findCatalogModel,
-  reasoningChoiceNote,
-  type CatalogModel,
-} from '@/domain/models/catalog'
-import { REASONING_LEVEL_NOTES, type ReasoningChoice } from '@/domain/models/types'
+  REASONING_LEVEL_NOTES,
+  restingReasoningLevel,
+  type ReasoningChoice,
+} from '@/domain/models/types'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { loadRecentModelIds, rememberRecentModel } from '@/domain/session/recents'
 import { ModelLibraryDialog } from '@/features/models/ModelLibraryDialog'
@@ -96,7 +96,10 @@ export function TurnMenu() {
     if (!open) setView('root')
   }, [open])
 
-  const chooseModel = (modelId: string | null, reasoningLevel: ReasoningChoice = effective.reasoningLevel) => {
+  const chooseModel = (
+    modelId: string | null,
+    reasoningLevel: ReasoningChoice | null = effective.reasoningLevel,
+  ) => {
     // Only an explicit pick counts as recent - the harness's default is the
     // resting state, not a choice the user made, and recording it would put a
     // row that resolves to whatever the defaults name into a list of names.
@@ -202,33 +205,42 @@ export function TurnMenu() {
 }
 
 /** The reasoning line the trigger's tooltip and the menu item show. */
-function reasoningLabel(model: CatalogModel | undefined, choice: ReasoningChoice): string | null {
+function reasoningLabel(
+  model: CatalogModel | undefined,
+  choice: ReasoningChoice | null,
+): string | null {
   // A model with no levels has no reasoning control to summarize; naming a
   // level beside it would advertise a dial that is not there.
   if (model !== undefined && model.reasoningLevels.length === 0) return null
-  if (choice === 'default' && model === undefined) return null
-  return choice === 'default' ? 'Default reasoning' : capital(choice)
+  if (model === undefined && choice === null) return null
+  const shown = choice ?? restingFor(model)
+  return shown === null ? null : capital(shown)
 }
 
 function capital(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1)
 }
 
-/** The dial's steps for one model: the provider's own default, then the levels
- * that model actually supports, in Pi's own order. Shared by the two places a
- * reasoning dial appears, so they can never disagree about what it offers. */
+/** The dial's resting level for one model: medium when it has it, otherwise
+ * the nearest supported level. Null when no model is named, which is the
+ * state with no dial to rest. */
+function restingFor(model: CatalogModel | undefined): ReasoningChoice | null {
+  if (model === undefined || model.reasoningLevels.length === 0) return null
+  return restingReasoningLevel(model.reasoningLevels)
+}
+
+/** The dial's steps for one model: only the levels that model actually
+ * supports, in Pi's own order. Shared by the two places a reasoning dial
+ * appears, so they can never disagree about what it offers. */
 function reasoningSteps(model: CatalogModel | undefined) {
-  return [
-    { id: 'default' as const, name: 'Default', note: reasoningChoiceNote('default') },
-    ...(model?.reasoningLevels ?? []).map((level) => {
-      const note = REASONING_LEVEL_NOTES.find((entry) => entry.id === level)
-      return {
-        id: level,
-        name: note?.name ?? capital(level),
-        note: note?.note,
-      }
-    }),
-  ]
+  return (model?.reasoningLevels ?? []).map((level) => {
+    const note = REASONING_LEVEL_NOTES.find((entry) => entry.id === level)
+    return {
+      id: level,
+      name: note?.name ?? capital(level),
+      note: note?.note,
+    }
+  })
 }
 
 function ModelPanel({
@@ -332,11 +344,12 @@ function ReasoningPanel({
   onChange,
 }: {
   model: CatalogModel | undefined
-  choice: ReasoningChoice
+  choice: ReasoningChoice | null
   onBack: () => void
   onChange: (choice: ReasoningChoice) => void
 }) {
   const steps = reasoningSteps(model)
+  const resting = restingFor(model) ?? 'medium'
   return (
     <>
       <button
@@ -352,7 +365,7 @@ function ReasoningPanel({
       <MenuSeparator />
       <StepSlider
         steps={steps}
-        value={steps.some((step) => step.id === choice) ? choice : 'default'}
+        value={choice !== null && steps.some((step) => step.id === choice) ? choice : resting}
         onChange={onChange}
       />
     </>
