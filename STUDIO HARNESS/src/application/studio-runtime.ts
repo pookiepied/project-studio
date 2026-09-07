@@ -58,6 +58,7 @@ import { ToolError } from "../tools/errors.js";
 import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
+import { BackgroundJobs } from "../process/background.js";
 import { ConversationStore } from "../conversations/store.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
 
@@ -462,6 +463,14 @@ export class StudioRuntime implements AgentHost {
    * turns.
    */
   readonly #imageBudget = new ImageBudget();
+  /**
+   * Background commands, one registry for the runtime.
+   *
+   * Here rather than per run because that is the whole point of them: a dev
+   * server started on one turn has to still be there on the next. Stopped in
+   * `stop()`, so nothing of ours outlives the harness.
+   */
+  readonly #jobs = new BackgroundJobs();
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -827,6 +836,7 @@ export class StudioRuntime implements AgentHost {
       acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
       accessLog: this.#accessLogFor(options.conversationId),
       imageBudget: this.#imageBudget,
+      jobs: this.#jobs,
       ...(questionBroker === undefined
         ? {}
         : {
@@ -997,6 +1007,11 @@ export class StudioRuntime implements AgentHost {
    * composition root that opened the connection closes it (ADR 0035 §4).
    */
   async stop(): Promise<void> {
+    // Before the supervisor, because these are the children nothing else
+    // knows about: a dev server the model started still holding port 3000
+    // after Studio has closed is a process the person never started and
+    // cannot see to end.
+    this.#jobs.stopAll();
     await this.#supervisor.stopAll();
   }
 }

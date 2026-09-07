@@ -17,6 +17,8 @@ import type { CallGate } from "../gate.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { readCommandPrograms } from "./command.js";
 import { programDirectories, shellResource } from "./resolve.js";
+import { createJobsTool } from "./jobs.js";
+import type { BackgroundJobs } from "../../process/background.js";
 
 export { shellResource } from "./resolve.js";
 export { readCommandPrograms, programName } from "./command.js";
@@ -68,6 +70,8 @@ export interface ShellInput {
   /** A directory inside the project. Defaults to the project root. */
   readonly cwd: string | undefined;
   readonly timeoutMs: number | undefined;
+  /** Start it and return, instead of waiting for it to finish. */
+  readonly background: boolean;
   /**
    * Every program the line starts, in the order it names them.
    *
@@ -91,7 +95,16 @@ const SHELL_DESCRIPTION =
   "Runs one command line through this machine's shell, for example " +
   '"npm test". The shell interprets pipes, quotes, and redirection. A line ' +
   "that names several programs - as a chain does - is approved for each of " +
-  "them.";
+  "them.\n\n" +
+  // Said here rather than left to be discovered, because discovering it costs
+  // a full timeout and returns nothing: a server started in the foreground
+  // holds the call until the limit and then has its output thrown away with
+  // the failure.
+  "Set background: true for a command that is not meant to finish - a dev " +
+  "server, a watcher, a long download. It returns a job id at once; use " +
+  "the jobs tool to read its output or stop it. Do not try to detach a " +
+  "command yourself: a line that launches something into the background " +
+  "still hands it these pipes, so this tool waits for it either way.";
 
 const SHELL_SCHEMA = {
   type: "object",
@@ -99,6 +112,7 @@ const SHELL_SCHEMA = {
     command: { type: "string", minLength: 1 },
     cwd: { type: "string" },
     timeoutMs: { type: "number", minimum: 1000, maximum: 600000 },
+    background: { type: "boolean" },
   },
   required: ["command"],
   additionalProperties: false,
@@ -269,7 +283,18 @@ function report(
   return clipped;
 }
 
-export function createShellTool(): ToolDefinition<ShellInput, string> {
+export interface ShellToolOptions {
+  /**
+   * The registry background commands are kept in. Omitted, `background: true`
+   * is refused with a sentence saying so rather than quietly running in the
+   * foreground - a caller that asked not to wait must not be made to wait.
+   */
+  readonly jobs?: BackgroundJobs;
+}
+
+export function createShellTool(
+  options: ShellToolOptions = {},
+): ToolDefinition<ShellInput, string> {
   return defineStudioTool({
     // Built from the interpreter this machine resolved, so the sentence the
     // model reads names the shell that will actually run its line.
@@ -325,10 +350,15 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
       // shown for approval.
       const programs = readCommandPrograms(value.command, interpreter);
 
+      if (value.background !== undefined && typeof value.background !== "boolean") {
+        throw new ToolError("invalid_input", { message: "background must be true or false." });
+      }
+
       return {
         command: value.command,
         cwd: value.cwd,
         timeoutMs,
+        background: value.background === true,
         programs,
         interpreter,
       };
@@ -380,6 +410,52 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
         context.sandbox.policy.environment.PATH ?? "",
         context.sandbox.policy.environment.PATHEXT,
       );
+
+      if (input.background) {
+        const jobs = options.jobs;
+        if (jobs === undefined) {
+          throw new ToolError("unavailable", {
+            message:
+              "This composition cannot run background commands. Run it in the " +
+              "foreground with a timeout instead.",
+          });
+        }
+        try {
+          const plan = await context.sandbox.spawnPlan("shell", {
+            executable: interpreter.path,
+            args: [...interpreter.args, input.command],
+            cwd,
+            lineJoin: interpreter.takes,
+            programRoots: granted.directories,
+          });
+          const started = jobs.start({
+            ...plan,
+            command: input.command,
+            conversationId: context.scope.conversationId,
+          });
+          return [
+            `Started ${started.id} in the background: ${input.command}`,
+            "",
+            "It is running now and this call did not wait for it. Read its " +
+              `output with jobs {"id": "${started.id}"}, and stop it with ` +
+              `jobs {"id": "${started.id}", "stop": true} when you are done ` +
+              "with it.",
+          ].join("\n");
+        } catch (error) {
+          if (error instanceof ToolError) throw error;
+          if (error instanceof SandboxError) {
+            return [
+              `The command runs ${input.programs.join(", ")}, and the sandbox ` +
+                "could not make everything it needs readable, so nothing ran.",
+              error.message,
+            ].join("\n");
+          }
+          throw new ToolError("execution_failed", {
+            message: `The command could not be started in ${interpreter.label}.`,
+            cause: error,
+          });
+        }
+      }
 
       try {
         // Through the sandbox rather than straight to `runProcess`, and the
@@ -496,6 +572,7 @@ export function createShellTool(): ToolDefinition<ShellInput, string> {
  * availability depends on the sandbox policy rather than on the tool. A
  * `LocalSandbox` without `allowExec` refuses it at the gate.
  */
-export function registerShellTools(gate: CallGate): void {
-  gate.register(createShellTool());
+export function registerShellTools(gate: CallGate, options: ShellToolOptions = {}): void {
+  gate.register(createShellTool(options));
+  if (options.jobs !== undefined) gate.register(createJobsTool(options.jobs));
 }

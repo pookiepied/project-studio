@@ -262,6 +262,44 @@ export class LocalSandbox {
   }
 
   /**
+   * Everything a spawn needs, contained, without performing it.
+   *
+   * The one seam a background job goes through. `run` cannot serve it: it
+   * resolves on the child's `close`, which is the whole thing a job exists
+   * not to wait for. What must not be duplicated is the part above the spawn
+   * - the isolation check asked at the moment of truth, and the environment
+   * built from policy rather than inherited - so that is here and the caller
+   * gets a descriptor it cannot assemble incorrectly.
+   */
+  async spawnPlan(
+    kind: ChildKind,
+    options: SandboxRunOptions,
+  ): Promise<{
+    readonly executable: string;
+    readonly args: readonly string[];
+    readonly cwd: string;
+    readonly env: Readonly<Record<string, string>>;
+  }> {
+    if (!this.#policy.trusted) {
+      assertIsolationAvailable(isolationForKind(kind), this.#isolationSupport);
+    }
+    const command = await this.plan(kind, {
+      executable: options.executable,
+      args: options.args,
+      cwd: options.cwd,
+      ...(options.lineJoin === undefined ? {} : { lineJoin: options.lineJoin }),
+      ...(options.programRoots === undefined ? {} : { programRoots: options.programRoots }),
+      network: this.#policy.allowNetwork,
+    });
+    return {
+      executable: command.executable,
+      args: command.args,
+      cwd: options.cwd,
+      env: this.environment(),
+    };
+  }
+
+  /**
    * The command that {@link LocalSandbox.run} would actually spawn.
    *
    * Public because "what does containment do to this command" is worth being

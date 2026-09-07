@@ -422,6 +422,14 @@ describe("nothing the model chose reaches a process uncontained", () => {
       // A long-lived streaming child, so it cannot use a call that waits for an
       // exit. It asks `containCommand` for the same verdict instead.
       [join("src", "extend", "mcp", "stdio-channel.ts"), "streams for a session"],
+      // A command the model asked to keep running - a dev server, a watcher.
+      // Same shape as the MCP channel above and here for the same reason:
+      // `LocalSandbox.run` resolves on the child's exit, which is precisely
+      // what a background job never does. Containment is not skipped, only
+      // the waiting - the executable and arguments it spawns come from
+      // `LocalSandbox.spawnPlan`, which performs the isolation check and
+      // builds the environment from policy exactly as `run` does.
+      [join("src", "process", "background.ts"), "outlives the call that started it"],
       // Configures the sandbox. Cannot use the sandbox.
       [join("src", "sandbox", "isolation", "windows", "launcher.ts"), "builds the container"],
       // Asks the kernel whether it will hand out a user namespace, by trying.

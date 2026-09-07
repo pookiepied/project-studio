@@ -8,6 +8,7 @@ import { ModelCatalog } from "../../providers/model-catalog.js";
 import type { CallGate } from "../gate.js";
 import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
 import type { ImageBudget } from "../filesystem/image-budget.js";
+import type { BackgroundJobs } from "../../process/background.js";
 import { registerAskTools, type AskToolRegistration } from "../ask/index.js";
 import { registerPlanTools, type PlanToolRegistration } from "../plan/index.js";
 import { registerGitTools } from "../git/index.js";
@@ -36,6 +37,16 @@ export interface NativeToolRegistrationOptions {
    * turns. A composition that omits it holds each image to its own size only.
    */
   readonly imageBudget?: ImageBudget;
+  /**
+   * Where background commands are kept.
+   *
+   * Passed in for the same reason as the access log and the image budget: a
+   * job outlives the turn that started it, and a registry built here would be
+   * discarded with the run - taking with it the only handle on a process that
+   * is still going. A composition that omits it offers no background mode and
+   * says so when one is asked for.
+   */
+  readonly jobs?: BackgroundJobs;
   /**
    * The read history the filesystem family enforces read-before-modify with.
    *
@@ -84,7 +95,7 @@ export function registerNativeTools(
   );
   registerSearchTools(gate);
   registerGitTools(gate);
-  registerShellTools(gate);
+  registerShellTools(gate, options.jobs === undefined ? {} : { jobs: options.jobs });
   if (options.ask !== undefined) {
     registerAskTools(gate, options.ask);
   }

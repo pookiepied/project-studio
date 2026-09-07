@@ -302,3 +302,29 @@ describe("the two directories a project conversation has", () => {
     expect(environmentBlock(plain)).not.toContain("not part of the project");
   });
 })
+
+/**
+ * The one thing a model cannot discover cheaply.
+ *
+ * A command meant never to finish - a dev server - holds the call until the
+ * time limit and then loses its output with the failure. Discovering that
+ * costs a full timeout and returns nothing, and the obvious workaround makes
+ * it worse: launching the server into its own window still hands it the same
+ * pipes, so the call waits exactly as long. Both facts belong in the block.
+ */
+describe("what the block says about commands that do not finish", () => {
+  const block = () =>
+    environmentBlock(environmentFacts("/w", new Date("2026-09-07T10:00:00"), "conversation"))
+
+  it("names the background option rather than leaving it to be found", () => {
+    if (!ISOLATION_ENFORCED) return
+    expect(block()).toContain("background option")
+  })
+
+  it("says that detaching by hand does not avoid the wait", () => {
+    // Without this the model reaches for `start` or `&`, waits out the
+    // timeout anyway, and reports the tool as broken.
+    if (!ISOLATION_ENFORCED) return
+    expect(block()).toContain("Do not try to detach a command by hand")
+  })
+})

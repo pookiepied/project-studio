@@ -23,6 +23,7 @@ import { createSandboxPolicy } from "../../../src/sandbox/policy.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
+import { BackgroundJobs } from "../../../src/process/background.js";
 import { readCommandPrograms } from "../../../src/tools/shell/command.js";
 import {
   interpreterCanStart,
@@ -87,7 +88,7 @@ function recordingApprover() {
   };
 }
 
-function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recordingApprover> } = {}) {
+function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recordingApprover>; jobs?: BackgroundJobs } = {}) {
   const sandbox = new LocalSandbox(
     createSandboxPolicy({
       workspaceRoot: workspace,
@@ -110,7 +111,7 @@ function gate(options: { allowExec?: boolean; approver?: ReturnType<typeof recor
     }),
     sandbox,
   });
-  registerShellTools(instance);
+  registerShellTools(instance, options.jobs === undefined ? {} : { jobs: options.jobs });
   return instance;
 }
 
@@ -777,3 +778,80 @@ describe("command lines running together", () => {
     expect(String(fine)).toContain("unaffected");
   });
 });
+
+/**
+ * The background mode, through the tool rather than through the registry.
+ *
+ * The registry's own behaviour is covered in `background-jobs.test.ts`. What
+ * is left to this file is the seam: that the flag reaches it, that a
+ * composition without one refuses instead of quietly blocking, and that the
+ * jobs tool only appears where there is somewhere to keep jobs.
+ */
+describe("running a command in the background", () => {
+  /**
+   * Ends every job and waits for the OS to let go.
+   *
+   * A live child holds its working directory open, and the suite's teardown
+   * removes that directory - so a test that merely issues the kill races the
+   * cleanup and fails with EPERM on a path that has nothing to do with what
+   * it was testing.
+   */
+  async function releaseAll(jobs: BackgroundJobs): Promise<void> {
+    jobs.stopAll();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
+  it("returns a job id instead of waiting for the command to finish", async () => {
+    const jobs = new BackgroundJobs();
+    const instance = gate({ jobs });
+
+    const answer = await run(instance, {
+      command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
+      background: true,
+    });
+
+    // A foreground call here would sit until its timeout; this one came back.
+    expect(String(answer)).toMatch(/Started job_1 in the background/);
+    expect(jobs.list(SCOPE.conversationId)).toHaveLength(1);
+    await releaseAll(jobs);
+  });
+
+  it("reads and stops the job through the jobs tool", async () => {
+    const jobs = new BackgroundJobs();
+    const instance = gate({ jobs });
+    await run(instance, {
+      command: `${NODEQ} -e "setInterval(() => {}, 1000)"`,
+      background: true,
+    });
+
+    const listed = await instance.call({ name: "native/jobs", input: {}, scope: SCOPE });
+    expect(String(listed)).toContain("job_1");
+
+    await instance.call({
+      name: "native/jobs",
+      input: { id: "job_1", stop: true },
+      scope: SCOPE,
+    });
+    expect(jobs.get(SCOPE.conversationId, "job_1")?.state).toBe("stopped");
+    await releaseAll(jobs);
+  });
+
+  it("refuses to stop without being told which job", async () => {
+    // Read as "stop everything", a forgotten id would take down a server the
+    // caller still needed, with nothing in the call saying so.
+    const instance = gate({ jobs: new BackgroundJobs() });
+
+    await expect(
+      instance.call({ name: "native/jobs", input: { stop: true }, scope: SCOPE }),
+    ).rejects.toThrow(/id of the job to stop/);
+  });
+
+  it("says so rather than blocking when there is nowhere to keep a job", async () => {
+    // A caller that asked not to wait must not be made to wait.
+    const instance = gate();
+
+    await expect(
+      run(instance, { command: `${NODEQ} -e "0"`, background: true }),
+    ).rejects.toThrow(/cannot run background commands/);
+  });
+})
