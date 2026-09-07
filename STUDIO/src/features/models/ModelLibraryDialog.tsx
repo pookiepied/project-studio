@@ -83,6 +83,12 @@ export function ModelLibraryDialog({
 
   // Reopening starts over: a library that remembers a query from last time
   // answers a question nobody is asking yet.
+  //
+  // On the way out is safe, though it does not look it: the dialog's exit is
+  // an AnimatePresence child, and the subtree it is holding is the one it
+  // rendered last, so state changed after `open` went false never reaches the
+  // screen. Measured before changing it - resetting on the way in instead
+  // moved nothing at all.
   useEffect(() => {
     if (!open) {
       setQuery('')

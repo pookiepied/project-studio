@@ -372,14 +372,22 @@ function ModelPanel({
   // Only picks that still resolve to a catalog row are offered. A model that
   // was removed since it was last chosen simply stops appearing here; the
   // remembered name is a shortcut, not a record the picker has to honour.
-  // Only picks that still resolve, and never the one already in force. A
-  // shortcut to where you already are is a row that does nothing, and it was
-  // the top row of the list - so the section spent its most valuable line
-  // offering the state the menu is already in.
+  // Only picks that still resolve to a catalog row. A model that was removed
+  // since it was last chosen simply stops appearing here; the remembered name
+  // is a shortcut, not a record the picker has to honour.
+  //
+  // The one in force is deliberately NOT filtered out, though it was for a
+  // day. These rows and "Default model" are one radio group over a single
+  // question - what does this turn ride - and a group whose current answer is
+  // removed from it can never draw its own check. The column then sits empty
+  // on every recent for ever, which is a reserved space that means nothing,
+  // and picking a row you were already on stops being confirmable. An empty
+  // check beside a row that COULD carry one says "not this one", which is the
+  // ordinary and useful thing; an empty check beside a row that never can is
+  // just an indent.
   const recent = loadRecentModelIds()
     .map((id) => findCatalogModel(catalog.models, id))
     .filter((entry): entry is CatalogModel => entry !== undefined)
-    .filter((entry) => entry.id !== selected)
 
   return (
     <>

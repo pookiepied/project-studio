@@ -678,14 +678,12 @@ describe('the Chat default, as the chat page sees it', () => {
 })
 
 describe('the recents shortcut', () => {
-  it('never offers the model already picked', async () => {
-    // The top row of the list was a shortcut to where you already are: it
-    // spent the section's most valuable line on the state the menu is in.
-    //
-    // Only for a model actually PICKED. A recent that matches the Chat
-    // default is still offered while a conversation is merely following it,
-    // because choosing it there is not a no-op - it pins the conversation,
-    // which is what the head says the rows below do.
+  it('draws the check on the recent that is in force', async () => {
+    // These rows and "Default model" are one radio group over one question.
+    // Filtering the current answer out of the group, which this did for a
+    // day, left a check column that could never fill on any recent - a
+    // reserved space meaning nothing, and no way to confirm the row you just
+    // clicked was the row that took effect.
     harnessConfigured()
     stubFetch(defaultRoute([THIRD_FLAT, FOURTH_FLAT]))
     localStorage.setItem(
@@ -701,8 +699,68 @@ describe('the recents shortcut', () => {
 
     await openModelPanel()
     const menu = within(screen.getByRole('menu'))
-    expect(menu.getByText('delta-pro')).toBeTruthy()
-    // Named in the head, where it belongs; not offered as somewhere to go.
-    expect(menu.queryAllByText('kappa-mini')).toHaveLength(1)
+    const chosen = await menu.findByRole('menuitemradio', { name: /kappa-mini/ })
+    expect(chosen.getAttribute('aria-checked')).toBe('true')
+    expect(
+      menu.getByRole('menuitemradio', { name: /delta-pro/ }).getAttribute('aria-checked'),
+    ).toBe('false')
+  })
+
+  it('checks the default row instead while a conversation is only following', async () => {
+    // Nothing in the list is the answer here, and every recent showing an
+    // empty check is the correct reading of "not this one".
+    harnessConfigured()
+    stubFetch(defaultRoute([THIRD_FLAT]))
+    localStorage.setItem('studio.recent-models', JSON.stringify(['anthropic/kappa-mini']))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+    const menu = within(screen.getByRole('menu'))
+
+    expect(
+      (await menu.findByRole('menuitemradio', { name: 'Default model' })).getAttribute(
+        'aria-checked',
+      ),
+    ).toBe('true')
+    expect(
+      menu.getByRole('menuitemradio', { name: /kappa-mini/ }).getAttribute('aria-checked'),
+    ).toBe('false')
+  })
+})
+
+/**
+ * Leaving the library.
+ *
+ * What is pinned here is the reset, not the animation: a library that
+ * remembers last time's query answers a question nobody is asking yet. The
+ * dismissal itself is a matter of timing between the panel and the scrim
+ * behind it, which lives in the Dialog primitive and has no honest assertion
+ * in jsdom - nothing there drives an exit to completion.
+ */
+describe('the library on the way out', () => {
+  it('starts over when it is opened again', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openLibrary()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), {
+      target: { value: 'jamba' },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /jamba-large-1\.7/ }))
+    await screen.findByText('Capabilities')
+    fireEvent.click(screen.getByRole('button', { name: 'Use this model' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Model library' })).toBeNull())
+
+    await openLibrary()
+
+    // The landing, with the search cleared. Not asserted: that the model page
+    // is gone from the DOM. The library's own page transition keeps an
+    // outgoing view mounted, and nothing in jsdom drives that exit to
+    // completion - so its presence proves nothing either way.
+    expect(familyIndex().getByRole('button', { name: /Anthropic/ })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveProperty('value', '')
   })
 })

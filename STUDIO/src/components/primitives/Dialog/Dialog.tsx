@@ -92,7 +92,20 @@ export function Dialog({
             aria-label={title}
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98, transition: { duration: DURATION.fast } }}
+            // Leaving takes as long as the scrim behind it, and travels far
+            // enough to read as leaving. It used to exit in `fast` while the
+            // scrim faded over `base`: the panel was gone a third of the way
+            // through, so what you actually saw was the box blinking out and
+            // then a scrim fading behind nothing. That is what "it just
+            // closes, there is no transition" describes - not a missing
+            // animation, a dismissal whose two halves were not the same
+            // length.
+            exit={{
+              opacity: 0,
+              scale: 0.96,
+              y: 4,
+              transition: { duration: DURATION.base, ease: EASE_OUT },
+            }}
             transition={SPRING_SURFACE}
             style={{ width, height }}
             className={cn(
