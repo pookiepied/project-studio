@@ -2,13 +2,9 @@ import { SHELL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { IdentityLine } from '@/shell/chrome/IdentityLine'
-import { ContextMeter } from '@/shell/chrome/SessionControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useNavigation } from '@/stores/navigation'
-import { contextBreakdown } from '@/domain/session/context'
-import { effectiveTurnSettings } from '@/domain/session/settings'
-import { findCatalogModel } from '@/domain/models/catalog'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
@@ -21,27 +17,21 @@ import { useWorkspace } from '@/stores/workspace'
  * Left is the window: controls and the sidebar toggle, and nothing else.
  * Centre is what you are looking at — and it gets the room, because the
  * identity line (project, title, branch) is the thing worth reading here.
- * Right is what the next message will cost and how it will be sent: the
- * context meter and the turn settings, and only on a conversation.
- * Everywhere else the strip ends in nothing, so the page's own content is the
- * last thing at the top of the window rather than a control repeated on every
- * screen.
+ * Right is the turn: which model, how hard it thinks, and how full its window
+ * is - one control, because those are one subject. Everywhere else the strip
+ * ends in nothing, so the page's own content is the last thing at the top of
+ * the window rather than a control repeated on every screen.
  *
- * The meter used to sit on the left, immediately beside the sidebar toggle,
- * where it read as a second button belonging to the window chrome. It is not
- * about the window; it is about this conversation and the model it is held
- * with, which is the same subject as the control beside it now. Keeping it
- * out of the centre is deliberate too: the identity line is centred on the
- * page and sized to its own content, so anything added to it moves the title
- * sideways and takes truncation room off it — and the title is already
- * carrying the shimmer, which is enough movement for one place.
+ * The context meter used to be a ring of its own, first beside the sidebar
+ * toggle and then beside the model pill. Neither place was right: it read as
+ * a window control in the first and as a second small circle next to the
+ * provider's mark in the second, and in both it was a fraction shown apart
+ * from its own denominator. It lives inside the model's menu now. What is
+ * left on the strip is a percentage in the pill's own words, once it is news.
  */
-/** What a conversation with nothing reported yet is worth: nothing, measured. */
-const EMPTY_REPORT = { measured: null, pending: 0 } as const
-
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations, settings, catalog, running, contextReports } = useWorkspace()
+  const { conversations, running } = useWorkspace()
 
   const conversation =
     route.kind === 'chat'
@@ -52,22 +42,6 @@ export function TopStrip() {
   const turnSettings = route.kind !== 'settings'
 
   const turnRunning = conversation !== null && running.has(conversation.id)
-
-  const effective = effectiveTurnSettings(conversation, settings)
-  const model = findCatalogModel(catalog.models, effective.modelId)
-
-  // The meter is measured against the model the conversation is actually held
-  // with - the same derivation the picker shows and the send uses - so a
-  // model with a small window does not borrow a big one's scale.
-  //
-  // The report comes from the open conversation's own page, which is the only
-  // thing that can see its transcript. Absent means that page has said
-  // nothing yet, and an empty report is the honest stand-in: no turn measured,
-  // nothing estimated, a ring at zero.
-  const report =
-    conversation === null ? null : contextReports.get(conversation.id) ?? EMPTY_REPORT
-  const breakdown =
-    report === null ? null : contextBreakdown(report, model?.contextWindow ?? null)
 
   return (
     <header
@@ -133,13 +107,6 @@ export function TopStrip() {
             invites the reading that it is *part of* those preferences — that
             changing it here is changing a default. It is not; it is a
             per-turn choice. Showing it where it cannot mean that is the fix. */}
-        {conversation && breakdown ? (
-          <ContextMeter
-            breakdown={breakdown}
-            running={turnRunning}
-            modelName={model?.name ?? null}
-          />
-        ) : null}
         {turnSettings ? <TurnMenu /> : null}
       </div>
     </header>

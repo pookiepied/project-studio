@@ -477,3 +477,70 @@ describe('the model picker', () => {
     expect(settled.getAttribute('aria-valuetext')).toBe('X-high')
   })
 })
+
+/**
+ * The context, where the model is.
+ *
+ * A fill is a fraction and the model is its denominator, so the window, the
+ * name and the bar are one statement here rather than a ring in one corner
+ * and a name in another. What is pinned: the window is stated under the name
+ * a turn would actually use, the bar exists only where there is a transcript
+ * to measure, and the strip stays quiet until the figure is worth reading.
+ */
+describe('the window the turn is measured against', () => {
+  /** Picks a model in one click through the recents shortcut. */
+  async function pickRecent(id: string, name: string) {
+    localStorage.setItem('studio.recent-models', JSON.stringify([id]))
+    await openModelPanel()
+    fireEvent.click(within(screen.getByRole('menu')).getByText(name))
+  }
+
+  it('states the selected model window under its name', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
+    await openModelPanel()
+
+    expect(await screen.findByText('200k context window')).toBeTruthy()
+  })
+
+  it('draws the bar on a conversation, and nothing to fill off one', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
+    await openModelPanel()
+    expect(screen.getByRole('meter', { name: 'Context used' })).toBeTruthy()
+
+    // Home has a composer and therefore a model, but no transcript - so there
+    // is a window to name and nothing yet occupying it.
+    cleanup()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker()
+    await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
+    await openModelPanel()
+    expect(screen.getByText('200k context window')).toBeTruthy()
+    expect(screen.queryByRole('meter', { name: 'Context used' })).toBeNull()
+  })
+
+  it('keeps the percentage off the strip until it is news', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await pickRecent('anthropic/jamba-large-1.7', 'jamba-large-1.7')
+
+    // Nothing has been sent, so the window is empty and the trigger says only
+    // what it always said: which model. A "0%" here would be a number the
+    // reader is invited to watch, and watching it is never the work.
+    const trigger = screen.getByRole('button', { name: 'Turn settings' })
+    expect(trigger.textContent).toContain('jamba-large-1.7')
+    expect(trigger.textContent).not.toContain('%')
+  })
+})

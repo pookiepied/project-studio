@@ -14,8 +14,15 @@ import {
   restingReasoningLevel,
   type ReasoningChoice,
 } from '@/domain/models/types'
+import {
+  contextBreakdown,
+  formatTokens,
+  type ContextBreakdown,
+  type ContextReport,
+} from '@/domain/session/context'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { loadRecentModelIds, rememberRecentModel } from '@/domain/session/recents'
+import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 import { ModelLibraryDialog } from '@/features/models/ModelLibraryDialog'
 import { CatalogStateNote } from '@/features/models/CatalogStateNote'
 import { useNavigation } from '@/stores/navigation'
@@ -58,6 +65,20 @@ import { cn } from '@/lib/cn'
  * rather than growing a second library. Until a model is named, the pill says
  * "Choose a model" rather than dressing the default up as a selection.
  *
+ * ---- Why the context lives here --------------------------------------------
+ *
+ * Because a fill is a fraction, and the model is its denominator. Shown apart
+ * - as the ring in the strip was - "42k" is a number with nothing to compare
+ * it against, and the reader has to remember which model is selected to know
+ * whether that is a tenth of the window or nearly all of it. Shown here, the
+ * name, the window and the fill are one statement, and the control that
+ * changes the denominator is directly under the bar it changes.
+ *
+ * It also settles what the strip should carry at rest: nothing but the
+ * percentage, in the pill's own words, once it is news. Two small circles
+ * side by side - a provider's mark and a meter ring - is one circle too many
+ * for a corner meant to read as a label.
+ *
  * ---- Why reasoning is a slider ---------------------------------------------
  *
  * Because it is the one setting here that is a dial rather than a choice. The
@@ -72,9 +93,20 @@ import { cn } from '@/lib/cn'
 
 type View = 'root' | 'reasoning'
 
+/** A conversation the page has said nothing about yet: nothing measured. */
+const EMPTY_REPORT: ContextReport = { measured: null, pending: 0 }
+
 export function TurnMenu() {
-  const { settings, setSettings, setConversationSettings, conversations, catalog, ensureStore } =
-    useWorkspace()
+  const {
+    settings,
+    setSettings,
+    setConversationSettings,
+    conversations,
+    catalog,
+    ensureStore,
+    contextReports,
+    running,
+  } = useWorkspace()
   const { route, openSettings } = useNavigation()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('root')
@@ -89,6 +121,22 @@ export function TurnMenu() {
       : null
   const effective = effectiveTurnSettings(active, settings)
   const model = findCatalogModel(catalog.models, effective.modelId)
+
+  // Measured against the model this surface would actually send with, which
+  // is the same derivation the label above uses - so the fill and the name it
+  // is drawn under can never disagree.
+  //
+  // Only on a conversation: home and a project have a composer but no
+  // transcript, so there is no window to be part-full. The report comes from
+  // the open conversation's own page, the only thing that can see its items.
+  const breakdown =
+    active === null
+      ? null
+      : contextBreakdown(
+          contextReports.get(active.id) ?? EMPTY_REPORT,
+          model?.contextWindow ?? null,
+        )
+  const turnRunning = active !== null && running.has(active.id)
 
   // Reopening lands on the top level. A menu that remembers it was left on a
   // sub-page reopens showing something other than what its trigger describes.
@@ -128,6 +176,12 @@ export function TurnMenu() {
   // that says what to do about it.
   const label = model?.name ?? 'Choose a model'
 
+  // The one thing the strip still says about the window at rest, and only
+  // when it has become worth saying. Below this the number is a figure nobody
+  // needs; above it, it changes what you do next.
+  const percent = breakdown === null ? null : Math.round(breakdown.used * 100)
+  const warn = percent !== null && percent >= 60
+
   return (
     <>
       <Popover
@@ -138,7 +192,11 @@ export function TurnMenu() {
         className="studio-scroll-bounded max-h-[28rem] w-80 overflow-y-auto"
         trigger={
           <Tooltip
-            label={[label, reasoningLabel(model, effective.reasoningLevel)]
+            label={[
+              label,
+              reasoningLabel(model, effective.reasoningLevel),
+              percent === null ? null : `${percent}% of the context window used`,
+            ]
               .filter(Boolean)
               .join(' · ')}
             side="bottom"
@@ -161,6 +219,9 @@ export function TurnMenu() {
                   places. */}
               {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
               <span className="min-w-0 truncate">{label}</span>
+              {warn ? (
+                <span className="shrink-0 tabular-nums text-muted-foreground">{percent}%</span>
+              ) : null}
               <Icons.disclosure state={open ? 'on' : 'rest'} className="opacity-60" />
             </button>
           </Tooltip>
@@ -176,7 +237,10 @@ export function TurnMenu() {
         ) : (
           <ModelPanel
             catalog={catalog}
+            model={model}
             selected={effective.modelId}
+            breakdown={breakdown}
+            running={turnRunning}
             onChoose={chooseModel}
             onOpenReasoning={() => setView('reasoning')}
             onOpenLibrary={() => {
@@ -245,7 +309,10 @@ function reasoningSteps(model: CatalogModel | undefined) {
 
 function ModelPanel({
   catalog,
+  model,
   selected,
+  breakdown,
+  running,
   reasoningLabel,
   hasReasoningControl,
   onChoose,
@@ -253,13 +320,19 @@ function ModelPanel({
   onOpenLibrary,
 }: {
   catalog: ReturnType<typeof useWorkspace>['catalog']
+  model: CatalogModel | undefined
   selected: string | null
+  /** Null off a conversation: a composer with no transcript has no window. */
+  breakdown: ContextBreakdown | null
+  running: boolean
   reasoningLabel: string | null
   hasReasoningControl: boolean
   onChoose: (modelId: string | null) => void
   onOpenReasoning: () => void
   onOpenLibrary: () => void
 }) {
+  const [detailed, setDetailed] = useState(false)
+
   if (catalog.phase.status !== 'ready') {
     return <CatalogStateNote catalog={catalog} />
   }
@@ -287,13 +360,66 @@ function ModelPanel({
 
   return (
     <>
+      {/* The head of the menu is the answer to "what am I sending, and how
+          much room is left in it". The model names itself, its window sits
+          under the name, and the bar is drawn against that window - one
+          statement rather than a name here and a fraction somewhere else. */}
+      {model !== undefined ? (
+        <div className="flex flex-col gap-2.5 px-2 pb-1 pt-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <ProviderMark provider={model.author} className="shrink-0" />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-ui text-foreground">{model.name}</span>
+              <span className="text-micro text-muted-foreground">
+                {model.contextWindow === 'unknown'
+                  ? 'Context window not declared'
+                  : `${formatTokens(model.contextWindow)} context window`}
+              </span>
+            </span>
+          </div>
+
+          {breakdown === null ? null : (
+            <>
+              <ContextTank breakdown={breakdown} running={running} />
+              <button
+                type="button"
+                onClick={() => setDetailed((current) => !current)}
+                aria-expanded={detailed}
+                className="flex items-center gap-1 self-start text-micro text-muted-foreground transition-colors duration-fast hover:text-foreground"
+              >
+                <Icons.disclosure state={detailed ? 'on' : 'rest'} />
+                {detailed ? 'Hide breakdown' : 'Breakdown'}
+              </button>
+              {detailed ? <ContextDetails breakdown={breakdown} /> : null}
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {/* The dial, in the open rather than behind a row: it is the second
+          thing about this turn, and a setting you adjust by feel should not
+          cost a page turn to reach. The sub-view survives for the notes each
+          step carries, which do not fit here. */}
+      {hasReasoningControl ? (
+        <>
+          <MenuSeparator />
+          <MenuItem
+            icon={<Icons.reasoning />}
+            hint={reasoningLabel ?? undefined}
+            onSelect={onOpenReasoning}
+          >
+            Reasoning
+          </MenuItem>
+        </>
+      ) : null}
+
+      <MenuSeparator />
       <MenuItem selected={selected === null} onSelect={() => onChoose(null)}>
         Default model
       </MenuItem>
 
       {recent.length > 0 ? (
         <>
-          <MenuSeparator />
           <MenuLabel>Recent</MenuLabel>
           {recent.map((candidate) => (
             <MenuItem
@@ -314,25 +440,9 @@ function ModelPanel({
           facts about each model, one step away. A picker is for choosing;
           browsing two hundred rows is a different activity and gets a page
           that can hold it. */}
-      <MenuSeparator />
       <MenuItem icon={<Icons.search />} onSelect={onOpenLibrary}>
         Model library…
       </MenuItem>
-
-      {/* Absent entirely for a model with no reasoning support - present and
-          inert would be a control that lies. */}
-      {hasReasoningControl ? (
-        <>
-          <MenuSeparator />
-          <MenuItem
-            icon={<Icons.reasoning />}
-            hint={reasoningLabel ?? undefined}
-            onSelect={onOpenReasoning}
-          >
-            Reasoning
-          </MenuItem>
-        </>
-      ) : null}
     </>
   )
 }

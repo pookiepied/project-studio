@@ -1,14 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { contextBreakdown } from '@/domain/session/context'
-import { ContextMeter } from '@/shell/chrome/SessionControls'
+import { ContextDetails, ContextTank } from '@/shell/chrome/ContextTank'
 
 /**
- * The context panel says only what something measured.
+ * The context account says only what something measured.
  *
  * The pressure on a panel like this is to look complete: a row for the system
  * prompt, one for tool definitions, one for MCP, one for skills, one for
@@ -20,35 +20,50 @@ import { ContextMeter } from '@/shell/chrome/SessionControls'
 
 afterEach(cleanup)
 
-function open(
+function tank(
   measured: { fresh: number; cached: number; reply: number } | null,
   pending: number,
   window: number | 'unknown' | null = 200_000,
 ) {
+  const breakdown = contextBreakdown({ measured, pending }, window)
   render(
-    <ContextMeter
-      breakdown={contextBreakdown({ measured, pending }, window)}
-      running={false}
-      modelName="Opus 5"
-    />,
+    <>
+      <ContextTank breakdown={breakdown} running={false} />
+      <ContextDetails breakdown={breakdown} />
+    </>,
   )
-  fireEvent.click(screen.getByRole('button', { name: /Context/ }))
 }
 
-describe('the context panel', () => {
-  it('divides the window into what was sent, what came back, and what is free', () => {
-    open({ fresh: 10_000, cached: 30_000, reply: 2_000 }, 0)
+describe('the context tank', () => {
+  it('states the fill against the window, in units a person reads', () => {
+    tank({ fresh: 10_000, cached: 30_000, reply: 2_000 }, 0)
 
-    expect(screen.getByText('42k / 200k')).toBeTruthy()
+    expect(screen.getByText('42k')).toBeTruthy()
+    expect(screen.getByText(/200k · 21%/)).toBeTruthy()
+  })
+
+  it('draws the bands in the window own proportions', () => {
+    tank({ fresh: 50_000, cached: 0, reply: 0 }, 0)
+
+    const meter = screen.getByRole('meter', { name: 'Context used' })
+    expect(meter.getAttribute('aria-valuenow')).toBe('25')
+    expect((meter.firstElementChild as HTMLElement | null)?.style.width).toBe('25%')
+  })
+})
+
+describe('the breakdown behind it', () => {
+  it('divides the window into what was sent, what came back, and what is free', () => {
+    tank({ fresh: 10_000, cached: 30_000, reply: 2_000 }, 0)
+
     // The prompt is one figure to a reader, however the provider split it for
-    // billing: 10,000 fresh plus 30,000 from cache is 40,000 sent.
+    // billing: 10,000 fresh plus 30,000 from cache is 40k sent.
     expect(screen.getByText('40k')).toBeTruthy()
     expect(screen.getByText('2k')).toBeTruthy()
     expect(screen.getByText('158k')).toBeTruthy()
   })
 
   it('marks the unmeasured tail as an estimate rather than letting it pass', () => {
-    open({ fresh: 1_000, cached: 0, reply: 100 }, 250)
+    tank({ fresh: 1_000, cached: 0, reply: 100 }, 250)
 
     expect(screen.getByText('Since that turn')).toBeTruthy()
     expect(screen.getByText('~250')).toBeTruthy()
@@ -58,7 +73,7 @@ describe('the context panel', () => {
     // A conversation whose first reply has not landed has no measured turn at
     // all, and a "Reply: 0" row would be a statement about a turn that never
     // happened.
-    open(null, 400)
+    tank(null, 400)
 
     expect(screen.queryByText('Sent to the model')).toBeNull()
     expect(screen.queryByText('Reply')).toBeNull()
@@ -70,7 +85,7 @@ describe('the context panel', () => {
     // has been typed since. A "Since that turn: ~0" row is a row about
     // nothing, and a "Reply: 0" on a turn that failed before producing
     // anything is worse - it reads as a reply that was empty.
-    open({ fresh: 1_000, cached: 0, reply: 0 }, 0)
+    tank({ fresh: 1_000, cached: 0, reply: 0 }, 0)
 
     expect(screen.getByText('Sent to the model')).toBeTruthy()
     expect(screen.queryByText('Reply')).toBeNull()
@@ -78,35 +93,14 @@ describe('the context panel', () => {
   })
 
   it('says when the window it divided by is a stand-in', () => {
-    open({ fresh: 1_000, cached: 0, reply: 0 }, 0, 'unknown')
+    tank({ fresh: 1_000, cached: 0, reply: 0 }, 0, 'unknown')
 
     expect(screen.getByText(/declares no window/)).toBeTruthy()
   })
 
-  it('names the model whose window it measured against', () => {
-    open({ fresh: 1_000, cached: 0, reply: 0 }, 0)
+  it('says how much of the prompt the cache carried, and that it still occupies the window', () => {
+    tank({ fresh: 5_000, cached: 35_000, reply: 100 }, 0)
 
-    expect(screen.getByText(/Opus 5/)).toBeTruthy()
-  })
-
-  it('prints the percentage beside the ring only once it is news', () => {
-    render(
-      <ContextMeter
-        breakdown={contextBreakdown({ measured: { fresh: 20_000, cached: 0, reply: 0 }, pending: 0 }, 200_000)}
-        running={false}
-        modelName="Opus 5"
-      />,
-    )
-    expect(screen.queryByText('10%')).toBeNull()
-
-    cleanup()
-    render(
-      <ContextMeter
-        breakdown={contextBreakdown({ measured: { fresh: 140_000, cached: 0, reply: 0 }, pending: 0 }, 200_000)}
-        running={false}
-        modelName="Opus 5"
-      />,
-    )
-    expect(screen.getByText('70%')).toBeTruthy()
+    expect(screen.getByText(/35k of the 40k sent came from the cache/)).toBeTruthy()
   })
 })

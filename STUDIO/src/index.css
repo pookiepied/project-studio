@@ -831,29 +831,31 @@
     }
   }
 
-  /* The context ring turning while a turn is in flight.
+  /* The context bar while a turn is in flight.
 
-     It moves in sympathy with the title's shimmer rather than reporting the
-     run itself, so the strip has one live thing instead of two. Slower than
-     the send button's halo on purpose: the halo sits on the control you press
-     to stop, where urgency is the point, and this sits beside a title you are
-     reading.
+     The figure it draws is still moving -- a measured turn plus an estimate
+     of everything after it -- so the bar breathes rather than sitting as a
+     settled fact. It moves in sympathy with the title's shimmer rather than
+     reporting the run itself; the title is what reports it. Slower than the
+     send button's halo on purpose: the halo sits on the control you press to
+     stop, where urgency is the point, and this sits inside a menu you opened
+     to read.
 
-     The global reduced-motion rule collapses it to a single frame, which is
-     the ring at rest -- the meter it draws is unaffected. */
-  .studio-spin {
-    animation: studio-spin 2.6s linear infinite;
+     Opacity only, so nothing about the bar's length or position moves and the
+     proportions stay readable through the whole cycle. The global
+     reduced-motion rule collapses it to a single frame, which is the bar at
+     rest -- the measurement it draws is unaffected. */
+  .studio-breathe {
+    animation: studio-breathe 2.6s ease-in-out infinite;
   }
 
-  /* Explicit both ends, and both offset by the ring's own -90deg start. A
-     `to`-only keyframe would take its first frame from the element's
-     underlying transform and sweep 450 degrees per cycle instead of 360. */
-  @keyframes studio-spin {
-    from {
-      transform: rotate(-90deg);
+  @keyframes studio-breathe {
+    0%,
+    100% {
+      opacity: 1;
     }
-    to {
-      transform: rotate(270deg);
+    50% {
+      opacity: 0.65;
     }
   }
 
