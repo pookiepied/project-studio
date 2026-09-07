@@ -89,4 +89,5 @@ allowBuilds:
 #   pin all of it end to end; they ran red for the whole 2.0.3 window and
 #   came back green the day this patch landed.
 patchedDependencies:
+  '@earendil-works/pi-ai@0.84.4': patches/@earendil-works__pi-ai@0.84.4.patch
   '@flue/runtime@2.0.3': patches/@flue__runtime@2.0.3.patch
