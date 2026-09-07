@@ -91,6 +91,176 @@ function closeOpenFence(text: string): string {
   return text.endsWith('\n') ? `${text}${marker}` : `${text}\n${marker}`
 }
 
+/**
+ * Close inline markup that has been opened and not yet finished.
+ *
+ * The same argument as `closeOpenFence`, one level down, and it is the reason
+ * a reply used to shimmer as it arrived. A paragraph being written is handed
+ * to the parser on every frame with its inline syntax half-typed, so the
+ * reader watches `**import` sit on screen as literal asterisks, and then the
+ * closing `**` lands and the same words become bold. Bold glyphs are wider, so
+ * the line re-wraps and everything after it moves. That happens once per
+ * emphasis, several times a paragraph.
+ *
+ * Links are the worst of it: `[the docs](https://example.com/a/long/path` is
+ * on screen at full width as ordinary text, and collapses to two words the
+ * instant the `)` arrives.
+ *
+ * Closing the delimiters ourselves means the span is bold - or a link - from
+ * its first character and only grows. The real closer, when it comes, changes
+ * nothing.
+ *
+ * ---- What must NOT be closed --------------------------------------------
+ *
+ * A delimiter is only closed if it could genuinely open emphasis, because the
+ * failure here is worse than the problem: `2 * 3` must not go italic halfway
+ * through an arithmetic expression, and `snake_case_name` must not either.
+ * So this follows CommonMark's flanking rules rather than counting characters
+ * - a run that is followed by whitespace cannot open, and `_` additionally
+ * cannot open inside a word, which is exactly what makes identifiers safe.
+ *
+ * An unclosed `[` is left alone. `[text` and `[text]` render identically as
+ * literal text, so adding the bracket buys nothing and puts a character on
+ * screen that the author did not type.
+ */
+function closeOpenInline(text: string): string {
+  /** Delimiters opened and not yet closed, innermost last. */
+  const open: { char: string; run: number }[] = []
+  let index = 0
+
+  while (index < text.length) {
+    const char = text[index]
+
+    // A backslash escapes whatever follows, including a delimiter.
+    if (char === '\\') {
+      index += 2
+      continue
+    }
+
+    // Code spans first, and they win: a delimiter inside one is literal text,
+    // so emphasis is not parsed until the span closes.
+    if (char === '`') {
+      let run = 1
+      while (text[index + run] === '`') run += 1
+      const close = closingBacktickRun(text, index + run, run)
+      if (close === -1) {
+        // Unterminated. Everything after it is code, so there is nothing
+        // further to parse and the span is the innermost thing open.
+        open.push({ char: '`', run })
+        break
+      }
+      index = close + run
+      continue
+    }
+
+    if (char === '[') {
+      open.push({ char: '[', run: 1 })
+      index += 1
+      continue
+    }
+
+    if (char === ']') {
+      for (let k = open.length - 1; k >= 0; k -= 1) {
+        if (open[k]?.char === '[') {
+          open.splice(k, 1)
+          break
+        }
+      }
+      // A destination has started. Until its `)` arrives the whole URL would
+      // otherwise be on screen as text.
+      if (text[index + 1] === '(') {
+        const close = text.indexOf(')', index + 2)
+        if (close === -1) {
+          open.push({ char: '(', run: 1 })
+          break
+        }
+        index = close + 1
+        continue
+      }
+      index += 1
+      continue
+    }
+
+    if (char === '*' || char === '_' || char === '~') {
+      let run = 1
+      while (text[index + run] === char) run += 1
+
+      // `~` is strikethrough only as a pair; a lone one is an ordinary tilde.
+      if (char === '~' && run !== 2) {
+        index += run
+        continue
+      }
+
+      const before = text[index - 1]
+      const after = text[index + run]
+      const innermost = open[open.length - 1]
+
+      if (innermost?.char === char && canClose(char, before, after)) {
+        open.pop()
+      } else if (canOpen(char, before, after)) {
+        open.push({ char, run })
+      }
+
+      index += run
+      continue
+    }
+
+    index += 1
+  }
+
+  if (open.length === 0) return text
+
+  let closed = text
+  for (let k = open.length - 1; k >= 0; k -= 1) {
+    const entry = open[k]
+    if (entry === undefined || entry.char === '[') continue
+    closed += entry.char === '(' ? ')' : entry.char.repeat(entry.run)
+  }
+  return closed
+}
+
+/** Where a backtick run of exactly `run` backticks next appears, or -1. */
+function closingBacktickRun(text: string, from: number, run: number): number {
+  let index = from
+  while (index < text.length) {
+    if (text[index] !== '`') {
+      index += 1
+      continue
+    }
+    let length = 1
+    while (text[index + length] === '`') length += 1
+    if (length === run) return index
+    index += length
+  }
+  return -1
+}
+
+function isSpace(char: string | undefined): boolean {
+  return char === undefined || /\s/.test(char)
+}
+
+function isWord(char: string | undefined): boolean {
+  return char !== undefined && /[\p{L}\p{N}]/u.test(char)
+}
+
+/**
+ * Left-flanking, in CommonMark's sense: there is something for the emphasis to
+ * be applied to. `* 3` cannot open, which is what keeps arithmetic upright.
+ */
+function canOpen(char: string, before: string | undefined, after: string | undefined): boolean {
+  if (isSpace(after)) return false
+  // Underscore never opens inside a word, so `snake_case_name` stays a name.
+  if (char === '_' && isWord(before)) return false
+  return true
+}
+
+/** Right-flanking: a closer must follow content rather than a space. */
+function canClose(char: string, before: string | undefined, after: string | undefined): boolean {
+  if (isSpace(before)) return false
+  if (char === '_' && isWord(after)) return false
+  return true
+}
+
 /** Walk the document once, producing blocks with their kind and fence state. */
 function blocksOf(text: string): Block[] {
   const blocks: Block[] = []
@@ -187,7 +357,14 @@ export function segment(text: string, settled: boolean): Segments {
   return {
     stable: blocks.slice(0, -1).map((block) => block.text),
     // An open fence is rendered closed, so the block is a code block from its
-    // first line rather than becoming one later.
-    tail: last.open ? closeOpenFence(last.text) : last.text,
+    // first line rather than becoming one later. Anything that is not a fence
+    // gets the same treatment for its inline markup. A closed fence that
+    // happens to be last is left exactly as it is: its content is code, and
+    // the delimiters in it are not markup to be balanced.
+    tail: last.open
+      ? closeOpenFence(last.text)
+      : last.kind === 'fence'
+        ? last.text
+        : closeOpenInline(last.text),
   }
 }
