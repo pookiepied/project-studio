@@ -3,18 +3,11 @@
 Paste the block below as the task. It is written to stand alone: it names what
 to read, what to build, what not to touch, and how to prove it.
 
-**Before handing it over, decide two things.** They are marked in the prompt as
-requiring an answer, and a subagent guessing at either will produce work that
-has to be redone:
-
-1. **Should step 3 include step 4's project UI?** They are independent. Step 3
-   alone is a complete, shippable change.
-2. **Does the heading get reworded?** ADR 0048 now says `# Capabilities`,
-   deliberately worded to be true while tools are still eager. Once discovery
-   exists, "available on request" becomes true and more useful — but changing it
-   is a one-off system-block change for every conversation that already exists.
-   Recommendation: reword it, and take the one-time cost while the number of
-   affected conversations is small.
+**Ready to hand over as-is.** The two decisions it depends on are answered
+inside it: the heading gets reworded to "available on request" (true once this
+step lands, and the one-off system-block cost is cheapest now), and the
+project-scope settings screen stays out of scope for step 4 to design
+separately.
 
 ---
 
@@ -109,12 +102,22 @@ MUST NOT BREAK — each of these has an ADR or a test behind it:
 - Discovery reaches only what selection already resolved to enabled. It is not a
   way to reach a server the project did not enable.
 
-DECISIONS THE PERSON HANDING THIS OVER MUST HAVE ANSWERED — if either is
-unanswered in the message you were given, ask before building:
-- Whether the inventory heading is reworded now that "available on request"
-  becomes true. It is a one-off system-block change for existing conversations.
-- Whether step 4 (the project-scope MCP settings screen) is in scope. Default:
-  no.
+TWO DECISIONS, ALREADY ANSWERED — do not ask about these, just do them:
+
+1. REWORD THE HEADING. Change `# Capabilities` to
+   `# Capabilities available on request`, and adjust the intro paragraph in
+   `capabilityInventoryBlock` so it says the tool names below can be requested
+   in full through the discovery tool, naming that tool. Until now the tools
+   were loaded eagerly and "on request" would have been false; once this step
+   lands it is true, and the more useful wording. This is a one-off system-block
+   change for conversations that already exist, and it is being taken
+   deliberately while few of them do. Update the example block in ADR 0048 §1 to
+   match, and delete the paragraph there explaining why the heading was
+   temporarily the shorter form — it stops being true with this change.
+
+2. THE PROJECT-SCOPE SETTINGS SCREEN IS OUT OF SCOPE. That is step 4 and it is
+   being designed separately. Do not add UI. Global-scope enablement already
+   works, which is enough to exercise everything here by hand.
 
 VERIFICATION — not optional:
 - `pnpm typecheck && pnpm lint` in `STUDIO HARNESS/`, and in `STUDIO/` if you
