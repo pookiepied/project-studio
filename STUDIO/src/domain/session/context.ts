@@ -1,4 +1,5 @@
 import type { Conversation } from '@/domain/session/types'
+import type { UsageFacts } from '@/platform/harness'
 
 /**
  * How much of the context window a conversation is using.
@@ -55,5 +56,51 @@ export function contextUsage(conversation: Conversation, contextWindow: number |
     return total + (message.text.length + thinking) / CHARS_PER_TOKEN + PER_MESSAGE_OVERHEAD
   }, 0)
 
+  return Math.min(1, tokens / window)
+}
+
+/**
+ * What a conversation's history costs, from what the provider actually
+ * charged for the last turn.
+ *
+ * The estimate below exists because nothing better was available; this is the
+ * better thing, and it is what the meter prefers whenever a turn has reported.
+ *
+ * The figure is taken from the LAST assistant message that carried usage, not
+ * summed across the conversation. Usage is reported per request, and every
+ * request after the first re-sends the whole history - so summing would count
+ * the same tokens once per turn and read far over the truth. What the next
+ * request will carry is this turn's prompt plus what this turn produced.
+ *
+ * `input`, `cacheRead` and `cacheWrite` are separate counts of one prompt:
+ * pi reports the cached parts apart from the fresh ones, so the prompt is
+ * their sum, and a cached conversation would otherwise read as almost empty
+ * however long it got.
+ *
+ * Null when no turn has reported yet - a conversation whose first reply is
+ * still arriving has no measurement, and saying zero would claim one.
+ */
+export function reportedContextTokens(
+  items: readonly { readonly kind: string; readonly usage?: UsageFacts | null }[],
+): number | null {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const usage = items[index]?.usage
+    if (usage === undefined || usage === null) continue
+    const prompt =
+      (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+    const produced = usage.output ?? 0
+    const total = prompt + produced
+    if (total > 0) return total
+  }
+  return null
+}
+
+/** That figure as a fraction of the model's window, clamped to one. */
+export function contextUsageFromTokens(
+  tokens: number,
+  contextWindow: number | 'unknown' | null,
+): number {
+  const window =
+    typeof contextWindow === 'number' && contextWindow > 0 ? contextWindow : FALLBACK_WINDOW
   return Math.min(1, tokens / window)
 }

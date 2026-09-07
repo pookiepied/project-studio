@@ -6,7 +6,7 @@ import { ContextMeter } from '@/shell/chrome/SessionControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useNavigation } from '@/stores/navigation'
-import { contextUsage } from '@/domain/session/context'
+import { contextUsage, contextUsageFromTokens } from '@/domain/session/context'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { findCatalogModel } from '@/domain/models/catalog'
 import { useWorkspace } from '@/stores/workspace'
@@ -28,7 +28,7 @@ import { useWorkspace } from '@/stores/workspace'
  */
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations, settings, catalog } = useWorkspace()
+  const { conversations, settings, catalog, running, contextTokens } = useWorkspace()
 
   const conversation =
     route.kind === 'chat'
@@ -41,6 +41,12 @@ export function TopStrip() {
   // The meter is measured against the model the conversation is actually held
   // with - the same derivation the picker shows and the send uses - so a
   // model with a small window does not borrow a big one's scale.
+  // What the open conversation reported, when a turn has reported anything.
+  // Undefined is "no measurement yet", which falls back to the estimate
+  // rather than claiming an empty window.
+  const measured = conversation === null ? undefined : contextTokens.get(conversation.id)
+  const turnRunning = conversation !== null && running.has(conversation.id)
+
   const effective = effectiveTurnSettings(conversation, settings)
   const model = findCatalogModel(catalog.models, effective.modelId)
 
@@ -63,7 +69,15 @@ export function TopStrip() {
         </IconButton>
 
         {conversation ? (
-          <ContextMeter used={contextUsage(conversation, model?.contextWindow ?? null)} />
+          <ContextMeter
+            used={
+              measured === undefined
+                ? contextUsage(conversation, model?.contextWindow ?? null)
+                : contextUsageFromTokens(measured, model?.contextWindow ?? null)
+            }
+            measured={measured !== undefined}
+            running={turnRunning}
+          />
         ) : null}
       </div>
 
@@ -91,7 +105,9 @@ export function TopStrip() {
           shrink-to-fit comes back as zero, silently. */}
       <div className="pointer-events-none absolute inset-x-0 flex justify-center">
         <div className="@container pointer-events-auto flex w-full min-w-0 max-w-[62%] justify-center">
-          {conversation ? <IdentityLine conversation={conversation} /> : null}
+          {conversation ? (
+            <IdentityLine conversation={conversation} running={turnRunning} />
+          ) : null}
         </div>
       </div>
 

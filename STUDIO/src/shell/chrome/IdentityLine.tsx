@@ -4,6 +4,7 @@ import { FADE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
+import { cn } from '@/lib/cn'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { useNavigation } from '@/stores/navigation'
 import { useDetachConversation, useWorkspace } from '@/stores/workspace'
@@ -27,7 +28,26 @@ import type { Conversation } from '@/domain/session/types'
  * eventually report. Merging them would put a real git operation in the same
  * list as "move this chat to a folder".
  */
-export function IdentityLine({ conversation }: { conversation: Conversation }) {
+export function IdentityLine({
+  conversation,
+  running = false,
+}: {
+  conversation: Conversation
+  /**
+   * A turn is in flight in this conversation.
+   *
+   * The title wears the shimmer the transcript already puts on a running tool
+   * row, which is what makes it the run's indicator: nothing new appears,
+   * nothing takes a place in the layout, and the app ends up with one visual
+   * word for "happening now" used at two scales. It goes here rather than on
+   * a capsule of its own because the title is what a reader looks at to know
+   * where they are, and while a turn runs "where you are" includes that it is
+   * still going.
+   *
+   * Defaulted, so a caller with nothing to say about a run says nothing.
+   */
+  running?: boolean
+}) {
   // `projects` stays: the line still *shows* which project a conversation is
   // in. Only `setProject` is gone, with the menu that reassigned it.
   const { projects, rename, setBranch, togglePin, setArchived, remove } = useWorkspace()
@@ -120,7 +140,14 @@ export function IdentityLine({ conversation }: { conversation: Conversation }) {
             {conversation.pinned ? (
               <Icons.pin />
             ) : null}
-            <span className="min-w-0 max-w-[11rem] truncate text-foreground @[26rem]:max-w-[15rem] @[40rem]:max-w-[20rem]">
+            <span
+              className={cn(
+                'min-w-0 max-w-[11rem] truncate text-foreground @[26rem]:max-w-[15rem] @[40rem]:max-w-[20rem]',
+                // `inline-block` is what the sweep needs to have a box to
+                // travel across; `truncate` already supplies the rest.
+                running && 'studio-shimmer inline-block',
+              )}
+            >
               {conversation.title}
             </span>
             <Icons.expand

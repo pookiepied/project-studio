@@ -831,6 +831,32 @@
     }
   }
 
+  /* The context ring turning while a turn is in flight.
+
+     It moves in sympathy with the title's shimmer rather than reporting the
+     run itself, so the strip has one live thing instead of two. Slower than
+     the send button's halo on purpose: the halo sits on the control you press
+     to stop, where urgency is the point, and this sits beside a title you are
+     reading.
+
+     The global reduced-motion rule collapses it to a single frame, which is
+     the ring at rest -- the meter it draws is unaffected. */
+  .studio-spin {
+    animation: studio-spin 2.6s linear infinite;
+  }
+
+  /* Explicit both ends, and both offset by the ring's own -90deg start. A
+     `to`-only keyframe would take its first frame from the element's
+     underlying transform and sweep 450 degrees per cycle instead of 360. */
+  @keyframes studio-spin {
+    from {
+      transform: rotate(-90deg);
+    }
+    to {
+      transform: rotate(270deg);
+    }
+  }
+
   /* The editorial serif. Display sizes carry the page's one statement -- the
      home greeting, a page title. Anywhere else it stops being a voice and
      becomes a second UI font, so the sans carries everything that is read

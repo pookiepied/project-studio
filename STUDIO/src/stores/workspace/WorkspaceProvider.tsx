@@ -208,6 +208,19 @@ interface WorkspaceValue {
    * should own the set both feed.
    */
   markRunning: (conversationId: string, active: boolean) => void
+  /**
+   * The tokens a conversation's history actually occupies, as the harness
+   * last reported them, by conversation id.
+   *
+   * On the store for the same reason `running` is: the witness is the open
+   * conversation's own live projection, and the reader is the top strip,
+   * which is not that page and cannot see its transcript. Absent means no
+   * turn has reported usage yet, which is not the same as zero - the meter
+   * falls back to its estimate rather than claiming an empty window.
+   */
+  readonly contextTokens: ReadonlyMap<string, number>
+  /** Reports what the last settled turn said the history costs. */
+  markContextTokens: (conversationId: string, tokens: number | null) => void
   readonly settings: TurnSettings
 
   setSettings: (settings: TurnSettings) => void
@@ -376,6 +389,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // that catches a harness-written title (see title-refresh).
   const runningWitnessRef = useRef<ReadonlySet<string>>(new Set())
   const titleRefreshRef = useRef<ReturnType<typeof createTitleRefresh> | null>(null)
+
+  const [contextTokens, setContextTokens] = useState<ReadonlyMap<string, number>>(
+    () => new Map<string, number>(),
+  )
+
+  const markContextTokens = useCallback((conversationId: string, tokens: number | null) => {
+    setContextTokens((current) => {
+      const held = current.get(conversationId);
+      if (tokens === null) {
+        if (held === undefined) return current
+        const next = new Map(current)
+        next.delete(conversationId)
+        return next
+      }
+      if (held === tokens) return current
+      const next = new Map(current)
+      next.set(conversationId, tokens)
+      return next
+    })
+  }, [])
 
   const markRunning = useCallback((conversationId: string, active: boolean) => {
     const was = runningWitnessRef.current.has(conversationId)
@@ -1152,6 +1185,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       status,
       running,
       markRunning,
+      contextTokens,
+      markContextTokens,
       settings,
       setSettings,
       setConversationSettings,
@@ -1186,6 +1221,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       createProject,
       ensureStore,
       markRunning,
+      contextTokens,
+      markContextTokens,
       orphanTrees,
       plans,
       questions,
