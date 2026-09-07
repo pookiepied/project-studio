@@ -208,10 +208,19 @@ export function Popover({
               role="menu"
               initial={{ opacity: 0, scale: 0.97, y: (position?.side ?? side) === 'top' ? 4 : -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
+              // The mirror of the entrance, and it has to be: the panel came in
+              // from 0.97 and 4px off the trigger, so it leaves back to the
+              // same place. It used to leave on `fast` - the token for a state
+              // change on something already visible - with a 2% scale and no
+              // displacement at all. Both halves of that are why picking a
+              // model read as the menu cutting out rather than closing: 120ms
+              // is under what a dismissal needs to register, and a 2% shrink
+              // going nowhere is not a direction the eye can follow.
               exit={{
                 opacity: 0,
-                scale: 0.98,
-                transition: { duration: DURATION.fast, ease: EASE_OUT },
+                scale: 0.97,
+                y: (position?.side ?? side) === 'top' ? 4 : -4,
+                transition: { duration: DURATION.base, ease: EASE_OUT },
               }}
               transition={SPRING_SNAPPY}
               style={{

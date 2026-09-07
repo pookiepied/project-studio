@@ -764,3 +764,25 @@ describe('the library on the way out', () => {
     expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveProperty('value', '')
   })
 })
+
+describe('the menu on the way out of a pick', () => {
+  /**
+   * A pick both settles the choice and closes the menu, and the closing half
+   * is an exit animation - which can only play on an element that is still
+   * mounted. If a pick ever tears the panel down in the same commit (a
+   * remount above it, a portal whose owner unmounts), the exit is skipped
+   * outright and the menu vanishes on the click. That is invisible to every
+   * other test here, because they all assert on what the pick wrote.
+   */
+  it('leaves the panel standing so its exit has something to play on', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([REASONING_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByRole('button', { name: 'open chat' }))
+
+    await openModelPanel()
+    fireEvent.click(screen.getByText('Default model'))
+
+    expect(screen.queryAllByRole('menu')).toHaveLength(1)
+  })
+})
