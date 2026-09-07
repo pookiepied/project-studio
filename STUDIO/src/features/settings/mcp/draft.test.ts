@@ -205,6 +205,8 @@ describe('editing an installed server', () => {
     const record: McpServerRecord = {
       id: 'memory',
       title: 'Memory',
+      description: 'Remembers things between conversations.',
+      provenance: 'user',
       transport: 'stdio',
       command: 'node',
       args: ['-y', 'server-memory'],
@@ -216,6 +218,11 @@ describe('editing an installed server', () => {
     const form = formFrom(record)
     expect(form).toMatchObject({
       id: 'memory',
+      // The sentence the model is given, carried through the dialog. It is a
+      // separate field from the name on purpose: the name is what a person
+      // scans the list for, and this is what decides whether a run reaches
+      // for the server at all.
+      description: 'Remembers things between conversations.',
       command: 'node',
       args: '-y server-memory',
       env: 'LOG=info',
@@ -224,6 +231,7 @@ describe('editing an installed server', () => {
     // And back again unchanged, so opening an edit and saving it is a no-op.
     expect(toDraft(form)).toMatchObject({
       id: 'memory',
+      description: 'Remembers things between conversations.',
       args: ['-y', 'server-memory'],
       env: { LOG: 'info' },
       needsNetwork: false,

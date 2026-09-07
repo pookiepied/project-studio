@@ -13,6 +13,8 @@ function server(transport: "stdio" | "http"): McpServerRecord {
   return {
     id: "example",
     title: "Example",
+    description: "",
+    provenance: "user",
     transport,
     ...(transport === "stdio" ? { command: "/usr/bin/node" } : { url: "https://example.test/mcp" }),
     args: [],

@@ -1667,9 +1667,32 @@ export interface McpServerStatus {
  * parse below rebuilds field by field for exactly this reason: a harness that
  * one day returned a secret could not smuggle it through a spread.
  */
+/** Whose server this is, and therefore whether its tools load eagerly. */
+export type McpProvenance = 'system' | 'user'
+
+export const MCP_PROVENANCES = ['system', 'user'] as const
+
 export interface McpServerRecord {
   readonly id: string
   readonly title: string
+  /**
+   * One sentence saying what the server is for, and not the title.
+   *
+   * The title is the label on the row - usually a product name. This is the
+   * sentence the harness puts in the model's capability inventory, so it is
+   * what decides whether a run reaches for this server at all. Empty when
+   * nobody has written one.
+   */
+  readonly description: string
+  /**
+   * Whether the server ships with Studio or somebody attached it.
+   *
+   * Read-only here. The dialog does not offer it, because it is a shipping
+   * decision rather than a preference, and a switch that makes a third-party
+   * server load on every turn is not one to put in front of someone without
+   * the paragraph that explains what it costs.
+   */
+  readonly provenance: McpProvenance
   readonly transport: McpTransport
   /** Absolute path to a real executable. `stdio` only. */
   readonly command?: string
@@ -1737,6 +1760,15 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
 
   const id = text(value['id'])
   const title = text(value['title'])
+  // Absent reads as empty rather than as a parse failure: a harness that
+  // predates the column is a harness this app still has to talk to, and a
+  // missing sentence is exactly "nobody has written one".
+  const description = optionalText(value['description'])
+  // Absent reads as `user`, matching the harness's own default and the column
+  // default behind it. Anything unrecognised also reads as `user`, which is
+  // the side that withholds - a value nobody understood must not be the thing
+  // that shows a server as shipping with Studio.
+  const provenance = oneOf(MCP_PROVENANCES, value['provenance']) ?? 'user'
   const transport = oneOf(MCP_TRANSPORTS, value['transport'])
   const auth = oneOf(MCP_AUTH_KINDS, value['auth'])
   const command = optionalText(value['command'])
@@ -1757,6 +1789,7 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
     auth === null ||
     args === null ||
     env === null ||
+    !description.ok ||
     !command.ok ||
     !url.ok ||
     !authHeader.ok ||
@@ -1784,6 +1817,8 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
   return {
     id,
     title,
+    description: description.value ?? '',
+    provenance,
     transport,
     auth,
     args,
@@ -1810,10 +1845,22 @@ export function parseMcpServers(value: unknown): readonly McpServerRecord[] | nu
  * separate call, so a draft can be logged, echoed back in an error, or held
  * in a form's state without ever being a thing that leaks a key.
  */
-export type McpServerDraft = Omit<McpServerRecord, 'status' | 'args' | 'env' | 'needsNetwork' | 'enabledByDefault'> & {
+export type McpServerDraft = Omit<
+  McpServerRecord,
+  'status' | 'args' | 'env' | 'needsNetwork' | 'enabledByDefault' | 'description' | 'provenance'
+> & {
   readonly args?: readonly string[]
   readonly env?: Readonly<Record<string, string>>
   readonly needsNetwork?: boolean
+  readonly description?: string
+  /**
+   * Left out of what this app sends, deliberately.
+   *
+   * Omitting it means the harness's default applies, and the harness's default
+   * is `user`. A server somebody attached here is a user server; there is no
+   * screen that should be able to say otherwise.
+   */
+  readonly provenance?: McpProvenance
 }
 
 export {

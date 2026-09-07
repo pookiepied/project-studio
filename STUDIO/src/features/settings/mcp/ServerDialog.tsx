@@ -250,6 +250,20 @@ function FormView({
         />
       </Field>
 
+      {/* Separate from the name, because they are read by different people.
+          The name is what the person scans this list for; this sentence is
+          what the model is told the server is for before it has seen a single
+          tool definition, so it is the field that decides whether the server
+          is reached for at all. Left blank the server is still listed, just
+          without a sentence. */}
+      <Field label="What it is for" hint="One sentence. The model reads this.">
+        <TextField
+          value={form.description}
+          onChange={(description) => onChange({ description })}
+          placeholder="Reads and writes files under a chosen folder."
+        />
+      </Field>
+
       <Field
         label="Id"
         hint={

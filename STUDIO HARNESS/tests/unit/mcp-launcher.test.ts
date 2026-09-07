@@ -153,6 +153,8 @@ function record(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
   return {
     id: "probe",
     title: "Probe",
+    description: "",
+    provenance: "user",
     transport: "stdio",
     args: [],
     env: {},

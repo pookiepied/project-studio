@@ -1,6 +1,6 @@
 # Capability discovery — the plan
 
-**Status:** Not started · **Opened:** 2026-09-07
+**Status:** Steps 1-2 landed · **Opened:** 2026-09-07 · **Last worked:** 2026-09-07
 **Decision:** [ADR 0048](../decisions/0048-a-capability-is-announced-before-it-is-loaded.md)
 **Rests on:** [ADR 0029](../decisions/0029-mcp-session-tool-membership.md) (append-only membership),
 [ADR 0024](../decisions/0024-capabilities-are-on-and-the-list-is-honest.md) (the list is honest),
@@ -30,10 +30,10 @@ the documentation.
 | Global MCP settings UI | Built | `STUDIO/src/features/settings/mcp/` |
 | Project-scope enablement over HTTP | Built, **no UI calls it** | `routes/mcp.ts` |
 | Conversation-scope enablement | Store only — **no route, no client** | `extend/selection.ts` |
-| Inventory prose in the system prompt | **Missing** | — |
+| Inventory prose in the system prompt | Built | `context/capability-inventory.ts` |
 | Discovery tool | **Missing** | — |
 | Withhold-by-default in `refreshTools` | **Missing** | `studio-runtime.ts:921` |
-| A server's purpose sentence, and system vs user provenance | **Missing** | `McpServerRecord` has neither |
+| A server's purpose sentence, and system vs user provenance | Built | `extend/mcp/registry.ts`, migration 22 |
 
 Two facts worth carrying into every step below.
 
@@ -105,10 +105,17 @@ No per-tool descriptions.
    already follows, and for the same reason — the block is the cached prefix of
    every request, and a section that says "nothing" is a permanent cost for no
    information.
-2. **Session-stable.** Built once per sandbox, not per turn, and unaffected by
-   what discovery has loaded. If loading a tool changed the inventory, every
-   discovery would invalidate the system block *and* the whole conversation —
-   which would make the mechanism cost more than the problem.
+2. **Session-stable.** Settled once per conversation and never moved again —
+   not by discovery loading a tool, not by a server reconnecting, not by a
+   `list_changed` refresh. If any of those changed the inventory, it would
+   invalidate the system block *and* the whole conversation behind it, which
+   would make the mechanism cost more than the problem.
+
+   *Corrected during step 2:* this first said "built once per sandbox", and
+   there is no such moment — Flue re-renders the agent every turn and
+   re-creates the sandbox per submission. The memo is keyed by conversation,
+   which is the lifetime the system block is actually cached against. ADR 0048
+   §1 and §5 have been reconciled to match.
 3. **Untrusted.** The purpose sentence and the tool names come from a third
    party. They sit in the system block, which is the most trusted position in
    the prompt. They must be length-capped, control-character-stripped, and
@@ -119,6 +126,19 @@ No per-tool descriptions.
 **Proof:** the empty case is byte-identical; a server contributes id, sentence,
 count and names; a hostile description cannot break out of its section; the
 block does not change across a turn that discovers a tool.
+
+**Landed 2026-09-07.** `src/context/capability-inventory.ts`, migration 22, and
+`#enabledMcpServers()` — one filter now feeding both the prose and the tools
+array, so the two can never describe different configurations. Harness 1792,
+client 847. Six negative controls, including one proving the extracted filter
+still drives exposure rather than being dead code.
+
+**Two things step 3 inherits.** The heading is `# Capabilities`, worded to be
+true while tools are still eager; step 3 should reword it, and that is a one-off
+system-block change for conversations that already exist. And `provenance` has
+exactly one value in practice — nothing writes `system` yet, and the client
+deliberately cannot — so step 3 or the first system server is what gives that
+column a second value.
 
 ---
 

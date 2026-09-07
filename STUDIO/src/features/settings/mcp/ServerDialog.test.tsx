@@ -191,6 +191,8 @@ describe('editing an installed server', () => {
   const RECORD: McpServerRecord = {
     id: 'memory',
     title: 'Memory',
+    description: 'Remembers things between conversations.',
+    provenance: 'user',
     transport: 'stdio',
     command: 'node',
     args: ['-y', 'server-memory'],

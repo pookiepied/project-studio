@@ -118,6 +118,7 @@ describe("MCP application runtime", () => {
       runtime.servers.save({
         id: "echo-server",
         title: "Echo server",
+        description: "Echoes text back, for testing.",
         transport: "stdio",
         command: process.execPath,
         args: [script],
@@ -161,8 +162,26 @@ describe("MCP application runtime", () => {
       expect(resourceResult?.content.every((block) => block.type === "text")).toBe(true);
       expect(JSON.stringify(resourceResult?.content)).toContain("from a resource");
 
+      // The inventory, against a real registry row and a real catalog. The
+      // count and the names are the live server's, which is the reason nothing
+      // stores a tool count: this number is a fact about a running program.
+      const inventory = runtime.conversationCapabilityInventory("agent");
+      expect(inventory).toContain("mcp:echo-server - Echoes text back, for testing. - 2 tools");
+      expect(inventory).toContain("echo");
+      expect(inventory).toContain("resource");
+      // And no schema, and no per-tool description. The array says what may be
+      // called; this says only what could be asked for.
+      expect(inventory).not.toContain("Echo the supplied text");
+      expect(inventory).not.toContain("inputSchema");
+
       runtime.servers.setEnabled(projectScope(runtime.projectId), "echo-server", false, AUTH_CONTEXT);
       await runtime.reconcile();
+
+      // Disabling a server does not move the system block. Membership is
+      // append-only and the block is settled for the conversation; a section
+      // that shrank here would re-bill the whole conversation behind it, for a
+      // toggle the person expected to cost nothing.
+      expect(runtime.conversationCapabilityInventory("agent")).toBe(inventory);
       const retained = sandbox.tools?.(env, { subagents: {} }) ?? [];
       const unavailable = retained.find((tool) => tool.name === "mcp__11_echo-server__4_echo");
       expect(unavailable).toBeDefined();

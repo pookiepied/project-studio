@@ -8,6 +8,14 @@ leaves it. This one says how a tool gets in.
 the list the model sees is honest. The rule survives: what is listed is
 callable. This adds a second surface, which is not a list of tools and does not
 claim to be.
+**Amended by:** [ADR 0049](0049-the-browser-is-ours-the-engine-is-the-machine-s.md)
+§5. Section 3 below says system provenance loads eagerly, and that conflated two
+independent axes: **who owns a capability** and **how expensive it is to load**.
+A Studio-owned browser is still twenty schemas. The corrected rule is that
+eagerness follows size and generality, not ownership — eager is for capabilities
+small enough and general enough that most turns might use them, which means the
+natives. Everything else is discovered, whoever wrote it. The original text
+stands below; the wrong answer and why we believed it is the useful part.
 **Implements:** `architecture/mental-model.md` §3.2 and §3.4. §3.2 already
 places an *"MCP / connector / skill inventory, plain English, session-stable"*
 in the system block; §3.4 already calls progressive discovery *"one round trip
@@ -68,7 +76,7 @@ prompt: its identity, what it is for, how many tools it has, and their names.
 No schemas, no parameters, no examples.
 
 ```
-## Capabilities available on request
+# Capabilities
 
 mcp:blender — Blender scene and object manipulation — 34 tools
   add_camera, add_light, apply_material, create_scene, delete_object, …
@@ -76,6 +84,13 @@ mcp:blender — Blender scene and object manipulation — 34 tools
 mcp:browser — Browser automation and page reading — 28 tools
   click, extract_text, navigate, screenshot, wait_for, …
 ```
+
+The heading is `# Capabilities` and not "available on request", which is what
+this first said. Until discovery ships, the tools are still loaded eagerly and
+"on request" would be a false statement in the most trusted part of the prompt —
+a model told it can request something that does not exist yet will wait for a
+tool that never arrives. The wording has to be true at every stage of the
+rollout, not only at the end of it.
 
 Names, not descriptions, per tool. A name plus the server's own sentence is
 enough for a model to decide whether to look further; a description per tool is
@@ -87,10 +102,25 @@ list of what may be called, and ADR 0024's rule — everything listed is callabl
 different questions: the array says *what you can do*, the inventory says *what
 you could ask for*.
 
-**It is session-stable, so it caches.** The inventory is built once when the
-sandbox is created, from the registry and the catalog, and does not change
-because a tool was loaded. Loading appends to the array — which is the free
-direction — and leaves the system block byte-identical.
+**It is session-stable, so it caches.** The inventory is settled once per
+conversation, from the registry and the catalog, and does not change afterwards
+for any reason. Loading appends to the array — which is the free direction —
+and leaves the system block byte-identical.
+
+*Corrected during implementation.* This first said "built once when the sandbox
+is created", and there is no such moment: Flue re-runs the agent render every
+turn and re-creates the sandbox per submission, so there is no sandbox-lifetime
+hook to hang it on. The memo is keyed by conversation, which is the lifetime the
+system block is actually cached against.
+
+*And stricter than §5 first allowed.* §5 below says a `list_changed` refresh
+rebuilds the inventory prose. It does not. A refresh that landed mid-conversation
+would move the system block and re-bill the entire history behind it, and a
+background reconnect finishing is not worth that. The rule that wins is this one:
+once settled, the block does not move for the life of the conversation. A server
+whose tools changed is described by its old sentence until the next
+conversation, which is a stale sentence rather than a wrong tools array — and
+the array is what governs what can actually be called.
 
 ### 2. One discovery tool, taking a scope
 
@@ -154,10 +184,11 @@ places, none of them able to answer another's.
 ### 5. A list-changed notification does not disturb what is loaded
 
 ADR 0029 §6 already says `notifications/tools/list_changed` marks a catalog
-dirty and refreshes at the next turn boundary. That refresh now also rebuilds
-the inventory prose, which is a system-block change and therefore a real cache
-cost — accepted, because it happens when a server actually changed its tools,
-not on a schedule.
+dirty and refreshes at the next turn boundary. The catalog refreshes; **the
+inventory prose does not**. See the correction under §1: a system-block change
+mid-conversation re-bills the whole history, and a server changing its tool list
+is not worth that. The refreshed catalog governs what discovery can load and
+what a call reaches, which is the half that has to be current.
 
 A tool that vanishes from a refreshed catalog stays in the array and fails at
 dispatch with the existing unavailable result. Unchanged from 0029, and for the

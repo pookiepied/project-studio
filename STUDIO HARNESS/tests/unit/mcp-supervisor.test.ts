@@ -79,6 +79,8 @@ class ScriptedChannel implements McpChannel {
 const RECORD: McpServerRecord = {
   id: "blender",
   title: "Blender",
+  description: "",
+  provenance: "user",
   transport: "stdio",
   command: "C:\\tools\\node.exe",
   args: ["server.js"],

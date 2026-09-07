@@ -148,6 +148,15 @@ export function Studio({ id }: AgentProps) {
   // remember to change.
   const kind = workspace === conversationWorkspaceDirectory(id) ? "conversation" : "project";
   const extraRoots = runtime.conversationExtraRoots?.(id) ?? [];
+  // Appended unconditionally, and empty for a conversation with no enabled
+  // servers. The condition lives in the builder rather than here so that the
+  // byte-identical case is a property of one function that can be asserted,
+  // rather than of a ternary at a call site somebody could later invert. It
+  // goes after the environment block because the two answer different
+  // questions and this is the stable one - a section whose content is settled
+  // for the whole conversation should not sit in the middle of one whose
+  // content is not.
+  const capabilities = runtime.conversationCapabilityInventory?.(id) ?? "";
   return `${STUDIO_SYSTEM_PROMPT}\n${environmentBlock(
     environmentFacts(
       workspace,
@@ -166,7 +175,7 @@ export function Studio({ id }: AgentProps) {
       // turn does exactly once.
       runtime.conversationBackgroundJobs?.(id),
     ),
-  )}`;
+  )}${capabilities}`;
 }
 
 /**

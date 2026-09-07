@@ -60,12 +60,65 @@ export function assertSafeMcpUrl(url: string): void {
   }
 }
 
+/**
+ * The longest a server's purpose sentence may be.
+ *
+ * It is one sentence, and a generous reading of one sentence is a couple of
+ * lines. The number is not about tidiness: this text is copied verbatim into
+ * the capability inventory, which sits in the system block, which is the most
+ * trusted position in the prompt and is paid for on every turn. Without a cap
+ * a server could spend a thousand tokens of that position on whatever it
+ * liked, on every request, for as long as it stayed installed.
+ */
+export const MCP_DESCRIPTION_LIMIT = 300;
+
+/**
+ * Characters that are not text, refused before the sentence is stored.
+ *
+ * A newline is the one that matters. The inventory renders one server per
+ * line; a description carrying a line break could open what looks like a new
+ * section, and a section in the system block is the voice the model trusts
+ * most. Refusing the character is the fix, because escaping it at every
+ * renderer is a rule that only has to be forgotten once.
+ *
+ * The tab is refused with them rather than allowed: nothing legitimate in a
+ * one-sentence purpose needs one, and a permitted whitespace character is one
+ * more thing a layout can be built from.
+ */
+// eslint-disable-next-line no-control-regex -- refusing control characters is the point.
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+
+/**
+ * Refuses a purpose sentence that could not honestly be one.
+ *
+ * Refused at the moment it is written rather than trimmed at the moment it is
+ * rendered. Trimming would leave the row holding something no reader expected
+ * and would put the guard in however many places one day render it; refusing
+ * puts the message in front of the person who typed it, and leaves exactly one
+ * shape in the database. The inventory still caps and strips what it renders,
+ * because a row can also arrive from a database written by hand.
+ */
+export function assertSafeMcpDescription(description: string): void {
+  if (description.length > MCP_DESCRIPTION_LIMIT) {
+    throw new ExtendError("internal", {
+      message: `A server description must be one sentence, at most ${MCP_DESCRIPTION_LIMIT} characters.`,
+    });
+  }
+  if (CONTROL_CHARACTER.test(description)) {
+    throw new ExtendError("internal", {
+      message: "A server description must be a single line of plain text.",
+    });
+  }
+}
+
 /** Defense in depth for records written without the HTTP adapter. */
 export function assertSafeMcpRecord(input: {
   readonly args?: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
   readonly url?: string;
+  readonly description?: string;
 }): void {
   assertSafeMcpPayload({ args: input.args ?? [], env: input.env ?? {} });
   if (input.url !== undefined) assertSafeMcpUrl(input.url);
+  if (input.description !== undefined) assertSafeMcpDescription(input.description);
 }

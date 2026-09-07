@@ -190,6 +190,17 @@ function ServerRow({
         </span>
         <div className="min-w-0">
           <p className="truncate text-ui text-foreground">{server.title}</p>
+          {/* Above the reach, and only when there is one. This is the sentence
+              the model is given about the server, so a person deciding whether
+              to leave it on is reading the same thing the model reads. A
+              server with no sentence shows none rather than a placeholder:
+              an empty line here would read as a server that failed to
+              describe itself. */}
+          {server.description === '' ? null : (
+            <p className="mt-0.5 truncate text-caption text-muted-foreground">
+              {server.description}
+            </p>
+          )}
           <p className="mt-0.5 truncate text-caption text-muted-foreground">{reach(server)}</p>
           <StatusLine server={server} />
         </div>

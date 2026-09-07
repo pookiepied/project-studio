@@ -80,6 +80,24 @@ function serverInput(value: unknown, idOverride?: string): McpServerInput {
     });
   }
 
+  // Absent and empty are the same thing here, and both mean "nobody has
+  // written a purpose sentence". A `PATCH` that clears the field sends the
+  // empty string, and it must land as the empty string rather than as a
+  // missing key that the registry's default would then fill back in.
+  const description = optionalString(value["description"], "description");
+
+  // Refused rather than coerced. `provenance` decides whether a server's tools
+  // load eagerly, so a value nobody recognised must stop the write instead of
+  // quietly resolving to one of the two answers - a typo that silently means
+  // "user" is a server that stopped working, and one that silently means
+  // "system" is a capability loaded on every turn that nobody asked for.
+  const provenance = value["provenance"];
+  if (provenance !== undefined && provenance !== "system" && provenance !== "user") {
+    throw new ExtendError("internal", {
+      message: "provenance must be system or user.",
+    });
+  }
+
   const command = optionalString(value["command"], "command");
   const url = optionalString(value["url"], "url");
   const authHeader = optionalString(value["authHeader"], "authHeader");
@@ -87,6 +105,8 @@ function serverInput(value: unknown, idOverride?: string): McpServerInput {
   return {
     id,
     title,
+    ...(description === undefined ? {} : { description }),
+    ...(provenance === undefined ? {} : { provenance }),
     transport,
     ...(command === undefined ? {} : { command }),
     args: stringList(value["args"], "args"),

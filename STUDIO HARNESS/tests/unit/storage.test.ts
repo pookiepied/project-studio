@@ -59,6 +59,35 @@ describe("migrations", () => {
     expect(rows.map((row) => row.name)).toEqual(MIGRATIONS.map((entry) => entry.name));
   });
 
+  it("gives an already-installed MCP server no sentence and user provenance", () => {
+    // The upgrade case, not the fresh one. A server installed before these
+    // columns existed has to come through with values, and they have to be the
+    // ones that change nothing: no purpose sentence, because nobody wrote one,
+    // and `user` provenance, because ADR 0048 §3 makes discovered the
+    // reversible side and an upgrade must not be what moves a server onto the
+    // eager one.
+    const handle = new DatabaseSync(":memory:");
+    const before = MIGRATIONS.filter((entry) => entry.name !== "mcp_server_purpose_and_provenance");
+    migrate(handle, before);
+
+    const now = Date.now();
+    handle
+      .prepare(
+        `INSERT INTO mcp_server (id, title, transport, args, env, auth_kind, installed_at, updated_at)
+         VALUES (?, ?, ?, '[]', '{}', 'none', ?, ?)`,
+      )
+      .run("older", "Older", "http", now, now);
+
+    migrate(handle);
+
+    const row = handle
+      .prepare("SELECT description, provenance FROM mcp_server WHERE id = ?")
+      .get("older") as { description: string; provenance: string };
+    expect(row.description).toBe("");
+    expect(row.provenance).toBe("user");
+    handle.close();
+  });
+
   it("migrates the conversation and project tables with their own foreign keys", () => {
     // Asserted against the database, not the stores: these are properties of
     // schema 14 itself, and the stores are one reader among many.

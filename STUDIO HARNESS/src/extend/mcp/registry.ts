@@ -39,9 +39,46 @@ export type McpAuthKind =
   /** A named header carries the secret, for servers that use their own. */
   | "header";
 
+/**
+ * Who put this server here, and therefore how its tools are loaded.
+ *
+ * `system` — the capability ships with Project Studio and is part of what the
+ * product is. Its tools load eagerly, exactly as the native ones do.
+ * `user` — somebody attached it. Announced in the inventory, loaded on
+ * request.
+ *
+ * The default is `user`, and that is the asymmetry of ADR 0048 §3 written
+ * down: discovered → eager only ever appends to the tools array, which costs
+ * the cache nothing, while eager → discovered is a removal and re-bills every
+ * conversation already carrying it. A capability whose side is uncertain
+ * belongs on the reversible one.
+ */
+export type McpProvenance = "system" | "user";
+
 export interface McpServerRecord {
   readonly id: string;
   readonly title: string;
+  /**
+   * One sentence saying what this server is for, and NOT the title.
+   *
+   * The title is the label on a settings row and is usually a product name; a
+   * model given "Blender" has been told nothing it can act on. This sentence
+   * is what the capability inventory puts in the system block, so it answers
+   * "what would I reach for this for".
+   *
+   * The empty string is a real value and means nobody has written one. The
+   * inventory renders the server without a sentence rather than inventing one,
+   * because a made-up purpose is worse than a missing one.
+   *
+   * **It reaches the most trusted position in the prompt, and it is a third
+   * party's words.** `assertSafeMcpRecord` caps its length and refuses control
+   * characters before it is ever stored, for the same reason `capabilities.ts`
+   * frames tool results as untrusted — this is that argument one layer
+   * earlier, at the point where the text becomes durable.
+   */
+  readonly description: string;
+  /** Whose server this is, and therefore whether its tools load eagerly. */
+  readonly provenance: McpProvenance;
   readonly transport: McpTransport;
   /** Absolute path to a real executable. `stdio` only. */
   readonly command?: string;
@@ -82,9 +119,22 @@ export interface McpServerRecord {
   readonly needsNetwork: boolean;
 }
 
-export type McpServerInput = Omit<McpServerRecord, "args" | "env" | "needsNetwork"> & {
+export type McpServerInput = Omit<
+  McpServerRecord,
+  "args" | "env" | "needsNetwork" | "description" | "provenance"
+> & {
   readonly args?: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
+  /** Optional on the way in, and the empty string when omitted. */
+  readonly description?: string;
+  /**
+   * Optional on the way in, and `user` when omitted.
+   *
+   * Omitted is the common case and must mean the reversible thing. A caller
+   * that wants a server loaded eagerly has to say so, which is the only way
+   * round that cannot be arrived at by forgetting.
+   */
+  readonly provenance?: McpProvenance;
   /**
    * Optional on the way in, and `true` when omitted.
    *
@@ -204,6 +254,8 @@ function assertConsistent(input: McpServerInput): void {
 interface ServerRow {
   id: string;
   title: string;
+  description: string;
+  provenance: string;
   transport: string;
   command: string | null;
   args: string;
@@ -219,6 +271,13 @@ function toRecord(row: ServerRow): McpServerRecord {
   return {
     id: row.id,
     title: row.title,
+    // `?? ""` and the `=== "system"` test rather than a cast: a row written
+    // before these columns existed carries the migration's defaults, and a
+    // hand-edited file could carry anything. An unrecognised provenance reads
+    // as `user`, which is the side that withholds — a typo in the database
+    // must not be the thing that loads a server eagerly.
+    description: row.description ?? "",
+    provenance: row.provenance === "system" ? "system" : "user",
     transport: row.transport as McpTransport,
     ...(row.command === null ? {} : { command: row.command }),
     args: JSON.parse(row.args) as string[],
@@ -263,17 +322,21 @@ export class McpServerRegistry {
       args: input.args ?? [],
       env: input.env ?? {},
       needsNetwork: input.needsNetwork ?? true,
+      description: input.description ?? "",
+      provenance: input.provenance ?? "user",
     };
 
     this.#db
       .prepare(
         `INSERT INTO mcp_server
-           (id, title, transport, command, args, env, url,
+           (id, title, description, provenance, transport, command, args, env, url,
             auth_kind, auth_header, auth_env_var, needs_network,
             installed_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
            title = excluded.title,
+           description = excluded.description,
+           provenance = excluded.provenance,
            transport = excluded.transport,
            command = excluded.command,
            args = excluded.args,
@@ -288,6 +351,8 @@ export class McpServerRegistry {
       .run(
         record.id,
         record.title,
+        record.description,
+        record.provenance,
         record.transport,
         record.command ?? null,
         JSON.stringify(record.args),
@@ -350,6 +415,14 @@ export class McpServerRegistry {
    *
    * `title` is absent because the user approved a tool, not a label. `id` is
    * present because two servers are two servers, however alike their commands.
+   *
+   * `description` and `provenance` are absent for the same reason as the
+   * title, and it is worth saying why rather than leaving it to be inferred.
+   * Neither changes what a tool does or where the call goes, so neither can
+   * invalidate an approval; and rewriting a purpose sentence must not restart
+   * a running server, which is what including it here would mean. Provenance
+   * decides whether tools are loaded eagerly, which is a question the tools
+   * array answers at session start, not one the supervisor answers.
    */
   static reachKey(record: McpServerRecord): string {
     return JSON.stringify([

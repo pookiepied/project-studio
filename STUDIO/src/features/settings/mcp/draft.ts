@@ -8,6 +8,15 @@ import {
 } from '@/platform/harness'
 
 /**
+ * The longest purpose sentence the harness will store.
+ *
+ * Kept in step with `MCP_DESCRIPTION_LIMIT` in the harness by hand, because
+ * the two halves of the repo share no code. If they drift, the harness wins
+ * and the person meets its refusal instead of this one.
+ */
+export const DESCRIPTION_LIMIT = 300
+
+/**
  * The dialog's working copy of a server.
  *
  * Every field is a string, because that is what a text input holds and
@@ -23,6 +32,15 @@ import {
 export interface ServerForm {
   readonly id: string
   readonly title: string
+  /**
+   * One sentence saying what the server is for.
+   *
+   * Not the name. This is what the model is told about the server before it
+   * has any of its tool definitions, so it is the field that decides whether
+   * the server is ever reached for. Optional - a server with no sentence is
+   * still listed, just without one.
+   */
+  readonly description: string
   readonly transport: McpTransport
   readonly command: string
   /** Space separated, quotes respected. See `splitArgs`. */
@@ -39,6 +57,7 @@ export interface ServerForm {
 export const EMPTY_FORM: ServerForm = {
   id: '',
   title: '',
+  description: '',
   transport: 'stdio',
   command: '',
   args: '',
@@ -54,6 +73,7 @@ export function formFrom(record: McpServerRecord): ServerForm {
   return {
     id: record.id,
     title: record.title,
+    description: record.description,
     transport: record.transport,
     command: record.command ?? '',
     args: joinArgs(record.args),
@@ -153,6 +173,13 @@ export function problemWith(form: ServerForm): string | null {
     return 'An id may hold only letters, numbers, dots, dashes and underscores.'
   }
   if (form.title.trim() === '') return 'Give the server a name.'
+  // The same limit the harness enforces, said here so the refusal arrives
+  // while the person is still looking at the field rather than after a round
+  // trip. The sentence ends up in the system prompt of every turn, which is
+  // what the limit is actually protecting.
+  if (form.description.trim().length > DESCRIPTION_LIMIT) {
+    return `Keep the description to one sentence, under ${DESCRIPTION_LIMIT} characters.`
+  }
 
   if (form.transport === 'stdio') {
     if (form.command.trim() === '') return 'Give the command that starts the server.'
@@ -179,6 +206,7 @@ export function toDraft(form: ServerForm): McpServerDraft {
   return {
     id: form.id.trim(),
     title: form.title.trim(),
+    description: form.description.trim(),
     transport: form.transport,
     auth: form.auth,
     args: stdio ? splitArgs(form.args) : [],
@@ -231,6 +259,7 @@ export function fromJson(text: string): { ok: true; form: ServerForm } | { ok: f
 
   const id = str('id')
   const title = str('title')
+  const description = str('description')
   const command = str('command')
   const url = str('url')
   const authHeader = str('authHeader')
@@ -238,12 +267,16 @@ export function fromJson(text: string): { ok: true; form: ServerForm } | { ok: f
   if (
     id === null ||
     title === null ||
+    description === null ||
     command === null ||
     url === null ||
     authHeader === null ||
     authEnvVar === null
   ) {
-    return { ok: false, error: 'id, title, command, url, authHeader and authEnvVar must be text.' }
+    return {
+      ok: false,
+      error: 'id, title, description, command, url, authHeader and authEnvVar must be text.',
+    }
   }
 
   const transport =
@@ -282,6 +315,7 @@ export function fromJson(text: string): { ok: true; form: ServerForm } | { ok: f
     form: {
       id,
       title,
+      description,
       transport,
       auth,
       command,

@@ -976,6 +976,35 @@ export const MIGRATIONS: readonly Migration[] = [
       db.exec("ALTER TABLE project ADD COLUMN sandbox_level TEXT NOT NULL DEFAULT 'contained'");
     },
   },
+  {
+    version: 22,
+    name: "mcp_server_purpose_and_provenance",
+    up(db) {
+      // What a server is FOR, and whose it is. Two questions the row could not
+      // answer, and both are read by things the model sees.
+      //
+      // `description` is not `title`. The title is the label on a settings row
+      // and is usually a product name - "Blender", "Browser" - which tells a
+      // model nothing it could act on. The description is the sentence that
+      // goes in the capability inventory in the system block, so it has to say
+      // what the server is for rather than what it is called.
+      //
+      // `provenance` is the eager/discovered split of ADR 0048 §3. `user` is
+      // the default, and deliberately so: a user server is discovered, and
+      // discovered is the reversible choice - moving a capability from
+      // discovered to eager grows the tools array, which the cache pays
+      // nothing for, while the reverse is a removal and re-bills every
+      // conversation that already carries it.
+      //
+      // Both default to a value every existing row can carry without anyone
+      // deciding anything, so this migration changes no behaviour on its own.
+      // Empty is a real value for the description and means "nobody has said" -
+      // the inventory renders the server without a sentence rather than
+      // inventing one.
+      db.exec("ALTER TABLE mcp_server ADD COLUMN description TEXT NOT NULL DEFAULT ''");
+      db.exec("ALTER TABLE mcp_server ADD COLUMN provenance TEXT NOT NULL DEFAULT 'user'");
+    },
+  },
 ];
 
 /** A `custom_provider` row whose columns all carry the shapes this file reads. */

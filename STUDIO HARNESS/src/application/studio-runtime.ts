@@ -18,11 +18,16 @@ import {
 import { ExtendError } from "../extend/errors.js";
 import { ExtensionInventory } from "../extend/inventory.js";
 import { ExtensionReconciler } from "../extend/reconcile.js";
+import {
+  CapabilityInventory,
+  type CapabilityInventoryEntry,
+} from "../context/capability-inventory.js";
 import { McpCapabilityCatalog } from "../extend/mcp/capabilities.js";
 import type { McpTool } from "../extend/mcp/capabilities.js";
 import { createMcpLauncher } from "../extend/mcp/launcher.js";
 import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
+import type { McpServerRecord } from "../extend/mcp/registry.js";
 import { McpSupervisor } from "../extend/mcp/supervisor.js";
 import { ExtensionSelectionStore } from "../extend/selection.js";
 import { McpManagementService, type McpAdministration } from "./mcp-management.js";
@@ -386,6 +391,18 @@ export interface AgentHost {
    * background commands still satisfies the host.
    */
   conversationBackgroundJobs?(conversationId: string): readonly string[];
+  /**
+   * The capability inventory section for this conversation's system block.
+   *
+   * Empty when nothing is enabled, and the render appends it unconditionally -
+   * so a conversation with no MCP servers gets a prompt byte-identical to the
+   * one it got before this section existed. Session-stable by construction:
+   * the runtime answers the same string for the whole conversation, so nothing
+   * discovery later loads can move the system block and re-bill the history
+   * behind it. Optional so a test double that predates the inventory still
+   * satisfies the host.
+   */
+  conversationCapabilityInventory?(conversationId: string): string;
 }
 
 /**
@@ -412,6 +429,7 @@ export class StudioRuntime implements AgentHost {
   readonly #supervisor: McpSupervisor;
   readonly #catalog: McpCapabilityCatalog;
   readonly #management: McpManagementService;
+  readonly #capabilities: CapabilityInventory;
 
   readonly #logger: Logger | undefined;
   readonly #approver: PermissionApprover | undefined;
@@ -552,6 +570,13 @@ export class StudioRuntime implements AgentHost {
         onStop: (serverId) => this.#catalog.remove(serverId),
       }),
     );
+    // Built here, from the same two sources the tools array is built from, so
+    // the prose and the array can never describe different configurations.
+    // The closure takes a conversation id it does not read: enablement is a
+    // property of the project this runtime serves, exactly as `refreshTools`
+    // resolves it, and the id is what the cache keys on rather than what the
+    // answer depends on.
+    this.#capabilities = new CapabilityInventory(() => this.#capabilityEntries());
     this.#management = new McpManagementService({
       registry: this.#registry,
       grants: this.#grants,
@@ -618,6 +643,72 @@ export class StudioRuntime implements AgentHost {
     const projectId = this.#conversationProject(conversationId);
     if (projectId === undefined) return [];
     return (this.#projects.get(projectId)?.folders ?? []).map((folder) => folder.path);
+  }
+
+  /**
+   * The installed servers this project's conversations actually get.
+   *
+   * One function because two readers must never disagree. `refreshTools`
+   * builds the tools array from this, and the capability inventory builds the
+   * prose from it; a second copy of the filter is how the prompt ends up
+   * announcing a server whose tools are not there, or the reverse.
+   *
+   * Resolved against the runtime's own project, not the sandbox root's.
+   * Enablement is a property of the project the harness serves, and a
+   * projectless conversation stands in a directory of its own - deriving a
+   * key from where a conversation happens to stand made the enabled set come
+   * back empty and every MCP tool vanish from every conversation.
+   */
+  #enabledMcpServers(): readonly McpServerRecord[] {
+    return this.#registry
+      .list()
+      .filter(
+        (record) =>
+          this.#selection.resolve("mcp", record.id, { projectId: this.#projectId })
+            .enabled,
+      );
+  }
+
+  /**
+   * What the inventory says, assembled from the registry and the live catalog.
+   *
+   * The count and the names come from the catalog rather than from anything
+   * stored, because how many tools a server has is a fact about the running
+   * server and a stored copy would go stale the first time one changed its
+   * list - silently, which is the worst way for a number in the system prompt
+   * to be wrong.
+   *
+   * A server with no tools in the catalog still gets a line. It is enabled and
+   * the person can see it in their settings, so announcing nothing about it
+   * would leave a model to conclude the setting did nothing; "0 tools" is the
+   * true answer for a server that has not connected yet.
+   */
+  #capabilityEntries(): readonly CapabilityInventoryEntry[] {
+    const records = this.#enabledMcpServers();
+    const names = new Map<string, string[]>(
+      records.map((record) => [McpServerRegistry.namespaceOf(record.id), []]),
+    );
+    for (const tool of this.#catalog.tools(records.map((record) => record.id))) {
+      names.get(tool.descriptor.id.namespace)?.push(tool.descriptor.id.name);
+    }
+    return records.map((record) => ({
+      id: McpServerRegistry.namespaceOf(record.id),
+      description: record.description,
+      toolNames: names.get(McpServerRegistry.namespaceOf(record.id)) ?? [],
+    }));
+  }
+
+  /**
+   * The capability inventory for one conversation's system block.
+   *
+   * A string rather than records, for the same reason the background jobs are
+   * lines: how a capability is described to a model is a prompt decision, and
+   * prompt decisions belong to the prose. The empty string when this
+   * conversation has no enabled servers, which leaves the block byte-identical
+   * to what it was before the section existed.
+   */
+  conversationCapabilityInventory(conversationId: string): string {
+    return this.#capabilities.blockFor(conversationId);
   }
 
   /**
@@ -932,14 +1023,7 @@ export class StudioRuntime implements AgentHost {
       // reconcile pass asks the runtime's project. Enablement is a property
       // of the project the harness serves; where a particular conversation
       // happens to stand is not that.
-      const active = this.#registry
-        .list()
-        .filter(
-          (record) =>
-            this.#selection.resolve("mcp", record.id, { projectId: this.#projectId })
-              .enabled,
-        )
-        .map((record) => record.id);
+      const active = this.#enabledMcpServers().map((record) => record.id);
 
       for (const tool of this.#catalog.tools(active)) {
         const key = capabilityKey(tool.descriptor.id);
