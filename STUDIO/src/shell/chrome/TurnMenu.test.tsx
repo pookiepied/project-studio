@@ -528,6 +528,21 @@ describe('the window the turn is measured against', () => {
     expect(screen.queryByRole('meter', { name: 'Context used' })).toBeNull()
   })
 
+  it('draws the bar for a conversation riding the harness default', async () => {
+    // The people most likely never to open this menu are the ones who never
+    // named a model, and hiding the bar from them would hide it from exactly
+    // the conversations nobody is watching the cost of.
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+
+    expect(await screen.findByText('No model chosen')).toBeTruthy()
+    expect(screen.getByRole('meter', { name: 'Context used' })).toBeTruthy()
+  })
+
   it('keeps the percentage off the strip until it is news', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([FLAT_MODEL]))

@@ -364,16 +364,27 @@ function ModelPanel({
           much room is left in it". The model names itself, its window sits
           under the name, and the bar is drawn against that window - one
           statement rather than a name here and a fraction somewhere else. */}
-      {model !== undefined ? (
+      {/* Present whenever there is a turn to describe, named or not. A
+          conversation riding the harness's default has a window being filled
+          like any other, and hiding the bar until someone names a model would
+          leave exactly the people who never open this menu with no way to see
+          it. The name says what is true instead: nothing is chosen yet. */}
+      {model !== undefined || breakdown !== null ? (
         <div className="flex flex-col gap-2.5 px-2 pb-1 pt-1.5">
           <div className="flex min-w-0 items-center gap-2">
-            <ProviderMark provider={model.author} className="shrink-0" />
+            {model === undefined ? null : (
+              <ProviderMark provider={model.author} className="shrink-0" />
+            )}
             <span className="flex min-w-0 flex-col">
-              <span className="truncate text-ui text-foreground">{model.name}</span>
+              <span className="truncate text-ui text-foreground">
+                {model?.name ?? 'No model chosen'}
+              </span>
               <span className="text-micro text-muted-foreground">
-                {model.contextWindow === 'unknown'
-                  ? 'Context window not declared'
-                  : `${formatTokens(model.contextWindow)} context window`}
+                {model === undefined
+                  ? `The harness default decides. ${formatTokens(breakdown?.window ?? 0)} stands in for its window.`
+                  : model.contextWindow === 'unknown'
+                    ? 'Context window not declared'
+                    : `${formatTokens(model.contextWindow)} context window`}
               </span>
             </span>
           </div>
