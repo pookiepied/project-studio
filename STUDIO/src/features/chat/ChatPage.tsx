@@ -16,7 +16,9 @@ import { QuestionPrompt } from '@/features/chat/questions/QuestionPrompt'
 import { usePendingQuestions } from '@/features/chat/questions/usePendingQuestions'
 import { PlanPill } from '@/features/plans/PlanPill'
 import { usePlan } from '@/features/plans/usePlan'
-import { planEntryId, useRail } from '@/stores/rail'
+import { JobsPill } from '@/features/jobs/JobsPill'
+import { useBackgroundJobs } from '@/features/jobs/useBackgroundJobs'
+import { jobsEntryId, planEntryId, useRail } from '@/stores/rail'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { contextReport } from '@/domain/session/context'
 import {
@@ -98,6 +100,11 @@ export function ChatPage({
     enabled: !gallery,
     active: isTurnRunning(live.phase),
   })
+
+  // The commands the model left running. Read on its own cadence rather than
+  // the run's: a download started three turns ago is still writing output long
+  // after the turn that began it ended.
+  const jobs = useBackgroundJobs(conversation.id, { enabled: !gallery })
 
   /**
    * True from the moment the words leave the composer until the harness
@@ -264,8 +271,15 @@ export function ChatPage({
   // showing this conversation's plan, and a second click takes it back down.
   // A plan entry that exists but is not on screen comes forward rather than
   // being opened twice - the rail keys it to the conversation either way.
-  const { open: railOpen, activeId: railActiveId, openPlan, close: closeRailEntry } = useRail()
+  const {
+    open: railOpen,
+    activeId: railActiveId,
+    openPlan,
+    openJobs,
+    close: closeRailEntry,
+  } = useRail()
   const planEntryVisible = railOpen && railActiveId === planEntryId(conversation.id)
+  const jobsEntryVisible = railOpen && railActiveId === jobsEntryId(conversation.id)
   const togglePlanPanel = useCallback(() => {
     if (planEntryVisible) {
       closeRailEntry(planEntryId(conversation.id))
@@ -273,6 +287,14 @@ export function ChatPage({
     }
     openPlan(conversation.id, conversation.title ?? 'Conversation')
   }, [planEntryVisible, closeRailEntry, openPlan, conversation.id, conversation.title])
+
+  const toggleJobsPanel = useCallback(() => {
+    if (jobsEntryVisible) {
+      closeRailEntry(jobsEntryId(conversation.id))
+      return
+    }
+    openJobs(conversation.id, conversation.title ?? 'Conversation')
+  }, [jobsEntryVisible, closeRailEntry, openJobs, conversation.id, conversation.title])
 
   return (
     <div className="relative flex h-full flex-col">
@@ -398,14 +420,27 @@ export function ChatPage({
               is feeding. It only describes it - an approval or a question
               blocks the run, and those stay in the flow below where the
               layout gives them weight. */}
-          {!gallery && plan.snapshot !== null && plan.hasPlan ? (
-            <div className="pointer-events-auto max-w-full px-4">
-              <PlanPill
-                snapshot={plan.snapshot}
-                items={plan.items}
-                open={planEntryVisible}
-                onToggle={togglePlanPanel}
-              />
+          {/* Both pills sit here for the same reason: they describe the run
+              the composer is feeding without blocking it. The commands come
+              second because the plan is what the run says it is doing, and a
+              process it left behind is a footnote to that. */}
+          {!gallery && (plan.hasPlan || jobs.jobs.length > 0) ? (
+            <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-2 px-4">
+              {plan.snapshot !== null && plan.hasPlan ? (
+                <PlanPill
+                  snapshot={plan.snapshot}
+                  items={plan.items}
+                  open={planEntryVisible}
+                  onToggle={togglePlanPanel}
+                />
+              ) : null}
+              {jobs.jobs.length > 0 ? (
+                <JobsPill
+                  jobs={jobs.jobs}
+                  open={jobsEntryVisible}
+                  onToggle={toggleJobsPanel}
+                />
+              ) : null}
             </div>
           ) : null}
         </div>

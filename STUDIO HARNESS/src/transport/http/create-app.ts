@@ -17,6 +17,7 @@ import type { StudioDatabase } from "../../storage/database.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createTurnSettingsMiddleware } from "./middleware/turn-settings.js";
 import type { ConversationTitlingPort } from "../../conversations/titling.js";
+import type { BackgroundJobs } from "../../process/background.js";
 import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
@@ -69,6 +70,12 @@ export interface CreateHttpAppOptions {
    * `options`, so this only has to reach the shape it declares.
    */
   readonly contextUsage?: ContextUsageTracker;
+  /**
+   * The runtime's background commands, for the panel that lists them.
+   * `createConversationRoutes` reads it through `options`, so this only has to
+   * reach the shape it declares.
+   */
+  readonly backgroundJobs?: BackgroundJobs;
   /**
    * The application database. The conversation routes own the purge of
    * conversation-scoped rows through it; everything else keeps reaching only

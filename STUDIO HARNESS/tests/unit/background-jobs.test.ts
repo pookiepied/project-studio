@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { BackgroundJobs, type JobStatus } from "../../src/process/background.js";
+import { BackgroundJobs, finishedNotice, type JobStatus } from "../../src/process/background.js";
 
 /**
  * Commands that are not meant to finish.
@@ -152,4 +152,157 @@ describe("a command started in the background", () => {
     expect(job.output).toContain("line 999");
     expect(job.output).not.toContain("line 0\n");
   });
+})
+
+/**
+ * The half that makes a background job something other than a thing to poll.
+ *
+ * A job that ends while nobody is looking has to keep that fact until there is
+ * somewhere to put it, and then say it exactly once. Said twice it reads as
+ * two jobs ending; said never it is a download the model waits on forever.
+ */
+describe("telling the caller a job has ended", () => {
+  /** A program that ends on its own, the way a download does. */
+  function brief(code = 0): readonly string[] {
+    return ["-e", `console.log('done'); process.exit(${code})`];
+  }
+
+  it("says nothing while the job is still running", async () => {
+    jobs = new BackgroundJobs();
+    const started = jobs.start({
+      executable: NODE,
+      args: server(),
+      cwd: process.cwd(),
+      command: "node server",
+      conversationId: "cnv_1",
+    });
+    await settles(started.id, (job) => job.output.includes("listening"));
+
+    // Running is not news. It is the state the caller asked for.
+    expect(jobs.drainFinished("cnv_1")).toEqual([]);
+  });
+
+  it("reports an ended job once, and not a second time", async () => {
+    jobs = new BackgroundJobs();
+    const started = jobs.start({
+      executable: NODE,
+      args: brief(),
+      cwd: process.cwd(),
+      command: "node download",
+      conversationId: "cnv_1",
+    });
+    await settles(started.id, (job) => job.state === "exited");
+
+    const first = jobs.drainFinished("cnv_1");
+    expect(first.map((job) => job.id)).toEqual([started.id]);
+    expect(first[0]?.exitCode).toBe(0);
+    // The drain is the delivery. A second read of the same ending would put
+    // the same job in front of the model twice.
+    expect(jobs.drainFinished("cnv_1")).toEqual([]);
+  });
+
+  it("records when a job ended, so a reader can tell fresh news from old", async () => {
+    jobs = new BackgroundJobs();
+    const started = jobs.start({
+      executable: NODE,
+      args: brief(3),
+      cwd: process.cwd(),
+      command: "node failing",
+      conversationId: "cnv_1",
+    });
+    const ended = await settles(started.id, (job) => job.state === "exited");
+    expect(ended.exitCode).toBe(3);
+    expect(ended.endedAt).toBeTypeOf("number");
+  });
+
+  it("does not report a job the person stopped by hand", async () => {
+    jobs = new BackgroundJobs();
+    const started = jobs.start({
+      executable: NODE,
+      args: server(),
+      cwd: process.cwd(),
+      command: "node server",
+      conversationId: "cnv_1",
+    });
+    jobs.stop("cnv_1", started.id);
+
+    // Somebody was already watching. Telling them what they just did is noise.
+    expect(jobs.drainFinished("cnv_1")).toEqual([]);
+  });
+
+  it("keeps one conversation's endings out of another's", async () => {
+    jobs = new BackgroundJobs();
+    const started = jobs.start({
+      executable: NODE,
+      args: brief(),
+      cwd: process.cwd(),
+      command: "node download",
+      conversationId: "cnv_1",
+    });
+    await settles(started.id, (job) => job.state === "exited");
+
+    expect(jobs.drainFinished("cnv_2")).toEqual([]);
+    expect(jobs.drainFinished("cnv_1")).toHaveLength(1);
+  });
+
+  it("gives each run its own ids, so a remembered one cannot land on a new job", () => {
+    const first = new BackgroundJobs();
+    const second = new BackgroundJobs();
+    const a = first.start({
+      executable: NODE,
+      args: brief(),
+      cwd: process.cwd(),
+      command: "node one",
+      conversationId: "cnv_1",
+    });
+    const b = second.start({
+      executable: NODE,
+      args: brief(),
+      cwd: process.cwd(),
+      command: "node two",
+      conversationId: "cnv_1",
+    });
+    first.stopAll();
+    second.stopAll();
+
+    // The registry is in memory, so a restart empties it - but the counter
+    // starting over would let `job_1` from before the restart name whatever
+    // ran first afterwards.
+    expect(a.id).not.toBe(b.id);
+  });
+});
+
+/**
+ * What the notice says, which is a prompt decision and not a formatting one.
+ *
+ * It arrives somewhere the model did not ask for it - stapled to an unrelated
+ * tool result, or in the environment block - so it has to say which job, how it
+ * ended, and where to look, in that order, and then stop.
+ */
+describe("the wording of the ending notice", () => {
+  it("says nothing when nothing ended", () => {
+    expect(finishedNotice([])).toBeUndefined()
+  })
+
+  it("names the job, how it ended, and where the output is", async () => {
+    jobs = new BackgroundJobs()
+    const started = jobs.start({
+      executable: NODE,
+      args: ["-e", "console.log('done')"],
+      cwd: process.cwd(),
+      command: "node download",
+      conversationId: "cnv_1",
+    })
+    await settles(started.id, (job) => job.state === "exited")
+
+    const notice = finishedNotice(jobs.drainFinished("cnv_1")) ?? ""
+    expect(notice).toContain(started.id)
+    expect(notice).toContain("node download")
+    // Without this a model told a download finished goes looking for the file
+    // by hand rather than reading what the command printed.
+    expect(notice).toContain("jobs tool")
+    // The output itself is not in it. A notice that takes over the result it
+    // was appended to is worse than no notice.
+    expect(notice).not.toContain("done")
+  })
 })

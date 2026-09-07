@@ -73,8 +73,38 @@ beforeEach(() => {
 
 afterEach(() => {
   db.close();
-  rmSync(workspace, { recursive: true, force: true });
+  removeWorkspace(workspace);
 });
+
+/**
+ * Removes the temporary workspace, waiting out a process that still holds it.
+ *
+ * A background job is killed by signalling its tree, and on Windows the
+ * directory it had as its `cwd` stays locked for a short while after the last
+ * process in that tree is gone - so a removal issued immediately fails with
+ * EPERM even though nothing is running any more. Retrying briefly is the fix;
+ * the alternative seen here was a suite that passed except when the machine
+ * was busy.
+ */
+function removeWorkspace(directory: string): void {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      rmSync(directory, { recursive: true, force: true });
+      return;
+    } catch {
+      // Busy-wait rather than await: this runs in a synchronous teardown, and
+      // the wait is tens of milliseconds at worst.
+      const until = Date.now() + 50;
+      while (Date.now() < until) {
+        /* hold */
+      }
+    }
+  }
+  // Last attempt, and this one is allowed to throw: a directory that is still
+  // locked after a second is a process we failed to kill, which is worth
+  // failing the suite over.
+  rmSync(directory, { recursive: true, force: true });
+}
 
 /** What the kernel was asked about, in order. */
 function recordingApprover() {
@@ -811,7 +841,10 @@ describe("running a command in the background", () => {
     });
 
     // A foreground call here would sit until its timeout; this one came back.
-    expect(String(answer)).toMatch(/Started job_1 in the background/);
+    // The id is matched by shape rather than spelled out: it carries a tag for
+    // the run that minted it, so that a remembered id from before a restart
+    // cannot land on a different process.
+    expect(String(answer)).toMatch(/Started job_\w+ in the background/);
     expect(jobs.list(SCOPE.conversationId)).toHaveLength(1);
     await releaseAll(jobs);
   });
@@ -824,15 +857,16 @@ describe("running a command in the background", () => {
       background: true,
     });
 
+    const id = jobs.list(SCOPE.conversationId)[0]?.id ?? "";
     const listed = await instance.call({ name: "native/jobs", input: {}, scope: SCOPE });
-    expect(String(listed)).toContain("job_1");
+    expect(String(listed)).toContain(id);
 
     await instance.call({
       name: "native/jobs",
-      input: { id: "job_1", stop: true },
+      input: { id, stop: true },
       scope: SCOPE,
     });
-    expect(jobs.get(SCOPE.conversationId, "job_1")?.state).toBe("stopped");
+    expect(jobs.get(SCOPE.conversationId, id)?.state).toBe("stopped");
     await releaseAll(jobs);
   });
 

@@ -52,6 +52,9 @@ function stubClient(overrides: {
     listModels: () =>
       error ? Promise.resolve({ ok: false as const, error }) : Promise.resolve(ok(overrides.models ?? [modelFor(KNOWN_VENDOR.id, 'claude-opus-5')])),
     getDefaults: () => Promise.resolve(ok({})),
+    conversationContext: () => Promise.resolve(ok(null)),
+    conversationJobs: () => Promise.resolve(ok([])),
+    stopConversationJob: () => Promise.resolve(ok(null)),
     createConnection: () => Promise.resolve(ok(KNOWN_VENDOR)),
     updateConnection: () => Promise.resolve(ok(KNOWN_VENDOR)),
     deleteConnection: () => Promise.resolve(ok(undefined)),

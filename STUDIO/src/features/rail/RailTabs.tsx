@@ -41,7 +41,12 @@ export function RailTabs() {
             // The plan is a different kind of thing in the same list: its own
             // mark, its own name, and a title that does not come from an
             // artifact the entry does not have.
-            const title = entry.kind === 'artifact' ? entry.artifact.title : 'Plan'
+            const title =
+              entry.kind === 'artifact'
+                ? entry.artifact.title
+                : entry.kind === 'jobs'
+                  ? 'Background commands'
+                  : 'Plan'
             return (
               <div
                 key={entry.id}
@@ -58,7 +63,13 @@ export function RailTabs() {
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   <span className="shrink-0">
-                    {entry.kind === 'artifact' ? <Icons.artifact /> : <Icons.plan />}
+                    {entry.kind === 'artifact' ? (
+                      <Icons.artifact />
+                    ) : entry.kind === 'jobs' ? (
+                      <Icons.backgroundJobs />
+                    ) : (
+                      <Icons.plan />
+                    )}
                   </span>
                   <span
                     className={cn(

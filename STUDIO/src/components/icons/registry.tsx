@@ -31,7 +31,7 @@ import {
   GitBranch, GitFork, Globe, Image, Keyboard, Lightbulb, ListChecks, MessageSquare, Mic, Monitor,
   MoreHorizontal, Moon, MessageCircleQuestionMark, Paperclip, Palette, Pause, Pencil, PenLine, Pin, Plus,
   RefreshCw, Search, Settings2, SlidersHorizontal, Split,
-  SquarePen, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
+  SquarePen, SquareTerminal, Sun, Target, Terminal, Trash2, UserCog, Volume2, WandSparkles, Webhook, X,
   FastForward, CircleAlert, Clapperboard, FileText,
   Link2, Maximize2, Sparkles,
   type LucideIcon,
@@ -207,6 +207,11 @@ const REGISTRY = {
   skill: { mark: WandSparkles },
   hook: { mark: Webhook },
   browserUse: { mark: Globe },
+  // Commands the model left running. `run` is already a terminal and means the
+  // act of running something; this means the things that are still running, so
+  // it is the same idea in the plural and takes a different mark rather than a
+  // second copy of that one.
+  backgroundJobs: { mark: SquareTerminal },
 
   // — Settings sections ---------------------------------------------------
   general: { mark: SlidersHorizontal },

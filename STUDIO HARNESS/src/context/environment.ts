@@ -107,6 +107,19 @@ export interface EnvironmentFacts {
    * scattered through a tree that was clean before the turn.
    */
   readonly scratch?: string;
+  /**
+   * The background commands this conversation has, as lines to render.
+   *
+   * Present only when there are any, and that condition is the whole design.
+   * The block is the cached prefix of every request, so a fact that changes
+   * every turn would cost a cache miss on every turn - for every conversation,
+   * including the overwhelming majority that never start a background command
+   * at all. Omitted when the list is empty, the prefix is byte-identical to
+   * what it has always been, and only a conversation that actually has jobs
+   * pays. On that conversation the miss buys the model knowing, at the top of
+   * the turn, that its download finished - which is worth more than the cache.
+   */
+  readonly backgroundJobs?: readonly string[];
 }
 
 /**
@@ -150,6 +163,7 @@ export function environmentFacts(
   extraRoots?: readonly string[],
   projectFolders?: readonly string[],
   scratch?: string,
+  backgroundJobs?: readonly string[],
 ): EnvironmentFacts {
   return {
     workspace,
@@ -162,6 +176,9 @@ export function environmentFacts(
     // conversation the two are the same directory, and naming it twice
     // invites the model to treat one path as two places.
     ...(scratch === undefined || scratch === workspace ? {} : { scratch }),
+    ...(backgroundJobs === undefined || backgroundJobs.length === 0
+      ? {}
+      : { backgroundJobs }),
   };
 }
 
@@ -345,6 +362,26 @@ function containmentStatement(): readonly string[] {
  * the same way the extra roots are listed. It belongs to the project branch
  * of the block and renders for no other kind.
  */
+/**
+ * The background commands, when there are any.
+ *
+ * Both the running and the just-ended ones, because the two answer different
+ * questions and a model given only one of them asks for the other. A running
+ * job is something the turn can use - the dev server is up, so fetch the page.
+ * An ended one is news, and it is delivered here exactly once: the caller
+ * drains the ended list to build these lines, so the next turn's block carries
+ * only what is still true.
+ */
+function backgroundJobsStatement(facts: EnvironmentFacts): readonly string[] {
+  if (facts.backgroundJobs === undefined || facts.backgroundJobs.length === 0) return [];
+  return [
+    "Background commands you started:",
+    ...facts.backgroundJobs,
+    "Read output or stop one with the jobs tool.",
+    "",
+  ];
+}
+
 function projectFoldersStatement(facts: EnvironmentFacts): readonly string[] {
   if (facts.kind !== "project") return [];
   const folders = facts.projectFolders ?? [];
@@ -386,6 +423,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
     "",
     ...workspaceStatement(facts),
     ...projectFoldersStatement(facts),
+    ...backgroundJobsStatement(facts),
     ...extraRootsStatement(facts.extraRoots),
     ...(shell === undefined
       ? [

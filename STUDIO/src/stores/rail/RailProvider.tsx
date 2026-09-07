@@ -46,6 +46,22 @@ export type RailEntry =
       readonly openedAt: number
     }
   | {
+      /**
+       * The conversation's background commands: one entry, not one per job.
+       *
+       * Like the plan, and for the same reason. Jobs arrive and end on their
+       * own schedule, and a tab per job would open and close the rail under
+       * somebody who was reading something else in it. One entry that lists
+       * them stays put.
+       */
+      readonly kind: 'jobs'
+      /** `jobs:<conversation id>` - one per conversation, keyed by it. */
+      readonly id: string
+      readonly conversationId: string
+      readonly conversationTitle: string
+      readonly openedAt: number
+    }
+  | {
       readonly kind: 'plan'
       /** `plan:<conversation id>` - one per conversation, keyed by it. */
       readonly id: string
@@ -57,6 +73,11 @@ export type RailEntry =
 /** The id of a conversation's plan entry. One plan per conversation, so the conversation keys it. */
 export function planEntryId(conversationId: string): string {
   return `plan:${conversationId}`
+}
+
+/** The id of a conversation's background-commands entry. Keyed the same way. */
+export function jobsEntryId(conversationId: string): string {
+  return `jobs:${conversationId}`
 }
 
 /**
@@ -121,6 +142,8 @@ interface RailValue {
   openArtifact: (artifact: Artifact, conversationId: string, conversationTitle: string) => void
   /** Opens - or focuses - the conversation's plan entry. Idempotent, like openArtifact. */
   openPlan: (conversationId: string, conversationTitle: string) => void
+  /** Opens - or focuses - the conversation's background commands. Idempotent too. */
+  openJobs: (conversationId: string, conversationTitle: string) => void
   focus: (id: string) => void
   close: (id: string) => void
   closeAll: () => void
@@ -196,6 +219,25 @@ export function RailProvider({ children }: { children: ReactNode }) {
     setCollapsed(false)
   }, [])
 
+  const openJobs = useCallback((conversationId: string, conversationTitle: string) => {
+    const id = jobsEntryId(conversationId)
+    setEntries((current) => {
+      const existing = current.find((entry) => entry.id === id)
+      if (existing) {
+        return current.map((entry) =>
+          entry.id === id && entry.kind === 'jobs' ? { ...entry, conversationTitle } : entry,
+        )
+      }
+      return capped([
+        ...current,
+        { kind: 'jobs', id, conversationId, conversationTitle, openedAt: Date.now() },
+      ])
+    })
+
+    setActiveId(id)
+    setCollapsed(false)
+  }, [])
+
   const close = useCallback((id: string) => {
     setEntries((current) => {
       const index = current.findIndex((entry) => entry.id === id)
@@ -233,6 +275,7 @@ export function RailProvider({ children }: { children: ReactNode }) {
       width,
       openArtifact,
       openPlan,
+      openJobs,
       focus: setActiveId,
       close,
       closeAll,
@@ -240,7 +283,18 @@ export function RailProvider({ children }: { children: ReactNode }) {
       expand: () => setCollapsed(false),
       setWidth,
     }),
-    [entries, activeId, width, collapsed, openArtifact, openPlan, close, closeAll, setWidth],
+    [
+      entries,
+      activeId,
+      width,
+      collapsed,
+      openArtifact,
+      openPlan,
+      openJobs,
+      close,
+      closeAll,
+      setWidth,
+    ],
   )
 
   return <RailContext.Provider value={value}>{children}</RailContext.Provider>

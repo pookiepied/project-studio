@@ -18,6 +18,7 @@ import {
 } from "../../../conversations/purge.js";
 import type { ConversationStore } from "../../../conversations/store.js";
 import type { ConversationUsage } from "../../../conversations/context-usage.js";
+import type { JobStatus } from "../../../process/background.js";
 import type { StudioDatabase } from "../../../storage/database.js";
 import { StorageError } from "../../../storage/errors.js";
 import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
@@ -35,6 +36,20 @@ export interface ConversationRoutesOptions {
    */
   readonly contextUsage?: {
     get(conversationId: string): ConversationUsage | undefined;
+  };
+  /**
+   * The background commands, for the panel that shows them.
+   *
+   * Read-only plus a stop, and scoped by conversation the same way the tool
+   * is: the panel may only see and end what this conversation started.
+   * Absent in a composition with no runtime behind it, and the routes then
+   * answer an empty list rather than failing - a window with no jobs to show
+   * is the normal case, not an error.
+   */
+  readonly backgroundJobs?: {
+    list(conversationId: string): readonly JobStatus[];
+    get(conversationId: string, id: string): JobStatus | undefined;
+    stop(conversationId: string, id: string): boolean;
   };
 }
 
@@ -126,6 +141,34 @@ export function createConversationRoutes(
   routes.get("/:id/context", (context) => {
     const measured = options.contextUsage?.get(context.req.param("id"));
     return context.json({ usage: measured ?? null });
+  });
+
+  /**
+   * One conversation's background commands, with their output.
+   *
+   * The output is included in the listing rather than behind a second call:
+   * the panel shows it, the tail is already bounded to a few hundred lines,
+   * and a second round trip per job would make a list of five jobs six
+   * requests to render one panel.
+   */
+  routes.get("/:id/jobs", (context) =>
+    context.json({ jobs: options.backgroundJobs?.list(context.req.param("id")) ?? [] }),
+  );
+
+  // The person's stop, which is the same operation the model's tool performs
+  // and deliberately not a different one. Unknown id answers 404 rather than
+  // succeeding quietly, because "I pressed stop and nothing happened" is the
+  // failure this route exists to make visible.
+  routes.post("/:id/jobs/:jobId/stop", (context) => {
+    const stopped = options.backgroundJobs?.stop(
+      context.req.param("id"),
+      context.req.param("jobId"),
+    );
+    if (stopped !== true) {
+      return context.json({ error: "There is no such background command." }, 404);
+    }
+    const job = options.backgroundJobs?.get(context.req.param("id"), context.req.param("jobId"));
+    return context.json({ job: job ?? null });
   });
 
   routes.post("/", async (context) => {

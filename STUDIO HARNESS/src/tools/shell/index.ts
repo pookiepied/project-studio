@@ -102,7 +102,10 @@ const SHELL_DESCRIPTION =
   // the failure.
   "Set background: true for a command that is not meant to finish - a dev " +
   "server, a watcher, a long download. It returns a job id at once; use " +
-  "the jobs tool to read its output or stop it. Do not try to detach a " +
+  "the jobs tool to read its output or stop it. You will be told when a " +
+  "background command ends, so there is no need to keep checking on one - " +
+  "start it, carry on with the work, and read its output when you hear. " +
+  "Do not try to detach a " +
   "command yourself: a line that launches something into the background " +
   "still hands it these pipes, so this tool waits for it either way.";
 

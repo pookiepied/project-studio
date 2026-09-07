@@ -58,7 +58,7 @@ import { ToolError } from "../tools/errors.js";
 import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
 import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
-import { BackgroundJobs } from "../process/background.js";
+import { BackgroundJobs, finishedNotice } from "../process/background.js";
 import { ConversationStore } from "../conversations/store.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
 
@@ -184,19 +184,29 @@ function asText(value: unknown): ModelTextContent {
   return { type: "text", text: textResult(value) };
 }
 
-function modelToolResult(value: unknown): ModelToolResult {
+function modelToolResult(value: unknown, notice?: string): ModelToolResult {
+  // Appended as its own block rather than spliced into the text of the result.
+  // The result belongs to the tool that was called and a model parsing it -
+  // reading JSON out of a search, counting lines from a read - must not find
+  // a sentence about something else inside it.
+  const appended: readonly ModelTextContent[] =
+    notice === undefined ? [] : [{ type: "text", text: notice }];
+
   if (isRecord(value) && Array.isArray(value["content"])) {
     return {
-      content: value["content"].map((block) =>
-        isSupportedContent(block) ? block : asText(block),
-      ),
+      content: [
+        ...value["content"].map((block) =>
+          isSupportedContent(block) ? block : asText(block),
+        ),
+        ...appended,
+      ],
       details: value,
       ...(value["isError"] === true ? { isError: true } : {}),
     };
   }
 
   return {
-    content: [asText(value)],
+    content: [asText(value), ...appended],
     details: value,
   };
 }
@@ -366,6 +376,16 @@ export interface AgentHost {
    * satisfies the host.
    */
   conversationProjectFolders?(conversationId: string): readonly string[];
+  /**
+   * The background commands to name in this turn's environment block.
+   *
+   * Lines rather than records, because the shaping is a prompt decision and
+   * the agent module is where prompt decisions belong. Calling this drains the
+   * ended ones - it is a delivery, not a read - so nothing else may call it.
+   * Optional for the same reason the folders are: a test double that predates
+   * background commands still satisfies the host.
+   */
+  conversationBackgroundJobs?(conversationId: string): readonly string[];
 }
 
 /**
@@ -598,6 +618,45 @@ export class StudioRuntime implements AgentHost {
     const projectId = this.#conversationProject(conversationId);
     if (projectId === undefined) return [];
     return (this.#projects.get(projectId)?.folders ?? []).map((folder) => folder.path);
+  }
+
+  /**
+   * What this conversation's background commands are, for the turn's block.
+   *
+   * Running jobs are listed every turn: they are current state, and a turn
+   * that knows the dev server is up does not start a second one. Ended jobs
+   * are drained, so each is announced once and then stops being mentioned -
+   * an exit code repeated on every turn for the rest of a conversation is
+   * noise that eventually reads as a job that keeps failing.
+   */
+  conversationBackgroundJobs(conversationId: string): readonly string[] {
+    const running = this.#jobs
+      .list(conversationId)
+      .filter((job) => job.state === "running")
+      .map((job) => `${job.id} is running: ${job.command}`);
+    const ended = this.#jobs.drainFinished(conversationId).map((job) => {
+      const how =
+        job.state === "stopped"
+          ? "was stopped"
+          : job.state === "failed"
+            ? "never started"
+            : job.exitCode === 0
+              ? "finished"
+              : `exited ${job.exitCode ?? "?"}`;
+      return `${job.id} ${how}: ${job.command}`;
+    });
+    return [...running, ...ended];
+  }
+
+  /**
+   * The background commands, for the HTTP surface that shows them.
+   *
+   * Exposed as the registry rather than as a copy of its listing, because the
+   * panel needs three operations on it and a snapshot would answer none of
+   * them - a list read a second ago cannot stop anything.
+   */
+  get backgroundJobs(): BackgroundJobs {
+    return this.#jobs;
   }
 
   /** Whether one conversation runs uncontained. Trusted is per project. */
@@ -976,7 +1035,15 @@ export class StudioRuntime implements AgentHost {
                   scope,
                   ...(signal === undefined ? {} : { signal }),
                 });
-                return modelToolResult(result);
+                // A job that ended mid-turn is told here, on the way back
+                // from an unrelated call. This is the delivery point that
+                // matters: a model that starts a download and keeps working
+                // learns it finished without anyone having polled for it, and
+                // without the harness starting a turn nobody asked for.
+                return modelToolResult(
+                  result,
+                  finishedNotice(this.#jobs.drainFinished(scope.conversationId)),
+                );
               } catch (error) {
                 if (error instanceof ToolError && error.kind === "unavailable") {
                   return {

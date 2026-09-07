@@ -328,3 +328,41 @@ describe("what the block says about commands that do not finish", () => {
     expect(block()).toContain("Do not try to detach a command by hand")
   })
 })
+
+/**
+ * The background commands, named at the top of the turn.
+ *
+ * The block is the cached prefix of every request, so this is the one fact in
+ * it that changes while a conversation is open. It is therefore omitted
+ * entirely when there are no jobs: a conversation that never starts one must
+ * cost exactly what it cost before, byte for byte.
+ */
+describe("the background commands in the block", () => {
+  const day = new Date(2026, 7, 30, 12, 0, 0)
+
+  it("says nothing at all when the conversation has no background commands", () => {
+    const without = environmentBlock(environmentFacts("/work", day))
+    const withEmpty = environmentBlock(
+      environmentFacts("/work", day, "conversation", undefined, undefined, undefined, []),
+    )
+
+    // Byte-identical, not merely similar. Anything else is a cache miss on
+    // every turn of every conversation, paid to say nothing.
+    expect(withEmpty).toBe(without)
+  })
+
+  it("names the jobs and where to read them", () => {
+    const block = environmentBlock(
+      environmentFacts("/work", day, "conversation", undefined, undefined, undefined, [
+        "job_ab1 is running: npm run dev",
+        "job_ab2 finished: curl model.bin",
+      ]),
+    )
+
+    expect(block).toContain("job_ab1 is running: npm run dev")
+    expect(block).toContain("job_ab2 finished: curl model.bin")
+    // A model told a download finished and not told how to read its output
+    // goes looking for the file by hand.
+    expect(block).toContain("jobs tool")
+  })
+})

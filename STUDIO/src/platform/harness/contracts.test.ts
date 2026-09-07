@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   executionModeFromWire,
   executionModeToWire,
+  parseBackgroundJob,
+  parseBackgroundJobs,
   parseHarnessErrorBody,
   parseModelCapability,
   parsePendingApprovals,
@@ -767,5 +769,52 @@ describe('parsePendingApprovals', () => {
         { ...APPROVAL, request: { ...APPROVAL.request, scopes: [{ id: 'this-file' }] } },
       ]),
     ).toBeNull()
+  })
+})
+
+/**
+ * The background commands, as they arrive over the wire.
+ *
+ * A row that does not parse is dropped rather than rendered with blank fields:
+ * the panel it feeds shows a stop button per row, and a row with no id is a
+ * button that cannot work.
+ */
+describe('reading background commands', () => {
+  const row = {
+    id: 'job_ab1',
+    command: 'npm run dev',
+    state: 'running',
+    exitCode: null,
+    startedAt: 10,
+    endedAt: null,
+    output: 'listening',
+    dropped: 0,
+  }
+
+  it('reads a listing', () => {
+    expect(parseBackgroundJobs({ jobs: [row] })).toEqual([row])
+  })
+
+  it('answers with nothing when the body is not a listing', () => {
+    expect(parseBackgroundJobs(null)).toEqual([])
+    expect(parseBackgroundJobs({})).toEqual([])
+    expect(parseBackgroundJobs({ jobs: 'two' })).toEqual([])
+  })
+
+  it('drops a row with no id, and keeps the rest', () => {
+    const kept = parseBackgroundJobs({ jobs: [{ ...row, id: '' }, row] })
+
+    expect(kept.map((job) => job.id)).toEqual(['job_ab1'])
+  })
+
+  it('drops a row whose state is not one this app knows', () => {
+    // A state the panel has no phrase for would render as a blank label beside
+    // a command, which reads as a bug in the command rather than in the wire.
+    expect(parseBackgroundJobs({ jobs: [{ ...row, state: 'zombie' }] })).toEqual([])
+  })
+
+  it('reads a single job out of a stop answer', () => {
+    expect(parseBackgroundJob({ ...row, state: 'stopped', endedAt: 12 })?.state).toBe('stopped')
+    expect(parseBackgroundJob(null)).toBeNull()
   })
 })

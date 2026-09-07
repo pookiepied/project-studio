@@ -161,6 +161,10 @@ export function Studio({ id }: AgentProps) {
       // this, and being told so is what keeps working files out of the
       // person's repository.
       conversationWorkspaceDirectory(id),
+      // Drains the ended ones, so this is the delivery and not a peek. It runs
+      // once per turn, here, because assembling the prompt is the one thing a
+      // turn does exactly once.
+      runtime.conversationBackgroundJobs?.(id),
     ),
   )}`;
 }

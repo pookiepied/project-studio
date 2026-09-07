@@ -32,6 +32,7 @@ import {
   type PendingApprovalRecord,
   type PendingQuestionRecord,
   type PlanSnapshot,
+  type BackgroundJob,
   type ProviderConnection,
 } from '@/platform/harness'
 import { defaultListen } from '@/features/chat/useConversation'
@@ -275,6 +276,17 @@ interface WorkspaceValue {
    * panel renders rather than a failure it swallows. Bound to the store's
    * client for the same restart reason `questions` is.
    */
+  /**
+   * The background commands a conversation started, and the person's stop.
+   *
+   * Bound to the store's client for the same restart reason `plans` is: the
+   * panel holds this object across a harness restart, and a captured client
+   * would keep pointing at the address that went away.
+   */
+  readonly backgroundJobs: {
+    list: (conversationId: string) => Promise<HarnessResult<readonly BackgroundJob[]>>
+    stop: (conversationId: string, jobId: string) => Promise<HarnessResult<BackgroundJob | null>>
+  }
   readonly plans: {
     get: (conversationId: string) => Promise<HarnessResult<PlanSnapshot>>
     tick: (
@@ -817,6 +829,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const backgroundJobs = useMemo(
+    () => ({
+      list: (conversationId: string) =>
+        clientRef.current?.conversationJobs(conversationId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so there are no commands to list.',
+          },
+        }),
+      stop: (conversationId: string, jobId: string) =>
+        clientRef.current?.stopConversationJob(conversationId, jobId) ??
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'not-reachable' as const,
+            timedOut: false,
+            message: 'The harness is not running, so nothing was stopped.',
+          },
+        }),
+    }),
+    [],
+  )
+
   const plans = useMemo(
     () => ({
       get: (conversationId: string) =>
@@ -1232,6 +1270,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       approvals,
       questions,
       plans,
+      backgroundJobs,
       createProject,
       removeProject,
       setBranch,
@@ -1264,6 +1303,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       trustFolders,
       orphanTrees,
       plans,
+      backgroundJobs,
       questions,
       refreshOrphanTrees,
       sweepOrphanTrees,

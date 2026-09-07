@@ -28,7 +28,10 @@ import {
   parseHarnessErrorBody,
   parseConversationRecord,
   parseMeasuredContextUsage,
+  parseBackgroundJob,
+  parseBackgroundJobs,
   type MeasuredContextUsage,
+  type BackgroundJob,
   parseConversationRecords,
   parseDetectedPresets,
   parseLibraryProviders,
@@ -271,6 +274,22 @@ export interface HarnessClient {
    * failure - the caller estimates instead.
    */
   conversationContext(id: string): Promise<HarnessResult<MeasuredContextUsage | null>>
+  /**
+   * The background commands one conversation started.
+   *
+   * With their output, in the one call: the tail is already bounded, the panel
+   * shows it, and a second request per job would make rendering a list of five
+   * six round trips.
+   */
+  conversationJobs(id: string): Promise<HarnessResult<readonly BackgroundJob[]>>
+  /**
+   * Ends one of them, at the person's request.
+   *
+   * The same operation the model's own tool performs, deliberately not a
+   * different one - a stop that took a gentler path than the model's would
+   * leave "the port is still held after I pressed stop".
+   */
+  stopConversationJob(id: string, jobId: string): Promise<HarnessResult<BackgroundJob | null>>
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
   updateConversation(
@@ -745,6 +764,29 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     speak(input) {
       return json('POST', `${MEDIA_PATH}/speech`, input, parseSpeechResult, 150_000)
+    },
+
+    conversationJobs(id) {
+      return json(
+        'GET',
+        `${CONVERSATIONS_PATH}/${encodeURIComponent(id)}/jobs`,
+        undefined,
+        parseBackgroundJobs,
+      )
+    },
+
+    stopConversationJob(id, jobId) {
+      return json(
+        'POST',
+        `${CONVERSATIONS_PATH}/${encodeURIComponent(id)}/jobs/${encodeURIComponent(jobId)}/stop`,
+        undefined,
+        (value) =>
+          parseBackgroundJob(
+            typeof value === 'object' && value !== null
+              ? (value as Record<string, unknown>)['job']
+              : null,
+          ),
+      )
     },
 
     conversationContext(id) {

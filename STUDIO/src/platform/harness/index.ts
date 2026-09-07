@@ -179,7 +179,10 @@ export {
   type SandboxScopeSource,
   type WireStreamEvent,
   parseMeasuredContextUsage,
+  parseBackgroundJob,
+  parseBackgroundJobs,
   type MeasuredContextUsage,
+  type BackgroundJob,
 } from './contracts'
 
 export {

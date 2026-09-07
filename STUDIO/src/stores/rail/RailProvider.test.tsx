@@ -123,3 +123,33 @@ describe('the rail holding a plan', () => {
     expect(result.current.activeId).toBeNull()
   })
 })
+
+/**
+ * The background-commands entry, which is keyed the way the plan is.
+ *
+ * Jobs arrive and end on their own schedule, so a tab per job would open and
+ * close the rail under somebody reading something else in it. One entry per
+ * conversation stays put.
+ */
+describe('the background commands entry', () => {
+  it('opens once per conversation however often it is asked for', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+
+    act(() => result.current.openJobs('cnv_1', 'A conversation'))
+    act(() => result.current.openJobs('cnv_1', 'A renamed conversation'))
+
+    const jobs = result.current.entries.filter((entry) => entry.kind === 'jobs')
+    expect(jobs).toHaveLength(1)
+    // Re-titled in place rather than duplicated - the same rule the plan keeps.
+    expect(jobs[0]?.conversationTitle).toBe('A renamed conversation')
+  })
+
+  it('gives each conversation its own', () => {
+    const { result } = renderHook(() => useRail(), { wrapper })
+
+    act(() => result.current.openJobs('cnv_1', 'One'))
+    act(() => result.current.openJobs('cnv_2', 'Two'))
+
+    expect(result.current.entries.filter((entry) => entry.kind === 'jobs')).toHaveLength(2)
+  })
+})

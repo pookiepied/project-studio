@@ -4,6 +4,7 @@ import { FADE, SPRING_PANEL } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives'
 import { renderArtifact } from '@/features/artifacts'
+import { JobsPanel } from '@/features/jobs/JobsPanel'
 import { PlanPanel } from '@/features/plans/PlanPanel'
 import { RailTabs } from '@/features/rail/RailTabs'
 import { RAIL_MAX_WIDTH, RAIL_MIN_WIDTH, useRail, type RailEntry } from '@/stores/rail'
@@ -21,7 +22,8 @@ const MIN_PAGE_WIDTH = 520
 
 /** What the header calls the active entry, per kind. */
 function entryTitle(entry: RailEntry): string {
-  return entry.kind === 'artifact' ? entry.artifact.title : 'Plan'
+  if (entry.kind === 'artifact') return entry.artifact.title
+  return entry.kind === 'jobs' ? 'Background commands' : 'Plan'
 }
 
 
@@ -156,6 +158,8 @@ export function SideRail() {
                 <motion.div {...FADE} className={cn('min-w-0', active.kind === 'artifact' && 'studio-prose')}>
                   {active.kind === 'artifact' ? (
                     renderArtifact(active.artifact)
+                  ) : active.kind === 'jobs' ? (
+                    <JobsPanel conversationId={active.conversationId} />
                   ) : (
                     <PlanPanel conversationId={active.conversationId} />
                   )}

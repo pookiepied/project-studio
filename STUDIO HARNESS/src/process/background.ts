@@ -68,6 +68,8 @@ export interface JobStatus {
   readonly output: string;
   /** Lines dropped off the front of the tail, or zero. */
   readonly dropped: number;
+  /** When it ended, or null while it runs. */
+  readonly endedAt: number | null;
   /** Why it failed to start, when it did. */
   readonly error?: string;
 }
@@ -84,6 +86,15 @@ interface Job {
   partial: string;
   state: JobState;
   exitCode: number | null;
+  endedAt: number | null;
+  /**
+   * Whether the end of this job has been told to the model yet.
+   *
+   * The point of the whole notice: a job that ends while nobody is looking is
+   * a fact that has to survive until there is somewhere to put it. Set by
+   * whichever delivery point gets to it first.
+   */
+  reported: boolean;
   error?: string;
   pid: number | undefined;
   kill: () => void;
@@ -106,6 +117,17 @@ export interface StartJobOptions extends Omit<RunProcessOptions, "timeoutMs" | "
 export class BackgroundJobs {
   readonly #jobs = new Map<string, Job>();
   #counter = 0;
+  /**
+   * A tag for this runtime, so an id cannot mean two things.
+   *
+   * The registry is in memory, so a restart empties it and every id from
+   * before the restart is already unknown - which is the safe answer. What is
+   * not safe is the counter starting over: a model that remembers `job_1` as
+   * the download it started an hour ago would, after a restart, aim `stop` at
+   * whatever happens to be the first job of the new run. Three characters of
+   * run tag make that a clean "there is no such job" instead.
+   */
+  readonly #tag = Math.random().toString(36).slice(2, 5);
 
   /**
    * Starts a command and returns at once.
@@ -118,7 +140,7 @@ export class BackgroundJobs {
     assertRunnableCommand(options.executable, options.args);
 
     this.#counter += 1;
-    const id = `job_${this.#counter}`;
+    const id = `job_${this.#tag}${this.#counter}`;
     const job: Job = {
       id,
       command: options.command,
@@ -130,6 +152,8 @@ export class BackgroundJobs {
       partial: "",
       state: "running",
       exitCode: null,
+      endedAt: null,
+      reported: false,
       pid: undefined,
       kill: () => {},
     };
@@ -165,6 +189,7 @@ export class BackgroundJobs {
         job.state = "exited";
         job.exitCode = code ?? 1;
       }
+      job.endedAt ??= Date.now();
     });
 
     return statusOf(job);
@@ -197,9 +222,37 @@ export class BackgroundJobs {
     if (job === undefined || job.conversationId !== conversationId) return false;
     if (job.state === "running") {
       job.state = "stopped";
+      job.endedAt = Date.now();
       job.kill();
     }
+    // A stop is somebody already watching, so there is nothing left to tell
+    // them about this one ending.
+    job.reported = true;
     return true;
+  }
+
+  /**
+   * The jobs that have ended since anyone last asked, marked as told.
+   *
+   * This is the half of the background mechanism that stops a finished job
+   * from being a fact only a poll can discover. It is drained rather than
+   * merely read: the notice is delivered once, at the first of the two places
+   * that can carry it - the tail of the next tool result within a turn, or the
+   * environment block of the next turn - and a notice delivered twice reads as
+   * two jobs having ended.
+   *
+   * Only ends are reported. A job that is still running is not news; it is
+   * something the caller asked for and can look at whenever it likes.
+   */
+  drainFinished(conversationId: string): readonly JobStatus[] {
+    const finished: JobStatus[] = [];
+    for (const job of this.#jobs.values()) {
+      if (job.conversationId !== conversationId) continue;
+      if (job.state === "running" || job.reported) continue;
+      job.reported = true;
+      finished.push(statusOf(job));
+    }
+    return finished;
   }
 
   /** Everything, for shutdown. Nothing of ours keeps running without Studio. */
@@ -207,6 +260,7 @@ export class BackgroundJobs {
     for (const job of this.#jobs.values()) {
       if (job.state !== "running") continue;
       job.state = "stopped";
+      job.endedAt = Date.now();
       job.kill();
     }
   }
@@ -249,6 +303,39 @@ function statusOf(job: Job): JobStatus {
     startedAt: job.startedAt,
     output: tail.join("\n"),
     dropped: job.dropped,
+    endedAt: job.endedAt,
     ...(job.error === undefined ? {} : { error: job.error }),
   };
+}
+
+/**
+ * One line per job that ended, for the model to read in passing.
+ *
+ * Deliberately short and deliberately without the output. The output can be
+ * long, this text arrives somewhere the model did not ask for it - stapled to
+ * an unrelated tool result, or in the environment block - and a notice that
+ * takes over the thing it was appended to is worse than no notice. What it has
+ * to carry is: which job, how it ended, and where to look. The jobs tool is
+ * named because a model that is told a download finished and not told how to
+ * read its output will run `ls` to find out.
+ */
+export function finishedNotice(finished: readonly JobStatus[]): string | undefined {
+  if (finished.length === 0) return undefined;
+  const lines = finished.map((job) => {
+    const how =
+      job.state === "stopped"
+        ? "was stopped"
+        : job.state === "failed"
+          ? `never started${job.error === undefined ? "" : `: ${job.error}`}`
+          : job.exitCode === 0
+            ? "finished"
+            : `exited ${job.exitCode ?? "?"}`;
+    return `${job.id} ${how} (${job.command})`;
+  });
+  const many = finished.length > 1;
+  return [
+    `Background ${many ? "commands have" : "command has"} ended while you were working:`,
+    ...lines,
+    `Read the output with the jobs tool if you need it.`,
+  ].join("\n");
 }

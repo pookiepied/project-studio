@@ -314,6 +314,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       database,
       titling,
       contextUsage,
+      backgroundJobs: runtime.backgroundJobs,
       admission: admission.verifier,
       // The same list the model picker is filled from: a submission's model
       // reference is settled against it at admission, so a choice the catalog
