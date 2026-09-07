@@ -113,6 +113,43 @@ describe("the conversation index", () => {
     ).toThrow(StorageError);
   });
 
+  it("settles the project a later receipt names onto the admitted row", () => {
+    // The admission path creates the row first: a first message from a
+    // project page is sent BEFORE the window records the conversation, and
+    // the submission wire carries no project. So the row exists with no
+    // project by the time `createConversation` arrives naming one, and that
+    // receipt is the only statement of which project the conversation
+    // belongs to. Dropping it filed every project conversation under none.
+    const conversations = new ConversationStore(db);
+    const projects = new ProjectStore(db);
+    projects.create({ id: "prj_home", name: "Home", icon: "arc" });
+
+    conversations.record({ id: "cnv_p", firstMessage: "Admitted first" });
+    expect(conversations.get("cnv_p")?.projectId).toBe(null);
+
+    conversations.record({
+      id: "cnv_p",
+      firstMessage: "Admitted first",
+      projectId: "prj_home",
+    });
+    expect(conversations.get("cnv_p")?.projectId).toBe("prj_home");
+    expect(conversations.list({ projectId: "prj_home" }).map((row) => row.id)).toEqual([
+      "cnv_p",
+    ]);
+  });
+
+  it("leaves a filed conversation alone when a later receipt names no project", () => {
+    // A plain repeat receipt must not unfile anything: absent is "nothing to
+    // say about the project", not "no project".
+    const conversations = new ConversationStore(db);
+    const projects = new ProjectStore(db);
+    projects.create({ id: "prj_keep", name: "Keep", icon: "arc" });
+
+    conversations.record({ id: "cnv_k", firstMessage: "Filed", projectId: "prj_keep" });
+    conversations.record({ id: "cnv_k", firstMessage: "Filed" });
+    expect(conversations.get("cnv_k")?.projectId).toBe("prj_keep");
+  });
+
   it("archives without deleting and lists the archive separately", () => {
     const store = new ConversationStore(db);
     store.record({ id: "cnv_a", firstMessage: "One", createdAt: 10 });

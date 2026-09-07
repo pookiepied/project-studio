@@ -211,12 +211,21 @@ export class ConversationStore {
   }
 
   /**
-   * The settings half of a create input, when it carries one.
+   * The settled half of a create input, when it carries one.
    *
-   * Undefined means the caller sent no settings at all, which must patch
+   * Undefined means the caller sent nothing to settle, which must patch
    * nothing - a receipt without a model cannot clear one that admission
    * already wrote. An explicit null (clear to the default) is a value and
    * passes through.
+   *
+   * The project belongs here for a reason that is easy to miss. A first
+   * message sent from a project page reaches the harness BEFORE the window
+   * records the conversation, and the submission wire carries no project - so
+   * admission always creates the row first, with no project on it, and the
+   * `createConversation` receipt that follows is the only statement of which
+   * project the conversation belongs to. Leaving it out of this settle filed
+   * every project conversation under none: the sidebar showed it beside the
+   * loose conversations and the project itself reported having none.
    */
   #settledSettings(
     input: ConversationCreateInput,
@@ -224,11 +233,13 @@ export class ConversationStore {
     modelId?: string | null;
     reasoningLevel?: string | null;
     permissionMode?: ExecutionMode;
+    projectId?: string | null;
   } | undefined {
     if (
       input.modelId === undefined &&
       input.reasoningLevel === undefined &&
-      input.permissionMode === undefined
+      input.permissionMode === undefined &&
+      input.projectId === undefined
     ) {
       return undefined;
     }
@@ -236,6 +247,7 @@ export class ConversationStore {
       ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
       ...(input.reasoningLevel === undefined ? {} : { reasoningLevel: input.reasoningLevel }),
       ...(input.permissionMode === undefined ? {} : { permissionMode: input.permissionMode }),
+      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
     };
   }
 
