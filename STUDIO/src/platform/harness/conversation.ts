@@ -213,6 +213,16 @@ export interface TurnSettingsWire {
   readonly modelId: string | null
   readonly reasoningLevel: string | null
   readonly permissionMode?: ExecutionModeWire
+  /**
+   * The project a first turn belongs to, when it has one.
+   *
+   * Carried with the send rather than left to the index write that follows
+   * the receipt, because the run reads the row to decide where it stands and
+   * the receipt has not arrived yet. Omitted entirely off a project, and
+   * never sent as null: the harness only ever sets this, so that a later turn
+   * cannot unfile a conversation somebody moved.
+   */
+  readonly projectId?: string
 }
 
 /**
@@ -234,11 +244,15 @@ export interface EffectiveTurnSettings {
  * path, because the mode's translation from the picker's vocabulary to the
  * harness's is exactly the kind of thing two copies start disagreeing about.
  */
-export function turnSettingsToWire(settings: EffectiveTurnSettings): TurnSettingsWire {
+export function turnSettingsToWire(
+  settings: EffectiveTurnSettings,
+  projectId?: string | null,
+): TurnSettingsWire {
   return {
     modelId: settings.modelId,
     reasoningLevel: settings.reasoningLevel,
     permissionMode: executionModeToWire(settings.permission),
+    ...(projectId === undefined || projectId === null ? {} : { projectId }),
   }
 }
 

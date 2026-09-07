@@ -143,6 +143,10 @@ export function createTurnSettingsMiddleware(
         ...(settings.permissionMode === undefined
           ? {}
           : { permissionMode: settings.permissionMode }),
+        // The project, settled with everything else, because the sandbox is
+        // built from this row: a conversation whose project arrives one turn
+        // late stands in the wrong directory for its whole first turn.
+        ...(settings.projectId === undefined ? {} : { projectId: settings.projectId }),
         createdAt: Date.now(),
       });
       // The same words the derivation used are what the titling agent will
@@ -192,14 +196,17 @@ function readSettings(output: SubmissionTurnSettings): {
   modelId?: string | null;
   reasoningLevel?: ReasoningChoice | null;
   permissionMode?: ExecutionMode;
+  projectId?: string;
 } {
   const modelId = output.modelId;
   const reasoningLevel = output.reasoningLevel;
   const permissionMode = output.permissionMode;
+  const projectId = output.projectId;
   return {
     ...(modelId === undefined ? {} : { modelId }),
     ...(reasoningLevel === undefined ? {} : { reasoningLevel }),
     ...(permissionMode === undefined ? {} : { permissionMode }),
+    ...(projectId === undefined ? {} : { projectId }),
   };
 }
 

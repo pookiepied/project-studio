@@ -56,7 +56,12 @@ export function StartConversation({
   // sending is the one the turn should use.
   const firstTurn = useFirstTurn({
     onStarted,
-    settings: () => turnSettingsToWire(effectiveTurnSettings(null, settings)),
+    // The project rides with the send, not with the index write that follows
+    // it. A first turn is submitted before the conversation row exists, so
+    // without this the run that answers it has no project to read and stands
+    // in the conversation's own scratch directory - with the project open on
+    // screen the whole time.
+    settings: () => turnSettingsToWire(effectiveTurnSettings(null, settings), projectId),
   })
 
   /** The send-time refusal for images a blind model cannot take. */

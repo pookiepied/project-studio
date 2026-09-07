@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { ProjectStore } from "../../src/projects/store.js";
 import { ConversationStore } from "../../src/conversations/store.js";
 import type { ConversationTitlingPort } from "../../src/conversations/titling.js";
 import { createTurnSettingsMiddleware } from "../../src/transport/http/middleware/turn-settings.js";
@@ -96,6 +97,38 @@ describe("the turn settings a submission carries", () => {
     expect(record?.reasoningLevel).toBe("high");
     // The title still derives from the words, the way the receipt path did.
     expect(record?.title).toBe("What files can you see?");
+  });
+
+  /** A real project row: the conversation index has a foreign key onto it. */
+  const aProject = () => new ProjectStore(db).create({ name: "Alpha", icon: "arc" });
+
+  it("files a first turn under its project, before the run reads the row", async () => {
+    // The sandbox is built from this row: it stands in the project's first
+    // folder when the row names a project, and in the conversation's own
+    // scratch directory when it does not. The client only writes the row
+    // after the receipt, so a project arriving with the send is the only way
+    // a first turn can start in the right place - without it, a conversation
+    // opened inside a project spent its whole first turn somewhere else.
+    const project = aProject();
+    const response = await submit("cnv_in_project", {
+      kind: "user",
+      body: "What is in this repository?",
+      projectId: project.id,
+    });
+
+    expect(response.status).toBe(202);
+    expect(store.get("cnv_in_project")?.projectId).toBe(project.id);
+  });
+
+  it("leaves a conversation filed where it is when a later turn carries no project", async () => {
+    // Only ever set, never cleared. A turn sent from a surface that does not
+    // know about the filing must not unfile a conversation somebody moved.
+    const project = aProject();
+    store.record({ id: "cnv_filed", firstMessage: "First", projectId: project.id });
+
+    await submit("cnv_filed", { kind: "user", body: "A later turn" });
+
+    expect(store.get("cnv_filed")?.projectId).toBe(project.id);
   });
 
   it("removes a row it created when the run is refused", async () => {

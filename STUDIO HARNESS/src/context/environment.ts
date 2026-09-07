@@ -97,6 +97,16 @@ export interface EnvironmentFacts {
    * the thing it was opened into without running a command to look.
    */
   readonly projectFolders?: readonly string[];
+  /**
+   * The conversation's own private directory, when it is not the workspace.
+   *
+   * Only meaningful on a project conversation. The directory exists for every
+   * conversation - a project one simply stands somewhere else - and a run
+   * that has not been told about it treats the person's repository as the
+   * only writable surface it has, which is how working files end up
+   * scattered through a tree that was clean before the turn.
+   */
+  readonly scratch?: string;
 }
 
 /**
@@ -139,6 +149,7 @@ export function environmentFacts(
   kind: WorkspaceKind = "conversation",
   extraRoots?: readonly string[],
   projectFolders?: readonly string[],
+  scratch?: string,
 ): EnvironmentFacts {
   return {
     workspace,
@@ -147,6 +158,10 @@ export function environmentFacts(
     today: localDate(now),
     ...(extraRoots === undefined || extraRoots.length === 0 ? {} : { extraRoots }),
     ...(projectFolders === undefined || projectFolders.length === 0 ? {} : { projectFolders }),
+    // Only when it is somewhere other than where the run stands. On a plain
+    // conversation the two are the same directory, and naming it twice
+    // invites the model to treat one path as two places.
+    ...(scratch === undefined || scratch === workspace ? {} : { scratch }),
   };
 }
 
@@ -213,17 +228,50 @@ export function environmentFacts(
  * Collapsing them into one careful paragraph would restore the original
  * problem, which was a model that could not tell which it was in.
  */
-function workspaceStatement(kind: WorkspaceKind): readonly string[] {
-  if (kind === "project") {
+function workspaceStatement(facts: EnvironmentFacts): readonly string[] {
+  if (facts.kind === "project") {
     return [
-      "This directory is the person's project, opened deliberately. The files",
-      "in it are theirs and existed before this conversation, so change them",
-      "only as the task asks, and do not scatter working files through the",
-      "tree. If you need somewhere to put intermediate output, ask where it",
-      "should go, or use a path the person named.",
+      "You are working in a project, not in a plain conversation. The",
+      "difference matters. A plain conversation stands in an empty directory",
+      "of its own and owns everything in it. Here you are standing in",
+      "the person's project: a codebase they already had and opened",
+      "deliberately. That project is the work - it is what you are here to",
+      "read and change, and it is where anything you produce for them",
+      "belongs.",
       "",
+      "So the project comes first, and this directory is where it starts.",
+      "The files here are theirs and existed before this conversation. Change",
+      "them as the task asks, and do not scatter working files through the",
+      "tree: a file that is not part of what was asked for should not be left",
+      "behind in their code.",
+      "",
+      ...(facts.scratch === undefined
+        ? [
+            "If you need somewhere to put intermediate output, ask where it",
+            "should go, or use a path the person named.",
+            "",
+          ]
+        : [
+            "You also have a private directory of your own. It is",
+            "not part of the project and never will be, and it is yours:",
+            `${facts.scratch}`,
+            "",
+            "Nothing in it is shipped, committed, or seen by anyone, and the",
+            "person is not looking at it. Use it as a scratchpad - a throwaway",
+            "script, a downloaded file, notes to yourself between turns, the",
+            "output of a command you want to read back later. It persists",
+            "across turns and restarts, so it is a real place to keep working",
+            "state.",
+            "",
+            "The rule between the two is one sentence: work the person asked",
+            "for belongs in the project, and nothing else does. Do not leave",
+            "temporary files in their code, and do not put finished work in",
+            "the scratchpad, where they will never find it.",
+            "",
+          ]),
     ];
   }
+
   return [
     "This directory belongs to this conversation and to nothing else. It",
     "started empty, no other conversation reads it, and it persists between",
@@ -329,7 +377,7 @@ export function environmentBlock(facts: EnvironmentFacts): string {
       ? "It is inside a git repository, so the git tools will work here."
       : "It is not a git repository.",
     "",
-    ...workspaceStatement(facts.kind),
+    ...workspaceStatement(facts),
     ...projectFoldersStatement(facts),
     ...extraRootsStatement(facts.extraRoots),
     ...(shell === undefined

@@ -155,6 +155,12 @@ export function Studio({ id }: AgentProps) {
       kind,
       extraRoots.length === 0 ? undefined : extraRoots,
       folders.length === 0 ? undefined : folders,
+      // The conversation's own directory, always - the facts builder drops it
+      // when it is also the workspace, which is every conversation that has
+      // no project. A project conversation stands elsewhere and still has
+      // this, and being told so is what keeps working files out of the
+      // person's repository.
+      conversationWorkspaceDirectory(id),
     ),
   )}`;
 }

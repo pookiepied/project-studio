@@ -69,6 +69,20 @@ export const submissionTurnSettingsSchema = v.object({
   modelId: v.optional(v.nullable(modelIdSchema)),
   reasoningLevel: v.optional(v.nullable(reasoningChoiceSchema)),
   permissionMode: v.optional(executionModeSchema),
+  /**
+   * The project a first turn belongs to.
+   *
+   * Here for the same reason the model is: it has to be durable before the
+   * run starts, because the run reads the row to decide where it stands. The
+   * client only posts the index row after the receipt, so without this a
+   * first turn in a project ran in the conversation's own scratch directory
+   * while the person watched a project open on screen - the folders reached
+   * the sandbox on the second turn and never on the first.
+   *
+   * Only ever set, never cleared: a later turn carrying nothing must not
+   * unfile a conversation somebody moved.
+   */
+  projectId: v.optional(v.string()),
 });
 
 export type SubmissionTurnSettings = v.InferOutput<typeof submissionTurnSettingsSchema>;

@@ -242,3 +242,63 @@ describe("the facts behind it", () => {
     expect(facts.today).toBe("2026-08-30");
   });
 });
+
+/**
+ * Which of the two directories a project conversation is standing in, and
+ * what each is for.
+ *
+ * The block already said "this is the person's project, be careful". What it
+ * never said was that the conversation's own private directory still exists
+ * while a project is open. A run told only to be careful with the repository,
+ * and given no other writable place it knows about, either writes its working
+ * files into the person's tree or stops to ask where a temporary file may go.
+ * Both are avoidable by naming the second directory and what it is not.
+ */
+describe("the two directories a project conversation has", () => {
+  const facts = (scratch?: string) =>
+    environmentFacts(
+      "/work/project",
+      new Date("2026-09-07T10:00:00"),
+      "project",
+      undefined,
+      ["/work/project"],
+      scratch,
+    );
+
+  it("says which mode this is, rather than leaving it to be inferred", () => {
+    const block = environmentBlock(facts("/home/studio/cnv_1/workspace"));
+
+    expect(block).toContain("working in a project, not in a plain conversation");
+  });
+
+  it("names the scratch directory and rules it out of the project", () => {
+    const block = environmentBlock(facts("/home/studio/cnv_1/workspace"));
+
+    expect(block).toContain("/home/studio/cnv_1/workspace");
+    expect(block).toContain("not part of the project");
+    // The half that keeps the person's work findable. Without it the
+    // scratchpad becomes somewhere finished work goes to be lost.
+    expect(block).toContain("belongs in the project, and nothing else does");
+  });
+
+  it("keeps the project's own folders as the priority", () => {
+    const block = environmentBlock(facts("/home/studio/cnv_1/workspace"));
+
+    expect(block).toContain("the project comes first");
+  });
+
+  it("does not name a second directory when there is only one", () => {
+    // A plain conversation stands in its own scratch directory: it is the
+    // workspace. Naming it twice would present one place as two.
+    const plain = environmentFacts(
+      "/home/studio/cnv_1/workspace",
+      new Date("2026-09-07T10:00:00"),
+      "conversation",
+      undefined,
+      undefined,
+      "/home/studio/cnv_1/workspace",
+    );
+
+    expect(environmentBlock(plain)).not.toContain("not part of the project");
+  });
+})
