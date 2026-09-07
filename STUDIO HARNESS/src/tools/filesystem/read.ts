@@ -33,7 +33,28 @@ const DEFAULT_LINE_LIMIT = 2_000;
 const MAX_LINE_LENGTH = 2_000;
 
 /** 1 MiB. A larger file is a data file, and belongs to a search, not a read. */
-const MAX_FILE_BYTES = 1024 * 1024;
+const MAX_TEXT_BYTES = 1024 * 1024;
+
+/**
+ * What a picture may weigh, which is a different question entirely.
+ *
+ * The text limit above is about the context window: a megabyte of source is
+ * more tokens than it is worth, and searching it is the better move. None of
+ * that reasoning transfers to an image. A photograph costs the same handful of
+ * tokens whether it arrived as 400 KB or 4 MB, because providers resize it to
+ * their own working dimension before it is ever tokenised. Weight is not cost
+ * here.
+ *
+ * What weight does decide is whether the request is accepted at all, and the
+ * strictest common ceiling is 5 MB for a single image. That ceiling is on the
+ * encoded payload, and base64 inflates bytes by four thirds, so the bound that
+ * matters is on the raw file: 3.75 MB in becomes just under 5 MB on the wire.
+ *
+ * Held apart from the text limit rather than raised to meet it. One number
+ * covering both would have to be the smaller of the two constraints, and there
+ * is no reason a 2 MB screenshot should answer for a 2 MB CSV.
+ */
+const MAX_IMAGE_BYTES = 3_750_000;
 
 /** Image kinds that can ride an image content block, by extension. */
 const IMAGE_MIME_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
@@ -86,9 +107,10 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
   description:
     "Reads a file from the project, returning numbered lines. Reads the first " +
     "2000 lines by default; use offset and limit to page through a longer " +
-    "file. A line longer than 2000 characters is truncated, and a file larger " +
-    "than 1 MB is refused - search it instead. " +
-    "Images (PNG, JPEG, GIF, WebP) come back as attachments when the model accepts image input.",
+    "file. A line longer than 2000 characters is truncated, and a text file " +
+    "larger than 1 MB is refused - search it instead. " +
+    "Images (PNG, JPEG, GIF, WebP) come back as attachments when the model " +
+    "accepts image input, and may be up to 3.5 MB.",
   inputSchema: {
     type: "object",
     properties: {
@@ -327,24 +349,40 @@ export function createReadTool(
         });
       }
 
-      if (stat.size > MAX_FILE_BYTES) {
-        throw new ToolError("invalid_input", {
-          message: `This file is ${Math.round(stat.size / 1024)} KB, which is too large to read at once. Search it instead.`,
-        });
-      }
-
       const extension = extensionOf(input.path);
       const mimeType = IMAGE_MIME_BY_EXTENSION.get(extension);
 
       if (extension === ".pdf") {
-        // Nothing downstream can carry one: the agent loop forwards text and
-        // image blocks and nothing else, and Pi's catalog marks image input
-        // only, so there is no honest answer to "can this model read a PDF".
-        // A refusal that says so beats base64 dressed up as an image.
+        // Ahead of the size check, and for the same reason the size check is
+        // now behind the kind: a PDF is refused whatever it weighs, so a large
+        // one should hear why rather than be told to search a file nothing
+        // here can search. Nothing downstream can carry one - the agent loop
+        // forwards text and image blocks and nothing else, and Pi's catalog
+        // marks image input only, so there is no honest answer to "can this
+        // model read a PDF". A refusal that says so beats base64 dressed up as
+        // an image.
         throw new ToolError("invalid_input", {
           message:
             "This file is a PDF, and PDFs cannot be shown to the model yet. " +
             "Extract the text you need with a command instead.",
+        });
+      }
+
+      // Deliberately after the kind is known. The size check used to come
+      // first, so a 2 MB screenshot was refused by the rule written for source
+      // files and told to "search it instead" - advice that cannot be followed
+      // on a PNG, about a limit that was never reasoning about pictures. Every
+      // photograph a phone takes failed here.
+      const ceiling = mimeType === undefined ? MAX_TEXT_BYTES : MAX_IMAGE_BYTES;
+      if (stat.size > ceiling) {
+        const kilobytes = Math.round(stat.size / 1024);
+        throw new ToolError("invalid_input", {
+          message:
+            mimeType === undefined
+              ? `This file is ${kilobytes} KB, which is too large to read at once. Search it instead.`
+              : `This image is ${kilobytes} KB, and the limit for one image is ` +
+                `${Math.round(MAX_IMAGE_BYTES / 1024)} KB - larger than that and the ` +
+                "provider refuses the request. Resize it, or ask the user to.",
         });
       }
 

@@ -144,6 +144,36 @@ describe("read", () => {
     await expect(read({ path: "big.txt" })).rejects.toThrow(/too large/i);
   });
 
+  it("does not measure a picture by the rule written for source files", async () => {
+    // The size limit is about the context window, and a photograph does not
+    // spend the context window the way a megabyte of source does - a provider
+    // resizes it before tokenising, so its weight and its cost are unrelated.
+    // Measured by the text rule, an ordinary phone screenshot was refused, and
+    // refused with advice ("search it instead") that cannot be carried out on
+    // a PNG.
+    writeFileSync(join(workspace, "photo.png"), Buffer.alloc(2 * 1024 * 1024));
+
+    await expect(read({ path: "photo.png" })).resolves.toBeDefined();
+  });
+
+  it("still holds a picture to the weight a provider will accept", async () => {
+    // Held for a different reason than the text limit, and so it says a
+    // different thing: this is the request being rejected on the wire, not a
+    // file better answered by a search.
+    writeFileSync(join(workspace, "huge.png"), Buffer.alloc(4 * 1024 * 1024));
+
+    await expect(read({ path: "huge.png" })).rejects.toThrow(/limit for one image/i);
+    await expect(read({ path: "huge.png" })).rejects.not.toThrow(/search it instead/i);
+  });
+
+  it("tells a large PDF what is actually wrong with it", async () => {
+    // A PDF is refused whatever it weighs, so the size rule answering first
+    // only replaced the real reason with an irrelevant one.
+    writeFileSync(join(workspace, "big.pdf"), Buffer.alloc(2 * 1024 * 1024));
+
+    await expect(read({ path: "big.pdf" })).rejects.toThrow(/PDFs cannot be shown/i);
+  });
+
   it("refuses a path outside the workspace", async () => {
     await expect(read({ path: "../escape.txt" })).rejects.toThrow(SandboxError);
   });
