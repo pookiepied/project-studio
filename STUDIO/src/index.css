@@ -1150,7 +1150,27 @@
     color: var(--foreground);
     font-optical-sizing: auto;
     min-width: 0;
-    overflow-wrap: anywhere;
+    /* `break-word`, not `anywhere`, and the difference is the reason prose
+       looked ragged rather than set.
+
+       Both break a word that genuinely cannot fit, which is the protection
+       this needs: a URL or a 60-character identifier must not push the column
+       wider than the window. They differ in what the LINE BREAKER is allowed
+       to assume. `anywhere` lets a break inside a word count toward the
+       element's min-content width, so the browser treats every word as
+       breakable when it measures - and then breaks mid-word to even out lines
+       that would have fitted whole. The result is ordinary sentences with
+       arbitrary splits in them, which reads as text that does not know where
+       its own lines end.
+
+       `break-word` keeps the same overflow protection and takes the licence
+       away: a word breaks only when leaving it whole would overflow. Ordinary
+       prose is then broken at spaces, where the reader expects. */
+    overflow-wrap: break-word;
+    /* Chromium reflows the last few lines of a block to avoid a short final
+       line and a single word left alone. It is the cheapest improvement
+       available to the rag, and it costs nothing where it is unsupported. */
+    text-wrap: pretty;
     -webkit-user-select: text;
     user-select: text;
   }
