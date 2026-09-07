@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
@@ -32,7 +32,7 @@ interface LiveStub {
   phase: ConversationPhase
   readonly offset: string | null
   readonly resume: () => void
-  readonly submit: () => Promise<{ readonly ok: boolean }>
+  submit: () => Promise<{ readonly ok: boolean }>
   readonly abort: () => Promise<{ readonly ok: boolean }>
   readonly refused: null
   readonly dismissRefusal: () => void
@@ -118,7 +118,13 @@ beforeEach(() => {
   )
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  // The stub is shared by the whole file: a test that made the send hang
+  // would otherwise hand the next one a submit that never answers.
+  live.phase = { status: 'idle' }
+  live.submit = () => Promise.resolve({ ok: true })
+})
 
 describe('the working mark mirrors the phase machine into the workspace', () => {
   it('marks a conversation while its turn runs and un-marks it when it settles', async () => {
@@ -151,6 +157,51 @@ describe('the working mark mirrors the phase machine into the workspace', () => 
       detail: null,
     }
     view.rerender(tree(CONVERSATION))
+    await waitFor(() => expect(workingList().textContent).toBe(''))
+  })
+
+  it('marks from the click rather than from the receipt', async () => {
+    // The gap this closes: the phase machine only says `submitted` once the
+    // POST has come back, so between pressing send and the harness answering
+    // nothing on the page moved - which on a real send is long enough to
+    // read as the message not having gone anywhere.
+    let admit: (value: { readonly ok: boolean }) => void = () => {}
+    live.phase = { status: 'live' }
+    live.submit = () =>
+      new Promise<{ readonly ok: boolean }>((resolve) => {
+        admit = resolve
+      })
+    const view = render(tree(CONVERSATION))
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'please answer this' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    // No receipt has arrived and the phase still says `live`.
+    await waitFor(() => expect(workingList().textContent).toContain('cnv_live'))
+
+    // The receipt hands the fact to the phase, which carries it from here.
+    admit({ ok: true })
+    live.phase = { status: 'submitted', submissionId: 'sub_1' }
+    view.rerender(tree(CONVERSATION))
+    await waitFor(() => expect(workingList().textContent).toContain('cnv_live'))
+  })
+
+  it('lets go when the send is refused, which no phase will ever settle', async () => {
+    let refuse: (value: { readonly ok: boolean }) => void = () => {}
+    live.phase = { status: 'live' }
+    live.submit = () =>
+      new Promise<{ readonly ok: boolean }>((resolve) => {
+        refuse = resolve
+      })
+    render(tree(CONVERSATION))
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'please answer this' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(workingList().textContent).toContain('cnv_live'))
+
+    // A refusal leaves the phase exactly where it was, so nothing downstream
+    // would ever take the mark off again.
+    refuse({ ok: false })
     await waitFor(() => expect(workingList().textContent).toBe(''))
   })
 

@@ -94,8 +94,25 @@ export function ChatPage({
     active: isTurnRunning(live.phase),
   })
 
+  /**
+   * True from the moment the words leave the composer until the harness
+   * answers with a receipt.
+   *
+   * The phase machine cannot cover this window: it only turns `submitted`
+   * once the POST has come back, and until then it still says `live`. So
+   * everything watching the phase - the sidebar's working mark, the title's
+   * shimmer - stayed still through a gap that on a real send is long enough
+   * to read as nothing having happened. The composer already held this fact
+   * privately, for its own stop control; the page holds it too, because the
+   * question "is this conversation working" is asked from outside the
+   * composer and has to be true from the click.
+   */
+  const [sending, setSending] = useState(false)
+
   // The sidebar's working mark is only as honest as its witness, and for a
-  // real turn this page is the only one there is: the phase machine here is
+  // real turn this page is the only one there is: the send above, which is
+  // what makes the mark true from the click rather than from the receipt, and
+  // the phase machine below, which is
   // what saw the admission (the receipt) and what sees the settlement (the
   // wire). While it reports submitted or streaming, the conversation is
   // working -- including when this page is not the one on screen, which is
@@ -107,12 +124,12 @@ export function ChatPage({
   // refuse, and resuming re-marks it within one replay.
   useEffect(() => {
     if (gallery) return
-    markRunning(conversation.id, isTurnRunning(live.phase))
+    markRunning(conversation.id, sending || isTurnRunning(live.phase))
     // The status is the whole question here, and `live.phase` is a fresh
     // object on every update: depending on it would re-mark the sidebar on
     // every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gallery, conversation.id, live.phase.status, markRunning])
+  }, [gallery, conversation.id, sending, live.phase.status, markRunning])
   // What the history costs, measured rather than estimated, reported to the
   // store so the top strip can show it. This page is the only witness: the
   // strip has no transcript of its own, exactly as with the working mark.
@@ -173,9 +190,18 @@ export function ChatPage({
       // The mode travels in the submission body like the model and reasoning
       // do, translated into the harness's vocabulary at the wire boundary:
       // what the picker shows is what the turn is admitted under.
-      const sent = await live.submit(text, turnSettingsToWire(effective), images)
-      if (sent.ok) touch(conversation.id)
-      return sent
+      setSending(true)
+      try {
+        const sent = await live.submit(text, turnSettingsToWire(effective), images)
+        if (sent.ok) touch(conversation.id)
+        return sent
+      } finally {
+        // Released whatever the answer was. A receipt hands the fact to the
+        // phase, which is already `submitted` in the render this release
+        // lands in; a refusal has nothing to hand it to, and holding this
+        // would leave the conversation marked as working forever.
+        setSending(false)
+      }
     },
     // The method, not the object it hangs off: `live` is rebuilt every
     // render and only `submit` is called here.
