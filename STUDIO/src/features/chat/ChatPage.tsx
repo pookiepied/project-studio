@@ -18,7 +18,7 @@ import { PlanPill } from '@/features/plans/PlanPill'
 import { usePlan } from '@/features/plans/usePlan'
 import { planEntryId, useRail } from '@/stores/rail'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
-import { reportedContextTokens } from '@/domain/session/context'
+import { contextReport } from '@/domain/session/context'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { turnSettingsToWire } from '@/platform/harness'
 import { useNavigation } from '@/stores/navigation'
@@ -64,7 +64,7 @@ export function ChatPage({
    */
   onForked?: (conversationId: string) => void
 }) {
-  const { status, fork, touch, settings, catalog, markRunning, markContextTokens } =
+  const { status, fork, touch, settings, catalog, markRunning, markContextReport } =
     useWorkspace()
   const { openChat } = useNavigation()
   const gallery = conversation.id === GALLERY_CONVERSATION_ID
@@ -130,13 +130,16 @@ export function ChatPage({
     // every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gallery, conversation.id, sending, live.phase.status, markRunning])
-  // What the history costs, measured rather than estimated, reported to the
-  // store so the top strip can show it. This page is the only witness: the
-  // strip has no transcript of its own, exactly as with the working mark.
+  // What the history costs, reported to the store so the top strip can show
+  // it. This page is the only witness: the strip has no transcript of its
+  // own, exactly as with the working mark. Recomputed on every delivery, so
+  // the ring moves while a turn runs rather than jumping when it ends - the
+  // store drops a report that says the same thing as the one it holds, which
+  // is what keeps a streamed delta from re-rendering the strip.
   useEffect(() => {
     if (gallery) return
-    markContextTokens(conversation.id, reportedContextTokens(live.items))
-  }, [gallery, conversation.id, live.items, markContextTokens])
+    markContextReport(conversation.id, contextReport(live.items))
+  }, [gallery, conversation.id, live.items, markContextReport])
 
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(gallery ? conversation.messages : live.items, conversation.id)

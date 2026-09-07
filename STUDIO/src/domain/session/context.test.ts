@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextUsageFromTokens, reportedContextTokens } from '@/domain/session/context'
+import { contextBreakdown, contextReport, measuredTotal } from '@/domain/session/context'
+import type { ContextReport } from '@/domain/session/context'
+
+/** The measured total, refusing rather than asserting when nothing measured. */
+function total(report: ContextReport): number {
+  const measured = report.measured
+  if (measured === null) throw new Error('this report measured nothing')
+  return measuredTotal(measured)
+}
 
 /** One assistant item's worth of reported usage, with the rest left null. */
 function usage(fields: {
@@ -11,6 +19,7 @@ function usage(fields: {
 }) {
   return {
     kind: 'assistant',
+    segments: [],
     usage: {
       input: fields.input ?? null,
       output: fields.output ?? null,
@@ -25,53 +34,104 @@ function usage(fields: {
   }
 }
 
-describe('the reported context figure', () => {
+/** A user message of a known length, for the estimated half. */
+function said(text: string) {
+  return { kind: 'user', text }
+}
+
+describe('the measured half', () => {
   it('counts the cached parts of the prompt, not just the fresh ones', () => {
-    // The whole point. pi reports cacheRead apart from input, so a long
+    // The whole point. The wire reports cacheRead apart from input, so a long
     // conversation being served from cache would otherwise read as nearly
     // empty however far it had gone.
-    expect(reportedContextTokens([usage({ input: 500, cacheRead: 40_000, output: 900 })])).toBe(
-      41_400,
-    )
+    const report = contextReport([usage({ input: 500, cacheRead: 40_000, output: 900 })])
+    expect(report.measured).toEqual({ fresh: 500, cached: 40_000, reply: 900 })
+    expect(total(report)).toBe(41_400)
   })
 
   it('takes the last turn rather than summing the conversation', () => {
     // Every request after the first re-sends the whole history, so usage is
     // not additive: summing counts the same tokens once per turn and reads
     // far over the truth. 30_000 is the second turn alone, not 42_000.
-    expect(
-      reportedContextTokens([
-        usage({ input: 12_000, output: 400 }),
-        usage({ input: 29_000, output: 1_000 }),
-      ]),
-    ).toBe(30_000)
+    const report = contextReport([
+      usage({ input: 12_000, output: 400 }),
+      usage({ input: 29_000, output: 1_000 }),
+    ])
+    expect(total(report)).toBe(30_000)
   })
 
   it('reaches past items that carry no usage', () => {
-    const items = [usage({ input: 8_000, output: 200 }), { kind: 'user' }, { kind: 'assistant' }]
-    expect(reportedContextTokens(items)).toBe(8_200)
+    const report = contextReport([usage({ input: 8_000, output: 200 }), { kind: 'user', text: '' }])
+    expect(total(report)).toBe(8_200)
   })
 
-  it('answers null when nothing has reported, rather than zero', () => {
+  it('measures nothing at all before a turn has reported', () => {
     // A conversation whose first reply is still arriving has no measurement.
-    // Zero would be a claim; null lets the meter fall back to its estimate.
-    expect(reportedContextTokens([{ kind: 'user' }])).toBe(null)
-    expect(reportedContextTokens([])).toBe(null)
-    expect(reportedContextTokens([usage({})])).toBe(null)
+    // Zero would be a claim; null lets the panel say the figure is estimated.
+    expect(contextReport([]).measured).toBe(null)
+    expect(contextReport([said('hello')]).measured).toBe(null)
+    expect(contextReport([usage({})]).measured).toBe(null)
   })
 })
 
-describe('the figure as a fraction of the window', () => {
-  it('divides by the model own window', () => {
-    expect(contextUsageFromTokens(50_000, 200_000)).toBeCloseTo(0.25)
+describe('the estimated half', () => {
+  it('estimates only what came after the last turn that reported', () => {
+    // The measured turn already accounts for everything up to itself. Adding
+    // an estimate of that same history on top would double-count the whole
+    // conversation, which is the mistake this split exists to prevent.
+    const report = contextReport([
+      said('a'.repeat(4_000)),
+      usage({ input: 9_000, output: 500 }),
+      said('b'.repeat(400)),
+    ])
+    expect(total(report)).toBe(9_500)
+    expect(report.pending).toBe(100)
   })
 
-  it('falls back to a standard window when the model declares none', () => {
-    expect(contextUsageFromTokens(50_000, 'unknown')).toBeCloseTo(0.25)
-    expect(contextUsageFromTokens(50_000, null)).toBeCloseTo(0.25)
+  it('estimates the whole transcript while nothing has reported', () => {
+    expect(contextReport([said('c'.repeat(800))]).pending).toBe(200)
   })
 
-  it('clamps at full rather than reporting over one', () => {
-    expect(contextUsageFromTokens(500_000, 200_000)).toBe(1)
+  it('counts what a reply has said so far, so the ring moves as it streams', () => {
+    const streaming = {
+      kind: 'assistant',
+      segments: [
+        { kind: 'thinking', text: 'd'.repeat(200) },
+        { kind: 'text', text: 'e'.repeat(200) },
+        // A tool group carries no text of its own; its output is not the
+        // transcript's to count and the wire never showed it here.
+        { kind: 'tools' },
+      ],
+      usage: null,
+    }
+    expect(contextReport([usage({ input: 100, output: 4 }), streaming]).pending).toBe(100)
+  })
+})
+
+describe('the breakdown against a window', () => {
+  const REPORT = { measured: { fresh: 10_000, cached: 30_000, reply: 2_000 }, pending: 500 }
+
+  it('adds both halves and divides by the model own window', () => {
+    const breakdown = contextBreakdown(REPORT, 200_000)
+    expect(breakdown.total).toBe(42_500)
+    expect(breakdown.free).toBe(157_500)
+    expect(breakdown.used).toBeCloseTo(0.2125)
+    expect(breakdown.windowDeclared).toBe(true)
+  })
+
+  it('stands a window in when the model declares none, and says which it did', () => {
+    for (const declared of ['unknown', null] as const) {
+      const breakdown = contextBreakdown(REPORT, declared)
+      expect(breakdown.window).toBe(200_000)
+      expect(breakdown.windowDeclared).toBe(false)
+    }
+  })
+
+  it('clamps at full and never reports negative free space', () => {
+    // A catalog window can understate what the provider actually allowed, and
+    // a ring drawn past its own circumference is worse than one sitting full.
+    const over = contextBreakdown({ measured: { fresh: 500_000, cached: 0, reply: 0 }, pending: 0 }, 200_000)
+    expect(over.used).toBe(1)
+    expect(over.free).toBe(0)
   })
 })

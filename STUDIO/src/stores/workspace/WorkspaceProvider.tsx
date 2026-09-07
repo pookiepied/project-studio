@@ -12,6 +12,7 @@ import type { CatalogModel } from '@/domain/models/catalog'
 import { catalogFrom } from '@/domain/models/catalog'
 import type { ReasoningChoice } from '@/domain/models/types'
 import { DEFAULT_PERMISSION_MODE, type PermissionMode } from '@/domain/permissions/modes'
+import type { ContextReport } from '@/domain/session/context'
 import { GALLERY_CONVERSATION_ID, galleryConversation } from '@/domain/session/gallery'
 import type { Conversation, SessionStatus, TurnSettings } from '@/domain/session/types'
 import type { Project } from '@/domain/projects/types'
@@ -209,18 +210,17 @@ interface WorkspaceValue {
    */
   markRunning: (conversationId: string, active: boolean) => void
   /**
-   * The tokens a conversation's history actually occupies, as the harness
-   * last reported them, by conversation id.
+   * What a conversation's context costs, by conversation id: the last turn
+   * the provider reported on, and an estimate of everything since.
    *
    * On the store for the same reason `running` is: the witness is the open
    * conversation's own live projection, and the reader is the top strip,
-   * which is not that page and cannot see its transcript. Absent means no
-   * turn has reported usage yet, which is not the same as zero - the meter
-   * falls back to its estimate rather than claiming an empty window.
+   * which is not that page and cannot see its transcript. Absent means the
+   * page has said nothing yet, which is not the same as an empty window.
    */
-  readonly contextTokens: ReadonlyMap<string, number>
-  /** Reports what the last settled turn said the history costs. */
-  markContextTokens: (conversationId: string, tokens: number | null) => void
+  readonly contextReports: ReadonlyMap<string, ContextReport>
+  /** Reports what the open conversation's transcript currently costs. */
+  markContextReport: (conversationId: string, report: ContextReport | null) => void
   readonly settings: TurnSettings
 
   setSettings: (settings: TurnSettings) => void
@@ -400,25 +400,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const runningWitnessRef = useRef<ReadonlySet<string>>(new Set())
   const titleRefreshRef = useRef<ReturnType<typeof createTitleRefresh> | null>(null)
 
-  const [contextTokens, setContextTokens] = useState<ReadonlyMap<string, number>>(
-    () => new Map<string, number>(),
+  const [contextReports, setContextReports] = useState<ReadonlyMap<string, ContextReport>>(
+    () => new Map<string, ContextReport>(),
   )
 
-  const markContextTokens = useCallback((conversationId: string, tokens: number | null) => {
-    setContextTokens((current) => {
-      const held = current.get(conversationId);
-      if (tokens === null) {
-        if (held === undefined) return current
+  const markContextReport = useCallback(
+    (conversationId: string, report: ContextReport | null) => {
+      setContextReports((current) => {
+        const held = current.get(conversationId)
+        if (report === null) {
+          if (held === undefined) return current
+          const next = new Map(current)
+          next.delete(conversationId)
+          return next
+        }
+        // Compared field by field, not by identity: the page rebuilds this
+        // object on every delivery, and storing each one would re-render the
+        // whole strip for every streamed delta that changed nothing.
+        if (
+          held !== undefined &&
+          held.pending === report.pending &&
+          held.measured?.fresh === report.measured?.fresh &&
+          held.measured?.cached === report.measured?.cached &&
+          held.measured?.reply === report.measured?.reply
+        ) {
+          return current
+        }
         const next = new Map(current)
-        next.delete(conversationId)
+        next.set(conversationId, report)
         return next
-      }
-      if (held === tokens) return current
-      const next = new Map(current)
-      next.set(conversationId, tokens)
-      return next
-    })
-  }, [])
+      })
+    },
+    [],
+  )
 
   const markRunning = useCallback((conversationId: string, active: boolean) => {
     const was = runningWitnessRef.current.has(conversationId)
@@ -1208,8 +1222,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       status,
       running,
       markRunning,
-      contextTokens,
-      markContextTokens,
+      contextReports,
+      markContextReport,
       trustFolders,
       settings,
       setSettings,
@@ -1245,8 +1259,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       createProject,
       ensureStore,
       markRunning,
-      contextTokens,
-      markContextTokens,
+      contextReports,
+      markContextReport,
       trustFolders,
       orphanTrees,
       plans,

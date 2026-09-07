@@ -6,7 +6,7 @@ import { ContextMeter } from '@/shell/chrome/SessionControls'
 import { TrafficLights } from '@/shell/chrome/TrafficLights'
 import { TurnMenu } from '@/shell/chrome/TurnMenu'
 import { useNavigation } from '@/stores/navigation'
-import { contextUsage, contextUsageFromTokens } from '@/domain/session/context'
+import { contextBreakdown } from '@/domain/session/context'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { findCatalogModel } from '@/domain/models/catalog'
 import { useWorkspace } from '@/stores/workspace'
@@ -18,17 +18,30 @@ import { useWorkspace } from '@/stores/workspace'
  * is a transparent layer over the one surface, and the page scrolls underneath
  * it behind a gradient.
  *
- * Left is the window: controls and the sidebar toggle, plus the context meter
- * once a conversation is far enough along to have one. Centre is what you are
- * looking at — and it gets the room, because the identity line (project,
- * title, branch) is the thing worth reading here. Right is the turn settings
- * behind one mark, and only on a conversation: everywhere else the strip ends
- * in nothing, so the page's own content is the last thing at the top of the
- * window rather than a control repeated on every screen.
+ * Left is the window: controls and the sidebar toggle, and nothing else.
+ * Centre is what you are looking at — and it gets the room, because the
+ * identity line (project, title, branch) is the thing worth reading here.
+ * Right is what the next message will cost and how it will be sent: the
+ * context meter and the turn settings, and only on a conversation.
+ * Everywhere else the strip ends in nothing, so the page's own content is the
+ * last thing at the top of the window rather than a control repeated on every
+ * screen.
+ *
+ * The meter used to sit on the left, immediately beside the sidebar toggle,
+ * where it read as a second button belonging to the window chrome. It is not
+ * about the window; it is about this conversation and the model it is held
+ * with, which is the same subject as the control beside it now. Keeping it
+ * out of the centre is deliberate too: the identity line is centred on the
+ * page and sized to its own content, so anything added to it moves the title
+ * sideways and takes truncation room off it — and the title is already
+ * carrying the shimmer, which is enough movement for one place.
  */
+/** What a conversation with nothing reported yet is worth: nothing, measured. */
+const EMPTY_REPORT = { measured: null, pending: 0 } as const
+
 export function TopStrip() {
   const { route, sidebarOpen, toggleSidebar } = useNavigation()
-  const { conversations, settings, catalog, running, contextTokens } = useWorkspace()
+  const { conversations, settings, catalog, running, contextReports } = useWorkspace()
 
   const conversation =
     route.kind === 'chat'
@@ -38,17 +51,23 @@ export function TopStrip() {
   /** Every surface that carries a composer, which is every surface but one. */
   const turnSettings = route.kind !== 'settings'
 
-  // The meter is measured against the model the conversation is actually held
-  // with - the same derivation the picker shows and the send uses - so a
-  // model with a small window does not borrow a big one's scale.
-  // What the open conversation reported, when a turn has reported anything.
-  // Undefined is "no measurement yet", which falls back to the estimate
-  // rather than claiming an empty window.
-  const measured = conversation === null ? undefined : contextTokens.get(conversation.id)
   const turnRunning = conversation !== null && running.has(conversation.id)
 
   const effective = effectiveTurnSettings(conversation, settings)
   const model = findCatalogModel(catalog.models, effective.modelId)
+
+  // The meter is measured against the model the conversation is actually held
+  // with - the same derivation the picker shows and the send uses - so a
+  // model with a small window does not borrow a big one's scale.
+  //
+  // The report comes from the open conversation's own page, which is the only
+  // thing that can see its transcript. Absent means that page has said
+  // nothing yet, and an empty report is the honest stand-in: no turn measured,
+  // nothing estimated, a ring at zero.
+  const report =
+    conversation === null ? null : contextReports.get(conversation.id) ?? EMPTY_REPORT
+  const breakdown =
+    report === null ? null : contextBreakdown(report, model?.contextWindow ?? null)
 
   return (
     <header
@@ -67,18 +86,6 @@ export function TopStrip() {
         >
           <Icons.sidebar size="md" />
         </IconButton>
-
-        {conversation ? (
-          <ContextMeter
-            used={
-              measured === undefined
-                ? contextUsage(conversation, model?.contextWindow ?? null)
-                : contextUsageFromTokens(measured, model?.contextWindow ?? null)
-            }
-            measured={measured !== undefined}
-            running={turnRunning}
-          />
-        ) : null}
       </div>
 
       {/* Centred on the page, not on the window. The identity names the
@@ -126,6 +133,13 @@ export function TopStrip() {
             invites the reading that it is *part of* those preferences — that
             changing it here is changing a default. It is not; it is a
             per-turn choice. Showing it where it cannot mean that is the fix. */}
+        {conversation && breakdown ? (
+          <ContextMeter
+            breakdown={breakdown}
+            running={turnRunning}
+            modelName={model?.name ?? null}
+          />
+        ) : null}
         {turnSettings ? <TurnMenu /> : null}
       </div>
     </header>

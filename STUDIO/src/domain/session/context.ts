@@ -1,4 +1,3 @@
-import type { Conversation } from '@/domain/session/types'
 import type { UsageFacts } from '@/platform/harness'
 
 /**
@@ -11,96 +10,155 @@ import type { UsageFacts } from '@/platform/harness'
  * were wrong with that, and the second is the one that showed.
  *
  * A stored figure can disagree with the messages it claims to describe. Edit a
- * turn, fork, retry, delete a reply — the transcript changes and the number
+ * turn, fork, retry, delete a reply - the transcript changes and the number
  * does not, because nothing recomputes it. It only ever went up.
  *
  * And seeding it meant every conversation in the demo opened above the
  * threshold, so the meter appeared on all of them at once, at values with no
- * relationship to how long any of them actually were. A meter that reads 72% on
- * a four-message conversation is not information, and once the reader notices
- * it is arbitrary they stop believing the rest of the chrome too.
+ * relationship to how long any of them actually were. A meter that reads 72%
+ * on a four-message conversation is not information, and once the reader
+ * notices it is arbitrary they stop believing the rest of the chrome too.
  *
  * Derived, it cannot lie: it is a function of what is on screen, so it drops
  * when a fork shortens the history and rises as you talk.
  *
- * ---- On the estimate -----------------------------------------------------
+ * ---- Measured first, estimated only where nothing measured ----------------
  *
- * Four characters to the token is the usual rough figure for English prose and
- * it is what this uses. It is an estimate and it is allowed to be: the meter
- * exists to say "you are getting close", and being ten percent out never
- * changes that answer. When the harness reports real usage this function is
- * where that arrives, and nothing else has to change.
+ * This file used to be an estimate over the stored `messages` array, which is
+ * empty for every live conversation - so the meter it fed drew nothing, ever.
+ * The provider's own usage is the figure now, and the estimate survives for
+ * exactly one job: the stretch of transcript newer than the last turn that
+ * reported. Four characters to the token is the usual rough figure for
+ * English prose and it is what that stretch uses. Being ten percent out over
+ * one message never changes the answer the ring exists to give, and the panel
+ * marks the row as an estimate rather than letting it pass as a measurement.
  */
 
 /** Characters per token. A rough average, and rough is sufficient here. */
 const CHARS_PER_TOKEN = 4
 
-/** Every turn costs a little beyond its text: role, delimiters, tool framing. */
-const PER_MESSAGE_OVERHEAD = 8
-
 /** Used when no model is selected, or the selected one declares no window. */
 const FALLBACK_WINDOW = 200_000
 
+/* -------------------------------------------------------------------------- */
+/* The breakdown                                                               */
+/* -------------------------------------------------------------------------- */
+
 /**
- * The selected model's own window, from the catalog the harness served; null
- * when nothing is selected or the model does not declare one.
+ * What one turn actually cost, in the only divisions the provider reports.
+ *
+ * There are exactly three, and the temptation is to invent more. A panel
+ * itemising "system prompt", "tool definitions", "MCP tools", "skills" and
+ * "memory files" would be a better-looking panel and a dishonest one: no
+ * provider reports any of that, and the harness does not count the sections
+ * of the prompt it assembles. Every one of those rows would be a number this
+ * app made up. What is real is what was sent, how much of it the provider
+ * already had cached, and what came back - so that is what this holds.
  */
-export function contextUsage(conversation: Conversation, contextWindow: number | 'unknown' | null): number {
-  const window = typeof contextWindow === 'number' && contextWindow > 0 ? contextWindow : FALLBACK_WINDOW
-
-  const tokens = conversation.messages.reduce((total, message) => {
-    // The reasoning trace occupies the window too, and on a long chain of
-    // thought it is the larger half. Counting only the reply would make the
-    // meter read low on exactly the conversations most at risk of filling up.
-    const thinking = message.thinking?.text.length ?? 0
-    return total + (message.text.length + thinking) / CHARS_PER_TOKEN + PER_MESSAGE_OVERHEAD
-  }, 0)
-
-  return Math.min(1, tokens / window)
+export interface MeasuredContext {
+  /** Prompt tokens the provider billed as fresh. */
+  readonly fresh: number
+  /** Prompt tokens served from cache: read back, plus what was written. */
+  readonly cached: number
+  /** What the model produced, reasoning included where a provider bills it so. */
+  readonly reply: number
 }
 
 /**
- * What a conversation's history costs, from what the provider actually
- * charged for the last turn.
+ * A conversation's context, measured where it can be and estimated after.
  *
- * The estimate below exists because nothing better was available; this is the
- * better thing, and it is what the meter prefers whenever a turn has reported.
+ * Two halves, kept apart all the way to the screen. `measured` is the last
+ * turn the provider reported on, and it is the truth. `pending` is everything
+ * the transcript has gained since - the message just sent, the reply still
+ * arriving - which no turn has reported yet and which is therefore estimated
+ * from its characters.
  *
- * The figure is taken from the LAST assistant message that carried usage, not
- * summed across the conversation. Usage is reported per request, and every
- * request after the first re-sends the whole history - so summing would count
- * the same tokens once per turn and read far over the truth. What the next
- * request will carry is this turn's prompt plus what this turn produced.
- *
- * `input`, `cacheRead` and `cacheWrite` are separate counts of one prompt:
- * pi reports the cached parts apart from the fresh ones, so the prompt is
- * their sum, and a cached conversation would otherwise read as almost empty
- * however long it got.
- *
- * Null when no turn has reported yet - a conversation whose first reply is
- * still arriving has no measurement, and saying zero would claim one.
+ * Without the second half the ring stood still from the moment a message was
+ * sent until the reply landed, and then jumped. With it the ring moves while
+ * the turn runs and then settles onto the measured figure, which is both
+ * livelier and more honest: the estimate is labelled as one wherever it shows.
  */
-export function reportedContextTokens(
-  items: readonly { readonly kind: string; readonly usage?: UsageFacts | null }[],
-): number | null {
+export interface ContextReport {
+  readonly measured: MeasuredContext | null
+  /** Estimated tokens for everything after the last turn that reported. */
+  readonly pending: number
+}
+
+/** An item's own text, for the estimate. Tool output is not the transcript's. */
+function itemCharacters(item: TranscriptLike): number {
+  if (item.kind === 'user') return item.text?.length ?? 0
+  let total = 0
+  for (const segment of item.segments ?? []) total += segment.text?.length ?? 0
+  return total
+}
+
+interface TranscriptLike {
+  readonly kind: string
+  readonly usage?: UsageFacts | null
+  readonly text?: string
+  readonly segments?: readonly { readonly kind: string; readonly text?: string }[]
+}
+
+/**
+ * The report for one transcript.
+ *
+ * Walks back to the last item carrying usage, takes that as the measurement,
+ * and estimates everything after it. A transcript with no usage anywhere is
+ * all estimate, which is a conversation whose first reply has not landed.
+ */
+export function contextReport(items: readonly TranscriptLike[]): ContextReport {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const usage = items[index]?.usage
     if (usage === undefined || usage === null) continue
-    const prompt =
-      (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
-    const produced = usage.output ?? 0
-    const total = prompt + produced
-    if (total > 0) return total
+    const fresh = usage.input ?? 0
+    const cached = (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+    const reply = usage.output ?? 0
+    if (fresh + cached + reply === 0) continue
+    let characters = 0
+    for (let after = index + 1; after < items.length; after += 1) {
+      characters += itemCharacters(items[after])
+    }
+    return {
+      measured: { fresh, cached, reply },
+      pending: Math.round(characters / CHARS_PER_TOKEN),
+    }
   }
-  return null
+  let characters = 0
+  for (const item of items) characters += itemCharacters(item)
+  return { measured: null, pending: Math.round(characters / CHARS_PER_TOKEN) }
 }
 
-/** That figure as a fraction of the model's window, clamped to one. */
-export function contextUsageFromTokens(
-  tokens: number,
+/** One turn's measured total: the whole prompt plus what it produced. */
+export function measuredTotal(measured: MeasuredContext): number {
+  return measured.fresh + measured.cached + measured.reply
+}
+
+export interface ContextBreakdown {
+  readonly report: ContextReport
+  /** The window the fractions are against, and whether the model named it. */
+  readonly window: number
+  readonly windowDeclared: boolean
+  readonly total: number
+  /** Never negative: a turn may overrun a window the catalog understates. */
+  readonly free: number
+  /** The total as a fraction of the window, clamped to one. */
+  readonly used: number
+}
+
+/** The report against one model's window, which is what the ring draws. */
+export function contextBreakdown(
+  report: ContextReport,
   contextWindow: number | 'unknown' | null,
-): number {
-  const window =
-    typeof contextWindow === 'number' && contextWindow > 0 ? contextWindow : FALLBACK_WINDOW
-  return Math.min(1, tokens / window)
+): ContextBreakdown {
+  const declared = typeof contextWindow === 'number' && contextWindow > 0
+  const window = declared ? contextWindow : FALLBACK_WINDOW
+  const total = (report.measured === null ? 0 : measuredTotal(report.measured)) + report.pending
+  return {
+    report,
+    window,
+    windowDeclared: declared,
+    total,
+    free: Math.max(0, window - total),
+    used: Math.min(1, total / window),
+  }
 }
