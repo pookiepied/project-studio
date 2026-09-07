@@ -543,6 +543,35 @@ describe('the window the turn is measured against', () => {
     expect(screen.getByRole('meter', { name: 'Context used' })).toBeTruthy()
   })
 
+  it('rules no line across the top of a menu whose head is empty', async () => {
+    // Home with nothing named: no model to describe, no window to fill, no
+    // reasoning dial. A separator is a rule BETWEEN two groups, and with
+    // nothing above it, it is a line drawn across the top of the panel
+    // against its own edge - a header with no header in it.
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker()
+
+    await openModelPanel()
+
+    expect(screen.getByText('Default model')).toBeTruthy()
+    expect(within(screen.getByRole('menu')).queryAllByRole('separator')).toHaveLength(0)
+  })
+
+  it('rules the line once there is a head for it to close', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+    await screen.findByRole('meter', { name: 'Context used' })
+
+    expect(
+      within(screen.getByRole('menu')).getAllByRole('separator').length,
+    ).toBeGreaterThan(0)
+  })
+
   it('keeps the percentage off the strip until it is news', async () => {
     harnessConfigured()
     stubFetch(defaultRoute([FLAT_MODEL]))

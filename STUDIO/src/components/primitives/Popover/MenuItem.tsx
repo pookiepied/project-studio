@@ -7,8 +7,17 @@ export function MenuLabel({ children }: { children: ReactNode }) {
   return <p className="px-2 pt-1.5 pb-1 text-micro text-muted-foreground">{children}</p>
 }
 
+/**
+ * A rule between two groups of rows.
+ *
+ * Carries the role rather than being a bare div: inside a menu this is a
+ * `separator` to anything reading the panel, and it is also the only handle a
+ * test has on a line that is otherwise a styled div. A separator with nothing
+ * above it is a rule across the top of the panel, so callers are responsible
+ * for not rendering one where a group does not actually end.
+ */
 export function MenuSeparator() {
-  return <div className="my-1 h-px bg-border" />
+  return <div role="separator" className="my-1 h-px bg-border" />
 }
 
 export function MenuItem({

@@ -333,6 +333,13 @@ function ModelPanel({
 }) {
   const [detailed, setDetailed] = useState(false)
 
+  // Whether anything at all stands above the model list. A separator is a
+  // rule BETWEEN two things, so with nothing above it, it is a line ruled
+  // across the top of the menu against the panel's own edge - which reads as
+  // a header with no header in it. That is what a conversation with no model
+  // named and no reasoning control was showing.
+  const head = model !== undefined || breakdown !== null
+
   if (catalog.phase.status !== 'ready') {
     return <CatalogStateNote catalog={catalog} />
   }
@@ -369,7 +376,7 @@ function ModelPanel({
           like any other, and hiding the bar until someone names a model would
           leave exactly the people who never open this menu with no way to see
           it. The name says what is true instead: nothing is chosen yet. */}
-      {model !== undefined || breakdown !== null ? (
+      {head ? (
         <div className="flex flex-col gap-2.5 px-2 pb-1 pt-1.5">
           <div className="flex min-w-0 items-center gap-2">
             {model === undefined ? null : (
@@ -424,7 +431,7 @@ function ModelPanel({
         </>
       ) : null}
 
-      <MenuSeparator />
+      {head || hasReasoningControl ? <MenuSeparator /> : null}
       <MenuItem selected={selected === null} onSelect={() => onChoose(null)}>
         Default model
       </MenuItem>

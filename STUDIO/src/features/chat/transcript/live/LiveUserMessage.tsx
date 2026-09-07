@@ -33,9 +33,18 @@ export const LiveUserMessage = memo(function LiveUserMessage({
         <CollapsibleText text={item.text} />
         {item.attachments.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap justify-end gap-1">
-            {item.attachments.map((attachment) => (
+            {/* Keyed by position, which is the only identity these have. An
+                attachment carries no id, and two files can honestly share a
+                type and a name - a pasted screenshot is `image.png` every
+                time - so keying on those collided the moment somebody
+                attached two of them: React warned, and one of the pair was
+                free to be dropped or duplicated. Position is safe here in
+                the way it usually is not, because this list is a sent
+                message's own record: it arrives once and never reorders,
+                grows or shrinks. */}
+            {item.attachments.map((attachment, index) => (
               <span
-                key={`${attachment.mediaType}-${attachment.filename ?? ''}`}
+                key={`${index}-${attachment.mediaType}-${attachment.filename ?? ''}`}
                 className="rounded-full bg-surface-raised px-2 py-0.5 text-caption text-muted-foreground"
               >
                 {attachment.filename ?? attachment.mediaType}
