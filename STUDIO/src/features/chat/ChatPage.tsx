@@ -7,7 +7,6 @@ import { Composer } from '@/features/chat/composer'
 import { useForkConversation } from '@/features/chat/fork'
 import { Transcript, useAutoScroll } from '@/features/chat/transcript'
 import { ConnectionNotice, SendRefusal } from '@/features/chat/transcript/live/ConnectionNotice'
-import { TurnStatus } from '@/features/chat/transcript/live/TurnStatus'
 import { LiveTranscript } from '@/features/chat/transcript/live/LiveTranscript'
 import { useConversationTranscript } from '@/features/chat/useConversationTranscript'
 import { isTurnRunning } from '@/features/chat/useConversation'
@@ -282,24 +281,61 @@ export function ChatPage({
           className="pointer-events-none absolute inset-x-0 bottom-full z-0 h-10 bg-gradient-to-t from-surface to-transparent"
         />
 
-        {/* Only offered once the reader has scrolled away. Shown permanently it
-            is a button that does nothing most of the time. */}
-        <AnimatePresence>
-          {!pinned ? (
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, y: 8, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.9 }}
-              transition={{ duration: DURATION.fast, ease: EASE_OUT }}
-              onClick={scrollToBottom}
-              aria-label="Jump to latest"
-              className="studio-blur absolute -top-14 left-1/2 z-20 flex size-8 -translate-x-1/2 items-center justify-center rounded-full border shadow-lifted"
-            >
-              <Icons.jumpToLatest />
-            </motion.button>
+        {/* The floating layer: chrome that belongs above the composer without
+            belonging to it.
+
+            Both of these used to be placed separately - the jump button
+            pinned a fixed distance above this wrapper, the plan pill in
+            normal flow inside the composer's own opaque block. The pill being
+            in flow is what made the composer's top edge march up the window
+            as the field grew: five image thumbnails pushed the whole slab,
+            pill included, and the hard line where that slab met the
+            transcript came with it.
+
+            Out of flow and stacked instead. The column is anchored to the top
+            of the composer, so it rides just above whatever height the field
+            currently is, and the composer can grow underneath without moving
+            anything through the layout. Stacking them together is also what
+            keeps them from colliding: two separately positioned centred
+            capsules overlapped by about ten pixels once both were showing.
+
+            `pointer-events-none` on the column so the transcript behind it
+            stays reachable in the gaps; each child takes its own events back. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-full z-20 flex flex-col items-center gap-2 pb-3">
+          {/* Only offered once the reader has scrolled away. Shown permanently
+              it is a button that does nothing most of the time. */}
+          <AnimatePresence>
+            {!pinned ? (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.9 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+                onClick={scrollToBottom}
+                aria-label="Jump to latest"
+                className="studio-blur pointer-events-auto flex size-8 items-center justify-center rounded-full border shadow-lifted"
+              >
+                <Icons.jumpToLatest />
+              </motion.button>
+            ) : null}
+          </AnimatePresence>
+
+          {/* Nearest the composer, because it describes the run the composer
+              is feeding. It only describes it - an approval or a question
+              blocks the run, and those stay in the flow below where the
+              layout gives them weight. */}
+          {!gallery && plan.snapshot !== null && plan.hasPlan ? (
+            <div className="pointer-events-auto max-w-full px-4">
+              <PlanPill
+                snapshot={plan.snapshot}
+                items={plan.items}
+                open={planEntryVisible}
+                onToggle={togglePlanPanel}
+              />
+            </div>
           ) : null}
-        </AnimatePresence>
+        </div>
 
         <div
           className="relative z-10 mx-auto w-full bg-surface pb-4"
@@ -347,26 +383,6 @@ export function ChatPage({
                   />
                 </div>
               ) : null}
-              {plan.snapshot !== null && plan.hasPlan ? (
-                // Last in the row, deliberately: the approval and the question
-                // block the run, the pill only describes it, and the order on
-                // screen says so.
-                <div className="mb-3 flex justify-center">
-                  <PlanPill
-                    snapshot={plan.snapshot}
-                    items={plan.items}
-                    open={planEntryVisible}
-                    onToggle={togglePlanPanel}
-                  />
-                </div>
-              ) : null}
-
-              {/* The turn's status: sent, working, done. It holds through the
-                  whole run and leaves on its own beat after a completion --
-                  see TurnStatus, which owns the state machine and the
-                  animation. Live conversations only: the gallery's demo turn
-                  is a local fixture with no run to report. */}
-              {!gallery ? <TurnStatus phase={live.phase} items={live.items} /> : null}
             </>
           ) : null}
 
