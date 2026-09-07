@@ -1182,11 +1182,37 @@
   .studio-prose :is(h1, h2, h3, h4) {
     @apply font-semibold tracking-tight;
     line-height: 1.35;
+    /* Headings are short and often wrap to two lines. `balance` evens those
+       lines instead of leaving one word alone on the second, which `pretty` --
+       inherited from the block, and tuned for the last lines of a paragraph --
+       does not do as well for a two-line title. */
+    text-wrap: balance;
   }
-  .studio-prose h1 { font-size: calc(var(--text-body) + 4px); }
-  .studio-prose h2 { font-size: calc(var(--text-body) + 2px); }
-  .studio-prose h3 { font-size: var(--text-body); }
-  .studio-prose h4 { font-size: var(--text-body); color: var(--muted-foreground); }
+
+  /* Ratios of the body size, not offsets from it, and the difference is worth
+     stating because the rest of the app deliberately goes the other way.
+
+     Chrome hierarchy comes from weight, colour and tracking rather than size,
+     which is right for dense furniture: a button that shouts is a worse button.
+     Prose is the exception. It is the one column anyone reads at length and the
+     only place a reader scans for structure, so its levels have to be
+     distinguishable at a glance rather than on inspection.
+
+     They were not. `h3` and `h4` both rendered at exactly body size, separated
+     from a paragraph by weight alone and from each other by colour alone --
+     and replies lean on `##` and `###`, so in practice the ladder had one
+     visible rung. An offset also flattens as the interface scales: `+4px` is
+     1.36x at the smallest text setting and 1.29x at the largest, so the reader
+     who enlarges the text gets less hierarchy, not more. A ratio holds at every
+     setting, and matches the em-based rhythm the rest of this block already
+     uses. */
+  .studio-prose h1 { font-size: 1.45em; }
+  .studio-prose h2 { font-size: 1.25em; }
+  .studio-prose h3 { font-size: 1.1em; }
+  /* Level with the body on purpose: the last rung is a label for the paragraph
+     under it, and colour is the whole of its difference. A fourth size here
+     would be a step nobody could name. */
+  .studio-prose h4 { font-size: 1em; color: var(--muted-foreground); }
 
   /* Headings bind to the text beneath them, not the block above. */
   .studio-prose > * + :is(h1, h2, h3, h4) {
