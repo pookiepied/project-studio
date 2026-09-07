@@ -91,6 +91,28 @@ describe('the chip is the default', () => {
     )
     expect(screen.getByText('mystery')).toBeTruthy()
   })
+
+  it('gives the harness tools that arrived last a verb instead of their raw name', () => {
+    // `discover` and `jobs` are native tools like any other, and an unmapped
+    // native tool falls through to the same rendering as `mystery` above --
+    // its bare wire name, with no mark. That is right for an extension's tool,
+    // whose name we cannot know, and wrong for ours, whose name we chose. This
+    // pins the two that shipped after the map was written, because the way
+    // this breaks is silent: the row still renders, it just reads like a leak.
+    render(
+      <ToolGroups
+        groups={groupsOf(
+          { toolName: 'discover', calls: [call({ toolName: 'discover', output: present('found') })] },
+          { toolName: 'jobs', calls: [call({ toolName: 'jobs', toolCallId: 'call-9', output: present('none') })] },
+        )}
+      />,
+    )
+
+    expect(screen.getByText('Discovered')).toBeTruthy()
+    expect(screen.getByText('Checked')).toBeTruthy()
+    expect(screen.queryByText('discover')).toBeNull()
+    expect(screen.queryByText('jobs')).toBeNull()
+  })
 })
 
 describe('the verb', () => {

@@ -122,6 +122,14 @@ const ACTIONS: Readonly<Record<string, ToolAction>> = {
   fetch: { mark: Icons.browserUse, running: 'Fetching', done: 'Fetched' },
   plan: { mark: Icons.plan, running: 'Planning', done: 'Planned' },
   ask_user_question: { mark: Icons.ask, running: 'Asking', done: 'Asked' },
+  // Discovery wears MCP's own mark rather than a magnifying glass: what it
+  // searches is the extensions, and the mark the settings pane already uses
+  // for them is the one a reader has been taught. Its verbs say what the
+  // model did, which is look something up - the loading it also does is a
+  // change to the next step's tools, and a row in the transcript is the
+  // wrong place to announce that.
+  discover: { mark: Icons.mcp, running: 'Discovering', done: 'Discovered' },
+  jobs: { mark: Icons.backgroundJobs, running: 'Checking', done: 'Checked' },
 }
 
 /** The tools whose subject is a file path, and so earns the file's own mark. */
