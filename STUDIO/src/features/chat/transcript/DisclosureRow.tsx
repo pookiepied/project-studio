@@ -102,7 +102,13 @@ export function DisclosureRow({
         {...(disabled ? {} : { 'aria-expanded': open, 'aria-controls': bodyId })}
         disabled={disabled}
         className={cn(
-          'group/disclosure inline-flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-left',
+          // `max-w-full` is load-bearing, not tidiness. An inline-flex box
+          // sizes to its content and nothing above it caps the width, so a
+          // long subject - a shell command with half a dozen npm flags - grew
+          // the button straight past the reading column and out of the
+          // window. The `truncate` on the subject could never fire: there was
+          // no bounded width for it to shrink against.
+          'group/disclosure inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-left',
           'text-caption text-muted-foreground transition-colors duration-fast',
           disabled ? 'cursor-default' : 'hover:text-foreground',
         )}
