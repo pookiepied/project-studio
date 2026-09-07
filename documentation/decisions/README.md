@@ -96,6 +96,7 @@ wrong answer, and why we believed it, is the useful part.
 | | |
 |---|---|
 | [0029](0029-mcp-session-tool-membership.md) | MCP session tool membership — amended by meta-task #56 |
+| [0048](0048-a-capability-is-announced-before-it-is-loaded.md) | A capability is announced before it is loaded — the inventory in the system block, and discovery on request |
 
 ### Errors, observability, and recovery
 | | |
