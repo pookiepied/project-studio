@@ -1,4 +1,5 @@
 export { Popover, MenuItem, MenuLabel, MenuSeparator } from './Popover'
+export { MenuViews } from './Popover/MenuViews'
 export { Tooltip } from './Tooltip/Tooltip'
 export { IconButton } from './IconButton/IconButton'
 export { Segmented } from './Segmented/Segmented'

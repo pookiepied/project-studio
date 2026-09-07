@@ -86,11 +86,15 @@ function stubFetch(route: Route): Call[] {
   return calls
 }
 
-/** The index and the catalog, served the way the harness serves them. */
-function defaultRoute(models: unknown): Route {
+/** The index and the catalog, served the way the harness serves them.
+ *
+ * `defaults` is the Chat slot as Settings writes it: the harness routes a
+ * conversation with no model of its own through the stable alias, and that
+ * alias resolves to exactly this. Empty is a machine where nobody set one. */
+function defaultRoute(models: unknown, defaults: unknown = {}): Route {
   return (url, method) => {
     if (url.includes('/models')) return jsonResponse(models)
-    if (url.includes('/defaults')) return jsonResponse({})
+    if (url.includes('/defaults')) return jsonResponse(defaults)
     if (url.includes('/connections')) return jsonResponse([KNOWN_VENDOR])
     if (url.includes('/conversations') && method === 'GET') {
       return jsonResponse([CONVERSATION])
@@ -472,8 +476,14 @@ describe('the model picker', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Turn settings' }))
     // The menu item's accessible name carries its hint ("Reasoning X-high").
     fireEvent.click(screen.getByRole('menuitem', { name: /^Reasoning/ }))
-    // Scoped to the menu: the dialog's own dial may still be on its way out.
-    const settled = within(screen.getByRole('menu')).getByRole('slider', { name: 'Reasoning effort' })
+    // Awaited, and scoped to the menu. The menu's pages wait for each other:
+    // the root slides out before the reasoning page arrives, so the dial is
+    // one beat away rather than in the same frame as the click. (The scoping
+    // is the older reason - the dialog's own dial may still be on its way
+    // out.)
+    const settled = await within(screen.getByRole('menu')).findByRole('slider', {
+      name: 'Reasoning effort',
+    })
     expect(settled.getAttribute('aria-valuetext')).toBe('X-high')
   })
 })
@@ -586,5 +596,113 @@ describe('the window the turn is measured against', () => {
     const trigger = screen.getByRole('button', { name: 'Turn settings' })
     expect(trigger.textContent).toContain('jamba-large-1.7')
     expect(trigger.textContent).not.toContain('%')
+  })
+})
+
+/**
+ * The model a conversation reaches when it names none of its own.
+ *
+ * The harness has always resolved this: no model on the conversation means
+ * the stable alias, and the alias means the Chat slot from Settings. The
+ * client loaded that slot at startup and never read it again, so the picker
+ * said "Choose a model" about a conversation whose model was chosen, the
+ * meter divided by a stand-in window, and the reasoning dial vanished
+ * because "no model named" was being read as "no levels".
+ */
+describe('the Chat default, as the chat page sees it', () => {
+  const CHAT_DEFAULT = { textGeneration: { connectionId: KNOWN_VENDOR.id, modelId: 'kappa-mini' } }
+
+  it('names the model the turn will actually reach', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([THIRD_FLAT], CHAT_DEFAULT))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Turn settings' }).textContent).toContain(
+        'kappa-mini',
+      ),
+    )
+  })
+
+  it('says the name came from Settings, so the pin it is not is not implied', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([THIRD_FLAT], CHAT_DEFAULT))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+
+    expect(await screen.findByText(/Following the Chat default/)).toBeTruthy()
+  })
+
+  it('gives the dial back, which absence had taken away', async () => {
+    // The consequence with teeth: a conversation on the default could not set
+    // reasoning at all, because no model resolved meant no levels to offer.
+    harnessConfigured()
+    stubFetch(
+      defaultRoute([REASONING_MODEL], {
+        textGeneration: { connectionId: KNOWN_VENDOR.id, modelId: 'claude-sonnet-4.5' },
+      }),
+    )
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+
+    expect(await screen.findByRole('menuitem', { name: /^Reasoning/ })).toBeTruthy()
+  })
+
+  it('measures against the default model own window, not the stand-in', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([THIRD_FLAT], CHAT_DEFAULT))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+
+    expect(await screen.findByText('200k context window')).toBeTruthy()
+  })
+
+  it('still says nothing is chosen when nothing is', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([THIRD_FLAT]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+
+    expect(await screen.findByText('No model chosen')).toBeTruthy()
+    expect(screen.queryByText(/Following the Chat default/)).toBeNull()
+  })
+})
+
+describe('the recents shortcut', () => {
+  it('never offers the model already picked', async () => {
+    // The top row of the list was a shortcut to where you already are: it
+    // spent the section's most valuable line on the state the menu is in.
+    //
+    // Only for a model actually PICKED. A recent that matches the Chat
+    // default is still offered while a conversation is merely following it,
+    // because choosing it there is not a no-op - it pins the conversation,
+    // which is what the head says the rows below do.
+    harnessConfigured()
+    stubFetch(defaultRoute([THIRD_FLAT, FOURTH_FLAT]))
+    localStorage.setItem(
+      'studio.recent-models',
+      JSON.stringify(['anthropic/kappa-mini', 'anthropic/delta-pro']),
+    )
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    await openModelPanel()
+    await screen.findByText('Recent')
+    fireEvent.click(within(screen.getByRole('menu')).getByText('kappa-mini'))
+
+    await openModelPanel()
+    const menu = within(screen.getByRole('menu'))
+    expect(menu.getByText('delta-pro')).toBeTruthy()
+    // Named in the head, where it belongs; not offered as somewhere to go.
+    expect(menu.queryAllByText('kappa-mini')).toHaveLength(1)
   })
 })

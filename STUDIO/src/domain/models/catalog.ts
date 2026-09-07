@@ -1,4 +1,5 @@
 import type {
+  DefaultSelection,
   ModelCapability,
   ModelPricing,
   ProviderConnection,
@@ -127,6 +128,61 @@ export function findCatalogModel(
 ): CatalogModel | undefined {
   if (id === null) return undefined
   return models.find((model) => model.id === id)
+}
+
+/**
+ * The model a turn with no model of its own will actually reach.
+ *
+ * The harness has had this answer all along: a conversation carrying no model
+ * is sent under the stable alias `project-studio/default`, and that alias
+ * resolves to the `textGeneration` slot the person set in Settings. The client
+ * loaded that slot at startup and then never read it, so the picker said
+ * "Choose a model" about a conversation whose model was chosen, the meter
+ * divided by a stand-in window instead of the real one, and the reasoning dial
+ * vanished entirely - "no model named" was being read as "no levels".
+ *
+ * Matched on connection and model id rather than on the row's own `id`,
+ * because the slot is stored as that pair and the row's id is built from the
+ * connection's vendor. Undefined when no slot is set, or when the slot points
+ * at a model this catalog no longer carries - both are "nothing to show", and
+ * neither is worth inventing a row for.
+ */
+export function findDefaultModel(catalog: {
+  readonly models: readonly CatalogModel[]
+  readonly defaults: DefaultSelection
+}): CatalogModel | undefined {
+  const slot = catalog.defaults.textGeneration
+  if (slot === undefined) return undefined
+  return catalog.models.find(
+    (model) => model.connectionId === slot.connectionId && model.modelId === slot.modelId,
+  )
+}
+
+/**
+ * What a surface is actually sending with, and how that was decided.
+ *
+ * `following` is the difference between a conversation pinned to a model and
+ * one riding whatever Settings currently points at. It is not a display
+ * detail: change the Chat default tomorrow and every following conversation
+ * moves with it, so a surface that showed only the name would be describing a
+ * pin that does not exist.
+ */
+export function resolveTurnModel(
+  catalog: {
+    readonly models: readonly CatalogModel[]
+    readonly defaults: DefaultSelection
+  },
+  modelId: string | null,
+): { readonly model: CatalogModel | undefined; readonly following: boolean } {
+  const named = findCatalogModel(catalog.models, modelId)
+  if (named !== undefined) return { model: named, following: false }
+  if (modelId !== null) {
+    // A conversation pinned to a model the catalog no longer carries. It is
+    // not following the default, and saying so would be a second lie on top
+    // of the first: the pin is real, the row is gone.
+    return { model: undefined, following: false }
+  }
+  return { model: findDefaultModel(catalog), following: true }
 }
 
 /** Display copy for a reasoning level. */

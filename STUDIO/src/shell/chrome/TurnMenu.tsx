@@ -4,11 +4,12 @@ import {
   MenuItem,
   MenuLabel,
   MenuSeparator,
+  MenuViews,
   Popover,
   StepSlider,
   Tooltip,
 } from '@/components/primitives'
-import { findCatalogModel, type CatalogModel } from '@/domain/models/catalog'
+import { findCatalogModel, resolveTurnModel, type CatalogModel } from '@/domain/models/catalog'
 import {
   REASONING_LEVEL_NOTES,
   restingReasoningLevel,
@@ -120,7 +121,11 @@ export function TurnMenu() {
       ? conversations.find((item) => item.id === route.conversationId) ?? null
       : null
   const effective = effectiveTurnSettings(active, settings)
-  const model = findCatalogModel(catalog.models, effective.modelId)
+  // What this surface is actually sending with. A conversation that named no
+  // model is not modelless - the harness sends it under the stable alias,
+  // which resolves to the Chat default from Settings - so the picker resolves
+  // the same way rather than reporting an absence that is not there.
+  const { model, following } = resolveTurnModel(catalog, effective.modelId)
 
   // Measured against the model this surface would actually send with, which
   // is the same derivation the label above uses - so the fill and the name it
@@ -227,6 +232,7 @@ export function TurnMenu() {
           </Tooltip>
         }
       >
+        <MenuViews view={view} depth={view === 'root' ? 0 : 1}>
         {view === 'reasoning' ? (
           <ReasoningPanel
             model={model}
@@ -249,8 +255,10 @@ export function TurnMenu() {
             }}
             reasoningLabel={reasoningLabel(model, effective.reasoningLevel)}
             hasReasoningControl={model !== undefined && model.reasoningLevels.length > 0}
+            following={following}
           />
         )}
+        </MenuViews>
       </Popover>
 
       <ModelLibraryDialog
@@ -315,6 +323,7 @@ function ModelPanel({
   running,
   reasoningLabel,
   hasReasoningControl,
+  following,
   onChoose,
   onOpenReasoning,
   onOpenLibrary,
@@ -327,6 +336,8 @@ function ModelPanel({
   running: boolean
   reasoningLabel: string | null
   hasReasoningControl: boolean
+  /** The model came from the Settings default, not from a pick made here. */
+  following: boolean
   onChoose: (modelId: string | null) => void
   onOpenReasoning: () => void
   onOpenLibrary: () => void
@@ -361,9 +372,14 @@ function ModelPanel({
   // Only picks that still resolve to a catalog row are offered. A model that
   // was removed since it was last chosen simply stops appearing here; the
   // remembered name is a shortcut, not a record the picker has to honour.
+  // Only picks that still resolve, and never the one already in force. A
+  // shortcut to where you already are is a row that does nothing, and it was
+  // the top row of the list - so the section spent its most valuable line
+  // offering the state the menu is already in.
   const recent = loadRecentModelIds()
     .map((id) => findCatalogModel(catalog.models, id))
     .filter((entry): entry is CatalogModel => entry !== undefined)
+    .filter((entry) => entry.id !== selected)
 
   return (
     <>
@@ -388,13 +404,26 @@ function ModelPanel({
               </span>
               <span className="text-micro text-muted-foreground">
                 {model === undefined
-                  ? `The harness default decides. ${formatTokens(breakdown?.window ?? 0)} stands in for its window.`
+                  ? `Nothing is set as the Chat default, so the harness decides and ${formatTokens(breakdown?.window ?? 0)} stands in for its window.`
                   : model.contextWindow === 'unknown'
                     ? 'Context window not declared'
                     : `${formatTokens(model.contextWindow)} context window`}
               </span>
             </span>
           </div>
+
+          {/* Said here and not in the pill. The pill answers "what am I
+              talking to", and the model's name is that answer whichever way
+              it was arrived at. HOW it was arrived at is a different question
+              with a different consequence - change the Chat default tomorrow
+              and every following conversation moves with it - and it belongs
+              next to the control that would change it. */}
+          {following && model !== undefined ? (
+            <p className="text-micro text-muted-foreground/80">
+              Following the Chat default. Picking a model below pins this
+              conversation to it instead.
+            </p>
+          ) : null}
 
           {breakdown === null ? null : (
             <>

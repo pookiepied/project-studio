@@ -1,4 +1,6 @@
 import { useId } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -30,6 +32,20 @@ import { cn } from '@/lib/cn'
  * — rather than with the step names. The names are for the value readout; the
  * ends are there so someone who has never seen the setting knows which way to
  * drag before they know what "medium" means here.
+ *
+ * ---- Why the movement is a spring and not a duration ----------------------
+ *
+ * A dial you drag should arrive the way a physical one does. The thumb and
+ * the fill used to be CSS transitions on `left` and `width` with a fixed
+ * duration, which travels at the same speed for one step as for five and
+ * stops dead on arrival — correct, and lifeless, and noticeably so on the one
+ * control in the app you adjust by feel. A spring covers a long throw faster
+ * than a short one and settles instead of stopping, which is the whole
+ * difference between a control that responds and one that updates.
+ *
+ * The readout crossfades rather than cutting, because the name and its note
+ * change length as they change: swapped in one frame the line jumps, and the
+ * eye reads the jump instead of the word.
  */
 export function StepSlider<T extends string>({
   steps,
@@ -53,22 +69,34 @@ export function StepSlider<T extends string>({
 
   return (
     <div className="px-2 pt-1 pb-2">
-      <div className="flex items-baseline justify-between gap-2 pb-2">
+      <div className="flex min-h-5 items-baseline justify-between gap-2 pb-2">
         <label htmlFor={id} className="text-ui text-foreground">
           {current?.name ?? 'Default'}
         </label>
-        {current?.note ? (
-          <span className="truncate text-micro text-muted-foreground">{current.note}</span>
-        ) : null}
+        <AnimatePresence mode="wait" initial={false}>
+          {current?.note ? (
+            <motion.span
+              key={current.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+              className="truncate text-micro text-muted-foreground"
+            >
+              {current.note}
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       <div className="relative flex h-5 items-center">
         {/* The track. The filled part is the distance travelled, which is what
             makes the position readable at a glance without counting stops. */}
         <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-fast ease-out"
-            style={{ width: `${progress * 100}%` }}
+          <motion.div
+            className="h-full rounded-full bg-primary"
+            animate={{ width: `${progress * 100}%` }}
+            transition={SPRING_SNAPPY}
           />
         </div>
 
@@ -86,12 +114,13 @@ export function StepSlider<T extends string>({
           ))}
         </div>
 
-        <div
+        <motion.div
           aria-hidden
-          className="pointer-events-none absolute size-3.5 rounded-full border border-hairline bg-surface-raised shadow-chip transition-[left] duration-fast ease-out"
+          className="pointer-events-none absolute size-3.5 rounded-full border border-hairline bg-surface-raised shadow-chip"
           // `calc` with the thumb's own width backed out, so it stays inside
           // the track at both ends instead of hanging half off.
-          style={{ left: `calc(${progress * 100}% - ${progress * 14}px)` }}
+          animate={{ left: `calc(${progress * 100}% - ${progress * 14}px)` }}
+          transition={SPRING_SNAPPY}
         />
 
         <input
