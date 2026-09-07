@@ -1866,10 +1866,32 @@ export interface SandboxScopeRow {
   readonly grantedAt: number
 }
 
+/*
+ * Folder trust: whether the person vouches for a directory at all.
+ *
+ * A different question from the two above, and a precondition rather than a
+ * wall - an undecided folder refuses every write and every command whatever
+ * the permission mode says. The vocabulary collides with `SandboxLevel`, whose
+ * `trusted` means uncontained: these two never derive from each other, and a
+ * folder can be vouched for while its project stays contained, which is the
+ * ordinary case.
+ */
+
+export const TRUST_DECISIONS = ['trusted', 'untrusted', 'undecided'] as const
+export type TrustDecision = (typeof TRUST_DECISIONS)[number]
+
+export interface FolderTrust {
+  readonly root: string
+  readonly name: string
+  readonly decision: TrustDecision
+}
+
 export interface SandboxScopeInfo {
   readonly project: readonly SandboxScopeRow[]
   readonly machineWide: readonly SandboxScopeRow[]
   readonly level: SandboxLevel
+  /** One row per folder of the project asked about; empty when none was. */
+  readonly trust: readonly FolderTrust[]
 }
 
 export interface DetectedPresetPath {
@@ -1908,13 +1930,23 @@ export function parseSandboxScopeRows(value: unknown): readonly SandboxScopeRow[
   return listOf(parseSandboxScopeRow, value)
 }
 
+export function parseFolderTrust(value: unknown): FolderTrust | null {
+  if (!isRecord(value)) return null
+  const root = text(value['root'])
+  const name = typeof value['name'] === 'string' ? value['name'] : null
+  const decision = oneOf(TRUST_DECISIONS, value['decision'])
+  if (root === null || name === null || decision === null) return null
+  return { root, name, decision }
+}
+
 export function parseSandboxScopeInfo(value: unknown): SandboxScopeInfo | null {
   if (!isRecord(value)) return null
   const project = listOf(parseSandboxScopeRow, value['project'])
   const machineWide = listOf(parseSandboxScopeRow, value['machineWide'])
   const level = oneOf(SANDBOX_LEVELS, value['level'])
-  if (project === null || machineWide === null || level === null) return null
-  return { project, machineWide, level }
+  const trust = listOf(parseFolderTrust, value['trust'])
+  if (project === null || machineWide === null || level === null || trust === null) return null
+  return { project, machineWide, level, trust }
 }
 
 export function parseDetectedPreset(value: unknown): DetectedPreset | null {

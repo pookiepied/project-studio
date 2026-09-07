@@ -58,7 +58,12 @@ vi.mock('@/platform/tauri', () => ({
   pickDirectory: () => pickDirectory(),
 }))
 vi.mock('@/stores/navigation', () => ({ useNavigation: () => ({ openProject }) }))
-vi.mock('@/stores/workspace', () => ({ useWorkspace: () => ({ createProject }) }))
+const trustFolders = vi.fn<(paths: readonly string[]) => Promise<HarnessFailure | null>>(() =>
+  Promise.resolve(null),
+)
+vi.mock('@/stores/workspace', () => ({
+  useWorkspace: () => ({ createProject, trustFolders }),
+}))
 
 /**
  * The sentence `systemScopeRefusal` writes for a Windows system directory,
@@ -188,6 +193,35 @@ describe('the folder the person actually picked', () => {
     expect(screen.getByText('The harness refused that folder.')).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
     expect(openProject).not.toHaveBeenCalled()
+  })
+
+  it('writes the trust answer for the folders, only when it was given', async () => {
+    // The bug this exists for: trust was a gate nobody could answer, so a
+    // project's conversations could only ever read. The dialog is where the
+    // person is looking at the folder, so it is where the answer is taken.
+    createProjectWriting(Promise.resolve(null))
+    renderDialog()
+    fillName('Quiet Hours')
+    await pick('C:\\Users\\pooki\\work\\quiet')
+    expect(await screen.findByText('quiet')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    // Unanswered is not "no": nothing is written, and Environments still asks.
+    expect(trustFolders).not.toHaveBeenCalled()
+  })
+
+  it('vouches for the picked folders when the person says so', async () => {
+    createProjectWriting(Promise.resolve(null))
+    renderDialog()
+    fillName('Quiet Hours')
+    await pick('C:\\Users\\pooki\\work\\quiet')
+    expect(await screen.findByText('quiet')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: 'I trust these folders' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
+
+    await waitFor(() => expect(trustFolders).toHaveBeenCalled())
+    expect(trustFolders).toHaveBeenCalledWith(['C:\\Users\\pooki\\work\\quiet'])
   })
 
   it('closes and opens the project once the write lands', async () => {

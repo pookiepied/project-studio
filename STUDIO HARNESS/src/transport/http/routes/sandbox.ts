@@ -1,8 +1,11 @@
 import { Hono } from "hono";
 import * as v from "valibot";
 
+import { isAbsolute } from "node:path";
+
 import { ADMISSION_SCOPES } from "../../../admission/scopes.js";
 import { requireAdmissionScope, type AdmissionEnv } from "../middleware/admission.js";
+import type { WorkspaceTrustStore } from "../../../permissions/trust.js";
 import type { ProjectStore } from "../../../projects/store.js";
 import { detectPresets } from "../../../sandbox/presets.js";
 import type { SandboxScopeStore } from "../../../sandbox/scope-store.js";
@@ -11,6 +14,12 @@ import { failure, invalidBody, statusOf } from "./error-status.js";
 export interface SandboxRoutesOptions {
   readonly scopes: SandboxScopeStore;
   readonly projects: ProjectStore;
+  /**
+   * The folder decisions. Optional the way the scope store is optional at
+   * composition: a composition without it serves no trust routes and reports
+   * no decisions, and production must wire it.
+   */
+  readonly trust?: WorkspaceTrustStore;
 }
 
 const grantSchema = v.object({
@@ -23,6 +32,11 @@ const grantSchema = v.object({
 
 const levelSchema = v.object({
   level: v.picklist(["contained", "trusted"]),
+});
+
+const trustSchema = v.object({
+  root: v.pipe(v.string(), v.minLength(1)),
+  trusted: v.boolean(),
 });
 
 async function body(context: { req: { json(): Promise<unknown> } }): Promise<unknown> {
@@ -41,6 +55,15 @@ async function body(context: { req: { json(): Promise<unknown> } }): Promise<unk
  * same way they are kept apart in the pane: granting a path never changes a
  * level, and choosing trusted never writes a scope row.
  *
+ * Folder trust is the third thing, and it is a precondition rather than a
+ * wall: until the person vouches for a folder, a conversation standing in it
+ * may only read, whatever its permission mode says and whatever scope rows
+ * exist. It lives here because this is the file about what a project may do
+ * with the disk, but note the vocabulary collision - a `trusted` **level**
+ * means uncontained, while a **trusted folder** means the person recognises
+ * it. Two different answers, two different routes, never derived from each
+ * other.
+ *
  * The admission scope is `project`: scope and level are product state about a
  * project, not a question that speaks for the person.
  */
@@ -50,6 +73,26 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
   const scopes = options.scopes;
   const projects = options.projects;
 
+  /**
+   * One row per folder of a project, carrying the decision the person made
+   * about it.
+   *
+   * Reported for every folder rather than only the first, even though a turn
+   * asks about the workspace root alone: a project whose folders are half
+   * vouched for is a state the person has to be able to see, and reordering
+   * the folders must not silently change what the next turn may do.
+   */
+  function folderTrust(projectId: string) {
+    const store = options.trust;
+    if (store === undefined) return [];
+    const folders = projects.get(projectId)?.folders ?? [];
+    return folders.map((folder) => ({
+      root: folder.path,
+      name: folder.name,
+      decision: store.decision(folder.path),
+    }));
+  }
+
   routes.get("/scope", (context) => {
     try {
       const projectId = context.req.query("projectId");
@@ -58,13 +101,43 @@ export function createSandboxRoutes(options: SandboxRoutesOptions): Hono<Admissi
           project: [],
           machineWide: scopes.listMachineWide(),
           level: "contained",
+          trust: [],
         });
       }
       return context.json({
         project: scopes.listProject(projectId),
         machineWide: scopes.listMachineWide(),
         level: projects.sandboxLevelOf(projectId),
+        trust: folderTrust(projectId),
       });
+    } catch (error) {
+      return context.json(failure(error), statusOf(error));
+    }
+  });
+
+  /**
+   * The person's answer about one folder.
+   *
+   * Addressed by path rather than by project, because that is the unit the
+   * decision is about: two projects that attach the same repository share one
+   * answer, and a folder detached from a project keeps it. A refusal is a
+   * write like any other - `trusted: false` records "declined", which is not
+   * the same as never having been asked.
+   */
+  routes.put("/trust", async (context) => {
+    try {
+      const store = options.trust;
+      if (store === undefined) return context.json({ error: "Trust is not available." }, 404);
+      const parsed = v.safeParse(trustSchema, await body(context));
+      if (!parsed.success) {
+        throw invalidBody("A trust decision names a folder and whether it is trusted.");
+      }
+      const root = parsed.output.root;
+      if (!isAbsolute(root)) {
+        throw invalidBody("A trusted folder is named by an absolute path.");
+      }
+      store.set(root, parsed.output.trusted);
+      return context.json({ root, decision: store.decision(root) });
     } catch (error) {
       return context.json(failure(error), statusOf(error));
     }

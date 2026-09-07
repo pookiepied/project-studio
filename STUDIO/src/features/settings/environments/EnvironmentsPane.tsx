@@ -4,7 +4,7 @@ import { Button, IconButton, Segmented } from '@/components/primitives'
 import { Pane, Row } from '@/features/settings/panes/Pane'
 import { StateNote } from '@/components/state/StateNote'
 import { useEnvironments } from '@/features/settings/environments/useEnvironments'
-import type { SandboxLevel } from '@/platform/harness'
+import type { FolderTrust, SandboxLevel } from '@/platform/harness'
 
 // A JSX string attribute is not escaped, so the two backslashes written
 // here would both reach the input. Held as a value instead.
@@ -13,11 +13,17 @@ const CUSTOM_PATH_PLACEHOLDER = 'C:\\Tools\\data'
 /**
  * Environments.
  *
- * Where commands actually run. Four parts, in this order: this project's
- * level, the scope the next grant will take, the detected toolchains, and
- * everything granted with where it came from. Scope and level are kept apart
- * here the same way they are kept apart everywhere else: granting a path
- * never changes a level.
+ * Where commands actually run. Five parts, in this order: whether the
+ * project's folders are vouched for at all, this project's level, the scope
+ * the next grant will take, the detected toolchains, and everything granted
+ * with where it came from. Scope and level are kept apart here the same way
+ * they are kept apart everywhere else: granting a path never changes a level.
+ *
+ * Trust comes first because it is the precondition the other three sit
+ * behind. An unvouched folder refuses every write and every command in every
+ * permission mode, so a person reading this pane top to bottom meets the
+ * answer that explains the refusal before they meet the controls that cannot
+ * fix it.
  *
  * Grants can be written at both scopes the harness keeps - for the selected
  * project, or machine-wide (every project and conversations with no project).
@@ -49,6 +55,7 @@ export function EnvironmentsPane() {
           onRefresh={() => void environments.refresh()}
           onSelectProject={(id) => void environments.selectProject(id)}
           onSetLevel={(id, level) => void environments.setLevel(id, level)}
+          onSetTrust={(root, trusted) => void environments.setTrust(root, trusted)}
           onGrantPreset={(id, presetId, path, mode) => void environments.grantPreset(id, presetId, path, mode)}
           onRevoke={(id, path) => void environments.revoke(id, path)}
           onGrantCustom={(id, path, mode) => void environments.grantCustom(id, path, mode)}
@@ -68,19 +75,21 @@ function Body({
   onRefresh,
   onSelectProject,
   onSetLevel,
+  onSetTrust,
   onGrantPreset,
   onRevoke,
   onGrantCustom,
 }: {
   projects: readonly { readonly id: string; readonly name: string }[]
   projectId: string | null
-  scope: { readonly project: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly machineWide: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly level: SandboxLevel }
+  scope: { readonly project: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly machineWide: readonly { readonly path: string; readonly mode: string; readonly source: string; readonly presetId: string | null }[]; readonly level: SandboxLevel; readonly trust: readonly FolderTrust[] }
   presets: readonly { readonly id: string; readonly title: string; readonly description: string; readonly paths: readonly { readonly path: string; readonly mode: 'read' | 'write' }[] }[]
   lastError: string | null
   refreshing: boolean
   onRefresh: () => void
   onSelectProject: (id: string | null) => void
   onSetLevel: (id: string, level: SandboxLevel) => void
+  onSetTrust: (root: string, trusted: boolean) => void
   onGrantPreset: (id: string, presetId: string, path: string, mode: 'read' | 'write') => void
   onRevoke: (id: string, path: string) => void
   onGrantCustom: (id: string, path: string, mode: 'read' | 'write') => void
@@ -158,6 +167,35 @@ function Body({
             ))}
           </select>
         </Row>
+      ) : null}
+
+      {projectId !== null && scope.trust.length > 0 ? (
+        <>
+          <Row
+            label="Folders this project works in"
+            hint="Vouching for a folder is a separate answer from the permission mode, and it is asked once about the folder rather than per command. Until it is answered a conversation standing here can only read - opening a repository someone sent you is the ordinary way a machine runs instructions its owner never wrote."
+          />
+          {scope.trust.map((folder) => (
+            <Row key={folder.root} label={folder.name} hint={folder.root}>
+              <Segmented
+                layoutId={`settings-folder-trust-${folder.root}`}
+                ariaLabel={`Trust ${folder.name}`}
+                value={folder.decision}
+                onChange={(value) => onSetTrust(folder.root, value === 'trusted')}
+                options={[
+                  { id: 'trusted', label: 'Trusted' },
+                  { id: 'untrusted', label: 'Not trusted' },
+                ]}
+              />
+            </Row>
+          ))}
+          {scope.trust.some((folder) => folder.decision !== 'trusted') ? (
+            <StateNote
+              title="This project can only read"
+              detail="A folder that is not trusted refuses every write and every command, whichever permission mode a conversation is set to. Answer above and the mode takes over from there."
+            />
+          ) : null}
+        </>
       ) : null}
 
       {projectId === null ? (

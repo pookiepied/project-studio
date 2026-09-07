@@ -252,8 +252,8 @@ export class PermissionKernel {
         source: "policy",
         reason:
           trust === "undecided"
-            ? "This folder has not been trusted yet, so only reading is allowed."
-            : "This folder is marked as not trusted, so only reading is allowed.",
+            ? "This folder has not been trusted yet, so only reading is allowed. Trust it in the project's Environment settings."
+            : "This folder is marked as not trusted, so only reading is allowed. Change that in the project's Environment settings.",
         grantId: undefined,
       };
     }

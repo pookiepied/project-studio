@@ -47,6 +47,7 @@ import {
   parsePurgeOutcome,
   parseOrphanSweepOutcome,
   parseOrphanTrees,
+  parseFolderTrust,
   parseSandboxScopeInfo,
   type ApprovalAnswer,
   type CapabilitySlot,
@@ -77,6 +78,7 @@ import {
   type ProviderModel,
   type PurgeOutcome,
   type ReasoningLevel,
+  type FolderTrust,
   type SandboxLevel,
   type SandboxScopeInfo,
   type SandboxScopeMode,
@@ -356,6 +358,13 @@ export interface HarnessClient {
   listPresets(): Promise<HarnessResult<readonly DetectedPreset[]>>
   /** Sets whether one project is contained at all. */
   setSandboxLevel(projectId: string, level: SandboxLevel): Promise<HarnessResult<void>>
+  /**
+   * Records the person's answer about one folder: whether they vouch for what
+   * is in it. Addressed by path rather than by project, because that is the
+   * unit the harness decides on - two projects that attach the same
+   * repository share one answer.
+   */
+  setFolderTrust(root: string, trusted: boolean): Promise<HarnessResult<FolderTrust>>
 }
 
 const MCP_PATH = '/api/mcp'
@@ -912,6 +921,10 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       return empty('PUT', `${SANDBOX_PATH}/projects/${encodeURIComponent(projectId)}/level`, {
         level,
       })
+    },
+
+    setFolderTrust(root, trusted) {
+      return json('PUT', `${SANDBOX_PATH}/trust`, { root, trusted }, parseFolderTrust)
     },
   }
 }

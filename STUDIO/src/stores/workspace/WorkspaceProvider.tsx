@@ -286,6 +286,16 @@ interface WorkspaceValue {
   }
 
   createProject: (input: NewProjectInput) => CreatedProject
+  /**
+   * Records that the person vouches for these folders.
+   *
+   * Separate from creating the project because the harness decides trust per
+   * folder rather than per project: two projects attaching the same
+   * repository share the one answer, and a folder keeps it when a project
+   * lets it go. Resolves to the first refusal, or null when every folder was
+   * written.
+   */
+  trustFolders: (paths: readonly string[]) => Promise<HarnessFailure | null>
   removeProject: (projectId: string) => void
   setBranch: (projectId: string, branch: string) => void
 
@@ -1111,6 +1121,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [load])
 
+  const trustFolders = useCallback(async (paths: readonly string[]): Promise<HarnessFailure | null> => {
+    const client = clientRef.current
+    if (client === null) return null
+    // In order and one at a time, stopping at the first refusal: the answer
+    // is per folder, so a project whose second folder is refused must still
+    // carry the answer about its first rather than losing the whole gesture.
+    for (const path of paths) {
+      const result = await client.setFolderTrust(path, true)
+      if (!result.ok) return result.error
+    }
+    return null
+  }, [])
+
   const removeProject = useCallback(
     (projectId: string) => {
       // Detaches its conversations rather than deleting them - SET NULL at
@@ -1187,6 +1210,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       markRunning,
       contextTokens,
       markContextTokens,
+      trustFolders,
       settings,
       setSettings,
       setConversationSettings,
@@ -1223,6 +1247,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       markRunning,
       contextTokens,
       markContextTokens,
+      trustFolders,
       orphanTrees,
       plans,
       questions,

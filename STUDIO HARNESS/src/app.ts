@@ -55,6 +55,7 @@ import { RetrievalSettingsStore } from "./retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
 import { ConversationTitler } from "./conversations/titling.js";
 import { ProjectStore } from "./projects/store.js";
+import { WorkspaceTrustStore } from "./permissions/trust.js";
 import { SandboxScopeStore } from "./sandbox/scope-store.js";
 
 interface HarnessApplication {
@@ -253,6 +254,13 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
     // where the policy is built and written from the settings pane and from
     // a scope question's answer.
     const scopes = new SandboxScopeStore(database);
+    // The answer to "do you vouch for this folder", which the permission
+    // kernel reads as a precondition ahead of every policy rule and every
+    // grant. The runtime holds a store of its own over the same table for the
+    // reading side; this one exists so the app can also *write* it, which
+    // until now nothing could - and an unwritten table means every project
+    // folder is undecided, so every project conversation could only read.
+    const trust = new WorkspaceTrustStore(database);
     // The automatic titling pass: watches the runtime for a conversation's
     // first exchange settling and writes the title agent's answer into the
     // index, once, while the row is still unnamed by a person. Subscribes
@@ -294,6 +302,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       conversations,
       projects,
       scopes,
+      trust,
       database,
       titling,
       admission: admission.verifier,

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Icons } from '@/components/icons'
-import { Button, Dialog, IconButton, TextArea, TextField } from '@/components/primitives'
+import { Button, Dialog, IconButton, Segmented, TextArea, TextField } from '@/components/primitives'
 import { StateNote } from '@/components/state/StateNote'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
 import { DEFAULT_PROJECT_ICON, PROJECT_ICONS, type ProjectIcon } from '@/domain/projects/types'
@@ -28,6 +28,16 @@ import { cn } from '@/lib/cn'
  * store says no. Outside the desktop app there is no picker, and the control
  * says so rather than inventing a path: a fabricated path that reaches the
  * store is the bug this dialog used to be.
+ *
+ * ---- Trust ----------------------------------------------------------------
+ *
+ * The folders are also where the trust question belongs, because this is the
+ * moment the person is looking at a directory and deciding to bring it in.
+ * Until that question is answered a conversation standing in the folder can
+ * only read, in every permission mode - so a project created without it looks
+ * broken in a way nothing on the chat page explains. Left unanswered here it
+ * stays unanswered rather than being assumed either way, and Environments is
+ * where it can be answered later.
  */
 
 /**
@@ -52,13 +62,17 @@ type Notice =
   | { readonly kind: 'refusal'; readonly text: string }
 
 export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { createProject } = useWorkspace()
+  const { createProject, trustFolders } = useWorkspace()
   const { openProject } = useNavigation()
 
   const [name, setName] = useState('')
   const [icon, setIcon] = useState<ProjectIcon>(DEFAULT_PROJECT_ICON)
   const [description, setDescription] = useState('')
   const [folders, setFolders] = useState<{ name: string; path: string }[]>([])
+  // Nothing is selected until the person selects it. A pre-ticked answer to
+  // "do you vouch for this code" is not an answer, and the whole reason trust
+  // is asked once about the folder is that it is meant to be deliberate.
+  const [trusted, setTrusted] = useState<'trusted' | 'not-yet' | 'unanswered'>('unanswered')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -76,6 +90,7 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
     setIcon(DEFAULT_PROJECT_ICON)
     setDescription('')
     setFolders([])
+    setTrusted('unanswered')
     setNotice(null)
     setSubmitting(false)
   }
@@ -118,6 +133,13 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
         setNotice({ kind: 'refusal', text: refusal.message })
         return
       }
+      // After the project, never before: the answer is about folders this
+      // person just attached, and writing it for a create that was refused
+      // would leave a decision behind with nothing to explain it. A refusal
+      // here is not worth holding the dialog open for - the project exists,
+      // and Environments states the folder's decision plainly - so the
+      // navigation happens either way.
+      if (trusted === 'trusted') void trustFolders(folders.map((folder) => folder.path))
       reset()
       onClose()
       openProject(project.id)
@@ -222,6 +244,32 @@ export function NewProjectDialog({ open, onClose }: { open: boolean; onClose: ()
             ) : null}
           </div>
         </Field>
+
+        {/* Not the `Field` above: that is a `label`, and a label wrapping a
+            radio group hands its whole text to the first radio as that
+            control's name. A heading and a group, which is what this is. */}
+        {folders.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-caption text-muted-foreground">Trust</span>
+            <div className="flex flex-col gap-1.5">
+              <Segmented
+                layoutId="new-project-trust"
+                ariaLabel="Trust these folders"
+                value={trusted}
+                onChange={setTrusted}
+                options={[
+                  { id: 'trusted', label: 'I trust these folders' },
+                  { id: 'not-yet', label: 'Not yet' },
+                ]}
+              />
+              <p className="text-micro text-muted-foreground/80">
+                {trusted === 'trusted'
+                  ? 'Conversations here can edit files and run commands, subject to the permission mode they are set to.'
+                  : 'Until a folder is trusted, conversations in this project can only read it - whatever permission mode they are set to. This can be answered later in Settings, under Environments.'}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
     </Dialog>
   )

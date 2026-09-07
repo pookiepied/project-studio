@@ -17,6 +17,10 @@ function usage(fields: {
       cacheRead: fields.cacheRead ?? null,
       cacheWrite: fields.cacheWrite ?? null,
       reasoning: null,
+      // Reported by some providers and deliberately unused: the figure is
+      // built from the parts, because a provider that sends a total without
+      // the cached parts would otherwise read as a nearly empty context.
+      totalTokens: null,
     },
   }
 }

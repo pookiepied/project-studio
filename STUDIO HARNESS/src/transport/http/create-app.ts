@@ -82,6 +82,15 @@ export interface CreateHttpAppOptions {
    * scope table also wants, and production must not be.
    */
   readonly scopes?: import("../../sandbox/scope-store.js").SandboxScopeStore;
+  /**
+   * The folder decisions, over the same database. Wired beside `scopes`
+   * because the sandbox routes serve both, and optional for the same reason:
+   * a composition without it answers no trust question, and production must
+   * not be that composition - without it every project folder stays
+   * undecided, which means read-only forever with nothing able to say
+   * otherwise.
+   */
+  readonly trust?: import("../../permissions/trust.js").WorkspaceTrustStore;
   readonly admission: AdmissionVerifier;
   /**
    * Answers whether the catalog currently serves a model reference. Settling a
@@ -128,7 +137,14 @@ export function createHttpApp(options: CreateHttpAppOptions): Hono<AdmissionEnv>
   app.route("/api/conversations", createConversationRoutes(options));
   app.route("/api/projects", createProjectRoutes(options));
   if (options.scopes !== undefined) {
-    app.route("/api/sandbox", createSandboxRoutes({ scopes: options.scopes, projects: options.projects }));
+    app.route(
+      "/api/sandbox",
+      createSandboxRoutes({
+        scopes: options.scopes,
+        projects: options.projects,
+        ...(options.trust === undefined ? {} : { trust: options.trust }),
+      }),
+    );
   }
   app.route("/api", createLifecycleRoutes({ requestShutdown: options.requestShutdown }));
 

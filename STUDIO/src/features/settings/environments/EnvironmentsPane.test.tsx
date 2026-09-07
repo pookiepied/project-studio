@@ -1,12 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EnvironmentsPane } from './EnvironmentsPane'
 import type { EnvironmentsView } from './useEnvironments'
-import type { SandboxScopeRow } from '@/platform/harness'
+import type { FolderTrust, SandboxScopeRow } from '@/platform/harness'
 
 /**
  * The two holes Task 57 left in this pane, and the words around them.
@@ -33,6 +33,7 @@ const environments = vi.hoisted(() => {
     grantPreset: vi.fn(async () => null),
     grantCustom: vi.fn(async () => null),
     revoke: vi.fn(async () => null),
+    setTrust: vi.fn(async () => null),
   }
 })
 
@@ -65,6 +66,7 @@ function scopeRow(path: string, projectId: string): SandboxScopeRow {
 function ready(scope: {
   readonly project?: readonly SandboxScopeRow[]
   readonly machineWide?: readonly SandboxScopeRow[]
+  readonly trust?: readonly FolderTrust[]
 }): void {
   environments.view = {
     status: 'ready',
@@ -83,6 +85,7 @@ function ready(scope: {
       project: scope.project ?? [],
       machineWide: scope.machineWide ?? [],
       level: 'contained',
+      trust: scope.trust ?? [],
     },
     presets: [
       {
@@ -100,7 +103,7 @@ function noProjects(): void {
     status: 'ready',
     projects: [],
     projectId: null,
-    scope: { project: [], machineWide: [], level: 'contained' },
+    scope: { project: [], machineWide: [], level: 'contained', trust: [] },
     presets: [
       {
         id: 'git',
@@ -201,5 +204,36 @@ describe('EnvironmentsPane', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Granted here and everywhere (revoke)' }))
     expect(environments.revoke).toHaveBeenCalledWith('prj_a', GIT)
     expect(environments.revoke).toHaveBeenCalledWith('', GIT)
+  })
+})
+
+/**
+ * The gate nobody could answer.
+ *
+ * `workspace_trust` was read before every policy rule and written by nothing,
+ * so a conversation in a project folder could only read, in every permission
+ * mode. This section is where an existing project answers it.
+ */
+describe('folder trust', () => {
+  const FOLDER: FolderTrust = { root: 'C:\\Work\\alpha', name: 'alpha', decision: 'undecided' }
+
+  it('says plainly why the project can only read, and takes the answer', () => {
+    ready({ trust: [FOLDER] })
+    render(<EnvironmentsPane />)
+
+    expect(screen.getByText('This project can only read')).toBeTruthy()
+    // Scoped to the folder's own group: the level control below offers a
+    // `Trusted` of its own, and the two answers are not the same question.
+    const group = screen.getByRole('radiogroup', { name: 'Trust alpha' })
+    fireEvent.click(within(group).getByRole('radio', { name: 'Trusted' }))
+
+    expect(environments.setTrust).toHaveBeenCalledWith(FOLDER.root, true)
+  })
+
+  it('drops the warning once every folder is vouched for', () => {
+    ready({ trust: [{ ...FOLDER, decision: 'trusted' }] })
+    render(<EnvironmentsPane />)
+
+    expect(screen.queryByText('This project can only read')).toBeNull()
   })
 })

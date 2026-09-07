@@ -30,6 +30,12 @@ export interface Environments {
   refresh: () => Promise<void>
   selectProject: (projectId: string | null) => Promise<void>
   setLevel: (projectId: string, level: SandboxLevel) => Promise<HarnessFailure | null>
+  /**
+   * The person's answer about one folder, by path. Not by project: the
+   * harness decides trust per folder, so two projects attaching the same
+   * repository share the one answer and this reload shows it in both.
+   */
+  setTrust: (root: string, trusted: boolean) => Promise<HarnessFailure | null>
   grantPreset: (
     projectId: string,
     presetId: string,
@@ -151,6 +157,7 @@ export function useEnvironments(): Environments {
     refresh,
     selectProject,
     setLevel: (id, level) => mutate((handle) => handle.setSandboxLevel(id, level)),
+    setTrust: (root, trusted) => mutate((handle) => handle.setFolderTrust(root, trusted)),
     grantPreset: (id, presetId, path, mode) =>
       mutate((handle) => handle.grantScope({ projectId: id, path, mode, source: 'preset', presetId })),
     grantCustom: (id, path, mode) =>
