@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { contextBreakdown, contextReport, measuredTotal } from '@/domain/session/context'
+import { contextBreakdown, contextReport, formatTokens, measuredTotal } from '@/domain/session/context'
 import type { ContextReport } from '@/domain/session/context'
 
 /** The measured total, refusing rather than asserting when nothing measured. */
@@ -133,5 +133,33 @@ describe('the breakdown against a window', () => {
     const over = contextBreakdown({ measured: { fresh: 500_000, cached: 0, reply: 0 }, pending: 0 }, 200_000)
     expect(over.used).toBe(1)
     expect(over.free).toBe(0)
+  })
+})
+
+describe('a token count as a person reads it', () => {
+  it('leaves a count under a thousand exactly as it is', () => {
+    // Shorter than any abbreviation of it, and exact costs nothing here.
+    expect(formatTokens(0)).toBe('0')
+    expect(formatTokens(840)).toBe('840')
+    expect(formatTokens(999)).toBe('999')
+  })
+
+  it('keeps one decimal where the decimal is the whole story', () => {
+    expect(formatTokens(1_000)).toBe('1k')
+    expect(formatTokens(1_150)).toBe('1.2k')
+    expect(formatTokens(9_400)).toBe('9.4k')
+  })
+
+  it('drops the decimal once it is noise', () => {
+    expect(formatTokens(11_600)).toBe('12k')
+    expect(formatTokens(264_000)).toBe('264k')
+  })
+
+  it('reads a window in the units the window is quoted in', () => {
+    // A model advertises a 1M window, never a 1,000k one.
+    expect(formatTokens(1_000_000)).toBe('1M')
+    expect(formatTokens(1_500_000)).toBe('1.5M')
+    expect(formatTokens(2_000_000)).toBe('2M')
+    expect(formatTokens(999_600)).toBe('1M')
   })
 })

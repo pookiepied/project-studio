@@ -162,3 +162,43 @@ export function contextBreakdown(
     used: Math.min(1, total / window),
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Reading the numbers                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** One decimal place, with a trailing zero dropped: 1.0 reads as 1. */
+function shorten(value: number): string {
+  return String(Math.round(value * 10) / 10)
+}
+
+/**
+ * A token count as a person reads it.
+ *
+ * `11,600` and `1,000,000` are numbers to calculate with; nobody calculates
+ * with these. What a reader wants from the context meter is a magnitude they
+ * can compare at a glance - is this a tenth of the window or most of it - and
+ * seven digits are actively worse at that than two characters, because the
+ * eye has to count the groups before it knows the size.
+ *
+ * So: under a thousand is itself, because at that size the exact figure is
+ * shorter than any abbreviation of it. Below ten thousand keeps one decimal,
+ * where the difference between 1.2k and 9.4k is the whole story. Above that
+ * the decimal is noise and it rounds to whole thousands. A million or more
+ * reads in millions, because that is how the windows themselves are quoted -
+ * a model advertises a 1M window, never a 1,000k one.
+ *
+ * The rounding is deliberately allowed to be visible: 999,600 reads as 1M
+ * rather than 1000k, because the alternative is a unit nobody uses.
+ */
+export function formatTokens(value: number): string {
+  const rounded = Math.max(0, Math.round(value))
+  if (rounded < 1_000) return String(rounded)
+
+  const millions = Math.round((rounded / 1_000_000) * 10) / 10
+  if (millions >= 1) return `${shorten(millions)}M`
+
+  const thousands = rounded / 1_000
+  if (thousands < 10) return `${shorten(thousands)}k`
+  return `${Math.round(thousands)}k`
+}

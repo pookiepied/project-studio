@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Popover } from '@/components/primitives'
-import { measuredTotal, type ContextBreakdown } from '@/domain/session/context'
+import { formatTokens, measuredTotal, type ContextBreakdown } from '@/domain/session/context'
 import { cn } from '@/lib/cn'
 
 /**
@@ -106,11 +106,6 @@ export function ContextMeter({
   )
 }
 
-/** Thousands separated, because these numbers are read, not calculated with. */
-function tokens(value: number): string {
-  return value.toLocaleString()
-}
-
 interface Band {
   readonly id: string
   readonly label: string
@@ -170,7 +165,7 @@ function ContextPanel({
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-ui text-foreground">Context</span>
           <span className="text-caption tabular-nums text-muted-foreground">
-            {tokens(total)} / {tokens(size)}
+            {formatTokens(total)} / {formatTokens(size)}
           </span>
         </div>
 
@@ -198,7 +193,7 @@ function ContextPanel({
               </span>
               <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
                 {band.estimated === true ? '~' : ''}
-                {tokens(band.value)}
+                {formatTokens(band.value)}
               </span>
             </div>
             <span className="pl-3.5 text-micro text-muted-foreground/80">{band.note}</span>
@@ -207,13 +202,13 @@ function ContextPanel({
 
         <li className="flex items-baseline justify-between gap-2 border-t pt-2">
           <span className="text-caption text-muted-foreground">Free</span>
-          <span className="text-caption tabular-nums text-muted-foreground">{tokens(free)}</span>
+          <span className="text-caption tabular-nums text-muted-foreground">{formatTokens(free)}</span>
         </li>
       </ul>
 
       {measured !== null && measured.cached > 0 ? (
         <p className="text-micro text-muted-foreground/80">
-          {tokens(measured.cached)} of the {tokens(measuredTotal(measured) - measured.reply)} sent
+          {formatTokens(measured.cached)} of the {formatTokens(measuredTotal(measured) - measured.reply)} sent
           came from the cache. It occupies the window the same way; it is only cheaper.
         </p>
       ) : null}
@@ -221,7 +216,7 @@ function ContextPanel({
       <p className="text-micro text-muted-foreground/80">
         {windowDeclared
           ? `Measured against the window ${modelName ?? 'the selected model'} declares.`
-          : `${modelName ?? 'The selected model'} declares no window, so ${tokens(size)} stands in for one.`}
+          : `${modelName ?? 'The selected model'} declares no window, so ${formatTokens(size)} stands in for one.`}
       </p>
     </div>
   )

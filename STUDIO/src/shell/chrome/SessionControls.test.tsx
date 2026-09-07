@@ -39,12 +39,12 @@ describe('the context panel', () => {
   it('divides the window into what was sent, what came back, and what is free', () => {
     open({ fresh: 10_000, cached: 30_000, reply: 2_000 }, 0)
 
-    expect(screen.getByText('42,000 / 200,000')).toBeTruthy()
+    expect(screen.getByText('42k / 200k')).toBeTruthy()
     // The prompt is one figure to a reader, however the provider split it for
     // billing: 10,000 fresh plus 30,000 from cache is 40,000 sent.
-    expect(screen.getByText('40,000')).toBeTruthy()
-    expect(screen.getByText('2,000')).toBeTruthy()
-    expect(screen.getByText('158,000')).toBeTruthy()
+    expect(screen.getByText('40k')).toBeTruthy()
+    expect(screen.getByText('2k')).toBeTruthy()
+    expect(screen.getByText('158k')).toBeTruthy()
   })
 
   it('marks the unmeasured tail as an estimate rather than letting it pass', () => {
