@@ -1,4 +1,4 @@
-import type { UsageFacts } from '@/platform/harness'
+import type { MeasuredContextUsage, UsageFacts } from '@/platform/harness'
 
 /**
  * How much of the context window a conversation is using.
@@ -100,32 +100,80 @@ interface TranscriptLike {
 }
 
 /**
- * The report for one transcript.
+ * The report for one transcript, given what the harness measured for it.
  *
- * Walks back to the last item carrying usage, takes that as the measurement,
- * and estimates everything after it. A transcript with no usage anywhere is
- * all estimate, which is a conversation whose first reply has not landed.
+ * ---- Why the measurement arrives from outside ------------------------------
+ *
+ * It used to be read off the transcript items, which carry a `usage` field.
+ * That field is never populated: Flue 2.0 stamps no usage into message
+ * metadata and its `message-completed` chunk carries none, so the walk below
+ * always fell through to the estimate at the bottom. The estimate is
+ * characters over the text that was rendered, and the text that was rendered
+ * is not the request that was sent - no system prompt, no tool definitions,
+ * no tool inputs or results, no images. On an agentic turn the tool traffic is
+ * most of the prompt, and the figure came out about half of the provider's own.
+ *
+ * So the measurement now comes from the harness, which sees the provider's
+ * report on the observation stream. `measured` is the whole of the last
+ * request; the transcript is still walked, but only to find where that request
+ * ended so the tail after it can be estimated.
+ *
+ * ---- Why the tail is still an estimate -------------------------------------
+ *
+ * Because nothing has measured it yet. Between a message being sent and its
+ * turn reporting, the only thing that exists is text. That estimate is the
+ * small end of the number now rather than the whole of it, and it is labelled
+ * as an estimate where it is shown.
  */
-export function contextReport(items: readonly TranscriptLike[]): ContextReport {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const usage = items[index]?.usage
-    if (usage === undefined || usage === null) continue
-    const fresh = usage.input ?? 0
-    const cached = (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
-    const reply = usage.output ?? 0
-    if (fresh + cached + reply === 0) continue
-    let characters = 0
-    for (let after = index + 1; after < items.length; after += 1) {
-      characters += itemCharacters(items[after])
-    }
-    return {
-      measured: { fresh, cached, reply },
-      pending: Math.round(characters / CHARS_PER_TOKEN),
+export function contextReport(
+  items: readonly TranscriptLike[],
+  measured?: MeasuredContextUsage | null,
+  /**
+   * Whether a turn is in flight. This is what says where the measurement
+   * stops, and the transcript cannot: a settled conversation and one halfway
+   * through a reply look the same in it. At rest the measurement covers
+   * everything, because it is re-read the moment a turn ends. While one runs
+   * it is the previous request's, so what has arrived since - the message just
+   * sent, the reply still streaming - is the unmeasured tail.
+   */
+  running = false,
+): ContextReport {
+  if (measured !== undefined && measured !== null) {
+    const fresh = measured.input
+    const cached = measured.cacheRead + measured.cacheWrite
+    const reply = measured.output
+    if (fresh + cached + reply > 0) {
+      return {
+        measured: { fresh, cached, reply },
+        pending: running ? Math.round(charactersSinceLastSend(items) / CHARS_PER_TOKEN) : 0,
+      }
     }
   }
+
   let characters = 0
   for (const item of items) characters += itemCharacters(item)
   return { measured: null, pending: Math.round(characters / CHARS_PER_TOKEN) }
+}
+
+/**
+ * What has arrived since the person last spoke.
+ *
+ * The last user message is where the running turn began, so it and everything
+ * after it is what the held measurement predates. Counted from the message
+ * itself rather than from the item after it, because the message is part of
+ * the prompt the next request carries.
+ */
+function charactersSinceLastSend(items: readonly TranscriptLike[]): number {
+  let from = items.length
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.kind === 'user') {
+      from = index
+      break
+    }
+  }
+  let characters = 0
+  for (let at = from; at < items.length; at += 1) characters += itemCharacters(items[at])
+  return characters
 }
 
 /** One turn's measured total: the whole prompt plus what it produced. */

@@ -27,6 +27,8 @@
 import {
   parseHarnessErrorBody,
   parseConversationRecord,
+  parseMeasuredContextUsage,
+  type MeasuredContextUsage,
   parseConversationRecords,
   parseDetectedPresets,
   parseLibraryProviders,
@@ -260,6 +262,15 @@ export interface HarnessClient {
     readonly text: string
   }): Promise<HarnessResult<{ readonly audio: string; readonly mimeType: string }>>
 
+  /**
+   * The provider's own figure for what one conversation's last request sent.
+   *
+   * A route of its own rather than a field on the record: it changes on every
+   * model request while the row changes on none of them. A conversation
+   * nothing has measured answers null, which is an ordinary state and not a
+   * failure - the caller estimates instead.
+   */
+  conversationContext(id: string): Promise<HarnessResult<MeasuredContextUsage | null>>
   listConversations(): Promise<HarnessResult<readonly ConversationRecord[]>>
   createConversation(draft: ConversationCreateDraft): Promise<HarnessResult<ConversationRecord>>
   updateConversation(
@@ -734,6 +745,15 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
 
     speak(input) {
       return json('POST', `${MEDIA_PATH}/speech`, input, parseSpeechResult, 150_000)
+    },
+
+    conversationContext(id) {
+      return json(
+        'GET',
+        `${CONVERSATIONS_PATH}/${encodeURIComponent(id)}/context`,
+        undefined,
+        parseMeasuredContextUsage,
+      )
     },
 
     listConversations() {

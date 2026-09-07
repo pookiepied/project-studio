@@ -178,6 +178,8 @@ export {
   type SandboxScopeRow,
   type SandboxScopeSource,
   type WireStreamEvent,
+  parseMeasuredContextUsage,
+  type MeasuredContextUsage,
 } from './contracts'
 
 export {

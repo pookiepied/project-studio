@@ -54,6 +54,7 @@ import { RetrievalManagementService } from "./application/retrieval-management.j
 import { RetrievalSettingsStore } from "./retrieval/settings.js";
 import { ConversationStore } from "./conversations/store.js";
 import { ConversationTitler } from "./conversations/titling.js";
+import { ContextUsageTracker } from "./conversations/context-usage.js";
 import { ProjectStore } from "./projects/store.js";
 import { WorkspaceTrustStore } from "./permissions/trust.js";
 import { SandboxScopeStore } from "./sandbox/scope-store.js";
@@ -271,6 +272,12 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       logger: observability.logger,
     });
     titling.start();
+    // The measured context, from the same process-global bus and for the same
+    // reason it is subscribed here rather than deeper: a run's own usage is
+    // reported to the observer, not to the transcript, and the webview cannot
+    // see it any other way. Stopped in the drain below beside the titler.
+    const contextUsage = new ContextUsageTracker();
+    contextUsage.start();
     bootLog("step 10: conversation and project stores completed");
 
     let shutdownPromise: Promise<void> | undefined;
@@ -279,6 +286,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
         admission?.verifier.invalidate();
         try {
           titling.stop();
+          contextUsage.stop();
           // Awaited: MCP servers run in the project directory, and returning
           // before they are gone leaves them orphaned.
           await runtime.stop();
@@ -305,6 +313,7 @@ async function createHarnessApplication(): Promise<HarnessApplication> {
       trust,
       database,
       titling,
+      contextUsage,
       admission: admission.verifier,
       // The same list the model picker is filled from: a submission's model
       // reference is settled against it at admission, so a choice the catalog

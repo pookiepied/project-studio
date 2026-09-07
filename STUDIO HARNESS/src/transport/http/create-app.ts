@@ -17,6 +17,7 @@ import type { StudioDatabase } from "../../storage/database.js";
 import { createAdmissionMiddleware, requireAdmissionScope, type AdmissionEnv } from "./middleware/admission.js";
 import { createTurnSettingsMiddleware } from "./middleware/turn-settings.js";
 import type { ConversationTitlingPort } from "../../conversations/titling.js";
+import type { ContextUsageTracker } from "../../conversations/context-usage.js";
 import { createConversationRoutes } from "./routes/conversations.js";
 import { createLifecycleRoutes } from "./routes/lifecycle.js";
 import { createMediaRoutes } from "./routes/media.js";
@@ -62,6 +63,12 @@ export interface CreateHttpAppOptions {
   readonly plans?: PlanItemStore;
   /** The conversation index: rows, never transcript content. */
   readonly conversations: ConversationStore;
+  /**
+   * The measured context usage per conversation, when something is watching
+   * the runtime for it. `createConversationRoutes` reads it through
+   * `options`, so this only has to reach the shape it declares.
+   */
+  readonly contextUsage?: ContextUsageTracker;
   /**
    * The application database. The conversation routes own the purge of
    * conversation-scoped rows through it; everything else keeps reaching only

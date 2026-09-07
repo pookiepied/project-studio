@@ -39,60 +39,87 @@ function said(text: string) {
   return { kind: 'user', text }
 }
 
+/** What the harness reports, which is what the provider actually measured. */
+function measured(fields: {
+  input?: number
+  cacheRead?: number
+  cacheWrite?: number
+  output?: number
+}) {
+  return {
+    input: fields.input ?? 0,
+    cacheRead: fields.cacheRead ?? 0,
+    cacheWrite: fields.cacheWrite ?? 0,
+    output: fields.output ?? 0,
+    observedAt: 1_000,
+  }
+}
+
 describe('the measured half', () => {
   it('counts the cached parts of the prompt, not just the fresh ones', () => {
-    // The whole point. The wire reports cacheRead apart from input, so a long
+    // The whole point. The provider reports cacheRead and cacheWrite apart
+    // from input, and all three are prompt occupying the window - so a long
     // conversation being served from cache would otherwise read as nearly
     // empty however far it had gone.
-    const report = contextReport([usage({ input: 500, cacheRead: 40_000, output: 900 })])
+    const report = contextReport(
+      [],
+      measured({ input: 500, cacheRead: 39_000, cacheWrite: 1_000, output: 900 }),
+    )
     expect(report.measured).toEqual({ fresh: 500, cached: 40_000, reply: 900 })
     expect(total(report)).toBe(41_400)
   })
 
-  it('takes the last turn rather than summing the conversation', () => {
-    // Every request after the first re-sends the whole history, so usage is
-    // not additive: summing counts the same tokens once per turn and reads
-    // far over the truth. 30_000 is the second turn alone, not 42_000.
-    const report = contextReport([
-      usage({ input: 12_000, output: 400 }),
-      usage({ input: 29_000, output: 1_000 }),
-    ])
-    expect(total(report)).toBe(30_000)
-  })
+  it('takes the figure the harness measured rather than the transcript on screen', () => {
+    // The transcript is not the request. The system prompt, the tool
+    // definitions, every tool input and result and every image are in the
+    // prompt and not on screen, and on an agentic turn they are most of it.
+    // Reading the rendered text gave about half the provider's own number,
+    // which is the entire reason the measurement is fetched.
+    const transcript = [said('hi'), { kind: 'assistant', segments: [{ kind: 'text', text: 'ok' }] }]
 
-  it('reaches past items that carry no usage', () => {
-    const report = contextReport([usage({ input: 8_000, output: 200 }), { kind: 'user', text: '' }])
-    expect(total(report)).toBe(8_200)
+    expect(total(contextReport(transcript, measured({ input: 114_748 })))).toBe(114_748)
   })
 
   it('measures nothing at all before a turn has reported', () => {
     // A conversation whose first reply is still arriving has no measurement.
     // Zero would be a claim; null lets the panel say the figure is estimated.
-    expect(contextReport([]).measured).toBe(null)
-    expect(contextReport([said('hello')]).measured).toBe(null)
-    expect(contextReport([usage({})]).measured).toBe(null)
+    expect(contextReport([], null).measured).toBe(null)
+    expect(contextReport([said('hello')], undefined).measured).toBe(null)
+    expect(contextReport([said('hello')], measured({})).measured).toBe(null)
+  })
+
+  it('ignores the usage field the transcript carries, which is never filled', () => {
+    // Flue 2.0 stamps no usage into message metadata and `message-completed`
+    // carries none either, so this field is always null on the wire. Reading
+    // it was what left the figure estimated; a transcript that somehow had one
+    // must still not be preferred over the harness's measurement.
+    expect(contextReport([usage({ input: 8_000, output: 200 })], null).measured).toBe(null)
   })
 })
 
 describe('the estimated half', () => {
-  it('estimates only what came after the last turn that reported', () => {
-    // The measured turn already accounts for everything up to itself. Adding
-    // an estimate of that same history on top would double-count the whole
-    // conversation, which is the mistake this split exists to prevent.
-    const report = contextReport([
-      said('a'.repeat(4_000)),
-      usage({ input: 9_000, output: 500 }),
-      said('b'.repeat(400)),
-    ])
+  it('adds no estimate to a settled conversation', () => {
+    // The measurement is re-read the moment a turn ends, so at rest it already
+    // accounts for the whole transcript. Estimating it again on top would
+    // double-count the conversation against itself, which is the mistake this
+    // split exists to prevent.
+    const report = contextReport(
+      [said('a'.repeat(4_000)), { kind: 'assistant', segments: [{ kind: 'text', text: 'r' }] }],
+      measured({ input: 9_000, output: 500 }),
+    )
+
     expect(total(report)).toBe(9_500)
-    expect(report.pending).toBe(100)
+    expect(report.pending).toBe(0)
   })
 
   it('estimates the whole transcript while nothing has reported', () => {
-    expect(contextReport([said('c'.repeat(800))]).pending).toBe(200)
+    expect(contextReport([said('c'.repeat(800))], null).pending).toBe(200)
   })
 
-  it('counts what a reply has said so far, so the ring moves as it streams', () => {
+  it('counts a streaming reply, so the figure moves before the turn settles', () => {
+    // Between sending and the turn reporting, text is all there is. The
+    // measurement is of the previous request, so what has arrived since is
+    // the tail.
     const streaming = {
       kind: 'assistant',
       segments: [
@@ -102,9 +129,20 @@ describe('the estimated half', () => {
         // transcript's to count and the wire never showed it here.
         { kind: 'tools' },
       ],
-      usage: null,
     }
-    expect(contextReport([usage({ input: 100, output: 4 }), streaming]).pending).toBe(100)
+    const report = contextReport(
+      [
+        { kind: 'assistant', segments: [{ kind: 'text', text: 'o'.repeat(4_000) }] },
+        said('n'.repeat(400)),
+        streaming,
+      ],
+      measured({ input: 100, output: 4 }),
+      true,
+    )
+
+    // The message just sent plus what has streamed back: 400 + 400 characters.
+    // Not the settled reply above it, which the measurement already counted.
+    expect(report.pending).toBe(200)
   })
 })
 

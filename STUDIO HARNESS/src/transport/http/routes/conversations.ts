@@ -17,6 +17,7 @@ import {
   sweepOrphanConversationTrees,
 } from "../../../conversations/purge.js";
 import type { ConversationStore } from "../../../conversations/store.js";
+import type { ConversationUsage } from "../../../conversations/context-usage.js";
 import type { StudioDatabase } from "../../../storage/database.js";
 import { StorageError } from "../../../storage/errors.js";
 import { resolveFlueJournalPath } from "../../../storage/flue-journal.js";
@@ -27,6 +28,14 @@ export interface ConversationRoutesOptions {
   readonly conversations: ConversationStore;
   /** The application database, for the conversation-scoped purge writes. */
   readonly database: StudioDatabase;
+  /**
+   * The measured context usage per conversation, when the runtime is watching
+   * for it. Absent in a composition with no Flue behind it - the route then
+   * answers "nothing measured", which is what the webview already handles.
+   */
+  readonly contextUsage?: {
+    get(conversationId: string): ConversationUsage | undefined;
+  };
 }
 
 /**
@@ -100,6 +109,25 @@ export function createConversationRoutes(
   // Creation happens on an admission receipt, never before it: a first send
   // the harness refuses reaches no route here at all, and a record created by
   // hand for an id no stream answers to stays possible and never load-bearing.
+  /**
+   * What one conversation's last turn actually sent.
+   *
+   * A read of a measurement, not of the index, so it is a route of its own
+   * rather than a field on the record: the number changes on every model
+   * request while the row it would hang off changes on none of them, and
+   * folding it in would make every conversation list carry a figure that is
+   * stale by the time it is rendered.
+   *
+   * A conversation nobody has measured answers 200 with a null rather than
+   * 404. It is a real and ordinary state - a conversation whose first reply
+   * has not landed, or one resumed after a restart - and the caller's job in
+   * that case is to fall back to its estimate, which is not an error path.
+   */
+  routes.get("/:id/context", (context) => {
+    const measured = options.contextUsage?.get(context.req.param("id"));
+    return context.json({ usage: measured ?? null });
+  });
+
   routes.post("/", async (context) => {
     try {
       const input = parseBody(conversationCreateSchema, await body(context));

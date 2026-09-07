@@ -19,6 +19,11 @@ import { usePlan } from '@/features/plans/usePlan'
 import { planEntryId, useRail } from '@/stores/rail'
 import { GALLERY_CONVERSATION_ID } from '@/domain/session/gallery'
 import { contextReport } from '@/domain/session/context'
+import {
+  createHarnessClient,
+  resolveHarnessAddress,
+  type MeasuredContextUsage,
+} from '@/platform/harness'
 import { effectiveTurnSettings } from '@/domain/session/settings'
 import { turnSettingsToWire } from '@/platform/harness'
 import { useNavigation } from '@/stores/navigation'
@@ -130,6 +135,35 @@ export function ChatPage({
     // every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gallery, conversation.id, sending, live.phase.status, markRunning])
+  // The provider's own figure for the last request, which is the only honest
+  // answer to "how full is the window". Fetched rather than derived: it is
+  // measured where the request is made and reaches the webview by no other
+  // route - the transcript's own `usage` field is never populated under Flue
+  // 2.0, which is what left this page estimating from rendered characters and
+  // reporting about half the real number.
+  //
+  // Re-fetched when a turn stops running, because that is when a new figure
+  // exists. Not polled while one runs: the number cannot change until a model
+  // request completes, and the estimate below covers the gap in the meantime.
+  const [measuredContext, setMeasuredContext] = useState<MeasuredContextUsage | null>(null)
+  const running = isTurnRunning(live.phase)
+  useEffect(() => {
+    if (gallery) return
+    let watching = true
+    void (async () => {
+      const address = await resolveHarnessAddress()
+      if (address === null || !watching) return
+      const result = await createHarnessClient(address).conversationContext(conversation.id)
+      // The conversation may have changed under us while the request was in
+      // flight; a figure from the previous one is worse than none.
+      if (!watching || !result.ok) return
+      setMeasuredContext(result.value)
+    })()
+    return () => {
+      watching = false
+    }
+  }, [gallery, conversation.id, running])
+
   // What the history costs, reported to the store so the top strip can show
   // it. This page is the only witness: the strip has no transcript of its
   // own, exactly as with the working mark. Recomputed on every delivery, so
@@ -138,8 +172,8 @@ export function ChatPage({
   // is what keeps a streamed delta from re-rendering the strip.
   useEffect(() => {
     if (gallery) return
-    markContextReport(conversation.id, contextReport(live.items))
-  }, [gallery, conversation.id, live.items, markContextReport])
+    markContextReport(conversation.id, contextReport(live.items, measuredContext, running))
+  }, [gallery, conversation.id, live.items, measuredContext, running, markContextReport])
 
   const { viewport, pinned, onScroll, onWheel, onPointerDown, onKeyDown, scrollToBottom } =
     useAutoScroll(gallery ? conversation.messages : live.items, conversation.id)
