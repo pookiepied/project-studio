@@ -179,17 +179,40 @@ describe("the failure taxonomy is actually adopted", () => {
   // remembered it.
 
   it("routes every error class in src through StudioError", async () => {
+    // The pattern is deliberately wider than the shape it is looking for, and
+    // both widenings were bought by a real miss.
+    //
+    // It first read `export class (\w*Error) extends (\w+)`, which anchored on
+    // two things that are conventions rather than rules. `export` missed a
+    // class used only inside its own module, and `\w*Error` missed any class
+    // whose name does not end in `Error`. `MediaRouteError` in
+    // `transport/http/routes/media.ts` was both — file-local, so unexported —
+    // and it extended bare `Error`, which meant every malformed body that route
+    // rejected reported as `unclassified` in an HTTP response. The sibling rule
+    // below could not see it either, because it is constructed as
+    // `new MediaRouteError(...)` and never as `new Error(...)`.
+    //
+    // So this now matches any class extending anything, and filters by the base
+    // instead of by the name. Every error class in `src` extends `StudioError`
+    // directly today, so the rule demands exactly that; if a domain class ever
+    // grows a subclass of its own, this is the line that has to learn about it,
+    // which is the right place for that decision to surface.
     const offenders: string[] = [];
 
     for (const path of await sourceFiles()) {
       const source = await readFile(path, "utf8");
       for (const match of source.matchAll(
-        /export class (\w*Error) extends (\w+)/g,
+        /(?:^|\n)\s*(?:export\s+)?(?:abstract\s+)?class (\w+) extends (\w+)/g,
       )) {
         const [, name, base] = match;
-        if (base !== "StudioError") {
-          offenders.push(`${name} extends ${base} in ${path}`);
-        }
+        if (name === undefined || base === undefined) continue;
+        if (name === "StudioError") continue;
+        // A class extending something that is not an error at all is not this
+        // rule's business; the test is whether anything named or shaped like an
+        // error takes a base outside the taxonomy.
+        if (!/Error|Exception/.test(name) && !/Error|Exception/.test(base)) continue;
+        if (base === "StudioError") continue;
+        offenders.push(`${name} extends ${base} in ${path}`);
       }
     }
 

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 
@@ -371,6 +371,14 @@ describe("every program a line names is authorized", () => {
   });
 
   it("runs nothing when one of the named programs is declined", async () => {
+    // The name promises more than a rejection, so the allowed half of the line
+    // leaves evidence: it writes a file, and the assertion is that the file is
+    // not there afterwards. Asserting only that the call rejects would pass
+    // just as well against a gate that ran `node`, then hit `curl`, and threw -
+    // which is the exact bug the authorize-before-run design exists to prevent
+    // and the one this test is named after.
+    const witness = join(workspace, "declined-witness.txt");
+
     const kernel = new PermissionKernel({
       grants: new PermissionGrantStore(db),
       approver: {
@@ -397,10 +405,16 @@ describe("every program a line names is authorized", () => {
     await expect(
       instance.call({
         name: "native/shell",
-        input: { command: `${NODEQ} -e "0" && curl example.com` },
+        input: {
+          command: `${NODEQ} -e "require('fs').writeFileSync(process.argv[1],'ran')" ${JSON.stringify(witness)} && curl example.com`,
+        },
         scope: SCOPE,
       }),
     ).rejects.toThrow(/declined/i);
+
+    // The half that was approved still never ran, because the whole line is
+    // authorized before any of it starts.
+    expect(existsSync(witness)).toBe(false);
   });
 
   it("checks the programs on both sides of a pipe", async () => {

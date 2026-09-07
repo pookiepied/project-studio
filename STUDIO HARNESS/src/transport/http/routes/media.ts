@@ -7,6 +7,7 @@ import {
   speechRequestSchema,
   transcribeRequestSchema,
 } from "../../../contracts/media.js";
+import { StudioError } from "../../../contracts/errors.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
 import type { MediaAdministration } from "../../../media/service.js";
 
@@ -33,8 +34,28 @@ async function body(context: { req: { json(): Promise<unknown> } }): Promise<unk
   }
 }
 
-/** A body that failed its contract - a 400 with a sentence, like retrieval's. */
-class MediaRouteError extends Error {}
+/**
+ * A body that failed its contract - a 400 with a sentence, like retrieval's.
+ *
+ * It extends `StudioError` rather than `Error` so the sentence it carries
+ * reports as `media.bad-request` instead of landing in the `unclassified`
+ * domain, which is meant to measure code that has not been onboarded rather
+ * than to be the permanent home of code that never was. The taxonomy scan in
+ * `architecture.test.ts` could not see this one: it was not exported, so the
+ * rule anchored on `export class` skipped it, and it was only ever constructed
+ * under its own name, so the rule that looks for the unclassified constructors
+ * skipped it too. Both rules have been widened alongside this fix.
+ */
+class MediaRouteError extends StudioError {
+  readonly domain = "media" as const;
+
+  constructor(message: string) {
+    // Not retryable: the same body sent again fails the same way. Only the
+    // caller changing what it sends can fix this.
+    super("bad-request", message, { retryable: false });
+    this.name = "MediaRouteError";
+  }
+}
 
 function failure(error: unknown): { error: string; code: string } {
   const report = toErrorReport(error);
@@ -92,9 +113,14 @@ function bytesOf(base64: string): Uint8Array {
 }
 
 /**
- * The route's own malformed-body error is a request fault (400); everything a
- * StudioError carries has its own meaning and reports as 502 - the far end or
- * the configuration refused, not this body.
+ * The route's own malformed-body error is a request fault (400); every other
+ * error reports as 502 - the far end or the configuration refused, not this
+ * body.
+ *
+ * The test is the class and not the domain. `MediaRouteError` is itself a
+ * `StudioError` reporting in the `media` domain, so is `MediaError`, and they
+ * mean opposite things about whose fault the request was: one is this body,
+ * the other is the provider behind it.
  */
 function statusOf(error: unknown): 400 | 502 {
   return error instanceof MediaRouteError ? 400 : 502;
