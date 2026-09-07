@@ -162,6 +162,39 @@ function hasAnyToolResult(context: Context): boolean {
   return context.messages.some((message) => message.role === "toolResult");
 }
 
+/** Whether an extension's tool has answered at least once, transcript-wide. */
+function hasMcpToolResult(context: Context): boolean {
+  return context.messages.some(
+    (message) =>
+      message.role === "toolResult" && (message.toolName ?? "").startsWith("mcp__"),
+  );
+}
+
+/** Whether the discovery has answered at least once, transcript-wide. */
+function hasDiscoverResult(context: Context): boolean {
+  return context.messages.some(
+    (message) => message.role === "toolResult" && message.toolName === "discover",
+  );
+}
+
+/**
+ * Whether the last tool result carried a given fragment.
+ *
+ * The discovery's answers say more than "done": a switched-off extension
+ * answers with the switched-off remedy, and the difference between the two is
+ * the one thing the closing sentence can read instead of pretending. Only the
+ * LAST result is read - the discovery of the moment, not the earlier ones -
+ * because the question the closing answers is what just happened.
+ */
+function lastToolResultIncludes(context: Context, fragment: string): boolean {
+  for (const message of context.messages.toReversed()) {
+    if (message.role === "toolResult") {
+      return JSON.stringify(message.content).includes(fragment);
+    }
+  }
+  return false;
+}
+
 function mcpToolName(context: Context): string | undefined {
   return context.tools?.find((tool) => tool.name.startsWith("mcp__"))?.name;
 }
@@ -340,20 +373,43 @@ export function stream(
       const initial = createMessage(model);
       events.push({ type: "start", partial: initial });
 
+      // The extension scenario, two steps. Under the withhold an extension's
+      // tools are not in the array until discovered, so the first pass calls
+      // discover - by the fixture's full id, which this scenario knows, the
+      // way a model that read the inventory would - and the tool joins the
+      // array only for the NEXT submission. A third call in the same
+      // submission still cannot see it; the trap 0048 §2 warns about, kept
+      // rather than fixed, so the call happens on the next message.
       const mcpName = mcpToolName(context);
-      if (userText.toLowerCase().includes("mcp") && mcpName !== undefined && !hasAnyToolResult(context)) {
-        const toolCall = {
-          type: "toolCall" as const,
-          id: "mcp-echo-1",
-          name: mcpName,
-          arguments: { text: "hello from the model" },
-        };
-        const message = createMessage(model, [toolCall]);
-        message.stopReason = "toolUse";
-        events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
-        events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
-        events.push({ type: "done", reason: "toolUse", message });
-        return;
+      if (userText.toLowerCase().includes("mcp")) {
+        if (mcpName !== undefined && !hasMcpToolResult(context)) {
+          const toolCall = {
+            type: "toolCall" as const,
+            id: "mcp-echo-1",
+            name: mcpName,
+            arguments: { text: "hello from the model" },
+          };
+          const message = createMessage(model, [toolCall]);
+          message.stopReason = "toolUse";
+          events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+          events.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message });
+          events.push({ type: "done", reason: "toolUse", message });
+          return;
+        }
+        if (!hasAnyToolResult(context)) {
+          const discoverCall = {
+            type: "toolCall" as const,
+            id: "mcp-discover-1",
+            name: "discover",
+            arguments: { scope: "mcp:echo-server/echo" },
+          };
+          const message = createMessage(model, [discoverCall]);
+          message.stopReason = "toolUse";
+          events.push({ type: "toolcall_start", contentIndex: 0, partial: initial });
+          events.push({ type: "toolcall_end", contentIndex: 0, toolCall: discoverCall, partial: message });
+          events.push({ type: "done", reason: "toolUse", message });
+          return;
+        }
       }
 
       // Two tool calls in one assistant message, which is what a model does
@@ -446,9 +502,18 @@ export function stream(
 
       const text = hasToolResult(context)
         ? "Project Studio V2 workspace is ready."
-        : hasAnyToolResult(context)
+        : hasMcpToolResult(context)
           ? "MCP tool completed."
-        : `Echo: ${userText.replace("[slow]", "").replace("[pace]", "").trim()}`;
+          : hasDiscoverResult(context)
+            ? // The discovery's own answer decides the closing, because the two
+              // endings it covers mean different things: a switched-off
+              // extension answered with its remedy, a found one answered with
+              // its definition - and the second is the only one callable from
+              // the next message, which is what the sentence then promises.
+              (lastToolResultIncludes(context, "switched off")
+                ? "The extension is switched off for this conversation. There is nothing of it to reach until that changes."
+                : "Found the MCP tool. It is yours to call from your next message.")
+            : `Echo: ${userText.replace("[slow]", "").replace("[pace]", "").trim()}`;
       const partial = createMessage(model, [{ type: "text", text: "" }]);
       let streamedText = "";
       events.push({ type: "text_start", contentIndex: 0, partial });

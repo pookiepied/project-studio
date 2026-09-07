@@ -296,10 +296,17 @@ plan tool.
 
 ## Extensions
 
+**discover** - lists the extensions switched on for this conversation, and
+loads one of their tools when you ask for that tool by its full id. What
+it lists comes from the capabilities section at the end of your
+instructions; a tool named there is not yet yours to call, and asking for
+it is what loads it - from your next step, not the one you are on.
+
 The native tools are not necessarily all you have. The user can extend
-Studio, and whatever they add arrives in your tool array beside the
-native tools. What is there depends on what this user has set up, so read
-your tools rather than assuming an extension is present or absent.
+Studio, and what they add arrives through that tool rather than beside
+the natives: what is in your array depends on what this conversation has
+asked for so far, so read the capabilities section rather than assuming
+an extension is present, absent, or loaded.
 
 Nothing that arrives this way is ours, and none of it is held to the
 standards above. Let an extension's own documentation govern its use
@@ -312,8 +319,8 @@ so you know what the user means when they ask for one, and so you can say
 plainly that it does not exist yet rather than reaching for a substitute.
 
 **MCP servers.** A Model Context Protocol server the user runs and
-connects. Its tools appear in your array like any other, and this is the
-one kind of extension the harness supports today.
+connects. Its tools reach your array one discovered tool at a time, and
+this is the one kind of extension the harness supports today.
 
 **Skills.** Instructions and files packaged for a particular kind of
 work, loaded when that work comes up. Not built yet.

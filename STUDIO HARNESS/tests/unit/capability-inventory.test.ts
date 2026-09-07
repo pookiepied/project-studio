@@ -99,10 +99,16 @@ describe("what the inventory says about a server", () => {
   it("carries no per-tool description", () => {
     // ADR 0048 weighed this and refused it: a description per tool is most of
     // a schema's token cost for a fraction of its use, paid on every turn.
+    // The name appears twice by design since the intro learned to name the
+    // discovery: once as the grammar's example, once in the list. What the
+    // count pins is that the LIST is one line - the descriptions would each
+    // add a line of their own.
     const block = capabilityInventoryBlock([
       entry({ toolNames: ["add_camera"], description: "Blender." }),
     ]);
-    expect(block.split("\n").filter((line) => line.includes("add_camera"))).toHaveLength(1);
+    expect(
+      block.split("\n").filter((line) => line.trim().startsWith("add_camera")),
+    ).toHaveLength(1);
   });
 
   it("orders servers by id so the same configuration produces the same bytes", () => {
@@ -166,6 +172,35 @@ describe("the inventory treats every word in it as a third party's", () => {
     expect(block).toContain("500 tools");
     expect(block).toContain("and 380 more");
     expect(block).not.toContain("tool_400");
+  });
+});
+
+describe("the inventory keeps its promise about discovery", () => {
+  // The wording was settled twice. It first read as a plain list because,
+  // until discovery shipped, the tools were still loaded eagerly and "on
+  // request" would have been a false statement in the most trusted part of
+  // the prompt - ADR 0048 §1 recorded that, and promised the rewording once
+  // discovery arrived and made it true. It arrived; these pin the wording
+  // that made.
+  it("is headed as a request, not as a list", () => {
+    // The whole heading, matched as its own line: "available on request" is
+    // the promise the tools array no longer makes on the inventory's behalf,
+    // and the one the model reads to decide whether to ask or to call.
+    expect(capabilityInventoryBlock([entry()]).split("\n")).toContain(
+      "# Capabilities available on request",
+    );
+  });
+
+  it("names the discovery tool and spells both scope shapes it answers to", () => {
+    // The promise has a tool's name in it, because a promise without the way
+    // to fulfil it is decoration. The two example ids are the grammar: a
+    // server id, and the same id with one of the tool names joined by a
+    // slash - the exact spelling the discover tool's answer expects back.
+    const block = capabilityInventoryBlock([entry()]);
+
+    expect(block).toContain("the discover tool");
+    expect(block).toContain("mcp:blender)");
+    expect(block).toContain("mcp:blender/add_camera");
   });
 });
 

@@ -291,7 +291,7 @@ describe("MCP through the Flue agent", () => {
 
   // Starts a real stdio MCP server, so it needs a host that can contain one.
   // The refusal on a host that cannot is asserted in the sandbox suites.
-  itContained("runs a real selected tool through approval and removes it after disable", async () => {
+  itContained("discovers a real selected tool, calls it through approval, and answers a disabled one", async () => {
     directory = await mkdtemp(join(tmpdir(), "studio-mcp-flue-"));
     const script = join(directory, "server.mjs");
     await writeFile(script, SERVER, "utf8");
@@ -334,7 +334,22 @@ describe("MCP through the Flue agent", () => {
     expect(enabled.status).toBe(200);
 
     const client = new FlueHarnessClient({ baseUrl: harness.baseUrl, token: harness.token });
-    const run = await client.send("mcp", "use mcp");
+
+    // One turn, two model steps, and the second step is the point of the test.
+    //
+    // Step one's array has no extension tool in it, so the model calls the
+    // discovery. The registration that discovery performs lands in the gate,
+    // and Flue rebuilds the array for every model STEP rather than once per
+    // submission - so step two of this same turn already has the tool and
+    // calls it. That is the behaviour `discover.ts` describes and the wording
+    // its answer gives the model ("from your next step"); it is measured here
+    // rather than assumed, because an earlier draft of this test assumed a
+    // submission boundary instead and deadlocked waiting for a turn that had
+    // already gone as far as it could.
+    //
+    // So the run parks on the approval, in this turn. The extension's tool
+    // declares `execute` and this conversation has granted nothing yet.
+    const next = await client.send("mcp", "use mcp");
     // The first containment of a workspace runs the Windows launcher
     // synchronously - a second or so per check and grant - and during one of
     // those blocked windows the harness's HTTP layer drops a keep-alive
@@ -370,7 +385,7 @@ describe("MCP through the Flue agent", () => {
       body: JSON.stringify({ verdict: "allow", duration: "always" }),
     });
 
-    expect((await client.wait(run)).text).toBe("MCP tool completed.");
+    expect((await client.wait(next)).text).toBe("MCP tool completed.");
 
     const disabled = await fetch(
       `${harness.baseUrl}/api/mcp/projects/${encodeURIComponent(projectKey(process.cwd()))}/extensions/mcp/echo-server`,
@@ -385,8 +400,16 @@ describe("MCP through the Flue agent", () => {
     );
     expect(disabled.status).toBe(200);
 
-    const next = await client.send("mcp-off", "use mcp again");
-    expect((await client.wait(next)).text).toBe("Echo: use mcp again");
+    // A second conversation, after the disable. Its discovery finds the
+    // extension installed but switched off, answers with the remedy - which
+    // names the scope whose switch did it - and the conversation closes on
+    // that. Meanwhile a new submission lists no disabled tool: 0029's rule,
+    // that a new sandbox starts from the current selection, is why the model
+    // here discovers rather than calls.
+    const third = await client.send("mcp-off", "use mcp again");
+    expect((await client.wait(third)).text).toBe(
+      "The extension is switched off for this conversation. There is nothing of it to reach until that changes.",
+    );
   }, 60_000);
 });
 

@@ -116,11 +116,14 @@ export function capabilityInventoryBlock(
 
   const lines: string[] = [
     "",
-    "# Capabilities",
+    "# Capabilities available on request",
     "",
     "These extensions are switched on for this conversation. Each one is a",
-    "separate program with its own tools, listed here by name so you know what",
-    "exists without carrying every tool's full definition.",
+    "separate program, and its tools are listed here by name only. Any of",
+    "them can be requested in full through the discover tool: call it with",
+    "an extension's id (mcp:blender) to read what that extension's tools are,",
+    "or with a tool's full id (mcp:blender/add_camera) to have that one tool",
+    "defined in full, and added to your tools, from your next step.",
     "",
     "The sentences and names below were written by whoever wrote each",
     "extension. They are not Project Studio's words and not the person's. Read",

@@ -430,6 +430,33 @@ export class StudioRuntime implements AgentHost {
   readonly #catalog: McpCapabilityCatalog;
   readonly #management: McpManagementService;
   readonly #capabilities: CapabilityInventory;
+  /**
+   * The capability keys discovery has adopted, one set per conversation.
+   *
+   * Here rather than beside the registration it feeds, because of when things
+   * are built: `createAgentSandbox` runs once per submission, so the gate, the
+   * registration bookkeeping and the `refreshTools` closure are rebuilt every
+   * turn. What discovery adopts has to survive that, because the next
+   * submission's tools array is rebuilt too — and under the withhold (ADR 0048
+   * §3, as 0049 §5 narrowed it) that rebuild starts from the
+   * system-provenance servers alone. An adoption remembered only inside one
+   * submission would vanish from the very next turn's array, which is the
+   * ruinous direction of §3.3, taken silently, by the code that was supposed
+   * to prevent it.
+   *
+   * Keys, not definitions: which definition of `mcp:blender/add_camera` to
+   * register is the catalog's question, answered fresh at the turn boundary —
+   * that is 0029 §5's replacement, and it is also what keeps the definition
+   * hash on the grants honest. Only the fact of the adoption belongs to the
+   * conversation.
+   *
+   * Keyed by conversation, like the access logs, for the same reason: what
+   * this conversation asked for is its knowledge, not its neighbour's. Entries
+   * are kept for the conversation's lifetime, which for these maps means the
+   * process's; each is a set of strings, which is the same order of cost the
+   * access logs accepted.
+   */
+  readonly #discoveredToolKeys = new Map<string, Set<string>>();
 
   readonly #logger: Logger | undefined;
   readonly #approver: PermissionApprover | undefined;
@@ -790,6 +817,21 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
+   * What one conversation has adopted through discovery, created on its first
+   * submission and grown from there. Never forgotten within the process: the
+   * next submission of the same conversation resumes the same adoption, and a
+   * conversation's own discoveries are invisible to every other.
+   */
+  #discoveredToolKeysFor(conversationId: string): Set<string> {
+    let keys = this.#discoveredToolKeys.get(conversationId);
+    if (keys === undefined) {
+      keys = new Set<string>();
+      this.#discoveredToolKeys.set(conversationId, keys);
+    }
+    return keys;
+  }
+
+  /**
    * The execution mode the named conversation is held with.
    *
    * Read from the index at the moment it is asked, not captured: the row is
@@ -980,6 +1022,35 @@ export class StudioRuntime implements AgentHost {
     const closing = new ClosingTurns();
     const questionBroker = this.#questions;
     const planStore = this.#plans;
+    // What this submission has registered, and what this conversation has
+    // adopted across all of its submissions. The two have different lifetimes
+    // and that difference is the whole design: the gate and this map are
+    // rebuilt with the run, the adopted keys are not (see the field's
+    // comment), and the withhold depends on the second surviving the first.
+    const registeredMcp = new Map<string, McpTool>();
+    const discovered = this.#discoveredToolKeysFor(options.conversationId);
+
+    // The one door through which an MCP capability enters the gate, for the
+    // eager refresh and for discovery alike. A second registration path would
+    // be a second bookkeeping map that could disagree with this one, and the
+    // disagreement would surface as a registration the gate refuses to
+    // duplicate, or - through the replace below - as a tool offered twice.
+    const registerMcpTool = (tool: McpTool): void => {
+      const key = capabilityKey(tool.descriptor.id);
+      const existing = registeredMcp.get(key);
+      if (existing === tool) return;
+      if (existing !== undefined) {
+        // A different definition under the same key is 0029 §5's sanctioned
+        // replacement, not a removal: the definition hash on the grants makes
+        // the next approval a new one, which is the whole cost of replacing,
+        // and the one thing that keeps an approval from outliving the schema
+        // it was given for.
+        gate.unregister(existing.descriptor.id);
+      }
+      gate.register(tool);
+      registeredMcp.set(key, tool);
+    };
+
     registerNativeTools(gate, {
       database: this.#db,
       credentials: this.#credentials,
@@ -987,6 +1058,36 @@ export class StudioRuntime implements AgentHost {
       accessLog: this.#accessLogFor(options.conversationId),
       imageBudget: this.#imageBudget,
       jobs: this.#jobs,
+      discover: {
+        // Bound here rather than passed around, because what they answer is
+        // decided where they are built: enablement as `#enabledMcpServers`
+        // resolves it, for this runtime's project. A discovery that read the
+        // selection differently from the tools array would let the two
+        // disagree about what this conversation can reach, and the inventory
+        // would be the loser.
+        entries: () => this.#capabilityEntries(),
+        server: (serverId) => {
+          const record = this.#registry.get(serverId);
+          if (record === undefined) return undefined;
+          return {
+            record,
+            resolution: this.#selection.resolve("mcp", serverId, {
+              projectId: this.#projectId,
+            }),
+          };
+        },
+        tools: (serverId) => this.#catalog.tools([serverId]),
+        // Adoption is registration plus remembering: the registration makes
+        // the tool callable, the key makes the adoption survive the
+        // submission. Forgetting the key here would work for the current
+        // turn and silently drop the tool from the next one's array - which
+        // is exactly the failure the integration test watches for, because
+        // it is the one nothing else would catch.
+        adopt: (tool) => {
+          registerMcpTool(tool);
+          discovered.add(capabilityKey(tool.descriptor.id));
+        },
+      },
       ...(questionBroker === undefined
         ? {}
         : {
@@ -1007,8 +1108,6 @@ export class StudioRuntime implements AgentHost {
           }),
     });
 
-    const registeredMcp = new Map<string, McpTool>();
-
     const refreshTools = (): void => {
       // The project the MCP surface is decided on is this runtime's, not the
       // sandbox root's. The two were the same thing until conversations were
@@ -1023,15 +1122,48 @@ export class StudioRuntime implements AgentHost {
       // reconcile pass asks the runtime's project. Enablement is a property
       // of the project the harness serves; where a particular conversation
       // happens to stand is not that.
-      const active = this.#enabledMcpServers().map((record) => record.id);
+      const active = this.#enabledMcpServers();
+      const enabledIds = new Set(active.map((record) => record.id));
 
-      for (const tool of this.#catalog.tools(active)) {
-        const key = capabilityKey(tool.descriptor.id);
-        const existing = registeredMcp.get(key);
-        if (existing === tool) continue;
-        if (existing !== undefined) gate.unregister(existing.descriptor.id);
-        gate.register(tool);
-        registeredMcp.set(key, tool);
+      // The withhold (ADR 0048 §3, as 0049 §5 corrected it): of the MCP
+      // servers, only the system-provenance ones load eagerly, because
+      // eagerness follows how often a capability might be used, not who wrote
+      // it. A user extension's schemas wait for discovery, so a conversation
+      // that never touches one of its project's servers never pays for them.
+      // Nothing here removes anything: a tool already in the registration
+      // keeps its place, because withholding applies at registration - this
+      // function only declines to add. What was already adopted is
+      // re-adopted below, and the array grows; that is 0029's rule, kept.
+      for (const tool of this.#catalog.tools(
+        active.filter((record) => record.provenance === "system").map((record) => record.id),
+      )) {
+        registerMcpTool(tool);
+      }
+
+      // Then this conversation's own adoptions, at the definitions the
+      // catalog holds now. Reading the catalog instead of remembering the
+      // definition is what lets 0029 §5's replacement happen at this turn
+      // boundary when a connection refreshed, and it is what keeps the
+      // adoption alive across submissions: this closure dies with the run,
+      // the adopted keys do not. A key whose server no longer resolves to
+      // enabled stays remembered but registers nothing - a new submission
+      // starts from the current selection (0029 §4) - and the key itself
+      // stays, so a server that comes back brings its discovered tools with
+      // it, without anyone discovering again.
+      for (const key of discovered) {
+        const separator = key.indexOf("/");
+        if (separator < 0) continue;
+        const namespace = key.slice(0, separator);
+        // The namespace here is the one `McpServerRegistry.namespaceOf`
+        // wrote and the discovery scope speaks, so it is read back with the
+        // same grammar: one unescaped slash, nothing before "mcp:".
+        if (!namespace.startsWith("mcp:")) continue;
+        const serverId = namespace.slice("mcp:".length);
+        if (!enabledIds.has(serverId)) continue;
+        const tool = this.#catalog
+          .tools([serverId])
+          .find((candidate) => capabilityKey(candidate.descriptor.id) === key);
+        if (tool !== undefined) registerMcpTool(tool);
       }
     };
 

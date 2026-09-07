@@ -180,10 +180,36 @@ otherwise a model discovers `add_camera`, calls it in the same turn, and gets
 say the tool is available from the next step, and the harness should verify that
 is actually when it lands.
 
+*Measured, and the "operation" turned out to be the step.* Flue rebuilds the
+tool array for every model step, not once per submission, so a discovered tool
+is available on the very next step of the same turn — the model discovers and
+calls without a round trip through the user. The tool's answer says "from your
+next step" and means it literally. The first integration test written for this
+assumed a submission boundary, scripted a two-message dance, and deadlocked
+waiting for a turn that had already finished; that deadlock is how the real
+boundary was found.
+
 **Proof:** every bullet in ADR 0048's *Required proof*, and specifically that a
 user server contributes zero schemas until discovered, that a system server
-contributes its schemas with no discovery call, and that a discovered tool is in
-the next turn's array while the system block is unchanged across that turn.
+contributes its schemas with no discovery call, and that a discovered tool is
+callable on the model's next step while the system block is unchanged across
+that turn.
+
+**Landed 2026-09-08.** `src/tools/discover/` (one capability, `native/discover`,
+`effects: ["read"]` like `plan`, `ask` and `jobs`) and the withhold in
+`refreshTools` — eager registration narrowed to `system`-provenance servers,
+with this conversation's discoveries re-registered at each turn boundary. One
+thing the plan did not spell out and the implementation had to: the registration
+bookkeeping in `createAgentSandbox` dies with the submission (Flue re-creates
+the sandbox per submission), so what discovery adopts is remembered as
+capability keys on the runtime, keyed by conversation, and the next
+submission's `refreshTools` re-registers them from the catalog's current
+definitions. Keys, not definitions — which is also what makes 0029 §5's
+definition replacement happen for a discovered tool whose connection
+refreshed. The heading is now `# Capabilities available on request` and the
+intro names the tool; the same one-off system-block change covered the
+Extensions section of the static system prompt, whose next sentences the
+withhold had made untrue.
 
 ---
 

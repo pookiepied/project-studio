@@ -76,7 +76,7 @@ prompt: its identity, what it is for, how many tools it has, and their names.
 No schemas, no parameters, no examples.
 
 ```
-# Capabilities
+# Capabilities available on request
 
 mcp:blender — Blender scene and object manipulation — 34 tools
   add_camera, add_light, apply_material, create_scene, delete_object, …
@@ -84,13 +84,6 @@ mcp:blender — Blender scene and object manipulation — 34 tools
 mcp:browser — Browser automation and page reading — 28 tools
   click, extract_text, navigate, screenshot, wait_for, …
 ```
-
-The heading is `# Capabilities` and not "available on request", which is what
-this first said. Until discovery ships, the tools are still loaded eagerly and
-"on request" would be a false statement in the most trusted part of the prompt —
-a model told it can request something that does not exist yet will wait for a
-tool that never arrives. The wording has to be true at every stage of the
-rollout, not only at the end of it.
 
 Names, not descriptions, per tool. A name plus the server's own sentence is
 enough for a model to decide whether to look further; a description per tool is
@@ -132,7 +125,18 @@ Absent scope lists the servers with their tool names — the same content as the
 inventory, for a model whose inventory has scrolled out of a long conversation.
 A server id (`mcp:blender`) returns that server's tools with descriptions. A
 tool id (`mcp:blender/add_camera`) returns the full schema **and registers that
-tool into the gate**, so the next turn's array contains it.
+tool into the gate**, so the next array the model is given contains it.
+
+*Measured during implementation, and better than this first said.* The original
+wording was "the next turn's array", which assumed the array is rebuilt once per
+submission and that a model discovering a tool would have to wait for the user's
+next message to call it. Flue rebuilds the tool array for every model **step**,
+so the tool arrives on the step immediately after the discovery — the model
+discovers and calls within one turn, with no round trip through the user. The
+discovery's answer says "from your next step" for this reason, and the
+integration test drives exactly that sequence. An earlier draft of that test
+assumed the submission boundary and deadlocked waiting for a turn that had
+already gone as far as it could, which is how the difference was found.
 
 **One tool with an argument, not a family of tools.** A `discover_all`, a
 `discover_mcp` and a `discover_mcp_blender` are three permanent schemas in the
@@ -249,8 +253,8 @@ in the prefix.
   call.
 - Discovery with no scope lists servers; with a server id lists that server's
   tools; with a tool id returns one schema and registers one tool.
-- A tool registered by discovery appears in the next turn's array, and the
-  system block is byte-identical across that turn.
+- A tool registered by discovery appears in the model's next step, within the
+  same turn, and the system block is byte-identical across that turn.
 - Discovery cannot reach a server that resolves to disabled for the
   conversation asking.
 - A discovered tool still requires approval, and a schema change still

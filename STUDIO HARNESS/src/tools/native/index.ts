@@ -10,6 +10,7 @@ import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
 import type { ImageBudget } from "../filesystem/image-budget.js";
 import type { BackgroundJobs } from "../../process/background.js";
 import { registerAskTools, type AskToolRegistration } from "../ask/index.js";
+import { registerDiscoverTools, type DiscoverToolRegistration } from "../discover/index.js";
 import { registerPlanTools, type PlanToolRegistration } from "../plan/index.js";
 import { registerGitTools } from "../git/index.js";
 import { registerSearchTools } from "../search/index.js";
@@ -59,6 +60,19 @@ export interface NativeToolRegistrationOptions {
    */
   readonly accessLog?: FileAccessLog;
   /**
+   * The discovery mechanism, and the reason it is not optional.
+   *
+   * Everything else here can be absent because what it needs is genuinely
+   * absent: no broker, no question tool; no store, no plan tool. Discovery
+   * needs nothing this composition does not already have, and the inventory
+   * in the system block names it - a prompt that says its tool names "can be
+   * requested in full through the discover tool" has made a promise, and a
+   * composition without the capability would break ADR 0024's rule from the
+   * far side, where a named capability does not exist. So discover is not
+   * optional, and the inventory's wording is allowed to lean on it.
+   */
+  readonly discover: DiscoverToolRegistration;
+  /**
    * The ask family's channel and closing-turn state.
    *
    * Optional because it needs a broker to ask through: a composition that
@@ -96,6 +110,7 @@ export function registerNativeTools(
   registerSearchTools(gate);
   registerGitTools(gate);
   registerShellTools(gate, options.jobs === undefined ? {} : { jobs: options.jobs });
+  registerDiscoverTools(gate, options.discover);
   if (options.ask !== undefined) {
     registerAskTools(gate, options.ask);
   }
