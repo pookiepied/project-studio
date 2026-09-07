@@ -160,7 +160,7 @@ describe("read", () => {
     // Held for a different reason than the text limit, and so it says a
     // different thing: this is the request being rejected on the wire, not a
     // file better answered by a search.
-    writeFileSync(join(workspace, "huge.png"), Buffer.alloc(4 * 1024 * 1024));
+    writeFileSync(join(workspace, "huge.png"), Buffer.alloc(6 * 1024 * 1024));
 
     await expect(read({ path: "huge.png" })).rejects.toThrow(/limit for one image/i);
     await expect(read({ path: "huge.png" })).rejects.not.toThrow(/search it instead/i);

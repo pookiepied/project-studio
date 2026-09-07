@@ -57,7 +57,7 @@ import { CallGate } from "../tools/gate.js";
 import { ToolError } from "../tools/errors.js";
 import { ClosingTurns } from "../execution/closing-turns.js";
 import { registerNativeTools } from "../tools/native/index.js";
-import { FileAccessLog } from "../tools/filesystem/index.js";
+import { FileAccessLog, ImageBudget } from "../tools/filesystem/index.js";
 import { ConversationStore } from "../conversations/store.js";
 import type { PlanItemStore } from "../plan/plan-items.js";
 
@@ -453,6 +453,15 @@ export class StudioRuntime implements AgentHost {
    * conversation's knowledge - and cleared with the conversation.
    */
   readonly #accessLogs = new Map<string, FileAccessLog>();
+  /**
+   * One budget for the whole runtime, keyed inside by conversation.
+   *
+   * Held here rather than per run for the same reason the access logs are:
+   * a run is one turn, and what these count - the images a transcript has
+   * accumulated, which every later turn resends - only means anything across
+   * turns.
+   */
+  readonly #imageBudget = new ImageBudget();
   #started: Promise<void> | undefined;
 
   constructor(options: StudioRuntimeOptions) {
@@ -817,6 +826,7 @@ export class StudioRuntime implements AgentHost {
       credentials: this.#credentials,
       acceptsImages: (conversationId) => this.#modelAcceptsImages(conversationId),
       accessLog: this.#accessLogFor(options.conversationId),
+      imageBudget: this.#imageBudget,
       ...(questionBroker === undefined
         ? {}
         : {

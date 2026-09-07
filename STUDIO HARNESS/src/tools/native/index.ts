@@ -7,6 +7,7 @@ import { ConnectionStore } from "../../providers/connection-store.js";
 import { ModelCatalog } from "../../providers/model-catalog.js";
 import type { CallGate } from "../gate.js";
 import { FileAccessLog, registerFilesystemTools } from "../filesystem/index.js";
+import type { ImageBudget } from "../filesystem/image-budget.js";
 import { registerAskTools, type AskToolRegistration } from "../ask/index.js";
 import { registerPlanTools, type PlanToolRegistration } from "../plan/index.js";
 import { registerGitTools } from "../git/index.js";
@@ -25,6 +26,16 @@ export interface NativeToolRegistrationOptions {
    * described the model is not evidence that the model is blind.
    */
   readonly acceptsImages?: (conversationId: string) => boolean | undefined;
+  /**
+   * What each conversation has already spent on images.
+   *
+   * Passed in for the same reason as the access log below: the totals are
+   * per conversation and this function runs once per run, so a budget created
+   * here would forget every picture the moment the turn ended - and the
+   * limits it exists to enforce are precisely the ones that accumulate across
+   * turns. A composition that omits it holds each image to its own size only.
+   */
+  readonly imageBudget?: ImageBudget;
   /**
    * The read history the filesystem family enforces read-before-modify with.
    *
@@ -66,7 +77,10 @@ export function registerNativeTools(
     // A ternary rather than a bare field: the option is optional-without-
     // undefined, and passing an explicit undefined would widen the type
     // instead of omitting it.
-    options.acceptsImages === undefined ? {} : { acceptsImages: options.acceptsImages },
+    {
+      ...(options.acceptsImages === undefined ? {} : { acceptsImages: options.acceptsImages }),
+      ...(options.imageBudget === undefined ? {} : { imageBudget: options.imageBudget }),
+    },
   );
   registerSearchTools(gate);
   registerGitTools(gate);

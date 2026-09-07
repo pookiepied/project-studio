@@ -9,6 +9,12 @@ import type { SandboxFileStat } from "../../sandbox/local-sandbox.js";
 import { ToolError } from "../errors.js";
 import { defineStudioTool, type ToolDefinition } from "../types.js";
 import { hashContent, type FileAccessLog } from "./access-log.js";
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGES_PER_CONVERSATION,
+  refusalMessage,
+  type ImageBudget,
+} from "./image-budget.js";
 
 /**
  * Reading a file, the way a model can actually use it.
@@ -35,26 +41,7 @@ const MAX_LINE_LENGTH = 2_000;
 /** 1 MiB. A larger file is a data file, and belongs to a search, not a read. */
 const MAX_TEXT_BYTES = 1024 * 1024;
 
-/**
- * What a picture may weigh, which is a different question entirely.
- *
- * The text limit above is about the context window: a megabyte of source is
- * more tokens than it is worth, and searching it is the better move. None of
- * that reasoning transfers to an image. A photograph costs the same handful of
- * tokens whether it arrived as 400 KB or 4 MB, because providers resize it to
- * their own working dimension before it is ever tokenised. Weight is not cost
- * here.
- *
- * What weight does decide is whether the request is accepted at all, and the
- * strictest common ceiling is 5 MB for a single image. That ceiling is on the
- * encoded payload, and base64 inflates bytes by four thirds, so the bound that
- * matters is on the raw file: 3.75 MB in becomes just under 5 MB on the wire.
- *
- * Held apart from the text limit rather than raised to meet it. One number
- * covering both would have to be the smaller of the two constraints, and there
- * is no reason a 2 MB screenshot should answer for a 2 MB CSV.
- */
-const MAX_IMAGE_BYTES = 3_750_000;
+/** Every limit a picture is held to lives in `image-budget.ts`. */
 
 /** Image kinds that can ride an image content block, by extension. */
 const IMAGE_MIME_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
@@ -93,6 +80,13 @@ export interface ReadToolOptions {
    * user-declared endpoint out of the feature.
    */
   readonly acceptsImages?: (conversationId: string) => boolean | undefined;
+  /**
+   * What each conversation has already spent on pictures. Omitted, every
+   * image is judged on its own size alone - which is the right behaviour for
+   * a caller with no conversation to keep a total against, and the wrong one
+   * for the agent loop, where the totals are the limits that bite.
+   */
+  readonly imageBudget?: ImageBudget;
 }
 
 export const READ_DESCRIPTOR: CapabilityDescriptor = {
@@ -109,8 +103,9 @@ export const READ_DESCRIPTOR: CapabilityDescriptor = {
     "2000 lines by default; use offset and limit to page through a longer " +
     "file. A line longer than 2000 characters is truncated, and a text file " +
     "larger than 1 MB is refused - search it instead. " +
-    "Images (PNG, JPEG, GIF, WebP) come back as attachments when the model " +
-    "accepts image input, and may be up to 3.5 MB.",
+    `Images (PNG, JPEG, GIF, WebP) come back as attachments when the model ` +
+    `accepts image input, up to ${Math.round(MAX_IMAGE_BYTES / 1_000_000)} MB each and ` +
+    `${MAX_IMAGES_PER_CONVERSATION} per conversation.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -373,17 +368,32 @@ export function createReadTool(
       // files and told to "search it instead" - advice that cannot be followed
       // on a PNG, about a limit that was never reasoning about pictures. Every
       // photograph a phone takes failed here.
-      const ceiling = mimeType === undefined ? MAX_TEXT_BYTES : MAX_IMAGE_BYTES;
-      if (stat.size > ceiling) {
-        const kilobytes = Math.round(stat.size / 1024);
-        throw new ToolError("invalid_input", {
-          message:
-            mimeType === undefined
-              ? `This file is ${kilobytes} KB, which is too large to read at once. Search it instead.`
-              : `This image is ${kilobytes} KB, and the limit for one image is ` +
-                `${Math.round(MAX_IMAGE_BYTES / 1024)} KB - larger than that and the ` +
-                "provider refuses the request. Resize it, or ask the user to.",
-        });
+      //
+      // A picture is measured against the conversation's whole budget, not
+      // just its own size, because every turn resends every image the
+      // transcript holds: the limit that breaks a request is the total, and a
+      // per-image check alone cannot see it coming.
+      if (mimeType === undefined) {
+        if (stat.size > MAX_TEXT_BYTES) {
+          throw new ToolError("invalid_input", {
+            message:
+              `This file is ${Math.round(stat.size / 1024)} KB, which is too large to ` +
+              "read at once. Search it instead.",
+          });
+        }
+      } else {
+        const budget = options.imageBudget;
+        const refusal =
+          budget === undefined
+            ? stat.size > MAX_IMAGE_BYTES
+              ? ({ kind: "too-large", bytes: stat.size } as const)
+              : null
+            : budget.check(context.scope.conversationId, stat.size);
+        if (refusal !== null) {
+          throw new ToolError("invalid_input", {
+            message: refusalMessage(input.path, refusal),
+          });
+        }
       }
 
       if (mimeType !== undefined) {
@@ -411,6 +421,13 @@ export function createReadTool(
           size: stat.size,
           contentHash: hashContent(bytes),
         });
+
+        // Recorded only now, against an image that is actually going back to
+        // the model. Counting at the check instead would charge the budget
+        // for reads that were refused further down - an unreadable file, a
+        // model that cannot see - and a conversation could exhaust its
+        // allowance without ever having been shown a picture.
+        options.imageBudget?.record(context.scope.conversationId, bytes.length);
 
         return {
           content: [
