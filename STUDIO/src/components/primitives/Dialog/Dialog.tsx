@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SHELL, SPRING_SURFACE } from '@/design/tokens'
+import { DURATION, EASE_IN, SHELL, SPRING_SURFACE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { IconButton } from '@/components/primitives/IconButton/IconButton'
 import { cn } from '@/lib/cn'
@@ -76,7 +76,7 @@ export function Dialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: DURATION.base, ease: EASE_OUT }}
+          transition={{ duration: DURATION.base, ease: EASE_IN }}
           className="studio-blur-scrim fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-scrim p-6"
           // The window's own corner, restated. Portalled to the body, the
           // scrim no longer inherits the rounded panel's clip, and the OS
@@ -100,11 +100,17 @@ export function Dialog({
             // closes, there is no transition" describes - not a missing
             // animation, a dismissal whose two halves were not the same
             // length.
+            // `EASE_IN`, matching the scrim above it. The house ease-out is
+            // front-loaded, which is right for arriving and wrong for
+            // leaving: it emptied the panel within the first two frames and
+            // then animated nothing for the rest of the duration, which is
+            // why the dialog read as vanishing rather than closing even
+            // after its duration was corrected. See the token's own note.
             exit={{
               opacity: 0,
               scale: 0.96,
               y: 4,
-              transition: { duration: DURATION.base, ease: EASE_OUT },
+              transition: { duration: DURATION.base, ease: EASE_IN },
             }}
             transition={SPRING_SURFACE}
             style={{ width, height }}

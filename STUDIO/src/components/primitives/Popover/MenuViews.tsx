@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
+import { DURATION, EASE_IN, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
 import type { ReactNode } from 'react'
 
 /**
@@ -51,7 +51,6 @@ export function MenuViews({
           initial="enter"
           animate="settled"
           exit="leave"
-          transition={{ duration: DURATION.fast, ease: EASE_OUT }}
         >
           {children}
         </motion.div>
@@ -63,8 +62,28 @@ export function MenuViews({
 /** Twelve pixels: a page turn inside one panel, not a change of surface. */
 const TRAVEL = 12
 
+/**
+ * Arriving and leaving take opposite curves. The house ease-out is
+ * front-loaded, which reads well on a page arriving and reads as a cut on the
+ * one it replaced - it is gone within a couple of frames and the rest of the
+ * duration animates nothing. So the outgoing page eases in and the incoming
+ * page eases out, and each carries its own transition because one prop on the
+ * element cannot say two things.
+ */
 const VARIANTS = {
-  enter: (depth: number) => ({ opacity: 0, x: depth > 0 ? TRAVEL : -TRAVEL }),
-  settled: { opacity: 1, x: 0 },
-  leave: (depth: number) => ({ opacity: 0, x: depth > 0 ? -TRAVEL : TRAVEL }),
+  enter: (depth: number) => ({
+    opacity: 0,
+    x: depth > 0 ? TRAVEL : -TRAVEL,
+    transition: { duration: DURATION.fast, ease: EASE_OUT },
+  }),
+  settled: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: DURATION.fast, ease: EASE_OUT },
+  },
+  leave: (depth: number) => ({
+    opacity: 0,
+    x: depth > 0 ? -TRAVEL : TRAVEL,
+    transition: { duration: DURATION.fast, ease: EASE_IN },
+  }),
 }

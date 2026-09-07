@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DURATION, EASE_OUT, SPRING_SNAPPY } from '@/design/tokens'
+import { DURATION, EASE_IN, SPRING_SNAPPY } from '@/design/tokens'
 import { cn } from '@/lib/cn'
 
 /**
@@ -208,19 +208,18 @@ export function Popover({
               role="menu"
               initial={{ opacity: 0, scale: 0.97, y: (position?.side ?? side) === 'top' ? 4 : -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              // The mirror of the entrance, and it has to be: the panel came in
-              // from 0.97 and 4px off the trigger, so it leaves back to the
-              // same place. It used to leave on `fast` - the token for a state
-              // change on something already visible - with a 2% scale and no
-              // displacement at all. Both halves of that are why picking a
-              // model read as the menu cutting out rather than closing: 120ms
-              // is under what a dismissal needs to register, and a 2% shrink
-              // going nowhere is not a direction the eye can follow.
+              // Retraces the entrance - back to 0.97, back toward the trigger
+              // - but on `EASE_IN`, not the house curve. That is the whole
+              // difference between a menu that closes and a menu that cuts
+              // out: `EASE_OUT` is front-loaded, so it took the panel to 38%
+              // opacity within two frames and spent the rest of the duration
+              // animating something already invisible. See the note on
+              // `EASE_IN`; it was measured, not guessed.
               exit={{
                 opacity: 0,
                 scale: 0.97,
                 y: (position?.side ?? side) === 'top' ? 4 : -4,
-                transition: { duration: DURATION.base, ease: EASE_OUT },
+                transition: { duration: DURATION.base, ease: EASE_IN },
               }}
               transition={SPRING_SNAPPY}
               style={{

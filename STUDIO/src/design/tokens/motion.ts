@@ -23,6 +23,24 @@ import type { Variants } from 'framer-motion'
 /** Ease-out quint. The house curve: fast start, long settle. */
 export const EASE_OUT = [0.16, 1, 0.3, 1] as const
 
+/**
+ * Ease-in quint. Its mirror, and the curve for things leaving.
+ *
+ * The house curve is front-loaded on purpose: something arriving should be
+ * readable immediately and then settle. Run the same curve backwards on a
+ * departure and you get the opposite of what you want - measured two frames
+ * into a 180ms popover exit, `EASE_OUT` had already taken it to 38% opacity
+ * and all but its final 2% of scale. The remaining 145ms were spent moving
+ * something already gone, so a dismissal that is nominally a fifth of a
+ * second reads as an instant cut, and lengthening the duration does not help
+ * because the visible part of it is over in two frames either way.
+ *
+ * A departure has to start slowly and accelerate away: the thing holds long
+ * enough to be seen going, then leaves. That is this curve, and every `exit`
+ * should use it.
+ */
+export const EASE_IN = [0.7, 0, 0.84, 0] as const
+
 export const DURATION = {
   /** A state change on something already visible — hover, a chip. */
   fast: 0.12,

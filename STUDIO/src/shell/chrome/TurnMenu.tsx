@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { DURATION, EASE_OUT } from '@/design/tokens'
 import { Icons, ProviderMark } from '@/components/icons'
 import {
   MenuItem,
@@ -221,9 +223,34 @@ export function TurnMenu() {
               {/* The model's own mark, not the connection's: a model reached
                   through OpenRouter wears its author's mark here, and the
                   connection wears OpenRouter's in Settings. Two facts, two
-                  places. */}
-              {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
-              <span className="min-w-0 truncate">{label}</span>
+                  places.
+
+                  Mark and name change together and are keyed on the model, so
+                  a pick replaces them as one thing and the replacement
+                  arrives with a small rise. Swapped in a single frame it read
+                  as the label merely being different, with nothing tying the
+                  new words to the click - and on a truncated name the only
+                  visible change can be two letters before the ellipsis.
+
+                  Keyed remount rather than an `AnimatePresence` crossover, and
+                  that was tried first: `mode="wait"` holds the new name back
+                  until the old one has finished leaving, which empties the
+                  label for a beat and delays the answer to the question just
+                  asked. Overlapping the two instead needs the outgoing name
+                  taken out of flow, which fights the truncation this label
+                  depends on. The new name appearing at once and settling in is
+                  both the simpler construction and the more honest one: the
+                  choice took effect immediately, so it should say so. */}
+              <motion.span
+                key={model?.id ?? label}
+                initial={{ opacity: 0, y: -3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+                className="flex min-w-0 items-center gap-1.5"
+              >
+                {model ? <ProviderMark provider={model.author} className="shrink-0" /> : null}
+                <span className="min-w-0 truncate">{label}</span>
+              </motion.span>
               {warn ? (
                 <span className="shrink-0 tabular-nums text-muted-foreground">{percent}%</span>
               ) : null}

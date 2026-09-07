@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 
 import { NavigationProvider, useNavigation } from '@/stores/navigation'
@@ -784,5 +784,53 @@ describe('the menu on the way out of a pick', () => {
     fireEvent.click(screen.getByText('Default model'))
 
     expect(screen.queryAllByRole('menu')).toHaveLength(1)
+  })
+})
+
+describe('the name in the strip, when the answer changes', () => {
+  /**
+   * The trigger is where a pick shows up, and it used to show up as the label
+   * being different from one frame to the next - nothing tying the new words
+   * to the click. Worst on a long name, where truncation can leave the only
+   * visible difference a couple of letters before the ellipsis.
+   *
+   * The name and its mark are now keyed on the model, so a pick remounts them
+   * and the new pair rises into place. Two things have to hold together: the
+   * new name is there at once (the choice took effect, and a label that goes
+   * blank while it animates would say otherwise), and it is still arriving
+   * rather than already arrived.
+   */
+  it('brings the new name in under its own motion rather than swapping it', async () => {
+    harnessConfigured()
+    stubFetch(defaultRoute([FLAT_MODEL]))
+    mountPicker({ conversationId: 'cnv_1' })
+    fireEvent.click(await screen.findByText('open chat'))
+
+    const trigger = screen.getByRole('button', { name: 'Turn settings' })
+    expect(trigger.textContent).toContain('Choose a model')
+
+    localStorage.setItem('studio.recent-models', JSON.stringify(['anthropic/jamba-large-1.7']))
+    await openModelPanel()
+    fireEvent.click(within(screen.getByRole('menu')).getByText('jamba-large-1.7'))
+
+    // Immediately: the answer, not a gap where the answer will be.
+    await waitFor(() => {
+      expect(trigger.textContent).toContain('jamba-large-1.7')
+    })
+    expect(trigger.textContent).not.toContain('Choose a model')
+
+    // And it arrived under motion. One frame in it is partly there; a plain
+    // swap would read 1 here from the very first frame.
+    await act(async () => {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(null))
+      })
+    })
+    const name = within(trigger).getByText('jamba-large-1.7').parentElement as HTMLElement
+    expect(Number(name.style.opacity)).toBeLessThan(1)
+
+    await waitFor(() => {
+      expect(Number(name.style.opacity)).toBe(1)
+    })
   })
 })
