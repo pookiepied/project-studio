@@ -38,7 +38,51 @@ on the line**, which for any program installed under `C:\Program Files` is
 exactly the entry the doctrine says never to ask for. Two parts of the same
 subsystem disagree, and only one of them has written down why.
 
-## 3. What has to be measured before it is fixed
+## 3. The experiment, run 2026-09-08
+
+Measured on the author's Windows machine, containing real commands through
+`containCommand` and comparing arms.
+
+**The doctrine is right; `shell` is over-granting.** Contained `git --version`
+runs with **no** program root granted at all, exit 0, correct output. The image
+really is opened with the launcher's own rights, exactly as `program-roots.ts`
+says. Passing the program's own directory is not needed to run the program.
+
+**On this machine git would never have been the failure.** Every Git directory
+already carries `ALL APPLICATION PACKAGES:(RX)` by inheritance, and
+`grantProgramRoots` skips a root that already holds read - so no entry is
+attempted and no elevation is asked for. The `error 5` the user met came from
+somewhere else on the line, or from an ancestor traverse, not from Git's own
+directory.
+
+**And there is a worse bug underneath.** Contained `git status` and `git init`
+fail in every workspace tried - under the temp directory and under the user's
+home alike:
+
+```
+fatal: unable to get current working directory: Permission denied
+```
+
+Contained `node` in the *same workspace under the same policy* lists that
+directory happily. So the containment is fine and the workspace grant is fine:
+**git specifically cannot resolve its own working directory inside an
+AppContainer.** Node reads `.` relatively; git resolves the absolute path,
+which walks the ancestor chain, and a traverse-only grant is evidently not
+enough for what it asks of each ancestor.
+
+Granting read on the ancestors instead is refused - the user's home needs
+elevation, and the backend's own advice is a machine-wide setup run.
+
+**So the two fixes are separate, and the small one is not the important one:**
+
+1. Stop passing the program's own directory from `shell`. It matches the
+   doctrine, removes a whole class of elevation prompts, and cannot break
+   running a program.
+2. Work out what git needs on the ancestor chain, because until that is
+   answered **git does not work in a contained conversation on Windows at
+   all** - a far larger hole than the grant that was being blamed for it.
+
+## 4. What still has to be measured
 
 Do not simply delete the grant. The doctrine says the *image* opens with the
 launcher's own rights, which is why a program runs without a grant on its own
@@ -55,13 +99,13 @@ So there are two possible truths and they need an experiment, not an opinion:
   program in `C:\Program Files`.
 - **If git genuinely needs to read its installation**, then the grant is right,
   the refusal is right, and the remedy has to become something a user can
-  actually perform - which is section 4.
+  actually perform - which is section 5.
 
 The experiment is cheap: contain a command with and without the root and
 compare. `studio-contain probe` already exists for asking the kernel directly
 rather than trusting a tool's error text.
 
-## 4. The onboarding that does not exist
+## 5. The onboarding that does not exist
 
 Even when the refusal is correct, the way a person meets it is wrong. Today it
 arrives mid-conversation, as an error, with a remedy (`pnpm sandbox:prepare`)
@@ -89,7 +133,7 @@ the time they are in a conversation, everything their machine has should
 already work, and every remaining refusal should be a permission question they
 are asked, not a wall they hit.
 
-## 5. Where this sits
+## 6. Where this sits
 
 Not on the roadmap's critical path - discovery, MCP, browser, providers come
 first. But it is the difference between something that works on the machine it
