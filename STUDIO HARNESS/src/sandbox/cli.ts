@@ -6,9 +6,9 @@ import { dirname, resolve } from "node:path";
 import {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,
-  grantTraverse,
+  grantCorridor,
   holdsRead,
-  holdsTraverse,
+  holdsCorridor,
   invokeLauncher,
 } from "./isolation/index.js";
 import {
@@ -52,11 +52,19 @@ import { createSandboxPolicy } from "./policy.js";
  * `pnpm sandbox:prepare [project-directory...]`
  *
  * Adds the one entry containment needs that an unelevated process cannot add:
- * traverse on the **system-owned** ancestors of a project - `C:\` and
- * `C:\Users` among them - for `ALL APPLICATION PACKAGES`. Without them a
+ * the corridor entry on the **system-owned** ancestors of a project - `C:\`
+ * and `C:\Users` among them - for `ALL APPLICATION PACKAGES`. Without them a
  * contained program dies resolving its own path, because `realpath` stats every
- * component of it. See `windows/traversal.ts` for what a traverse entry grants
- * and, more importantly, what it does not.
+ * component of it, and git dies resolving its working directory, because it
+ * lists every component's parent. See `windows/traversal.ts` for what a
+ * corridor entry grants and, more importantly, what it does not.
+ *
+ * **A machine prepared before the corridor entry existed must be prepared
+ * again.** The earlier runs left a traverse-only entry on those two
+ * directories; it is not enough for git, and `holdsCorridor` answers false for
+ * it, so re-running this reports them as work to do rather than as already set
+ * up. The re-grant rewrites that trustee's entry in place - it does not
+ * accumulate a second one.
  *
  * Only the ancestors that need elevation come here. Everything inside the
  * user's own folders is granted per workspace, automatically, and removed again
@@ -386,12 +394,12 @@ async function prepare(targets: readonly string[]): Promise<void> {
       if (seen.has(ancestor)) continue;
       seen.add(ancestor);
 
-      if (holdsTraverse(ancestor, ALL_APPLICATION_PACKAGES)) {
+      if (holdsCorridor(ancestor, ALL_APPLICATION_PACKAGES)) {
         process.stdout.write(`${ancestor} — already set up\n`);
         continue;
       }
       try {
-        grantTraverse(ancestor, ALL_APPLICATION_PACKAGES);
+        grantCorridor(ancestor, ALL_APPLICATION_PACKAGES);
         process.stdout.write(`${ancestor} — ready\n`);
       } catch (error) {
         // The advice is conditional on the failure, and that is not fussiness.

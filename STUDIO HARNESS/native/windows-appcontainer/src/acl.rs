@@ -88,6 +88,30 @@ const WRITE_ACCESS: u32 = READ_ACCESS
 const TRAVERSE_ACCESS: u32 =
     FILE_TRAVERSE | FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE;
 
+/// Traverse, plus the one bit that lets a program resolve the directory it is
+/// standing in.
+///
+/// This exists because of git, and the measurement is written up in
+/// `documentation/work/git-sandbox-findings.md`. Git's `getcwd` on Windows
+/// resolves its working directory through `GetFinalPathNameByHandleW`, and
+/// when that does not answer it falls back to `GetLongPathNameW`, which maps
+/// short names to long ones by *listing each component's parent*. Listing is
+/// `FILE_LIST_DIRECTORY`, the one bit `TRAVERSE_ACCESS` deliberately omits, so
+/// git died before it could look at a repository - on every workspace, with
+/// the corridor otherwise complete. Node never noticed because its own path
+/// resolution walks by `lstat`, which needs only traverse and read-attributes.
+///
+/// **What this costs, stated plainly.** A holder of this entry on the users
+/// directory can list it - it learns the names of the accounts on the machine.
+/// On the volume root it learns the top-level folder names. That is strictly
+/// more than `TRAVERSE_ACCESS` gives away, and it is the reason this is a
+/// separate mode rather than an extra bit on that one: it goes on the corridor
+/// and nowhere else, and the corridor is a chain of directories whose *names*
+/// the child already knows, because they are the ancestors of its own
+/// workspace. It still does not inherit, so nothing one level below any of
+/// them is reachable through it.
+const CORRIDOR_ACCESS: u32 = TRAVERSE_ACCESS | FILE_LIST_DIRECTORY;
+
 /// `ACCESS_ALLOWED_ACE_TYPE`. Not exported by `windows-sys`, and stable since
 /// NT: a deny entry is type 1, and every other type is an audit or callback
 /// entry that grants nothing.
@@ -105,6 +129,8 @@ const CONTAINER_INHERIT_ACE: u32 = 0x2;
 pub enum Mode {
     /// Pass through this directory; do not list it.
     Traverse,
+    /// Pass through this directory and list it; reach nothing below it.
+    Corridor,
     /// Read and list, here and below.
     Read,
     /// Read, list, create, modify and delete, here and below.
@@ -115,6 +141,7 @@ impl Mode {
     pub fn parse(text: &str) -> Result<Self, String> {
         match text {
             "traverse" => Ok(Mode::Traverse),
+            "corridor" => Ok(Mode::Corridor),
             "read" => Ok(Mode::Read),
             "write" => Ok(Mode::Write),
             other => Err(format!("unknown access mode: {other}")),
@@ -124,6 +151,7 @@ impl Mode {
     fn mask(self) -> u32 {
         match self {
             Mode::Traverse => TRAVERSE_ACCESS,
+            Mode::Corridor => CORRIDOR_ACCESS,
             Mode::Read => READ_ACCESS,
             Mode::Write => WRITE_ACCESS,
         }
@@ -140,12 +168,12 @@ impl Mode {
     /// goes on a volume root, and propagating from there rewrites every
     /// security descriptor on the disk — see `set_this_object_only`.
     fn propagates(self) -> bool {
-        !matches!(self, Mode::Traverse)
+        !matches!(self, Mode::Traverse | Mode::Corridor)
     }
 
     fn inheritance(self) -> u32 {
         match self {
-            Mode::Traverse => 0,
+            Mode::Traverse | Mode::Corridor => 0,
             Mode::Read | Mode::Write => OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
         }
     }
@@ -348,4 +376,39 @@ pub fn revoke(path: &str, sid: &OwnedSid, mode: Mode) -> Result<(), String> {
     // the identical hang as granting one on `C:\`, and it appears at shutdown
     // rather than at startup, which is a worse place to find it.
     apply(path, sid, 0, 0, REVOKE_ACCESS, mode.propagates())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The corridor is the traverse entry plus exactly one bit.
+    ///
+    /// Pinned because the difference is the whole point and it is one
+    /// character wide. A corridor that quietly grew a second right would widen
+    /// what a contained child can see on the user's volume root, which is the
+    /// one place this project has always refused to widen by accident.
+    #[test]
+    fn corridor_is_traverse_plus_listing_only() {
+        assert_eq!(CORRIDOR_ACCESS, TRAVERSE_ACCESS | FILE_LIST_DIRECTORY);
+        assert_eq!(CORRIDOR_ACCESS & !TRAVERSE_ACCESS, FILE_LIST_DIRECTORY);
+    }
+
+    /// The corridor stays on the directory it names.
+    ///
+    /// Inheritance here would push an entry onto every child of the user's
+    /// home, and propagation would rewrite every descriptor on the volume -
+    /// the two failures `Mode::Traverse` exists to avoid, which the new mode
+    /// inherits by being in the same arms.
+    #[test]
+    fn corridor_neither_inherits_nor_propagates() {
+        assert_eq!(Mode::Corridor.inheritance(), 0);
+        assert!(!Mode::Corridor.propagates());
+    }
+
+    /// A mode is only usable if the command line can name it.
+    #[test]
+    fn corridor_parses_from_its_own_name() {
+        assert!(matches!(Mode::parse("corridor"), Ok(Mode::Corridor)));
+    }
 }

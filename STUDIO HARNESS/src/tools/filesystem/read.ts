@@ -52,11 +52,6 @@ const IMAGE_MIME_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
   [".webp", "image/webp"],
 ]);
 
-/** The mime types those extensions map to, for judging a sniff result by. */
-const SHOWABLE_IMAGE_MIMES: ReadonlySet<string> = new Set(
-  IMAGE_MIME_BY_EXTENSION.values(),
-);
-
 /**
  * Image kinds a person plausibly points the tool at, which the model still
  * cannot be shown - the extensions deliberately absent from

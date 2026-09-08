@@ -35,11 +35,11 @@ export {
   ALL_APPLICATION_PACKAGES,
   ancestorsOf,
   ensureTraversable,
-  grantTraverse,
+  grantCorridor,
   holdsRead,
-  holdsTraverse,
+  holdsCorridor,
   isFullPermissionList,
-  revokeTraverse,
+  revokeCorridor,
 } from "./windows/traversal.js";
 export {
   assertIsolationAvailable,

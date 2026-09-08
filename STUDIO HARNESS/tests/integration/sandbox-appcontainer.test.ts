@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hostIsolation } from "../../src/sandbox/isolation/index.js";
 import { profileName } from "../../src/sandbox/isolation/windows/appcontainer.js";
 import { invokeLauncher, launcherPath } from "../../src/sandbox/isolation/windows/launcher.js";
-import { holdsTraverse } from "../../src/sandbox/isolation/windows/traversal.js";
+import { holdsCorridor } from "../../src/sandbox/isolation/windows/traversal.js";
 import { readLedger } from "../../src/sandbox/isolation/windows/ledger.js";
 import { LocalSandbox } from "../../src/sandbox/local-sandbox.js";
 import { createSandboxPolicy } from "../../src/sandbox/policy.js";
@@ -255,7 +255,7 @@ windows("a contained child on Windows", () => {
     // process that never saw this workspace.
     const sid = invokeLauncher(["profile-ensure", "--name", profileName(doomed)]);
     for (const ancestor of recorded ?? []) {
-      expect(holdsTraverse(ancestor, sid)).toBe(true);
+      expect(holdsCorridor(ancestor, sid)).toBe(true);
     }
 
     await rm(doomed, { recursive: true, force: true });
@@ -267,7 +267,7 @@ windows("a contained child on Windows", () => {
     );
 
     for (const ancestor of recorded ?? []) {
-      expect(holdsTraverse(ancestor, sid)).toBe(false);
+      expect(holdsCorridor(ancestor, sid)).toBe(false);
     }
     expect(readLedger().some((record) => record.workspaceRoot === doomed)).toBe(false);
   }, 120_000);

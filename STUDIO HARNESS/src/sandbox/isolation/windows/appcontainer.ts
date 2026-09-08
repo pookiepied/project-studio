@@ -26,9 +26,9 @@ import {
   ancestorsOf,
   ensureTraversable,
   holdsRead,
-  holdsTraverse,
+  holdsCorridor,
   isFullPermissionList,
-  revokeTraverse,
+  revokeCorridor,
 } from "./traversal.js";
 
 /**
@@ -371,7 +371,7 @@ class WindowsAppContainerBackend implements IsolationBackend {
     // ever in the answer.
     for (const ancestor of this.#corridorFor(key, policy, sid, container)) {
       if (!existsSync(ancestor)) continue;
-      revokeTraverse(ancestor, sid);
+      revokeCorridor(ancestor, sid);
     }
     invokeLauncher(["profile-delete", "--name", profileName(key)]);
     this.#prepared.delete(key);
@@ -425,7 +425,7 @@ class WindowsAppContainerBackend implements IsolationBackend {
     for (const root of roots) {
       for (const ancestor of ancestorsOf(root)) {
         if (corridor.has(ancestor)) continue;
-        if (holdsTraverse(ancestor, sid)) corridor.add(ancestor);
+        if (holdsCorridor(ancestor, sid)) corridor.add(ancestor);
       }
     }
     return [...corridor];

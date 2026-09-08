@@ -139,3 +139,46 @@ Not on the roadmap's critical path - discovery, MCP, browser, providers come
 first. But it is the difference between something that works on the machine it
 was built on and something a person can install. It should land before anyone
 other than the author runs Studio.
+
+## 7. The installer's job, written down while it is fresh (2026-09-08)
+
+The corridor fix landed (ADR 0041's amendment,
+[the findings](git-sandbox-findings.md)), and landing it produced the concrete
+list this brief was missing. **The installer must do this**, because in a
+packaged `.exe` there is no pnpm, no `package.json` and no checkout, so the
+remedy the runtime currently names does not exist on the machine at all.
+
+**What has to happen once, elevated.** The corridor entry -
+traverse + read-attributes + `FILE_LIST_DIRECTORY`, non-inheriting - granted to
+`ALL APPLICATION PACKAGES` on the system-owned ancestors of everywhere Studio
+will stand: the volume root, the users directory, and the root of any drive the
+person keeps projects on. Today that is
+`pnpm sandbox:prepare "<home>" "<projects root>"` from an administrator
+terminal. An installer already runs elevated - the person is already answering
+a UAC prompt to install the software - so this costs one line inside a consent
+they are giving anyway, instead of a permission refusal in the middle of their
+first conversation.
+
+**What must NOT move into the installer.** Everything below the user's own
+folders. `ensureTraversable` grants those per workspace, automatically,
+unelevated, on first use, and `release` takes them back. An installer that
+tried to pre-grant them would be guessing at directories that do not exist yet
+and leaving entries nothing removes.
+
+**A toolchain installed later needs nothing, and this was measured.** The
+corridor entries are about the path chain to a workspace; no program is named
+in them. Git installed a year after Studio still finds them in place. And a
+program's own directory is already readable when it lives under
+`C:\Program Files`, which carries an inheritable
+`ALL APPLICATION PACKAGES:(RX)` entry by default - so Git, Node and Python are
+readable the moment they are installed, with no grant from us. The only case
+left is a toolchain somewhere unusual (a portable unzip, `D:\tools`, a per-user
+install), which cannot be predicted at install time and therefore belongs to
+the runtime: it must ask, in a dialog that names the directory and elevates
+itself if it must, never in a message telling someone to run a package-manager
+command.
+
+**The test that says this is done.** A person installs Studio on a machine
+that has never seen it, opens a conversation, and asks the model to run
+`git status` in a project. It works, and they were never told what a program
+root or a traverse entry is.

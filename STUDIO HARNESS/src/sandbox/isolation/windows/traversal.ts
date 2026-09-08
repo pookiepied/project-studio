@@ -35,13 +35,25 @@ import { invokeLauncher, launcherInstalled } from "./launcher.js";
  * it is granted to the per-workspace SID instead: narrower, and `release()`
  * takes it away again.
  *
- * ## What a traverse entry is
+ * ## What a corridor entry is
  *
- * Traverse and read-attributes. **Not** `FILE_LIST_DIRECTORY` — the holder can
- * confirm the directory exists and walk through it, and cannot learn what is in
- * it. Non-inheriting, so it reaches nothing below. That is why it is acceptable
- * on `C:\Users`: it says "this folder exists", which the folder's own name
- * already said.
+ * Traverse, read-attributes, and `FILE_LIST_DIRECTORY`. Non-inheriting, so it
+ * reaches nothing below the directory it is on.
+ *
+ * The listing bit was deliberately absent until it was measured to be the
+ * reason git could not run at all: git's `getcwd` resolves its own working
+ * directory by listing each component's parent, so with traverse alone every
+ * contained git command died before it could look at a repository. The full
+ * measurement, including why node never noticed, is in
+ * `documentation/work/git-sandbox-findings.md`.
+ *
+ * What the extra bit gives away, stated rather than glossed: a holder can list
+ * the corridor directories themselves, so on the users directory it learns the
+ * account names on the machine and on the volume root the top-level folder
+ * names. It cannot open any of them, and it cannot see one level further down,
+ * because the entry does not inherit. The corridor is the chain of ancestors
+ * of the child's own workspace - directories whose names it necessarily
+ * already knows.
  */
 
 /** `ALL APPLICATION PACKAGES` — every AppContainer on the machine. */
@@ -72,11 +84,32 @@ export function ancestorsOf(path: string): readonly string[] {
   return chain.reverse();
 }
 
-/** Whether a trustee already holds traverse on a directory. Read-only. */
+/**
+ * Whether a trustee already holds the older, narrower traverse entry.
+ *
+ * Kept beside `holdsCorridor` for one reason: a machine prepared before the
+ * corridor entry existed carries traverse-only entries on its two
+ * system-owned ancestors, and those entries are still enough for everything
+ * except git. Treating them as nothing would take a working sandbox away from
+ * every such machine at once, in exchange for a fix the person has not been
+ * asked for yet. So the corridor is attempted, and this is the floor that
+ * decides whether falling short of it is fatal.
+ */
 export function holdsTraverse(path: string, sid: string): boolean {
   if (!launcherInstalled()) return false;
   try {
     invokeLauncher(["check", "--sid", sid, "--path", path, "--mode", "traverse"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a trustee already holds the corridor entry on a directory. Read-only. */
+export function holdsCorridor(path: string, sid: string): boolean {
+  if (!launcherInstalled()) return false;
+  try {
+    invokeLauncher(["check", "--sid", sid, "--path", path, "--mode", "corridor"]);
     return true;
   } catch {
     // `check` exits non-zero for "missing", which `invokeLauncher` raises. An
@@ -108,15 +141,15 @@ export function holdsRead(path: string, sid: string): boolean {
   }
 }
 
-export function grantTraverse(path: string, sid: string): void {
-  invokeLauncher(["grant", "--sid", sid, "--path", path, "--mode", "traverse"]);
+export function grantCorridor(path: string, sid: string): void {
+  invokeLauncher(["grant", "--sid", sid, "--path", path, "--mode", "corridor"]);
 }
 
-export function revokeTraverse(path: string, sid: string): void {
+export function revokeCorridor(path: string, sid: string): void {
   // The mode matters on the way out too. Revoking with propagation on would
   // walk every file under the user's home folder to undo an entry that never
   // reached below one directory.
-  invokeLauncher(["revoke", "--sid", sid, "--path", path, "--mode", "traverse"]);
+  invokeLauncher(["revoke", "--sid", sid, "--path", path, "--mode", "corridor"]);
 }
 
 export interface TraversalOutcome {
@@ -185,17 +218,29 @@ export function ensureTraversable(
       // Either identity satisfies it. The machine-wide entry is what
       // `sandbox:prepare` leaves behind, and re-granting per workspace on top
       // of it would be a second entry that says the same thing.
-      if (holdsTraverse(ancestor, ALL_APPLICATION_PACKAGES)) continue;
-      if (holdsTraverse(ancestor, workspaceSid)) {
+      if (holdsCorridor(ancestor, ALL_APPLICATION_PACKAGES)) continue;
+      if (holdsCorridor(ancestor, workspaceSid)) {
         granted.push(ancestor);
         continue;
       }
 
       try {
-        grantTraverse(ancestor, workspaceSid);
+        grantCorridor(ancestor, workspaceSid);
         granted.push(ancestor);
       } catch (error) {
-        // A system-owned directory, or a full list — not an error here, it is
+        // Falling short of the corridor is not automatically a shortfall. A
+        // machine prepared before the corridor entry existed holds traverse
+        // here and nothing more, which is enough for every contained program
+        // except git - so the old floor still counts as satisfied, and the
+        // person is not locked out of their shell to buy a git fix they have
+        // not been offered yet. `sandbox:prepare` is what offers it.
+        if (
+          holdsTraverse(ancestor, ALL_APPLICATION_PACKAGES) ||
+          holdsTraverse(ancestor, workspaceSid)
+        ) {
+          continue;
+        }
+        // A system-owned directory, or a full list - not an error here, it is
         // the bucket, and the caller decides what each one means.
         if (isFullPermissionList(error)) {
           refused.push(ancestor);

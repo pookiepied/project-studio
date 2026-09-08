@@ -4,6 +4,20 @@
 
 **The one-paragraph answer.** Inside the container, git's `getcwd` (`compat/mingw.c` at the installed build's own commit, quoted in §2) resolves the working directory it got from `GetCurrentDirectoryW` through `CreateFileW(cwd, 0, …, FILE_FLAG_BACKUP_SEMANTICS)` and then `GetFinalPathNameByHandleW`, falling back to `GetLongPathNameW`. Whatever the first resolving step asks beyond *traverse* is missing on the ancestor chain, and the `GetLongPathNameW` fallback needs `FILE_LIST_DIRECTORY` (the same 0x1 bit as `FILE_READ_DATA`) on the parent of *every* component — including `C:\` and `C:\Users`, which on this machine carry only the machine-prepared traverse ACE and cannot be extended by an unelevated process. Granting traverse+LIST on the whole chain, drive root included, fixes it: proven by compressing the chain to a single grantable component with `subst`, after which the identical binary, grants and policy answered `fatal: not a git repository` — the good error — instead of dying. The read-extended-attributes bit is *not* needed (measured). `C:\Users\pooki` and below need no elevation (measured); exactly two directories do (measured).
 
+**What shipped, 2026-09-08.** Option A, as recommended: a fourth launcher mode,
+`corridor` — `TRAVERSE_ACCESS | FILE_LIST_DIRECTORY`, still non-inheriting,
+still `SetFileSecurityW`. `traversal.ts` grants it on the ancestors of every
+workspace and `sandbox:prepare` grants it to `ALL APPLICATION PACKAGES` on the
+two system-owned ones. Verified by the §5 experiment repeated against the
+shipped binary: with traverse only, `fatal: Unable to read current working
+directory`; with the corridor entry, the same binary in the same workspace ran
+`git init`, `git status` and `git rev-parse --show-toplevel` to completion.
+One departure from the memo, for a reason it could not have known: falling
+short of the corridor is **not** treated as a shortfall when the ancestor still
+holds the old traverse entry, so a machine prepared before this change keeps
+working for everything except git rather than losing its shell until someone
+re-runs an elevated command. See ADR 0041's amendment.
+
 ---
 
 ## 1. Corrections to the previous round, first

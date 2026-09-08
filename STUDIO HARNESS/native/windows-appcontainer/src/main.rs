@@ -13,9 +13,9 @@
 //! ```text
 //! studio-contain profile-ensure --name <name> [--display <text>]   → SID on stdout
 //! studio-contain profile-delete --name <name>
-//! studio-contain grant  --sid <sid> --path <path> --mode traverse|read|write
-//! studio-contain revoke --sid <sid> --path <path> [--mode traverse|read|write]
-//! studio-contain check  --sid <sid> --path <path> --mode traverse|read|write
+//! studio-contain grant  --sid <sid> --path <path> --mode traverse|corridor|read|write
+//! studio-contain revoke --sid <sid> --path <path> [--mode traverse|corridor|read|write]
+//! studio-contain check  --sid <sid> --path <path> --mode traverse|corridor|read|write
 //! studio-contain run    --sid <sid> [--cwd <dir>] [--capability <name>]... — <program> [args...]
 //! ```
 //!
@@ -49,9 +49,9 @@ studio-contain — run a program inside a Windows AppContainer
 
   profile-ensure --name <name> [--display <text>]
   profile-delete --name <name>
-  grant  --sid <sid> --path <path> --mode traverse|read|write
-  revoke --sid <sid> --path <path> [--mode traverse|read|write]
-  check  --sid <sid> --path <path> --mode traverse|read|write
+  grant  --sid <sid> --path <path> --mode traverse|corridor|read|write
+  revoke --sid <sid> --path <path> [--mode traverse|corridor|read|write]
+  check  --sid <sid> --path <path> --mode traverse|corridor|read|write
   run    --sid <sid> [--cwd <dir>] [--capability <name>]...
          [--join argv|command-line] -- <program> [args...]
   probe  --path <path> | --connect <host:port> | --resolve <host>

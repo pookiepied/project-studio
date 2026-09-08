@@ -111,6 +111,37 @@ what is in it. Non-inheriting, so it reaches nothing below. That is what makes
 it acceptable on `C:\Users` — it says "this folder exists", which the folder's
 name already said.
 
+*Amended 2026-09-08: the corridor entry, which is that plus one bit.* Traverse
+alone is not enough for git, and the reason is not `realpath`. Git's `getcwd`
+on Windows resolves its working directory through `GetFinalPathNameByHandleW`
+and falls back to `GetLongPathNameW`, which maps short names to long ones by
+**listing each component's parent** - `FILE_LIST_DIRECTORY`, the one bit
+deliberately withheld above. So every contained git command died before it
+could look at a repository, on every workspace, while node ran fine beside it:
+node's own path resolution walks by `lstat`, which needs only traverse and
+read-attributes. The measurement, the source at the installed build's commit,
+and the elimination that identifies the two resolvers are in
+`documentation/work/git-sandbox-findings.md`; the decisive experiment
+compressed the ancestor chain to one grantable component with `subst`, and the
+identical binary answered `fatal: not a git repository` - the good failure.
+
+So there is a fourth mode, `corridor`: traverse, read-attributes, and
+`FILE_LIST_DIRECTORY`, still non-inheriting, still `SetFileSecurityW`. It is a
+separate mode rather than an extra bit on `traverse` because it does give
+something away that traverse did not - a holder can list the corridor
+directories themselves, learning the account names under the users directory
+and the top-level folder names under the volume root. That is the price, and it
+is paid only on the ancestors of the child's own workspace, whose names it
+already knows. It cannot open any of them and cannot see one level further
+down.
+
+**A machine prepared before this must be prepared again.** The two
+system-owned directories carry a traverse-only entry from the earlier run;
+`holdsCorridor` answers false for it, so `pnpm sandbox:prepare` reports them as
+work to do and rewrites that trustee's entry in place. Until that elevated run
+happens, contained commands refuse with the remedy named - which is the
+existing behaviour, now for a reason that has a fix.
+
 ### `SetNamedSecurityInfo` walks children, and the volume root is why that matters
 
 Changing a DACL with `SetNamedSecurityInfo` recomputes inherited entries on
