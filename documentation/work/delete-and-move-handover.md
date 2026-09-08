@@ -4,7 +4,28 @@ A droppable task. Written 2026-09-08 from a read of the code. The first
 section is the finding that decides the design, so read it before planning
 anything.
 
-## The finding: undo already exists, and it is not a recycle bin
+## The design: two recovery mechanisms, chosen by where the file lives
+
+A delete tool needs recovery, and there is no single mechanism that covers
+every file it can reach. There are two, and which one applies is decided by
+the **path**, never by what the conversation is about:
+
+- **A path inside a snapshotted project** is already covered. See the finding
+  below: the shadow repo gives it a history, and a delete tool needs to add
+  nothing at all.
+- **A path outside one** - a folder the user granted, their Downloads, their
+  Pictures - has no recovery today. This is where a trash or a recycle bin is
+  the real answer rather than a duplicate of something we have.
+
+Do not key this on the kind of conversation. A conversation about anything can
+delete a file inside a project, and a coding conversation can delete a
+holiday photo in Downloads. The path decides.
+
+The tool must also be able to say which of the two applied, because "this is
+recoverable and here is how" is part of the answer a person needs after a
+delete they did not expect.
+
+## The finding: undo already exists for projects, and it is not a recycle bin
 
 Models using Studio have asked for `delete`, `mkdir` and `rename`, and the
 argument offered for delete was that a tool could add a recycle bin where
@@ -42,10 +63,10 @@ reading and measuring rather than assuming. The known suspects:
   `.gitignore`. A deleted file that was excluded is not in the history. Find
   out what happens to a delete of an ignored file.
 
-Only after that do you decide whether a trash directory is needed at all, and
-for what. A plausible answer is "snapshots cover the project, and a trash
-covers granted paths outside it" - but do not assume it, and do not build both
-mechanisms for the same files.
+Only after that do you decide what covers the paths outside a project. The
+expected shape is stated above - snapshots for the project, something else for
+everything outside it - but the boundary between the two is a thing to measure,
+not to assume, and no file may be covered by both.
 
 ## On the Windows Recycle Bin specifically
 
