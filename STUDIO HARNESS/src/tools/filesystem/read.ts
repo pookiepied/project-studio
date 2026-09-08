@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { open, readFile, type FileHandle } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 
 import {
@@ -50,6 +50,54 @@ const IMAGE_MIME_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
   [".jpeg", "image/jpeg"],
   [".gif", "image/gif"],
   [".webp", "image/webp"],
+]);
+
+/** The mime types those extensions map to, for judging a sniff result by. */
+const SHOWABLE_IMAGE_MIMES: ReadonlySet<string> = new Set(
+  IMAGE_MIME_BY_EXTENSION.values(),
+);
+
+/**
+ * Image kinds a person plausibly points the tool at, which the model still
+ * cannot be shown - the extensions deliberately absent from
+ * `IMAGE_MIME_BY_EXTENSION`.
+ *
+ * Adding them there is the obvious-looking fix and it is wrong: it would turn
+ * a bad error message into a failed provider call, which is strictly worse.
+ * The providers this serves take PNG, JPEG, GIF and WebP and nothing more -
+ * Bedrock's adapter throws on any other mime outright, and Anthropic and
+ * OpenAI answer a BMP with a 400. (Google's models also take HEIC and HEIF,
+ * but a refusal here runs before the conversation's provider is known, so the
+ * message names only the formats every vision-capable model this serves
+ * accepts.) An unshowable picture is refused by kind instead, ahead of the
+ * size check, with the formats that would have worked named.
+ *
+ * SVG is absent on purpose: it is text, and reading it as text is right.
+ */
+const UNSHOWABLE_IMAGE_EXTENSIONS: ReadonlyMap<string, string> = new Map([
+  [".bmp", "image/bmp"],
+  [".tif", "image/tiff"],
+  [".tiff", "image/tiff"],
+  [".heic", "image/heic"],
+  [".heif", "image/heif"],
+  [".avif", "image/avif"],
+  [".ico", "image/x-icon"],
+]);
+
+/** What the kind refusal calls the file. A named format is one the model can act on. */
+const UNSHOWABLE_IMAGE_LABELS: ReadonlyMap<string, string> = new Map([
+  ["image/bmp", "a BMP image"],
+  ["image/tiff", "a TIFF image"],
+  ["image/heic", "a HEIC image"],
+  ["image/heif", "a HEIF image"],
+  ["image/avif", "an AVIF image"],
+  ["image/x-icon", "an ICO icon"],
+]);
+
+/** Every extension this treats as a picture, showable or not. */
+const IMAGE_ISH_EXTENSIONS: ReadonlySet<string> = new Set([
+  ...IMAGE_MIME_BY_EXTENSION.keys(),
+  ...UNSHOWABLE_IMAGE_EXTENSIONS.keys(),
 ]);
 
 export interface ReadInput {
@@ -290,6 +338,105 @@ function missingFileError(path: string, siblings: readonly string[]): ToolError 
   });
 }
 
+/** The head a sniff needs. The furthest signature read ends at byte 12. */
+const SNIFF_HEAD_BYTES = 16;
+
+/**
+ * The first bytes of a file, for deciding what it is without reading it all.
+ *
+ * Straight from disk rather than through the sandbox, which decodes utf8 -
+ * the same seam the image read below uses, over a path `resolveRead` has
+ * already contained. This is a bounded read, not a whole-file one: the kind
+ * is decided before the size checks, and learning that a 58 MB file is a PNG
+ * must not mean holding it in memory first. A failure returns undefined
+ * rather than erroring: the sniff is a refinement of the extension's
+ * decision, and a file whose head cannot be read still deserves the answer
+ * the name alone would have given it.
+ */
+async function readHead(absolute: string, length: number): Promise<Buffer | undefined> {
+  let handle: FileHandle | undefined;
+  try {
+    handle = await open(absolute, "r");
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close();
+  }
+}
+
+const asciiAt = (bytes: Buffer, start: number, length: number): string =>
+  bytes.subarray(start, start + length).toString("latin1");
+
+const startsWith = (bytes: Buffer, signature: readonly number[]): boolean =>
+  signature.every((byte, index) => bytes[index] === byte);
+
+/**
+ * What the leading bytes say a file is. Showable rides an image content
+ * block; unshowable is a picture the model cannot take, which hears why;
+ * undefined means the head matched no signature this knows and the extension
+ * decides, as it always has.
+ */
+type SniffedImageKind =
+  | { readonly verdict: "showable"; readonly mimeType: string }
+  | { readonly verdict: "unshowable"; readonly mimeType: string };
+
+function sniffImageKind(head: Buffer, extension: string): SniffedImageKind | undefined {
+  // The strong signatures, believed on the bytes alone: a text file does not
+  // plausibly begin with any of these.
+  if (startsWith(head, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    return { verdict: "showable", mimeType: "image/png" };
+  }
+  if (startsWith(head, [0xff, 0xd8, 0xff])) {
+    return { verdict: "showable", mimeType: "image/jpeg" };
+  }
+  if (asciiAt(head, 0, 6) === "GIF87a" || asciiAt(head, 0, 6) === "GIF89a") {
+    return { verdict: "showable", mimeType: "image/gif" };
+  }
+  if (asciiAt(head, 0, 4) === "RIFF" && asciiAt(head, 8, 4) === "WEBP") {
+    return { verdict: "showable", mimeType: "image/webp" };
+  }
+  if (asciiAt(head, 0, 4) === "II*\0" || asciiAt(head, 0, 4) === "MM\0*") {
+    return { verdict: "unshowable", mimeType: "image/tiff" };
+  }
+  if (asciiAt(head, 4, 4) === "ftyp") {
+    const brand = asciiAt(head, 8, 4);
+    if (brand === "avif" || brand === "avis") {
+      return { verdict: "unshowable", mimeType: "image/avif" };
+    }
+    if (brand === "heic" || brand === "heix" || brand === "hevc" || brand === "hevx") {
+      return { verdict: "unshowable", mimeType: "image/heic" };
+    }
+    if (brand === "mif1" || brand === "msf1" || brand === "miaf") {
+      return { verdict: "unshowable", mimeType: "image/heif" };
+    }
+    // A container this does not serve (mp4, mov) is not a picture here;
+    // leave it to the extension and, failing that, the binary guard.
+    return undefined;
+  }
+  if (startsWith(head, [0x00, 0x00, 0x01, 0x00])) {
+    return { verdict: "unshowable", mimeType: "image/x-icon" };
+  }
+  // The one weak signature: two ASCII letters that begin ordinary words.
+  // "BMW sales by quarter" is text and must stay text, so a bare "BM" is
+  // believed only when the name already claims a picture.
+  if (asciiAt(head, 0, 2) === "BM" && IMAGE_ISH_EXTENSIONS.has(extension)) {
+    return { verdict: "unshowable", mimeType: "image/bmp" };
+  }
+  return undefined;
+}
+
+async function sniffedImageKind(
+  absolute: string,
+  extension: string,
+): Promise<SniffedImageKind | undefined> {
+  const head = await readHead(absolute, SNIFF_HEAD_BYTES);
+  if (head === undefined) return undefined;
+  return sniffImageKind(head, extension);
+}
+
 export function createReadTool(
   log: FileAccessLog,
   options: ReadToolOptions = {},
@@ -345,7 +492,6 @@ export function createReadTool(
       }
 
       const extension = extensionOf(input.path);
-      const mimeType = IMAGE_MIME_BY_EXTENSION.get(extension);
 
       if (extension === ".pdf") {
         // Ahead of the size check, and for the same reason the size check is
@@ -360,6 +506,42 @@ export function createReadTool(
           message:
             "This file is a PDF, and PDFs cannot be shown to the model yet. " +
             "Extract the text you need with a command instead.",
+        });
+      }
+
+      // The kind is decided from the bytes first and the name second. Reading
+      // a sixteen-byte head costs one small open on a file that is about to
+      // be read anyway, and it is what makes a real PNG carrying a .txt name
+      // an attachment rather than a "not text" refusal - the mirror of the
+      // mislabelled picture that only ever worked because the provider was
+      // tolerant of what its name claimed. When the head matches no signature
+      // the extension decides, as it always has.
+      const sniffed = await sniffedImageKind(absolute, extension);
+      const mimeType =
+        sniffed === undefined
+          ? IMAGE_MIME_BY_EXTENSION.get(extension)
+          : sniffed.verdict === "showable"
+            ? sniffed.mimeType
+            : undefined;
+      const unshowableMime =
+        sniffed === undefined
+          ? UNSHOWABLE_IMAGE_EXTENSIONS.get(extension)
+          : sniffed.verdict === "unshowable"
+            ? sniffed.mimeType
+            : undefined;
+
+      if (unshowableMime !== undefined) {
+        // Ahead of the size check, like the PDF branch above: this is refused
+        // whatever the file weighs, so a large one should hear why rather than
+        // be told to search a bitmap nothing here can search - and a small one
+        // should hear why rather than be refused as binary, which is true but
+        // teaches nothing. The working formats are named because a refusal
+        // that does not say what would have worked cannot be acted on.
+        throw new ToolError("invalid_input", {
+          message:
+            `This file is ${UNSHOWABLE_IMAGE_LABELS.get(unshowableMime)}, which the model ` +
+            "cannot be shown. The image formats it can see are PNG, JPEG, GIF and WebP. " +
+            "Convert it to one of those and read it again.",
         });
       }
 

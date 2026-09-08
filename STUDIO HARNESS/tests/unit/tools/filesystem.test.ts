@@ -281,6 +281,134 @@ describe("read sees pictures", () => {
 
     expect(log.get(SCOPE, join(workspace, "logo.png"))).toBeDefined();
   });
+
+  describe("a picture the model cannot be shown", () => {
+    // The two files that started this: a BMP fell to the text path, and
+    // depending on its weight either hit the 1 MB text limit - "search it
+    // instead", advice no bitmap can follow, about a limit that was never
+    // reasoning about pictures - or was refused as binary, which is true but
+    // teaches nothing. Refused by kind instead, ahead of the size check, with
+    // the formats that would have worked named.
+    const BMP = Buffer.concat([Buffer.from("BM"), Buffer.alloc(64)]);
+    const TIFF = Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+    it("refuses a large BMP by kind, ahead of the size check", async () => {
+      writeFileSync(
+        join(workspace, "screenshot.bmp"),
+        Buffer.concat([Buffer.from("BM"), Buffer.alloc(2 * 1024 * 1024)]),
+      );
+
+      await expect(read({ path: "screenshot.bmp" })).rejects.toThrow(/BMP/);
+      await expect(read({ path: "screenshot.bmp" })).rejects.toThrow(
+        /PNG, JPEG, GIF and WebP/,
+      );
+      // The old answer, twice wrong: the text limit's number and advice a
+      // bitmap cannot follow.
+      await expect(read({ path: "screenshot.bmp" })).rejects.not.toThrow(/too large/i);
+      await expect(read({ path: "screenshot.bmp" })).rejects.not.toThrow(/search it/i);
+    });
+
+    it("refuses a small BMP by kind rather than as binary", async () => {
+      // Under the text limit it used to reach the NUL-byte guard and be told
+      // "not text" - no name, no remedy.
+      writeFileSync(join(workspace, "icon.bmp"), BMP);
+
+      await expect(read({ path: "icon.bmp" })).rejects.toThrow(/BMP/);
+      await expect(read({ path: "icon.bmp" })).rejects.not.toThrow(/not text/i);
+    });
+
+    it("names TIFF for both of its extensions", async () => {
+      writeFileSync(join(workspace, "scan.tiff"), TIFF);
+      writeFileSync(join(workspace, "scan.tif"), TIFF);
+
+      await expect(read({ path: "scan.tiff" })).rejects.toThrow(/TIFF/);
+      await expect(read({ path: "scan.tif" })).rejects.toThrow(/TIFF/);
+    });
+
+    it("refuses the container formats a person plausibly hands it", async () => {
+      // HEIC and AVIF ride an ISO base media file container, identified by the
+      // brand at byte 8; ICO is four bytes.
+      const isobmff = (brand: string) =>
+        Buffer.concat([
+          Buffer.from([0x00, 0x00, 0x00, 0x18]),
+          Buffer.from(`ftyp${brand}`),
+          Buffer.alloc(8),
+        ]);
+      writeFileSync(join(workspace, "photo.heic"), isobmff("heic"));
+      writeFileSync(join(workspace, "portrait.heif"), isobmff("mif1"));
+      writeFileSync(join(workspace, "modern.avif"), isobmff("avif"));
+      writeFileSync(join(workspace, "favicon.ico"), Buffer.from([0x00, 0x00, 0x01, 0x00]));
+
+      await expect(read({ path: "photo.heic" })).rejects.toThrow(/HEIC/);
+      await expect(read({ path: "portrait.heif" })).rejects.toThrow(/HEIF/);
+      await expect(read({ path: "modern.avif" })).rejects.toThrow(/AVIF/);
+      await expect(read({ path: "favicon.ico" })).rejects.toThrow(/ICO/);
+    });
+  });
+
+  describe("the kind is decided by the bytes, not the name", () => {
+    it("shows a real PNG that carries a .txt name", async () => {
+      // Read as text, this was refused as binary - truthful, and useless.
+      writeFileSync(join(workspace, "image.txt"), Buffer.from(TINY_PNG, "base64"));
+
+      const result = await pictureGate(() => true).call({
+        name: "native/read",
+        input: { path: "image.txt" },
+        scope: SCOPE,
+      });
+
+      const image = contentBlocksOf(result)?.find(isImageBlock);
+      expect(image?.mimeType).toBe("image/png");
+      expect(image?.data).toBe(TINY_PNG);
+    });
+
+    it("labels a mislabelled picture by its bytes", async () => {
+      // 12-mislabelled.jpg holds PNG bytes under a jpg name, and only ever
+      // worked because the provider was tolerant of what the name claimed.
+      writeFileSync(join(workspace, "12-mislabelled.jpg"), Buffer.from(TINY_PNG, "base64"));
+
+      const result = await pictureGate(() => true).call({
+        name: "native/read",
+        input: { path: "12-mislabelled.jpg" },
+        scope: SCOPE,
+      });
+
+      expect(contentBlocksOf(result)?.find(isImageBlock)?.mimeType).toBe("image/png");
+    });
+
+    it("refuses BMP bytes however showable the name claims to be", async () => {
+      // Sent on as a "PNG", these bytes are a provider 400. Refused by kind,
+      // they are a sentence the model can act on.
+      writeFileSync(
+        join(workspace, "fakery.png"),
+        Buffer.concat([Buffer.from("BM"), Buffer.alloc(64)]),
+      );
+
+      await expect(read({ path: "fakery.png" })).rejects.toThrow(/BMP/);
+    });
+
+    it("keeps text that merely begins like a signature as text", async () => {
+      // "BM" is two ASCII letters that begin ordinary words, so a bare one is
+      // believed only when the name already claims a picture.
+      writeFileSync(join(workspace, "fleet.txt"), "BMW sales by quarter, and up.\n");
+
+      expect(await read({ path: "fleet.txt" })).toContain("BMW sales");
+    });
+
+    it("leaves SVG a text file, because that is what it is", async () => {
+      // Deliberately outside both maps: reading it as text is right, and a
+      // large one is a large text file - the text limit and its advice apply.
+      writeFileSync(
+        join(workspace, "logo.svg"),
+        '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>\n',
+      );
+
+      expect(await read({ path: "logo.svg" })).toContain("<svg");
+
+      writeFileSync(join(workspace, "huge.svg"), "<svg>".padEnd(2 * 1024 * 1024, "x"));
+      await expect(read({ path: "huge.svg" })).rejects.toThrow(/too large/i);
+    });
+  });
 });
 
 describe("write", () => {
