@@ -134,6 +134,36 @@ describe("the environment block", () => {
     expect(conversation).not.toMatch(/scratch directory[\s\S]{0,40}\/w/);
   });
 
+  it("says who the two directories belong to, and what to do about a third", () => {
+    // Three sentences a model was previously left to infer, and each one it
+    // got wrong somewhere: that a plain conversation's directory is for real
+    // work rather than notes, that the scratch directory is the
+    // conversation's and not the project's, and that a folder it cannot reach
+    // is a thing to name and ask for rather than to route around or to
+    // quietly claim it checked.
+    const conversation = environmentBlock({
+      workspace: "/w",
+      kind: "conversation",
+      git: false,
+      today: "2026-08-30",
+      scratch: "/s",
+    });
+    expect(conversation).toMatch(/Real work happens here/);
+    expect(conversation).toMatch(/cannot see yours/);
+
+    const project = environmentBlock({
+      workspace: "/w",
+      kind: "project",
+      git: false,
+      today: "2026-08-30",
+      scratch: "/s",
+    });
+    // The project's own folders are the working directory, and no second one
+    // is given - the question a person kept having to ask about the layout.
+    expect(project).toMatch(/does not/);
+    expect(project).toMatch(/belongs to this conversation, not to the/);
+  });
+
   it("says nothing about a scratch directory when there is none", () => {
     // The facts builder drops a scratch equal to the workspace, and a
     // composition that supplies none must not leave the two-place sentence

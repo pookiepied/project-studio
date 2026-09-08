@@ -1392,8 +1392,16 @@ export class StudioRuntime implements AgentHost {
         // render keeps a refused send from creating anything, and the
         // sandbox root is in place before the runtime's first AGENTS.md and
         // skills discovery reads the environment.
-        ensureDirectory(conversationWorkspaceDirectory(options.conversationId));
-        ensureDirectory(conversationScratchDirectory(options.conversationId));
+        // The working directory, only when it is this conversation's own. A
+        // project conversation stands in the person's repository, so its
+        // `workspace/` would be a folder nothing writes to, nothing reads
+        // from, and nobody can explain - the third place in a design that has
+        // two. Both modes get exactly the working directory they stand in and
+        // one scratch directory beside it.
+        if (projectRoot === conversationWorkspaceDirectory(options.conversationId)) {
+          ensureDirectory(conversationWorkspaceDirectory(options.conversationId));
+        }
+        ensureDirectory(scratchRoot);
         ensureDirectory(conversationAttachmentsDirectory(options.conversationId));
         ensureDirectory(conversationArtifactsDirectory(options.conversationId));
         return sessionEnvironment(sandbox);

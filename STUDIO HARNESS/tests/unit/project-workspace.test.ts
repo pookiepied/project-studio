@@ -11,6 +11,7 @@ import { ConversationStore } from "../../src/conversations/store.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
+  conversationScratchDirectory,
   conversationWorkspaceDirectory,
 } from "../../src/platform/paths.js";
 import { ProjectStore } from "../../src/projects/store.js";
@@ -260,7 +261,14 @@ describe("a project conversation stands in the project's folders", () => {
       await environmentFor(state, "cnv_tree");
       expect(existsSync(conversationAttachmentsDirectory("cnv_tree"))).toBe(true);
       expect(existsSync(conversationArtifactsDirectory("cnv_tree"))).toBe(true);
-      expect(existsSync(conversationWorkspaceDirectory("cnv_tree"))).toBe(true);
+      // The scratch directory exists in both modes: it is the one place the
+      // model may leave working files whatever it is standing in.
+      expect(existsSync(conversationScratchDirectory("cnv_tree"))).toBe(true);
+      // And `workspace/` does not, because this conversation stands in the
+      // person's repository. Creating it here would leave a folder nothing
+      // writes to and nobody can explain - a third place in a design that has
+      // two. It is made only when it is the working directory.
+      expect(existsSync(conversationWorkspaceDirectory("cnv_tree"))).toBe(false);
     } finally {
       await stop(state);
     }
