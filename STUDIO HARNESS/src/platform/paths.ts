@@ -274,6 +274,32 @@ export function conversationArtifactsDirectory(conversationId: string): string {
 }
 
 /**
+ * Where a delete sets a file aside when the snapshot history cannot cover it.
+ *
+ * The shadow repository's work tree is the workspace root, so a path the user
+ * granted outside it - a second folder on the project, their Downloads - has
+ * no restore point when deleted. The delete tool moves such a path here
+ * instead of destroying it, so "delete" is recoverable everywhere it can
+ * reach, by one of two mechanisms that never overlap: inside the workspace
+ * root the snapshot history is the recovery; outside it, this trash is.
+ *
+ * A sibling of `workspace/` rather than a child of it, and granted to no
+ * sandbox root: trashed files are recovery state, not something the model
+ * works with - the same reasoning that keeps `attachments/` and `artifacts/`
+ * out of its reach. The delete tool's result names the entry it created, so
+ * the model can tell the person where the file went without being able to
+ * touch it again.
+ *
+ * Retention needs no second mechanism: the tree is inside the conversation's
+ * own directory, so a purge of the conversation destroys it, and until then
+ * nothing sweeps - the same doctrine `conversations/purge.ts` states for the
+ * rest of the tree. Nothing else needs to know this directory exists.
+ */
+export function conversationTrashDirectory(conversationId: string): string {
+  return join(conversationDirectory(conversationId), "trash");
+}
+
+/**
  * Everything that must survive, for a backup or export to enumerate.
  *
  * Derived from the same accessors the rest of the application uses, so a new

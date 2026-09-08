@@ -83,8 +83,13 @@ export async function currentState(
  * directories exist and the question has no answer. Nearest-first while
  * walking up, reversed on return, so the result reads outermost-first the way
  * a path does.
+ *
+ * Exported rather than private because `move` answers the same question about
+ * its destination, whose parents its rename creates by the same contract -
+ * and a meaning kept in two copies is a meaning that will differ, which is
+ * this codebase's oldest lesson.
  */
-async function directoriesToCreate(
+export async function directoriesToCreate(
   sandbox: { exists: (path: string) => Promise<boolean> },
   path: string,
 ): Promise<readonly string[]> {

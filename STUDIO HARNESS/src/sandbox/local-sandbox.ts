@@ -1,4 +1,4 @@
-import { readdir, readFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 
 import type { CapabilityDescriptor } from "../contracts/capabilities.js";
@@ -456,6 +456,39 @@ export class LocalSandbox {
     }
 
     await rm(target, { recursive: true, force: true });
+  }
+
+  /**
+   * Moves one writable path to another, preserving the bytes exactly.
+   *
+   * Both endpoints resolve through `resolveWrite`, so a move can neither
+   * start outside the writable roots nor land outside them - the same one
+   * resolver every other filesystem operation goes through, asked twice
+   * because a move names two paths.
+   *
+   * The workspace root is refused as either endpoint, for the reason
+   * {@link LocalSandbox.remove} refuses it as a target: the root is where
+   * this agent stands, and relocating it is not an operation anyone meant.
+   * The destination's parents are created first, matching the contract
+   * `writeFile` states and every caller of that relies on.
+   *
+   * Overwriting is deliberately not offered here. Windows does not replace
+   * through rename anyway, and "move onto an existing file" is a decision
+   * about discarding content, which belongs to the tool that can require the
+   * file to have been read first.
+   */
+  async rename(from: string, to: string): Promise<void> {
+    const source = this.resolveWrite(from);
+    const target = this.resolveWrite(to);
+
+    if (source === this.#policy.workspaceRoot || target === this.#policy.workspaceRoot) {
+      throw new SandboxError("not_permitted", {
+        message: "The workspace root cannot be moved.",
+      });
+    }
+
+    await mkdir(dirname(target), { recursive: true });
+    await rename(source, target);
   }
 }
 

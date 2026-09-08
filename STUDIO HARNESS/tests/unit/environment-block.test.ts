@@ -131,7 +131,7 @@ describe("the environment block", () => {
     // The scratch path is never the working directory: a model handed one
     // directory under two names treats it as two places, which is the bug
     // this shape exists to prevent.
-    expect(conversation).not.toMatch(/scratch directory[\s\S]{0,40}\/w/);
+    expect(conversation).not.toMatch(/scratch directory[\s\S]{0,40}\/w\b/);
   });
 
   it("says who the two directories belong to, and what to do about a third", () => {

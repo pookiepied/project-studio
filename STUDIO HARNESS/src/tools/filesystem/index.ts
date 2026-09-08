@@ -1,7 +1,9 @@
 import type { CallGate } from "../gate.js";
 import { FileAccessLog } from "./access-log.js";
 import type { ImageBudget } from "./image-budget.js";
+import { createDeleteTool } from "./delete.js";
 import { createEditTool } from "./edit.js";
+import { createMoveTool } from "./move.js";
 import { createReadTool } from "./read.js";
 import { createWriteTool } from "./write.js";
 
@@ -12,7 +14,9 @@ export {
   MAX_IMAGES_PER_CONVERSATION,
   MAX_IMAGE_BYTES,
 } from "./image-budget.js";
+export { DELETE_DESCRIPTOR, createDeleteTool } from "./delete.js";
 export { EDIT_DESCRIPTOR, createEditTool } from "./edit.js";
+export { MOVE_DESCRIPTOR, createMoveTool } from "./move.js";
 export { READ_DESCRIPTOR, createReadTool, formatNumbered } from "./read.js";
 export { WRITE_DESCRIPTOR, createWriteTool } from "./write.js";
 
@@ -28,15 +32,18 @@ export interface FilesystemToolOptions {
 }
 
 /**
- * The filesystem family: read, write, edit.
+ * The filesystem family: read, write, edit, delete, move.
  *
- * Registered together and sharing one access log, because the rule that a file
- * must be read before it is modified only holds if all three agree on what has
- * been read. Registering them separately with separate logs would leave the
- * rule enforceable in principle and absent in practice.
+ * Registered together and sharing one access log, because the rule that a
+ * file must be read before it is modified only holds if all of them agree on
+ * what has been read. Registering them separately with separate logs would
+ * leave the rule enforceable in principle and absent in practice.
  *
  * There is no `list` tool: `glob` covers it, and two ways to enumerate a
- * directory is one more permission surface than the capability needs.
+ * directory is one more permission surface than the capability needs. There
+ * is no `mkdir` tool either, for the same kind of reason: `write` creates
+ * every missing parent directory already, so the only thing a separate tool
+ * buys is an empty directory, which almost nothing needs.
  */
 export function registerFilesystemTools(
   gate: CallGate,
@@ -46,5 +53,7 @@ export function registerFilesystemTools(
   gate.register(createReadTool(log, options));
   gate.register(createWriteTool(log));
   gate.register(createEditTool(log));
+  gate.register(createDeleteTool(log));
+  gate.register(createMoveTool(log));
   return log;
 }

@@ -216,6 +216,19 @@ replace it whole rather than trying the same edit a third time.
 **write** - creates a file, or replaces one whole. Use it when the change
 is the whole file, and as the way out of a failing edit.
 
+**delete** - removes a file, or a directory with everything inside it once
+you pass recursive. Read a file before deleting it: what you are discarding
+is worth knowing, and an unread file is a guess. The result tells you how
+the delete can be undone - kept in the project's snapshot history, or set
+aside in a trash it names. Nothing here runs the shell's rm, because the
+shell's rm comes back with no answer.
+
+**move** - renames a file or directory, or relocates it to another of your
+roots. It is the only tool that can, and it does not change what a file
+contains - it is not a copy followed by a write. It refuses to land on a
+path that is taken; when you mean the takeover, read what you are about to
+replace and pass overwrite.
+
 Never write to the same file twice in one message. Independent calls go
 out together, so two writes to one file in one message race each other;
 make that change in a single call, or across messages.

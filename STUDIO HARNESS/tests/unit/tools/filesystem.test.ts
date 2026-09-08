@@ -1,15 +1,26 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ExecutionScope } from "../../../src/contracts/capabilities.js";
+import { conversationTrashDirectory } from "../../../src/platform/paths.js";
 import { PermissionGrantStore } from "../../../src/permissions/grant-store.js";
 import { PermissionKernel } from "../../../src/permissions/kernel.js";
 import { SandboxError } from "../../../src/sandbox/errors.js";
 import { LocalSandbox } from "../../../src/sandbox/local-sandbox.js";
-import { createSandboxPolicy } from "../../../src/sandbox/policy.js";
+import { createSandboxPolicy, type SandboxPolicy } from "../../../src/sandbox/policy.js";
+import { SnapshotStore } from "../../../src/snapshots/store.js";
+import { TurnSnapshots, type SnapshotHook } from "../../../src/snapshots/turn.js";
 import { openDatabase, type StudioDatabase } from "../../../src/storage/database.js";
 import { ToolError } from "../../../src/tools/errors.js";
 import { CallGate } from "../../../src/tools/gate.js";
@@ -882,11 +893,15 @@ describe("what counts as the file having changed", () => {
 });
 
 describe("every tool goes through the gate", () => {
-  it("registers exactly the three filesystem capabilities", () => {
+  it("registers exactly the five filesystem capabilities", () => {
     // No `list` tool: glob covers it, and two ways to enumerate a directory is
-    // one more permission surface than the capability needs.
+    // one more permission surface than the capability needs. No `mkdir` tool
+    // either: `write` creates every missing parent already, so the only thing
+    // one would buy is an empty directory.
     expect(gate.list().map((tool) => tool.id.name).sort()).toEqual([
+      "delete",
       "edit",
+      "move",
       "read",
       "write",
     ]);
@@ -898,14 +913,22 @@ describe("every tool goes through the gate", () => {
     expect(byName.get("read")).toEqual(["read"]);
     expect(byName.get("write")).toEqual(["write"]);
     expect(byName.get("edit")).toEqual(["write"]);
+    expect(byName.get("delete")).toEqual(["write"]);
+    expect(byName.get("move")).toEqual(["write"]);
   });
 
-  it("marks edit as not idempotent, because reapplying it fails", () => {
-    // The old string is gone the second time. A correct refusal, not a safe
-    // retry — which matters when a call fails with an unknown outcome.
-    const edit = gate.list().find((tool) => tool.id.name === "edit");
+  it("marks the calls whose retry meets a changed file as not idempotent", () => {
+    // Editing twice: the old string is gone the second time. Deleting twice:
+    // the second call finds the path already gone. Moving twice: the source
+    // is already where it was going. Each is a correct refusal, not a safe
+    // retry - which matters when a call fails with an unknown outcome. A
+    // repeated write, by contrast, lands the same file.
+    const byName = new Map(gate.list().map((tool) => [tool.id.name, tool.idempotent]));
 
-    expect(edit?.idempotent).toBe(false);
+    expect(byName.get("write")).toBe(true);
+    expect(byName.get("edit")).toBe(false);
+    expect(byName.get("delete")).toBe(false);
+    expect(byName.get("move")).toBe(false);
   });
 
   it("surfaces a bad argument as a tool error, not a crash", async () => {
@@ -979,5 +1002,389 @@ describe("tool calls arriving together", () => {
 
     expect(readFileSync(join(workspace, "one.txt"), "utf8")).toBe("first");
     expect(readFileSync(join(workspace, "two.txt"), "utf8")).toBe("second");
+  });
+});
+
+/**
+ * A private gate, for the tests that need more than the shared one: a log
+ * whose records they can read, a second writable root, or the undo history
+ * behind the gate. The shared `gate` answers to nobody's assertions.
+ *
+ * Each call needs its own `PermissionKernel`, because registration refuses a
+ * duplicate rather than updating in place - the same refusal the gate itself
+ * gives, at the door below it.
+ */
+function privateGate(options: {
+  log?: FileAccessLog;
+  policy?: SandboxPolicy;
+  snapshots?: SnapshotHook;
+}): CallGate {
+  const kernel = new PermissionKernel({
+    grants: new PermissionGrantStore(db),
+    // Writing asks by default; an always-approving user keeps these tests
+    // about the tools, exactly as the shared gate's kernel does.
+    approver: { request: async () => ({ verdict: "allow", duration: "always" }) },
+  });
+  const instance = new CallGate({
+    kernel,
+    sandbox: new LocalSandbox(options.policy ?? createSandboxPolicy({ workspaceRoot: workspace })),
+    ...(options.snapshots === undefined ? {} : { snapshots: options.snapshots }),
+  });
+  registerFilesystemTools(instance, options.log ?? new FileAccessLog());
+  return instance;
+}
+
+const SCOPE_CALLS = (gate: CallGate) => (name: string, input: unknown, scope = SCOPE) =>
+  gate.call({ name, input, scope });
+
+describe("delete", () => {
+  const call = (input: unknown) =>
+    gate.call({ name: "native/delete", input, scope: SCOPE }) as Promise<string>;
+
+  it("removes a file the conversation has read, and says how the deletion is undone", async () => {
+    await read({ path: "src/app.ts" });
+
+    const note = await call({ path: "src/app.ts" });
+
+    expect(note).toContain("Deleted src/app.ts.");
+    // Inside the workspace root, the honest answer: the shadow repository,
+    // not this conversation, holds what is needed to put it back.
+    expect(note).toContain("snapshot history");
+    expect(existsSync(join(workspace, "src", "app.ts"))).toBe(false);
+  });
+
+  it("does not demand a read of a file this conversation wrote", async () => {
+    // The write is a read as far as the log is concerned - the tool knows
+    // what it just put there, and `write` records it. Editing without
+    // re-reading has worked this way since the rule shipped; deleting is
+    // the same bargain, or the rule would charge a second look for a file
+    // whose contents are already known.
+    await write({ path: "mine.txt", content: "ours" });
+
+    await call({ path: "mine.txt" });
+
+    expect(existsSync(join(workspace, "mine.txt"))).toBe(false);
+  });
+
+  it("refuses a file the conversation has never seen", async () => {
+    writeFileSync(join(workspace, "unread.txt"), "not yours yet");
+
+    await expect(call({ path: "unread.txt" })).rejects.toThrow(/has not been read yet/);
+    expect(existsSync(join(workspace, "unread.txt"))).toBe(true);
+  });
+
+  it("refuses a path that is not there", async () => {
+    await expect(call({ path: "missing.txt" })).rejects.toThrow(/does not exist/);
+  });
+
+  it("refuses a directory until recursive is passed, then takes everything under it", async () => {
+    // Deliberately unread files inside: a directory cannot be read (`read`
+    // refuses one), so the read-first rule cannot reach in here, and the
+    // explicit `recursive` is the acknowledgment instead.
+    mkdirSync(join(workspace, "tree", "deep"), { recursive: true });
+    writeFileSync(join(workspace, "tree", "a.txt"), "a");
+    writeFileSync(join(workspace, "tree", "deep", "b.txt"), "b");
+
+    await expect(call({ path: "tree" })).rejects.toThrow(/recursive: true/);
+    expect(existsSync(join(workspace, "tree"))).toBe(true);
+
+    await call({ path: "tree", recursive: true });
+
+    expect(existsSync(join(workspace, "tree"))).toBe(false);
+  });
+
+  it("refuses the workspace root, which the agent itself stands in", async () => {
+    // Everything below it is a legitimate delete; the root is the one path
+    // whose removal ends the conversation's ability to work at all.
+    await expect(call({ path: ".", recursive: true })).rejects.toThrow(/workspace root/);
+    expect(existsSync(join(workspace, "src", "app.ts"))).toBe(true);
+  });
+});
+
+describe("a delete outside the workspace root", () => {
+  let log: FileAccessLog;
+  let other: string;
+  let home: string;
+  let previousHome: string | undefined;
+  let outsideGate: CallGate;
+  const call = (name: string, input: unknown, scope = SCOPE) =>
+    outsideGate.call({ name, input, scope });
+
+  beforeEach(() => {
+    other = mkdtempSync(join(tmpdir(), "studio-fs-other-"));
+    home = mkdtempSync(join(tmpdir(), "studio-fs-home-"));
+    // `studioHome()` reads this per call, so setting it here directs the
+    // trash - and nothing else in this suite, which uses no other part of
+    // the Studio home.
+    previousHome = process.env.PROJECT_STUDIO_HOME;
+    process.env.PROJECT_STUDIO_HOME = home;
+    log = new FileAccessLog();
+    outsideGate = privateGate({
+      log,
+      policy: createSandboxPolicy({
+        workspaceRoot: workspace,
+        readRoots: [other],
+        writeRoots: [workspace, other],
+      }),
+    });
+  });
+
+  afterEach(() => {
+    if (previousHome === undefined) delete process.env.PROJECT_STUDIO_HOME;
+    else process.env.PROJECT_STUDIO_HOME = previousHome;
+    rmSync(other, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("moves the deleted path into the conversation's trash, rather than destroying it", async () => {
+    // A granted folder is outside the shadow repository's work tree: no
+    // capture of this conversation ever contained this file, so the delete
+    // would be permanent if the tool did not provide the recovery itself.
+    const note = join(other, "notes.txt");
+    await call("native/write", { path: note, content: "travels" });
+
+    const result = (await call("native/delete", { path: note })) as string;
+
+    expect(result).toContain("trash at");
+    expect(existsSync(note)).toBe(false);
+
+    const trashRoot = conversationTrashDirectory(SCOPE.conversationId);
+    expect(trashRoot.startsWith(join(home, "data", "conversations"))).toBe(true);
+    const [entry] = readdirSync(trashRoot);
+    expect(entry).toBeDefined();
+
+    expect(readFileSync(join(trashRoot, entry!, "content"), "utf8")).toBe("travels");
+
+    const origin = JSON.parse(readFileSync(join(trashRoot, entry!, "origin.json"), "utf8")) as {
+      originalPath: string;
+      originalName: string;
+      conversationId: string;
+    };
+    expect(origin.originalPath).toBe(note);
+    expect(origin.originalName).toBe("notes.txt");
+    expect(origin.conversationId).toBe(SCOPE.conversationId);
+
+    // And the access log closes the circle: the deletion recorded against
+    // the resolved path, the same record every other modification leaves.
+    expect(log.get(SCOPE, note)).toEqual({ modifiedAt: 0, size: 0 });
+  });
+
+  it("moves between the roots, and says so when the history cannot help", async () => {
+    const from = join(workspace, "brief.txt");
+    await call("native/write", { path: from, content: "crossing" });
+    const to = join(other, "brief.txt");
+
+    const result = (await call("native/move", { from, to, overwrite: false })) as string;
+
+    // Neither endpoint is inside the workspace root's history, so the honest
+    // note is the cheaper one: the bytes moved, nothing was lost, and the
+    // move back is the undo.
+    expect(result).toContain("moving it back undoes this");
+    expect(existsSync(from)).toBe(false);
+    expect(readFileSync(to, "utf8")).toBe("crossing");
+  });
+});
+
+describe("a delete inside the project, undone", () => {
+  it("brings the deleted file back from the point taken before the delete", async () => {
+    // Real git, through the real gate: the same shadow repository the
+    // runtime keeps, pointed at this test's workspace. A mocked capture
+    // would prove only that the code believes in its own contract.
+    const snapshotRoot = mkdtempSync(join(tmpdir(), "studio-fs-snapshots-"));
+    try {
+      const store = new SnapshotStore({ workspaceRoot: workspace, root: snapshotRoot });
+      const snapshots = new TurnSnapshots({ store });
+      const call = SCOPE_CALLS(privateGate({ snapshots }));
+
+      // prepareModelTurn opens a turn before any tool of it runs, so the
+      // conversation's first write is already the second turn's candidate:
+      // the runtime's own sequence, not an extra courtesy.
+      snapshots.beginTurn();
+
+      // The conversation's first write opens the turn's undo point.
+      await call("native/write", {
+        path: "src/kept.txt",
+        content: "the conversation's version",
+      });
+      snapshots.beginTurn();
+
+      // The delete is the turn's first write, so its undo point is taken
+      // now - a capture that must already contain the file it is about to
+      // lose. This is the gate's ordering, not the test's.
+      const note = (await call("native/delete", { path: "src/kept.txt" })) as string;
+      expect(note).toContain("snapshot history");
+      expect(existsSync(join(workspace, "src", "kept.txt"))).toBe(false);
+
+      const [latest, prior] = await store.list();
+      expect(latest?.label).toBe("turn 2");
+      expect(prior?.label).toBe("turn 1");
+
+      await store.restore(latest!.id);
+
+      expect(readFileSync(join(workspace, "src", "kept.txt"), "utf8")).toBe(
+        "the conversation's version",
+      );
+    } finally {
+      rmSync(snapshotRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("move", () => {
+  const move = (input: unknown) =>
+    gate.call({ name: "native/move", input, scope: SCOPE }) as Promise<string>;
+
+  it("renames, and the contents arrive unchanged", async () => {
+    await write({ path: "before.txt", content: "the contents" });
+
+    const note = await move({ from: "before.txt", to: "after.txt" });
+
+    expect(note).toContain("Moved before.txt to after.txt.");
+    expect(existsSync(join(workspace, "before.txt"))).toBe(false);
+    expect(readFileSync(join(workspace, "after.txt"), "utf8")).toBe("the contents");
+    // Both endpoints answered to the workspace, so the history holds both.
+    expect(note).toContain("snapshot history");
+  });
+
+  it("moves a directory, its files, and its subtrees", async () => {
+    mkdirSync(join(workspace, "folder", "deeper"), { recursive: true });
+    writeFileSync(join(workspace, "folder", "in.txt"), "inside");
+    writeFileSync(join(workspace, "folder", "deeper", "down.txt"), "down");
+
+    await move({ from: "folder", to: "relocated" });
+
+    expect(readFileSync(join(workspace, "relocated", "in.txt"), "utf8")).toBe("inside");
+    expect(readFileSync(join(workspace, "relocated", "deeper", "down.txt"), "utf8")).toBe("down");
+    expect(existsSync(join(workspace, "folder"))).toBe(false);
+  });
+
+  it("refuses to land on a taken path, unless the takeover is asked for", async () => {
+    await write({ path: "one.txt", content: "one" });
+    await write({ path: "two.txt", content: "two" });
+
+    await expect(move({ from: "one.txt", to: "two.txt" })).rejects.toThrow(
+      /already exists. Add overwrite/,
+    );
+    expect(readFileSync(join(workspace, "two.txt"), "utf8")).toBe("two");
+
+    // The casualty was written by this conversation, so the read-first rule
+    // is already satisfied by the write, as it is for `edit`.
+    await move({ from: "one.txt", to: "two.txt", overwrite: true });
+
+    expect(readFileSync(join(workspace, "two.txt"), "utf8")).toBe("one");
+    expect(existsSync(join(workspace, "one.txt"))).toBe(false);
+  });
+
+  it("refuses to overwrite a destination the conversation has not read", async () => {
+    // Neither path was written through the tool, so neither observation
+    // exists: overwriting would be the blind replacement the read-first
+    // rule exists to prevent.
+    writeFileSync(join(workspace, "one.txt"), "one");
+    writeFileSync(join(workspace, "two.txt"), "two");
+
+    await expect(move({ from: "one.txt", to: "two.txt", overwrite: true })).rejects.toThrow(
+      /has not been read yet/,
+    );
+    expect(readFileSync(join(workspace, "two.txt"), "utf8")).toBe("two");
+  });
+
+  it("refuses to replace a directory wholesale, which is delete's work", async () => {
+    mkdirSync(join(workspace, "occupied", "inner"), { recursive: true });
+    writeFileSync(join(workspace, "occupied", "inner", "f.txt"), "f");
+    writeFileSync(join(workspace, "wanderer.txt"), "x");
+
+    await expect(move({ from: "wanderer.txt", to: "occupied", overwrite: true })).rejects.toThrow(
+      /is a directory/,
+    );
+    expect(existsSync(join(workspace, "occupied", "inner", "f.txt"))).toBe(true);
+    expect(existsSync(join(workspace, "wanderer.txt"))).toBe(true);
+  });
+
+  it("refuses a source that is not there", async () => {
+    await expect(move({ from: "nowhere.txt", to: "x.txt" })).rejects.toThrow(/does not exist/);
+  });
+
+  it("refuses the move that moves nothing", async () => {
+    await write({ path: "still.txt", content: "one" });
+
+    await expect(move({ from: "still.txt", to: "./still.txt" })).rejects.toThrow(/same path/);
+  });
+
+  it("refuses a directory moved into itself, which loses the inner copy's source", async () => {
+    mkdirSync(join(workspace, "outer", "inside"), { recursive: true });
+    writeFileSync(join(workspace, "outer", "in.txt"), "x");
+
+    await expect(move({ from: "outer", to: "outer/inside" })).rejects.toThrow(/inside itself/);
+  });
+
+  it("creates the destination's missing parents, and says it did", async () => {
+    await write({ path: "traveller.txt", content: "x" });
+
+    const note = await move({ from: "traveller.txt", to: "a/b/c.txt" });
+
+    // The same report `write` gives, for the same silent creation - and the
+    // same reason: a mistyped destination reads as success until something
+    // names where the file actually went.
+    expect(note).toContain("Created directories a, a/b, which did not exist.");
+    expect(readFileSync(join(workspace, "a", "b", "c.txt"), "utf8")).toBe("x");
+  });
+
+  it("refuses the workspace root as either end, through the sandbox", async () => {
+    // The tool's own checks answer most shapes; the primitive's guard is
+    // what a direct caller meets, and what keeps the two stories the same.
+    const sandbox = new LocalSandbox(createSandboxPolicy({ workspaceRoot: workspace }));
+
+    await expect(sandbox.rename(".", "elsewhere")).rejects.toThrow(/workspace root/);
+    await expect(sandbox.rename("src", ".")).rejects.toThrow(/workspace root/);
+    expect(existsSync(join(workspace, "src", "app.ts"))).toBe(true);
+  });
+});
+
+describe("delete and move leave their records", () => {
+  it("records the deleted path as absent, and the moved source likewise but the destination never", async () => {
+    const log = new FileAccessLog();
+    const ownGate = privateGate({ log });
+    const call = (name: string, input: unknown) =>
+      ownGate.call({ name, input, scope: SCOPE });
+
+    await call("native/write", { path: "gone.txt", content: "first" });
+    await call("native/delete", { path: "gone.txt" });
+
+    expect(log.get(SCOPE, join(workspace, "gone.txt"))).toEqual({ modifiedAt: 0, size: 0 });
+
+    await call("native/write", { path: "src/thing.ts", content: "contents" });
+    await call("native/move", { from: "src/thing.ts", to: "renamed.ts" });
+
+    // The old path: absent, exactly as a deletion reads.
+    expect(log.get(SCOPE, join(workspace, "src", "thing.ts"))).toEqual({
+      modifiedAt: 0,
+      size: 0,
+    });
+    // The destination: deliberately nothing. This conversation has moved the
+    // file but never seen what it contains, and the log only speaks for what
+    // was seen - so the next edit reads first, which is the rule.
+    expect(log.get(SCOPE, join(workspace, "renamed.ts"))).toBeUndefined();
+  });
+
+  it("asks for a fresh read of a file that reappeared at a deleted path", async () => {
+    const log = new FileAccessLog();
+    const ownGate = privateGate({ log });
+    const call = (name: string, input: unknown) =>
+      ownGate.call({ name, input, scope: SCOPE });
+
+    await call("native/read", { path: "src/app.ts" });
+    await call("native/delete", { path: "src/app.ts" });
+    writeFileSync(join(workspace, "src", "app.ts"), "someone else recreated it\n");
+
+    // The log's last word on this path was the deletion; a new occupant is
+    // not the file that was read, and the next modification says so rather
+    // than editing against the memory of the departed one.
+    await expect(
+      call("native/edit", {
+        path: "src/app.ts",
+        oldString: "someone else recreated it",
+        newString: "x",
+      }),
+    ).rejects.toThrow(/changed after it was read/);
   });
 });
