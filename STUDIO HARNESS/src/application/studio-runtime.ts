@@ -48,6 +48,7 @@ import type { QuestionBroker } from "./question-broker.js";
 import {
   conversationArtifactsDirectory,
   conversationAttachmentsDirectory,
+  conversationScratchDirectory,
   conversationWorkspaceDirectory,
   ensureDirectory,
 } from "../platform/paths.js";
@@ -1116,10 +1117,29 @@ export class StudioRuntime implements AgentHost {
     // arriving alone used to take the conversation's own directory out of the
     // writable set, which is the opposite of what a grant means.
     const otherFolders = projectFolders.slice(1);
+    // The conversation's own scratch directory, writable in every mode.
+    //
+    // Named here because the policy replaces its default write set with
+    // whatever arrives, and a project conversation's set is built from the
+    // person's folders - none of which is this. The prompt has always told a
+    // project conversation it has a private directory of its own; until this
+    // line the sandbox did not agree, and the first write to it was refused
+    // as outside the workspace. In a plain conversation it is a second
+    // writable root beside the workspace the run stands in.
+    const scratchRoot = conversationScratchDirectory(options.conversationId);
     const policy = createSandboxPolicy({
       workspaceRoot: projectRoot,
-      readRoots: withoutDuplicateRoots([...otherFolders, ...roots.readRoots]),
-      writeRoots: withoutDuplicateRoots([projectRoot, ...otherFolders, ...roots.writeRoots]),
+      // The scratch root is readable as well as writable, and not only for
+      // symmetry: the policy refuses a writable root that sits inside no
+      // readable one, because a place you may write and never read back is a
+      // place you cannot work in.
+      readRoots: withoutDuplicateRoots([scratchRoot, ...otherFolders, ...roots.readRoots]),
+      writeRoots: withoutDuplicateRoots([
+        projectRoot,
+        scratchRoot,
+        ...otherFolders,
+        ...roots.writeRoots,
+      ]),
       ...(trusted ? { trusted: true } : {}),
       // PATH is the one grant a command line needs beyond the workspace: a
       // shell's job is finding programs, and with the policy environment
@@ -1373,6 +1393,7 @@ export class StudioRuntime implements AgentHost {
         // sandbox root is in place before the runtime's first AGENTS.md and
         // skills discovery reads the environment.
         ensureDirectory(conversationWorkspaceDirectory(options.conversationId));
+        ensureDirectory(conversationScratchDirectory(options.conversationId));
         ensureDirectory(conversationAttachmentsDirectory(options.conversationId));
         ensureDirectory(conversationArtifactsDirectory(options.conversationId));
         return sessionEnvironment(sandbox);

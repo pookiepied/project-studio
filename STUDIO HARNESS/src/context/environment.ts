@@ -172,9 +172,13 @@ export function environmentFacts(
     today: localDate(now),
     ...(extraRoots === undefined || extraRoots.length === 0 ? {} : { extraRoots }),
     ...(projectFolders === undefined || projectFolders.length === 0 ? {} : { projectFolders }),
-    // Only when it is somewhere other than where the run stands. On a plain
-    // conversation the two are the same directory, and naming it twice
-    // invites the model to treat one path as two places.
+    // A guard that no longer fires, kept because the failure it prevents is
+    // silent. The scratch directory is a sibling of the workspace, so the two
+    // are different paths in both modes; earlier the workspace was passed
+    // here on a plain conversation and the model was handed one directory
+    // under two names, which it reasonably treated as two places. Should a
+    // caller ever pass the workspace again, dropping it is still the right
+    // answer.
     ...(scratch === undefined || scratch === workspace ? {} : { scratch }),
     ...(backgroundJobs === undefined || backgroundJobs.length === 0
       ? {}
@@ -239,11 +243,20 @@ export function environmentFacts(
  * already persists across turns, and `write` already writes to it. What was
  * missing was one sentence saying so.
  *
- * The two cases say opposite things on purpose. In a conversation the
- * instruction is "this is yours, use it"; in a project it is "these are
- * theirs, and a working file goes somewhere you were asked to put it".
- * Collapsing them into one careful paragraph would restore the original
- * problem, which was a model that could not tell which it was in.
+ * The two cases now say the same thing about the same two places, and that
+ * is the correction. Both name a working directory that holds what the person
+ * asked for, and a scratch directory beside it that holds everything else,
+ * with one identical sentence dividing them. Only the *identity* of the
+ * working directory changes with the mode - the person's repository in a
+ * project, the conversation's own folder otherwise - which is what the mode
+ * means and needs no separate discipline to reason about.
+ *
+ * What must not collapse is the surrounding warning. A project conversation
+ * is standing in files that existed before it and belong to someone else, and
+ * that paragraph stays. A plain conversation is standing in an empty
+ * directory it owns, and saying so is what stopped a model from treating its
+ * own scratch space as somebody's source tree. The shared part is the
+ * two-place rule; the different part is who owns what it is standing in.
  */
 function workspaceStatement(facts: EnvironmentFacts): readonly string[] {
   if (facts.kind === "project") {
@@ -292,15 +305,33 @@ function workspaceStatement(facts: EnvironmentFacts): readonly string[] {
   return [
     "This directory belongs to this conversation and to nothing else. It",
     "started empty, no other conversation reads it, and it persists between",
-    "turns and across restarts. It is yours to work in: write intermediate",
-    "files, notes, scripts and downloads here as freely as you need, and read",
-    "them back later. Nothing here is the person's own work unless they put",
-    "it here, so you are not disturbing anything by using it.",
+    "turns and across restarts. Nothing here is the person's own work unless",
+    "they put it here, so you are not disturbing anything by using it. What",
+    "you make here for them - a script they asked for, a page, a document -",
+    "is what they will come looking for, so this is where finished work",
+    "belongs.",
     "",
-    "It starts empty, which is the one thing to keep in mind: the person's own",
-    "code is not here. If they want work done on a codebase they already have,",
-    "say so and ask them to open it as a project, rather than rebuilding part",
-    "of it here from what they have told you.",
+    ...(facts.scratch === undefined
+      ? []
+      : [
+          "Beside it you have a scratch directory, and it is not this one:",
+          `${facts.scratch}`,
+          "",
+          "That is where everything else goes - a throwaway script, a file you",
+          "downloaded to look at once, the output of a command you want to",
+          "read back later, notes to yourself between turns. It persists the",
+          "same way, and the person is not looking at it.",
+          "",
+          "The rule between the two is one sentence: work the person asked for",
+          "belongs in the working directory, and nothing else does. Keeping",
+          "them apart is what lets someone open this conversation's folder and",
+          "see what they asked for rather than what it took to get there.",
+          "",
+        ]),
+    "The working directory starts empty, which is the one thing to keep in",
+    "mind: the person's own code is not here. If they want work done on a",
+    "codebase they already have, say so and ask them to open it as a project,",
+    "rather than rebuilding part of it here from what they have told you.",
     "",
   ];
 }

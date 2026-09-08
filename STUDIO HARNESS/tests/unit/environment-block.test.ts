@@ -76,9 +76,14 @@ describe("the environment block", () => {
       today: "2026-08-30",
     });
     expect(own).toContain("belongs to this conversation");
-    expect(own).toMatch(/yours to work in/);
-    // The instruction that makes it usable, not just permitted.
-    expect(own).toMatch(/intermediate/);
+    // Permission, in the words that answer the misreading: nothing here is
+    // theirs, so using it disturbs nothing.
+    expect(own).toMatch(/not disturbing anything/);
+    // And what the directory is FOR, which is the half that makes it usable
+    // rather than merely permitted. It is where finished work goes; the
+    // scratch directory beside it takes everything else, and that sentence is
+    // asserted where a scratch path is actually supplied.
+    expect(own).toMatch(/where finished work/);
     // And the one real limit of a private workspace: it is empty, so the
     // person's existing code is somewhere else.
     expect(own).toMatch(/open it as a project/);
@@ -94,6 +99,52 @@ describe("the environment block", () => {
     // be careful everywhere is what produced the original misreading.
     expect(theirs).not.toMatch(/yours to work in/);
     expect(own).not.toContain("the person's project");
+  });
+
+  it("divides the two places by the same sentence in both kinds", () => {
+    // The correction to the original split. Both kinds now name a working
+    // directory that holds what was asked for and a scratch directory that
+    // holds everything else, so a model does not learn one discipline in a
+    // project and a different one outside it. Only the identity of the
+    // working directory changes, which is what the mode means.
+    const conversation = environmentBlock({
+      workspace: "/w",
+      kind: "conversation",
+      git: false,
+      today: "2026-08-30",
+      scratch: "/s",
+    });
+    const project = environmentBlock({
+      workspace: "/w",
+      kind: "project",
+      git: false,
+      today: "2026-08-30",
+      scratch: "/s",
+    });
+
+    for (const block of [conversation, project]) {
+      expect(block).toContain("/s");
+      expect(block).toMatch(/scratch/);
+      expect(block).toMatch(/nothing else does/);
+    }
+
+    // The scratch path is never the working directory: a model handed one
+    // directory under two names treats it as two places, which is the bug
+    // this shape exists to prevent.
+    expect(conversation).not.toMatch(/scratch directory[\s\S]{0,40}\/w/);
+  });
+
+  it("says nothing about a scratch directory when there is none", () => {
+    // The facts builder drops a scratch equal to the workspace, and a
+    // composition that supplies none must not leave the two-place sentence
+    // dangling with no second place named.
+    const block = environmentBlock({
+      workspace: "/w",
+      kind: "conversation",
+      git: false,
+      today: "2026-08-30",
+    });
+    expect(block).not.toMatch(/nothing else does/);
   });
 
   it("defaults the workspace kind to the conversation's own", () => {

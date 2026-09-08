@@ -242,6 +242,27 @@ export function conversationWorkspaceDirectory(conversationId: string): string {
   return join(conversationDirectory(conversationId), "workspace");
 }
 
+/**
+ * The model's own private directory, in every mode.
+ *
+ * A sibling of `workspace/` rather than a place inside it, because the two
+ * answer different questions and the answer must not change with the mode. A
+ * project conversation stands in the person's repository and this is the only
+ * directory it owns; a plain conversation stands in `workspace/` and this is
+ * still the place its throwaway files go. So the rule the model is given
+ * reads the same either way - what you were asked for goes in the workspace,
+ * everything else goes here - and `workspace/` never has to mean "the work"
+ * in one mode and "the junk" in the other.
+ *
+ * It is writable in both modes, which is the half that used to be missing: a
+ * project conversation was told it had a private directory and the sandbox's
+ * write roots did not include it, so the promise was refused at the first
+ * write.
+ */
+export function conversationScratchDirectory(conversationId: string): string {
+  return join(conversationDirectory(conversationId), "scratch");
+}
+
 /** Where files the user contributes to a conversation land. */
 export function conversationAttachmentsDirectory(conversationId: string): string {
   return join(conversationDirectory(conversationId), "attachments");

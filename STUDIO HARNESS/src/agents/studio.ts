@@ -4,7 +4,10 @@ import { useModel, useSandbox, type AgentProps } from "@flue/runtime";
 
 import { getStudioRuntime } from "../application/studio-runtime.js";
 import { STUDIO_AGENT_ID } from "../contracts/agents.js";
-import { conversationWorkspaceDirectory } from "../platform/paths.js";
+import {
+  conversationScratchDirectory,
+  conversationWorkspaceDirectory,
+} from "../platform/paths.js";
 import { environmentBlock, environmentFacts } from "../context/environment.js";
 import { STUDIO_SYSTEM_PROMPT } from "../context/system-prompt.js";
 import {
@@ -164,12 +167,14 @@ export function Studio({ id }: AgentProps) {
       kind,
       extraRoots.length === 0 ? undefined : extraRoots,
       folders.length === 0 ? undefined : folders,
-      // The conversation's own directory, always - the facts builder drops it
-      // when it is also the workspace, which is every conversation that has
-      // no project. A project conversation stands elsewhere and still has
-      // this, and being told so is what keeps working files out of the
-      // person's repository.
-      conversationWorkspaceDirectory(id),
+      // The conversation's scratch directory, always, and never the workspace.
+      // It is a sibling of `workspace/`, so the two are different paths in
+      // both modes and the model is never handed one directory under two
+      // names - the confusion an earlier version caused by passing the
+      // workspace here and letting the facts builder drop it. What each place
+      // is for now reads identically whichever mode this is: the workspace
+      // holds the work, this holds everything else.
+      conversationScratchDirectory(id),
       // Drains the ended ones, so this is the delivery and not a peek. It runs
       // once per turn, here, because assembling the prompt is the one thing a
       // turn does exactly once.
