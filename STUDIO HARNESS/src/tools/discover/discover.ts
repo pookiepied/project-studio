@@ -132,8 +132,10 @@ export const DISCOVER_DESCRIPTOR: CapabilityDescriptor = {
     "tool names; with a scope of \"mcp:blender\" to read what one extension " +
     "offers; or with \"mcp:blender/add_camera\" to load that one tool - its " +
     "full definition comes back here, and the tool itself joins your " +
-    "available tools from your next step. Native tools are already yours and " +
-    "cannot be discovered.",
+    "available tools from your next step. Several tools of one extension can " +
+    "be named at once, separated by commas, as in " +
+    "\"mcp:blender/add_camera,add_light\". Native tools are already yours " +
+    "and cannot be discovered.",
   inputSchema: {
     type: "object",
     properties: {
@@ -172,7 +174,7 @@ const THIRD_PARTY_NOTE =
  * are named in the refusal too - a schema they already hold is not a thing to
  * ask for.
  */
-function parseScope(scope: string): { serverId: string; toolName: string | undefined } {
+function parseScope(scope: string): { serverId: string; toolNames: readonly string[] | undefined } {
   if (!scope.startsWith(SCOPE_PREFIX)) {
     throw new ToolError("invalid_input", {
       message:
@@ -184,15 +186,39 @@ function parseScope(scope: string): { serverId: string; toolName: string | undef
   }
   const remainder = scope.slice(SCOPE_PREFIX.length);
   const separator = remainder.indexOf("/");
-  return {
-    // Beyond the first separator a tool name is whatever remains. Tool names
-    // cannot themselves contain a separator, so this is not a guess; a scope
-    // like `mcp:blender/add/camera` simply names a tool that does not exist,
-    // and the answer lists the ones that do.
-    serverId: separator === -1 ? remainder : remainder.slice(0, separator),
-    toolName: separator === -1 ? undefined : remainder.slice(separator + 1),
-  };
+  if (separator === -1) return { serverId: remainder, toolNames: undefined };
+
+  // Beyond the first separator a tool name is whatever remains. Tool names
+  // cannot themselves contain a separator, so this is not a guess; a scope
+  // like `mcp:blender/add/camera` simply names a tool that does not exist,
+  // and the answer lists the ones that do.
+  //
+  // Commas separate several of them, which is the whole of the bulk form: a
+  // model that knows it needs three tools of one extension pays one round
+  // trip instead of three, and stalls mid-task none of those times. It is
+  // bounded rather than unlimited, and there is deliberately no wildcard -
+  // loading an extension's whole catalog back is the very cost ADR 0048 §2
+  // exists to remove, and a wildcard is the one spelling that invites it.
+  const names = remainder
+    .slice(separator + 1)
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "");
+
+  return { serverId: remainder.slice(0, separator), toolNames: names };
 }
+
+/**
+ * How many tools one call may load.
+ *
+ * A pipeline a model can plan in advance is three or four tools; ten is
+ * already someone loading an extension by hand because they could not be
+ * bothered to choose. The cap is what keeps the comma form a convenience
+ * rather than the wildcard by another spelling, and it refuses rather than
+ * silently truncating, because a model told nothing about the tools it did
+ * not get would call them.
+ */
+const MAX_TOOLS_PER_CALL = 8;
 
 /**
  * The switch-on extensions, as the prompt announced them.
@@ -316,26 +342,63 @@ function extensionAnswer(
   return lines.join("\n");
 }
 
-/** The one tool's definition, and the fact that it is now loadable. */
-function loadedAnswer(tool: McpTool): string {
-  return [
-    `${capabilityKey(tool.descriptor.id)} - its full definition.`,
+/** The tools' definitions, and the fact that they are now loadable. */
+function loadedAnswer(tools: readonly McpTool[]): string {
+  const [first] = tools;
+  if (first === undefined) {
+    // Reachable: a scope of "mcp:blender/" names an extension and then no
+    // tool at all, because the comma split drops an empty name rather than
+    // inventing one. That is invalid input and not an internal fault, so it
+    // is refused the way every other malformed scope is - by naming the
+    // shapes that would have worked.
+    throw new ToolError("invalid_input", {
+      message:
+        "That scope names an extension and then no tool. Give a tool id " +
+        "(mcp:blender/add_camera), several of them separated by commas, or " +
+        "just the extension id to read what it offers.",
+    });
+  }
+  const many = tools.length > 1;
+
+  const lines: string[] = [
+    many
+      ? `${tools.length} tools - their full definitions.`
+      : `${capabilityKey(first.descriptor.id)} - its full definition.`,
     "",
     THIRD_PARTY_NOTE,
     "",
-    tool.descriptor.description === ""
-      ? "(The extension wrote no description for this tool.)"
-      : tool.descriptor.description,
-    "",
-    "The input it takes, as JSON Schema:",
-    JSON.stringify(tool.descriptor.inputSchema),
-    "",
-    "It is not in the tool list you are holding: that list was built before " +
-      "this call, and the tool arrived afterwards. From your next step it is " +
-      "in your tools, and calling it then is an ordinary call - the usual " +
-      "permission question, the usual result. You do not have to wait for " +
-      "the person to say anything first.",
-  ].join("\n");
+  ];
+
+  for (const tool of tools) {
+    // Named above its own definition when there are several, so that a schema
+    // can never be read against the wrong tool. With one, the heading already
+    // said which tool this is and repeating it would be noise.
+    if (many) lines.push(capabilityKey(tool.descriptor.id), "");
+    lines.push(
+      tool.descriptor.description === ""
+        ? "(The extension wrote no description for this tool.)"
+        : tool.descriptor.description,
+      "",
+      "The input it takes, as JSON Schema:",
+      JSON.stringify(tool.descriptor.inputSchema),
+      "",
+    );
+  }
+
+  lines.push(
+    many
+      ? "They are not in the tool list you are holding: that list was built " +
+          "before this call, and they arrived afterwards. From your next step " +
+          "they are in your tools, and calling them then is an ordinary call - " +
+          "the usual permission question, the usual result. You do not have to " +
+          "wait for the person to say anything first."
+      : "It is not in the tool list you are holding: that list was built before " +
+          "this call, and the tool arrived afterwards. From your next step it is " +
+          "in your tools, and calling it then is an ordinary call - the usual " +
+          "permission question, the usual result. You do not have to wait for " +
+          "the person to say anything first.",
+  );
+  return lines.join("\n");
 }
 
 /** An extension that is not there at all, and the ones that are. */
@@ -396,34 +459,63 @@ export function createDiscoverTool(
       const reached = reachedState(scope.serverId, dependencies);
       if (typeof reached === "string") return reached;
 
-      if (scope.toolName === undefined) {
+      if (scope.toolNames === undefined) {
         return extensionAnswer(reached, dependencies.tools(scope.serverId));
       }
 
       const namespace = nameOf(reached);
       const tools = dependencies.tools(scope.serverId);
+      // Refused whole rather than truncated. A model handed the first eight of
+      // the twelve it asked for, and told nothing about the other four, would
+      // call them.
+      if (scope.toolNames.length > MAX_TOOLS_PER_CALL) {
+        throw new ToolError("invalid_input", {
+          message:
+            `One call loads at most ${MAX_TOOLS_PER_CALL} tools, and this one ` +
+            `named ${scope.toolNames.length}. Name the ones this task needs, ` +
+            "in another call if it truly needs more.",
+        });
+      }
+
       // Found by the joined key, because that is the id the model was given:
       // the extension's, then the tool's. Nothing here invents a shorter name
-      // for it, and nothing here loads more than the one tool that was asked
-      // for - loading the extension's whole catalog back would be the very
-      // waste ADR 0048 §2 exists to remove.
-      const wanted = tools.find(
-        (tool) => capabilityKey(tool.descriptor.id) === `${namespace}/${scope.toolName}`,
-      );
-      if (wanted === undefined) {
+      // for one, and nothing loads a tool that was not named - loading the
+      // extension's whole catalog back would be the very waste ADR 0048 §2
+      // exists to remove.
+      const wanted: McpTool[] = [];
+      const missing: string[] = [];
+      for (const toolName of scope.toolNames) {
+        const found = tools.find(
+          (tool) => capabilityKey(tool.descriptor.id) === `${namespace}/${toolName}`,
+        );
+        if (found === undefined) missing.push(toolName);
+        else if (!wanted.includes(found)) wanted.push(found);
+      }
+
+      // Nothing is loaded when any name is wrong, and the answer says which.
+      // A partial load would leave the model believing it holds tools it does
+      // not, which is the one belief this whole mechanism exists to prevent -
+      // and the recovery is one corrected call, which is cheap.
+      if (missing.length > 0) {
         return [
-          `${namespace} has no tool named "${scope.toolName}".`,
+          missing.length === 1
+            ? `${namespace} has no tool named "${missing[0]}".`
+            : `${namespace} has no tool named ${missing.map((name) => `"${name}"`).join(" or ")}.`,
           "",
           tools.length === 0
             ? "None of its tools are known yet - it has not answered since it last started."
             : `Its tools are: ${tools.map((tool) => tool.descriptor.id.name).join(", ")}`,
+          ...(wanted.length === 0
+            ? []
+            : ["", "Nothing was loaded, including the names that were right - ask again for those."]),
         ].join("\n");
       }
+
       // Registration, then the answer: the order matters, because the answer
       // speaks of the registration as done, and an answer that lied about its
       // own side effect would be the one thing the model trusts without
       // reason.
-      dependencies.adopt(wanted);
+      for (const tool of wanted) dependencies.adopt(tool);
       return loadedAnswer(wanted);
     },
   });

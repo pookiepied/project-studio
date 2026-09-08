@@ -96,6 +96,24 @@ describe("what the inventory says about a server", () => {
     expect(block).toContain("mcp:blender - 3 tools");
   });
 
+  it("says that a name here is not yet a callable tool", () => {
+    // The gap a live experiment found: the section lists names, the model
+    // reads a list of names as a list of tools, and calling one that was
+    // never discovered fails - the gate matches names exactly and substitutes
+    // nothing. The model learned that by spending credits on it. Saying it
+    // costs a sentence.
+    const block = capabilityInventoryBlock([entry()]);
+
+    expect(block).toContain("not yet a tool you can call");
+    expect(block).toContain("nearest match is substituted");
+  });
+
+  it("says that what is discovered stays for the conversation", () => {
+    // Without this a model re-discovers a tool it already holds, which is a
+    // round trip bought for nothing, every time.
+    expect(capabilityInventoryBlock([entry()])).toContain("rest of this");
+  });
+
   it("carries no per-tool description", () => {
     // ADR 0048 weighed this and refused it: a description per tool is most of
     // a schema's token cost for a fraction of its use, paid on every turn.

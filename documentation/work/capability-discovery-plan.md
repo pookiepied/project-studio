@@ -339,6 +339,44 @@ so; (c) stays unbuilt, with its price written down beside it.
 
 ---
 
+#### What a live experiment found, and what was done about it (2026-09-08)
+
+The first real MCP server (Firecrawl, 25 tools) was driven by a model in a
+real conversation, which produced an incident report. Four things it found
+were true, and are now fixed or refused deliberately.
+
+**Fixed.** The capabilities section listed tool names and did not say that a
+name there is not yet callable. The model read the list as a list of tools,
+emitted a call for one it had never discovered, and its own generation slipped
+to the nearest name it *did* hold - which was a different tool, and a billable
+one. Two wasted calls. The section now says a name is not callable until
+discovered, that nothing is substituted for a name that is not there, and that
+what is discovered stays for the rest of the conversation.
+
+**Fixed.** Loading was one tool per call, so a model that knew it needed three
+paid three round trips and stalled twice mid-task. The scope now takes several
+tool names separated by commas, capped at eight, all-or-nothing when a name is
+wrong. There is deliberately no wildcard: loading a whole catalog back is the
+cost this mechanism exists to remove, and a wildcard is the spelling that
+invites it.
+
+**Refused - unload.** The report asked for a way to drop a schema mid
+conversation. Adding to the tools array appends after the cached prefix and is
+nearly free; removing invalidates the prefix and re-bills the entire
+conversation at full rate. On a long conversation that trades a few hundred
+tokens for tens of thousands. It is the most expensive thing the harness could
+offer, dressed as an optimization. Not to be built.
+
+**Refused - cost metadata.** The report asked that discovery say what a call
+costs. A third-party server's credits are its own; we cannot annotate a schema
+with a price we have no access to. What a server reports in its own results is
+already passed through.
+
+**Corrected.** The report inferred that the harness might have substituted a
+nearest-match tool. It does not: `CallGate.call` looks the name up exactly
+and throws `unknown_tool`. The substitution happened inside the model, which is
+why the prompt is where it was fixed.
+
 ### Step 5 — The browser, as the first real consumer
 
 The reason this plan exists in this order. A browser server is 25–30 tools —

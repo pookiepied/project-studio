@@ -255,6 +255,52 @@ describe("the discovery's answers", () => {
     expect(adopted).toEqual([]);
   });
 
+  it("loads several tools of one extension in one call", async () => {
+    // The bulk form exists because a model that knows its pipeline needs
+    // three tools should pay one round trip, not three - and should not stall
+    // half way through a task to fetch the next schema. It stays explicit:
+    // every tool loaded was named, and there is no wildcard.
+    const { discover, adopted } = world([blender()], INVENTORY_ENTRIES);
+    const answer = await answered(discover, { scope: "mcp:blender/add_camera,add_light" });
+
+    expect(answer).toContain("2 tools");
+    expect(answer).toContain("mcp:blender/add_camera");
+    expect(answer).toContain("mcp:blender/add_light");
+    expect(answer).toContain(JSON.stringify(CAMERA_SCHEMA));
+    expect(answer).toContain("next step");
+    expect(adopted.map((tool) => tool.descriptor.id.name)).toEqual(["add_camera", "add_light"]);
+  });
+
+  it("loads nothing at all when one of several names is wrong", async () => {
+    // All or nothing, deliberately. A partial load would leave the model
+    // believing it holds a tool it does not, which is the belief the whole
+    // mechanism exists to prevent; one corrected call is the cheaper failure.
+    const { discover, adopted } = world([blender()], INVENTORY_ENTRIES);
+    const answer = await answered(discover, { scope: "mcp:blender/add_camera,add_lite" });
+
+    expect(answer).toContain('no tool named "add_lite"');
+    expect(answer).toContain("Nothing was loaded");
+    expect(adopted).toEqual([]);
+  });
+
+  it("refuses a call that names more tools than it will load", async () => {
+    const { discover, adopted } = world([blender()], INVENTORY_ENTRIES);
+    const many = Array.from({ length: 9 }, (_, index) => `t${index}`).join(",");
+
+    await expect(answered(discover, { scope: `mcp:blender/${many}` })).rejects.toThrow(ToolError);
+    expect(adopted).toEqual([]);
+  });
+
+  it("refuses a scope that names an extension and then no tool", async () => {
+    // "mcp:blender/" is a shape a model can produce, and the empty name is
+    // dropped rather than guessed at, so this would otherwise reach the
+    // answer with nothing to describe.
+    const { discover, adopted } = world([blender()], INVENTORY_ENTRIES);
+
+    await expect(answered(discover, { scope: "mcp:blender/" })).rejects.toThrow(ToolError);
+    expect(adopted).toEqual([]);
+  });
+
   it("says honestly when a switched-on extension has answered no tools yet", async () => {
     // A server that has not come back from tools/list still gets its line -
     // the inventory's own reasoning, that silence about an enabled extension
