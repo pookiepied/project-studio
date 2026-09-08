@@ -488,3 +488,113 @@ describe('the dictation body', () => {
     })
   })
 })
+
+/**
+ * A record exactly as `GET /servers` answers it, so the wire tests below
+ * prove the round trip and not just the URL: a list whose records fail to
+ * parse would look identical to an empty one at the call boundary, which is
+ * the failure nobodydebugs from the outside.
+ */
+const MCP_RECORD = {
+  id: 'echo-server',
+  title: 'Echo server',
+  description: 'Echoes the supplied text',
+  provenance: 'user',
+  transport: 'stdio',
+  command: 'C:\tools\node.exe',
+  args: ['server.js'],
+  env: {},
+  needsNetwork: false,
+  auth: 'none',
+  enabledByDefault: false,
+}
+
+/**
+ * The scope writes, on the wire.
+ *
+ * What these pin is the pairing between the value a screen shows and the
+ * value the harness reads: Inherit is `null` - the third answer, which clears
+ * the decision so the wider scope applies again - and neither the project nor
+ * the conversation write may send a boolean there, because the difference
+ * between "inherits" and "off" is a different answer from the model's side.
+ */
+describe('the scope writes', () => {
+  it('reads the list, and no scope, when nothing narrower was asked', async () => {
+    const stub = stubFetch(() => jsonResponse([MCP_RECORD]))
+    const result = await clientWith(stub.fetch).listMcpServers()
+
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/mcp/servers`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value[0]?.id).toBe('echo-server')
+  })
+
+  it('asks the project question in the query, not in a second route', async () => {
+    const stub = stubFetch(() => jsonResponse([{ ...MCP_RECORD }]))
+    await clientWith(stub.fetch).listMcpServers({ projectId: 'prj/1' })
+
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/mcp/servers?projectId=prj%2F1`)
+  })
+
+  it('asks the conversation question the same way', async () => {
+    const stub = stubFetch(() => jsonResponse([{ ...MCP_RECORD, conversation: { decision: null, resolved: true, decidedAt: 'global' } }]))
+    const result = await clientWith(stub.fetch).listMcpServers({ conversationId: 'conv_1' })
+
+    expect(stub.calls[0]?.url).toBe(`${BASE_URL}/api/mcp/servers?conversationId=conv_1`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // The reading survived the parse, decisions and all: an inherit that
+    // arrived here as a boolean would be the flattening, one seam later.
+    expect(result.value[0]?.conversation).toEqual({ decision: null, resolved: true, decidedAt: 'global' })
+  })
+
+  it('writes a project decision at the project route, as the body the harness parses', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+
+    const result = await clientWith(stub.fetch).setMcpServerEnabled('echo-server', true, {
+      projectId: 'prj 1',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(stub.calls[0]?.method).toBe('PUT')
+    expect(stub.calls[0]?.url).toBe(
+      `${BASE_URL}/api/mcp/projects/prj%201/extensions/mcp/echo-server`,
+    )
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: true })
+  })
+
+  it('writes Inherit as null, which the harness reads as clear, not as off', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+
+    await clientWith(stub.fetch).setMcpServerEnabled('echo-server', null, {
+      projectId: 'prj_1',
+    })
+
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: null })
+  })
+
+  it("writes the conversation's decision to the conversation's own route", async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+
+    const result = await clientWith(stub.fetch).setConversationMcpServerEnabled(
+      'conv_1',
+      'echo-server',
+      false,
+    )
+
+    expect(result.ok).toBe(true)
+    expect(stub.calls[0]?.method).toBe('PUT')
+    expect(stub.calls[0]?.url).toBe(
+      `${BASE_URL}/api/mcp/conversations/conv_1/extensions/mcp/echo-server`,
+    )
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: false })
+  })
+
+  it('writes the conversation inherit as the same third value', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }))
+
+    await clientWith(stub.fetch).setConversationMcpServerEnabled('conv_1', 'echo-server', null)
+
+    expect(JSON.parse(stub.calls[0]?.body ?? 'null')).toEqual({ enabled: null })
+  })
+})

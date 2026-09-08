@@ -1646,6 +1646,27 @@ export type McpEra = (typeof MCP_ERAS)[number]
 export const SCOPE_KINDS = ['global', 'project', 'conversation'] as const
 export type ScopeKind = (typeof SCOPE_KINDS)[number]
 
+/**
+ * What one scope has decided, and what the whole chain answers.
+ *
+ * Three facts, because a row has to be honest about the effect, not only the
+ * setting. `decision` is what is stored at this scope: on, off, or `null`
+ * when it inherits - a real third answer, not a spelling of off, because
+ * inherit hands the question to a wider scope while off ends it. `resolved`
+ * and `decidedAt` are what the chain answers for the context the read named:
+ * this scope's own answer when it decided, the wider scope's when it did not.
+ * A control that showed only the decision would render "inherits" and "off"
+ * as the same silence, and the model's reach differs under the two.
+ */
+export interface McpScopeReading {
+  /** What this scope has stored: on, off, or `null` when it inherits. */
+  readonly decision: boolean | null
+  /** What selection resolves for the context this read was made in. */
+  readonly resolved: boolean
+  /** Which scope produced `resolved`. Absent when nothing anywhere decided; that resolves to off. */
+  readonly decidedAt?: ScopeKind
+}
+
 export interface McpServerStatus {
   readonly state: McpState
   /** Failed starts so far. Zero unless the state is failed or given-up. */
@@ -1717,6 +1738,17 @@ export interface McpServerRecord {
    * default - so this is stored state, never inferred from `status`.
    */
   readonly enabledByDefault: boolean
+  /**
+   * What the narrower scopes decided, when the read asked about one.
+   *
+   * `project` is present when the read named a project, `conversation` when it
+   * named a conversation, and neither is present from the global read, whose
+   * rows are about the default itself. Absent also means a harness older than
+   * the readings: such a read still works, it just cannot say what inherit
+   * resolves to, which is the one thing these fields are for.
+   */
+  readonly project?: McpScopeReading
+  readonly conversation?: McpScopeReading
   readonly status?: McpServerStatus
 }
 
@@ -1752,6 +1784,33 @@ function parseMcpStatus(value: unknown): McpServerStatus | null {
     ...(era === null ? {} : { era }),
     ...(protocolVersion.value === undefined ? {} : { protocolVersion: protocolVersion.value }),
     ...(lastError.value === undefined ? {} : { lastError: lastError.value }),
+  }
+}
+
+/**
+ * One scope's reading, as the harness wrote it.
+ *
+ * `decision` must say which of the three answers it is rather than collapsing
+ * to a boolean, because the difference between "inherits" (`null`) and "off"
+ * (`false`) is the difference between the wider scope deciding and this scope
+ * having ended the question - exactly the flattening this parser exists to
+ * keep honest. A reading that is present but malformed is refused outright
+ * rather than guessed at: the row would otherwise display an inherited state
+ * it only half knows.
+ */
+function parseMcpScopeReading(value: unknown): McpScopeReading | null {
+  if (!isRecord(value)) return null
+  const decision = value['decision']
+  if (typeof decision !== 'boolean' && decision !== null) return null
+  const resolved = flag(value['resolved'])
+  if (resolved === null) return null
+  const decidedAt = oneOf(SCOPE_KINDS, value['decidedAt'])
+  if (value['decidedAt'] !== undefined && decidedAt === null) return null
+
+  return {
+    decision,
+    resolved,
+    ...(decidedAt === null ? {} : { decidedAt }),
   }
 }
 
@@ -1811,6 +1870,14 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
     value['enabledByDefault'] === undefined ? false : flag(value['enabledByDefault'])
   if (enabledByDefault === null) return null
 
+  // Read when present, refused when malformed, absent when the harness
+  // predates them - which is the one case where a row legitimately cannot say
+  // what inherit resolves to, because nobody told it.
+  const project = value['project'] === undefined ? undefined : parseMcpScopeReading(value['project'])
+  const conversation =
+    value['conversation'] === undefined ? undefined : parseMcpScopeReading(value['conversation'])
+  if (project === null || conversation === null) return null
+
   const status = value['status'] === undefined ? undefined : parseMcpStatus(value['status'])
 
   // Rebuilt field by field, never spread from the response.
@@ -1825,6 +1892,8 @@ export function parseMcpServer(value: unknown): McpServerRecord | null {
     env,
     needsNetwork,
     enabledByDefault,
+    ...(project === undefined ? {} : { project }),
+    ...(conversation === undefined ? {} : { conversation }),
     ...(command.value === undefined ? {} : { command: command.value }),
     ...(url.value === undefined ? {} : { url: url.value }),
     ...(authHeader.value === undefined ? {} : { authHeader: authHeader.value }),

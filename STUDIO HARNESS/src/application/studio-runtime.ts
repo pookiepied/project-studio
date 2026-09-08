@@ -29,7 +29,7 @@ import { createMcpReconciler } from "../extend/mcp/reconcile.js";
 import { McpServerRegistry } from "../extend/mcp/registry.js";
 import type { McpServerRecord } from "../extend/mcp/registry.js";
 import { McpSupervisor } from "../extend/mcp/supervisor.js";
-import { ExtensionSelectionStore } from "../extend/selection.js";
+import { ExtensionSelectionStore, type ResolutionContext } from "../extend/selection.js";
 import { McpManagementService, type McpAdministration } from "./mcp-management.js";
 import { modelToolName } from "./tool-name.js";
 import { ProjectStore } from "../projects/store.js";
@@ -564,12 +564,16 @@ export class StudioRuntime implements AgentHost {
       diagnostic: (message, serverId) =>
         this.#logger?.warn(message, { server_id: serverId }),
       // Resolved rather than read at one scope: a server with no decision for
-      // this project inherits the user's global default, which is what makes a
-      // freshly created project useful without visiting a settings screen. The
-      // conversation scope exists in the store and is deliberately not asked
-      // here - see the note at the reconcile pass below.
-      isServerEnabled: (serverId) =>
-        this.#selection.resolve("mcp", serverId, { projectId: this.#projectId })
+      // this conversation inherits its project's answer, and then the user's
+      // global default, which is what makes a freshly created project useful
+      // without visiting a settings screen. The conversation the dispatch
+      // belongs to is what makes the chain; the tools array, the discovery and
+      // this predicate all resolve it the same way (see #enablementContext),
+      // because two readers answering differently is how a tool that is
+      // announced stops being callable.
+      isServerEnabled: (serverId, conversationId) =>
+        this.#selection
+          .resolve("mcp", serverId, this.#enablementContext(conversationId))
           .enabled,
     });
     this.#supervisor = new McpSupervisor({
@@ -599,11 +603,15 @@ export class StudioRuntime implements AgentHost {
     );
     // Built here, from the same two sources the tools array is built from, so
     // the prose and the array can never describe different configurations.
-    // The closure takes a conversation id it does not read: enablement is a
-    // property of the project this runtime serves, exactly as `refreshTools`
-    // resolves it, and the id is what the cache keys on rather than what the
-    // answer depends on.
-    this.#capabilities = new CapabilityInventory(() => this.#capabilityEntries());
+    // The closure does read its conversation id now: the conversation's own
+    // decision is the narrowest leg of its enablement, so the note a
+    // conversation is announced with must be built from that conversation's
+    // chain. What has not changed is when it is settled - the first build
+    // decides, and the memo (not the closure) is what keeps the block still
+    // for the conversation's life, which is ADR 0048 §1's rule.
+    this.#capabilities = new CapabilityInventory((conversationId) =>
+      this.#capabilityEntries(this.#enablementContext(conversationId)),
+    );
     this.#management = new McpManagementService({
       registry: this.#registry,
       grants: this.#grants,
@@ -611,6 +619,8 @@ export class StudioRuntime implements AgentHost {
       supervisor: this.#supervisor,
       extensions: this.#extensions,
       credentials: this.#credentials,
+      projectId: this.#projectId,
+      conversationProject: (conversationId) => this.#conversationProject(conversationId),
     });
   }
 
@@ -673,26 +683,62 @@ export class StudioRuntime implements AgentHost {
   }
 
   /**
-   * The installed servers this project's conversations actually get.
+   * The chain one conversation's enablement resolves through.
+   *
+   * Narrowest first: this conversation, then the project it is filed under,
+   * then this harness's project, then off. A conversation filed nowhere
+   * resolves through the harness's project, because that leg is what the
+   * historic projectless-conversation bug taught `refreshTools` never to lose
+   * (see the comment there); it loses its turn only to the conversation's own
+   * project when there is one. Everything that reads enablement for a
+   * conversation - the tools array, the discovery, the dispatch predicate -
+   * comes through here, so the three cannot disagree about the same
+   * conversation.
+   */
+  #enablementContext(conversationId: string): ResolutionContext {
+    return {
+      conversationId,
+      projectId: this.#conversationProject(conversationId) ?? this.#projectId,
+    };
+  }
+
+  /**
+   * Every project whose decisions may start a server.
+   *
+   * This harness's project leads, because a conversation standing in no
+   * project resolves through it. Every recorded project joins it, because the
+   * reconciler runs a server while at least one project wants it, and a
+   * decision made on a project's own screen has to be enough to start what
+   * that project's conversations will resolve to. It was never a decision to
+   * end a process; it was never a decision about one workspace either.
+   */
+  #reconcileProjects(): readonly string[] {
+    return [this.#projectId, ...this.#projects.list().map((project) => project.id)];
+  }
+
+  /**
+   * The installed servers one context actually gets.
    *
    * One function because two readers must never disagree. `refreshTools`
    * builds the tools array from this, and the capability inventory builds the
    * prose from it; a second copy of the filter is how the prompt ends up
    * announcing a server whose tools are not there, or the reverse.
    *
-   * Resolved against the runtime's own project, not the sandbox root's.
-   * Enablement is a property of the project the harness serves, and a
-   * projectless conversation stands in a directory of its own - deriving a
-   * key from where a conversation happens to stand made the enabled set come
-   * back empty and every MCP tool vanish from every conversation.
+   * The context comes from `#enablementContext`, so it always answers for a
+   * conversation. Enablement was resolved against the harness's project alone
+   * until the conversation scope gained a route, and a projectless
+   * conversation still resolves through it - deriving the project leg from
+   * where a conversation happens to stand made the enabled set come back
+   * empty and every MCP tool vanish from every conversation, which is why the
+   * leg falls to this harness's project rather than to a key derived from
+   * where the conversation happens to stand.
    */
-  #enabledMcpServers(): readonly McpServerRecord[] {
+  #enabledMcpServers(context: ResolutionContext): readonly McpServerRecord[] {
     return this.#registry
       .list()
       .filter(
         (record) =>
-          this.#selection.resolve("mcp", record.id, { projectId: this.#projectId })
-            .enabled,
+          this.#selection.resolve("mcp", record.id, context).enabled,
       );
   }
 
@@ -710,8 +756,8 @@ export class StudioRuntime implements AgentHost {
    * would leave a model to conclude the setting did nothing; "0 tools" is the
    * true answer for a server that has not connected yet.
    */
-  #capabilityEntries(): readonly CapabilityInventoryEntry[] {
-    const records = this.#enabledMcpServers();
+  #capabilityEntries(context: ResolutionContext): readonly CapabilityInventoryEntry[] {
+    const records = this.#enabledMcpServers(context);
     const names = new Map<string, string[]>(
       records.map((record) => [McpServerRegistry.namespaceOf(record.id), []]),
     );
@@ -884,12 +930,12 @@ export class StudioRuntime implements AgentHost {
   }
 
   start(): Promise<void> {
-    this.#started ??= this.#extensions.reconcile([this.#projectId]).then(() => undefined);
+    this.#started ??= this.#extensions.reconcile(this.#reconcileProjects()).then(() => undefined);
     return this.#started;
   }
 
   async reconcile(): Promise<void> {
-    await this.#extensions.reconcile([this.#projectId]);
+    await this.#extensions.reconcile(this.#reconcileProjects());
   }
 
   /**
@@ -911,6 +957,11 @@ export class StudioRuntime implements AgentHost {
 
   createAgentSandbox(options: StudioAgentSandboxOptions): SandboxFactory {
     const conversationProject = this.#conversationProject(options.conversationId);
+    // The chain this conversation's enablement resolves through, computed once
+    // and read by both of the readers below: the discovery's answers and the
+    // tools array are built from the same context, so neither can describe a
+    // conversation the other does not.
+    const enablement = this.#enablementContext(options.conversationId);
     // The conversation's project record, read where the sandbox is built. A
     // conversation filed under a project with folders stands in the project's
     // first folder and reaches the others as roots; a project with no folders
@@ -1060,20 +1111,19 @@ export class StudioRuntime implements AgentHost {
       jobs: this.#jobs,
       discover: {
         // Bound here rather than passed around, because what they answer is
-        // decided where they are built: enablement as `#enabledMcpServers`
-        // resolves it, for this runtime's project. A discovery that read the
-        // selection differently from the tools array would let the two
-        // disagree about what this conversation can reach, and the inventory
-        // would be the loser.
-        entries: () => this.#capabilityEntries(),
+        // decided where they are built: enablement as this conversation's
+        // chain resolves it - the same context `refreshTools` resolves, so the
+        // discovery's answer and the tools array cannot disagree about what
+        // this conversation can reach, and the inventory would be the loser.
+        // When the conversation's own scope decides, both readers have already
+        // had the decision, because they resolve through the same chain.
+        entries: () => this.#capabilityEntries(enablement),
         server: (serverId) => {
           const record = this.#registry.get(serverId);
           if (record === undefined) return undefined;
           return {
             record,
-            resolution: this.#selection.resolve("mcp", serverId, {
-              projectId: this.#projectId,
-            }),
+            resolution: this.#selection.resolve("mcp", serverId, enablement),
           };
         },
         tools: (serverId) => this.#catalog.tools([serverId]),
@@ -1109,20 +1159,21 @@ export class StudioRuntime implements AgentHost {
     });
 
     const refreshTools = (): void => {
-      // The project the MCP surface is decided on is this runtime's, not the
-      // sandbox root's. The two were the same thing until conversations were
-      // given a directory of their own: the fallback sandbox root *was* the
-      // runtime's project, so a project key derived from the root happened to
-      // match the one the registry, the selection store, the catalog and the
-      // reconcile pass all use. Once a projectless conversation stood in
+      // Enablement resolves through this conversation's chain
+      // (`#enablementContext`): this conversation, then the project it is
+      // filed under, then this harness's project. The project leg is not a
+      // key derived from the sandbox root, and this is why: the fallback
+      // sandbox root *was* the harness's project, so the derived key happened
+      // to match the one the registry, the selection store, the catalog and
+      // the reconcile pass all use. Once a projectless conversation stood in
       // `~/.studio/workspace/<conversation>`, the derived key stopped
       // matching, the enabled set came back empty, and every MCP tool a user
       // had enabled for their project vanished from every conversation's
       // tool list - while the server itself still started, because the
-      // reconcile pass asks the runtime's project. Enablement is a property
-      // of the project the harness serves; where a particular conversation
-      // happens to stand is not that.
-      const active = this.#enabledMcpServers();
+      // reconcile pass asks the harness's project. That bug is what the
+      // harness's project leg protects, which is why a projectless
+      // conversation keeps it.
+      const active = this.#enabledMcpServers(enablement);
       const enabledIds = new Set(active.map((record) => record.id));
 
       // The withhold (ADR 0048 §3, as 0049 §5 corrected it): of the MCP

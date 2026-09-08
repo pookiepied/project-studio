@@ -95,6 +95,7 @@ function stubClient(overrides: {
     saveMcpServer: () => refuse(),
     removeMcpServer: () => refuse(),
     setMcpServerEnabled: () => refuse(),
+    setConversationMcpServerEnabled: () => refuse(),
     setMcpCredential: () => refuse(),
     deleteMcpCredential: () => refuse(),
     // The environments half of the client. This stub is the providers pane's,

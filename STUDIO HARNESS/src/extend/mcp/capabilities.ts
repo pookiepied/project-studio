@@ -1,4 +1,4 @@
-import type { CapabilityDescriptor } from "../../contracts/capabilities.js";
+import type { CapabilityDescriptor, ExecutionScope } from "../../contracts/capabilities.js";
 import { ToolError } from "../../tools/errors.js";
 import { defineStudioTool, type ToolDefinition } from "../../tools/types.js";
 import { ExtendError } from "../errors.js";
@@ -14,7 +14,19 @@ export interface McpCallResult {
 
 export interface McpCapabilityCatalogOptions {
   readonly diagnostic?: (message: string, serverId: string) => void;
-  readonly isServerEnabled?: (serverId: string) => boolean;
+  /**
+   * Whether a tool's call may go out, asked at dispatch time.
+   *
+   * The second argument is the conversation the dispatch belongs to, because
+   * enablement resolves narrowest-first and the narrowest scope is that
+   * conversation. Without it the predicate can only answer for the project, and
+   * a conversation whose own scope switched a server off would still run its
+   * tools - contradicting, within the very submission the switch landed in,
+   * what the discovery just told the model. The two readers must disagree
+   * about nothing, which is why the predicate is consulted at every call and
+   * not once at registration.
+   */
+  readonly isServerEnabled?: (serverId: string, conversationId: string) => boolean;
 }
 
 interface McpToolEntry {
@@ -186,7 +198,7 @@ function createTool(
   record: McpServerRecord,
   entry: McpToolEntry,
   connection: McpCapabilityConnection,
-  available: () => boolean,
+  available: (scope: ExecutionScope) => boolean,
 ): McpTool {
   return defineStudioTool({
     descriptor: descriptor(record, entry),
@@ -194,7 +206,7 @@ function createTool(
     parse: parseArguments,
     resource: () => undefined,
     execute: async (input, context) => {
-      if (!available()) {
+      if (!available(context.scope)) {
         throw new ToolError("unavailable", {
           message: "This MCP tool is currently unavailable because its server is disabled or disconnected.",
           tool: entry.name,
@@ -213,7 +225,7 @@ function createTool(
 
 export class McpCapabilityCatalog {
   readonly #diagnostic: (message: string, serverId: string) => void;
-  readonly #isServerEnabled: (serverId: string) => boolean;
+  readonly #isServerEnabled: (serverId: string, conversationId: string) => boolean;
   readonly #tools = new Map<string, readonly McpTool[]>();
   readonly #availableNames = new Map<string, ReadonlySet<string>>();
   readonly #connections = new Map<string, McpCapabilityConnection>();
@@ -251,14 +263,10 @@ export class McpCapabilityCatalog {
 
       names.add(entry.name);
       tools.push(
-        createTool(
-          record,
-          entry,
-          connection,
-          () =>
-            this.#connections.get(record.id) === connection &&
-            this.#isServerEnabled(record.id) &&
-            this.#availableNames.get(record.id)?.has(entry.name) === true,
+        createTool(record, entry, connection, (scope) =>
+          this.#connections.get(record.id) === connection &&
+          this.#isServerEnabled(record.id, scope.conversationId) &&
+          this.#availableNames.get(record.id)?.has(entry.name) === true,
         ),
       );
     }

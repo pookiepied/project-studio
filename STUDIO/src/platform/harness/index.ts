@@ -99,6 +99,7 @@ export {
   SCOPE_KINDS,
   type McpAuthKind,
   type McpEra,
+  type McpScopeReading,
   type McpServerDraft,
   type McpServerRecord,
   type McpServerStatus,

@@ -4,8 +4,43 @@ import { ExtendError } from "../extend/errors.js";
 import type { ExtensionReconciler } from "../extend/reconcile.js";
 import { McpServerRegistry, type McpServerInput, type McpServerRecord } from "../extend/mcp/registry.js";
 import type { McpSupervisor } from "../extend/mcp/supervisor.js";
-import { GLOBAL_SCOPE, type ExtensionSelectionStore, type Scope } from "../extend/selection.js";
+import { GLOBAL_SCOPE, conversationScope, projectScope, type ExtensionSelectionStore, type Resolution, type ResolutionContext, type Scope, type ScopeKind } from "../extend/selection.js";
 import type { PermissionGrantStore } from "../permissions/grant-store.js";
+
+/**
+ * Which narrower context a read should answer for.
+ *
+ * Both scopes are optional and independently askable: a project's screen asks
+ * about its project, a conversation's about its conversation, and the global
+ * settings ask about neither - their rows carry no readings at all, because
+ * they are editing the default itself and nothing else answers to it.
+ */
+export interface McpReadContext {
+  readonly projectId?: string;
+  readonly conversationId?: string;
+}
+
+/**
+ * What one scope has decided, and what the whole chain answers.
+ *
+ * Three facts, because a settings row has to be honest about the effect, not
+ * only the setting. `decision` is what is stored at this scope: true or false
+ * when this scope has an opinion, and `null` when it inherits - which is a
+ * real third answer and not a spelling of off. `resolved` and `decidedAt` are
+ * what selection answers for the context the read was made in: when this
+ * scope decided, its own answer; when it did not, the wider scope's, or off
+ * when nothing anywhere had an opinion. A control that showed only the
+ * decision would render "inherits" and "off" as the same silence, and the two
+ * leave the model with different reach.
+ */
+export interface McpScopeReading {
+  /** What this scope has stored: on, off, or `null` when it inherits. */
+  readonly decision: boolean | null;
+  /** What selection resolves for the context this read was made in. */
+  readonly resolved: boolean;
+  /** Which scope produced `resolved`. `undefined` when nothing anywhere decided; that resolves to off. */
+  readonly decidedAt?: ScopeKind;
+}
 
 /**
  * The one mutation surface for installed MCP servers.
@@ -22,6 +57,15 @@ export interface McpManagementOptions {
   readonly supervisor: Pick<McpSupervisor, "stop" | "status">;
   readonly extensions: Pick<ExtensionReconciler, "changed">;
   readonly credentials?: SecureCredentialStore;
+  /**
+   * This harness's own project: the scope whose decisions its tools array
+   * resolves. It answers the read's question "and what does the wider leg say"
+   * for a conversation that stands in no project, which is the leg the
+   * historic projectless-conversation bug taught the runtime never to lose.
+   */
+  readonly projectId: string;
+  /** Where one conversation's wider leg is, when it stands in a project. */
+  readonly conversationProject?: (conversationId: string) => string | undefined;
 }
 
 /** A server as a caller sees it: what was configured, plus what it is doing. */
@@ -29,6 +73,17 @@ export type McpServerView = McpServerRecord & {
   readonly status: ReturnType<McpSupervisor["status"]>;
   /** Whether the user's default has this server on. Not per project. */
   readonly enabledByDefault: boolean;
+  /**
+   * The readings for the narrower scopes the read asked about, when it did.
+   *
+   * They are absent from the global read, which is about the default only.
+   * Each reading's `resolved` is the whole chain's answer for the read's
+   * context, so a project row shows what a conversation of that project gets
+   * before any conversation of its own had a say, and a conversation row
+   * shows what this conversation resolves to right now.
+   */
+  readonly project?: McpScopeReading;
+  readonly conversation?: McpScopeReading;
 };
 
 /**
@@ -40,8 +95,8 @@ export type McpServerView = McpServerRecord & {
  * exposed. This interface is the seam instead (ADR 0035 §2).
  */
 export interface McpAdministration {
-  list(): readonly McpServerView[];
-  get(id: string): McpServerView | undefined;
+  list(context?: McpReadContext): readonly McpServerView[];
+  get(id: string, context?: McpReadContext): McpServerView | undefined;
   save(input: McpServerInput, auth: AuthContext): McpServerView;
   remove(id: string, auth: AuthContext): Promise<boolean>;
   /** `null` clears the decision at this scope, so the wider scope applies. */
@@ -57,6 +112,10 @@ export class McpManagementService implements McpAdministration {
   readonly #supervisor: Pick<McpSupervisor, "stop" | "status">;
   readonly #extensions: Pick<ExtensionReconciler, "changed">;
   readonly #credentials: SecureCredentialStore | undefined;
+  readonly #projectId: string;
+  readonly #conversationProject:
+    | ((conversationId: string) => string | undefined)
+    | undefined;
 
   constructor(options: McpManagementOptions) {
     this.#registry = options.registry;
@@ -65,10 +124,50 @@ export class McpManagementService implements McpAdministration {
     this.#supervisor = options.supervisor;
     this.#extensions = options.extensions;
     this.#credentials = options.credentials;
+    this.#projectId = options.projectId;
+    this.#conversationProject = options.conversationProject;
   }
 
-  /** Configuration joined with live status — the join belongs here, not in a route. */
-  #view(record: McpServerRecord): McpServerView {
+  /**
+   * The chain the read's resolution runs down.
+   *
+   * A conversation asked about alone resolves through the project it is filed
+   * under - the chain its conversations actually stand in - and through this
+   * harness's project when it stands in none, which is the leg the tools
+   * array has always consulted. A read naming both scopes is answered as
+   * given; neither is invented for the other.
+   */
+  #resolutionContext(context: McpReadContext): ResolutionContext {
+    const projectId =
+      context.projectId ??
+      (context.conversationId === undefined
+        ? undefined
+        : (this.#conversationProject?.(context.conversationId) ?? this.#projectId));
+    return {
+      ...(projectId === undefined ? {} : { projectId }),
+      ...(context.conversationId === undefined ? {} : { conversationId: context.conversationId }),
+    };
+  }
+
+  /**
+   * What one scope stores, beside what the chain resolves.
+   *
+   * One resolution serves every reading on the row, because both questions
+   * are answered by the same chain: the stored decision is read at the
+   * scope's own key, and the resolution is the chain's answer. Computing them
+   * apart would let a row say "inherits" while its resolution came from
+   * somewhere the inheritance does not reach.
+   */
+  #reading(extensionId: string, scope: Scope, resolution: Resolution): McpScopeReading {
+    return {
+      decision: this.#selection.decisionAt({ kind: "mcp", extensionId, scope }) ?? null,
+      resolved: resolution.enabled,
+      ...(resolution.decidedAt === undefined ? {} : { decidedAt: resolution.decidedAt }),
+    };
+  }
+
+  #view(record: McpServerRecord, context: McpReadContext = {}): McpServerView {
+    const resolution = this.#selection.resolve("mcp", record.id, this.#resolutionContext(context));
     return {
       ...record,
       status: this.#supervisor.status(record.id),
@@ -84,16 +183,30 @@ export class McpManagementService implements McpAdministration {
           extensionId: record.id,
           scope: GLOBAL_SCOPE,
         }) ?? false,
+      ...(context.projectId === undefined
+        ? {}
+        : {
+            project: this.#reading(record.id, projectScope(context.projectId), resolution),
+          }),
+      ...(context.conversationId === undefined
+        ? {}
+        : {
+            conversation: this.#reading(
+              record.id,
+              conversationScope(context.conversationId),
+              resolution,
+            ),
+          }),
     };
   }
 
-  list(): readonly McpServerView[] {
-    return this.#registry.list().map((record) => this.#view(record));
+  list(context: McpReadContext = {}): readonly McpServerView[] {
+    return this.#registry.list().map((record) => this.#view(record, context));
   }
 
-  get(id: string): McpServerView | undefined {
+  get(id: string, context: McpReadContext = {}): McpServerView | undefined {
     const record = this.#registry.get(id);
-    return record === undefined ? undefined : this.#view(record);
+    return record === undefined ? undefined : this.#view(record, context);
   }
 
   save(input: McpServerInput, _auth: AuthContext): McpServerView {

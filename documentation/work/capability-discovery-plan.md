@@ -1,6 +1,6 @@
 # Capability discovery — the plan
 
-**Status:** Steps 1-2 landed · **Opened:** 2026-09-07 · **Last worked:** 2026-09-07
+**Status:** Steps 1-4 landed · **Opened:** 2026-09-07 · **Last worked:** 2026-09-08
 **Decision:** [ADR 0048](../decisions/0048-a-capability-is-announced-before-it-is-loaded.md)
 **Rests on:** [ADR 0029](../decisions/0029-mcp-session-tool-membership.md) (append-only membership),
 [ADR 0024](../decisions/0024-capabilities-are-on-and-the-list-is-honest.md) (the list is honest),
@@ -228,6 +228,114 @@ The spine has three scopes; the app can write one.
 
 **Precedence is already decided and is not reopened here:** narrowest-first,
 absence means no decision. Conversation, then project, then global, then off.
+
+#### The mid-conversation question, answered in writing (2026-09-08)
+
+The inventory is settled once per conversation and never moves, because moving
+it re-bills the whole conversation behind it. So a person who switches an
+extension on while a conversation is open has changed what the tools array can
+grow to, but not what the system block says: the model will not learn the
+extension exists from this conversation's capabilities note, ever. Three
+answers were sketched, and none was chosen, so this writes down what each
+costs and recommends one. It remains a recommendation; the decision is a
+product one.
+
+First, what already happens without anything new, because it decides what each
+option is actually buying:
+
+- **The tools array already tracks the toggle, at the next submission, for
+  free in the cheap direction.** `refreshTools` re-reads selection at every
+  submission. Switching *on* adds registrations — the append direction of
+  §3.3, which costs only the new bytes. Switching *off* removes this
+  conversation's adopted registrations at its next submission — which is 0029
+  §4's rule (a new submission starts from the current selection) and therefore
+  a one-time removal, the expensive direction, already accepted. Within the
+  current submission a disabled tool stays listed and fails at dispatch with
+  the unavailable result, exactly as 0029 says.
+- **The capabilities note never moves.** `CapabilityInventory` is keyed by
+  conversation and its entries are never evicted. A toggle mid-conversation
+  does not touch it, for any reason, which is ADR 0048 §1 kept.
+- **Discovery reads live enablement.** Its scope-less answer lists what is
+  switched on *now*, not what the note above the conversation says. So after a
+  mid-conversation switch-on, one `discover` call tells the model everything
+  the note would have said.
+
+That third fact is the hinge. What option (c) buys, over what the mechanism
+already does, is only the prose: (a) and (b) together describe what already
+happens, honestly, at zero built cost.
+
+- **(a) Say it on the row.** Wherever a scope's switch meets a conversation
+  that is already open, the row says what actually happens: the model meets an
+  extension it discovers by asking, or in a new conversation, whichever comes
+  first; its capabilities note stays as it began. Cost: one sentence, written
+  once, reviewed never. This is the recommendation, because it is the only one
+  of the three that adds information the person cannot get anywhere else —
+  what (b) does silently and (c) postpones.
+- **(b) Apply it to conversations that have not started yet, silently.** This
+  is not a choice to make but a fact to keep: a conversation's note is built at
+  its first submission from the enablement of that moment, so a decision
+  written before the first message silently applies and correctly. Its cost is
+  the one (a) exists to cover — nothing tells the person that the *open*
+  conversation was not included.
+- **(c) Offer an explicit "apply here", accepting the one-time re-billing.
+  Not built in this task.** What it costs, concretely: applying in place moves
+  the tools array, which sits *ahead of* the system block and the whole
+  conversation, so the next request diverges at position zero and bills the
+  entire history at full rate once. On a 100k-token conversation that is
+  ~100k input tokens at full rate instead of the cached 10% — roughly 90k
+  tokens' worth of extra billing, once, after which it re-caches. And what it
+  buys is the note, which a `discover` call already answers for — a fair trade
+  only for a conversation nobody is steering, where nothing will ever prompt
+  the model to ask. So the condition that should reopen (c): the first report
+  of a long-running, unattended conversation that missed an extension its
+  person switched on, where nobody said "discover it" and the silence cost
+  something. Until that happens, (c) is a mechanism looking for its witness.
+
+**Landed 2026-09-08.** The project scope is configured on the project's own
+page (`ProjectPage` gained an Extensions section); the conversation scope,
+deliberately the smallest, is a dialog beside the conversation's own title.
+The route reads answers too: `GET /servers` answers for a project or a
+conversation, each row carrying what that scope stored and what the whole
+chain resolves to, so a row can be honest about the effect rather than only
+the setting. Inherit rides the wire as `null` from the control to the store;
+nothing between them flattens it.
+
+Three things the plan did not spell out and the implementation had to:
+
+- **Which project the MCP scope means.** The spine says "project", but the
+  harness carries two: the conversation's project record, which the trust and
+  sandbox scopes key on, and the harness's own workspace key
+  (`projectKey(projectRoot)`), which was the only one the tools array ever
+  resolved. Enablement now resolves conversation, then the conversation's own
+  project record, then the harness's project, then off — so the project
+  screen's decision bites, and a conversation standing in no project keeps
+  the wider leg it always had, which is the historic projectless-conversation
+  bug's lesson kept. The reconciler hears about every recorded project beside
+  the harness's, because a decision made on a project's own screen has to be
+  enough to start what that project's conversations will resolve to.
+- **The dispatch predicate reads the conversation too.** Registration is
+  filtered per conversation, but availability is consulted at call time, and
+  until the predicate read the conversation, a tool this conversation had
+  switched off still ran within its own submission — disagreeing, in exactly
+  the way the discovery's answer warns about, with what that discovery had
+  just said. One conversation, three readers, one chain (`#enablementContext`
+  in the runtime): the tools array, the discovery, and the predicate now
+  resolve it the same way, because two of them answering differently is how
+  an announced tool stops being callable.
+- **A conversation's note is built from its own chain.** The inventory's
+  memoization already keyed by conversation; what changed is that the build
+  now reads the conversation id it was handed. Each conversation's note
+  settles from its own enablement at its first build and does not move — the
+  ADR 0048 §1 rule, whose test was not touched.
+
+Harness 1818 passed, 25 skipped; client 892. Negative controls, restored
+afterwards: collapsing Inherit to Off, in both directions the bug has — the
+control reading `null` as Off, and the control sending `false` for Inherit —
+and the three tests that fail name the Inherit radio; and the conversation
+route writing its decision at the project scope, which fails the precedence
+test with the conversation row never existing in the store. The
+mid-conversation question above is answered by (a), and the two surfaces say
+so; (c) stays unbuilt, with its price written down beside it.
 
 ---
 

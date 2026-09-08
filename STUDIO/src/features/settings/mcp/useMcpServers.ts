@@ -42,17 +42,44 @@ export interface McpServers {
   /**
    * Records the user's default for a server.
    *
-   * `null` clears the decision. This pane only ever writes the global scope -
-   * a project's decision belongs to that project's screen, and a global change
-   * reachable from somewhere local is a change someone did not know they were
-   * making.
+   * `null` clears the decision. Without a scope this pane only ever writes
+   * the global one - a project's decision belongs to that project's screen,
+   * and a global change reachable from somewhere local is a change someone
+   * did not know they were making. With a scope, the same hook serves that
+   * scope's screen: the read, the write and the refresh are one machinery,
+   * and what changes per scope is only which door they knock on.
    */
   setEnabled: (id: string, enabled: boolean | null) => Promise<HarnessFailure | null>
   setCredential: (id: string, secret: string) => Promise<HarnessFailure | null>
   clearCredential: (id: string) => Promise<HarnessFailure | null>
 }
 
-export function useMcpServers(): McpServers {
+/** Which narrower context this hook's reads and writes answer for, if any. */
+export interface McpScopeTarget {
+  readonly projectId?: string
+  readonly conversationId?: string
+}
+
+/**
+ * The scope as the harness read wants it, or nothing for the global question.
+ *
+ * Both fields absent and no scope at all are the same question - what is
+ * installed - so they deliberately produce the same call: one argument shape,
+ * where the difference between "the global read" and "no scope" is a
+ * distinction without a difference.
+ */
+function readScope(
+  projectId: string | undefined,
+  conversationId: string | undefined,
+): McpScopeTarget | undefined {
+  if (projectId === undefined && conversationId === undefined) return undefined
+  return {
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(conversationId === undefined ? {} : { conversationId }),
+  }
+}
+
+export function useMcpServers(scope: McpScopeTarget = {}): McpServers {
   const [view, setView] = useState<McpView>({ status: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
   const client = useRef<HarnessClient | null>(null)
@@ -79,6 +106,14 @@ export function useMcpServers(): McpServers {
     return client.current
   }, [])
 
+  // The scope's fields, held apart from the object: the caller builds the
+  // scope inline, so the object is a new identity every render, while these
+  // two values are what the reads, the writes and the effect dependencies
+  // actually key on. Depending on the object itself would re-read the list
+  // forever, which is the one way this hook could turn into a spin.
+  const projectId = scope.projectId
+  const conversationId = scope.conversationId
+
   const read = useCallback(
     async (quiet: boolean) => {
       const harness = await connect()
@@ -88,7 +123,11 @@ export function useMcpServers(): McpServers {
         return
       }
       if (quiet) setRefreshing(true)
-      const result = await harness.listMcpServers()
+      // The scope travels on the read: a project's rows carry that project's
+      // readings, a conversation's carry the conversation's, and the global
+      // read carries neither, because it edits the default and nothing else
+      // answers to it.
+      const result = await harness.listMcpServers(readScope(projectId, conversationId))
       if (!live.current) return
       setRefreshing(false)
       // A failed refresh leaves the previous list on screen rather than
@@ -100,7 +139,7 @@ export function useMcpServers(): McpServers {
       }
       setView({ status: 'ready', servers: result.value })
     },
-    [connect],
+    [connect, projectId, conversationId],
   )
 
   useEffect(() => {
@@ -149,8 +188,20 @@ export function useMcpServers(): McpServers {
     save: useCallback((draft) => write((harness) => harness.saveMcpServer(draft)), [write]),
     remove: useCallback((id) => write((harness) => harness.removeMcpServer(id)), [write]),
     setEnabled: useCallback(
-      (id, enabled) => write((harness) => harness.setMcpServerEnabled(id, enabled)),
-      [write],
+      (id, enabled) =>
+        write((harness) =>
+          // The write follows the read's scope: a conversation's decision goes
+          // to the conversation's own route, where the conversation lives, and
+          // everything else goes to the scope the harness call itself names.
+          conversationId === undefined
+            ? harness.setMcpServerEnabled(
+                id,
+                enabled,
+                projectId === undefined ? undefined : { projectId },
+              )
+            : harness.setConversationMcpServerEnabled(conversationId, id, enabled),
+        ),
+      [write, projectId, conversationId],
     ),
     setCredential: useCallback(
       (id, secret) => write((harness) => harness.setMcpCredential(id, secret)),

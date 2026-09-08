@@ -6,6 +6,7 @@ import {
   parseBackgroundJob,
   parseBackgroundJobs,
   parseHarnessErrorBody,
+  parseMcpServer,
   parseModelCapability,
   parsePendingApprovals,
   parseProbeResult,
@@ -816,5 +817,76 @@ describe('reading background commands', () => {
   it('reads a single job out of a stop answer', () => {
     expect(parseBackgroundJob({ ...row, state: 'stopped', endedAt: 12 })?.state).toBe('stopped')
     expect(parseBackgroundJob(null)).toBeNull()
+  })
+})
+
+/**
+ * A well-formed record, as `GET /servers` answers it. The scope readings
+ * below are added to it; the fields that decisions do not touch are here so
+ * the tests fail the moment the contract grows a required field nobody
+ * renamed.
+ */
+const MCP_SERVER = {
+  id: 'echo-server',
+  title: 'Echo server',
+  description: 'Echoes the supplied text',
+  provenance: 'user',
+  transport: 'stdio',
+  command: 'C:\tools\node.exe',
+  args: ['server.js'],
+  env: {},
+  needsNetwork: false,
+  auth: 'none',
+  enabledByDefault: false,
+}
+
+describe('parseMcpServer', () => {
+  it('reads a record with no scope readings, from a harness older than them', () => {
+    // Absent, not defaulted: a row that cannot say what inherit resolves to
+    // keeps quiet about it, because the difference between an old harness and
+    // an "inherits nothing" answer is exactly the difference between unknown
+    // and off.
+    const record = parseMcpServer({ ...MCP_SERVER })
+    expect(record).toEqual({ ...MCP_SERVER })
+    expect(record?.project).toBeUndefined()
+    expect(record?.conversation).toBeUndefined()
+  })
+
+  it('reads inherit as null, and says where the wider answer came from', () => {
+    // The one test the checkbox-collapse bug fails: `decision: null` reaching
+    // the row as `null`, not as `false`. Flattened here, a project whose
+    // default says on would display - and behave - as switched off.
+    const record = parseMcpServer({
+      ...MCP_SERVER,
+      project: { decision: null, resolved: true, decidedAt: 'global' },
+    })
+    expect(record?.project).toEqual({ decision: null, resolved: true, decidedAt: 'global' })
+  })
+
+  it('reads a decision of this scope, with the conversation reading beside it', () => {
+    const record = parseMcpServer({
+      ...MCP_SERVER,
+      project: { decision: true, resolved: true, decidedAt: 'project' },
+      conversation: { decision: false, resolved: false, decidedAt: 'conversation' },
+    })
+    expect(record?.project).toEqual({ decision: true, resolved: true, decidedAt: 'project' })
+    expect(record?.conversation).toEqual({ decision: false, resolved: false, decidedAt: 'conversation' })
+  })
+
+  it('keeps a reading whose answer came from nothing, with no invented scope', () => {
+    // Nothing anywhere decided, so the chain answers off and `decidedAt` is
+    // absent. Inventing a scope here would be the lie the settings row exists
+    // to prevent: there was no opinion, which is not an opinion for off.
+    const record = parseMcpServer({
+      ...MCP_SERVER,
+      conversation: { decision: null, resolved: false },
+    })
+    expect(record?.conversation).toEqual({ decision: null, resolved: false })
+  })
+
+  it('refuses a malformed reading rather than rendering half of one', () => {
+    expect(parseMcpServer({ ...MCP_SERVER, project: { decision: 'yes', resolved: true } })).toBeNull()
+    expect(parseMcpServer({ ...MCP_SERVER, project: { decision: true } })).toBeNull()
+    expect(parseMcpServer({ ...MCP_SERVER, project: { decision: null, resolved: true, decidedAt: 'village' } })).toBeNull()
   })
 })

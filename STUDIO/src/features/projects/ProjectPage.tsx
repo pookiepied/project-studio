@@ -5,6 +5,7 @@ import { Button } from '@/components/primitives'
 import { PlaceholderText } from '@/components/placeholder'
 import { StateNote } from '@/components/state'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
+import { ProjectExtensions } from '@/features/projects/ProjectExtensions'
 import { StartConversation } from '@/features/chat/composer'
 import { useNavigation } from '@/stores/navigation'
 import { useWorkspace } from '@/stores/workspace'
@@ -134,6 +135,13 @@ export function ProjectPage({ project }: { project: Project }) {
               ))}
             </div>
           )}
+        </Section>
+        <Section title="Extensions">
+          {/* The project's own decisions about what it can reach. Last on the
+              page because the conversations above it are the work, and this is
+              the configuration they answer to - the narrower scope lives
+              where its project lives. */}
+          <ProjectExtensions projectId={project.id} />
         </Section>
       </div>
     </div>

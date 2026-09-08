@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FADE } from '@/design/tokens'
 import { Icons } from '@/components/icons'
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from '@/components/primitives'
+import { ConversationExtensionsDialog } from '@/shell/ConversationExtensionsDialog'
 import { DeleteConversationDialog } from '@/shell/DeleteConversationDialog'
 import { cn } from '@/lib/cn'
 import { ProjectIconMark } from '@/domain/projects/ProjectIconMark'
@@ -56,6 +57,7 @@ export function IdentityLine({
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [branchOpen, setBranchOpen] = useState(false)
+  const [extensionsOpen, setExtensionsOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const field = useRef<HTMLInputElement>(null)
@@ -70,6 +72,7 @@ export function IdentityLine({
     setMenuOpen(false)
     setConfirmingDelete(false)
     setBranchOpen(false)
+    setExtensionsOpen(false)
   }, [conversation.id])
 
   if (!conversation.title) return null
@@ -186,6 +189,22 @@ export function IdentityLine({
           Open in new window
         </MenuItem>
 
+        {/* Where the conversation's own scope is decided. It sits with the
+            facts about this conversation rather than with the filing, because
+            the narrowest extension switch belongs where the conversation
+            lives - a project answers for its conversations, this answers for
+            itself. */}
+        <MenuItem
+          icon={<Icons.mcp />}
+          note="What this conversation can reach."
+          onSelect={() => {
+            setMenuOpen(false)
+            setExtensionsOpen(true)
+          }}
+        >
+          Extensions
+        </MenuItem>
+
         {/* No project list here.
             This menu hangs off the conversation's own title, opened from
             inside that conversation — which means the project is already
@@ -218,6 +237,11 @@ export function IdentityLine({
           Delete
         </MenuItem>
       </Popover>
+      <ConversationExtensionsDialog
+        conversation={extensionsOpen ? conversation : null}
+        projectName={project?.name ?? null}
+        onClose={() => setExtensionsOpen(false)}
+      />
       <DeleteConversationDialog
         conversation={confirmingDelete ? conversation : null}
         onClose={() => setConfirmingDelete(false)}

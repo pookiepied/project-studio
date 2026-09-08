@@ -192,8 +192,18 @@ export interface HarnessClient {
 
   /* -- MCP servers -------------------------------------------------------- */
 
-  /** Every installed server, each with what it is currently doing. */
-  listMcpServers(): Promise<HarnessResult<readonly McpServerRecord[]>>
+  /**
+   * Every installed server, each with what it is currently doing.
+   *
+   * With a scope, each row also carries that scope's reading: what the
+   * project or conversation has decided, and what the whole chain resolves
+   * to. Without one the rows say nothing narrower, because the global screen
+   * edits the default and nothing else answers to it.
+   */
+  listMcpServers(scope?: {
+    readonly projectId?: string
+    readonly conversationId?: string
+  }): Promise<HarnessResult<readonly McpServerRecord[]>>
   /** Installs a server, or replaces one with the same id. */
   saveMcpServer(draft: McpServerDraft): Promise<HarnessResult<McpServerRecord>>
   removeMcpServer(id: string): Promise<HarnessResult<void>>
@@ -274,6 +284,22 @@ export interface HarnessClient {
    * failure - the caller estimates instead.
    */
   conversationContext(id: string): Promise<HarnessResult<MeasuredContextUsage | null>>
+  /**
+   * Records a decision for one conversation, where the conversation lives.
+   *
+   * The narrowest scope of the three, so it sits with the conversation's own
+   * reads rather than with the administration surface - the same argument
+   * that keeps a project's decision off the global screen. The body is the
+   * project write's, exactly: `null` clears, so the project (or the default)
+   * answers again. Nothing here reaches past this conversation, because a
+   * conversation change reachable from somewhere wider is a change someone
+   * did not know they were making.
+   */
+  setConversationMcpServerEnabled(
+    conversationId: string,
+    serverId: string,
+    enabled: boolean | null,
+  ): Promise<HarnessResult<void>>
   /**
    * The background commands one conversation started.
    *
@@ -669,8 +695,21 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
       return empty('DELETE', connectionPath(id))
     },
 
-    listMcpServers() {
-      return json('GET', `${MCP_PATH}/servers`, undefined, parseMcpServers)
+    listMcpServers(scope) {
+      // The scope rides in the query rather than in three separate methods,
+      // because it is one question - what is installed - read for one
+      // narrower context or for none. Absent and empty keys are the same
+      // answer here: the global read, whose rows carry no readings.
+      const params = new URLSearchParams()
+      if (scope?.projectId !== undefined) params.set('projectId', scope.projectId)
+      if (scope?.conversationId !== undefined) params.set('conversationId', scope.conversationId)
+      const search = params.toString()
+      return json(
+        'GET',
+        `${MCP_PATH}/servers${search === '' ? '' : `?${search}`}`,
+        undefined,
+        parseMcpServers,
+      )
     },
 
     saveMcpServer(draft) {
@@ -795,6 +834,19 @@ export function createHarnessClient(options: HarnessClientOptions): HarnessClien
         `${CONVERSATIONS_PATH}/${encodeURIComponent(id)}/context`,
         undefined,
         parseMeasuredContextUsage,
+      )
+    },
+
+    setConversationMcpServerEnabled(conversationId, serverId, enabled) {
+      // The conversation's own route, which lives under the MCP mount rather
+      // than under /conversations, because every extension write - whichever
+      // scope it answers for - is administered at /api/mcp. What makes this a
+      // conversation's door is the path it writes, not a different resource:
+      // the scope is the decision, so the URL names both.
+      return empty(
+        'PUT',
+        `${MCP_PATH}/conversations/${encodeURIComponent(conversationId)}/extensions/mcp/${encodeURIComponent(serverId)}`,
+        { enabled },
       )
     },
 

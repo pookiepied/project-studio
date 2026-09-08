@@ -5,7 +5,12 @@ import { McpManagementService } from "../../src/application/mcp-management.js";
 import { InMemoryCredentialStore } from "../../src/credentials/memory-store.js";
 import { PermissionGrantStore } from "../../src/permissions/grant-store.js";
 import { openDatabase, type StudioDatabase } from "../../src/storage/database.js";
-import { ExtensionSelectionStore, projectScope } from "../../src/extend/selection.js";
+import {
+  ExtensionSelectionStore,
+  GLOBAL_SCOPE,
+  conversationScope,
+  projectScope,
+} from "../../src/extend/selection.js";
 import type { McpSupervisor } from "../../src/extend/mcp/supervisor.js";
 import { McpServerRegistry } from "../../src/extend/mcp/registry.js";
 
@@ -54,6 +59,10 @@ describe("MCP management", () => {
     changed = 0;
     stopped = [];
     credentials = new InMemoryCredentialStore();
+    // The harness's own project, as the runtime supplies it. The readings
+    // below only make sense against a fixed wider leg: which project a
+    // projectless conversation's chain falls back to is part of what they
+    // pin.
     management = new McpManagementService({
       registry,
       grants,
@@ -64,6 +73,11 @@ describe("MCP management", () => {
         status: () => ({ state: "idle" }) as ReturnType<McpSupervisor["status"]>,
       },
       credentials,
+      projectId: "workspace-root",
+      conversationProject: (conversationId) =>
+        conversationId === "filed-conversation" || conversationId === "filed-sibling"
+          ? "filed-project"
+          : undefined,
     });
   });
 
@@ -183,5 +197,117 @@ describe("MCP management", () => {
 
     expect(await management.remove("example", AUTH_CONTEXT)).toBe(true);
     expect(await credentials.get({ scope: "mcp", id: "example" })).toBeNull();
+  });
+
+  /**
+   * What a narrower read answers.
+   *
+   * The invariant every case here pins is the same one: a row must be honest
+   * about the effect, not only the setting. Inherit and off are different
+   * answers that leave the model with different reach, so the reading carries
+   * the stored decision AND what the chain resolves AND where that answer
+   * came from - and the read that asks about nothing narrower carries none of
+   * it, because the global screen edits the default and nothing else answers
+   * to it.
+   */
+  describe("the scope readings", () => {
+    beforeEach(() => {
+      management.save(server(), AUTH_CONTEXT);
+    });
+
+    it("carries no readings when the read named no narrower scope", () => {
+      selection.set({ kind: "mcp", extensionId: "example", scope: GLOBAL_SCOPE }, true);
+
+      const [view] = management.list();
+
+      expect(view?.project).toBeUndefined();
+      expect(view?.conversation).toBeUndefined();
+      // The global read's own answer, unchanged: the stored default, not a
+      // resolution - this screen IS the widest scope, so there is nothing to
+      // inherit and nothing to resolve past.
+      expect(view?.enabledByDefault).toBe(true);
+    });
+
+    it("reads inherit as null, not as off, when only the default decided", () => {
+      selection.set({ kind: "mcp", extensionId: "example", scope: GLOBAL_SCOPE }, true);
+
+      const [view] = management.list({ projectId: "project-a" });
+
+      // The one assertion the checkbox-collapse bug fails. Absence at the
+      // project scope is "no decision here" - the global default's on still
+      // applies - and flattening it to false would silently switch the
+      // project's conversations off.
+      expect(view?.project).toEqual({
+        decision: null,
+        resolved: true,
+        decidedAt: "global",
+      });
+    });
+
+    it("lets a project override, and leaves other projects inheriting", () => {
+      selection.set({ kind: "mcp", extensionId: "example", scope: GLOBAL_SCOPE }, true);
+      selection.set({ kind: "mcp", extensionId: "example", scope: projectScope("project-a") }, false);
+
+      const rows = management.list({ projectId: "project-a" });
+      expect(rows[0]?.project).toEqual({ decision: false, resolved: false, decidedAt: "project" });
+
+      const [elsewhere] = management.list({ projectId: "project-b" });
+      expect(elsewhere?.project).toEqual({ decision: null, resolved: true, decidedAt: "global" });
+    });
+
+    it("reads an explicit inherit back as an absent decision, not an off", () => {
+      management.setEnabled(projectScope("project-a"), "example", true, AUTH_CONTEXT);
+      expect(
+        selection.decisionAt({ kind: "mcp", extensionId: "example", scope: projectScope("project-a") }),
+      ).toBe(true);
+
+      // `null` is the third value: it clears, so the wider scope applies
+      // again. Writing an off here instead would trap the project at the
+      // narrow scope - the model's reach would change and nobody asked for it.
+      management.setEnabled(projectScope("project-a"), "example", null, AUTH_CONTEXT);
+      expect(
+        selection.decisionAt({ kind: "mcp", extensionId: "example", scope: projectScope("project-a") }),
+      ).toBeUndefined();
+
+      const [view] = management.list({ projectId: "project-a" });
+      expect(view?.project?.decision).toBeNull();
+    });
+
+    it("answers nothing about a context nobody has decided about, and says so", () => {
+      selection.set({ kind: "mcp", extensionId: "example", scope: GLOBAL_SCOPE }, false);
+
+      // An unknown project id is not an error: the honest reading of a
+      // context with no rows is "nothing decides here", and the chain's
+      // answer - the default's - is the true one for it.
+      const [view] = management.list({ projectId: "never-heard-of-it" });
+      expect(view?.project).toEqual({ decision: null, resolved: false, decidedAt: "global" });
+    });
+
+    it("resolves a conversation through the project it is filed under", () => {
+      selection.set({ kind: "mcp", extensionId: "example", scope: projectScope("filed-project") }, true);
+
+      const [filed] = management.list({ conversationId: "filed-conversation" });
+      expect(filed?.conversation).toEqual({ decision: null, resolved: true, decidedAt: "project" });
+
+      // A conversation standing in no project falls back to the harness's
+      // own project, which is the leg the tools array has always consulted -
+      // the historic projectless-conversation rule, and the reason the wider
+      // leg is never dropped from the chain.
+      selection.set({ kind: "mcp", extensionId: "example", scope: projectScope("workspace-root") }, true);
+      const [projectless] = management.list({ conversationId: "loose-conversation" });
+      expect(projectless?.conversation).toEqual({ decision: null, resolved: true, decidedAt: "project" });
+    });
+
+    it("lets the conversation's own decision answer, and says it did", () => {
+      selection.set({ kind: "mcp", extensionId: "example", scope: projectScope("filed-project") }, true);
+      management.setEnabled(conversationScope("filed-conversation"), "example", false, AUTH_CONTEXT);
+
+      const [filed] = management.list({ conversationId: "filed-conversation" });
+      expect(filed?.conversation).toEqual({ decision: false, resolved: false, decidedAt: "conversation" });
+
+      // And only that conversation: another one in the same project inherits.
+      const [other] = management.list({ conversationId: "filed-sibling" });
+      expect(other?.conversation).toEqual({ decision: null, resolved: true, decidedAt: "project" });
+    });
   });
 });

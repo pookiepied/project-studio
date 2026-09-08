@@ -6,8 +6,8 @@ import { ExtendError } from "../../../extend/errors.js";
 import { assertSafeMcpPayload } from "../../../extend/mcp/input-security.js";
 import type { McpServerInput } from "../../../extend/mcp/registry.js";
 import { toErrorReport } from "../../../observability/error-reporter.js";
-import type { McpAdministration } from "../../../application/mcp-management.js";
-import { GLOBAL_SCOPE, projectScope } from "../../../extend/selection.js";
+import type { McpAdministration, McpReadContext } from "../../../application/mcp-management.js";
+import { GLOBAL_SCOPE, conversationScope, projectScope } from "../../../extend/selection.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -131,11 +131,30 @@ function failure(error: unknown): { error: string; code: string } {
   return { error: report.message, code: report.code };
 }
 
+/**
+ * Which narrower context the list should answer for, from the query string.
+ *
+ * Absent or empty means the default question - the global read - whose rows
+ * carry no readings, because the global settings edit the default itself. An
+ * unknown project or conversation id still answers, with an absent decision
+ * and whatever the wider scopes resolve: the selection store carries no
+ * registry of scopes, so there is nothing here to 404, and the wider answer
+ * is the true one for a context nobody has decided about yet.
+ */
+function readContext(context: { req: { query(name: string): string | undefined } }): McpReadContext {
+  const projectId = context.req.query("projectId");
+  const conversationId = context.req.query("conversationId");
+  return {
+    ...(projectId === undefined || projectId === "" ? {} : { projectId }),
+    ...(conversationId === undefined || conversationId === "" ? {} : { conversationId }),
+  };
+}
+
 export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> {
   const routes = new Hono<AdmissionEnv>();
   routes.use("*", requireAdmissionScope(ADMISSION_SCOPES.EXTENSION_MANAGEMENT));
 
-  routes.get("/servers", (context) => context.json(servers.list()));
+  routes.get("/servers", (context) => context.json(servers.list(readContext(context))));
 
   routes.get("/servers/:id/status", (context) => {
     const record = servers.get(context.req.param("id"));
@@ -222,6 +241,35 @@ export function createMcpRoutes(servers: McpAdministration): Hono<AdmissionEnv> 
         const enabled = decision(await body(context));
         servers.setEnabled(
           projectScope(context.req.param("projectId")),
+          context.req.param("id"),
+          enabled,
+          authContext(context),
+        );
+        return context.json({ enabled });
+      } catch (error) {
+        return context.json(failure(error), 400);
+      }
+    },
+  );
+
+  // The conversation's own decision, written from the conversation's own
+  // surface - the narrowest scope of the three, and deliberately the last one
+  // given a route, because it is the one with the least evidence of being
+  // needed. It mirrors the project route exactly on purpose: the body, the
+  // validation and the errors are the same, because a person switching an
+  // extension off for this conversation is asking the same question a project
+  // asks, one step narrower. What the conversation route cannot do is reach
+  // past its own scope: a conversation change reachable from a project screen
+  // would be a change someone did not know they were making, which is the
+  // same argument that keeps the project screen off the global scope.
+  routes.put(
+    "/conversations/:conversationId/extensions/mcp/:id",
+    requireAdmissionScope(ADMISSION_SCOPES.PROJECT),
+    async (context) => {
+      try {
+        const enabled = decision(await body(context));
+        servers.setEnabled(
+          conversationScope(context.req.param("conversationId")),
           context.req.param("id"),
           enabled,
           authContext(context),

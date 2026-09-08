@@ -7,7 +7,7 @@ import { afterEach, describe, expect } from "vitest";
 import { itContained } from "../contained.js";
 import { ALL_ADMISSION_SCOPES } from "../../src/admission/scopes.js";
 import type { SecureCredentialStore } from "../../src/credentials/credential-store.js";
-import { projectScope } from "../../src/extend/selection.js";
+import { conversationScope, projectScope } from "../../src/extend/selection.js";
 import type { McpProvenance } from "../../src/extend/mcp/registry.js";
 import { StudioRuntime } from "../../src/application/studio-runtime.js";
 import { WorkspaceTrustStore } from "../../src/permissions/trust.js";
@@ -311,6 +311,108 @@ describe("MCP application runtime", () => {
       // Awaited: the MCP child runs in the project directory, and afterEach
       // removes it. Returning early raced the removal, which Windows reported
       // as EBUSY and every other platform silently tolerated.
+      await runtime.stop();
+      database.close();
+    }
+  }, 30_000);
+
+  // The conversation scope, end to end, because this is the first thing that
+  // ever wrote one. The project-scope test above answers every question this
+  // one also answers; what it cannot answer is what changes when the
+  // narrowest leg is the one that decided, and the answer is: each
+  // conversation is told its own truth - the tools that stay answer to the
+  // conversation's own switch, the note each conversation is announced with
+  // is built from its own chain, and the discovery names the scope that
+  // decided, which until the conversation route existed was a sentence the
+  // harness wrote without ever sending.
+  itContained("lets a conversation override its project, and tells each conversation its own truth", async () => {
+    const { runtime, database } = await startedRuntime("user");
+    try {
+      const sandbox = runtime.createAgentSandbox({ agentId: "agent", conversationId: "agent" });
+      const env = await sandbox.createSandbox({ id: "agent" });
+      const listTools = () => sandbox.tools?.(env, { subagents: {} }) ?? [];
+
+      // This extension's provenance is `user`, so the overridden conversation
+      // discovers before it can call, exactly as the project test's does: the
+      // registration lands after the discovery, in this submission's array.
+      const before = listTools();
+      const discovery = before.find((tool) => tool.name === "discover");
+      expect(discovery).toBeDefined();
+      await discovery?.execute("discover-1", { scope: "mcp:echo-server/echo" });
+      const after = listTools();
+      const loaded = after.find((tool) => tool.name === "mcp__11_echo-server__4_echo");
+      expect(loaded).toBeDefined();
+
+      // THE CONVERSATION'S OWN DECISION. Narrowest of the three; it answers
+      // for this conversation and nobody else, which is what the rest of the
+      // test takes turns proving.
+      runtime.servers.setEnabled(conversationScope("agent"), "echo-server", false, AUTH_CONTEXT);
+
+      // 0029 §2, at the conversation scope: the registration keeps its place
+      // within the submission, and the tool answers from its availability
+      // predicate - which reads the conversation the dispatch belongs to, not
+      // the project. Before the predicate learned the conversation, this call
+      // ran, and the tools array, the discovery, and the switch disagreed
+      // about the same conversation.
+      const retained = listTools();
+      const unavailable = retained.find((tool) => tool.name === "mcp__11_echo-server__4_echo");
+      expect(unavailable).toBeDefined();
+      if (unavailable === undefined) return;
+      expect((await unavailable.execute("call-2", { text: "hello" })).content).toEqual([
+        { type: "text", text: "This MCP tool is currently unavailable because its server is disabled or disconnected." },
+      ]);
+
+      // And the next submission starts from the current selection (0029 §4),
+      // which for this conversation now says off: the adopted key stays
+      // remembered and registers nothing. The disappearance is priced - a
+      // removal, the expensive direction of §3.3 - and it is the trade 0029
+      // already accepted for the project scope; the conversation leg inherits
+      // it, it does not change it.
+      const nextSandbox = runtime.createAgentSandbox({ agentId: "agent", conversationId: "agent" });
+      const nextEnv = await nextSandbox.createSandbox({ id: "agent" });
+      const nextTools = nextSandbox.tools?.(nextEnv, { subagents: {} }) ?? [];
+      expect(nextTools.map((tool) => tool.name)).not.toContain("mcp__11_echo-server__4_echo");
+
+      // Each conversation's note is built from its own chain, at its own
+      // first ask. The overridden conversation's note, built after its
+      // decision, announces nothing; the bystander, which decided nothing,
+      // still announces the extension - two notes from one runtime, because
+      // their chains differ. A note that read one project for both would
+      // collapse this distinction, and the second conversation would either
+      // see what it cannot reach or miss what it can.
+      const overriddenNote = runtime.conversationCapabilityInventory("agent");
+      expect(overriddenNote).not.toContain("mcp:echo-server");
+      const bystanderNote = runtime.conversationCapabilityInventory("bystander");
+      expect(bystanderNote).toContain("mcp:echo-server - Echoes text back, for testing. - 2 tools");
+
+      // And the discovery answers by the conversation it was asked from. The
+      // overridden one says so, and names the conversation's own setting as
+      // the switch that did it - the remedy sentence, which is the one fact
+      // the model can act on. The bystander's, asked through its own
+      // submission, answers the extension's question instead: installed, and
+      // none of the switched-off machinery.
+      const bystanderSandbox = runtime.createAgentSandbox({
+        agentId: "bystander",
+        conversationId: "bystander",
+      });
+      const bystanderEnv = await bystanderSandbox.createSandbox({ id: "bystander" });
+      const bystanderTools = bystanderSandbox.tools?.(bystanderEnv, { subagents: {} }) ?? [];
+      const bystanderDiscovery = bystanderTools.find((tool) => tool.name === "discover");
+      expect(bystanderDiscovery).toBeDefined();
+      const bystanderAnswer = await bystanderDiscovery?.execute("discover-2", {
+        scope: "mcp:echo-server/echo",
+      });
+      const bystanderText =
+        bystanderAnswer?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ?? "";
+      expect(bystanderText).toContain("mcp:echo-server/echo");
+      expect(bystanderText).not.toContain("switched off");
+
+      const overriddenAnswer = await discovery?.execute("discover-3", { scope: "mcp:echo-server" });
+      const overriddenText =
+        overriddenAnswer?.content.map((block) => (block.type === "text" ? block.text : "")).join("\n") ?? "";
+      expect(overriddenText).toContain("installed, but switched off for this conversation");
+      expect(overriddenText).toContain("this conversation's extension setting");
+    } finally {
       await runtime.stop();
       database.close();
     }

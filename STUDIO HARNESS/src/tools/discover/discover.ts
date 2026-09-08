@@ -84,11 +84,12 @@ export interface DiscoveredServerState {
  *
  * Every closure is bound where the tool is registered - inside the sandbox
  * factory for one submission, whose conversation id the registration already
- * knows - so none of them takes one. Enablement in particular is resolved the
- * way `#enabledMcpServers` resolves it, against the project the runtime
- * serves, because that is the resolution the tools array answers to; a
- * second, conversation-flavoured reading would let the discovery answer
- * describe a conversation that does not exist.
+ * knows - so none of them takes one. Enablement in particular is resolved
+ * through that conversation's own chain (`#enablementContext`: the
+ * conversation, then its project, then the harness's), which is the same
+ * context the tools array is built from; a second reading resolved any other
+ * way would let the discovery answer describe a conversation that does not
+ * exist.
  */
 export interface DiscoverToolRegistration {
   /**
